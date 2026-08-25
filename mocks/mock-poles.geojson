@@ -1,0 +1,2787 @@
+{
+ "type": "FeatureCollection",
+ "crs_note": "EPSG:4326 (lng, lat)",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.49,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0001",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.92,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-03-24",
+    "warranty_expiry": "2024-03-24",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.49032,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0002",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-09-20",
+    "warranty_expiry": "2024-09-20",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.490641,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0003",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2024-10-09",
+    "warranty_expiry": "2026-10-09",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.490961,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0004",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.99,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2023-02-03",
+    "warranty_expiry": "2026-02-03",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.491281,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0005",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2024-09-04",
+    "warranty_expiry": "2027-09-04",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.491601,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0006",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.98,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-12-03",
+    "warranty_expiry": "2024-12-03",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.491922,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0007",
+    "segment_id": "SEG-001",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2022-02-13",
+    "warranty_expiry": "2025-02-13",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492242,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0008",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-10-21",
+    "warranty_expiry": "2023-10-21",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492562,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0009",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.99,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2022-11-11",
+    "warranty_expiry": "2024-11-11",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492882,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0010",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2023-04-21",
+    "warranty_expiry": "2026-04-21",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493203,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0011",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2023-12-19",
+    "warranty_expiry": "2026-12-19",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493523,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0012",
+    "segment_id": "SEG-001",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2022-09-16",
+    "warranty_expiry": "2024-09-16",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493843,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0013",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-07-13",
+    "warranty_expiry": "2026-07-13",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494163,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0014",
+    "segment_id": "SEG-001",
+    "fixture_status": "out",
+    "status_confidence": 0.88,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-11-18",
+    "warranty_expiry": "2024-11-18",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494484,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0015",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2023-09-25",
+    "warranty_expiry": "2025-09-25",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494804,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0016",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-03-12",
+    "warranty_expiry": "2024-03-12",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495124,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0017",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2023-05-08",
+    "warranty_expiry": "2025-05-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495444,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0018",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-03-22",
+    "warranty_expiry": "2025-03-22",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495765,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0019",
+    "segment_id": "SEG-001",
+    "fixture_status": "out",
+    "status_confidence": 0.93,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-09-25",
+    "warranty_expiry": "2027-09-25",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496085,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0020",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2023-08-17",
+    "warranty_expiry": "2026-08-17",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496405,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0021",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.95,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2022-10-08",
+    "warranty_expiry": "2024-10-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496725,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0022",
+    "segment_id": "SEG-001",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-09-08",
+    "warranty_expiry": "2024-09-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.497046,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0023",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.98,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2024-04-26",
+    "warranty_expiry": "2027-04-26",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.497366,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0024",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2024-08-28",
+    "warranty_expiry": "2029-08-28",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.497686,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0025",
+    "segment_id": "SEG-001",
+    "fixture_status": "dim",
+    "status_confidence": 0.83,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-04-07",
+    "warranty_expiry": "2023-04-07",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.498007,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0026",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2021-08-26",
+    "warranty_expiry": "2026-08-26",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.498327,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0027",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.9,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-04-06",
+    "warranty_expiry": "2024-04-06",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.498647,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0028",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2024-01-13",
+    "warranty_expiry": "2027-01-13",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.498967,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0029",
+    "segment_id": "SEG-001",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2024-03-07",
+    "warranty_expiry": "2027-03-07",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.499288,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0030",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-01-19",
+    "warranty_expiry": "2024-01-19",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.499608,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0031",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.98,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2021-10-03",
+    "warranty_expiry": "2026-10-03",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.499928,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0032",
+    "segment_id": "SEG-001",
+    "fixture_status": "out",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-10-03",
+    "warranty_expiry": "2024-10-03",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500248,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0033",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-05-13",
+    "warranty_expiry": "2024-05-13",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500569,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0034",
+    "segment_id": "SEG-001",
+    "fixture_status": "out",
+    "status_confidence": 0.98,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2021-08-20",
+    "warranty_expiry": "2026-08-20",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500889,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0035",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2023-02-08",
+    "warranty_expiry": "2026-02-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501209,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0036",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-11-27",
+    "warranty_expiry": "2026-11-27",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501529,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0037",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-12-18",
+    "warranty_expiry": "2023-12-18",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.50185,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0038",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.92,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2023-09-16",
+    "warranty_expiry": "2026-09-16",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.50217,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0039",
+    "segment_id": "SEG-001",
+    "fixture_status": "dim",
+    "status_confidence": 0.63,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2023-03-21",
+    "warranty_expiry": "2026-03-21",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.50249,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0040",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.9,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2021-12-05",
+    "warranty_expiry": "2026-12-05",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.50281,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0041",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2023-06-26",
+    "warranty_expiry": "2025-06-26",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503131,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0042",
+    "segment_id": "SEG-001",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2024-10-24",
+    "warranty_expiry": "2026-10-24",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503451,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0043",
+    "segment_id": "SEG-001",
+    "fixture_status": "dim",
+    "status_confidence": 0.85,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-03-24",
+    "warranty_expiry": "2024-03-24",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503771,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0044",
+    "segment_id": "SEG-001",
+    "fixture_status": "dim",
+    "status_confidence": 0.65,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-08-08",
+    "warranty_expiry": "2023-08-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.504091,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0045",
+    "segment_id": "SEG-001",
+    "fixture_status": "dim",
+    "status_confidence": 0.68,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2021-11-07",
+    "warranty_expiry": "2024-11-07",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.504412,
+     10.969973
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0046",
+    "segment_id": "SEG-001",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2023-06-21",
+    "warranty_expiry": "2028-06-21",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492025,
+     10.965989
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0047",
+    "segment_id": "SEG-002",
+    "fixture_status": "out",
+    "status_confidence": 0.91,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2023-01-04",
+    "warranty_expiry": "2028-01-04",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.49218,
+     10.966314
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0048",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.95,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2021-07-19",
+    "warranty_expiry": "2023-07-19",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492334,
+     10.96664
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0049",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.98,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2022-06-14",
+    "warranty_expiry": "2024-06-14",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492489,
+     10.966966
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0050",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.98,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2023-11-14",
+    "warranty_expiry": "2026-11-14",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492644,
+     10.967291
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0051",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-11-24",
+    "warranty_expiry": "2026-11-24",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492798,
+     10.967617
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0052",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-10-20",
+    "warranty_expiry": "2029-10-20",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492953,
+     10.967943
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0053",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.95,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2022-11-03",
+    "warranty_expiry": "2025-11-03",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493108,
+     10.968268
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0054",
+    "segment_id": "SEG-002",
+    "fixture_status": "dim",
+    "status_confidence": 0.79,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2022-04-05",
+    "warranty_expiry": "2024-04-05",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493262,
+     10.968594
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0055",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2024-07-21",
+    "warranty_expiry": "2029-07-21",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493417,
+     10.96892
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0056",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2021-02-25",
+    "warranty_expiry": "2024-02-25",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493572,
+     10.969245
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0057",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2022-02-15",
+    "warranty_expiry": "2024-02-15",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493726,
+     10.969571
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0058",
+    "segment_id": "SEG-002",
+    "fixture_status": "out",
+    "status_confidence": 0.95,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-09-15",
+    "warranty_expiry": "2026-09-15",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.493881,
+     10.969897
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0059",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-11-08",
+    "warranty_expiry": "2027-11-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494036,
+     10.970222
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0060",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2021-03-05",
+    "warranty_expiry": "2023-03-05",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.49419,
+     10.970548
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0061",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-07-02",
+    "warranty_expiry": "2026-07-02",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494345,
+     10.970873
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0062",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-08-01",
+    "warranty_expiry": "2027-08-01",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.4945,
+     10.971199
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0063",
+    "segment_id": "SEG-002",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2024-09-24",
+    "warranty_expiry": "2029-09-24",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494654,
+     10.971525
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0064",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.9,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2023-11-22",
+    "warranty_expiry": "2026-11-22",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494809,
+     10.97185
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0065",
+    "segment_id": "SEG-002",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2021-07-19",
+    "warranty_expiry": "2026-07-19",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.494964,
+     10.972176
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0066",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2021-05-13",
+    "warranty_expiry": "2024-05-13",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495119,
+     10.972502
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0067",
+    "segment_id": "SEG-002",
+    "fixture_status": "dim",
+    "status_confidence": 0.72,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-05-27",
+    "warranty_expiry": "2026-05-27",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495273,
+     10.972827
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0068",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.99,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2022-11-03",
+    "warranty_expiry": "2027-11-03",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495428,
+     10.973153
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0069",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.9,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2022-04-05",
+    "warranty_expiry": "2025-04-05",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495583,
+     10.973479
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0070",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2021-03-10",
+    "warranty_expiry": "2023-03-10",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495737,
+     10.973804
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0071",
+    "segment_id": "SEG-002",
+    "fixture_status": "out",
+    "status_confidence": 0.92,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2022-02-19",
+    "warranty_expiry": "2027-02-19",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.495892,
+     10.97413
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0072",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2021-10-26",
+    "warranty_expiry": "2023-10-26",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496047,
+     10.974456
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0073",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2021-07-27",
+    "warranty_expiry": "2024-07-27",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496201,
+     10.974781
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0074",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2022-07-06",
+    "warranty_expiry": "2027-07-06",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496356,
+     10.975107
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0075",
+    "segment_id": "SEG-002",
+    "fixture_status": "dim",
+    "status_confidence": 0.77,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2023-04-27",
+    "warranty_expiry": "2025-04-27",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496511,
+     10.975433
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0076",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.95,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-06-01",
+    "warranty_expiry": "2027-06-01",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.496665,
+     10.975758
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0077",
+    "segment_id": "SEG-002",
+    "fixture_status": "normal",
+    "status_confidence": 0.92,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2023-10-23",
+    "warranty_expiry": "2026-10-23",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.499976,
+     10.975987
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0078",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.92,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-11-23",
+    "warranty_expiry": "2027-11-23",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500136,
+     10.975714
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0079",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.92,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2023-08-18",
+    "warranty_expiry": "2028-08-18",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500296,
+     10.975442
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0080",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2023-05-08",
+    "warranty_expiry": "2025-05-08",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500457,
+     10.97517
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0081",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2023-12-19",
+    "warranty_expiry": "2028-12-19",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500617,
+     10.974897
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0082",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2023-01-23",
+    "warranty_expiry": "2028-01-23",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500777,
+     10.974625
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0083",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2022-11-28",
+    "warranty_expiry": "2025-11-28",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.500937,
+     10.974353
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0084",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.93,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2021-05-28",
+    "warranty_expiry": "2024-05-28",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501097,
+     10.974081
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0085",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2022-03-26",
+    "warranty_expiry": "2027-03-26",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": true,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501257,
+     10.973808
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0086",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2022-09-13",
+    "warranty_expiry": "2025-09-13",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501417,
+     10.973536
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0087",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2021-04-21",
+    "warranty_expiry": "2023-04-21",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501578,
+     10.973264
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0088",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2024-08-23",
+    "warranty_expiry": "2029-08-23",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501738,
+     10.972991
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0089",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.96,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-02-22",
+    "warranty_expiry": "2026-02-22",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.501898,
+     10.972719
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0090",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 60,
+    "install_date": "2022-05-27",
+    "warranty_expiry": "2024-05-27",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.502058,
+     10.972447
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0091",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2023-08-04",
+    "warranty_expiry": "2026-08-04",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.502218,
+     10.972175
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0092",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-02-20",
+    "warranty_expiry": "2026-02-20",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.502378,
+     10.971902
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0093",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2021-04-22",
+    "warranty_expiry": "2026-04-22",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.502538,
+     10.97163
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0094",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2021-03-16",
+    "warranty_expiry": "2026-03-16",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.502699,
+     10.971358
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0095",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-02-16",
+    "warranty_expiry": "2027-02-16",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.502859,
+     10.971085
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0096",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2022-06-14",
+    "warranty_expiry": "2027-06-14",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503019,
+     10.970813
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0097",
+    "segment_id": "SEG-003",
+    "fixture_status": "dim",
+    "status_confidence": 0.76,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2024-02-11",
+    "warranty_expiry": "2027-02-11",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503179,
+     10.970541
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0098",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.97,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2021-11-28",
+    "warranty_expiry": "2026-11-28",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503339,
+     10.970269
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0099",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.94,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2024-01-07",
+    "warranty_expiry": "2027-01-07",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503499,
+     10.969996
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0100",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.99,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 40,
+    "install_date": "2022-12-06",
+    "warranty_expiry": "2025-12-06",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-17T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": true
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503659,
+     10.969724
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0101",
+    "segment_id": "SEG-003",
+    "fixture_status": "normal",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 100,
+    "install_date": "2022-08-23",
+    "warranty_expiry": "2025-08-23",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-18T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.503819,
+     10.969452
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0102",
+    "segment_id": "SEG-003",
+    "fixture_status": "unknown",
+    "status_confidence": null,
+    "power_source": "solar",
+    "fixture_type": "solar_all_in_one",
+    "lamp_watt": 60,
+    "install_date": "2022-08-18",
+    "warranty_expiry": "2024-08-18",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-19T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 0,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.50398,
+     10.969179
+    ]
+   },
+   "properties": {
+    "pole_id": "POLE-0103",
+    "segment_id": "SEG-003",
+    "fixture_status": "out",
+    "status_confidence": 0.91,
+    "power_source": "grid",
+    "fixture_type": "led_road_lamp",
+    "lamp_watt": 80,
+    "install_date": "2024-06-26",
+    "warranty_expiry": "2029-06-26",
+    "commune_id": "COM-001",
+    "last_seen_at": "2026-08-20T12:00:00Z",
+    "last_sweep_id": "SWEEP-2026-08-19-01",
+    "open_fault_count": 1,
+    "has_iot_node": false,
+    "near_sensitive_poi": false
+   }
+  }
+ ]
+}
