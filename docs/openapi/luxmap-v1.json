@@ -1,0 +1,141 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "LuxMap API",
+    "description": "WP2 — GIS + IoT + Computer Vision quản lý chiếu sáng đường nông thôn. Base URL /api/v1. Quy ước theo API Contract v1.1: JSON snake_case, enum là chuỗi thường, thời gian ISO 8601 UTC hậu tố Z, toạ độ EPSG:4326.",
+    "version": "v1"
+  },
+  "paths": { },
+  "components": {
+    "schemas": {
+      "DataSource": {
+        "enum": [
+          "field",
+          "public_imagery",
+          "calibration_rig",
+          "simulated"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — data_source. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "FaultStatus": {
+        "enum": [
+          "detected",
+          "confirmed",
+          "rejected",
+          "in_progress",
+          "resolved",
+          "verified"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — fault_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "FaultType": {
+        "enum": [
+          "lamp_out",
+          "lamp_dim",
+          "segment_outage",
+          "node_offline",
+          "runtime_decline"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — fault_type. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "FixtureStatus": {
+        "enum": [
+          "normal",
+          "dim",
+          "out",
+          "unknown"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — fixture_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "FixtureType": {
+        "enum": [
+          "led_road_lamp",
+          "solar_all_in_one"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — fixture_type. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "NodeRole": {
+        "enum": [
+          "segment_controller",
+          "sampled_fixture"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — node_role. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "NodeStatus": {
+        "enum": [
+          "online",
+          "offline",
+          "never_reported"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — node_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "PowerSource": {
+        "enum": [
+          "grid",
+          "solar"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — power_source. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "RoadClass": {
+        "enum": [
+          "inter_commune",
+          "inter_village"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — road_class. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "Severity": {
+        "enum": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — severity. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "SourceChannel": {
+        "enum": [
+          "cv",
+          "iot",
+          "field_report"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — source_channel. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      },
+      "WorkOrderStatus": {
+        "enum": [
+          "open",
+          "assigned",
+          "in_progress",
+          "done",
+          "verified",
+          "cancelled"
+        ],
+        "type": "string",
+        "description": "Contract v1.1 mục 1 — work_order_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Dán JWT vào đây, KHÔNG kèm tiền tố 'Bearer '.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
+}

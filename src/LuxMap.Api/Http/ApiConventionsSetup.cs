@@ -25,7 +25,14 @@ public static class ApiConventionsSetup
             // Contract mục 0: version nằm trong URL (/api/v1), không phải header hay query.
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
         })
-        .AddMvc();
+        .AddMvc()
+        .AddApiExplorer(options =>
+        {
+            options.GroupNameFormat = "'v'VVV";
+            // Thay {version} trong route bằng số thật, để spec ghi /api/v1/... chứ không
+            // phải /api/v{version}/... — WP6 sinh URL từ spec này.
+            options.SubstituteApiVersionInUrl = true;
+        });
 
         services.AddControllers();
 
@@ -79,14 +86,24 @@ public static class ApiConventionsSetup
 public static class ApiPipelineSetup
 {
     /// <summary>
-    /// Thứ tự bắt buộc: correlation id phải chạy TRƯỚC exception handler, vì handler cần
-    /// id để đưa vào body lỗi.
+    /// Phải chạy TRƯỚC request logging và exception handler: cả hai đều cần correlation id.
     /// </summary>
-    public static WebApplication UseLuxMapApiConventions(this WebApplication app)
+    public static WebApplication UseLuxMapCorrelationId(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
 
         app.UseMiddleware<CorrelationIdMiddleware>();
+
+        return app;
+    }
+
+    /// <summary>
+    /// Dựng hình dạng lỗi của Contract cho cả ngoại lệ lẫn các status trần (404, 405, 415).
+    /// </summary>
+    public static WebApplication UseLuxMapErrorHandling(this WebApplication app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
         app.UseMiddleware<ExceptionHandlingMiddleware>();
         app.UseStatusCodePages(HandleBareStatusCodeAsync);
 

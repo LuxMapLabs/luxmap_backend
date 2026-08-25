@@ -153,6 +153,57 @@ Contract nằm trong `KnownErrors`.
 Phân trang: nhận `PageQuery` trong action rồi gọi `ToPageRequest()`, trả `PagedResult<T>`.
 `page_size` vượt 200 bị kẹp im lặng về 200 — client phải đọc `page_size` trong response.
 
+## Log và OpenAPI
+
+### Log
+
+Serilog, hai sink: Console (dạng đọc được) và file JSON có cấu trúc tại `<thư mục chạy>/logs/luxmap-<ngày>.log`,
+xoay vòng theo ngày, giữ 14 file, tối đa 50 MB mỗi file. `logs/` đã nằm trong `.gitignore`.
+
+Mọi log entry mang `CorrelationId` — `CorrelationIdMiddleware` đẩy vào `LogContext`, không phải
+nhét tay ở từng lời gọi. Mỗi request có một dòng tổng kết kèm method, path, status code và thời
+gian xử lý; mức log là Information cho 2xx/3xx, Warning cho 4xx, Error cho 5xx.
+
+`SensitivePropertyScrubber` che cứng mọi property có tên chứa `authorization`, `token`,
+`password`, `secret`, `apikey`, `connectionstring`, `cookie`. Đây là chặn ở tầng ghi log, không
+phải trông chờ mỗi lời gọi tự nhớ. Đừng gỡ nó ra khi thêm log mới.
+
+Chỉnh mức log trong `appsettings.json`, mục `Serilog`.
+
+### Swagger
+
+Bật/tắt qua `Swagger:Enabled` — mặc định **tắt**, chỉ `appsettings.Development.json` bật.
+
+```bash
+dotnet run --project src/LuxMap.Api
+```
+
+Mở `http://localhost:<cổng>/swagger`. Nút **Authorize** nhận JWT (dán token trần, không kèm
+tiền tố `Bearer`). BE-05 mới chỉ khai security scheme cho tài liệu — **chưa validate token**,
+việc đó thuộc BE-07.
+
+### Xuất OpenAPI spec ra file
+
+WP6 sinh DTO Kotlin từ [`docs/openapi/luxmap-v1.json`](docs/openapi/luxmap-v1.json) (FM-04).
+**Chạy lại lệnh này mỗi khi thêm hoặc sửa endpoint**, rồi commit file kết quả:
+
+```bash
+dotnet tool restore
+```
+
+```bash
+dotnet build src/LuxMap.Api && Swagger__Enabled=true dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+```
+
+Lệnh này dựng host thật nên cần `.env` (hoặc `POSTGRES_PASSWORD`) như mọi lần chạy khác; không
+cần database đang chạy vì chỉ đọc cấu hình chứ không kết nối.
+
+Trên PowerShell, đặt biến trước rồi gọi lệnh:
+
+```bash
+$env:Swagger__Enabled="true"; dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+```
+
 ## Cấu trúc
 
 | Project | Vai trò |

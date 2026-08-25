@@ -45,13 +45,13 @@
 
   <div class="card">
     <strong>Tiến độ nền tảng (W1)</strong>
-    <div class="bar"><i style="width:83%"></i></div>
-    <span class="muted">5 / 6 task nền tảng xong — BE-01, BE-00, BE-02, BE-03, BE-04. Còn BE-05.</span>
+    <div class="bar"><i style="width:100%"></i></div>
+    <span class="muted">6 / 6 task nền tảng W1 xong. Kế tiếp: GIS tài sản (W2–W4), bắt đầu từ BE-06.</span>
   </div>
 
   <div class="grid">
     <div class="stat"><b>10</b><span>project trong solution</span></div>
-    <div class="stat"><b>103</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>129</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
     <div class="stat"><b>2</b><span>service Docker healthy</span></div>
@@ -66,7 +66,7 @@
       <tr><td><code>BE-02</code></td><td>Docker Compose: PostgreSQL + PostGIS + Redis</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-03</code></td><td>EF Core + Npgsql + NetTopologySuite</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-04</code></td><td>Middleware lỗi, correlation id, phân trang, <code>/api/v1</code></td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>BE-05</code></td><td>Serilog + Swagger + JWT security scheme</td><td><span class="tag t-block">Kế tiếp — chặn FM-04 (W1)</span></td></tr>
+      <tr><td><code>BE-05</code></td><td>Serilog + Swagger + JWT security scheme</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
     </table>
   </div>
@@ -105,6 +105,12 @@
         <td><code>src/LuxMap.Api/Http/</code>, <code>src/LuxMap.Shared/Http/</code>, <code>tests/LuxMap.Api.Tests/</code></td>
         <td><code>feat(BE-04): add error middleware, correlation id and pagination plumbing</code></td>
       </tr>
+      <tr>
+        <td>25/08/2026</td>
+        <td><code>BE-05</code> Serilog (console + file JSON, correlation id, che dữ liệu nhạy cảm) + Swagger có nút Authorize + xuất OpenAPI spec cho WP6</td>
+        <td><code>src/LuxMap.Api/Observability/</code>, <code>src/LuxMap.Api/OpenApi/</code>, <code>docs/openapi/luxmap-v1.json</code>, <code>.config/dotnet-tools.json</code></td>
+        <td><code>feat(BE-05): add Serilog, Swagger and JWT security scheme</code></td>
+      </tr>
     </table>
   </div>
 
@@ -112,7 +118,7 @@
   <div class="card">
     <table>
       <tr><th>Task</th><th>Ai chờ</th><th>Hạn</th></tr>
-      <tr><td><code>BE-05</code> OpenAPI spec</td><td>FM-04 sinh DTO Kotlin</td><td>W1</td></tr>
+      <tr><td><s><code>BE-05</code> OpenAPI spec</s></td><td>FM-04 — <strong>đã gỡ chặn</strong>, spec có 12 enum</td><td><s>W1</s> xong 25/08</td></tr>
       <tr><td><code>BE-07</code> auth</td><td>FM-05</td><td>W1</td></tr>
       <tr><td><code>BE-42</code> <code>LuxReading</code></td><td>FM-14, FO-14, CV-12</td><td><strong>W4 — đã đẩy sớm</strong></td></tr>
       <tr><td><code>BE-13</code> topology</td><td>CV-05, CV-15</td><td>W4</td></tr>
@@ -132,6 +138,8 @@
       <li><strong>Image PostGIS phải đổi khỏi <code>postgis/postgis</code>.</strong> Repo chính thức không publish bản arm64 cho bất kỳ tag PostgreSQL 17 nào — <code>docker pull</code> báo lỗi thẳng trên Mac Apple Silicon. Đã dùng <code>imresamu/postgis:17-3.5</code> (cùng maintainer, multi-arch) để cả máy Windows lẫn Mac đều chạy native. <strong>BE-36 phải dùng đúng image này cho Testcontainers.</strong></li>
       <li><strong>Tag <code>17-3.5</code> vẫn trôi theo patch.</strong> Hôm nay ra PostgreSQL 17.6 / PostGIS 3.5.3, nhưng tag sẽ tự nhảy khi upstream build lại. Muốn tái lập tuyệt đối kết quả nghiên cứu thì phải pin theo digest.</li>
       <li><strong>Testcontainers không dùng lại init script của compose.</strong> BE-36 phải tự <code>CREATE EXTENSION postgis</code> trong fixture, nếu không test không gian sẽ fail vì thiếu kiểu <code>geometry</code>.</li>
+      <li><strong>Spec hiện CHỈ có 12 enum, chưa có path nào.</strong> Chưa endpoint domain nào tồn tại (BE-09 trở đi). FM-04 sinh được enum class Kotlin ngay, nhưng DTO và Retrofit interface thì phải chờ. <strong>Phải chạy lại lệnh export và commit lại file mỗi khi thêm endpoint</strong> — không có gì tự động kiểm tra spec đã cũ hay chưa.</li>
+      <li><strong>Swagger chỉ khai security scheme, chưa validate token.</strong> Nút Authorize nhận JWT nhưng server chưa kiểm gì — BE-07 mới làm. Đừng nhầm là auth đã chạy.</li>
       <li><strong>Contract thiếu mã lỗi cho validation và lỗi hệ thống.</strong> BE-04 buộc phải thêm <code>VALIDATION_FAILED</code> và <code>INTERNAL_ERROR</code> vì mọi API phải cùng một hình dạng lỗi. <strong>Cần đưa vào Contract ở FW-00 rồi tăng version</strong> — hiện FE đang phải tự đoán hai mã này.</li>
       <li><strong>Correlation id giờ nằm ở CẢ header lẫn <code>error.details</code>.</strong> Khác với quyết định lúc BE-00 (chỉ header). Không phá hình dạng 3 khoá vì <code>details</code> là bag tự do, nhưng cần thống nhất lại với FE.</li>
       <li><strong>Bẫy binding phân trang.</strong> Đặt tên tham số action là <code>page</code> thì MVC lấy nó làm prefix rồi đi tìm <code>page.page_size</code>, khiến <code>page_size</code> âm thầm rơi về mặc định. Đã xử lý bằng <code>PageQueryModelBinder</code>; đừng thay bằng <code>[FromQuery]</code> thường.</li>
