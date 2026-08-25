@@ -99,12 +99,67 @@ docker compose down -v && docker compose up -d
 
 `-v` xoá volume `luxmap_postgres_data` — **mất toàn bộ dữ liệu dev**. Không có `-v` thì dữ liệu vẫn còn nguyên qua `down`/`up`/`restart`.
 
+## Database và migration
+
+Cần stack ở [Chạy môi trường dev](#chạy-môi-trường-dev) đang chạy. Connection string dựng từ
+chính `.env` mà docker compose dùng, nên không phải khai cổng hay mật khẩu ở hai chỗ.
+Đặt `ConnectionStrings__LuxMap` để ghi đè trọn gói (CI, staging).
+
+```bash
+dotnet tool install --global dotnet-ef
+```
+
+```bash
+dotnet ef migrations add <Tên> -p src/LuxMap.Persistence -s src/LuxMap.Api -o Migrations
+```
+
+```bash
+dotnet ef database update -p src/LuxMap.Persistence -s src/LuxMap.Api
+```
+
+Một `LuxMapDbContext` dùng chung. Entity và `IEntityTypeConfiguration` nằm trong module của
+nó; `LuxMapDbContext` quét assembly từng module nên `LuxMap.Persistence` không tham chiếu
+ngược lại module nào. Module nào có entity thì tự thêm reference tới `LuxMap.Persistence`.
+
+Quy ước bắt buộc:
+
+| Hạng mục | Quy ước |
+|---|---|
+| Tên bảng / cột | `snake_case` toàn chữ thường, không quote |
+| Bảng lịch sử migration | `__ef_migrations_history` |
+| SRID hình học | **4326** — `SpatialConstants.Srid` |
+| EPSG:3405 (VN-2000) | Chỉ nội bộ, không bao giờ ra API |
+| Enum | Cột `text` mang đúng chuỗi Contract, kèm `CHECK` constraint |
+| Thời gian | `timestamptz`, luôn `DateTimeKind.Utc` |
+
+Map enum bằng `builder.HasContractEnum(x => x.FaultType)` — hàm này vừa đặt value converter
+vừa sinh `CHECK`. Đừng dùng `HasConversion<string>()` mặc định của EF: nó lưu tên C#
+(`LampOut`) chứ không phải chuỗi Contract (`lamp_out`).
+
+## Quy ước lỗi và phân trang
+
+Mọi lỗi — kể cả validation và route không khớp — trả về đúng một hình dạng:
+
+```json
+{ "error": { "code": "VALIDATION_FAILED", "message": "...", "details": { "note": ["..."], "correlation_id": "..." } } }
+```
+
+Correlation id có ở **mọi** response qua header `X-Correlation-Id`. Client gửi lên thì server
+dùng lại, không gửi thì server tự sinh.
+
+Ném `LuxMapException` cho lỗi nghiệp vụ đã biết; middleware dựng body. Mã và HTTP status của
+Contract nằm trong `KnownErrors`.
+
+Phân trang: nhận `PageQuery` trong action rồi gọi `ToPageRequest()`, trả `PagedResult<T>`.
+`page_size` vượt 200 bị kẹp im lặng về 200 — client phải đọc `page_size` trong response.
+
 ## Cấu trúc
 
 | Project | Vai trò |
 |---|---|
 | `src/LuxMap.Api` | Host, liệt kê module, áp quy ước JSON |
 | `src/LuxMap.Shared` | Quy ước contract dùng chung: enum, JSON, lỗi, phân trang, seam module |
+| `src/LuxMap.Persistence` | EF Core, Npgsql, NetTopologySuite, `LuxMapDbContext` |
 | `src/LuxMap.Modules.Identity` | AppUser, AdministrativeUnit, JWT, phân quyền (BE-06..BE-08) |
 | `src/LuxMap.Modules.Assets` | Pole, Fixture, RoadSegment, Feeder, bbox (BE-09..BE-14) |
 | `src/LuxMap.Modules.Survey` | SurveySweep, SurveyFrame, Detection, LuxReading (BE-15..BE-17, BE-42) |
@@ -113,6 +168,8 @@ docker compose down -v && docker compose up -d
 | `src/LuxMap.Modules.Telemetry` | IotNode, TelemetryReading |
 | `src/LuxMap.Modules.Admin` | Danh mục, ngưỡng, model version, dashboard (BE-28..BE-35) |
 | `tests/LuxMap.Shared.Tests` | Khoá lại quy ước contract |
+| `tests/LuxMap.Persistence.Tests` | Enum lưu xuống DB đúng chuỗi Contract |
+| `tests/LuxMap.Api.Tests` | Hình dạng lỗi, correlation id, phân trang qua pipeline thật |
 
 ## Thêm một module
 
