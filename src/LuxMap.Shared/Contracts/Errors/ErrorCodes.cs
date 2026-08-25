@@ -23,4 +23,14 @@ public static class ErrorCodes
 
     /// <summary>403 — yêu cầu <c>commune_id</c> ngoài phạm vi claim (mục 7).</summary>
     public const string CommuneForbidden = "COMMUNE_FORBIDDEN";
+
+    // ── Dưới đây KHÔNG có trong Contract v1.1 ────────────────────────────────
+    // Hai mã hạ tầng, thêm ở BE-04 vì mọi API phải cùng một hình dạng lỗi.
+    // Cần đưa vào Contract ở FW-00 rồi tăng version, đừng để FE tự đoán.
+
+    /// <summary>400 — request không qua được validation. Chi tiết từng field nằm trong <c>details</c>.</summary>
+    public const string ValidationFailed = "VALIDATION_FAILED";
+
+    /// <summary>500 — lỗi chưa xử lý. Thông điệp cố ý chung chung, chi tiết chỉ có trong log theo correlation id.</summary>
+    public const string InternalError = "INTERNAL_ERROR";
 }

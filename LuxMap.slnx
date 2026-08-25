@@ -12,6 +12,7 @@
     <Project Path="src/LuxMap.Shared/LuxMap.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/LuxMap.Api.Tests/LuxMap.Api.Tests.csproj" />
     <Project Path="tests/LuxMap.Persistence.Tests/LuxMap.Persistence.Tests.csproj" />
     <Project Path="tests/LuxMap.Shared.Tests/LuxMap.Shared.Tests.csproj" />
   </Folder>
