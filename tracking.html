@@ -45,8 +45,8 @@
 
   <div class="card">
     <strong>Tiến độ nền tảng (W1)</strong>
-    <div class="bar"><i style="width:33%"></i></div>
-    <span class="muted">2 / 6 task nền tảng xong — BE-01, BE-00. Còn BE-02..BE-05.</span>
+    <div class="bar"><i style="width:50%"></i></div>
+    <span class="muted">3 / 6 task nền tảng xong — BE-01, BE-00, BE-02. Còn BE-03, BE-04, BE-05.</span>
   </div>
 
   <div class="grid">
@@ -54,6 +54,7 @@
     <div class="stat"><b>74</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
+    <div class="stat"><b>2</b><span>service Docker healthy</span></div>
   </div>
 
   <h2>Sprint hiện tại — W1 Nền tảng</h2>
@@ -62,8 +63,8 @@
       <tr><th>Mã</th><th>Việc</th><th>Trạng thái</th></tr>
       <tr><td><code>BE-01</code></td><td>Solution .NET modular monolith</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-00</code></td><td>Quy ước API Contract — JSON, enum, thời gian, lỗi, phân trang</td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>BE-02</code></td><td>Docker Compose: PostgreSQL + PostGIS + Redis</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
-      <tr><td><code>BE-03</code></td><td>EF Core + Npgsql + NetTopologySuite</td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
+      <tr><td><code>BE-02</code></td><td>Docker Compose: PostgreSQL + PostGIS + Redis</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-03</code></td><td>EF Core + Npgsql + NetTopologySuite</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>BE-04</code></td><td>Middleware lỗi, correlation id, phân trang, <code>/api/v1</code></td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
       <tr><td><code>BE-05</code></td><td>Serilog + Swagger + JWT security scheme</td><td><span class="tag t-block">Chặn FM-04 (W1)</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
@@ -85,6 +86,12 @@
         <td><code>BE-00</code> Quy ước contract — snake_case, 12 enum chuỗi thường, ISO 8601 UTC <code>Z</code>, hình dạng lỗi và phân trang</td>
         <td><code>src/LuxMap.Shared/Serialization/*</code>, <code>src/LuxMap.Shared/Contracts/**</code>, <code>tests/LuxMap.Shared.Tests/*</code></td>
         <td><code>feat(BE-00): implement API contract v1.1 conventions</code></td>
+      </tr>
+      <tr>
+        <td>25/08/2026</td>
+        <td><code>BE-02</code> Docker Compose — PostgreSQL 17.6 + PostGIS 3.5.3 + Redis 8.10.1, init script bật PostGIS, TZ=UTC, named volume, healthcheck cả hai</td>
+        <td><code>docker-compose.yml</code>, <code>docker/postgres/init/01-postgis.sql</code>, <code>.env.example</code>, <code>README.md</code></td>
+        <td><code>feat(BE-02): add PostGIS and Redis dev stack</code></td>
       </tr>
     </table>
   </div>
@@ -110,6 +117,9 @@
   <div class="card">
     <ul>
       <li><strong>Nhánh <code>feat/BE-01-BE-00-foundation</code> chưa push.</strong> 3 commit đã sẵn sàng, chờ mở PR vào <code>main</code>.</li>
+      <li><strong>Image PostGIS phải đổi khỏi <code>postgis/postgis</code>.</strong> Repo chính thức không publish bản arm64 cho bất kỳ tag PostgreSQL 17 nào — <code>docker pull</code> báo lỗi thẳng trên Mac Apple Silicon. Đã dùng <code>imresamu/postgis:17-3.5</code> (cùng maintainer, multi-arch) để cả máy Windows lẫn Mac đều chạy native. <strong>BE-36 phải dùng đúng image này cho Testcontainers.</strong></li>
+      <li><strong>Tag <code>17-3.5</code> vẫn trôi theo patch.</strong> Hôm nay ra PostgreSQL 17.6 / PostGIS 3.5.3, nhưng tag sẽ tự nhảy khi upstream build lại. Muốn tái lập tuyệt đối kết quả nghiên cứu thì phải pin theo digest.</li>
+      <li><strong>Testcontainers không dùng lại init script của compose.</strong> BE-36 phải tự <code>CREATE EXTENSION postgis</code> trong fixture, nếu không test không gian sẽ fail vì thiếu kiểu <code>geometry</code>.</li>
       <li><strong>Correlation id chưa có chỗ trong body lỗi.</strong> Đã chọn header <code>X-Correlation-Id</code> cho mọi response; body giữ đúng 3 khoá đã publish. Cần nêu ở FW-00 để FE biết đọc header.</li>
       <li><strong><code>page_size</code> vượt 200 kẹp im lặng về 200.</strong> Contract không nói cách xử lý. FE phải đọc <code>page_size</code> trong response, không giả định bằng giá trị đã gửi.</li>
       <li><strong>CLAUDE.md thiếu <code>data_source</code></strong> trong khối enum ở mục "Enum — khoá cứng", dù mô tả nó ở phần Nhánh C. Contract mục 1 có đủ. Đã theo Contract.</li>
