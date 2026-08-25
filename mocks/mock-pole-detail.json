@@ -1,0 +1,479 @@
+{
+ "pole_id": "POLE-0047",
+ "segment_id": "SEG-002",
+ "segment_name": "Tuyen B - duong lien ap",
+ "commune_id": "COM-001",
+ "location": {
+  "lat": 10.965989,
+  "lng": 106.492025
+ },
+ "fixture": {
+  "fixture_type": "solar_all_in_one",
+  "power_source": "solar",
+  "lamp_watt": 60,
+  "install_date": "2023-01-04",
+  "warranty_expiry": "2028-01-04",
+  "supplier": "SUP-004"
+ },
+ "current_status": {
+  "fixture_status": "dim",
+  "status_confidence": 0.81,
+  "determined_at": "2026-08-19T12:00:00Z",
+  "source_channel": "cv"
+ },
+ "iot_node": {
+  "node_id": "NODE-0047",
+  "node_status": "online",
+  "last_report_at": "2026-08-20T06:00:00Z"
+ },
+ "luminance_baseline": {
+  "baseline_value": 1.0,
+  "baseline_window_nights": 14,
+  "dim_threshold_ratio": 0.8,
+  "out_threshold_ratio": 0.15,
+  "computed_at": "2026-08-19T12:00:00Z"
+ },
+ "luminance_history": [
+  {
+   "observed_at": "2026-07-21T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-21-01",
+   "normalized_luminance": 0.989,
+   "baseline_ratio": 0.989,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-22T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-22-01",
+   "normalized_luminance": 1.009,
+   "baseline_ratio": 1.009,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-23T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-23-01",
+   "normalized_luminance": 1.002,
+   "baseline_ratio": 1.002,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-24T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-24-01",
+   "normalized_luminance": 0.973,
+   "baseline_ratio": 0.973,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-25T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-25-01",
+   "normalized_luminance": 0.972,
+   "baseline_ratio": 0.972,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-26T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-26-01",
+   "normalized_luminance": 0.974,
+   "baseline_ratio": 0.974,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-27T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-27-01",
+   "normalized_luminance": 0.995,
+   "baseline_ratio": 0.995,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-28T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-28-01",
+   "normalized_luminance": 0.977,
+   "baseline_ratio": 0.977,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-29T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-29-01",
+   "normalized_luminance": 1.008,
+   "baseline_ratio": 1.008,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-30T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-30-01",
+   "normalized_luminance": 1.005,
+   "baseline_ratio": 1.005,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-07-31T20:00:00Z",
+   "sweep_id": "SWEEP-2026-07-31-01",
+   "normalized_luminance": 1.029,
+   "baseline_ratio": 1.029,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-01T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-01-01",
+   "normalized_luminance": 1.022,
+   "baseline_ratio": 1.022,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-02T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-02-01",
+   "normalized_luminance": 0.979,
+   "baseline_ratio": 0.979,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-03T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-03-01",
+   "normalized_luminance": 0.972,
+   "baseline_ratio": 0.972,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-04T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-04-01",
+   "normalized_luminance": 0.948,
+   "baseline_ratio": 0.948,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-05T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-05-01",
+   "normalized_luminance": 0.958,
+   "baseline_ratio": 0.958,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-06T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-06-01",
+   "normalized_luminance": 0.936,
+   "baseline_ratio": 0.936,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-07T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-07-01",
+   "normalized_luminance": 0.89,
+   "baseline_ratio": 0.89,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-08T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-08-01",
+   "normalized_luminance": 0.911,
+   "baseline_ratio": 0.911,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-09T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-09-01",
+   "normalized_luminance": 0.872,
+   "baseline_ratio": 0.872,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-10T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-10-01",
+   "normalized_luminance": 0.864,
+   "baseline_ratio": 0.864,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-11T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-11-01",
+   "normalized_luminance": 0.868,
+   "baseline_ratio": 0.868,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-12T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-12-01",
+   "normalized_luminance": 0.818,
+   "baseline_ratio": 0.818,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-13T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-13-01",
+   "normalized_luminance": 0.818,
+   "baseline_ratio": 0.818,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-14T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-14-01",
+   "normalized_luminance": 0.814,
+   "baseline_ratio": 0.814,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-15T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-15-01",
+   "normalized_luminance": 0.812,
+   "baseline_ratio": 0.812,
+   "classified_as": "normal"
+  },
+  {
+   "observed_at": "2026-08-16T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-16-01",
+   "normalized_luminance": 0.762,
+   "baseline_ratio": 0.762,
+   "classified_as": "dim"
+  },
+  {
+   "observed_at": "2026-08-17T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-17-01",
+   "normalized_luminance": 0.729,
+   "baseline_ratio": 0.729,
+   "classified_as": "dim"
+  },
+  {
+   "observed_at": "2026-08-18T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-18-01",
+   "normalized_luminance": 0.706,
+   "baseline_ratio": 0.706,
+   "classified_as": "dim"
+  },
+  {
+   "observed_at": "2026-08-19T20:00:00Z",
+   "sweep_id": "SWEEP-2026-08-19-01",
+   "normalized_luminance": 0.733,
+   "baseline_ratio": 0.733,
+   "classified_as": "dim"
+  }
+ ],
+ "runtime_history": [
+  {
+   "night_of": "2026-07-21",
+   "runtime_hours": 11.33,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-22",
+   "runtime_hours": 11.29,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-23",
+   "runtime_hours": 11.43,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-24",
+   "runtime_hours": 11.5,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-25",
+   "runtime_hours": 11.47,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-26",
+   "runtime_hours": 11.3,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-27",
+   "runtime_hours": 11.66,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-28",
+   "runtime_hours": 11.36,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-29",
+   "runtime_hours": 11.72,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-30",
+   "runtime_hours": 11.45,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-07-31",
+   "runtime_hours": 11.27,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-01",
+   "runtime_hours": 11.39,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-02",
+   "runtime_hours": 11.31,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-03",
+   "runtime_hours": 11.37,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-04",
+   "runtime_hours": 10.97,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-05",
+   "runtime_hours": 10.57,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-06",
+   "runtime_hours": 10.13,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-07",
+   "runtime_hours": 9.92,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-08",
+   "runtime_hours": 9.74,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-09",
+   "runtime_hours": 9.53,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-10",
+   "runtime_hours": 9.1,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-11",
+   "runtime_hours": 9.01,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-12",
+   "runtime_hours": 8.66,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-13",
+   "runtime_hours": 8.53,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-14",
+   "runtime_hours": 7.94,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-15",
+   "runtime_hours": 7.57,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-16",
+   "runtime_hours": 7.6,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-17",
+   "runtime_hours": 7.18,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-18",
+   "runtime_hours": 6.98,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  },
+  {
+   "night_of": "2026-08-19",
+   "runtime_hours": 6.65,
+   "on_at": "18:32:00Z",
+   "off_at": null,
+   "source": "iot"
+  }
+ ],
+ "open_faults": [
+  {
+   "fault_id": "FAULT-0027",
+   "fault_type": "runtime_decline",
+   "severity": "medium",
+   "fault_status": "detected",
+   "priority_score": 66.4
+  }
+ ],
+ "recent_frames": [
+  {
+   "frame_id": "FRM-88213",
+   "sweep_id": "SWEEP-2026-08-19-01",
+   "captured_at": "2026-08-19T12:00:00Z",
+   "thumbnail_url": "/api/v1/frames/FRM-88213/thumbnail",
+   "distance_m": 24.6,
+   "heading_deg": 25.0
+  }
+ ]
+}

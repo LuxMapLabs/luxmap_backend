@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LuxMap.Api/LuxMap.Api.csproj" />
+    <Project Path="src/LuxMap.Modules.Admin/LuxMap.Modules.Admin.csproj" />
+    <Project Path="src/LuxMap.Modules.Assets/LuxMap.Modules.Assets.csproj" />
+    <Project Path="src/LuxMap.Modules.Faults/LuxMap.Modules.Faults.csproj" />
+    <Project Path="src/LuxMap.Modules.Identity/LuxMap.Modules.Identity.csproj" />
+    <Project Path="src/LuxMap.Modules.Survey/LuxMap.Modules.Survey.csproj" />
+    <Project Path="src/LuxMap.Modules.Telemetry/LuxMap.Modules.Telemetry.csproj" />
+    <Project Path="src/LuxMap.Modules.WorkOrders/LuxMap.Modules.WorkOrders.csproj" />
+    <Project Path="src/LuxMap.Shared/LuxMap.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LuxMap.Shared.Tests/LuxMap.Shared.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,511 @@
+{
+ "page": 1,
+ "page_size": 50,
+ "total": 28,
+ "items": [
+  {
+   "fault_id": "FAULT-0007",
+   "pole_id": "POLE-0039",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_dim",
+   "fault_status": "confirmed",
+   "severity": "medium",
+   "priority_score": 96.3,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-20T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.50217
+   }
+  },
+  {
+   "fault_id": "FAULT-0002",
+   "pole_id": "POLE-0019",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_out",
+   "fault_status": "detected",
+   "severity": "high",
+   "priority_score": 96.0,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-19T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.495765
+   }
+  },
+  {
+   "fault_id": "FAULT-0003",
+   "pole_id": "POLE-0022",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_out",
+   "fault_status": "confirmed",
+   "severity": "high",
+   "priority_score": 96.0,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.496725
+   }
+  },
+  {
+   "fault_id": "FAULT-0024",
+   "pole_id": "POLE-0097",
+   "segment_id": "SEG-003",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 92.9,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-19T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.970813,
+    "lng": 106.503019
+   }
+  },
+  {
+   "fault_id": "FAULT-0004",
+   "pole_id": "POLE-0025",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 90.7,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.497686
+   }
+  },
+  {
+   "fault_id": "FAULT-0011",
+   "pole_id": "POLE-0047",
+   "segment_id": "SEG-002",
+   "fault_type": "lamp_out",
+   "fault_status": "confirmed",
+   "severity": "high",
+   "priority_score": 89.8,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.965989,
+    "lng": 106.492025
+   }
+  },
+  {
+   "fault_id": "FAULT-0001",
+   "pole_id": "POLE-0014",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_out",
+   "fault_status": "confirmed",
+   "severity": "critical",
+   "priority_score": 86.0,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-19T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.494163
+   }
+  },
+  {
+   "fault_id": "FAULT-0008",
+   "pole_id": "POLE-0043",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 85.3,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.503451
+   }
+  },
+  {
+   "fault_id": "FAULT-0016",
+   "pole_id": "POLE-0075",
+   "segment_id": "SEG-002",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 84.1,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-20T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.975107,
+    "lng": 106.496356
+   }
+  },
+  {
+   "fault_id": "FAULT-0015",
+   "pole_id": "POLE-0071",
+   "segment_id": "SEG-002",
+   "fault_type": "lamp_out",
+   "fault_status": "detected",
+   "severity": "high",
+   "priority_score": 83.3,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.973804,
+    "lng": 106.495737
+   }
+  },
+  {
+   "fault_id": "FAULT-0006",
+   "pole_id": "POLE-0034",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_out",
+   "fault_status": "detected",
+   "severity": "high",
+   "priority_score": 81.9,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.500569
+   }
+  },
+  {
+   "fault_id": "FAULT-0021",
+   "pole_id": "POLE-0094",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "confirmed",
+   "severity": "critical",
+   "priority_score": 79.5,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-19T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.97163,
+    "lng": 106.502538
+   }
+  },
+  {
+   "fault_id": "FAULT-0014",
+   "pole_id": "POLE-0067",
+   "segment_id": "SEG-002",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 76.6,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.972502,
+    "lng": 106.495119
+   }
+  },
+  {
+   "fault_id": "FAULT-0012",
+   "pole_id": "POLE-0054",
+   "segment_id": "SEG-002",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 76.4,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.968268,
+    "lng": 106.493108
+   }
+  },
+  {
+   "fault_id": "FAULT-0009",
+   "pole_id": "POLE-0044",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_dim",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 76.1,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.503771
+   }
+  },
+  {
+   "fault_id": "FAULT-0023",
+   "pole_id": "POLE-0096",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 75.9,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-19T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.971085,
+    "lng": 106.502859
+   }
+  },
+  {
+   "fault_id": "FAULT-0027",
+   "pole_id": "POLE-0076",
+   "segment_id": "SEG-002",
+   "fault_type": "runtime_decline",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 72.5,
+   "cluster_id": null,
+   "source_channel": "iot",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.975433,
+    "lng": 106.496511
+   }
+  },
+  {
+   "fault_id": "FAULT-0005",
+   "pole_id": "POLE-0032",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_out",
+   "fault_status": "detected",
+   "severity": "high",
+   "priority_score": 70.5,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.499928
+   }
+  },
+  {
+   "fault_id": "FAULT-0025",
+   "pole_id": "POLE-0098",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 66.7,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.970541,
+    "lng": 106.503179
+   }
+  },
+  {
+   "fault_id": "FAULT-0028",
+   "pole_id": "POLE-0075",
+   "segment_id": "SEG-002",
+   "fault_type": "runtime_decline",
+   "fault_status": "detected",
+   "severity": "medium",
+   "priority_score": 61.6,
+   "cluster_id": null,
+   "source_channel": "iot",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.975107,
+    "lng": 106.496356
+   }
+  },
+  {
+   "fault_id": "FAULT-0019",
+   "pole_id": "POLE-0092",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 60.8,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.972175,
+    "lng": 106.502218
+   }
+  },
+  {
+   "fault_id": "FAULT-0026",
+   "pole_id": "POLE-0103",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 54.8,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-20T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969179,
+    "lng": 106.50398
+   }
+  },
+  {
+   "fault_id": "FAULT-0020",
+   "pole_id": "POLE-0093",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 54.2,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-17T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.971902,
+    "lng": 106.502378
+   }
+  },
+  {
+   "fault_id": "FAULT-0022",
+   "pole_id": "POLE-0095",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 50.2,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-16T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.971358,
+    "lng": 106.502699
+   }
+  },
+  {
+   "fault_id": "FAULT-0017",
+   "pole_id": "POLE-0090",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 49.6,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.972719,
+    "lng": 106.501898
+   }
+  },
+  {
+   "fault_id": "FAULT-0010",
+   "pole_id": "POLE-0045",
+   "segment_id": "SEG-001",
+   "fault_type": "lamp_dim",
+   "fault_status": "confirmed",
+   "severity": "medium",
+   "priority_score": 44.7,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-18T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969973,
+    "lng": 106.504091
+   }
+  },
+  {
+   "fault_id": "FAULT-0018",
+   "pole_id": "POLE-0091",
+   "segment_id": "SEG-003",
+   "fault_type": "segment_outage",
+   "fault_status": "detected",
+   "severity": "critical",
+   "priority_score": 42.7,
+   "cluster_id": "CLU-0001",
+   "source_channel": "cv",
+   "detected_at": "2026-08-20T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.972447,
+    "lng": 106.502058
+   }
+  },
+  {
+   "fault_id": "FAULT-0013",
+   "pole_id": "POLE-0058",
+   "segment_id": "SEG-002",
+   "fault_type": "lamp_out",
+   "fault_status": "confirmed",
+   "severity": "high",
+   "priority_score": 42.1,
+   "cluster_id": null,
+   "source_channel": "cv",
+   "detected_at": "2026-08-20T12:00:00Z",
+   "confirmed_by": null,
+   "confirmed_at": null,
+   "location": {
+    "lat": 10.969571,
+    "lng": 106.493726
+   }
+  }
+ ]
+}

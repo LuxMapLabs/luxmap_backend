@@ -1,0 +1,57 @@
+{
+ "page": 1,
+ "page_size": 20,
+ "total": 3,
+ "items": [
+  {
+   "work_order_id": "WO-0001",
+   "title": "Su co ca doan - Tuyen C",
+   "segment_id": "SEG-003",
+   "cluster_id": "CLU-0001",
+   "fault_ids": [
+    "FAULT-0018",
+    "FAULT-0019",
+    "FAULT-0020",
+    "FAULT-0021",
+    "FAULT-0022",
+    "FAULT-0023",
+    "FAULT-0024"
+   ],
+   "wo_status": "assigned",
+   "assigned_to": "USR-khang",
+   "priority_score": 98.0,
+   "created_at": "2026-08-19T12:00:00Z",
+   "due_date": "2026-08-25"
+  },
+  {
+   "work_order_id": "WO-0002",
+   "title": "Thay bong den - 3 cot Tuyen A",
+   "segment_id": "SEG-001",
+   "cluster_id": null,
+   "fault_ids": [
+    "FAULT-0003",
+    "FAULT-0007",
+    "FAULT-0011"
+   ],
+   "wo_status": "in_progress",
+   "assigned_to": "USR-khang",
+   "priority_score": 74.2,
+   "created_at": "2026-08-17T12:00:00Z",
+   "due_date": "2026-08-24"
+  },
+  {
+   "work_order_id": "WO-0003",
+   "title": "Kiem tra pin solar - Tuyen B",
+   "segment_id": "SEG-002",
+   "cluster_id": null,
+   "fault_ids": [
+    "FAULT-0027"
+   ],
+   "wo_status": "open",
+   "assigned_to": null,
+   "priority_score": 66.4,
+   "created_at": "2026-08-20T12:00:00Z",
+   "due_date": "2026-08-28"
+  }
+ ]
+}
