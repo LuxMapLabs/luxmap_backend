@@ -6,6 +6,7 @@ using LuxMap.Modules.Survey;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Shared.Modularity;
+using LuxMap.Shared.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,9 @@ ILuxMapModule[] modules =
     new TelemetryModule(),
     new AdminModule(),
 ];
+
+// BE-00 — quy ước JSON của Contract v1.1 mục 0 (snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z).
+builder.Services.AddLuxMapJsonConventions();
 
 // Mỗi module tự đăng ký service của mình.
 builder.Services.AddLuxMapModules(builder.Configuration, modules);

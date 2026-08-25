@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LuxMap Backend — Tracking</title>
+<style>
+  :root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e9ef;--mut:#98a2b3;
+        --ok:#3ecf8e;--warn:#f5a524;--info:#4a9eff;--dim:#6b7280;}
+  *{box-sizing:border-box}
+  body{margin:0;padding:32px;background:var(--bg);color:var(--fg);
+       font:15px/1.6 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 4px}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);
+     margin:32px 0 12px;font-weight:600}
+  .sub{color:var(--mut);margin:0 0 24px;font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:14px}
+  .bar{height:8px;background:#22262f;border-radius:99px;overflow:hidden;margin:10px 0 6px}
+  .bar>i{display:block;height:100%;background:var(--ok)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .stat b{display:block;font-size:26px;line-height:1.2}
+  .stat span{color:var(--mut);font-size:13px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  tr:last-child td{border-bottom:0}
+  code{background:#0b0d11;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:13px}
+  .tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}
+  .t-done{background:rgba(62,207,142,.14);color:var(--ok)}
+  .t-todo{background:rgba(107,114,128,.18);color:var(--dim)}
+  .t-block{background:rgba(245,165,36,.14);color:var(--warn)}
+  .t-next{background:rgba(74,158,255,.14);color:var(--info)}
+  ul{margin:6px 0 0;padding-left:20px}
+  li{margin:4px 0}
+  .muted{color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>LuxMap — Backend (WP2)</h1>
+  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 25/08/2026</p>
+
+  <div class="card">
+    <strong>Tiến độ nền tảng (W1)</strong>
+    <div class="bar"><i style="width:33%"></i></div>
+    <span class="muted">2 / 6 task nền tảng xong — BE-01, BE-00. Còn BE-02..BE-05.</span>
+  </div>
+
+  <div class="grid">
+    <div class="stat"><b>10</b><span>project trong solution</span></div>
+    <div class="stat"><b>74</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>0</b><span>warning khi build</span></div>
+    <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
+  </div>
+
+  <h2>Sprint hiện tại — W1 Nền tảng</h2>
+  <div class="card">
+    <table>
+      <tr><th>Mã</th><th>Việc</th><th>Trạng thái</th></tr>
+      <tr><td><code>BE-01</code></td><td>Solution .NET modular monolith</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-00</code></td><td>Quy ước API Contract — JSON, enum, thời gian, lỗi, phân trang</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-02</code></td><td>Docker Compose: PostgreSQL + PostGIS + Redis</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
+      <tr><td><code>BE-03</code></td><td>EF Core + Npgsql + NetTopologySuite</td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
+      <tr><td><code>BE-04</code></td><td>Middleware lỗi, correlation id, phân trang, <code>/api/v1</code></td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
+      <tr><td><code>BE-05</code></td><td>Serilog + Swagger + JWT security scheme</td><td><span class="tag t-block">Chặn FM-04 (W1)</span></td></tr>
+      <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-todo">Chưa bắt đầu</span></td></tr>
+    </table>
+  </div>
+
+  <h2>Đã hoàn thành</h2>
+  <div class="card">
+    <table>
+      <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>25/08/2026</td>
+        <td><code>BE-01</code> Solution modular monolith — 7 module domain + Shared + Api + test; seam DI <code>ILuxMapModule</code></td>
+        <td><code>LuxMap.slnx</code>, <code>src/LuxMap.Api/Program.cs</code>, <code>src/LuxMap.Shared/Modularity/*</code>, <code>src/LuxMap.Modules.*/</code></td>
+        <td><code>feat(BE-01): scaffold .NET modular monolith solution</code></td>
+      </tr>
+      <tr>
+        <td>25/08/2026</td>
+        <td><code>BE-00</code> Quy ước contract — snake_case, 12 enum chuỗi thường, ISO 8601 UTC <code>Z</code>, hình dạng lỗi và phân trang</td>
+        <td><code>src/LuxMap.Shared/Serialization/*</code>, <code>src/LuxMap.Shared/Contracts/**</code>, <code>tests/LuxMap.Shared.Tests/*</code></td>
+        <td><code>feat(BE-00): implement API contract v1.1 conventions</code></td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>Còn lại — mốc chặn người khác</h2>
+  <div class="card">
+    <table>
+      <tr><th>Task</th><th>Ai chờ</th><th>Hạn</th></tr>
+      <tr><td><code>BE-05</code> OpenAPI spec</td><td>FM-04 sinh DTO Kotlin</td><td>W1</td></tr>
+      <tr><td><code>BE-07</code> auth</td><td>FM-05</td><td>W1</td></tr>
+      <tr><td><code>BE-42</code> <code>LuxReading</code></td><td>FM-14, FO-14, CV-12</td><td><strong>W4 — đã đẩy sớm</strong></td></tr>
+      <tr><td><code>BE-13</code> topology</td><td>CV-05, CV-15</td><td>W4</td></tr>
+      <tr><td><code>BE-14</code> bbox</td><td>FW-08, FM-15</td><td>W4</td></tr>
+      <tr><td><code>BE-19</code>, <code>BE-20</code></td><td>FW-12, FW-13, FM-17</td><td>W8–W9</td></tr>
+      <tr><td><code>BE-24</code> evidence</td><td>FM-18</td><td>W11</td></tr>
+      <tr><td><code>BE-27</code> Notification</td><td>FM-21 — chốt tên bảng cùng FE2 trước W16</td><td>W12</td></tr>
+      <tr><td><code>BE-41</code> <code>field_report</code> fault</td><td>FM-19</td><td>W13</td></tr>
+      <tr><td><code>BE-43</code> sync</td><td>FM-20 offline đầy đủ</td><td>W14–W15</td></tr>
+    </table>
+  </div>
+
+  <h2>Vấn đề đang mở</h2>
+  <div class="card">
+    <ul>
+      <li><strong>Nhánh <code>feat/BE-01-BE-00-foundation</code> chưa push.</strong> 3 commit đã sẵn sàng, chờ mở PR vào <code>main</code>.</li>
+      <li><strong>Correlation id chưa có chỗ trong body lỗi.</strong> Đã chọn header <code>X-Correlation-Id</code> cho mọi response; body giữ đúng 3 khoá đã publish. Cần nêu ở FW-00 để FE biết đọc header.</li>
+      <li><strong><code>page_size</code> vượt 200 kẹp im lặng về 200.</strong> Contract không nói cách xử lý. FE phải đọc <code>page_size</code> trong response, không giả định bằng giá trị đã gửi.</li>
+      <li><strong>CLAUDE.md thiếu <code>data_source</code></strong> trong khối enum ở mục "Enum — khoá cứng", dù mô tả nó ở phần Nhánh C. Contract mục 1 có đủ. Đã theo Contract.</li>
+      <li><strong>BE-00 và BE-04 chồng phạm vi.</strong> Task list giao middleware lỗi + correlation id + phân trang cho BE-04. BE-00 chỉ định nghĩa KIỂU; middleware để nguyên cho BE-04.</li>
+      <li><strong>Chưa chốt (Contract mục 6):</strong> vector tile khi vượt ~5000 cột · realtime khi sweep xong · chính sách lưu ảnh dài hạn.</li>
+      <li><strong>Chưa có đặc tả:</strong> BE-07, BE-12, BE-15/16, BE-27, BE-28→31, BE-33→35. Không tự sinh endpoint trước khi thống nhất.</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>
