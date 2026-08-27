@@ -6,7 +6,10 @@ using LuxMap.Modules.Survey;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Api.Http;
+using LuxMap.Api.Observability;
+using LuxMap.Api.OpenApi;
 using LuxMap.Persistence;
+using Serilog;
 using LuxMap.Shared.Modularity;
 using LuxMap.Shared.Serialization;
 
@@ -14,7 +17,16 @@ using LuxMap.Shared.Serialization;
 // mật khẩu chỉ khai một chỗ, dùng chung với docker compose của BE-02.
 DotNetEnv.Env.TraversePath().Load();
 
+// BE-05 — logger tạm để nếu host chết lúc khởi động thì vẫn ghi lại được lý do.
+SerilogSetup.CreateBootstrapLogger();
+
+try
+{
+
 var builder = WebApplication.CreateBuilder(args);
+
+// BE-05 — Serilog thay logging mặc định; cấu hình sink nằm trong appsettings.
+builder.UseLuxMapSerilog();
 
 // Danh sách module của monolith. Liệt kê tường minh thay vì quét assembly:
 // thứ tự đăng ký nhìn thấy được, và thêm module là sửa đúng một dòng ở đây.
@@ -35,6 +47,9 @@ builder.Services.AddLuxMapJsonConventions();
 // BE-04 — versioning /api/v1, correlation id, và map lỗi validation về hình dạng của Contract.
 builder.Services.AddLuxMapApiConventions();
 
+// BE-05 — Swagger + security scheme JWT. Chỉ bật khi Swagger:Enabled = true.
+builder.Services.AddLuxMapSwagger();
+
 // BE-03 — EF Core + Npgsql + NetTopologySuite, một DbContext dùng chung.
 builder.Services.AddLuxMapPersistence(
     LuxMapConnectionString.FromEnvironment(),
@@ -45,7 +60,16 @@ builder.Services.AddLuxMapModules(builder.Configuration, modules);
 
 var app = builder.Build();
 
-app.UseLuxMapApiConventions();
+// Thứ tự bắt buộc:
+//   1. CorrelationIdMiddleware đẩy CorrelationId vào LogContext
+//   2. request logging của Serilog chạy BÊN TRONG scope đó nên dòng tổng kết mang id
+//   3. exception handler nằm trong cùng, để lỗi thành response 500 rồi Serilog ghi
+//      status thật thay vì tự log trùng một lần nữa
+app.UseLuxMapCorrelationId();
+app.UseLuxMapRequestLogging();
+app.UseLuxMapErrorHandling();
+
+app.UseLuxMapSwagger();
 app.UseHttpsRedirection();
 
 app.MapControllers();
@@ -54,6 +78,17 @@ app.MapControllers();
 app.MapLuxMapModules(modules);
 
 app.Run();
+
+}
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "LuxMap.Api dừng bất thường lúc khởi động");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 // Cho WebApplicationFactory trong test dựng được host này.
 public partial class Program;

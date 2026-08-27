@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -37,6 +38,30 @@ public sealed class TestEndpointsController : ControllerBase
 
     [HttpGet("ok")]
     public IActionResult Fine() => Ok(new { pole_id = "POLE-0001" });
+
+    /// <summary>
+    /// DTO mẫu CHỈ có trong assembly test, để kiểm chứng cấu hình sinh spec: enum ra chuỗi,
+    /// DateTime và DateOnly ra hai format khác nhau, tên property snake_case.
+    /// </summary>
+    [HttpGet("schema-probe")]
+    public ActionResult<SchemaProbe> Schema() => Ok(new SchemaProbe());
+
+    public sealed class SchemaProbe
+    {
+        public string PoleId { get; init; } = "POLE-0001";
+
+        public FixtureStatus FixtureStatus { get; init; }
+
+        public SourceChannel SourceChannel { get; init; }
+
+        public DateTime LastSeenAt { get; init; }
+
+        public DateOnly InstallDate { get; init; }
+
+        public DateOnly? WarrantyExpiry { get; init; }
+
+        public bool NearSensitivePoi { get; init; }
+    }
 
     public sealed class ValidatedBody
     {
