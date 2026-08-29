@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

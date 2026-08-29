@@ -8,6 +8,7 @@ using LuxMap.Modules.WorkOrders;
 using LuxMap.Api.Http;
 using LuxMap.Api.Observability;
 using LuxMap.Api.OpenApi;
+using LuxMap.Api.Seeding;
 using LuxMap.Persistence;
 using Serilog;
 using LuxMap.Shared.Modularity;
@@ -60,6 +61,12 @@ builder.Services.AddLuxMapModules(builder.Configuration, modules);
 
 var app = builder.Build();
 
+// BE-06 — `dotnet run -- --seed`: chạy seed rồi thoát, không dựng pipeline HTTP.
+if (SeedCommand.IsRequested(args))
+{
+    return await SeedCommand.RunAsync(app);
+}
+
 // Thứ tự bắt buộc:
 //   1. CorrelationIdMiddleware đẩy CorrelationId vào LogContext
 //   2. request logging của Serilog chạy BÊN TRONG scope đó nên dòng tổng kết mang id
@@ -78,6 +85,8 @@ app.MapControllers();
 app.MapLuxMapModules(modules);
 
 app.Run();
+
+return 0;
 
 }
 catch (Exception ex) when (ex is not HostAbortedException)

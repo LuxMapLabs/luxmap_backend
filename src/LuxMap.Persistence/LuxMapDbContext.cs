@@ -1,4 +1,5 @@
 using System.Reflection;
+using LuxMap.Persistence.Conventions;
 using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Persistence;
@@ -29,6 +30,10 @@ public class LuxMapDbContext(
         {
             modelBuilder.ApplyConfigurationsFromAssembly(assembly);
         }
+
+        // Phải chạy SAU khi áp hết cấu hình: quét model tìm cột đã gắn HasPrefixedId
+        // rồi tạo sequence tương ứng, để không ai phải nhớ khai sequence bằng tay.
+        modelBuilder.CreatePrefixedIdSequences();
     }
 }
 
