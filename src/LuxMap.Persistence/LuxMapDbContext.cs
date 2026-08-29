@@ -1,5 +1,6 @@
 using System.Reflection;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Shared.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Persistence;
@@ -17,9 +18,22 @@ namespace LuxMap.Persistence;
 /// </summary>
 public class LuxMapDbContext(
     DbContextOptions<LuxMapDbContext> options,
-    ModuleAssemblyCatalog catalog)
+    ModuleAssemblyCatalog catalog,
+    ICommuneScopeAccessor scopeAccessor)
     : DbContext(options)
 {
+    /// <summary>
+    /// Phạm vi địa bàn của request hiện tại. Query filter đọc qua ĐÂY chứ không bắt accessor từ
+    /// ngoài — xem chú thích ở <c>CommuneScopeBuilderExtensions.ApplyFilter</c>.
+    /// </summary>
+    public CommuneScope CurrentCommuneScope => scopeAccessor.Scope;
+
+    /// <summary>
+    /// Định danh tập module đã nạp. Model phụ thuộc vào nó nên khoá cache model phải gồm nó —
+    /// xem <see cref="LuxMapModelCacheKeyFactory"/>.
+    /// </summary>
+    internal string CatalogSignature => catalog.Signature;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -34,8 +48,12 @@ public class LuxMapDbContext(
         // Phải chạy SAU khi áp hết cấu hình: quét model tìm cột đã gắn HasPrefixedId
         // rồi tạo sequence tương ứng, để không ai phải nhớ khai sequence bằng tay.
         modelBuilder.CreatePrefixedIdSequences();
+
+        // Contract mục 7. Quên gắn scope là app KHÔNG khởi động được, thay vì rò dữ liệu im lặng.
+        modelBuilder.ApplyCommuneScope(this);
     }
 }
+
 
 /// <summary>
 /// Danh sách assembly được quét tìm cấu hình entity. Host dựng từ danh sách module đã đăng ký.
@@ -43,4 +61,7 @@ public class LuxMapDbContext(
 public sealed class ModuleAssemblyCatalog(IEnumerable<Assembly> assemblies)
 {
     public IReadOnlyList<Assembly> Assemblies { get; } = [.. assemblies.Distinct()];
+
+    /// <summary>Chuỗi ổn định đại diện cho tập assembly, dùng làm một phần khoá cache model.</summary>
+    public string Signature => field ??= string.Join('|', Assemblies.Select(a => a.FullName).Order(StringComparer.Ordinal));
 }

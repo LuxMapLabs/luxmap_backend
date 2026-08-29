@@ -2,6 +2,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LuxMap.Modules.Identity.Auth;
@@ -13,6 +14,9 @@ namespace LuxMap.Modules.Identity.Auth;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/auth")]
+// BE-08 đặt mặc định toàn ứng dụng là PHẢI xác thực. Ba endpoint này là đường vào để lấy token
+// nên bắt buộc mở, và phải khai tường minh.
+[AllowAnonymous]
 public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]

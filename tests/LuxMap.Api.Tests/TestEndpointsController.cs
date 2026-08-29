@@ -3,6 +3,7 @@ using Asp.Versioning;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LuxMap.Api.Tests;
@@ -14,6 +15,9 @@ namespace LuxMap.Api.Tests;
 [ApiController]
 [Route("api/v{version:apiVersion}/_test")]
 [ApiVersion("1.0")]
+// Nhóm endpoint này test pipeline LỖI và PHÂN TRANG của BE-04, không phải xác thực. BE-08 đặt
+// mặc định toàn ứng dụng là phải đăng nhập, nên phải mở tường minh.
+[AllowAnonymous]
 public sealed class TestEndpointsController : ControllerBase
 {
     [HttpGet("boom")]

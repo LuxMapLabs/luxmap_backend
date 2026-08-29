@@ -42,11 +42,15 @@ public static class KnownErrors
     public static readonly KnownError InvalidRefreshToken =
         new(ErrorCodes.InvalidRefreshToken, HttpStatusCode.Unauthorized, "BE-07, chưa có trong Contract");
 
+    /// <summary>BE-08 — cũng chưa có trong Contract.</summary>
+    public static readonly KnownError Unauthenticated =
+        new(ErrorCodes.Unauthenticated, HttpStatusCode.Unauthorized, "BE-08, chưa có trong Contract");
+
     public static IReadOnlyList<KnownError> All { get; } =
     [
         BboxTooLarge, PoleNotFound, LocationRequired,
         FaultTypeNotReportable, DuplicateOp, CommuneForbidden,
-        InvalidCredentials, AccountLocked, InvalidRefreshToken,
+        InvalidCredentials, AccountLocked, InvalidRefreshToken, Unauthenticated,
     ];
 
     public static KnownError? Find(string code)

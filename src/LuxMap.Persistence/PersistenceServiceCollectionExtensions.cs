@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Npgsql;
 
 namespace LuxMap.Persistence;
@@ -48,5 +49,7 @@ public static class PersistenceServiceCollectionExtensions
                 // sau khi initial migration đã chạy thì đổi rất phiền.
                 .MigrationsHistoryTable("__ef_migrations_history"))
             // Contract mục 5.1: tên bảng/cột snake_case toàn chữ thường, không quote.
-            .UseSnakeCaseNamingConvention();
+            .UseSnakeCaseNamingConvention()
+            // Model phụ thuộc danh sách module, nên khoá cache model phải gồm danh sách đó.
+            .ReplaceService<IModelCacheKeyFactory, LuxMapModelCacheKeyFactory>();
 }

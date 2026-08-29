@@ -5,6 +5,7 @@ using LuxMap.Modules.Identity;
 using LuxMap.Modules.Survey;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
+using LuxMap.Api.Authorization;
 using LuxMap.Api.Http;
 using LuxMap.Api.Observability;
 using LuxMap.Api.OpenApi;
@@ -51,6 +52,9 @@ builder.Services.AddLuxMapApiConventions();
 // BE-05 — Swagger + security scheme JWT. Chỉ bật khi Swagger:Enabled = true.
 builder.Services.AddLuxMapSwagger();
 
+// BE-08 — kiểm token, policy theo vai trò, và phạm vi địa bàn của Contract mục 7.
+builder.Services.AddLuxMapAuthorization();
+
 // BE-03 — EF Core + Npgsql + NetTopologySuite, một DbContext dùng chung.
 builder.Services.AddLuxMapPersistence(
     LuxMapConnectionString.FromEnvironment(),
@@ -78,6 +82,11 @@ app.UseLuxMapErrorHandling();
 
 app.UseLuxMapSwagger();
 app.UseHttpsRedirection();
+
+// Phải nằm TRONG UseStatusCodePages (tức sau UseLuxMapErrorHandling), nếu không 401/403
+// vẫn ra body rỗng thay vì hình dạng lỗi của Contract.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

@@ -51,4 +51,11 @@ public static class ErrorCodes
     /// một mã: phân biệt ra là giúp kẻ tấn công dò xem token nào từng tồn tại.
     /// </summary>
     public const string InvalidRefreshToken = "INVALID_REFRESH_TOKEN";
+
+    /// <summary>
+    /// 401 — access token thiếu, sai chữ ký, hết hạn, sai issuer hoặc sai audience.
+    /// MỘT mã cho MỌI nguyên nhân: phân biệt ra là giúp kẻ tấn công dò cấu hình.
+    /// KHÔNG có trong Contract v1.1, cần bổ sung ở FW-00.
+    /// </summary>
+    public const string Unauthenticated = "UNAUTHENTICATED";
 }

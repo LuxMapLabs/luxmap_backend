@@ -121,6 +121,10 @@ public static class ApiPipelineSetup
 
         var (code, message) = response.StatusCode switch
         {
+            // BE-08 — ASP.NET Core trả BODY RỖNG cho 401/403; Contract yêu cầu mọi API cùng một
+            // hình dạng lỗi nên phải dựng lại ở đây.
+            401 => (ErrorCodes.Unauthenticated, "Yêu cầu đăng nhập."),
+            403 => (ErrorCodes.CommuneForbidden, "Không có quyền truy cập tài nguyên này."),
             404 => ("NOT_FOUND", "Không tìm thấy tài nguyên."),
             405 => ("METHOD_NOT_ALLOWED", "Phương thức không được hỗ trợ trên đường dẫn này."),
             415 => ("UNSUPPORTED_MEDIA_TYPE", "Content-Type không được hỗ trợ."),

@@ -90,9 +90,25 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
     }
 
     [Fact]
-    public async Task Unmatched_route_also_returns_contract_error_shape()
+    public async Task Unmatched_route_returns_401_for_anonymous_callers_after_BE08()
     {
+        // BE-08 đặt fallback policy nên mọi request chưa xác thực đều dừng ở tầng authorization,
+        // KỂ CẢ route không tồn tại. Hệ quả có lợi: người lạ không dò được route nào có thật.
         var response = await Client.GetAsync("/api/v1/khong-ton-tai");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        AssertContractErrorShape(await ReadAsync(response));
+    }
+
+    [Fact]
+    public async Task Unmatched_route_returns_404_once_authenticated()
+    {
+        var client = factory.CreateClient();
+        var tokens = await client.LoginAsync("engineer", "SEED_ENGINEER_PASSWORD");
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        var response = await client.GetAsync("/api/v1/khong-ton-tai");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         AssertContractErrorShape(await ReadAsync(response));
@@ -101,8 +117,8 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
     [Fact]
     public async Task Every_known_contract_error_code_is_registered_with_its_status()
     {
-        // 6 mã Contract đặc tả + 3 mã của nhóm /auth ở BE-07 (chưa có trong Contract).
-        Assert.Equal(9, KnownErrors.All.Count);
+        // 6 mã Contract đặc tả + 3 mã /auth của BE-07 + 1 mã xác thực của BE-08.
+        Assert.Equal(10, KnownErrors.All.Count);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, KnownErrors.Find(ErrorCodes.BboxTooLarge)!.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, KnownErrors.Find(ErrorCodes.PoleNotFound)!.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, KnownErrors.Find(ErrorCodes.LocationRequired)!.StatusCode);
@@ -116,5 +132,8 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
         Assert.Equal(HttpStatusCode.Unauthorized, KnownErrors.Find(ErrorCodes.InvalidCredentials)!.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, KnownErrors.Find(ErrorCodes.AccountLocked)!.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, KnownErrors.Find(ErrorCodes.InvalidRefreshToken)!.StatusCode);
+
+        // BE-08 — một mã cho MỌI nguyên nhân xác thực thất bại.
+        Assert.Equal(HttpStatusCode.Unauthorized, KnownErrors.Find(ErrorCodes.Unauthenticated)!.StatusCode);
     }
 }
