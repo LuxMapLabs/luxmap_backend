@@ -36,6 +36,13 @@ public static class ContractEnum
             value => ToDbValue(value),
             text => Parse<TEnum>(text));
 
+    /// <summary>Bản cho cột enum cho phép NULL — NULL đi thẳng qua, không convert.</summary>
+    public static ValueConverter<TEnum?, string?> NullableConverter<TEnum>()
+        where TEnum : struct, Enum
+        => new(
+            value => value.HasValue ? ToDbValue(value.Value) : null,
+            text => text == null ? null : Parse<TEnum>(text));
+
     /// <summary>So sánh enum đã convert bằng giá trị, không phải bằng tham chiếu chuỗi.</summary>
     public static ValueComparer<TEnum> Comparer<TEnum>()
         where TEnum : struct, Enum
@@ -84,6 +91,32 @@ public static class ContractEnumBuilderExtensions
         return entity.ToTable(table => table.HasCheckConstraint(
             $"ck_{entity.Metadata.GetTableName()?.ToSnakeCaseLower()}_{column}",
             $"\"{column}\" IN ({allowed})"));
+    }
+
+    /// <summary>
+    /// Bản cho property enum nullable. CHECK constraint cho phép NULL, vì NULL ở đây mang
+    /// nghĩa nghiệp vụ riêng (ví dụ: chưa thu hồi) chứ không phải giá trị sai.
+    /// </summary>
+    public static EntityTypeBuilder<TEntity> HasContractEnum<TEntity, TEnum>(
+        this EntityTypeBuilder<TEntity> entity,
+        Expression<Func<TEntity, TEnum?>> property)
+        where TEntity : class
+        where TEnum : struct, Enum
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(property);
+
+        var builder = entity.Property(property);
+        builder
+            .HasColumnType("text")
+            .HasConversion(ContractEnum.NullableConverter<TEnum>());
+
+        var column = builder.Metadata.Name.ToSnakeCaseLower();
+        var allowed = string.Join(", ", ContractEnum.AllDbValues<TEnum>().Select(v => $"'{v}'"));
+
+        return entity.ToTable(table => table.HasCheckConstraint(
+            $"ck_{entity.Metadata.GetTableName()?.ToSnakeCaseLower()}_{column}",
+            $"\"{column}\" IS NULL OR \"{column}\" IN ({allowed})"));
     }
 
     /// <summary>

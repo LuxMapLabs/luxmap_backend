@@ -235,6 +235,47 @@ Trên PowerShell, đặt biến trước rồi gọi lệnh:
 $env:Swagger__Enabled="true"; dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
 ```
 
+## Xác thực
+
+Ba endpoint, đều **không cần** access token:
+
+```bash
+POST /api/v1/auth/login     { "username": "...", "password": "..." }
+POST /api/v1/auth/refresh   { "refresh_token": "..." }
+POST /api/v1/auth/logout    { "refresh_token": "..." }
+```
+
+Login và refresh trả đúng bốn trường: `access_token`, `refresh_token`, `token_type`, `expires_in`.
+`expires_in` là lifetime của **access** token tính bằng giây. Logout luôn trả `204`, kể cả khi
+token đã thu hồi hoặc không tồn tại.
+
+Claim trong access token — **BE-08 so chuỗi chính xác, đừng đổi**:
+
+| Claim | Kiểu | Ví dụ |
+|---|---|---|
+| `sub` | chuỗi | `USR-001` |
+| `role` | **chuỗi**, không phải mảng | `maintenance_engineer` |
+| `commune_ids` | **luôn là mảng** | `["COM-001"]` · Quản trị: `["*"]` |
+| `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
+
+Vòng đời: access **60 phút**; refresh trượt **30 ngày** mỗi lần xoay vòng, nhưng không bao giờ
+vượt trần **90 ngày** kể từ lần đăng nhập đầu của chuỗi đó.
+
+Mỗi lần đăng nhập mở một **chuỗi** riêng, nên thu hồi một chuỗi không đụng phiên trên thiết bị
+khác. Dùng lại token vừa xoay vòng trong **30 giây** được coi là retry lành tính (chỉ `401`);
+quá 30 giây thì thu hồi cả chuỗi đó. Token đã logout thì dùng lại **không bao giờ** bị coi là
+tấn công.
+
+Khoá ký lấy từ `JWT_SIGNING_KEY` trong `.env`. **Thiếu hoặc ngắn hơn 32 byte thì app dừng ngay
+lúc khởi động**, không chạy tiếp với giá trị mặc định. Sinh khoá mới:
+
+```bash
+openssl rand -base64 48
+```
+
+BE-07 chỉ **phát** token. Việc **kiểm** token và chặn request theo địa bàn là BE-08 — hiện chưa
+có endpoint nào yêu cầu đăng nhập.
+
 ## Cấu trúc
 
 | Project | Vai trò |

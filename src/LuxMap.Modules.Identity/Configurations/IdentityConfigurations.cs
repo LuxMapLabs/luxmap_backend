@@ -85,6 +85,7 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.Property(token => token.UserId).HasColumnType("text").IsRequired();
         builder.Property(token => token.TokenHash).HasColumnType("text").IsRequired();
         builder.Property(token => token.CreatedAt).HasDefaultValueSql("now()");
+        builder.HasContractEnum(token => token.RevokedReason);
 
         builder.HasOne(token => token.User)
             .WithMany(user => user.RefreshTokens)
@@ -101,5 +102,8 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
 
         // Dọn token hết hạn (BE-07) quét theo cột này.
         builder.HasIndex(token => token.ExpiresAt);
+
+        // Thu hồi cả chuỗi khi phát hiện dùng lại token: một câu UPDATE theo index này.
+        builder.HasIndex(token => token.ChainId);
     }
 }

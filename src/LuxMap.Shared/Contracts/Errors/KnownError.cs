@@ -32,10 +32,21 @@ public static class KnownErrors
     public static readonly KnownError CommuneForbidden =
         new(ErrorCodes.CommuneForbidden, HttpStatusCode.Forbidden, "mục 7");
 
+    // BE-07 — nhóm /auth. Contract chưa đặc tả, cần bổ sung ở FW-00.
+    public static readonly KnownError InvalidCredentials =
+        new(ErrorCodes.InvalidCredentials, HttpStatusCode.Unauthorized, "BE-07, chưa có trong Contract");
+
+    public static readonly KnownError AccountLocked =
+        new(ErrorCodes.AccountLocked, HttpStatusCode.Forbidden, "BE-07, chưa có trong Contract");
+
+    public static readonly KnownError InvalidRefreshToken =
+        new(ErrorCodes.InvalidRefreshToken, HttpStatusCode.Unauthorized, "BE-07, chưa có trong Contract");
+
     public static IReadOnlyList<KnownError> All { get; } =
     [
         BboxTooLarge, PoleNotFound, LocationRequired,
         FaultTypeNotReportable, DuplicateOp, CommuneForbidden,
+        InvalidCredentials, AccountLocked, InvalidRefreshToken,
     ];
 
     public static KnownError? Find(string code)
