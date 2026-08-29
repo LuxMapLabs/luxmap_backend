@@ -130,11 +130,42 @@ Quy ước bắt buộc:
 | SRID hình học | **4326** — `SpatialConstants.Srid` |
 | EPSG:3405 (VN-2000) | Chỉ nội bộ, không bao giờ ra API |
 | Enum | Cột `text` mang đúng chuỗi Contract, kèm `CHECK` constraint |
+| ID hiển thị | Sequence PostgreSQL, format ở tầng DB — `COM-001`, `POLE-0001` |
 | Thời gian | `timestamptz`, luôn `DateTimeKind.Utc` |
 
 Map enum bằng `builder.HasContractEnum(x => x.FaultType)` — hàm này vừa đặt value converter
 vừa sinh `CHECK`. Đừng dùng `HasConversion<string>()` mặc định của EF: nó lưu tên C#
 (`LampOut`) chứ không phải chuỗi Contract (`lamp_out`).
+
+### ID hiển thị
+
+Cả 16 entity có ID hiển thị (Contract mục 0.2) dùng chung một cơ chế. Trong
+`IEntityTypeConfiguration` của entity:
+
+```bash
+builder.Property(p => p.PoleId).HasPrefixedId(PrefixedIds.Pole);
+```
+
+`PrefixedIds` ở `LuxMap.Shared/Contracts/PrefixedId.cs` khai sẵn đủ 16 dòng của bảng prefix —
+đừng gõ lại prefix hay số chữ số bằng tay. **Không cần khai sequence**: `LuxMapDbContext` quét
+model tìm mọi cột đã đánh dấu rồi tạo sequence tương ứng, nên migration luôn đủ và không ai quên.
+
+Client KHÔNG tự đặt ID (Contract mục 0.4). Insert bỏ trống cột, DB sinh giá trị.
+
+## Seed dữ liệu nền
+
+```bash
+dotnet run --project src/LuxMap.Api -- --seed
+```
+
+Chạy lại bao nhiêu lần cũng được, không tạo trùng — mỗi bản ghi nhận diện bằng khoá tự nhiên
+(tên xã, username) chứ không phải ID, nên ID vẫn do sequence sinh đúng quy ước.
+
+Seed tạo một xã và bốn tài khoản, mỗi vai trò một tài khoản: `admin`, `agency`, `engineer`,
+`crew`. Mật khẩu đọc từ `.env` (`SEED_*_PASSWORD`) — **thiếu biến nào thì seed dừng hẳn** kèm
+thông báo, không lặng lẽ đặt mật khẩu mặc định.
+
+Phải `dotnet ef database update` trước; lệnh seed từ chối chạy khi còn migration chưa apply.
 
 ## Quy ước lỗi và phân trang
 
