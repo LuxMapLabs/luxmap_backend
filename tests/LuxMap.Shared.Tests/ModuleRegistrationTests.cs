@@ -25,15 +25,38 @@ public class ModuleRegistrationTests
         new AdminModule(),
     ];
 
+    /// <summary>
+    /// Module Identity CỐ Ý ném lỗi khi thiếu khoá ký JWT (BE-07 fail-fast), nên test phải cấp
+    /// khoá giả — đúng như host thật đọc từ .env.
+    /// </summary>
+    private static IConfiguration ConfigurationWithSigningKey()
+        => new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:SigningKey"] = "khoa-gia-chi-dung-trong-test-dai-hon-32-byte",
+            })
+            .Build();
+
     [Fact]
     public void Every_module_registers_without_throwing()
     {
         var services = new ServiceCollection();
-        var configuration = new ConfigurationBuilder().Build();
 
-        services.AddLuxMapModules(configuration, AllModules());
+        services.AddLuxMapModules(ConfigurationWithSigningKey(), AllModules());
 
         Assert.NotNull(services.BuildServiceProvider());
+    }
+
+    [Fact]
+    public void Identity_module_refuses_to_start_without_a_jwt_signing_key()
+    {
+        var services = new ServiceCollection();
+        var withoutKey = new ConfigurationBuilder().Build();
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => services.AddLuxMapModules(withoutKey, AllModules()));
+
+        Assert.Contains("JWT_SIGNING_KEY", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

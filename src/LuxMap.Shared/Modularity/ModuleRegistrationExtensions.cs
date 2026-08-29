@@ -15,9 +15,15 @@ public static class ModuleRegistrationExtensions
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(modules);
 
+        var mvc = services.AddControllers();
+
         foreach (var module in modules)
         {
             module.RegisterServices(services, configuration);
+
+            // Controller nằm trong assembly của module, không phải của host — phải nạp
+            // tường minh, nếu không MVC sẽ không thấy và route trả 404.
+            mvc.AddApplicationPart(module.GetType().Assembly);
         }
 
         return services;

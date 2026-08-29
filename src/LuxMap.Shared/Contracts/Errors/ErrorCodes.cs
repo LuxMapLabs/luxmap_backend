@@ -33,4 +33,22 @@ public static class ErrorCodes
 
     /// <summary>500 — lỗi chưa xử lý. Thông điệp cố ý chung chung, chi tiết chỉ có trong log theo correlation id.</summary>
     public const string InternalError = "INTERNAL_ERROR";
+
+    // ── Xác thực (BE-07) — cũng KHÔNG có trong Contract v1.1 ────────────────
+    // Contract chưa đặc tả nhóm endpoint /auth. Cần bổ sung ở FW-00.
+
+    /// <summary>
+    /// 401 — sai tài khoản HOẶC sai mật khẩu. Cố ý dùng CHUNG một mã cho cả hai:
+    /// tách ra là nói cho kẻ tấn công biết tài khoản nào tồn tại.
+    /// </summary>
+    public const string InvalidCredentials = "INVALID_CREDENTIALS";
+
+    /// <summary>403 — đúng mật khẩu nhưng tài khoản đang bị khoá.</summary>
+    public const string AccountLocked = "ACCOUNT_LOCKED";
+
+    /// <summary>
+    /// 401 — refresh token sai, hết hạn, đã thu hồi, hoặc bị dùng lại. Cũng cố ý dùng CHUNG
+    /// một mã: phân biệt ra là giúp kẻ tấn công dò xem token nào từng tồn tại.
+    /// </summary>
+    public const string InvalidRefreshToken = "INVALID_REFRESH_TOKEN";
 }

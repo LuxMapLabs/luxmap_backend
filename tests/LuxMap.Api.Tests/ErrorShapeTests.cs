@@ -101,7 +101,8 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
     [Fact]
     public async Task Every_known_contract_error_code_is_registered_with_its_status()
     {
-        Assert.Equal(6, KnownErrors.All.Count);
+        // 6 mã Contract đặc tả + 3 mã của nhóm /auth ở BE-07 (chưa có trong Contract).
+        Assert.Equal(9, KnownErrors.All.Count);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, KnownErrors.Find(ErrorCodes.BboxTooLarge)!.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, KnownErrors.Find(ErrorCodes.PoleNotFound)!.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, KnownErrors.Find(ErrorCodes.LocationRequired)!.StatusCode);
@@ -110,5 +111,10 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
 
         // Contract mục 2.8: trùng client_op_id trả 200, KHÔNG phải lỗi.
         Assert.Equal(HttpStatusCode.OK, KnownErrors.Find(ErrorCodes.DuplicateOp)!.StatusCode);
+
+        // BE-07 — sai tài khoản và sai mật khẩu dùng CHUNG một mã, cố ý.
+        Assert.Equal(HttpStatusCode.Unauthorized, KnownErrors.Find(ErrorCodes.InvalidCredentials)!.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, KnownErrors.Find(ErrorCodes.AccountLocked)!.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, KnownErrors.Find(ErrorCodes.InvalidRefreshToken)!.StatusCode);
     }
 }

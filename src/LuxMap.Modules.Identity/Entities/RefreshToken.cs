@@ -13,13 +13,28 @@ public class RefreshToken
 
     public required string UserId { get; set; }
 
+    /// <summary>
+    /// Nhóm mọi token sinh ra từ MỘT lần đăng nhập. Mỗi lần đăng nhập một chuỗi riêng, nên thu
+    /// hồi chuỗi này không đụng phiên đang chạy trên thiết bị khác của cùng người dùng.
+    /// </summary>
+    public Guid ChainId { get; set; }
+
     /// <summary>Hash của token, có unique index để tra cứu bằng một lần đọc index.</summary>
     public required string TokenHash { get; set; }
 
     public DateTime ExpiresAt { get; set; }
 
+    /// <summary>
+    /// Trần tuyệt đối của cả chuỗi: thời điểm ĐĂNG NHẬP ĐẦU + 90 ngày. Mọi token trong chuỗi
+    /// kế thừa đúng giá trị này; xoay vòng KHÔNG BAO GIỜ đẩy nó ra xa.
+    /// </summary>
+    public DateTime ChainAbsoluteExpiry { get; set; }
+
     /// <summary>Null nghĩa là chưa thu hồi.</summary>
     public DateTime? RevokedAt { get; set; }
+
+    /// <summary>Null khi chưa thu hồi. Xem <see cref="RefreshTokenRevocationReason"/>.</summary>
+    public RefreshTokenRevocationReason? RevokedReason { get; set; }
 
     /// <summary>
     /// Token mới thay thế token này khi xoay vòng (BE-07). Có chuỗi thay thế thì phát hiện được
