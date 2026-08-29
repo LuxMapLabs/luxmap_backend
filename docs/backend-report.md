@@ -1,8 +1,8 @@
 # LuxMap Backend — Báo cáo hiện trạng để review
 
 **Repo:** `LuxMapLabs/luxmap_backend` · **WP2** · nhánh tích hợp `dev`
-**Phạm vi báo cáo:** BE-00 → BE-07 (nền tảng W1 + nhóm Identity)
-**Ngày:** 30/08/2026 · **Quy mô:** ~5.760 dòng C# trong 78 file, 13 project (10 src + 3 test), 174 test
+**Phạm vi báo cáo:** BE-00 → BE-08 (nền tảng W1 + trọn nhóm Identity)
+**Ngày:** 30/08/2026 · **Quy mô:** ~6.970 dòng C# trong 92 file, 13 project (10 src + 3 test), 202 test
 
 > Tài liệu này viết cho người review code. Mọi khẳng định đều đối chiếu code thật trong repo,
 > không phải kế hoạch. Phần **§8 Điểm cần soi kỹ** và **§9 Chưa làm** là phần đáng đọc nhất.
@@ -39,8 +39,10 @@ Ba ràng buộc chi phối gần như mọi quyết định kỹ thuật:
 | BE-05 | Serilog + Swagger + security scheme JWT + export OpenAPI | `a3ff311` |
 | BE-06 | Entity Identity, initial migration, seed idempotent | `251c0c1` |
 | BE-07 | 3 endpoint auth, JWT HS256, xoay vòng refresh token | `3428377` |
+| BE-08 | Kiểm JWT, policy 4 vai trò, lọc theo địa bàn | `c07061c` |
 
-**Chưa merge:** BE-07 đang ở nhánh `feat/BE-07-auth-endpoints`.
+**Chưa merge:** BE-07 (`feat/BE-07-auth-endpoints`) và BE-08 (`feat/BE-08-authorization`, chồng
+trên BE-07).
 
 ---
 
@@ -48,8 +50,9 @@ Ba ràng buộc chi phối gần như mọi quyết định kỹ thuật:
 
 ```
 LuxMap.slnx
-├── src/LuxMap.Api                 host: pipeline, Serilog, Swagger, seed command
+├── src/LuxMap.Api                 host: pipeline, Serilog, Swagger, auth, seed command
 ├── src/LuxMap.Shared              quy ước Contract — KHÔNG phụ thuộc EF Core
+│   ├── Authorization              ICommuneScoped, CommuneScope, CommuneFilter
 │   ├── Contracts/Enums            12 enum Contract mục 1 + UserRole
 │   ├── Contracts/Errors           ApiErrorResponse, ErrorCodes, KnownErrors
 │   ├── Contracts/Paging           PagedResult<T>, PageRequest
@@ -94,7 +97,8 @@ assembly host, không nạp ApplicationPart thì MVC không thấy route và tr�
 | Serilog.AspNetCore | 10.0.0 | + Console 6.1.1, File 7.0.0 |
 | Swashbuckle.AspNetCore | 10.2.3 | + CLI cùng version (local tool) |
 | Asp.Versioning.Mvc | 10.2.1 | + `.ApiExplorer` |
-| Microsoft.IdentityModel.JsonWebTokens | 8.15.0 | phát JWT |
+| Microsoft.IdentityModel.JsonWebTokens | 8.15.0 | phát JWT (BE-07) |
+| Microsoft.AspNetCore.Authentication.JwtBearer | 10.0.11 | kiểm JWT (BE-08) |
 | DotNetEnv | 3.2.0 | nạp `.env` cho app |
 | xunit | 2.9.3 | + Mvc.Testing 10.0.11, TimeProvider.Testing 10.0.0 |
 
@@ -116,6 +120,7 @@ try {
     builder.Services.AddLuxMapJsonConventions();   // BE-00
     builder.Services.AddLuxMapApiConventions();    // BE-04: versioning + validation
     builder.Services.AddLuxMapSwagger();           // BE-05
+    builder.Services.AddLuxMapAuthorization();     // BE-08
     builder.Services.AddLuxMapPersistence(...);    // BE-03
     builder.Services.AddLuxMapModules(...);        // mỗi module tự đăng ký
 
@@ -127,6 +132,8 @@ try {
     app.UseLuxMapErrorHandling();     // 3. lỗi → response, Serilog thấy status thật
     app.UseLuxMapSwagger();
     app.UseHttpsRedirection();
+    app.UseAuthentication();          // 4. phải nằm TRONG UseStatusCodePages,
+    app.UseAuthorization();           //    nếu không 401/403 ra body rỗng
     app.MapControllers();
     app.MapLuxMapModules(modules);
     app.Run();
@@ -136,7 +143,8 @@ try {
 ```
 
 **Thứ tự 1→2→3 là bắt buộc.** Đảo lại thì hoặc log mất correlation id, hoặc Serilog tự bắt
-exception và log trùng với `ExceptionHandlingMiddleware`.
+exception và log trùng với `ExceptionHandlingMiddleware`. Bước 4 phải nằm **sau** bước 3 để
+`UseStatusCodePages` bọc được 401/403 — ASP.NET Core mặc định trả body rỗng cho hai status này.
 
 ---
 
@@ -393,54 +401,169 @@ lộ tài khoản tồn tại. Tài khoản khoá bị chặn ở **cả login l
 
 ---
 
-## 8. Điểm cần soi kỹ khi review
+## 8. Phân quyền (BE-08)
 
-1. **`RotateAsync` — giả định về mức cô lập transaction.** Cơ chế chống đồng thời dựa vào hành vi
+Đặc tả: Contract mục 7. Hướng dẫn cho người viết endpoint: [`authorization-guide.md`](authorization-guide.md).
+
+### 8.1 Kiểm token
+
+`AddJwtBearer` lấy **chính `JwtOptions`** mà BE-07 dùng để ký, qua DI — cùng một object nên không
+có cơ hội lệch issuer, audience hay khoá. Bật đủ: issuer, audience, lifetime, signing key, và
+`ValidAlgorithms` giới hạn đúng `HS256`.
+
+Hai chỉnh sửa bắt buộc so với mặc định của .NET:
+
+| | Mặc định | Đặt thành | Vì sao |
+|---|---|---|---|
+| `ClockSkew` | **5 phút** | **30 giây** | Access token sống 60 phút mà cho lệch 5 phút là quá rộng |
+| `MapInboundClaims` | `true` | **`false`** | Mặc định đổi `sub` thành `http://schemas.xmlsoap.org/.../nameidentifier`, khiến `User.FindFirst("sub")` **luôn** trả null |
+
+`commune_ids` là mảng trong JWT nên vào `ClaimsPrincipal` thành **nhiều claim cùng tên** — phải đọc
+bằng `FindAll`, `FindFirst` chỉ lấy được phần tử đầu.
+
+### 8.2 Fail đóng
+
+Fallback policy yêu cầu xác thực cho **toàn ứng dụng**. Endpoint mới được bảo vệ sẵn, không phải
+khai gì; muốn mở phải khai `[AllowAnonymous]` tường minh.
+
+Hệ quả: request chưa đăng nhập tới **route không tồn tại** nhận `401` chứ không phải `404`. Đây là
+chủ ý — người lạ không dò được route nào có thật.
+
+### 8.3 Lọc theo địa bàn — ba lớp
+
+| Lớp | Làm gì | Tính chất |
+|---|---|---|
+| Global query filter | Giới hạn mọi truy vấn trên entity khai `ICommuneScoped` | **Tự động** — endpoint không phải nhớ gì |
+| **Chốt chặn lúc dựng model** | Entity khai `ICommuneScoped` mà thiếu `HasCommuneScope()` → **app không boot** | Biến quên thành lỗi ồn ào |
+| Kiểm `commune_id` tường minh | `CommuneFilter.Narrow` ném 403 khi ngoài phạm vi | Bắt buộc — filter không làm được |
+
+Lớp thứ ba không thể bỏ: query filter chỉ *lọc mất bản ghi* rồi trả `200` với danh sách rỗng,
+trong khi Contract đòi **403 `COMMUNE_FORBIDDEN`**.
+
+Chốt chặn đối chiếu **annotation do chính hệ thống đặt**, cùng khuôn `HasPrefixedId` của BE-06 —
+không đi dò query filter trong nội bộ EF nên không phụ thuộc phiên bản EF.
+
+**Lọc nằm trong `WHERE`, không phải kiểm sau khi lấy.** Đây là điều kiện để tài nguyên ngoài phạm
+vi trả **404** đúng Contract: bản ghi đơn giản là không tìm thấy. Lấy-rồi-kiểm sẽ tự nhiên ra 403
+và tiết lộ tài nguyên đó tồn tại.
+
+### 8.4 ⚠️ Hai bẫy đã gặp thật — đừng làm hỏng
+
+**1. Filter phải tham chiếu `LuxMapDbContext`, không được bắt singleton từ ngoài.**
+
+Bản đầu tiên tôi viết filter bắt `ICommuneScopeAccessor` từ bên ngoài. EF **hằng-số-hoá**
+`scopeAccessor.Scope.IsSystemWide` vào query đã biên dịch, mà query cache theo hình dạng — nên
+**mọi người dùng sau đều dùng lại phạm vi của người dùng ĐẦU TIÊN**. Triệu chứng: admin, agency và
+crew đều thấy đúng một xã `COM-001`.
+
+Test bắt được. Đường đúng là tham chiếu qua DbContext — EF đọc lại giá trị theo từng instance
+context, tức từng request. Xem `CommuneScopeBuilderExtensions.ApplyFilter`.
+
+**2. `ICommuneScopeAccessor` phải đăng ký singleton, không phải scoped.** Cùng lý do: model dựng
+một lần rồi cache, giữ tham chiếu tới instance lúc dựng model. Singleton đọc `IHttpContextAccessor`
+(AsyncLocal **tĩnh**) nên vẫn lấy đúng người dùng từng request.
+
+### 8.5 `LuxMapModelCacheKeyFactory`
+
+Khoá cache model mặc định của EF chỉ gồm **kiểu DbContext**, trong khi model LuxMap còn phụ thuộc
+`ModuleAssemblyCatalog` — danh sách module quyết định entity nào có mặt. Thiếu lớp này thì hai host
+trong cùng một process với danh sách module khác nhau dùng chung model của host dựng trước, và host
+còn lại truy vấn entity của mình sẽ ném lỗi.
+
+Trong ứng dụng thật chỉ có một host nên không đổi gì — nhưng khoá cache phải phản ánh đúng thứ model
+thực sự phụ thuộc vào. Lỗi này lộ ra khi chạy test.
+
+### 8.6 Kiểm chéo `["*"]` với vai trò
+
+Claim `commune_ids` mang `"*"` mà vai trò không phải Quản trị → **403 + log mức Error**.
+
+Đây **không phải** chống client giả mạo — claim nằm trong JWT đã ký, client không sửa được nếu
+không có khoá. Đây là lớp chặn **lỗi ở phía phát token**: BE-06 **không có ràng buộc DB nào** buộc
+`has_system_wide_scope` đi cùng `role = 'administrator'` (chỉ seeder tự đặt khớp), nên một câu
+`UPDATE` tay hoặc một bug ở BE-33 là đủ để BE-07 phát `["*"]` cho tài khoản thường.
+
+Log ở mức **Error** vì đó là dấu hiệu bug ở phía phát token, không phải dấu hiệu bị tấn công.
+
+### 8.7 Mã lỗi
+
+| Tình huống | HTTP | `error.code` |
+|---|---|---|
+| Thiếu / sai / hết hạn token, sai `iss`, sai `aud` | 401 | `UNAUTHENTICATED` — một mã cho mọi nguyên nhân |
+| Sai vai trò · `commune_id` ngoài phạm vi · `["*"]` lệch vai trò | 403 | `COMMUNE_FORBIDDEN` |
+| Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` |
+
+401 và 403 đi qua `UseStatusCodePages` của BE-04 để có đúng hình dạng
+`{ error: { code, message, details } }` — ASP.NET Core mặc định trả **body rỗng**.
+
+---
+
+## 9. Điểm cần soi kỹ khi review
+
+1. **Chốt chặn KHÔNG bắt được entity quên khai `ICommuneScoped`.** Nó chỉ kiểm entity *đã* khai
+   interface. Entity mới có `commune_id` mà quên khai thì rò toàn bộ, im lặng, và không cơ chế nào
+   thấy. **Đây là giới hạn thật, chỉ review mới bắt được** — đừng coi cơ chế là kín.
+
+2. **Entity suy commune qua nhiều bậc không được bảo vệ.** `SurveyFrame`, `TelemetryReading` không
+   khai `ICommuneScoped` nên phải tự viết join có scope. Chỗ dễ rò nhất hệ thống, sẽ xuất hiện từ
+   BE-15 trở đi.
+
+3. **Ba đường lách query filter:** `IgnoreQueryFilters()`, `FromSqlRaw`, và `Find()` trên entity
+   đang được change tracker giữ. Không có gì chặn cả ba.
+
+4. **Chưa đo `EXPLAIN`.** Filter sinh `WHERE (@isSystemWide OR commune_id = ANY(@ids))` đi kèm
+   `ST_Intersects`. Giả thuyết là không phá GIST index vì index chính cho `bbox` nằm trên cột
+   geometry còn mệnh đề commune chỉ là filter phụ — **chưa chứng minh được**, chưa có bảng `pole`.
+   BE-14 bắt buộc phải đo; không đạt 500ms/2000 cột thì chuyển nhánh nóng sang repository tường minh.
+
+5. **Fail đóng đổi hành vi 404 của BE-04.** Request chưa xác thực tới route không tồn tại giờ nhận
+   401 thay vì 404. Có chủ ý, nhưng là thay đổi so với hành vi BE-04 đã có.
+
+6. **`RotateAsync` — giả định về mức cô lập transaction.** Cơ chế chống đồng thời dựa vào hành vi
    của READ COMMITTED trong PostgreSQL (UPDATE bị chặn rồi đánh giá lại điều kiện). Nếu ai đó đổi
    isolation level hoặc chuyển sang DB khác, bảo đảm này mất mà **không có test nào đỏ ngay** —
    test đồng thời hiện tại chạy trên PostgreSQL thật.
 
-2. **`HandleRevokedTokenAsync` chạy NGOÀI transaction.** Việc thu hồi chuỗi khi phát hiện reuse
+7. **`HandleRevokedTokenAsync` chạy NGOÀI transaction.** Việc thu hồi chuỗi khi phát hiện reuse
    không nằm trong transaction nào. Hai request reuse đồng thời có thể cùng chạy UPDATE thu hồi
    chuỗi — kết quả cuối vẫn đúng (idempotent) nhưng đáng xác nhận lại.
 
-3. **`commune_ids` lấy từ bảng nối mỗi lần phát token.** Sửa phân công xã của user **không** làm
+8. **`commune_ids` lấy từ bảng nối mỗi lần phát token.** Sửa phân công xã của user **không** làm
    access token đang lưu hành mất hiệu lực — nó vẫn mang claim cũ tới 60 phút. BE-08 cần biết điều
    này.
 
-4. **`AuthService` gọi `SaveChangesAsync` nhiều lần** trong `RotateAsync` và `IdentitySeeder`.
+9. **`AuthService` gọi `SaveChangesAsync` nhiều lần** trong `RotateAsync` và `IdentitySeeder`.
    Trong transaction thì an toàn, nhưng đáng soi xem có chỗ nào ngoài transaction không —
    PostgreSQL abort cả transaction khi một statement lỗi.
 
-5. **Test tích hợp chạy trên database dev thật**, không có isolation giữa các test. Chúng tạo
+10. **Test tích hợp chạy trên database dev thật**, không có isolation giữa các test. Chúng tạo
    `refresh_token` thật và không dọn. BE-36 (Testcontainers) sẽ xử lý; hiện tại chạy test nhiều
    lần sẽ tích luỹ rác trong bảng.
 
-6. **`ExceptionHandlingMiddleware` log 401 kèm stack trace.** `LogWarning(exception, ...)` nên mỗi
+11. **`ExceptionHandlingMiddleware` log 401 kèm stack trace.** `LogWarning(exception, ...)` nên mỗi
    401 auth ghi cả stack trace vào file log. Không rò credential nhưng rất ồn khi FM-05 test.
 
-7. **Timing attack — đã nhận diện, chưa xử lý.** Username sai thì trả 401 ngay; username đúng thì
+12. **Timing attack — đã nhận diện, chưa xử lý.** Username sai thì trả 401 ngay; username đúng thì
    chạy PBKDF2 rồi mới trả 401. Chênh lệch thời gian để lộ tài khoản nào tồn tại. Cách chuẩn là
    luôn verify với một hash giả.
 
-8. **`Program.cs` gọi `LuxMapConnectionString.FromEnvironment()` ở thời điểm đăng ký DI**, nên
+13. **`Program.cs` gọi `LuxMapConnectionString.FromEnvironment()` ở thời điểm đăng ký DI**, nên
    thiếu `POSTGRES_PASSWORD` là app không khởi động được — kể cả khi chỉ muốn export OpenAPI.
 
 ---
 
-## 9. Chưa làm / còn nợ
+## 10. Chưa làm / còn nợ
 
-### 9.1 Lệch với Contract — cần nêu ở FW-00
+### 10.1 Lệch với Contract — cần nêu ở FW-00
 
 | Chỗ lệch | Chi tiết |
 |---|---|
 | Nhóm `/auth` chưa có trong Contract | 3 endpoint, hình dạng response, 3 claim |
-| 5 mã lỗi chưa có trong Contract | `VALIDATION_FAILED`, `INTERNAL_ERROR`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `INVALID_REFRESH_TOKEN` |
+| 6 mã lỗi chưa có trong Contract | `VALIDATION_FAILED`, `INTERNAL_ERROR`, `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`, `INVALID_REFRESH_TOKEN`, `UNAUTHENTICATED` |
 | 4 giá trị `UserRole` chưa có trong Contract | `management_agency`, `maintenance_engineer`, `field_crew`, `administrator` — sẽ nằm trong claim JWT nên FE/mobile sẽ hardcode |
 | Correlation id | Nằm ở cả header lẫn `error.details`, khác quyết định ban đầu (chỉ header) |
 | Bỏ endpoint đăng ký | `tasks-backend.csv` dòng BE-07 vẫn ghi "API đăng ký" |
 
-### 9.2 Mock FO-26 lệch bảng prefix Contract mục 0.2 — sẽ chặn BE-39
+### 10.2 Mock FO-26 lệch bảng prefix Contract mục 0.2 — sẽ chặn BE-39
 
 | Trong mock | Contract quy định |
 |---|---|
@@ -451,11 +574,11 @@ lộ tài khoản tồn tại. Tài khoản khoá bị chặn ở **cả login l
 | `SWEEP-2026` | `SWP-001` |
 | `SUP-004` | không có trong bảng prefix |
 
-### 9.3 Chức năng chưa có
+### 10.3 Chức năng chưa có
 
-- **Không có `AddAuthentication`/`AddJwtBearer`** — BE-07 chỉ *phát* token. Hiện **chưa endpoint
-  nào yêu cầu đăng nhập**. Kiểm token và lọc theo địa bàn là BE-08.
 - **Redis chạy nhưng chưa có code nào dùng.**
+- **Chưa có health endpoint.** Fail đóng đã bật nhưng không có endpoint hạ tầng nào để kiểm tra
+  sống/chết từ ngoài.
 - **6/7 module domain là khung rỗng** — không entity, không endpoint. Từ BE-09.
 - **Chưa có CI.** Không có gì tự động phát hiện `docs/openapi/luxmap-v1.json` đã cũ khi thêm
   endpoint mà quên chạy lại lệnh export.
@@ -464,14 +587,14 @@ lộ tài khoản tồn tại. Tài khoản khoá bị chặn ở **cả login l
   claim `commune_ids` khớp cột `commune_id` chứ không dùng phép chứa không gian, và Nhánh C không
   có nguồn ranh giới thật.
 
-### 9.4 Mốc sắp tới dễ trượt
+### 10.4 Mốc sắp tới dễ trượt
 
 **BE-42 `LuxReading` hạn W4** — FO-14 đo lux ở W5, FM-14 và CV-12 phụ thuộc. Nằm ngoài dãy số
 BE-08 → BE-09 nên rất dễ bị bỏ quên khi làm tuần tự.
 
 ---
 
-## 10. Database
+## 11. Database
 
 | Bảng | Cột | Index |
 |---|---|---|
@@ -489,22 +612,27 @@ nhiên (tên xã, username) chứ không cấy ID cứng nên ID vẫn do sequen
 
 ---
 
-## 11. Test
+## 12. Test
 
 | Project | Số test | Phủ gì |
 |---|---|---|
-| `LuxMap.Shared.Tests` | 100 | Từng giá trị của 12 enum, snake_case, UTC/ISO 8601, hình dạng lỗi và phân trang, 16 prefix ID, `UserRole`, seam module |
+| `LuxMap.Shared.Tests` | 108 | Từng giá trị của 12 enum, snake_case, UTC/ISO 8601, hình dạng lỗi và phân trang, 16 prefix ID, `UserRole`, seam module, luật thu hẹp `commune_id` |
 | `LuxMap.Persistence.Tests` | 15 | Giá trị enum trong DB **khớp tuyệt đối** giá trị JSON |
-| `LuxMap.Api.Tests` | 59 | Pipeline thật qua `WebApplicationFactory`: hình dạng lỗi, correlation id, phân trang, spec OpenAPI, che dữ liệu nhạy cảm, **toàn bộ luồng auth** |
-| **Tổng** | **174** | tất cả xanh, build 0 warning |
+| `LuxMap.Api.Tests` | 79 | Pipeline thật qua `WebApplicationFactory`: hình dạng lỗi, correlation id, phân trang, spec OpenAPI, che dữ liệu nhạy cảm, **toàn bộ luồng auth**, **xác thực và phạm vi địa bàn** |
+| **Tổng** | **202** | tất cả xanh, build 0 warning |
 
-Test auth dùng `FakeTimeProvider` để tua qua cửa sổ ân hạn 30 giây và mốc 90 ngày mà không phải
-chờ thật, và **query thẳng database** để kiểm trạng thái bản ghi (thu hồi lúc nào, lý do, token
-thay thế, các token khác trong chuỗi) thay vì chỉ tin mã trả về của service.
+Test auth (BE-07) dùng `FakeTimeProvider` để tua qua cửa sổ ân hạn 30 giây và mốc 90 ngày mà không
+phải chờ thật, và **query thẳng database** để kiểm trạng thái bản ghi (thu hồi lúc nào, lý do,
+token thay thế, các token khác trong chuỗi) thay vì chỉ tin mã trả về của service.
+
+Test phân quyền (BE-08) dùng **entity chỉ tồn tại trong assembly test**; bảng do fixture tạo và
+xoá bằng SQL thô nên **không để lại migration nào trong dự án**. Entity vào model qua
+`ModuleAssemblyCatalog` — dùng đúng seam sẵn có của BE-03, không sửa gì ở ứng dụng thật.
+Chốt chặn được kiểm bằng cách **bỏ thật** `HasCommuneScope()` và xác nhận app không khởi động được.
 
 ---
 
-## 12. Chạy thử
+## 13. Chạy thử
 
 ```bash
 cp .env.example .env          # rồi đặt JWT_SIGNING_KEY và các SEED_*_PASSWORD
@@ -514,8 +642,14 @@ dotnet run --project src/LuxMap.Api -- --seed
 dotnet run --project src/LuxMap.Api
 ```
 
-Swagger ở `/swagger` (chỉ bật khi `Swagger:Enabled = true`, mặc định chỉ Development).
+Swagger ở `/swagger` (chỉ bật khi `Swagger:Enabled = true`, mặc định chỉ Development). Swagger
+không bị fallback policy chặn vì middleware của nó kết thúc request trước khi tới authorization.
+
+**Mọi endpoint khác đều yêu cầu đăng nhập.** Lấy token qua `POST /api/v1/auth/login` với một trong
+bốn tài khoản seed (`admin`, `agency`, `engineer`, `crew`), mật khẩu trong `.env`.
 Cổng mặc định: PostgreSQL **5433**, Redis **6380** (tránh đụng bản cài native trên máy dev), cả hai
 chỉ bind `127.0.0.1`.
 
-Xem thêm `README.md` cho chi tiết từng phần.
+Xem thêm:
+- [`README.md`](../README.md) — chi tiết từng phần
+- [`authorization-guide.md`](authorization-guide.md) — **bắt buộc đọc trước khi viết endpoint mới**
