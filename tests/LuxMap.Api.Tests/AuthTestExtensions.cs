@@ -7,7 +7,7 @@ public sealed record TokenPair(string AccessToken, string RefreshToken, int Expi
 
 public static class AuthTestExtensions
 {
-    /// <summary>Mật khẩu seed đọc từ .env, giống hệt cách BE-06 seed — không hard-code trong test.</summary>
+    /// <summary>Seed passwords come from .env exactly as BE-06 reads them — never hardcoded in tests.</summary>
     public static string SeedPassword(string variable)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -24,7 +24,7 @@ public static class AuthTestExtensions
             }
         }
 
-        throw new InvalidOperationException($"Thiếu {variable} trong .env");
+        throw new InvalidOperationException($"{variable} is missing from .env");
     }
 
     public static async Task<HttpResponseMessage> PostLoginAsync(this HttpClient client, string user, string password)

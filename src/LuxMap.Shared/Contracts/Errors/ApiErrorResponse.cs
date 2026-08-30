@@ -1,9 +1,10 @@
 namespace LuxMap.Shared.Contracts.Errors;
 
 /// <summary>
-/// Contract v1.1 mục 0 — hình dạng lỗi đã chốt: <c>{ "error": { "code", "message", "details" } }</c>.
-/// Correlation id đi ở header <see cref="ApiHeaders.CorrelationId"/>, không nằm trong body:
-/// body giữ đúng ba khoá đã publish.
+/// Contract v1.1 section 0 — the frozen error shape:
+/// <c>{ "error": { "code", "message", "details" } }</c>.
+/// The correlation id travels in the <see cref="ApiHeaders.CorrelationId"/> header and inside
+/// <c>details</c>; the object itself keeps exactly the three published keys.
 /// </summary>
 public sealed record ApiErrorResponse(ApiError Error)
 {
@@ -14,9 +15,9 @@ public sealed record ApiErrorResponse(ApiError Error)
         => new(new ApiError(code, message, details ?? ApiError.NoDetails));
 }
 
-/// <param name="Code">Mã ổn định để client rẽ nhánh, ví dụ <c>BBOX_TOO_LARGE</c>. Xem <see cref="ErrorCodes"/>.</param>
-/// <param name="Message">Câu mô tả cho người đọc. Client không được parse.</param>
-/// <param name="Details">Bag tuỳ ngữ cảnh; luôn có mặt, rỗng thì là <c>{}</c>.</param>
+/// <param name="Code">Stable machine-readable code, e.g. <c>BBOX_TOO_LARGE</c>. See <see cref="ErrorCodes"/>.</param>
+/// <param name="Message">Human-readable sentence. Clients must not parse it.</param>
+/// <param name="Details">Context bag; always present, rendered as <c>{}</c> when empty.</param>
 public sealed record ApiError(
     string Code,
     string Message,

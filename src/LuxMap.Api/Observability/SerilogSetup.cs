@@ -9,14 +9,14 @@ public static class SerilogSetup
     private static int bootstrapped;
 
     /// <summary>
-    /// Logger tối thiểu dùng trong lúc khởi động — nếu host chết trước khi đọc xong cấu hình
-    /// thì vẫn có chỗ ghi lại lý do.
+    /// A minimal logger for the startup window — if the host dies before configuration is read, there
+    /// is still somewhere to record why.
     /// </summary>
     /// <remarks>
-    /// Dùng <c>CreateLogger</c> chứ KHÔNG phải <c>CreateBootstrapLogger</c>: bootstrap logger
-    /// là loại reloadable, và <c>UseSerilog</c> sẽ gọi <c>Freeze()</c> lên nó mỗi lần dựng host.
-    /// Dựng host lần thứ hai trong cùng process — đúng điều WebApplicationFactory làm khi chạy
-    /// test — sẽ ném <c>The logger is already frozen</c>. Logger thường bị thay thế êm ru.
+    /// Uses <c>CreateLogger</c> and NOT <c>CreateBootstrapLogger</c>: a bootstrap logger is reloadable
+    /// and <c>UseSerilog</c> calls <c>Freeze()</c> on it every time a host is built. Building a second
+    /// host in the same process — exactly what WebApplicationFactory does in tests — then throws
+    /// <c>The logger is already frozen</c>. A plain logger is replaced silently.
     /// </remarks>
     public static void CreateBootstrapLogger()
     {
@@ -36,16 +36,16 @@ public static class SerilogSetup
 
         builder.Host.UseSerilog((context, _, configuration) => configuration
             .ReadFrom.Configuration(context.Configuration)
-            // Bắt buộc cho correlation id: CorrelationIdMiddleware đẩy property vào LogContext,
-            // enricher này mới là thứ đưa nó vào từng log entry.
+            // Required for the correlation id: CorrelationIdMiddleware pushes the property onto
+            // LogContext, and this enricher is what copies it into each log entry.
             .Enrich.FromLogContext()
             .Enrich.With<SensitivePropertyScrubber>()
             .Enrich.WithProperty("Application", "LuxMap.Api"));
     }
 
     /// <summary>
-    /// Một dòng tổng kết cho mỗi request: method, path, status code, thời gian xử lý.
-    /// KHÔNG đưa header vào — Authorization sẽ lộ token.
+    /// One summary line per request: method, path, status code, elapsed time.
+    /// Headers are deliberately excluded — Authorization would leak the token.
     /// </summary>
     public static WebApplication UseLuxMapRequestLogging(this WebApplication app)
     {
@@ -54,7 +54,7 @@ public static class SerilogSetup
         app.UseSerilogRequestLogging(options =>
         {
             options.MessageTemplate =
-                "{RequestMethod} {RequestPath} trả {StatusCode} trong {Elapsed:0.0000} ms";
+                "{RequestMethod} {RequestPath} returned {StatusCode} in {Elapsed:0.0000} ms";
 
             options.GetLevel = static (httpContext, _, exception) => exception is not null
                 ? LogEventLevel.Error
@@ -70,8 +70,8 @@ public static class SerilogSetup
                 diagnostics.Set("RequestHost", httpContext.Request.Host.Value);
                 diagnostics.Set("RequestScheme", httpContext.Request.Scheme);
 
-                // Correlation id đã có sẵn qua LogContext; set thêm ở đây để dòng tổng kết
-                // vẫn mang nó kể cả khi ai đó đổi thứ tự middleware.
+                // The correlation id already arrives via LogContext; setting it here as well keeps
+                // the summary line correct even if someone reorders the middleware.
                 var correlation = httpContext.RequestServices.GetService<CorrelationIdHolder>();
                 if (correlation is not null)
                 {

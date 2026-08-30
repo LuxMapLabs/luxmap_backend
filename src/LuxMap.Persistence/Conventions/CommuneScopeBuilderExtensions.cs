@@ -6,30 +6,30 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace LuxMap.Persistence.Conventions;
 
 /// <summary>
-/// Lọc theo địa bàn ở tầng truy vấn (Contract mục 7).
+/// Commune scoping at the query level (Contract section 7).
 /// <para>
-/// Dùng trong <c>IEntityTypeConfiguration</c> của entity khai <see cref="ICommuneScoped"/>:
+/// Use it in the <c>IEntityTypeConfiguration</c> of any entity implementing <see cref="ICommuneScoped"/>:
 /// <code>
 /// builder.HasCommuneScope();
 /// </code>
 /// </para>
 /// </summary>
 /// <remarks>
-/// Cùng khuôn với <c>HasPrefixedId</c>: lệnh này chỉ ĐÁNH DẤU ý định; bộ lọc thật do
-/// <see cref="LuxMapDbContext"/> áp tập trung sau khi đã nạp hết cấu hình module — vì
-/// <c>ApplyConfigurationsFromAssembly</c> khởi tạo cấu hình bằng constructor rỗng nên không
-/// tiêm được <see cref="ICommuneScopeAccessor"/> vào đây.
+/// Same shape as <c>HasPrefixedId</c>: this call only MARKS the intent; the actual filter is applied
+/// centrally by <see cref="LuxMapDbContext"/> once every module configuration has been loaded —
+/// <c>ApplyConfigurationsFromAssembly</c> instantiates configurations through their parameterless
+/// constructor, so an <see cref="ICommuneScopeAccessor"/> cannot be injected here.
 /// <para>
-/// Lọc nằm trong <c>WHERE</c> chứ không phải kiểm sau khi lấy — đây là điều kiện để
-/// <c>GET /poles/{id}</c> ngoài phạm vi trả <b>404</b>: bản ghi đơn giản là không tìm thấy.
-/// Lấy-rồi-kiểm sẽ tự nhiên ra 403 và tiết lộ tài nguyên đó tồn tại.
+/// The filter lives in the <c>WHERE</c> clause rather than in a post-fetch check — that is what makes
+/// an out-of-scope <c>GET /poles/{id}</c> return <b>404</b>: the row simply is not found.
+/// Fetch-then-check naturally produces 403 and reveals that the resource exists.
 /// </para>
 /// </remarks>
 public static class CommuneScopeBuilderExtensions
 {
     /// <summary>
-    /// Annotation do CHÍNH hệ thống đặt. Chốt chặn đối chiếu annotation này chứ không đi dò
-    /// query filter trong nội bộ EF — nhờ vậy không phụ thuộc phiên bản EF.
+    /// An annotation WE define. The guard compares against this rather than probing EF's internal
+    /// query-filter metadata, so it does not depend on the EF version.
     /// </summary>
     internal const string ScopeAnnotation = "LuxMap:CommuneScopeApplied";
 
@@ -41,8 +41,8 @@ public static class CommuneScopeBuilderExtensions
     }
 
     /// <summary>
-    /// Áp bộ lọc cho mọi entity đã đánh dấu, VÀ kiểm bất biến: entity khai
-    /// <see cref="ICommuneScoped"/> mà thiếu đánh dấu thì ném lỗi — app không khởi động được.
+    /// Applies the filter to every marked entity AND enforces the invariant: an entity implementing
+    /// <see cref="ICommuneScoped"/> without the marker throws — the application will not start.
     /// </summary>
     internal static void ApplyCommuneScope(this ModelBuilder modelBuilder, LuxMapDbContext context)
     {
@@ -60,9 +60,9 @@ public static class CommuneScopeBuilderExtensions
         if (missing.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Entity khai ICommuneScoped nhưng chưa gọi HasCommuneScope(): {string.Join(", ", missing)}. "
-                + "Contract mục 7 yêu cầu lọc theo địa bàn ở server, LUÔN LUÔN — thiếu là rò dữ liệu xã khác. "
-                + "Thêm builder.HasCommuneScope() vào IEntityTypeConfiguration của entity đó.");
+                $"Entities implement ICommuneScoped but never call HasCommuneScope(): {string.Join(", ", missing)}. "
+                + "Contract section 7 requires commune scoping on the server, ALWAYS — leaving it out leaks "
+                + "data across communes. Add builder.HasCommuneScope() to that entity's IEntityTypeConfiguration.");
         }
 
         foreach (var entity in scoped)
@@ -78,15 +78,15 @@ public static class CommuneScopeBuilderExtensions
             nameof(ApplyFilter), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     /// <summary>
-    /// Biểu thức tham chiếu CHÍNH DbContext, không phải một singleton bắt từ ngoài.
+    /// The expression references the DbContext ITSELF, not an accessor captured from outside.
     /// </summary>
     /// <remarks>
-    /// ⚠️ Đây không phải chuyện phong cách. Bắt <c>ICommuneScopeAccessor</c> từ bên ngoài thì EF
-    /// coi <c>scopeAccessor.Scope.IsSystemWide</c> là biểu thức con tính được và HẰNG-SỐ-HOÁ nó
-    /// vào query đã biên dịch. Query đó được cache theo hình dạng, nên MỌI người dùng sau đều
-    /// dùng lại phạm vi của người dùng ĐẦU TIÊN — rò dữ liệu im lặng.
-    /// Tham chiếu qua DbContext là đường EF hỗ trợ chính thức: giá trị được đọc lại theo từng
-    /// instance context, tức từng request.
+    /// ⚠️ This is not a style choice. Capturing <c>ICommuneScopeAccessor</c> from outside lets EF treat
+    /// <c>scopeAccessor.Scope.IsSystemWide</c> as an evaluatable subtree and FOLD IT INTO A CONSTANT
+    /// inside the compiled query. That query is cached by shape, so EVERY later user reuses the FIRST
+    /// user's scope — a silent cross-commune leak.
+    /// Going through the DbContext is the officially supported path: the value is re-read per context
+    /// instance, which means per request.
     /// </remarks>
     private static void ApplyFilter<TEntity>(ModelBuilder modelBuilder, LuxMapDbContext context)
         where TEntity : class, ICommuneScoped

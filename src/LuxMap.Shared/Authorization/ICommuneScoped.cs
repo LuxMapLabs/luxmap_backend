@@ -1,20 +1,22 @@
 namespace LuxMap.Shared.Authorization;
 
 /// <summary>
-/// Entity mang <c>commune_id</c> trực tiếp và PHẢI bị giới hạn theo phạm vi địa bàn của
-/// người dùng (Contract mục 7).
+/// An entity that carries <c>commune_id</c> directly and MUST be restricted to the caller's
+/// commune scope (Contract section 7).
 /// </summary>
 /// <remarks>
-/// Khai interface này là một lời cam kết có chốt chặn: <c>LuxMapDbContext</c> kiểm lúc dựng model,
-/// entity nào implement mà chưa gọi <c>HasCommuneScope()</c> thì <b>app không khởi động được</b>.
-/// Quên scope trở thành lỗi ồn ào ngay lập tức thay vì lỗ rò im lặng.
+/// Implementing this interface is a promise with teeth: <c>LuxMapDbContext</c> verifies it while
+/// building the model, and an entity that implements it without calling <c>HasCommuneScope()</c>
+/// makes <b>the application fail to start</b>. Forgetting the scope becomes a loud error instead
+/// of a silent leak.
 /// <para>
-/// ⚠️ Chốt chặn chỉ thấy được entity ĐÃ khai interface này. Entity có <c>commune_id</c> mà quên
-/// khai thì không cơ chế nào bắt được — đó là giới hạn thật, phải chặn ở khâu review.
+/// ⚠️ The guard only sees entities that ALREADY implement this interface. An entity that has
+/// <c>commune_id</c> but forgets to implement it slips through — that is a real limit, and only
+/// code review catches it.
 /// </para>
 /// <para>
-/// Entity phải suy ra commune qua nhiều bậc quan hệ (<c>SurveyFrame</c>, <c>TelemetryReading</c>)
-/// KHÔNG khai interface này; chúng đi qua truy vấn tường minh có scope.
+/// Entities whose commune is several relationships away (<c>SurveyFrame</c>,
+/// <c>TelemetryReading</c>) do NOT implement this; they go through explicit scoped queries.
 /// </para>
 /// </remarks>
 public interface ICommuneScoped

@@ -1,62 +1,62 @@
 namespace LuxMap.Modules.Identity.Auth;
 
 /// <summary>
-/// Cấu hình phát JWT. Giá trị không bí mật nằm ở <c>appsettings.json</c> mục <c>Jwt</c>;
-/// khoá ký KHÔNG nằm ở đó — xem <see cref="SigningKey"/>.
+/// JWT issuance settings. Non-secret values live in <c>appsettings.json</c> under <c>Jwt</c>; the
+/// signing key does NOT — see <see cref="SigningKey"/>.
 /// </summary>
 public sealed record JwtOptions
 {
     public const string SectionName = "Jwt";
 
-    /// <summary>Biến môi trường chứa khoá ký, nạp từ <c>.env</c> như mật khẩu DB ở BE-03.</summary>
+    /// <summary>Environment variable holding the signing key, loaded from <c>.env</c> like the BE-03 database password.</summary>
     public const string SigningKeyEnvironmentVariable = "JWT_SIGNING_KEY";
 
-    /// <summary>HS256 cần khoá tối thiểu 256 bit.</summary>
+    /// <summary>HS256 requires at least a 256-bit key.</summary>
     public const int MinimumSigningKeyBytes = 32;
 
-    /// <summary>BE-08 so chuỗi CHÍNH XÁC. Lệch một ký tự là mọi request bị từ chối.</summary>
+    /// <summary>BE-08 compares this string EXACTLY. One character out and every request is rejected.</summary>
     public string Issuer { get; init; } = "luxmap-api";
 
     public string Audience { get; init; } = "luxmap-clients";
 
-    /// <summary>Access token sống 60 phút — giá trị này đi thẳng vào <c>expires_in</c>.</summary>
+    /// <summary>Access tokens live 60 minutes — this value goes straight into <c>expires_in</c>.</summary>
     public int AccessTokenMinutes { get; init; } = 60;
 
-    /// <summary>Refresh token trượt: mỗi lần xoay vòng lại được 30 ngày kể từ lúc đó.</summary>
+    /// <summary>Sliding refresh window: each rotation grants another 30 days from that moment.</summary>
     public int RefreshSlidingDays { get; init; } = 30;
 
-    /// <summary>Trần tuyệt đối kể từ lần đăng nhập đầu. Xoay vòng không đẩy mốc này ra xa.</summary>
+    /// <summary>Absolute ceiling measured from the first sign-in. Rotation never pushes it further out.</summary>
     public int RefreshAbsoluteDays { get; init; } = 90;
 
     /// <summary>
-    /// Dùng lại token vừa xoay vòng trong bấy nhiêu giây được coi là retry lành tính.
-    /// Vùng sóng yếu retry là hoạt động bình thường, cùng tinh thần với <c>client_op_id</c>.
+    /// Replaying a just-rotated token within this many seconds counts as a benign retry. Retrying on a
+    /// weak connection is normal behaviour, in the same spirit as <c>client_op_id</c>.
     /// </summary>
     public int ReuseGraceSeconds { get; init; } = 30;
 
-    /// <summary>Khoá ký HS256. Không hard-code, không commit, không có giá trị mặc định.</summary>
+    /// <summary>The HS256 signing key. Never hardcoded, never committed, never defaulted.</summary>
     public required string SigningKey { get; init; }
 
     public TimeSpan AccessTokenLifetime => TimeSpan.FromMinutes(AccessTokenMinutes);
 
     public TimeSpan ReuseGraceWindow => TimeSpan.FromSeconds(ReuseGraceSeconds);
 
-    /// <summary>Thiếu khoá hoặc khoá quá ngắn thì DỪNG ngay lúc khởi động, không chạy tiếp.</summary>
+    /// <summary>A missing or too-short key STOPS startup immediately rather than running on.</summary>
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(SigningKey))
         {
             throw new InvalidOperationException(
-                $"Thiếu {SigningKeyEnvironmentVariable}. Chạy `cp .env.example .env` ở thư mục gốc repo "
-                + "rồi đặt một khoá ngẫu nhiên đủ dài.");
+                $"{SigningKeyEnvironmentVariable} is not set. Run `cp .env.example .env` at the repository "
+                + "root and put a long random key in it.");
         }
 
         var bytes = System.Text.Encoding.UTF8.GetByteCount(SigningKey);
         if (bytes < MinimumSigningKeyBytes)
         {
             throw new InvalidOperationException(
-                $"{SigningKeyEnvironmentVariable} chỉ dài {bytes} byte, HS256 cần tối thiểu "
-                + $"{MinimumSigningKeyBytes} byte.");
+                $"{SigningKeyEnvironmentVariable} is only {bytes} bytes; HS256 requires at least "
+                + $"{MinimumSigningKeyBytes}.");
         }
     }
 }

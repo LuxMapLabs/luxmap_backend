@@ -21,8 +21,8 @@ public static class ModuleRegistrationExtensions
         {
             module.RegisterServices(services, configuration);
 
-            // Controller nằm trong assembly của module, không phải của host — phải nạp
-            // tường minh, nếu không MVC sẽ không thấy và route trả 404.
+            // Controllers live in the module's assembly, not the host's — they must be registered
+            // explicitly or MVC never discovers the routes and every call returns 404.
             mvc.AddApplicationPart(module.GetType().Assembly);
         }
 

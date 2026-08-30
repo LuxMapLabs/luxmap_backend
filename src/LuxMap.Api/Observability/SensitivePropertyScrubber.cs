@@ -4,16 +4,16 @@ using Serilog.Events;
 namespace LuxMap.Api.Observability;
 
 /// <summary>
-/// Chặn cứng các trường nhạy cảm ở tầng ghi log, thay vì trông chờ mọi lời gọi log
-/// đều nhớ không truyền chúng vào. Bất kỳ property nào có tên khớp danh sách dưới đây
-/// đều bị thay bằng <c>***</c> trước khi sink nhìn thấy.
+/// Hard-blocks sensitive fields at the logging layer instead of trusting every call site to remember
+/// not to pass them. Any property whose name matches the list below is replaced with <c>***</c>
+/// before any sink sees it.
 /// </summary>
 public sealed class SensitivePropertyScrubber : ILogEventEnricher
 {
     private const string Mask = "***";
 
-    /// <summary>So khớp theo chuỗi con, không phân biệt hoa thường — bắt được cả
-    /// <c>Authorization</c>, <c>RequestHeaders.Authorization</c>, <c>DbPassword</c>...</summary>
+    /// <summary>Matched as a case-insensitive substring — catches <c>Authorization</c>,
+    /// <c>RequestHeaders.Authorization</c>, <c>DbPassword</c> and so on.</summary>
     private static readonly string[] SensitiveFragments =
     [
         "authorization",
@@ -33,7 +33,7 @@ public sealed class SensitivePropertyScrubber : ILogEventEnricher
     {
         ArgumentNullException.ThrowIfNull(logEvent);
 
-        // Chụp danh sách tên trước khi sửa, tránh sửa collection đang duyệt.
+        // Snapshot the names before mutating, so we never modify the collection we are iterating.
         var offenders = logEvent.Properties.Keys.Where(IsSensitive).ToArray();
 
         foreach (var name in offenders)

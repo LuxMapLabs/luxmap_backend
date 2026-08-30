@@ -3,14 +3,14 @@ using Npgsql;
 namespace LuxMap.Persistence;
 
 /// <summary>
-/// Dựng connection string từ đúng những biến môi trường mà <c>.env</c> của BE-02 đã khai,
-/// để cổng và mật khẩu chỉ tồn tại ở MỘT chỗ cho cả docker compose lẫn ứng dụng.
+/// Builds the connection string from exactly the environment variables declared in the BE-02
+/// <c>.env</c>, so the port and password live in ONE place shared by Docker Compose and the app.
 /// </summary>
 public static class LuxMapConnectionString
 {
     public const string DefaultHost = "localhost";
 
-    /// <summary>5433 chứ không phải 5432 — xem docker-compose.yml của BE-02.</summary>
+    /// <summary>5433 rather than 5432 — see the BE-02 docker-compose.yml.</summary>
     public const int DefaultPort = 5433;
 
     public const string DefaultDatabase = "luxmap_dev";
@@ -18,7 +18,7 @@ public static class LuxMapConnectionString
 
     public static string FromEnvironment()
     {
-        // Cho phép ghi đè trọn gói (CI, staging) trước khi ghép từ từng mảnh.
+        // A whole-string override (CI, staging) wins before we assemble from parts.
         var whole = Environment.GetEnvironmentVariable("ConnectionStrings__LuxMap");
         if (!string.IsNullOrWhiteSpace(whole))
         {
@@ -29,8 +29,8 @@ public static class LuxMapConnectionString
         if (string.IsNullOrWhiteSpace(password))
         {
             throw new InvalidOperationException(
-                "Thiếu POSTGRES_PASSWORD. Chạy `cp .env.example .env` ở thư mục gốc repo, " +
-                "hoặc set biến môi trường ConnectionStrings__LuxMap.");
+                "POSTGRES_PASSWORD is not set. Run `cp .env.example .env` at the repository root, "
+                + "or set the ConnectionStrings__LuxMap environment variable.");
         }
 
         return Build(

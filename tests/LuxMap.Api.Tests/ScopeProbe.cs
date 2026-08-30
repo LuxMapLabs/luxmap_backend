@@ -6,14 +6,14 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Entity CHỈ tồn tại trong assembly test (phương án (c)). Không có migration; bảng do
-/// <c>ScopeTestFixture</c> tạo và xoá bằng SQL thô, nên không để lại gì trong migration history
-/// của dự án.
+/// An entity that exists ONLY in the test assembly (option (c)). No migration; the table is created
+/// and dropped with raw SQL by <c>ScopeTestFixture</c>, so nothing is left behind in the project's
+/// migration history.
 /// </summary>
 /// <remarks>
-/// <c>CommuneId</c> là cột THƯỜNG có index, giống hệt cách <c>Pole</c> sẽ có ở BE-09 — khác
-/// <c>AdministrativeUnit</c> nơi <c>commune_id</c> là khoá chính, lọc trên khoá chính là ca suy
-/// biến không bắt được lỗi thật.
+/// <c>CommuneId</c> is an ORDINARY indexed column, exactly as <c>Pole</c> will have it in BE-09 —
+/// unlike <c>AdministrativeUnit</c>, where <c>commune_id</c> is the primary key and filtering on the
+/// key is a degenerate case that would not catch a real bug.
 /// </remarks>
 public class ScopeProbe : ICommuneScoped
 {
@@ -35,7 +35,7 @@ public sealed class ScopeProbeConfiguration : IEntityTypeConfiguration<ScopeProb
         builder.Property(probe => probe.CommuneId).HasColumnType("text").IsRequired();
         builder.HasIndex(probe => probe.CommuneId);
 
-        // Đây là dòng mà chốt chặn lúc khởi động đòi hỏi. Bỏ nó đi thì app không boot.
+        // This is the line the startup guard demands. Remove it and the application will not boot.
         builder.HasCommuneScope();
     }
 }

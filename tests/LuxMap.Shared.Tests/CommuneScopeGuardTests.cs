@@ -3,7 +3,7 @@ using LuxMap.Shared.Authorization;
 namespace LuxMap.Shared.Tests;
 
 /// <summary>
-/// Luật thu hẹp theo tham số <c>commune_id</c> (Contract mục 7) và hành vi fail đóng của
+/// The <c>commune_id</c> narrowing rules (Contract section 7) and the fail-closed behaviour of
 /// <see cref="CommuneScope"/>.
 /// </summary>
 public class CommuneScopeTests
@@ -57,7 +57,7 @@ public class CommuneScopeTests
     [Fact]
     public void One_forbidden_commune_poisons_the_whole_request()
     {
-        // Trộn xã hợp lệ với xã ngoài phạm vi vẫn phải 403, không được lặng lẽ bỏ cái sai.
+        // Mixing an allowed commune with a forbidden one must still be 403, never silently dropped.
         Assert.Throws<LuxMap.Shared.Http.LuxMapException>(
             () => CommuneFilter.Narrow(CommuneScope.ForCommunes(["COM-001"]), ["COM-001", "COM-009"]));
     }

@@ -7,22 +7,22 @@ using LuxMap.Shared.Contracts.Enums;
 namespace LuxMap.Api.Authorization;
 
 /// <summary>
-/// Rút phạm vi địa bàn từ <see cref="ClaimsPrincipal"/> của request hiện tại.
+/// Derives the commune scope from the current request's <see cref="ClaimsPrincipal"/>.
 /// </summary>
 /// <remarks>
-/// ⚠️ PHẢI đăng ký là <b>singleton</b>, không phải scoped. Model của EF Core dựng MỘT LẦN rồi
-/// được cache, và biểu thức query filter giữ tham chiếu tới đúng instance accessor lúc dựng
-/// model. Nếu accessor là scoped thì mọi request sau sẽ dùng lại phạm vi của request đầu tiên —
-/// rò dữ liệu im lặng, đúng loại lỗi BE-08 sinh ra để chặn.
-/// Singleton đọc <see cref="IHttpContextAccessor"/> nên vẫn lấy đúng người dùng của từng request.
+/// ⚠️ MUST be registered as a <b>singleton</b>, not scoped. EF Core builds the model ONCE and caches
+/// it, and the query-filter expression holds a reference to whichever accessor instance existed at
+/// model-build time. A scoped accessor would leave every later request reusing the first request's
+/// scope — a silent leak, exactly the failure BE-08 exists to prevent.
+/// A singleton reading <see cref="IHttpContextAccessor"/> still resolves the correct user per request.
 /// </remarks>
 public sealed class CommuneScopeAccessor(IHttpContextAccessor httpContextAccessor) : ICommuneScopeAccessor
 {
     public CommuneScope Scope => FromPrincipal(httpContextAccessor.HttpContext?.User);
 
     /// <summary>
-    /// Fail đóng ở mọi nhánh: chưa xác thực, claim thiếu hẳn, hoặc claim rỗng đều ra
-    /// <see cref="CommuneScope.Empty"/> — KHÔNG bao giờ hiểu là "không có ràng buộc".
+    /// Fails closed on every branch: unauthenticated, claim missing entirely, or claim present but
+    /// empty all produce <see cref="CommuneScope.Empty"/> — none of them ever means "unrestricted".
     /// </summary>
     public static CommuneScope FromPrincipal(ClaimsPrincipal? principal)
     {
@@ -31,8 +31,8 @@ public sealed class CommuneScopeAccessor(IHttpContextAccessor httpContextAccesso
             return CommuneScope.Empty;
         }
 
-        // commune_ids là MẢNG trong JWT nên vào ClaimsPrincipal thành NHIỀU claim cùng tên.
-        // Phải dùng FindAll, FindFirst chỉ lấy được phần tử đầu.
+        // commune_ids is an ARRAY in the JWT, so it becomes SEVERAL claims of the same name in the
+        // principal. FindAll is required; FindFirst would only ever see the first element.
         var communeIds = principal.FindAll(AuthClaims.CommuneIds).Select(claim => claim.Value).ToArray();
 
         if (communeIds.Length == 0)
@@ -45,9 +45,9 @@ public sealed class CommuneScopeAccessor(IHttpContextAccessor httpContextAccesso
             return CommuneScope.ForCommunes(communeIds);
         }
 
-        // Phòng vệ chiều sâu: '*' chỉ có nghĩa khi vai trò đúng là Quản trị. Trường hợp lệch đã
-        // bị chặn ở CommuneScopeConsistencyHandler; ở đây fail đóng lần nữa phòng khi ai đó
-        // dùng accessor ngoài đường pipeline có authorization.
+        // Defence in depth: '*' only means anything when the role really is Administrator. The
+        // mismatch case is already rejected by CommuneScopeConsistencyHandler; failing closed a
+        // second time here covers anyone using the accessor outside the authorization pipeline.
         return IsAdministrator(principal) ? CommuneScope.SystemWide : CommuneScope.Empty;
     }
 

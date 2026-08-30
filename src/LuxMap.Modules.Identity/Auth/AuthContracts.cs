@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace LuxMap.Modules.Identity.Auth;
 
 /// <summary>
-/// Login CHỈ kiểm tra có mặt và độ dài tối đa. KHÔNG áp password policy ở đây — mật khẩu hợp lệ
-/// đặt từ trước sẽ bị chặn trước khi kịp so với DB.
+/// Login validates presence and a sane maximum length ONLY. No password policy here — an old but
+/// valid password would be rejected before it ever reached the database.
 /// </summary>
 public sealed class LoginRequest
 {
@@ -32,10 +32,10 @@ public sealed class LogoutRequest
 }
 
 /// <summary>
-/// Hình dạng response của login và refresh. ĐÚNG bốn trường, không thêm gì.
-/// Serialize snake_case theo quy ước BE-00.
+/// Response shape for login and refresh. EXACTLY four fields, nothing more.
+/// Serialised as snake_case per the BE-00 conventions.
 /// </summary>
-/// <param name="ExpiresIn">Lifetime của ACCESS token tính bằng giây, kể từ lúc phát response.</param>
+/// <param name="ExpiresIn">Lifetime of the ACCESS token in seconds, measured from when the response is issued.</param>
 public sealed record AuthTokenResponse(
     string AccessToken,
     string RefreshToken,

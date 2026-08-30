@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Assets;
 
 /// <summary>
-/// Module Assets — Pole, Fixture, RoadSegment, Feeder, topology và truy vấn bbox (BE-09..BE-14).
-/// Khung rỗng ở BE-01: chưa có entity, chưa có endpoint.
+/// Assets module — Pole, Fixture, RoadSegment, Feeder, topology and bbox queries (BE-09..BE-14).
+/// Empty shell as of BE-01: no entities, no endpoints yet.
 /// </summary>
 public sealed class AssetsModule : ILuxMapModule
 {

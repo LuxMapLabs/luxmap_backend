@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace LuxMap.Api.Tests;
 
-/// <summary>Nhóm 1 — xác thực.</summary>
+/// <summary>Group 1 — authentication.</summary>
 [Collection(nameof(ScopeCollection))]
 public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper output)
 {
@@ -27,7 +27,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
     private static async Task AssertContractErrorAsync(HttpResponseMessage response, string expectedCode)
     {
         var body = await response.Content.ReadAsStringAsync();
-        Assert.False(string.IsNullOrWhiteSpace(body), "401/403 KHÔNG được trả body rỗng");
+        Assert.False(string.IsNullOrWhiteSpace(body), "401/403 must NOT return an empty body");
 
         var root = JsonDocument.Parse(body).RootElement;
         Assert.Equal(["error"], root.EnumerateObject().Select(p => p.Name));
@@ -66,7 +66,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
         var client = await AuthenticatedAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var response = await client.GetAsync("/api/v1/_scope/whoami");
 
-        output.WriteLine($"  token của BE-07 → HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  token issued by BE-07 → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -76,9 +76,9 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
         var client = await AuthenticatedAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var root = JsonDocument.Parse(await client.GetStringAsync("/api/v1/_scope/whoami")).RootElement;
 
-        output.WriteLine($"  đọc từ ClaimsPrincipal: {root.GetRawText()}");
+        output.WriteLine($"  read from ClaimsPrincipal: {root.GetRawText()}");
 
-        // Nếu MapInboundClaims chưa tắt thì "sub" sẽ là null ở đây.
+        // With MapInboundClaims still on, "sub" would be null here.
         Assert.Equal("USR-003", root.GetProperty("sub").GetString());
         Assert.Equal("maintenance_engineer", root.GetProperty("role").GetString());
         Assert.NotEmpty(root.GetProperty("commune_ids").EnumerateArray());
@@ -94,9 +94,9 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
             var root = JsonDocument.Parse(await client.GetStringAsync("/api/v1/_scope/whoami")).RootElement;
 
             var communes = root.GetProperty("commune_ids").EnumerateArray().Select(v => v.GetString()).ToArray();
-            output.WriteLine($"  commune_ids đọc ra: [{string.Join(", ", communes)}]");
+            output.WriteLine($"  commune_ids read back: [{string.Join(", ", communes)}]");
 
-            // FindAll chứ không phải FindFirst — FindFirst chỉ lấy được phần tử đầu.
+            // FindAll, not FindFirst — FindFirst would only see the first element.
             Assert.Equal(2, communes.Length);
             Assert.Contains(ScopeTestFixture.InScopeCommune, communes);
             Assert.Contains(factory.SecondCommune, communes);
@@ -115,23 +115,23 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         await AssertContractErrorAsync(response, ErrorCodes.Unauthenticated);
-        output.WriteLine($"  không token → {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
+        output.WriteLine($"  no token → {(int)response.StatusCode} {await response.Content.ReadAsStringAsync()}");
     }
 
     [Theory]
-    [InlineData("hết hạn")]
-    [InlineData("sai khoá ký")]
-    [InlineData("sai issuer")]
-    [InlineData("sai audience")]
+    [InlineData("expired")]
+    [InlineData("wrong signing key")]
+    [InlineData("wrong issuer")]
+    [InlineData("wrong audience")]
     public async Task Invalid_tokens_all_return_the_same_401(string reason)
     {
         var token = reason switch
         {
-            "hết hạn" => ForgeToken("luxmap-api", "luxmap-clients", RealKey, DateTime.UtcNow.AddMinutes(-10)),
-            "sai khoá ký" => ForgeToken("luxmap-api", "luxmap-clients",
-                "khoa-hoan-toan-khac-nhung-du-dai-32-byte-tro-len", DateTime.UtcNow.AddHours(1)),
-            "sai issuer" => ForgeToken("ke-gia-mao", "luxmap-clients", RealKey, DateTime.UtcNow.AddHours(1)),
-            _ => ForgeToken("luxmap-api", "audience-khac", RealKey, DateTime.UtcNow.AddHours(1)),
+            "expired" => ForgeToken("luxmap-api", "luxmap-clients", RealKey, DateTime.UtcNow.AddMinutes(-10)),
+            "wrong signing key" => ForgeToken("luxmap-api", "luxmap-clients",
+                "a-completely-different-key-that-is-at-least-32-bytes", DateTime.UtcNow.AddHours(1)),
+            "wrong issuer" => ForgeToken("an-impostor", "luxmap-clients", RealKey, DateTime.UtcNow.AddHours(1)),
+            _ => ForgeToken("luxmap-api", "a-different-audience", RealKey, DateTime.UtcNow.AddHours(1)),
         };
 
         var client = factory.CreateClient();
@@ -150,7 +150,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
         var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
         var response = await client.GetAsync("/api/v1/_scope/engineer-only");
 
-        output.WriteLine($"  field_crew gọi endpoint của kỹ sư → HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  field_crew calling an engineer-only endpoint → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         await AssertContractErrorAsync(response, ErrorCodes.CommuneForbidden);
     }
@@ -165,13 +165,13 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
     [Fact]
     public async Task Auth_endpoints_stay_reachable_without_a_token()
     {
-        // Đăng nhập được khi chưa đăng nhập — nếu không thì không ai vào được hệ thống.
+        // Signing in must work while unauthenticated — otherwise nobody can ever get in.
         var login = await Client.PostLoginAsync("engineer", AuthTestExtensions.SeedPassword("SEED_ENGINEER_PASSWORD"));
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
         var anonymous = await Client.GetAsync("/api/v1/_scope/open");
         Assert.Equal(HttpStatusCode.OK, anonymous.StatusCode);
 
-        output.WriteLine("  /auth/login và endpoint [AllowAnonymous] đều vào được khi chưa đăng nhập");
+        output.WriteLine("  /auth/login and the [AllowAnonymous] endpoint are both reachable without a token");
     }
 }

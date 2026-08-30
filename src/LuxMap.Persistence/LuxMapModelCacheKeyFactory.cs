@@ -4,14 +4,14 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 namespace LuxMap.Persistence;
 
 /// <summary>
-/// Khoá cache model của EF mặc định chỉ gồm KIỂU DbContext. Nhưng model của LuxMap còn phụ thuộc
-/// <see cref="ModuleAssemblyCatalog"/> — danh sách module quyết định entity nào có mặt.
+/// EF Core's default model cache key is just the DbContext TYPE. The LuxMap model also depends on
+/// <see cref="ModuleAssemblyCatalog"/> — the module list decides which entities exist.
 /// </summary>
 /// <remarks>
-/// Không có lớp này thì hai host trong cùng một process với danh sách module khác nhau sẽ dùng
-/// chung model của host dựng trước, và host còn lại truy vấn entity của mình sẽ ném lỗi. Trong
-/// ứng dụng thật chỉ có một host nên không đổi gì; nhưng khoá cache phải phản ánh đúng thứ model
-/// thực sự phụ thuộc vào, nếu không đây là quả bom hẹn giờ cho mọi kịch bản nhiều host.
+/// Without this, two hosts in the same process with different module lists share whichever model was
+/// built first, and the other one throws when it queries its own entities. The real application only
+/// ever runs one host, so nothing changes there — but the cache key must reflect what the model
+/// actually depends on, otherwise this is a time bomb for every multi-host scenario.
 /// </remarks>
 public sealed class LuxMapModelCacheKeyFactory : IModelCacheKeyFactory
 {

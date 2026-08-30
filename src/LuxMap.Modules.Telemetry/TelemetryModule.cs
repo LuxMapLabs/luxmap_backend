@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Telemetry;
 
 /// <summary>
-/// Module Telemetry — IotNode, TelemetryReading, ingest idempotent theo (node_id, reading_time).
-/// Khung rỗng ở BE-01: chưa có entity, chưa có endpoint.
+/// Telemetry module — IotNode, TelemetryReading, ingest idempotent on (node_id, reading_time).
+/// Empty shell as of BE-01: no entities, no endpoints yet.
 /// </summary>
 public sealed class TelemetryModule : ILuxMapModule
 {

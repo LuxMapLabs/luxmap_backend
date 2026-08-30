@@ -9,9 +9,9 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Host thật cho nhóm test BE-08. Thêm assembly test vào <see cref="ModuleAssemblyCatalog"/> để
-/// <see cref="ScopeProbe"/> vào model — dùng đúng seam sẵn có của BE-03, không sửa gì ở ứng dụng.
-/// Bảng tạo và xoá bằng SQL thô nên KHÔNG để lại migration nào trong dự án.
+/// A real host for the BE-08 tests. It adds the test assembly to <see cref="ModuleAssemblyCatalog"/>
+/// so <see cref="ScopeProbe"/> joins the model — reusing the existing BE-03 seam without touching the
+/// application. The table is created and dropped with raw SQL, so NO migration is left in the project.
 /// </summary>
 public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -46,13 +46,13 @@ public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLif
         await db.Database.ExecuteSqlRawAsync(ScopeProbeSchema.DropSql);
         await db.Database.ExecuteSqlRawAsync(ScopeProbeSchema.CreateSql);
 
-        // Hai xã phụ tạo mới mỗi lần chạy để không đụng dữ liệu seed của BE-06.
-        SecondCommune = await EnsureCommuneAsync(db, $"Xã test scope B {Guid.NewGuid():N}"[..28]);
-        OutOfScopeCommune = await EnsureCommuneAsync(db, $"Xã test scope C {Guid.NewGuid():N}"[..28]);
+        // Two extra communes created per run so BE-06's seeded data is never disturbed.
+        SecondCommune = await EnsureCommuneAsync(db, $"Scope test commune B {Guid.NewGuid():N}"[..34]);
+        OutOfScopeCommune = await EnsureCommuneAsync(db, $"Scope test commune C {Guid.NewGuid():N}"[..34]);
 
-        InScopeProbeId = await InsertProbeAsync(db, "trong phạm vi", InScopeCommune);
-        SecondProbeId = await InsertProbeAsync(db, "xã thứ hai", SecondCommune);
-        OutOfScopeProbeId = await InsertProbeAsync(db, "ngoài phạm vi", OutOfScopeCommune);
+        InScopeProbeId = await InsertProbeAsync(db, "in scope", InScopeCommune);
+        SecondProbeId = await InsertProbeAsync(db, "second commune", SecondCommune);
+        OutOfScopeProbeId = await InsertProbeAsync(db, "out of scope", OutOfScopeCommune);
     }
 
     public new async Task DisposeAsync()
@@ -66,7 +66,7 @@ public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLif
         await base.DisposeAsync();
     }
 
-    /// <summary>Gán xã cho user seed để claim commune_ids có nhiều phần tử.</summary>
+    /// <summary>Assigns a commune to a seeded user so the commune_ids claim holds several values.</summary>
     public async Task AssignCommuneAsync(string username, string communeId)
     {
         await using var scope = Services.CreateAsyncScope();

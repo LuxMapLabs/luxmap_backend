@@ -5,9 +5,9 @@ using LuxMap.Shared.Serialization;
 namespace LuxMap.Shared.Tests;
 
 /// <summary>
-/// ⚠️ Bốn giá trị này KHÔNG có trong Contract v1.1 — do BE-06 đặt. Chúng sẽ nằm trong claim
-/// của JWT nên FE và mobile sẽ hardcode; khoá lại ở đây để không ai đổi ngầm trước khi
-/// Contract được cập nhật ở FW-00.
+/// ⚠️ These four values are NOT in Contract v1.1 — BE-06 chose them. They travel in the JWT claim, so
+/// web and mobile will hardcode them; pinned here so nobody changes them quietly before the Contract
+/// is updated at FW-00.
 /// </summary>
 public class UserRoleTests
 {
@@ -24,7 +24,7 @@ public class UserRoleTests
     {
         Assert.Equal(4, Enum.GetValues<UserRole>().Length);
 
-        // CLAUDE.md và Contract mục 7 đều nêu đích danh: không có vai trò Người dân.
+        // Both CLAUDE.md and Contract section 7 state it explicitly: there is no Citizen role.
         foreach (var forbidden in new[] { "citizen", "public", "resident", "nguoidan" })
         {
             Assert.DoesNotContain(forbidden, string.Join(',', Enum.GetNames<UserRole>()), StringComparison.OrdinalIgnoreCase);

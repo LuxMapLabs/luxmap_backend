@@ -4,25 +4,25 @@ using LuxMap.Shared.Http;
 namespace LuxMap.Shared.Authorization;
 
 /// <summary>
-/// Kiểm tham số <c>commune_id</c> mà client truyền lên.
+/// Validates the <c>commune_id</c> query parameter supplied by the client.
 /// </summary>
 /// <remarks>
-/// Global query filter KHÔNG làm được việc này: nó chỉ lọc mất bản ghi, cho ra danh sách rỗng và
-/// HTTP 200. Contract mục 7 đòi <b>403 <c>COMMUNE_FORBIDDEN</c></b> khi client hỏi một xã ngoài
-/// phạm vi, nên phần này bắt buộc phải kiểm tường minh ở tầng vào.
+/// A global query filter cannot do this job: it merely drops rows, producing an empty list with
+/// HTTP 200. Contract section 7 requires <b>403 <c>COMMUNE_FORBIDDEN</c></b> when the client asks
+/// for a commune outside its scope, so this check must be explicit at the entry point.
 /// <para>
-/// Query param <c>commune_id</c> là bộ lọc THU HẸP trong phạm vi được phép, không phải cách mở
-/// rộng phạm vi.
+/// <c>commune_id</c> NARROWS within the permitted scope; it never widens it.
 /// </para>
 /// </remarks>
 public static class CommuneFilter
 {
     /// <summary>
-    /// Trả về tập xã cần lọc thêm, hoặc <c>null</c> nghĩa là "không thu hẹp" (để query filter lo).
+    /// Returns the communes to narrow to, or <c>null</c> meaning "no narrowing" (leave it to the
+    /// query filter).
     /// </summary>
     /// <exception cref="LuxMapException">
-    /// 403 <c>COMMUNE_FORBIDDEN</c> nếu có bất kỳ xã nào nằm ngoài phạm vi — kể cả khi các xã
-    /// còn lại đều hợp lệ.
+    /// 403 <c>COMMUNE_FORBIDDEN</c> if ANY requested commune falls outside the scope — even when
+    /// the remaining ones are valid.
     /// </exception>
     public static IReadOnlyList<string>? Narrow(CommuneScope scope, IEnumerable<string>? requested)
     {
@@ -45,9 +45,9 @@ public static class CommuneFilter
             throw new LuxMapException(
                 ErrorCodes.CommuneForbidden,
                 System.Net.HttpStatusCode.Forbidden,
-                "Yêu cầu địa bàn ngoài phạm vi được phép.",
-                // Nêu đúng xã bị từ chối là an toàn: client đã tự nói ra giá trị đó, không lộ
-                // thêm thông tin nào về dữ liệu bên trong.
+                "Requested commune is outside the permitted scope.",
+                // Echoing the rejected commune is safe: the client supplied that value itself, so
+                // it reveals nothing about the data behind the API.
                 new Dictionary<string, object?> { ["commune_id"] = forbidden });
         }
 

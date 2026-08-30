@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "WP2 — GIS + IoT + Computer Vision quản lý chiếu sáng đường nông thôn. Base URL /api/v1. Quy ước theo API Contract v1.1: JSON snake_case, enum là chuỗi thường, thời gian ISO 8601 UTC hậu tố Z, toạ độ EPSG:4326.",
+    "description": "WP2 — GIS + IoT + Computer Vision platform for rural street-lighting assets. Base URL /api/v1. Conventions from API Contract v1.1: snake_case JSON, lowercase string enums, ISO 8601 UTC timestamps with a Z suffix, EPSG:4326 coordinates.",
     "version": "v1"
   },
   "paths": {
@@ -330,7 +330,7 @@
           "simulated"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — data_source. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — data_source. Frozen: do not add values, do not rename, do not use int."
       },
       "FaultStatus": {
         "enum": [
@@ -342,7 +342,7 @@
           "verified"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — fault_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — fault_status. Frozen: do not add values, do not rename, do not use int."
       },
       "FaultType": {
         "enum": [
@@ -353,7 +353,7 @@
           "runtime_decline"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — fault_type. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — fault_type. Frozen: do not add values, do not rename, do not use int."
       },
       "FixtureStatus": {
         "enum": [
@@ -363,7 +363,7 @@
           "unknown"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — fixture_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — fixture_status. Frozen: do not add values, do not rename, do not use int."
       },
       "FixtureType": {
         "enum": [
@@ -371,7 +371,7 @@
           "solar_all_in_one"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — fixture_type. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — fixture_type. Frozen: do not add values, do not rename, do not use int."
       },
       "LoginRequest": {
         "required": [
@@ -413,7 +413,7 @@
           "sampled_fixture"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — node_role. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — node_role. Frozen: do not add values, do not rename, do not use int."
       },
       "NodeStatus": {
         "enum": [
@@ -422,7 +422,7 @@
           "never_reported"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — node_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — node_status. Frozen: do not add values, do not rename, do not use int."
       },
       "PowerSource": {
         "enum": [
@@ -430,7 +430,7 @@
           "solar"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — power_source. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — power_source. Frozen: do not add values, do not rename, do not use int."
       },
       "RefreshRequest": {
         "required": [
@@ -452,7 +452,7 @@
           "inter_village"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — road_class. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — road_class. Frozen: do not add values, do not rename, do not use int."
       },
       "Severity": {
         "enum": [
@@ -462,7 +462,7 @@
           "critical"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — severity. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — severity. Frozen: do not add values, do not rename, do not use int."
       },
       "SourceChannel": {
         "enum": [
@@ -471,7 +471,7 @@
           "field_report"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — source_channel. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — source_channel. Frozen: do not add values, do not rename, do not use int."
       },
       "WorkOrderStatus": {
         "enum": [
@@ -483,13 +483,13 @@
           "cancelled"
         ],
         "type": "string",
-        "description": "Contract v1.1 mục 1 — work_order_status. Khoá cứng: không thêm giá trị, không đổi tên, không dùng int."
+        "description": "Contract v1.1 section 1 — work_order_status. Frozen: do not add values, do not rename, do not use int."
       }
     },
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Dán JWT vào đây, KHÔNG kèm tiền tố 'Bearer '.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       }

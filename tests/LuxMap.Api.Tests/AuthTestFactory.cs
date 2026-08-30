@@ -10,8 +10,8 @@ using Microsoft.Extensions.Time.Testing;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Host thật cho nhóm test BE-07, có <see cref="FakeTimeProvider"/> thay cho đồng hồ hệ thống
-/// để tua thời gian qua cửa sổ ân hạn 30 giây mà không phải chờ thật.
+/// A real host for the BE-07 tests, with <see cref="FakeTimeProvider"/> replacing the system clock so
+/// time can be wound past the 30-second grace window without actually waiting.
 /// </summary>
 public sealed class AuthTestFactory : WebApplicationFactory<Program>
 {
@@ -27,7 +27,7 @@ public sealed class AuthTestFactory : WebApplicationFactory<Program>
         });
     }
 
-    /// <summary>Truy vấn thẳng database — kiểm trạng thái THẬT của bản ghi, không tin service.</summary>
+    /// <summary>Queries the database directly — inspects the REAL row state instead of trusting the service.</summary>
     public async Task<T> QueryAsync<T>(Func<LuxMapDbContext, Task<T>> query)
     {
         await using var scope = Services.CreateAsyncScope();

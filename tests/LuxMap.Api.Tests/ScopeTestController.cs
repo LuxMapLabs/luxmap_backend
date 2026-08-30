@@ -10,11 +10,11 @@ using Microsoft.EntityFrameworkCore;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Controller CHỈ tồn tại trong assembly test — nạp vào host qua ApplicationPart. Ứng dụng thật
-/// không có endpoint nghiệp vụ nào ở BE-08.
+/// A controller that exists ONLY in the test assembly, loaded through an ApplicationPart. The real
+/// application ships no business endpoints in BE-08.
 /// <para>
-/// Viết đúng như BE-14/BE-20/BE-40 sẽ viết, để test chứng minh được cơ chế hoạt động với cách
-/// dùng thật chứ không phải cách dùng riêng cho test.
+/// Written exactly the way BE-14/BE-20/BE-40 will write theirs, so the tests prove the mechanism
+/// against real usage rather than a test-only shortcut.
 /// </para>
 /// </summary>
 [ApiController]
@@ -24,7 +24,7 @@ public sealed class ScopeTestController(
     LuxMapDbContext dbContext,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
-    /// <summary>Không gọi gì thêm — global filter tự giới hạn theo claim.</summary>
+    /// <summary>Nothing extra to call — the global filter restricts by claim on its own.</summary>
     [HttpGet("probes")]
     public async Task<IActionResult> ListAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId,
@@ -32,7 +32,7 @@ public sealed class ScopeTestController(
     {
         var query = dbContext.Set<ScopeProbe>().AsNoTracking();
 
-        // Bước tường minh DUY NHẤT: kiểm tham số client truyền lên. Ngoài phạm vi → 403.
+        // The ONLY explicit step: validate the client-supplied parameter. Out of scope → 403.
         var narrowed = CommuneFilter.Narrow(scopeAccessor.Scope, communeId);
         if (narrowed is not null)
         {
@@ -47,7 +47,7 @@ public sealed class ScopeTestController(
         return Ok(items);
     }
 
-    /// <summary>Lookup theo ID: filter nằm trong WHERE nên ngoài phạm vi ra null → 404.</summary>
+    /// <summary>Lookup by id: the filter lives in the WHERE clause, so out of scope yields null → 404.</summary>
     [HttpGet("probes/{id:long}")]
     public async Task<IActionResult> GetAsync(long id, CancellationToken cancellationToken)
     {
@@ -59,7 +59,7 @@ public sealed class ScopeTestController(
             : Ok(new { probe.Id, probe.Label, probe.CommuneId });
     }
 
-    /// <summary>Đọc lại claim từ ClaimsPrincipal để chứng minh MapInboundClaims đã xử lý.</summary>
+    /// <summary>Reads the claims back from ClaimsPrincipal to prove MapInboundClaims was handled.</summary>
     [HttpGet("whoami")]
     public IActionResult WhoAmI() => Ok(new
     {

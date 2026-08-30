@@ -1,7 +1,7 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 
 namespace LuxMap.Persistence;
@@ -26,8 +26,8 @@ public static class PersistenceServiceCollectionExtensions
     }
 
     /// <summary>
-    /// NetTopologySuite phải bật ở tầng DataSource thì Npgsql mới đọc/ghi được
-    /// <c>geometry</c> thành <c>Point</c> / <c>LineString</c>.
+    /// NetTopologySuite has to be enabled at the data source level before Npgsql can read and write
+    /// <c>geometry</c> as <c>Point</c> / <c>LineString</c>.
     /// </summary>
     public static NpgsqlDataSource BuildDataSource(string connectionString)
     {
@@ -37,19 +37,20 @@ public static class PersistenceServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Một chỗ duy nhất cấu hình DbContext — host và công cụ migration phải đi qua đây,
-    /// nếu không quy ước snake_case sẽ chỉ áp cho một bên và migration lệch với runtime.
+    /// The single place the DbContext is configured — the host and the migration tooling must both
+    /// go through it, otherwise the snake_case convention applies to only one of them and the
+    /// migrations drift from the runtime model.
     /// </summary>
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, NpgsqlDataSource dataSource)
         => options
             .UseNpgsql(dataSource, npgsql => npgsql
                 .UseNetTopologySuite()
-                // EF mặc định đặt bảng lịch sử là "__EFMigrationsHistory" — mixed case nên
-                // Postgres buộc phải quote ở mọi nơi, trái Contract mục 5.1. Đổi trước BE-09,
-                // sau khi initial migration đã chạy thì đổi rất phiền.
+                // EF names the history table "__EFMigrationsHistory" by default — mixed case, so
+                // Postgres has to quote it everywhere, which violates Contract section 5.1. Change
+                // it before BE-09; changing it after the initial migration has run is painful.
                 .MigrationsHistoryTable("__ef_migrations_history"))
-            // Contract mục 5.1: tên bảng/cột snake_case toàn chữ thường, không quote.
+            // Contract section 5.1: table and column names are lowercase snake_case, unquoted.
             .UseSnakeCaseNamingConvention()
-            // Model phụ thuộc danh sách module, nên khoá cache model phải gồm danh sách đó.
+            // The model depends on the module list, so the model cache key must include it.
             .ReplaceService<IModelCacheKeyFactory, LuxMapModelCacheKeyFactory>();
 }

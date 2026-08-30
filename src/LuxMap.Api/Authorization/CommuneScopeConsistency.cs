@@ -1,15 +1,17 @@
+using LuxMap.Modules.Identity.Auth;
 using Microsoft.AspNetCore.Authorization;
 
 namespace LuxMap.Api.Authorization;
 
 /// <summary>
-/// Claim <c>commune_ids</c> mang <c>"*"</c> thì vai trò bắt buộc phải là Quản trị.
+/// If the <c>commune_ids</c> claim carries <c>"*"</c>, the role must be Administrator.
 /// </summary>
 /// <remarks>
-/// ĐÂY KHÔNG PHẢI chống client giả mạo — <c>commune_ids</c> nằm trong JWT đã ký, client không sửa
-/// được nếu không có khoá. Đây là lớp chặn LỖI Ở PHÍA PHÁT TOKEN: BE-06 không có ràng buộc DB nào
-/// buộc <c>has_system_wide_scope</c> đi cùng <c>role = 'administrator'</c>, nên một câu UPDATE tay
-/// hoặc một bug ở BE-33 là đủ để BE-07 phát <c>["*"]</c> cho tài khoản thường.
+/// This is NOT protection against a forged client — <c>commune_ids</c> lives inside a signed JWT and
+/// cannot be altered without the signing key. It guards against a BUG ON THE ISSUING SIDE: BE-06 has
+/// no database constraint tying <c>has_system_wide_scope</c> to <c>role = 'administrator'</c>, so a
+/// single manual UPDATE or a defect in BE-33 is enough to make BE-07 hand <c>["*"]</c> to an ordinary
+/// account.
 /// </remarks>
 public sealed class CommuneScopeConsistencyRequirement : IAuthorizationRequirement;
 
@@ -24,21 +26,20 @@ public sealed class CommuneScopeConsistencyHandler(ILogger<CommuneScopeConsisten
 
         if (principal.Identity?.IsAuthenticated != true)
         {
-            // Chưa xác thực thì để RequireAuthenticatedUser lo, ở đây không kết luận gì.
+            // Not authenticated is RequireAuthenticatedUser's business; draw no conclusion here.
             return Task.CompletedTask;
         }
 
         if (CommuneScopeAccessor.HasWildcardClaim(principal) && !CommuneScopeAccessor.IsAdministrator(principal))
         {
-            // Error chứ không phải Warning: đây là dấu hiệu BUG ở phía phát token, không phải
-            // dấu hiệu bị tấn công.
+            // Error rather than Warning: this signals a BUG on the token-issuing side, not an attack.
             logger.LogError(
-                "Token của {Subject} mang commune_ids '*' nhưng vai trò là {Role}, không phải Quản trị. "
-                + "Kiểm tra has_system_wide_scope của tài khoản này ở BE-06/BE-33.",
-                principal.FindFirst(LuxMap.Modules.Identity.Auth.AuthClaims.Subject)?.Value ?? "(không rõ)",
-                principal.FindFirst(LuxMap.Modules.Identity.Auth.AuthClaims.Role)?.Value ?? "(không rõ)");
+                "Token for {Subject} carries commune_ids '*' but the role is {Role}, not Administrator. "
+                + "Check has_system_wide_scope on that account in BE-06/BE-33.",
+                principal.FindFirst(AuthClaims.Subject)?.Value ?? "(unknown)",
+                principal.FindFirst(AuthClaims.Role)?.Value ?? "(unknown)");
 
-            context.Fail(new AuthorizationFailureReason(this, "commune_ids '*' không khớp vai trò."));
+            context.Fail(new AuthorizationFailureReason(this, "commune_ids '*' does not match the role."));
             return Task.CompletedTask;
         }
 

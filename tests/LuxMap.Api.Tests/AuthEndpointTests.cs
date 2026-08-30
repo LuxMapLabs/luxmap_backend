@@ -27,7 +27,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         var tokens = await Client.LoginAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var payload = DecodePayload(tokens.AccessToken);
 
-        output.WriteLine("── payload đã giải mã (KHÔNG dán token gốc) ──");
+        output.WriteLine("── decoded payload (the raw token is NEVER printed) ──");
         output.WriteLine(JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
 
         Assert.Equal("USR-003", payload.GetProperty("sub").GetString());
@@ -49,7 +49,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         var tokens = await Client.LoginAsync("admin", "SEED_ADMIN_PASSWORD");
         var communes = DecodePayload(tokens.AccessToken).GetProperty("commune_ids");
 
-        output.WriteLine($"  commune_ids của Quản trị = {communes.GetRawText()}");
+        output.WriteLine($"  administrator commune_ids = {communes.GetRawText()}");
 
         Assert.Equal(JsonValueKind.Array, communes.ValueKind);
         Assert.Equal(["*"], communes.EnumerateArray().Select(v => v.GetString()));
@@ -86,15 +86,17 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         var a = await StripCorrelationAsync(unknown);
         var b = await StripCorrelationAsync(wrongPassword);
 
-        output.WriteLine($"  sai tài khoản: {a}");
-        output.WriteLine($"  sai mật khẩu : {b}");
+        output.WriteLine($"  unknown user : {a}");
+        output.WriteLine($"  wrong password: {b}");
 
         Assert.Equal(a, b);
         Assert.Contains(ErrorCodes.InvalidCredentials, a);
 
-        // details không được trỏ vào field cụ thể — đó là đường rò rỉ.
-        Assert.DoesNotContain("username", a, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("password", a, StringComparison.OrdinalIgnoreCase);
+        // details must never point at a specific field — that is the leak. Inspect the details keys
+        // themselves rather than scanning the whole body: the shared message legitimately reads
+        // "Incorrect username or password", so a substring scan would measure the wrong thing.
+        var details = JsonDocument.Parse(a).RootElement.GetProperty("error").GetProperty("details");
+        Assert.Empty(details.EnumerateObject());
     }
 
     [Fact]
@@ -107,14 +109,14 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
             var login = await Client.PostLoginAsync("crew", AuthTestExtensions.SeedPassword("SEED_CREW_PASSWORD"));
             var refresh = await Client.PostRefreshAsync(tokens.RefreshToken);
 
-            output.WriteLine($"  login khi bị khoá   : HTTP {(int)login.StatusCode}");
-            output.WriteLine($"  refresh khi bị khoá : HTTP {(int)refresh.StatusCode}");
+            output.WriteLine($"  login while locked   : HTTP {(int)login.StatusCode}");
+            output.WriteLine($"  refresh while locked : HTTP {(int)refresh.StatusCode}");
 
             Assert.Equal(HttpStatusCode.Forbidden, login.StatusCode);
             Assert.Equal(HttpStatusCode.Forbidden, refresh.StatusCode);
             Assert.Contains(ErrorCodes.AccountLocked, await login.Content.ReadAsStringAsync());
 
-            // Logout vẫn phải cho phép.
+            // Logout must still be allowed.
             Assert.Equal(HttpStatusCode.NoContent, (await Client.PostLogoutAsync(tokens.RefreshToken)).StatusCode);
         }
         finally
@@ -130,10 +132,10 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         var payload = DecodePayload(tokens.AccessToken);
         var expiresAt = DateTimeOffset.FromUnixTimeSeconds(payload.GetProperty("exp").GetInt64());
 
-        Assert.True(expiresAt > factory.Clock.GetUtcNow(), "access token phải còn hạn");
+        Assert.True(expiresAt > factory.Clock.GetUtcNow(), "the access token must still be valid");
 
         var response = await Client.PostRefreshAsync(tokens.RefreshToken);
-        output.WriteLine($"  refresh khi access token còn hạn: HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  refresh while the access token is still valid: HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -146,10 +148,10 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         {
             Content = JsonContent.Create(new { refresh_token = tokens.RefreshToken }),
         };
-        request.Headers.TryAddWithoutValidation("Authorization", "Bearer rac-hoan-toan-khong-hop-le");
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer complete-garbage-not-a-token");
 
         var response = await Client.SendAsync(request);
-        output.WriteLine($"  refresh kèm Authorization rác: HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  refresh with a junk Authorization header: HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -162,7 +164,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         var second = await Client.PostLogoutAsync(tokens.RefreshToken);
         var neverExisted = await Client.PostLogoutAsync("token-chua-bao-gio-ton-tai");
 
-        output.WriteLine($"  logout lần 1: {(int)first.StatusCode} | lần 2: {(int)second.StatusCode} | token lạ: {(int)neverExisted.StatusCode}");
+        output.WriteLine($"  logout #1: {(int)first.StatusCode} | #2: {(int)second.StatusCode} | unknown token: {(int)neverExisted.StatusCode}");
 
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, second.StatusCode);
@@ -193,7 +195,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
     {
         var response = await Client.PostRefreshAsync(token);
 
-        // Chuỗi rỗng bị validation chặn trước; token lạ thì 401. Cả hai đều đúng hình dạng lỗi.
+        // An empty string is stopped by validation first; an unknown token gives 401. Both use the error shape.
         Assert.Contains(response.StatusCode, new[] { HttpStatusCode.Unauthorized, HttpStatusCode.BadRequest });
 
         var root = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;

@@ -10,7 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace LuxMap.Api.Authorization;
 
-/// <summary>Tên policy theo vai trò. Dùng hằng số, không rải chuỗi ma thuật khắp code.</summary>
+/// <summary>Role policy names. Use the constants; do not scatter magic strings through the code.</summary>
 public static class LuxMapPolicies
 {
     public const string ManagementAgency = "role:management_agency";
@@ -24,7 +24,7 @@ public static class LuxMapPolicies
         UserRole.MaintenanceEngineer => MaintenanceEngineer,
         UserRole.FieldCrew => FieldCrew,
         UserRole.Administrator => Administrator,
-        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Vai trò chưa có policy."),
+        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "No policy defined for this role."),
     };
 }
 
@@ -36,20 +36,21 @@ public static class AuthorizationSetup
 
         services.AddHttpContextAccessor();
 
-        // Singleton — bắt buộc. Xem chú thích ở CommuneScopeAccessor.
+        // Singleton — mandatory. See the note on CommuneScopeAccessor.
         services.AddSingleton<ICommuneScopeAccessor, CommuneScopeAccessor>();
         services.AddSingleton<IAuthorizationHandler, CommuneScopeConsistencyHandler>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer();
 
-        // Lấy JwtOptions qua DI để cấu hình kiểm token TRÙNG KHÍT với cấu hình phát token của
-        // BE-07 — cùng một object, không có cơ hội lệch issuer/audience/khoá.
+        // Resolve JwtOptions through DI so validation is configured from the SAME object BE-07 signs
+        // with — there is no opportunity for the issuer, audience or key to drift apart.
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<JwtOptions>(ConfigureJwtBearer);
 
         services.AddAuthorizationBuilder()
-            // Fail ĐÓNG: mặc định toàn ứng dụng là phải xác thực; mở ra phải khai [AllowAnonymous].
+            // Fail CLOSED: the whole application requires authentication by default; opening an
+            // endpoint requires an explicit [AllowAnonymous].
             .SetDefaultPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .AddRequirements(new CommuneScopeConsistencyRequirement())
@@ -74,9 +75,9 @@ public static class AuthorizationSetup
 
     private static void ConfigureJwtBearer(JwtBearerOptions options, JwtOptions jwt)
     {
-        // ⚠️ Handler mặc định ĐỔI TÊN claim khi đọc vào: sub thành
+        // ⚠️ The default handler RENAMES inbound claims: sub becomes
         // http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier.
-        // Không tắt thì User.FindFirst("sub") LUÔN trả null.
+        // Leave this on and User.FindFirst("sub") ALWAYS returns null.
         options.MapInboundClaims = false;
 
         options.TokenValidationParameters = new TokenValidationParameters
@@ -92,13 +93,14 @@ public static class AuthorizationSetup
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
 
-            // Chỉ chấp nhận đúng thuật toán BE-07 dùng để ký.
+            // Accept only the algorithm BE-07 actually signs with.
             ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
 
-            // Mặc định của .NET là 5 PHÚT. Access token sống 60 phút mà cho lệch 5 phút là quá rộng.
+            // .NET defaults to 5 MINUTES. With a 60-minute access token, 5 minutes of slack is far
+            // too generous.
             ClockSkew = TimeSpan.FromSeconds(30),
 
-            // Tên claim đúng như BE-07 phát ra, không dùng URI schema của WS-Federation.
+            // Claim names exactly as BE-07 issues them, not the WS-Federation URI schema.
             NameClaimType = AuthClaims.Subject,
             RoleClaimType = AuthClaims.Role,
         };

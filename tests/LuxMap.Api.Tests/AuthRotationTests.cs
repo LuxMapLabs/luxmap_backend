@@ -6,8 +6,8 @@ using Xunit.Abstractions;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Xoay vòng, dùng lại token và đồng thời. Mọi khẳng định đều đối chiếu TRẠNG THÁI THẬT
-/// trong database, không chỉ tin mã trả về của service.
+/// Rotation, replay and concurrency. Every assertion checks the REAL row state in the database rather
+/// than trusting the service's return value.
 /// </summary>
 [Collection(nameof(AuthCollection))]
 public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output)
@@ -16,7 +16,7 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
 
     private void Dump(string label, RefreshToken? t)
         => output.WriteLine(t is null
-            ? $"  {label}: (không có trong DB)"
+            ? $"  {label}: (not present in the database)"
             : $"  {label}: id={t.Id} chain={t.ChainId.ToString()[..8]} revoked_at={(t.RevokedAt?.ToString("HH:mm:ss") ?? "null")} "
               + $"reason={(t.RevokedReason?.ToString() ?? "null")} replaced_by={(t.ReplacedByTokenId?.ToString() ?? "null")}");
 
@@ -29,9 +29,9 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
         var oldToken = await factory.FindTokenAsync(first.RefreshToken);
         var newToken = await factory.FindTokenAsync(second.RefreshToken);
 
-        output.WriteLine("── sau một lần xoay vòng ──");
-        Dump("token cũ", oldToken);
-        Dump("token mới", newToken);
+        output.WriteLine("── after one rotation ──");
+        Dump("old token", oldToken);
+        Dump("new token", newToken);
 
         Assert.NotNull(oldToken);
         Assert.NotNull(newToken);
@@ -57,7 +57,7 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
         var winners = responses.Where(r => r.StatusCode == HttpStatusCode.OK).ToArray();
         var losers = responses.Where(r => r.StatusCode == HttpStatusCode.Unauthorized).ToArray();
 
-        output.WriteLine($"── hai request đồng thời: {winners.Length} thắng, {losers.Length} thua ──");
+        output.WriteLine($"── two concurrent requests: {winners.Length} won, {losers.Length} lost ──");
 
         Assert.Single(winners);
         Assert.Single(losers);
@@ -66,17 +66,17 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
         var winnerToken = await factory.FindTokenAsync(issued.RefreshToken);
         var original = await factory.FindTokenAsync(login.RefreshToken);
 
-        Dump("token gốc", original);
-        Dump("token request THẮNG phát ra", winnerToken);
+        Dump("original token", original);
+        Dump("token issued to the WINNER", winnerToken);
 
-        // Điểm mấu chốt: request thua KHÔNG được đụng tới token của request thắng.
+        // The crux: the loser must NOT touch the winner's token.
         Assert.NotNull(winnerToken);
         Assert.Null(winnerToken.RevokedAt);
         Assert.Null(winnerToken.RevokedReason);
 
-        // Và chuỗi vẫn còn đúng một token sống.
+        // And the chain still holds exactly one live token.
         var alive = (await factory.ChainAsync(original!.ChainId)).Count(t => t.RevokedAt is null);
-        output.WriteLine($"  token còn sống trong chuỗi: {alive}");
+        output.WriteLine($"  live tokens in the chain: {alive}");
         Assert.Equal(1, alive);
     }
 
@@ -86,22 +86,22 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
         var login = await Client.LoginAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var rotated = await (await Client.PostRefreshAsync(login.RefreshToken)).ReadTokensAsync();
 
-        // Vẫn nằm trong 30 giây kể từ lúc thu hồi.
+        // Still inside 30 seconds of the revocation.
         factory.Clock.Advance(TimeSpan.FromSeconds(5));
 
         var reuse = await Client.PostRefreshAsync(login.RefreshToken);
         Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
 
         var live = await factory.FindTokenAsync(rotated.RefreshToken);
-        output.WriteLine("── dùng lại sau 5 giây (trong ân hạn) ──");
-        Dump("token đang sống", live);
+        output.WriteLine("── replay after 5 seconds (inside the grace window) ──");
+        Dump("live token", live);
 
         Assert.NotNull(live);
         Assert.Null(live.RevokedAt);
 
-        // Chuỗi vẫn dùng được: refresh tiếp vẫn thành công.
+        // The chain still works: the next refresh succeeds.
         var stillWorks = await Client.PostRefreshAsync(rotated.RefreshToken);
-        output.WriteLine($"  refresh tiếp theo trên chuỗi: HTTP {(int)stillWorks.StatusCode}");
+        output.WriteLine($"  next refresh on the chain: HTTP {(int)stillWorks.StatusCode}");
         Assert.Equal(HttpStatusCode.OK, stillWorks.StatusCode);
     }
 
@@ -113,7 +113,7 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
 
         var rotated = await (await Client.PostRefreshAsync(victim.RefreshToken)).ReadTokensAsync();
 
-        // Quá cửa sổ ân hạn 30 giây.
+        // Past the 30-second grace window.
         factory.Clock.Advance(TimeSpan.FromSeconds(31));
 
         var reuse = await Client.PostRefreshAsync(victim.RefreshToken);
@@ -122,15 +122,15 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
         var killed = await factory.FindTokenAsync(rotated.RefreshToken);
         var survivor = await factory.FindTokenAsync(otherDevice.RefreshToken);
 
-        output.WriteLine("── dùng lại sau 31 giây (quá ân hạn) ──");
-        Dump("token của chuỗi bị tấn công", killed);
-        Dump("token của chuỗi thiết bị khác", survivor);
+        output.WriteLine("── replay after 31 seconds (past the grace window) ──");
+        Dump("token from the attacked chain", killed);
+        Dump("token from the other device chain", survivor);
 
         Assert.NotNull(killed);
         Assert.NotNull(killed.RevokedAt);
         Assert.Equal(RefreshTokenRevocationReason.ReuseDetected, killed.RevokedReason);
 
-        // Chuỗi khác của CÙNG người dùng không bị đụng.
+        // The SAME user's other chain is untouched.
         Assert.NotNull(survivor);
         Assert.Null(survivor.RevokedAt);
         Assert.Equal(HttpStatusCode.OK, (await Client.PostRefreshAsync(otherDevice.RefreshToken)).StatusCode);
@@ -144,20 +144,20 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
 
         Assert.Equal(HttpStatusCode.NoContent, (await Client.PostLogoutAsync(second.RefreshToken)).StatusCode);
 
-        // Rất lâu sau — logout không bao giờ bị coi là tấn công.
+        // Much later — a logout is never treated as an attack.
         factory.Clock.Advance(TimeSpan.FromHours(6));
 
         var reuse = await Client.PostRefreshAsync(second.RefreshToken);
         Assert.Equal(HttpStatusCode.Unauthorized, reuse.StatusCode);
 
         var token = await factory.FindTokenAsync(second.RefreshToken);
-        output.WriteLine("── dùng lại token đã logout, 6 giờ sau ──");
+        output.WriteLine("── replaying a logged-out token, 6 hours later ──");
         Dump("token", token);
 
         Assert.Equal(RefreshTokenRevocationReason.Logout, token!.RevokedReason);
 
         var chain = await factory.ChainAsync(token.ChainId);
-        output.WriteLine($"  lý do thu hồi trong chuỗi: {string.Join(", ", chain.Select(t => t.RevokedReason?.ToString() ?? "null"))}");
+        output.WriteLine($"  revocation reasons in the chain: {string.Join(", ", chain.Select(t => t.RevokedReason?.ToString() ?? "null"))}");
         Assert.DoesNotContain(chain, t => t.RevokedReason == RefreshTokenRevocationReason.ReuseDetected);
     }
 
@@ -176,13 +176,13 @@ public class AuthRotationTests(AuthTestFactory factory, ITestOutputHelper output
         }
 
         var latest = await factory.FindTokenAsync(current);
-        output.WriteLine("── sau 4 lần xoay vòng cách nhau 3 ngày ──");
-        output.WriteLine($"  trần tuyệt đối lúc đăng nhập : {anchor:O}");
-        output.WriteLine($"  trần tuyệt đối của token mới : {latest!.ChainAbsoluteExpiry:O}");
-        output.WriteLine($"  hạn của token mới            : {latest.ExpiresAt:O}");
+        output.WriteLine("── after 4 rotations spaced 3 days apart ──");
+        output.WriteLine($"  absolute ceiling at sign-in   : {anchor:O}");
+        output.WriteLine($"  absolute ceiling of newest    : {latest!.ChainAbsoluteExpiry:O}");
+        output.WriteLine($"  expiry of the newest token    : {latest.ExpiresAt:O}");
 
         Assert.Equal(anchor, latest.ChainAbsoluteExpiry);
-        Assert.True(latest.ExpiresAt <= anchor, "expires_at không được vượt trần tuyệt đối");
+        Assert.True(latest.ExpiresAt <= anchor, "expires_at must never exceed the absolute ceiling");
     }
 }
 

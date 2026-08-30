@@ -1,22 +1,21 @@
 namespace LuxMap.Modules.Identity.Entities;
 
 /// <summary>
-/// Vì sao một refresh token bị thu hồi. Không phải enum của Contract mục 1 — đây là chi tiết
-/// nội bộ, không bao giờ ra API.
+/// Why a refresh token was revoked. Not a Contract section 1 enum — this is internal detail and never
+/// leaves the API.
 /// </summary>
 /// <remarks>
-/// Phân biệt được lý do là điều kiện BẮT BUỘC để xử lý đúng việc dùng lại token:
-/// retry lành tính sau khi xoay vòng phải im lặng, còn logout thì không bao giờ được coi là
-/// tấn công.
+/// Knowing the reason is REQUIRED to handle token replay correctly: a benign retry after rotation
+/// must stay silent, and a logout must never be treated as an attack.
 /// </remarks>
 public enum RefreshTokenRevocationReason
 {
-    /// <summary>Bị thay bằng token mới khi refresh. Trong cửa sổ ân hạn thì dùng lại là retry.</summary>
+    /// <summary>Replaced by a new token during refresh. Reuse inside the grace window is a retry.</summary>
     Rotation,
 
-    /// <summary>Người dùng chủ động đăng xuất. Dùng lại KHÔNG bao giờ kích hoạt thu hồi chuỗi.</summary>
+    /// <summary>The user signed out deliberately. Reuse NEVER triggers chain revocation.</summary>
     Logout,
 
-    /// <summary>Thu hồi vì phát hiện dùng lại token đã xoay quá cửa sổ ân hạn.</summary>
+    /// <summary>Revoked because a rotated token was replayed after the grace window.</summary>
     ReuseDetected,
 }

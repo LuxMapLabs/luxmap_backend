@@ -3,9 +3,9 @@ namespace LuxMap.Shared.Contracts;
 public static class ApiHeaders
 {
     /// <summary>
-    /// Correlation id đi trên MỌI response (2xx lẫn lỗi), không nhét vào body —
-    /// hình dạng <c>{ error: { code, message, details } }</c> đã publish, không thêm khoá.
-    /// Middleware gắn header là việc của BE-04.
+    /// Sent on EVERY response (2xx and errors alike), never placed in the body — the
+    /// <c>{ error: { code, message, details } }</c> shape is published and must not grow new keys.
+    /// Attaching the header is BE-04 middleware's job.
     /// </summary>
     public const string CorrelationId = "X-Correlation-Id";
 }

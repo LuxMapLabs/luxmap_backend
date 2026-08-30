@@ -6,7 +6,7 @@ using Xunit.Abstractions;
 
 namespace LuxMap.Api.Tests;
 
-/// <summary>Nhóm 2 — không thể bypass phạm vi địa bàn (Contract mục 7).</summary>
+/// <summary>Group 2 — the commune scope cannot be bypassed (Contract section 7).</summary>
 [Collection(nameof(ScopeCollection))]
 public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper output)
 {
@@ -32,7 +32,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         var client = await AuthenticatedAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var seen = await CommunesSeenAsync(client);
 
-        output.WriteLine($"  không truyền commune_id → thấy [{string.Join(", ", seen)}]");
+        output.WriteLine($"  no commune_id supplied → sees [{string.Join(", ", seen)}]");
         Assert.Equal([ScopeTestFixture.InScopeCommune], seen);
         Assert.DoesNotContain(factory.OutOfScopeCommune, seen);
     }
@@ -48,8 +48,8 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
             var all = await CommunesSeenAsync(client);
             var narrowed = await CommunesSeenAsync(client, $"?commune_id={factory.SecondCommune}");
 
-            output.WriteLine($"  claim 2 xã → thấy [{string.Join(", ", all)}]");
-            output.WriteLine($"  thu hẹp còn 1 xã → thấy [{string.Join(", ", narrowed)}]");
+            output.WriteLine($"  claim with 2 communes → sees [{string.Join(", ", all)}]");
+            output.WriteLine($"  narrowed to 1 commune → sees [{string.Join(", ", narrowed)}]");
 
             Assert.Equal(2, all.Length);
             Assert.Equal([factory.SecondCommune], narrowed);
@@ -67,7 +67,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         var client = await AuthenticatedAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var response = await client.GetAsync($"/api/v1/_scope/probes?commune_id={factory.OutOfScopeCommune}");
 
-        output.WriteLine($"  commune_id ngoài phạm vi → HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  commune_id outside the scope → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
         var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync())
@@ -82,7 +82,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         var response = await client.GetAsync(
             $"/api/v1/_scope/probes?commune_id={ScopeTestFixture.InScopeCommune}&commune_id={factory.OutOfScopeCommune}");
 
-        output.WriteLine($"  một xã hợp lệ + một xã ngoài phạm vi → HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  one allowed commune + one forbidden → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -94,12 +94,12 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         var inScope = await client.GetAsync($"/api/v1/_scope/probes/{factory.InScopeProbeId}");
         var outOfScope = await client.GetAsync($"/api/v1/_scope/probes/{factory.OutOfScopeProbeId}");
 
-        output.WriteLine($"  trong phạm vi → {(int)inScope.StatusCode} · ngoài phạm vi → {(int)outOfScope.StatusCode}");
+        output.WriteLine($"  in scope → {(int)inScope.StatusCode} · out of scope → {(int)outOfScope.StatusCode}");
 
         Assert.Equal(HttpStatusCode.OK, inScope.StatusCode);
 
-        // 403 sẽ xác nhận tài nguyên đó tồn tại. Lọc nằm trong WHERE nên bản ghi đơn giản là
-        // không tìm thấy.
+        // A 403 would confirm the resource exists. The filter lives in the WHERE clause, so the row
+        // simply is not found.
         Assert.Equal(HttpStatusCode.NotFound, outOfScope.StatusCode);
     }
 
@@ -112,7 +112,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
             var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
             var seen = await CommunesSeenAsync(client);
 
-            output.WriteLine($"  claim commune_ids rỗng → thấy {seen.Length} xã");
+            output.WriteLine($"  empty commune_ids claim → sees {seen.Length} commune(s)");
             Assert.Empty(seen);
 
             var lookup = await client.GetAsync($"/api/v1/_scope/probes/{factory.InScopeProbeId}");
@@ -130,13 +130,13 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         var client = await AuthenticatedAsync("admin", "SEED_ADMIN_PASSWORD");
         var seen = await CommunesSeenAsync(client);
 
-        output.WriteLine($"  Quản trị [\"*\"] → thấy [{string.Join(", ", seen)}]");
+        output.WriteLine($"  administrator [\"*\"] → sees [{string.Join(", ", seen)}]");
 
         Assert.Contains(ScopeTestFixture.InScopeCommune, seen);
         Assert.Contains(factory.SecondCommune, seen);
         Assert.Contains(factory.OutOfScopeCommune, seen);
 
-        // Quản trị tra được cả bản ghi mà kỹ sư không thấy.
+        // The administrator can even fetch the row the engineer cannot see.
         Assert.Equal(HttpStatusCode.OK,
             (await client.GetAsync($"/api/v1/_scope/probes/{factory.OutOfScopeProbeId}")).StatusCode);
     }
@@ -144,14 +144,14 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
     [Fact]
     public async Task Wildcard_claim_on_a_non_administrator_is_rejected()
     {
-        // Mô phỏng BUG ở phía phát token: bật cờ toàn hệ thống cho tài khoản field_crew.
+        // Simulate a BUG on the issuing side: turn on the system-wide flag for a field_crew account.
         await factory.SetSystemWideAsync("crew", true);
         try
         {
             var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
             var response = await client.GetAsync("/api/v1/_scope/probes");
 
-            output.WriteLine($"  field_crew mang [\"*\"] → HTTP {(int)response.StatusCode}");
+            output.WriteLine($"  field_crew carrying [\"*\"] → HTTP {(int)response.StatusCode}");
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
             var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync())

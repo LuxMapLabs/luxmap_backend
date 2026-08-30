@@ -36,9 +36,9 @@ namespace LuxMap.Persistence.Migrations
                 table: "refresh_token",
                 column: "chain_id");
 
-            // AddColumn để lại DEFAULT vĩnh viễn trên cột. Giá trị đó chỉ dùng để lấp cho
-            // hàng cũ (bảng đang rỗng), giữ lại là bẫy: quên set ChainId sẽ ghi toàn số 0 và
-            // gộp nhầm các phiên không liên quan vào cùng một chuỗi.
+            // AddColumn leaves a PERMANENT DEFAULT on the column. That value only exists to backfill
+            // pre-existing rows (the table is empty), and keeping it is a trap: forgetting to set
+            // ChainId would write all-zero guids and merge unrelated sessions into one chain.
             migrationBuilder.Sql(@"ALTER TABLE refresh_token ALTER COLUMN chain_id DROP DEFAULT;");
             migrationBuilder.Sql(@"ALTER TABLE refresh_token ALTER COLUMN chain_absolute_expiry DROP DEFAULT;");
 

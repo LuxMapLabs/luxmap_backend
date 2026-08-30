@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Lỗi nghiệp vụ đã lường trước KHÔNG được kèm stack trace. Xác thực thất bại là chuyện bình
-/// thường; mỗi lần gõ sai mật khẩu sinh ~2.800 ký tự stack trace thì log thật bị che mất.
+/// Anticipated business failures must NOT carry a stack trace. Failed authentication is ordinary;
+/// ~2,800 characters of stack trace per mistyped password buries the real errors.
 /// </summary>
 public class ExpectedErrorLoggingTests
 {
@@ -66,15 +66,15 @@ public class ExpectedErrorLoggingTests
     public async Task Expected_business_errors_are_logged_without_a_stack_trace(
         HttpStatusCode statusCode, string code)
     {
-        var logger = await RunAsync(new LuxMapException(code, statusCode, "lý do từ chối"));
+        var logger = await RunAsync(new LuxMapException(code, statusCode, "rejection reason"));
 
         var entry = Assert.Single(logger.Entries);
-        Assert.Null(entry.Exception);                       // ← không stack trace
+        Assert.Null(entry.Exception);                       // ← no stack trace
         Assert.Equal(LogLevel.Warning, entry.Level);
 
-        // Vẫn phải điều tra được: mã lỗi, lý do, method và path đều còn.
+        // Still fully investigable: code, reason, method and path are all present.
         Assert.Contains(code, entry.Message, StringComparison.Ordinal);
-        Assert.Contains("lý do từ chối", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("rejection reason", entry.Message, StringComparison.Ordinal);
         Assert.Contains("/api/v1/auth/login", entry.Message, StringComparison.Ordinal);
         Assert.Contains("POST", entry.Message, StringComparison.Ordinal);
     }
@@ -83,7 +83,7 @@ public class ExpectedErrorLoggingTests
     public async Task Server_side_business_errors_are_logged_at_error_level()
     {
         var logger = await RunAsync(new LuxMapException(
-            "SOMETHING_BROKE", HttpStatusCode.InternalServerError, "hỏng phía server"));
+            "SOMETHING_BROKE", HttpStatusCode.InternalServerError, "server-side failure"));
 
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Error, entry.Level);
@@ -93,11 +93,11 @@ public class ExpectedErrorLoggingTests
     [Fact]
     public async Task Unexpected_exceptions_keep_their_stack_trace()
     {
-        var boom = new InvalidOperationException("lỗi thật ngoài dự kiến");
+        var boom = new InvalidOperationException("a genuine unexpected failure");
         var logger = await RunAsync(boom);
 
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Error, entry.Level);
-        Assert.Same(boom, entry.Exception);                 // ← vẫn có stack trace
+        Assert.Same(boom, entry.Exception);                 // ← stack trace retained
     }
 }

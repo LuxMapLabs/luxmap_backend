@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Faults;
 
 /// <summary>
-/// Module Faults — Fault, FaultType, FaultHistory, luồng trạng thái và clustering (BE-18..BE-20, BE-41).
-/// Khung rỗng ở BE-01: chưa có entity, chưa có endpoint.
+/// Faults module — Fault, FaultType, FaultHistory, status workflow and clustering (BE-18..BE-20, BE-41).
+/// Empty shell as of BE-01: no entities, no endpoints yet.
 /// </summary>
 public sealed class FaultsModule : ILuxMapModule
 {

@@ -7,9 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Identity;
 
 /// <summary>
-/// Module Identity — AppUser, AdministrativeUnit, RefreshToken, JWT, phân quyền theo vai trò
-/// và địa bàn (BE-06..BE-08).
-/// BE-07 phát access token và refresh token; việc KIỂM token là BE-08.
+/// Identity module — AppUser, AdministrativeUnit, RefreshToken, JWT, role and territorial
+/// authorization (BE-06..BE-08).
+/// BE-07 ISSUES access and refresh tokens; VALIDATING them is BE-08's job.
 /// </summary>
 public sealed class IdentityModule : ILuxMapModule
 {
@@ -22,7 +22,7 @@ public sealed class IdentityModule : ILuxMapModule
 
         services.AddScoped<IdentitySeeder>();
 
-        // Giá trị không bí mật lấy từ appsettings; khoá ký CHỈ lấy từ biến môi trường.
+        // Non-secret values come from appsettings; the signing key comes ONLY from the environment.
         var options = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
             ?? new JwtOptions { SigningKey = string.Empty };
 
@@ -33,7 +33,7 @@ public sealed class IdentityModule : ILuxMapModule
                 ?? string.Empty,
         };
 
-        // Thiếu khoá thì DỪNG ngay lúc khởi động, không lặng lẽ chạy với giá trị mặc định.
+        // A missing key STOPS startup rather than quietly running with a default.
         options.Validate();
 
         services.AddSingleton(options);

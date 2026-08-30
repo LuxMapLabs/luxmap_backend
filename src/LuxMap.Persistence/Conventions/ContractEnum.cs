@@ -8,16 +8,16 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LuxMap.Persistence.Conventions;
 
 /// <summary>
-/// Enum lưu xuống DB dưới dạng <c>text</c> mang ĐÚNG chuỗi mà API trả ra
-/// (<c>lamp_out</c>, <c>field_report</c>, ...), kèm CHECK constraint giới hạn tập giá trị.
+/// Enums are stored as <c>text</c> holding EXACTLY the string the API returns
+/// (<c>lamp_out</c>, <c>field_report</c>, ...), guarded by a CHECK constraint.
 /// <para>
-/// Cùng một <see cref="JsonNamingPolicy.SnakeCaseLower"/> mà BE-00 dùng cho tầng JSON, nên
-/// giá trị trong DB và giá trị trên dây không thể lệch nhau. <c>ContractEnumStorageTests</c>
-/// khoá lại điều đó cho từng giá trị của cả 12 enum.
+/// It reuses the very <see cref="JsonNamingPolicy.SnakeCaseLower"/> that BE-00 applies to JSON, so
+/// the database value and the wire value cannot drift apart. <c>ContractEnumStorageTests</c> pins
+/// that for every value of all 12 enums.
 /// </para>
 /// <para>
-/// Không dùng <c>HasConversion&lt;string&gt;()</c> mặc định của EF Core: nó lưu TÊN C#
-/// (<c>LampOut</c>), lệch với chuỗi trên API.
+/// Do NOT use EF Core's default <c>HasConversion&lt;string&gt;()</c>: it stores the C# NAME
+/// (<c>LampOut</c>), which differs from the API string.
 /// </para>
 /// </summary>
 public static class ContractEnum
@@ -36,14 +36,14 @@ public static class ContractEnum
             value => ToDbValue(value),
             text => Parse<TEnum>(text));
 
-    /// <summary>Bản cho cột enum cho phép NULL — NULL đi thẳng qua, không convert.</summary>
+    /// <summary>Variant for nullable enum columns — NULL passes straight through, unconverted.</summary>
     public static ValueConverter<TEnum?, string?> NullableConverter<TEnum>()
         where TEnum : struct, Enum
         => new(
             value => value.HasValue ? ToDbValue(value.Value) : null,
             text => text == null ? null : Parse<TEnum>(text));
 
-    /// <summary>So sánh enum đã convert bằng giá trị, không phải bằng tham chiếu chuỗi.</summary>
+    /// <summary>Compares converted enums by value, not by string reference.</summary>
     public static ValueComparer<TEnum> Comparer<TEnum>()
         where TEnum : struct, Enum
         => new(
@@ -62,14 +62,14 @@ public static class ContractEnum
         }
 
         throw new InvalidOperationException(
-            $"Giá trị '{text}' trong cột {typeof(TEnum).Name} không thuộc tập enum của Contract mục 1.");
+            $"Value '{text}' in column {typeof(TEnum).Name} is not part of the Contract section 1 enum set.");
     }
 }
 
 public static class ContractEnumBuilderExtensions
 {
     /// <summary>
-    /// Map một property enum thành cột <c>text</c> mang chuỗi của Contract, kèm CHECK constraint.
+    /// Maps an enum property to a <c>text</c> column holding the Contract string, plus a CHECK constraint.
     /// </summary>
     public static EntityTypeBuilder<TEntity> HasContractEnum<TEntity, TEnum>(
         this EntityTypeBuilder<TEntity> entity,
@@ -94,8 +94,8 @@ public static class ContractEnumBuilderExtensions
     }
 
     /// <summary>
-    /// Bản cho property enum nullable. CHECK constraint cho phép NULL, vì NULL ở đây mang
-    /// nghĩa nghiệp vụ riêng (ví dụ: chưa thu hồi) chứ không phải giá trị sai.
+    /// Variant for nullable enum properties. The CHECK constraint permits NULL, because NULL carries
+    /// its own business meaning here (for example: not revoked yet) rather than an invalid value.
     /// </summary>
     public static EntityTypeBuilder<TEntity> HasContractEnum<TEntity, TEnum>(
         this EntityTypeBuilder<TEntity> entity,
@@ -120,8 +120,8 @@ public static class ContractEnumBuilderExtensions
     }
 
     /// <summary>
-    /// Cùng quy tắc snake_case với EFCore.NamingConventions, dùng để dựng tên cột trong
-    /// CHECK constraint — thời điểm cấu hình model thì tên cột cuối cùng chưa được chốt.
+    /// The same snake_case rule EFCore.NamingConventions applies, used to build the column name for
+    /// the CHECK constraint — at configuration time the final column name is not settled yet.
     /// </summary>
     internal static string ToSnakeCaseLower(this string name)
         => JsonNamingPolicy.SnakeCaseLower.ConvertName(name);

@@ -9,25 +9,25 @@ using Microsoft.AspNetCore.Mvc;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Controller CHỈ tồn tại trong assembly test. Nạp vào host qua ApplicationPart nên
-/// LuxMap.Api không phải mang endpoint giả — BE-04 là middleware, chưa phải endpoint.
+/// A controller that exists ONLY in the test assembly. Loaded into the host through an
+/// ApplicationPart so LuxMap.Api never has to ship a fake endpoint — BE-04 is middleware, not endpoints.
 /// </summary>
 [ApiController]
 [Route("api/v{version:apiVersion}/_test")]
 [ApiVersion("1.0")]
-// Nhóm endpoint này test pipeline LỖI và PHÂN TRANG của BE-04, không phải xác thực. BE-08 đặt
-// mặc định toàn ứng dụng là phải đăng nhập, nên phải mở tường minh.
+// These endpoints exercise BE-04's ERROR and PAGINATION pipelines, not authentication. BE-08 makes
+// sign-in mandatory application-wide, so they must be opened explicitly.
 [AllowAnonymous]
 public sealed class TestEndpointsController : ControllerBase
 {
     [HttpGet("boom")]
-    public IActionResult Boom() => throw new InvalidOperationException("nổ có chủ đích");
+    public IActionResult Boom() => throw new InvalidOperationException("deliberate blow-up");
 
     [HttpGet("known-error")]
     public IActionResult KnownError() => throw new LuxMapException(
         LuxMap.Shared.Contracts.Errors.ErrorCodes.BboxTooLarge,
         System.Net.HttpStatusCode.RequestEntityTooLarge,
-        "Phóng to để xem chi tiết.",
+        "Zoom in to see detail.",
         new Dictionary<string, object?> { ["pole_count"] = 4211 });
 
     [HttpGet("paged")]
@@ -44,8 +44,8 @@ public sealed class TestEndpointsController : ControllerBase
     public IActionResult Fine() => Ok(new { pole_id = "POLE-0001" });
 
     /// <summary>
-    /// DTO mẫu CHỈ có trong assembly test, để kiểm chứng cấu hình sinh spec: enum ra chuỗi,
-    /// DateTime và DateOnly ra hai format khác nhau, tên property snake_case.
+    /// A sample DTO living ONLY in the test assembly, used to verify the spec generation settings:
+    /// string enums, distinct formats for DateTime and DateOnly, and snake_case property names.
     /// </summary>
     [HttpGet("schema-probe")]
     public ActionResult<SchemaProbe> Schema() => Ok(new SchemaProbe());
