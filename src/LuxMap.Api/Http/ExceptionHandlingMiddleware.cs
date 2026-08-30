@@ -21,10 +21,14 @@ public sealed class ExceptionHandlingMiddleware(
         }
         catch (LuxMapException known)
         {
-            logger.LogWarning(
-                known,
-                "Lỗi nghiệp vụ {Code} trên {Path} (correlation {CorrelationId})",
-                known.Code, context.Request.Path, correlation.CorrelationId);
+            // KHÔNG truyền exception vào logger. Đây là lỗi nghiệp vụ ĐÃ LƯỜNG TRƯỚC — sai mật
+            // khẩu, token hết hạn, bbox quá lớn — không phải sự cố ứng dụng. Kèm stack trace thì
+            // mỗi lần người dùng gõ sai mật khẩu sinh ra gần 3.000 ký tự rác, che mất lỗi thật.
+            // Mã lỗi, đường dẫn, phương thức và correlation id là đủ để điều tra.
+            logger.Log(
+                LevelFor(known.StatusCode),
+                "Từ chối {Method} {Path}: {Code} — {Reason}",
+                context.Request.Method, context.Request.Path, known.Code, known.Message);
 
             await WriteAsync(context, known.StatusCode, known.Code, known.Message, known.Details, correlation);
         }
@@ -53,6 +57,12 @@ public sealed class ExceptionHandlingMiddleware(
                 correlation);
         }
     }
+
+    /// <summary>
+    /// 4xx là hành vi bình thường của client nên chỉ Warning; 5xx mới là lỗi phía ta.
+    /// </summary>
+    private static LogLevel LevelFor(HttpStatusCode statusCode)
+        => (int)statusCode >= 500 ? LogLevel.Error : LogLevel.Warning;
 
     internal static async Task WriteAsync(
         HttpContext context,
