@@ -4,6 +4,9 @@ Modular monolith ASP.NET Core phục vụ Web SPA (WP5), Android native (WP6) v�
 
 Nguồn sự thật: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) → [`docs/tasks-backend.csv`](docs/tasks-backend.csv) → [`CLAUDE.md`](CLAUDE.md).
 
+📖 **Mới vào dự án?** Đọc [`docs/code-walkthrough.md`](docs/code-walkthrough.md) — hướng dẫn đọc
+code theo thứ tự, giải thích từng cơ chế và vì sao nó tồn tại.
+
 ## Yêu cầu
 
 - .NET SDK 10.0
