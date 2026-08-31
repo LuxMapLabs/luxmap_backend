@@ -56,4 +56,10 @@ public static class ErrorCodes
     /// ONE code for EVERY cause: splitting them helps an attacker probe the configuration.
     /// </summary>
     public const string Unauthenticated = "UNAUTHENTICATED";
+
+    /// <summary>
+    /// 409 — the username or email is already taken. Registration is open and internal-only, so a
+    /// clear answer is worth more than hiding which identifiers exist; see docs/contract-drift.md.
+    /// </summary>
+    public const string IdentifierTaken = "IDENTIFIER_TAKEN";
 }

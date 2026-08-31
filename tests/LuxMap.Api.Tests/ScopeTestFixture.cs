@@ -66,6 +66,13 @@ public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLif
         await base.DisposeAsync();
     }
 
+    /// <summary>Queries the database directly — inspects the REAL row state instead of trusting the API.</summary>
+    public async Task<T> QueryAsync<T>(Func<LuxMapDbContext, Task<T>> query)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await query(scope.ServiceProvider.GetRequiredService<LuxMapDbContext>());
+    }
+
     /// <summary>Assigns a commune to a seeded user so the commune_ids claim holds several values.</summary>
     public async Task AssignCommuneAsync(string username, string communeId)
     {

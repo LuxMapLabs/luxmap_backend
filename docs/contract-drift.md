@@ -18,10 +18,10 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Đề xuất sửa bên nào |
 |---|---|---|---|---|
 | 1 | Nhóm endpoint `/auth` chưa có trong Contract | 🔴 Cao | WP5, WP6 | Contract — thêm mục 2.10 |
-| 2 | 6 mã lỗi chưa có trong Contract | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 0 |
+| 2 | 7 mã lỗi chưa có trong Contract | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 0 |
 | 3 | Giá trị `user_role` chưa có trong Contract mục 1 | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 1 |
 | 4 | Correlation id nằm ở cả header lẫn body | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ |
-| 5 | Task list ghi "API đăng ký", code đã bỏ | 🟡 Vừa | Không ai | Nêu ở review, task list đã publish |
+| 5 | **Endpoint đăng ký — đã ĐẢO NGƯỢC quyết định cũ** | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 2.10 |
 | 6 | Bộ mock FO-26 lệch bảng prefix mục 0.2 | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa 6 chỗ |
 | 7 | `page_size` vượt 200 bị kẹp im lặng | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ hành vi |
 | 8 | Route không tồn tại trả 401 khi chưa đăng nhập | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
@@ -67,13 +67,13 @@ sinh DTO từ `docs/openapi/luxmap-v1.json`, đổi bây giờ là breaking chan
 
 ---
 
-## 2. Sáu mã lỗi chưa có trong Contract 🔴
+## 2. Bảy mã lỗi chưa có trong Contract 🔴
 
 **Contract đang ghi gì:** mục 0 chốt hình dạng `{ error: { code, message, details } }` và các mục
 2.1, 2.8, 7 nêu đích danh 6 mã: `BBOX_TOO_LARGE`, `POLE_NOT_FOUND`, `LOCATION_REQUIRED`,
 `FAULT_TYPE_NOT_REPORTABLE`, `DUPLICATE_OP`, `COMMUNE_FORBIDDEN`.
 
-**Code đang làm gì:** phải thêm 6 mã nữa để mọi API cùng một hình dạng lỗi:
+**Code đang làm gì:** phải thêm 7 mã nữa để mọi API cùng một hình dạng lỗi:
 
 | Mã | HTTP | Khi nào | Thuộc |
 |---|---|---|---|
@@ -83,13 +83,14 @@ sinh DTO từ `docs/openapi/luxmap-v1.json`, đổi bây giờ là breaking chan
 | `ACCOUNT_LOCKED` | 403 | Đúng mật khẩu nhưng tài khoản bị khoá | BE-07 |
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token sai / hết hạn / đã thu hồi / bị dùng lại — chung một mã | BE-07 |
 | `UNAUTHENTICATED` | 401 | Access token thiếu / sai chữ ký / hết hạn / sai `iss` / sai `aud` — chung một mã | BE-08 |
+| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username hoặc email | BE-07 (bổ sung) |
 
 **Vì sao gộp mã:** phân biệt "sai tài khoản" với "sai mật khẩu" là nói cho kẻ tấn công biết tài
 khoản nào tồn tại. Tương tự với refresh token và access token. **Đây là chủ ý, đừng tách ra.**
 
-**Đề xuất:** thêm cả 6 vào mục 0 của Contract.
+**Đề xuất:** thêm cả 7 vào mục 0 của Contract.
 
-**Ảnh hưởng:** WP5 và WP6 đang phải tự đoán 6 mã này.
+**Ảnh hưởng:** WP5 và WP6 đang phải tự đoán 7 mã này.
 
 ---
 
@@ -132,20 +133,105 @@ báo lỗi, còn header phục vụ trường hợp response thành công.
 
 ---
 
-## 5. Task list ghi "API đăng ký" nhưng code đã bỏ endpoint đó 🟡
+## 5. Endpoint đăng ký — ĐÃ ĐẢO NGƯỢC quyết định trước đó 🔴
+
+> ⚠️ **Mục này thay thế hoàn toàn nội dung cũ.** Trước đây mục 5 ghi *"đã bỏ endpoint đăng ký"*.
+> Quyết định đó **đã bị đảo**. Phần dưới giải thích vì sao đảo được mà vẫn an toàn — người đọc ở
+> FW-00 cần hiểu cơ chế thay thế, không chỉ biết là đã đảo.
 
 **Task list đang ghi gì:** dòng BE-07 — *"API đăng ký / đăng nhập / refresh token"*.
 
-**Code đang làm gì:** **không có endpoint đăng ký.** Chỉ có login, refresh, logout.
+**Contract đang ghi gì:** không có gì. Cả nhóm `/auth` chưa được đặc tả (xem mục 1).
 
-**Lý do:** LuxMap **không có vai trò Người dân** — cả 4 vai trò đều là cán bộ nội bộ. Tự đăng ký
-nghĩa là người lạ tự chọn vai trò cho mình, mà không có luồng duyệt nào được đặc tả ở đâu. Việc tạo
-tài khoản thuộc về **BE-33 (quản trị danh mục)**.
+**Code đang làm gì:** có `POST /api/v1/auth/register`, **mở, không cần mã mời, không cần duyệt trước**.
 
-**Đề xuất:** không sửa task list (đã publish). Nêu ở review và **giao rõ phần tạo tài khoản cho
-BE-33**, để không ai tưởng nó đã có.
+### Vì sao trước đây bỏ
 
-**Ảnh hưởng:** không ai. Nhưng nếu không nêu thì đến W15 mới phát hiện chưa có cách tạo tài khoản.
+Lập luận cũ: LuxMap không có vai trò Người dân, cả 4 vai trò đều là cán bộ nội bộ, nên **không có
+cách hợp lý nào để người tự đăng ký nhận vai trò và địa bàn**. Lập luận đó vẫn đúng — chỉ là nó
+chứng minh sai kết luận.
+
+### Vì sao giờ mở lại được
+
+Vì tách hai thứ vốn bị gộp làm một:
+
+> **Đăng ký tạo ra DANH TÍNH. Đăng ký KHÔNG tạo ra QUYỀN.**
+
+Tài khoản mới nhận:
+
+| | |
+|---|---|
+| `role` | `field_crew` — vai trò hẹp nhất trong bốn |
+| `commune_ids` | **RỖNG** — không xã nào |
+| trạng thái | mở, không khoá |
+
+Người dùng **đăng nhập được ngay**, nhưng **không thấy một bản ghi nào** cho tới khi quản trị gán
+địa bàn. Việc gán thuộc **BE-33**.
+
+### Cơ chế an toàn — dựa trên thứ đã có sẵn, không phải thứ mới
+
+An toàn KHÔNG đến từ endpoint đăng ký. Nó đến từ cơ chế lọc của BE-08, vốn đã tồn tại và đã có test
+trước khi endpoint này ra đời:
+
+- BE-07 phát `commune_ids: []` cho tài khoản không có xã — đã đo bằng token thật
+- BE-08 `CommuneScopeAccessor` fail đóng: 0 phần tử → `CommuneScope.Empty`
+- Query filter của BE-08 không cho một hàng nào lọt qua
+- Tra cứu trực tiếp theo ID → **404**, không phải 403, nên không lộ cả sự tồn tại
+
+Ba đường leo thang đặc quyền hiển nhiên nhất đã có test riêng: gửi kèm `role`, `commune_ids: ["*"]`,
+`commune_ids: ["COM-001"]` trong body — **cả ba bị bỏ qua hoàn toàn**, vì DTO không có property nào
+để nhận chúng.
+
+### Chọn `field_crew` làm vai trò thấp nhất — vì sao
+
+| Vai trò | Nếu bị gán nhầm địa bàn thì thiệt hại |
+|---|---|
+| `field_crew` | Báo sự cố nhiễu — nhưng kỹ sư vẫn phải duyệt |
+| `maintenance_engineer` | **Bác bỏ được sự cố thật** → che mất hỏng hóc |
+| `management_agency` | Nhìn xuyên nhiều xã |
+
+CLAUDE.md: *"kỹ sư duyệt chứ không tạo"*. `field_crew` là vai trò tác nghiệp đầu vào, quyền hẹp nhất.
+
+Đã cân nhắc thêm vai trò thứ năm kiểu `pending` — bỏ, vì an toàn đến từ `commune_ids` rỗng chứ không
+từ tên vai trò, mà thêm giá trị enum thì WP5/WP6 phải hardcode thêm và BE-08 phải thêm policy.
+
+### Chống dò tài khoản — chọn trả lỗi rõ
+
+Đăng ký mở tạo ra một lỗ rò không có ở hệ thống nội bộ: thử đăng ký để biết username nào đã tồn tại.
+**Chọn (a) trả lỗi rõ** kèm `409 IDENTIFIER_TAKEN`.
+
+Lý do trong bối cảnh cụ thể: hệ thống nội bộ, không có API công khai cho người dân, chạy trong mạng
+cơ quan, khoảng chục tài khoản với username đoán được sẵn (`admin`, `engineer`, `crew`). Trả cùng
+một response cho cả thành công lẫn trùng sẽ khiến người đăng ký thật nhận "thành công" rồi không
+đăng nhập được — một lỗi dùng hàng ngày, đổi lấy việc chống một mối đe doạ gần như không áp dụng.
+
+⚠️ **Nếu hệ thống ra Internet thì phải xem lại** — và cách đúng lúc đó là rate limit cả `/login` lẫn
+`/register`, không phải làm mờ response.
+
+### Đề xuất cho Contract
+
+Bổ sung vào **mục 2.10 (Auth)** cùng với login/refresh/logout:
+
+```
+POST /api/v1/auth/register
+{ "username": "...", "email": "...", "full_name": "...", "password": "..." }
+
+201 Created
+{ "user_id": "USR-005", "username": "...", "email": "...", "full_name": "...",
+  "role": "field_crew", "commune_ids": [],
+  "message": "Account created. An administrator must assign communes before any data becomes visible." }
+```
+
+Ghi rõ trong Contract: **server áp cứng `role` và `commune_ids`, client không set được**; mật khẩu
+tối thiểu **12 ký tự**, không ràng buộc thành phần (NIST SP 800-63B: độ dài hơn quy tắc thành phần);
+trùng định danh → **409 `IDENTIFIER_TAKEN`**; **không trả token** — gọi `/auth/login` riêng.
+
+**Ảnh hưởng:** WP5 cần màn đăng ký và phải hiển thị được thông điệp "chưa được gán địa bàn". WP6
+tương tự nếu mobile cho đăng ký. **Cả hai phải biết tài khoản mới sẽ thấy danh sách rỗng — đó là
+đúng, không phải lỗi API.**
+
+**Còn nợ:** chưa có UI gán vai trò/địa bàn cho tới BE-33. Trong lúc chờ, quản trị gán bằng SQL —
+xem `docs/authorization-guide.md`.
 
 ---
 

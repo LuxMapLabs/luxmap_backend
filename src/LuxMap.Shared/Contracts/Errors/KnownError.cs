@@ -46,11 +46,16 @@ public static class KnownErrors
     public static readonly KnownError Unauthenticated =
         new(ErrorCodes.Unauthenticated, HttpStatusCode.Unauthorized, "BE-08, not yet in the Contract");
 
+    /// <summary>BE-07 open registration — also absent from the Contract.</summary>
+    public static readonly KnownError IdentifierTaken =
+        new(ErrorCodes.IdentifierTaken, HttpStatusCode.Conflict, "BE-07, not yet in the Contract");
+
     public static IReadOnlyList<KnownError> All { get; } =
     [
         BboxTooLarge, PoleNotFound, LocationRequired,
         FaultTypeNotReportable, DuplicateOp, CommuneForbidden,
         InvalidCredentials, AccountLocked, InvalidRefreshToken, Unauthenticated,
+        IdentifierTaken,
     ];
 
     public static KnownError? Find(string code)

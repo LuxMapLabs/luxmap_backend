@@ -117,8 +117,9 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
     [Fact]
     public async Task Every_known_contract_error_code_is_registered_with_its_status()
     {
-        // 6 codes specified by the Contract + 3 /auth codes from BE-07 + 1 authentication code from BE-08.
-        Assert.Equal(10, KnownErrors.All.Count);
+        // 6 codes specified by the Contract + 3 /auth codes from BE-07 + 1 authentication code from
+        // BE-08 + 1 registration code from the BE-07 open-registration supplement.
+        Assert.Equal(11, KnownErrors.All.Count);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, KnownErrors.Find(ErrorCodes.BboxTooLarge)!.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, KnownErrors.Find(ErrorCodes.PoleNotFound)!.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, KnownErrors.Find(ErrorCodes.LocationRequired)!.StatusCode);
@@ -135,5 +136,8 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
 
         // BE-08 — one code for EVERY authentication failure.
         Assert.Equal(HttpStatusCode.Unauthorized, KnownErrors.Find(ErrorCodes.Unauthenticated)!.StatusCode);
+
+        // Open registration — a duplicate identifier is a conflict, not a validation failure.
+        Assert.Equal(HttpStatusCode.Conflict, KnownErrors.Find(ErrorCodes.IdentifierTaken)!.StatusCode);
     }
 }

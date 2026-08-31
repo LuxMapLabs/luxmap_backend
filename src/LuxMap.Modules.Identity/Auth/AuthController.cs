@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
+using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
@@ -36,6 +37,49 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     /// The refresh token is the ONLY credential here: this endpoint does NOT read the Authorization
     /// header and does not need a valid access token. Refreshing is allowed at any time.
     /// </summary>
+    /// <summary>
+    /// Open registration. Creates an IDENTITY, never a PERMISSION.
+    /// </summary>
+    /// <remarks>
+    /// The new account signs in immediately but sees NO data: it is created with the lowest role and
+    /// no commune assignment, and the BE-08 query filter admits nothing on an empty scope. An
+    /// administrator grants access separately (BE-33).
+    /// <para>
+    /// Deliberately returns NO token. The account calls <c>POST /auth/login</c> like everyone else, so
+    /// exactly one code path issues tokens and opens refresh chains.
+    /// </para>
+    /// </remarks>
+    [HttpPost("register")]
+    [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<RegisterResponse>> RegisterAsync(
+        [FromBody] RegisterRequest request,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await authService.RegisterAsync(
+            request.Username!, request.Email!, request.FullName!, request.Password!, cancellationToken);
+
+        if (!outcome.Succeeded)
+        {
+            throw new LuxMapException(
+                KnownErrors.IdentifierTaken.Code,
+                KnownErrors.IdentifierTaken.StatusCode,
+                "That username or email address is already registered.",
+                outcome.TakenFields);
+        }
+
+        var user = outcome.User!;
+        return StatusCode(StatusCodes.Status201Created, new RegisterResponse(
+            user.UserId,
+            user.Username,
+            user.Email,
+            user.FullName,
+            ContractEnum.ToDbValue(user.Role),
+            [],
+            RegisterResponse.PendingAssignmentMessage));
+    }
+
     [HttpPost("refresh")]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

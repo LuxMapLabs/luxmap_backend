@@ -152,6 +152,42 @@ cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bu
 
 ---
 
+## Tài khoản mới đăng ký: quản trị phải làm gì
+
+`POST /api/v1/auth/register` mở cho mọi người. Tài khoản mới nhận `field_crew` và **không có xã
+nào**, nên **đăng nhập được nhưng không thấy bản ghi nào**. Đó là thiết kế, không phải lỗi.
+
+**Chưa có UI cho tới BE-33.** Trong lúc chờ, quản trị gán bằng SQL:
+
+```bash
+docker compose exec postgres psql -U luxmap -d luxmap_dev
+```
+
+Xem ai đang chờ được gán:
+
+```sql
+SELECT u.user_id, u.username, u.role, count(c.commune_id) AS communes
+FROM app_user u LEFT JOIN app_user_commune c ON c.user_id = u.user_id
+GROUP BY u.user_id, u.username, u.role HAVING count(c.commune_id) = 0 ORDER BY u.user_id;
+```
+
+Gán địa bàn:
+
+```sql
+INSERT INTO app_user_commune (user_id, commune_id) VALUES ('USR-005', 'COM-001');
+```
+
+Đổi vai trò nếu cần:
+
+```sql
+UPDATE app_user SET role = 'maintenance_engineer' WHERE user_id = 'USR-005';
+```
+
+⚠️ **Đừng bật `has_system_wide_scope` cho tài khoản không phải Quản trị.** Không có ràng buộc DB nào
+chặn, nhưng BE-08 sẽ từ chối mọi request của tài khoản đó và ghi log mức Error.
+
+📌 Người dùng phải **đăng nhập lại** để thấy thay đổi: access token mang claim cũ tới 60 phút.
+
 ## Còn nợ
 
 **BE-14 phải đo `EXPLAIN`.** Filter sinh ra `WHERE (@isSystemWide OR commune_id = ANY(@ids))` đi
