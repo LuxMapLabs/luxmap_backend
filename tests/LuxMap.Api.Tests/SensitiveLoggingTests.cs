@@ -5,7 +5,7 @@ using Serilog.Parsing;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Loại trừ dữ liệu nhạy cảm phải là cấu hình tường minh, không phải "nhớ đừng log".
+/// Excluding sensitive data must be explicit configuration, not "remember not to log it".
 /// </summary>
 public class SensitiveLoggingTests
 {
@@ -55,11 +55,11 @@ public class SensitiveLoggingTests
     [InlineData("PoleId")]
     public void Ordinary_properties_are_left_alone(string propertyName)
     {
-        var logEvent = EventWith((propertyName, "giữ nguyên"));
+        var logEvent = EventWith((propertyName, "kept as is"));
 
         new SensitivePropertyScrubber().Enrich(logEvent, propertyFactory: null!);
 
-        Assert.Contains("giữ nguyên", logEvent.Properties[propertyName].ToString());
+        Assert.Contains("kept as is", logEvent.Properties[propertyName].ToString());
     }
 
     [Fact]

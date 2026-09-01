@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LuxMap.Shared.Tests;
 
-/// <summary>BE-01 — mọi module đều cắm được vào seam DI chung.</summary>
+/// <summary>BE-01 — every module plugs into the shared DI seam.</summary>
 public class ModuleRegistrationTests
 {
     private static ILuxMapModule[] AllModules() =>
@@ -26,14 +26,14 @@ public class ModuleRegistrationTests
     ];
 
     /// <summary>
-    /// Module Identity CỐ Ý ném lỗi khi thiếu khoá ký JWT (BE-07 fail-fast), nên test phải cấp
-    /// khoá giả — đúng như host thật đọc từ .env.
+    /// The Identity module DELIBERATELY throws when the JWT signing key is missing (BE-07 fail-fast),
+    /// so the test supplies a dummy key — exactly as the real host reads one from .env.
     /// </summary>
     private static IConfiguration ConfigurationWithSigningKey()
         => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:SigningKey"] = "khoa-gia-chi-dung-trong-test-dai-hon-32-byte",
+                ["Jwt:SigningKey"] = "dummy-key-used-only-in-tests-longer-than-32-bytes",
             })
             .Build();
 

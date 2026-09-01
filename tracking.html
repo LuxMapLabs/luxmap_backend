@@ -46,12 +46,12 @@
   <div class="card">
     <strong>Tiến độ nền tảng (W1)</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">Nền tảng W1 xong. Identity: BE-06 và BE-07 xong, kế tiếp BE-08.</span>
+    <span class="muted">Nền tảng W1 và nhóm Identity xong (BE-06 → BE-08). Kế tiếp: GIS tài sản, bắt đầu từ BE-09.</span>
   </div>
 
   <div class="grid">
     <div class="stat"><b>10</b><span>project trong solution</span></div>
-    <div class="stat"><b>174</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>219</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
     <div class="stat"><b>4</b><span>bảng trong initial migration</span></div>
@@ -125,6 +125,18 @@
         <td><code>src/LuxMap.Modules.Identity/Auth/</code>, migration <code>AddRefreshTokenChainTracking</code>, <code>docs/openapi/luxmap-v1.json</code></td>
         <td><code>feat(BE-07): add login, refresh and logout endpoints</code></td>
       </tr>
+      <tr>
+        <td>30/08/2026</td>
+        <td><code>BE-08</code> Kiểm JWT, policy 4 vai trò, lọc theo địa bàn bằng global filter + chốt chặn lúc khởi động</td>
+        <td><code>src/LuxMap.Api/Authorization/</code>, <code>src/LuxMap.Persistence/Conventions/CommuneScopeBuilderExtensions.cs</code>, <code>docs/authorization-guide.md</code></td>
+        <td><code>feat(BE-08): add JWT validation, role policies and commune scoping</code></td>
+      </tr>
+      <tr>
+        <td>31/08/2026</td>
+        <td><code>BE-07+</code> Endpoint đăng ký mở — tài khoản mới nhận vai trò thấp nhất và KHÔNG có xã nào, đăng nhập được nhưng không thấy dữ liệu</td>
+        <td><code>src/LuxMap.Modules.Identity/Auth/</code>, migration <code>AddCaseInsensitiveIdentityIndexes</code>, <code>docs/contract-drift.md</code></td>
+        <td><code>feat(BE-07): add open registration that grants no permissions</code></td>
+      </tr>
     </table>
   </div>
 
@@ -161,6 +173,11 @@
       <li><strong>Bỏ endpoint đăng ký, lệch với task list.</strong> <code>tasks-backend.csv</code> dòng BE-07 ghi "API đăng ký / đăng nhập / refresh token". Cả 4 vai trò là cán bộ nội bộ nên tự đăng ký không hợp lý — tạo tài khoản chuyển sang BE-33. CSV vẫn lệch, cần nêu ở review.</li>
       <li><strong>Nhóm <code>/auth</code> và 3 mã lỗi của nó chưa có trong Contract.</strong> <code>INVALID_CREDENTIALS</code>, <code>ACCOUNT_LOCKED</code>, <code>INVALID_REFRESH_TOKEN</code> — FM-05 sẽ gặp ngay. Cần bổ sung vào Contract ở FW-00.</li>
       <li><strong>BE-06 không chuẩn hoá hoa thường cho username.</strong> <code>ADMIN</code> và <code>admin</code> cùng tồn tại được vì unique index là btree thường. BE-07 tra cứu bằng <code>lower()</code> nên đăng nhập vẫn đúng, nhưng gốc rễ vẫn còn — cần unique index trên <code>lower(username)</code> nếu muốn chặn hẳn.</li>
+      <li><strong>Đăng ký mở lộ ra một lỗi có sẵn ở BE-06.</strong> Unique index nằm trên cột thô nhưng đăng nhập tra bằng <code>lower()</code>, nên <code>crew</code> và <code>CREW</code> cùng tồn tại được và truy vấn đăng nhập khớp HAI hàng. Đã bịt bằng unique index trên <code>lower()</code>. Tài khoản chỉ do seeder tạo thì không bao giờ lộ ra.</li>
+      <li><strong>Chưa có UI gán vai trò/địa bàn cho tới BE-33.</strong> Tài khoản vừa đăng ký không thấy gì cho tới khi quản trị gán bằng SQL — hướng dẫn ở <code>docs/authorization-guide.md</code>.</li>
+      <li><strong>BE-14 phải đo <code>EXPLAIN</code>.</strong> Query filter sinh mệnh đề <code>OR</code> đi kèm <code>ST_Intersects</code>. Giả thuyết là không phá GIST index nhưng <strong>chưa chứng minh được</strong> vì chưa có bảng <code>pole</code>. Không đạt 500ms/2000 cột thì chuyển nhánh nóng sang repository tường minh.</li>
+      <li><strong>Chốt chặn không bắt được entity QUÊN khai <code>ICommuneScoped</code>.</strong> Đây là giới hạn thật, không xoá được bằng cơ chế — chỉ review mới bắt. Đã ghi rõ trong <code>docs/authorization-guide.md</code>.</li>
+      <li><strong>Entity suy commune qua nhiều bậc</strong> (<code>SurveyFrame</code>, <code>TelemetryReading</code>) KHÔNG được cơ chế nào bảo vệ — phải tự viết join có scope. Chỗ dễ rò nhất hệ thống.</li>
       <li><strong>Contract thiếu mã lỗi cho validation và lỗi hệ thống.</strong> BE-04 buộc phải thêm <code>VALIDATION_FAILED</code> và <code>INTERNAL_ERROR</code> vì mọi API phải cùng một hình dạng lỗi. <strong>Cần đưa vào Contract ở FW-00 rồi tăng version</strong> — hiện FE đang phải tự đoán hai mã này.</li>
       <li><strong>Correlation id giờ nằm ở CẢ header lẫn <code>error.details</code>.</strong> Khác với quyết định lúc BE-00 (chỉ header). Không phá hình dạng 3 khoá vì <code>details</code> là bag tự do, nhưng cần thống nhất lại với FE.</li>
       <li><strong>Bẫy binding phân trang.</strong> Đặt tên tham số action là <code>page</code> thì MVC lấy nó làm prefix rồi đi tìm <code>page.page_size</code>, khiến <code>page_size</code> âm thầm rơi về mặc định. Đã xử lý bằng <code>PageQueryModelBinder</code>; đừng thay bằng <code>[FromQuery]</code> thường.</li>

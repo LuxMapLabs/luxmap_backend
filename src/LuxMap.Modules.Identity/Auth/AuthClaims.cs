@@ -1,23 +1,23 @@
 namespace LuxMap.Modules.Identity.Auth;
 
 /// <summary>
-/// Tên claim trong access token. BE-08 so chuỗi CHÍNH XÁC — đừng đổi hoa thường,
-/// đừng camelCase, đừng dịch.
+/// Claim names inside the access token. BE-08 compares these strings EXACTLY — do not change the
+/// casing, do not camelCase them, do not translate them.
 /// </summary>
 public static class AuthClaims
 {
-    /// <summary>ID người dùng, ví dụ <c>USR-001</c>.</summary>
+    /// <summary>User id, e.g. <c>USR-001</c>.</summary>
     public const string Subject = "sub";
 
-    /// <summary>MỘT chuỗi, đúng giá trị của BE-06 (<c>administrator</c>, <c>field_crew</c>...).</summary>
+    /// <summary>A SINGLE string carrying the BE-06 value (<c>administrator</c>, <c>field_crew</c>, ...).</summary>
     public const string Role = "role";
 
     /// <summary>
-    /// LUÔN là mảng, kể cả khi chỉ có một xã. Quản trị mang <c>["*"]</c> — mảng một phần tử,
-    /// KHÔNG phải chuỗi <c>"*"</c>.
+    /// ALWAYS an array, even with a single commune. Administrators carry <c>["*"]</c> — a one-element
+    /// array, NOT the bare string <c>"*"</c>.
     /// </summary>
     public const string CommuneIds = "commune_ids";
 
-    /// <summary>Giá trị đặc biệt cho phạm vi toàn hệ thống, Contract mục 7.</summary>
+    /// <summary>The special system-wide scope value from Contract section 7.</summary>
     public const string AllCommunes = "*";
 }

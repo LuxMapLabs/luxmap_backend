@@ -4,12 +4,13 @@ using System.Text.Json.Serialization;
 namespace LuxMap.Shared.Serialization;
 
 /// <summary>
-/// Nguồn sự thật duy nhất cho quy ước JSON của contract (mục 0 và mục 5.5).
-/// Mọi host — minimal API, MVC controller, Hangfire job, test — phải đi qua <see cref="Configure"/>.
+/// The single source of truth for the Contract's JSON conventions (sections 0 and 5.5).
+/// Every host — minimal API, MVC controllers, Hangfire jobs, tests — must go through
+/// <see cref="Configure"/>.
 /// </summary>
 public static class LuxMapJsonOptions
 {
-    /// <summary>Bản dùng sẵn (đã đóng băng) cho serialize thủ công ngoài pipeline HTTP.</summary>
+    /// <summary>A ready-made, frozen instance for manual serialization outside the HTTP pipeline.</summary>
     public static JsonSerializerOptions Default { get; } = CreateDefault();
 
     public static JsonSerializerOptions CreateDefault()
@@ -23,16 +24,17 @@ public static class LuxMapJsonOptions
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        // Mục 0: định dạng JSON snake_case.
+        // Section 0: snake_case JSON.
         options.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
         options.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
         options.PropertyNameCaseInsensitive = true;
 
-        // Mục 5.5: enum trả chuỗi thường, KHÔNG trả số — int enum của .NET sẽ làm hỏng FE.
+        // Section 5.5: enums go out as lowercase strings, NEVER numbers — .NET int enums break the
+        // front end, and the Contract calls this out by name.
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
 
-        // Mục 0: ISO 8601 UTC hậu tố Z. DateOnly (install_date, warranty_expiry, night_of)
-        // đã ra đúng YYYY-MM-DD theo mặc định của System.Text.Json — không cần converter.
+        // Section 0: ISO 8601 UTC with a Z suffix. DateOnly (install_date, warranty_expiry,
+        // night_of) already renders as YYYY-MM-DD by default, so it needs no converter.
         options.Converters.Add(new UtcDateTimeConverter());
         options.Converters.Add(new UtcDateTimeOffsetConverter());
     }

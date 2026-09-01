@@ -9,7 +9,7 @@ namespace LuxMap.Modules.Identity.Auth;
 
 public sealed record IssuedAccessToken(string Token, DateTime ExpiresAtUtc, int ExpiresInSeconds);
 
-/// <summary>Phát access token HS256. BE-07 chỉ PHÁT; việc kiểm token là BE-08.</summary>
+/// <summary>Issues HS256 access tokens. BE-07 only ISSUES; validation belongs to BE-08.</summary>
 public sealed class AccessTokenIssuer(JwtOptions options, TimeProvider timeProvider)
 {
     private readonly SigningCredentials credentials = new(
@@ -24,9 +24,9 @@ public sealed class AccessTokenIssuer(JwtOptions options, TimeProvider timeProvi
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var expires = now.Add(options.AccessTokenLifetime);
 
-        // Dùng SecurityTokenDescriptor.Claims với giá trị là MẢNG thay vì nhiều Claim trùng
-        // tên: handler cũ gộp claim trùng tên thành mảng CHỈ KHI có từ hai giá trị, nên một xã
-        // sẽ ra chuỗi thay vì mảng và làm hỏng bên đọc.
+        // Use SecurityTokenDescriptor.Claims with an ARRAY value rather than several claims sharing a
+        // name: the handler only merges same-named claims into an array when there are TWO OR MORE,
+        // so a single commune would serialise as a string and break every reader.
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = options.Issuer,
@@ -51,9 +51,9 @@ public sealed class AccessTokenIssuer(JwtOptions options, TimeProvider timeProvi
 }
 
 /// <summary>
-/// Sinh và băm refresh token. Token là 32 byte ngẫu nhiên nên không brute-force được — băm
-/// chậm kiểu PBKDF2 không thêm an toàn mà chỉ làm mỗi lần refresh chậm đi. SHA-256 cho phép
-/// tra cứu bằng MỘT lần đọc unique index.
+/// Generates and hashes refresh tokens. The token is 32 random bytes, so it cannot be brute-forced —
+/// a slow hash like PBKDF2 would add no security and would slow down every refresh. SHA-256 keeps
+/// lookup to a single unique-index read.
 /// </summary>
 public static class RefreshTokenGenerator
 {

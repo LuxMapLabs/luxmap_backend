@@ -5,8 +5,8 @@ using LuxMap.Shared.Serialization;
 namespace LuxMap.Shared.Tests;
 
 /// <summary>
-/// Contract v1.1 mục 0 và mục 5.2 — thời gian ra API là ISO 8601 UTC hậu tố <c>Z</c>,
-/// và kind phải là <see cref="DateTimeKind.Utc"/> vì Npgsql ném exception với TIMESTAMPTZ sai kind.
+/// Contract v1.1 sections 0 and 5.2 — API timestamps are ISO 8601 UTC with a <c>Z</c> suffix,
+/// and the kind must be <see cref="DateTimeKind.Utc"/> because Npgsql throws on a TIMESTAMPTZ with the wrong kind.
 /// </summary>
 public class UtcDateTimeConventionTests
 {
@@ -74,7 +74,7 @@ public class UtcDateTimeConventionTests
     [Fact]
     public void Output_matches_the_timestamp_format_used_by_the_fo26_mocks()
     {
-        // Bộ mock FO-26 dùng dạng giây tròn: "2026-08-20T04:00:00Z".
+        // The FO-26 mock set uses whole seconds: "2026-08-20T04:00:00Z".
         var parsed = DateTime.Parse(
             "2026-08-20T04:00:00Z",
             CultureInfo.InvariantCulture,

@@ -5,8 +5,8 @@ using LuxMap.Shared.Serialization;
 namespace LuxMap.Shared.Tests;
 
 /// <summary>
-/// Contract v1.1 mục 1 khoá cứng từng giá trị enum, và mục 5.5 cấm trả enum dạng số.
-/// FE/mobile đã hardcode các chuỗi này, nên khoá lại TỪNG giá trị chứ không chỉ kiểm tra "là chuỗi".
+/// Contract v1.1 section 1 freezes every enum value, and section 5.5 forbids numeric enums.
+/// Web and mobile hardcode these strings, so pin EVERY value rather than merely checking "it is a string".
 /// </summary>
 public class DomainEnumSerializationTests
 {
@@ -108,7 +108,7 @@ public class DomainEnumSerializationTests
     [Fact]
     public void Enum_never_serializes_as_number()
     {
-        // Mục 5.5: "int enum của .NET sẽ làm hỏng FE".
+        // Section 5.5: ".NET int enums break the front end".
         var json = JsonSerializer.Serialize(new { fault_status = FaultStatus.InProgress }, Options);
         Assert.Contains("\"in_progress\"", json);
         Assert.DoesNotContain("3", json);
@@ -117,7 +117,7 @@ public class DomainEnumSerializationTests
     [Fact]
     public void Every_enum_member_is_covered_by_a_case()
     {
-        // Chốt chặn: thêm giá trị enum mới mà quên khoá chuỗi trên dây thì test này đỏ.
+        // Backstop: adding a new enum value without pinning its wire string turns this test red.
         (Type Type, int Expected)[] enums =
         [
             (typeof(FixtureStatus), 4), (typeof(PowerSource), 2), (typeof(FixtureType), 2),

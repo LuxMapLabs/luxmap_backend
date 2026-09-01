@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Survey;
 
 /// <summary>
-/// Module Survey — SurveySweep, SurveyFrame, Detection, LuminanceBaseline, LuxReading (BE-15..BE-17, BE-42).
-/// Khung rỗng ở BE-01: chưa có entity, chưa có endpoint.
+/// Survey module — SurveySweep, SurveyFrame, Detection, LuminanceBaseline, LuxReading (BE-15..BE-17, BE-42).
+/// Empty shell as of BE-01: no entities, no endpoints yet.
 /// </summary>
 public sealed class SurveyModule : ILuxMapModule
 {

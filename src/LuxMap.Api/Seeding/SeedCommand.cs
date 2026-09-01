@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace LuxMap.Api.Seeding;
 
 /// <summary>
-/// Chạy bằng <c>dotnet run --project src/LuxMap.Api -- --seed</c>. Tách khỏi đường khởi động
-/// bình thường: seed là thao tác ghi, không nên chạy ngầm mỗi lần ai đó bật app lên.
+/// Invoked with <c>dotnet run --project src/LuxMap.Api -- --seed</c>. Kept off the normal startup
+/// path: seeding writes to the database and should not run silently every time someone starts the app.
 /// </summary>
 public static class SeedCommand
 {
@@ -26,7 +26,7 @@ public static class SeedCommand
         if (pending.Length > 0)
         {
             logger.LogError(
-                "Còn {Count} migration chưa apply. Chạy `dotnet ef database update` trước khi seed.",
+                "{Count} migration(s) are still pending. Run `dotnet ef database update` before seeding.",
                 pending.Length);
             return 1;
         }

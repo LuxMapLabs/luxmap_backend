@@ -5,7 +5,7 @@ using LuxMap.Shared.Serialization;
 
 namespace LuxMap.Shared.Tests;
 
-/// <summary>Contract v1.1 mục 0 — hình dạng lỗi và hình dạng phân trang.</summary>
+/// <summary>Contract v1.1 section 0 — the error shape and the pagination shape.</summary>
 public class ContractShapeTests
 {
     private static readonly JsonSerializerOptions Options = LuxMapJsonOptions.Default;
@@ -14,7 +14,7 @@ public class ContractShapeTests
     public void Error_response_has_exactly_the_contract_shape()
     {
         var json = JsonSerializer.Serialize(
-            ApiErrorResponse.Create(ErrorCodes.BboxTooLarge, "Phóng to để xem chi tiết"),
+            ApiErrorResponse.Create(ErrorCodes.BboxTooLarge, "Zoom in to see detail"),
             Options);
 
         using var doc = JsonDocument.Parse(json);
@@ -34,7 +34,7 @@ public class ContractShapeTests
         var json = JsonSerializer.Serialize(
             ApiErrorResponse.Create(
                 ErrorCodes.CommuneForbidden,
-                "Ngoài phạm vi địa bàn",
+                "Outside the permitted commune scope",
                 new Dictionary<string, object?> { ["RequestedCommuneId"] = "COM-009" }),
             Options);
 
@@ -60,10 +60,10 @@ public class ContractShapeTests
     }
 
     [Theory]
-    [InlineData(null, null, 1, 50)]      // mặc định theo ví dụ ?page=1&page_size=50
+    [InlineData(null, null, 1, 50)]      // defaults, matching the ?page=1&page_size=50 example
     [InlineData(3, 25, 3, 25)]
-    [InlineData(1, 200, 1, 200)]         // đúng trần
-    [InlineData(1, 500, 1, 200)]         // kẹp im lặng về 200
+    [InlineData(1, 200, 1, 200)]         // exactly at the ceiling
+    [InlineData(1, 500, 1, 200)]         // silently clamped to 200
     [InlineData(0, 0, 1, 1)]
     [InlineData(-5, -5, 1, 1)]
     public void Page_request_clamps_into_the_contract_range(int? page, int? pageSize, int expectedPage, int expectedPageSize)

@@ -42,8 +42,8 @@ public class CorrelationIdTests(LuxMapApiFactory factory) : IClassFixture<LuxMap
     }
 
     [Theory]
-    [InlineData("có\nxuống dòng")]
-    [InlineData("dấu cách và ký tự lạ ()")]
+    [InlineData("has\nnewline")]
+    [InlineData("spaces and odd chars ()")]
     public async Task Hostile_correlation_id_from_client_is_replaced(string hostile)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/_test/ok");

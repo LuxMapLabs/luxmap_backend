@@ -1,25 +1,39 @@
 using System.Reflection;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Shared.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Persistence;
 
 /// <summary>
-/// Một DbContext dùng chung cho cả monolith. Mỗi module đóng góp
-/// <see cref="IEntityTypeConfiguration{TEntity}"/> của riêng mình; DbContext quét assembly
-/// của từng module nên Persistence không cần tham chiếu ngược lại module nào.
+/// One DbContext shared by the whole monolith. Every module contributes its own
+/// <see cref="IEntityTypeConfiguration{TEntity}"/>; the context scans each module's assembly, so
+/// Persistence never has to reference a module back.
 /// <para>
-/// Chọn một context chung thay vì mỗi module một context vì Contract bắt buộc join xuyên
-/// module: <c>GET /poles/{id}</c> phải trả <c>open_faults[]</c> trong MỘT request,
-/// <c>GET /segments</c> cần <c>has_active_segment_fault</c>, <c>GET /sync/bundle</c> gom
-/// poles + segments + faults + work orders.
+/// A single shared context rather than one per module because the Contract requires cross-module
+/// joins: <c>GET /poles/{id}</c> must return <c>open_faults[]</c> in ONE request,
+/// <c>GET /segments</c> needs <c>has_active_segment_fault</c>, and <c>GET /sync/bundle</c> bundles
+/// poles, segments, faults and work orders together.
 /// </para>
 /// </summary>
 public class LuxMapDbContext(
     DbContextOptions<LuxMapDbContext> options,
-    ModuleAssemblyCatalog catalog)
+    ModuleAssemblyCatalog catalog,
+    ICommuneScopeAccessor scopeAccessor)
     : DbContext(options)
 {
+    /// <summary>
+    /// Commune scope of the current request. Query filters read it through HERE rather than
+    /// capturing an outside accessor — see the note on <c>CommuneScopeBuilderExtensions.ApplyFilter</c>.
+    /// </summary>
+    public CommuneScope CurrentCommuneScope => scopeAccessor.Scope;
+
+    /// <summary>
+    /// Identifies the set of loaded modules. The model depends on it, so the model cache key must
+    /// include it — see <see cref="LuxMapModelCacheKeyFactory"/>.
+    /// </summary>
+    internal string CatalogSignature => catalog.Signature;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -31,16 +45,23 @@ public class LuxMapDbContext(
             modelBuilder.ApplyConfigurationsFromAssembly(assembly);
         }
 
-        // Phải chạy SAU khi áp hết cấu hình: quét model tìm cột đã gắn HasPrefixedId
-        // rồi tạo sequence tương ứng, để không ai phải nhớ khai sequence bằng tay.
+        // Must run AFTER every configuration is applied: scans the model for columns marked by
+        // HasPrefixedId and creates the matching sequence, so nobody has to remember to declare one.
         modelBuilder.CreatePrefixedIdSequences();
+
+        // Contract section 7. Forgetting the scope means the app WILL NOT START, instead of leaking
+        // data silently.
+        modelBuilder.ApplyCommuneScope(this);
     }
 }
 
 /// <summary>
-/// Danh sách assembly được quét tìm cấu hình entity. Host dựng từ danh sách module đã đăng ký.
+/// The assemblies scanned for entity configurations. The host builds it from the registered module list.
 /// </summary>
 public sealed class ModuleAssemblyCatalog(IEnumerable<Assembly> assemblies)
 {
     public IReadOnlyList<Assembly> Assemblies { get; } = [.. assemblies.Distinct()];
+
+    /// <summary>A stable string identifying the assembly set, used as part of the model cache key.</summary>
+    public string Signature => field ??= string.Join('|', Assemblies.Select(a => a.FullName).Order(StringComparer.Ordinal));
 }

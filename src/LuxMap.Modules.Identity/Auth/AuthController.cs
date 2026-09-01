@@ -1,18 +1,23 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
+using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LuxMap.Modules.Identity.Auth;
 
 /// <summary>
-/// Nhóm endpoint xác thực. CHƯA có trong Contract v1.1 — cần bổ sung ở FW-00.
-/// BE-07 chỉ PHÁT token; việc kiểm token và chặn request theo địa bàn là BE-08.
+/// The authentication endpoints. NOT yet in Contract v1.1 — to be added at FW-00.
+/// BE-07 only ISSUES tokens; validating them and enforcing commune scope is BE-08.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/auth")]
+// BE-08 makes authentication mandatory application-wide. These three endpoints are the way in to
+// obtain a token, so they must stay open — and that has to be declared explicitly.
+[AllowAnonymous]
 public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]
@@ -29,9 +34,52 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     }
 
     /// <summary>
-    /// Refresh token là credential DUY NHẤT ở đây: endpoint này KHÔNG đọc header Authorization
-    /// và không cần access token còn hạn. Refresh được phép bất cứ lúc nào.
+    /// The refresh token is the ONLY credential here: this endpoint does NOT read the Authorization
+    /// header and does not need a valid access token. Refreshing is allowed at any time.
     /// </summary>
+    /// <summary>
+    /// Open registration. Creates an IDENTITY, never a PERMISSION.
+    /// </summary>
+    /// <remarks>
+    /// The new account signs in immediately but sees NO data: it is created with the lowest role and
+    /// no commune assignment, and the BE-08 query filter admits nothing on an empty scope. An
+    /// administrator grants access separately (BE-33).
+    /// <para>
+    /// Deliberately returns NO token. The account calls <c>POST /auth/login</c> like everyone else, so
+    /// exactly one code path issues tokens and opens refresh chains.
+    /// </para>
+    /// </remarks>
+    [HttpPost("register")]
+    [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<RegisterResponse>> RegisterAsync(
+        [FromBody] RegisterRequest request,
+        CancellationToken cancellationToken)
+    {
+        var outcome = await authService.RegisterAsync(
+            request.Username!, request.Email!, request.FullName!, request.Password!, cancellationToken);
+
+        if (!outcome.Succeeded)
+        {
+            throw new LuxMapException(
+                KnownErrors.IdentifierTaken.Code,
+                KnownErrors.IdentifierTaken.StatusCode,
+                "That username or email address is already registered.",
+                outcome.TakenFields);
+        }
+
+        var user = outcome.User!;
+        return StatusCode(StatusCodes.Status201Created, new RegisterResponse(
+            user.UserId,
+            user.Username,
+            user.Email,
+            user.FullName,
+            ContractEnum.ToDbValue(user.Role),
+            [],
+            RegisterResponse.PendingAssignmentMessage));
+    }
+
     [HttpPost("refresh")]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -45,7 +93,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         return Respond(result);
     }
 
-    /// <summary>Idempotent: token đã thu hồi hoặc không tồn tại vẫn trả 204.</summary>
+    /// <summary>Idempotent: an already-revoked or unknown token still returns 204.</summary>
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -64,25 +112,25 @@ public sealed class AuthController(AuthService authService) : ControllerBase
             return Ok(AuthTokenResponse.From(result.Tokens!));
         }
 
-        // Ném LuxMapException để middleware của BE-04 dựng body — mọi API cùng một hình dạng lỗi.
+        // Throw LuxMapException so the BE-04 middleware builds the body — one error shape for every API.
         throw result.Failure switch
         {
             AuthFailure.AccountLocked => new LuxMapException(
                 KnownErrors.AccountLocked.Code,
                 KnownErrors.AccountLocked.StatusCode,
-                "Tài khoản đang bị khoá. Liên hệ quản trị."),
+                "This account is locked. Contact an administrator."),
 
             AuthFailure.InvalidRefreshToken => new LuxMapException(
                 KnownErrors.InvalidRefreshToken.Code,
                 KnownErrors.InvalidRefreshToken.StatusCode,
-                "Refresh token không hợp lệ."),
+                "The refresh token is not valid."),
 
-            // Sai tài khoản và sai mật khẩu dùng CHUNG một body: tách ra là tiết lộ tài khoản
-            // nào tồn tại. Không đặt details trỏ vào field cụ thể.
+            // Wrong username and wrong password SHARE one body: separating them reveals which
+            // accounts exist. Never point details at a specific field.
             _ => new LuxMapException(
                 KnownErrors.InvalidCredentials.Code,
                 KnownErrors.InvalidCredentials.StatusCode,
-                "Tài khoản hoặc mật khẩu không đúng."),
+                "Incorrect username or password."),
         };
     }
 }

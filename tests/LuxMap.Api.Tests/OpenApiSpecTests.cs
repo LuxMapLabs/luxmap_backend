@@ -3,8 +3,8 @@ using System.Text.Json;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Ba điểm WP6 phụ thuộc trực tiếp (FM-04 sinh DTO Kotlin). Sai bất kỳ điểm nào thì
-/// Retrofit/kotlinx sinh ra kiểu sai và hỏng cả module Android.
+/// Three things WP6 depends on directly (FM-04 generates Kotlin DTOs). Get any of them wrong and
+/// Retrofit/kotlinx generates the wrong types, breaking the whole Android module.
 /// </summary>
 public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxMapSwaggerFactory>
 {
@@ -42,7 +42,7 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.Equal("string", schema.GetProperty("type").GetString());
         Assert.Equal(expected, schema.GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
 
-        // "integer" ở đây nghĩa là Swashbuckle đã mô tả enum bằng số — WP6 sẽ sinh Int.
+        // "integer" here would mean Swashbuckle described the enum numerically — WP6 would generate Int.
         Assert.NotEqual("integer", schema.GetProperty("type").GetString());
     }
 
@@ -58,7 +58,7 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         var schemas = Spec.GetProperty("components").GetProperty("schemas");
         foreach (var name in expected)
         {
-            Assert.True(schemas.TryGetProperty(name, out _), $"Thiếu enum {name} trong spec");
+            Assert.True(schemas.TryGetProperty(name, out _), $"Enum {name} is missing from the spec");
         }
     }
 

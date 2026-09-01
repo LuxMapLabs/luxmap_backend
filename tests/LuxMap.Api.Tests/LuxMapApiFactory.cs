@@ -8,7 +8,7 @@ public sealed class LuxMapApiFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Production để chứng minh lỗi 500 KHÔNG lộ chi tiết ngoại lệ ra ngoài.
+        // Production, to prove a 500 does NOT leak exception detail to the client.
         builder.UseEnvironment("Production");
 
         builder.ConfigureServices(services =>
@@ -17,8 +17,8 @@ public sealed class LuxMapApiFactory : WebApplicationFactory<Program>
 }
 
 /// <summary>
-/// Bản bật Swagger để kiểm chứng spec. Tách khỏi <see cref="LuxMapApiFactory"/> vì factory kia
-/// cố tình chạy ở Production để chứng minh lỗi 500 không lộ chi tiết ngoại lệ.
+/// A Swagger-enabled variant for verifying the spec. Kept separate from <see cref="LuxMapApiFactory"/>
+/// because that one deliberately runs in Production to prove a 500 leaks no exception detail.
 /// </summary>
 public sealed class LuxMapSwaggerFactory : WebApplicationFactory<Program>
 {

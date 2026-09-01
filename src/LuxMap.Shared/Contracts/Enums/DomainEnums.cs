@@ -1,9 +1,9 @@
 namespace LuxMap.Shared.Contracts.Enums;
 
-// Contract v1.1 mục 1 — KHOÁ CỨNG. FE/mobile đã hardcode các giá trị này.
-// Không thêm giá trị, không đổi tên, không đổi sang int.
-// Chuỗi trên dây do LuxMapJsonOptions sinh (SnakeCaseLower) và được khoá lại
-// từng giá trị một trong DomainEnumSerializationTests.
+// Contract v1.1 section 1 — FROZEN. Web and mobile already hardcode these values.
+// Do not add values, do not rename, do not switch to int.
+// The wire strings are produced by LuxMapJsonOptions (SnakeCaseLower) and every single value is
+// pinned by DomainEnumSerializationTests.
 
 /// <summary>fixture_status : normal | dim | out | unknown</summary>
 public enum FixtureStatus
@@ -12,7 +12,7 @@ public enum FixtureStatus
     Dim,
     Out,
 
-    /// <summary>Sweep gần nhất không phủ được cột. KHÔNG phải lỗi, không gộp vào <see cref="Out"/>.</summary>
+    /// <summary>The latest sweep did not cover this pole. NOT a fault — never fold into <see cref="Out"/>.</summary>
     Unknown,
 }
 
@@ -61,8 +61,8 @@ public enum Severity
 }
 
 /// <summary>
-/// source_channel : cv | iot | field_report — <em>kênh nào phát hiện ra</em>.
-/// Giá trị <c>manual</c> của v1.0 đã bị bỏ, không dùng lại.
+/// source_channel : cv | iot | field_report — <em>which channel detected it</em>.
+/// The v1.0 value <c>manual</c> was dropped and must not come back.
 /// </summary>
 public enum SourceChannel
 {
@@ -72,12 +72,12 @@ public enum SourceChannel
 }
 
 /// <summary>
-/// data_source : field | public_imagery | calibration_rig | simulated — <em>dữ liệu đến từ đâu</em>.
-/// Chiều khác với <see cref="SourceChannel"/>; một bản ghi mang cả hai cùng lúc.
+/// data_source : field | public_imagery | calibration_rig | simulated — <em>where the data came
+/// from</em>. A different axis from <see cref="SourceChannel"/>; one record carries both at once.
 /// </summary>
 public enum DataSource
 {
-    /// <summary>Giữ cho tương lai — Nhánh C không sinh bản ghi nào mang giá trị này.</summary>
+    /// <summary>Reserved for later — Branch C produces no records with this value.</summary>
     Field,
     PublicImagery,
     CalibrationRig,

@@ -22,15 +22,15 @@ public static class ApiConventionsSetup
             options.DefaultApiVersion = new ApiVersion(1, 0);
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ReportApiVersions = true;
-            // Contract mục 0: version nằm trong URL (/api/v1), không phải header hay query.
+            // Contract section 0: the version lives in the URL (/api/v1), not in a header or query.
             options.ApiVersionReader = new UrlSegmentApiVersionReader();
         })
         .AddMvc()
         .AddApiExplorer(options =>
         {
             options.GroupNameFormat = "'v'VVV";
-            // Thay {version} trong route bằng số thật, để spec ghi /api/v1/... chứ không
-            // phải /api/v{version}/... — WP6 sinh URL từ spec này.
+            // Substitutes the real number for {version} in the route so the spec reads /api/v1/...
+            // rather than /api/v{version}/... — WP6 generates its URLs from that spec.
             options.SubstituteApiVersionInUrl = true;
         });
 
@@ -38,9 +38,9 @@ public static class ApiConventionsSetup
 
         services.Configure<ApiBehaviorOptions>(options =>
         {
-            // ĐÂY LÀ CÁI BẪY: [ApiController] mặc định trả RFC 7807 ProblemDetails cho lỗi
-            // validation, KHÔNG khớp hình dạng error của Contract. Không thay factory này
-            // thì FE nhận hai hình dạng lỗi khác nhau tuỳ tình huống.
+            // THIS IS THE TRAP: by default [ApiController] returns RFC 7807 ProblemDetails for
+            // validation failures, which does NOT match the Contract's error shape. Without replacing
+            // this factory the front end receives two different error shapes depending on the case.
             options.InvalidModelStateResponseFactory = BuildValidationErrorResponse;
         });
 
@@ -55,7 +55,7 @@ public static class ApiConventionsSetup
                 entry => entry.Key.ToSnakeCaseLower(),
                 entry => (object?)entry.Value!.Errors
                     .Select(error => string.IsNullOrWhiteSpace(error.ErrorMessage)
-                        ? "Giá trị không hợp lệ."
+                        ? "Invalid value."
                         : error.ErrorMessage)
                     .ToArray());
 
@@ -66,7 +66,7 @@ public static class ApiConventionsSetup
 
         return new ObjectResult(ApiErrorResponse.Create(
             ErrorCodes.ValidationFailed,
-            "Dữ liệu gửi lên không hợp lệ.",
+            "The submitted payload is invalid.",
             fields))
         {
             StatusCode = (int)HttpStatusCode.BadRequest,
@@ -74,8 +74,8 @@ public static class ApiConventionsSetup
     }
 
     /// <summary>
-    /// Tên field trong <c>details</c> phải snake_case cho khớp với body mà client gửi lên;
-    /// ModelState dùng tên property C# (PascalCase).
+    /// Field names in <c>details</c> must be snake_case to match the body the client sent;
+    /// ModelState uses the C# property names (PascalCase).
     /// </summary>
     private static string ToSnakeCaseLower(this string key)
         => string.IsNullOrEmpty(key)
@@ -86,7 +86,7 @@ public static class ApiConventionsSetup
 public static class ApiPipelineSetup
 {
     /// <summary>
-    /// Phải chạy TRƯỚC request logging và exception handler: cả hai đều cần correlation id.
+    /// Must run BEFORE request logging and before the exception handler: both need the correlation id.
     /// </summary>
     public static WebApplication UseLuxMapCorrelationId(this WebApplication app)
     {
@@ -98,7 +98,8 @@ public static class ApiPipelineSetup
     }
 
     /// <summary>
-    /// Dựng hình dạng lỗi của Contract cho cả ngoại lệ lẫn các status trần (404, 405, 415).
+    /// Produces the Contract's error shape for thrown exceptions and for bare status codes
+    /// (401, 403, 404, 405, 415).
     /// </summary>
     public static WebApplication UseLuxMapErrorHandling(this WebApplication app)
     {
@@ -111,8 +112,8 @@ public static class ApiPipelineSetup
     }
 
     /// <summary>
-    /// Route không khớp, method sai... vốn trả body rỗng. Contract yêu cầu mọi API cùng một
-    /// hình dạng, nên dựng luôn <c>{ error: {...} }</c> cho các status trần này.
+    /// Unmatched routes, wrong methods and so on normally return an empty body. The Contract requires
+    /// one shape for every API response, so we build <c>{ error: {...} }</c> for those too.
     /// </summary>
     private static async Task HandleBareStatusCodeAsync(StatusCodeContext context)
     {
@@ -121,10 +122,14 @@ public static class ApiPipelineSetup
 
         var (code, message) = response.StatusCode switch
         {
-            404 => ("NOT_FOUND", "Không tìm thấy tài nguyên."),
-            405 => ("METHOD_NOT_ALLOWED", "Phương thức không được hỗ trợ trên đường dẫn này."),
-            415 => ("UNSUPPORTED_MEDIA_TYPE", "Content-Type không được hỗ trợ."),
-            _ => ("REQUEST_FAILED", "Yêu cầu không thực hiện được."),
+            // BE-08 — ASP.NET Core returns an EMPTY BODY for 401/403; the Contract demands one shape
+            // for every response, so they are rebuilt here.
+            401 => (ErrorCodes.Unauthenticated, "Authentication required."),
+            403 => (ErrorCodes.CommuneForbidden, "You do not have access to this resource."),
+            404 => ("NOT_FOUND", "Resource not found."),
+            405 => ("METHOD_NOT_ALLOWED", "That method is not supported on this path."),
+            415 => ("UNSUPPORTED_MEDIA_TYPE", "Unsupported Content-Type."),
+            _ => ("REQUEST_FAILED", "The request could not be completed."),
         };
 
         await ExceptionHandlingMiddleware.WriteAsync(

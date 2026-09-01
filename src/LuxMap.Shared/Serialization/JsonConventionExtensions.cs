@@ -5,10 +5,10 @@ namespace LuxMap.Shared.Serialization;
 public static class JsonConventionExtensions
 {
     /// <summary>
-    /// Áp quy ước JSON của contract cho CẢ hai đường: minimal API
-    /// (<c>Microsoft.AspNetCore.Http.Json.JsonOptions</c>) và MVC controller
-    /// (<c>Microsoft.AspNetCore.Mvc.JsonOptions</c>). Hai đường này đọc hai options khác nhau —
-    /// chỉ cấu hình một bên thì endpoint kiểu còn lại sẽ âm thầm trả camelCase.
+    /// Applies the Contract's JSON conventions to BOTH pipelines: minimal APIs
+    /// (<c>Microsoft.AspNetCore.Http.Json.JsonOptions</c>) and MVC controllers
+    /// (<c>Microsoft.AspNetCore.Mvc.JsonOptions</c>). They read two different options objects —
+    /// configuring only one silently leaves the other returning camelCase.
     /// </summary>
     public static IServiceCollection AddLuxMapJsonConventions(this IServiceCollection services)
     {

@@ -6,9 +6,9 @@ using LuxMap.Shared.Serialization;
 namespace LuxMap.Persistence.Tests;
 
 /// <summary>
-/// Quyết định BE-03: enum lưu dạng <c>text</c> mang đúng chuỗi của Contract.
-/// Giá trị trong DB và giá trị trên JSON phải KHỚP TUYỆT ĐỐI — lệch một chữ là
-/// truy vấn thống kê tay (CV-11, CV-18, IOT-16) ra số khác với API.
+/// The BE-03 decision: enums are stored as <c>text</c> holding exactly the Contract string.
+/// The database value and the JSON value must match EXACTLY — one character of drift and the manual
+/// reporting queries (CV-11, CV-18, IOT-16) return different numbers from the API.
 /// </summary>
 public class ContractEnumStorageTests
 {

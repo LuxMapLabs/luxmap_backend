@@ -4,7 +4,7 @@ using LuxMap.Shared.Serialization;
 
 namespace LuxMap.Shared.Tests;
 
-/// <summary>Contract v1.1 mục 0 — snake_case, ngày YYYY-MM-DD, thời gian ISO 8601 UTC hậu tố Z.</summary>
+/// <summary>Contract v1.1 section 0 — snake_case, YYYY-MM-DD dates, ISO 8601 UTC timestamps with a Z suffix.</summary>
 public class JsonConventionTests
 {
     private static readonly JsonSerializerOptions Options = LuxMapJsonOptions.Default;
@@ -45,7 +45,7 @@ public class JsonConventionTests
         Assert.Contains("\"has_iot_node\":true", json);
         Assert.Contains("\"near_sensitive_poi\":false", json);
 
-        // Không có khoá camelCase nào lọt ra.
+        // No camelCase key may escape.
         Assert.DoesNotContain("poleId", json);
         Assert.DoesNotContain("nearSensitivePoi", json);
     }

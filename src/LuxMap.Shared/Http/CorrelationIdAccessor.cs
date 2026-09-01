@@ -1,8 +1,8 @@
 namespace LuxMap.Shared.Http;
 
 /// <summary>
-/// Correlation id của request hiện tại. Tầng nghiệp vụ lấy qua đây thay vì đọc
-/// <c>HttpContext</c>, để module không phụ thuộc vào tầng web.
+/// Correlation id of the current request. Business code reads it through this interface instead of
+/// touching <c>HttpContext</c>, so modules stay independent of the web layer.
 /// </summary>
 public interface ICorrelationIdAccessor
 {

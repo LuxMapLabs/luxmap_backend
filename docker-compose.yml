@@ -1,37 +1,38 @@
-# BE-02 — hạ tầng dev cục bộ. Đúng hai dịch vụ, không thêm gì khác.
-# Không có pgvector (dự án đã bỏ RAG), không có MinIO (BE-11), không có pgAdmin.
+# BE-02 — local development infrastructure. Exactly two services, nothing else.
+# No pgvector (the project dropped RAG), no MinIO (that is BE-11), no pgAdmin.
 
 name: luxmap
 
 services:
   postgres:
-    # Multi-arch amd64 + arm64: Windows/x86 và Mac Apple Silicon đều chạy native,
-    # không ai cần `platform:` và không ai phải chạy emulation.
-    # postgis/postgis chính thức KHÔNG có bản arm64 cho bất kỳ tag PostgreSQL 17 nào.
-    # imresamu là maintainer chính của docker-postgis, cùng lineage Dockerfile.
+    # Multi-arch amd64 + arm64: Windows/x86 and Apple Silicon Macs both run natively, nobody needs a
+    # `platform:` line and nobody runs under emulation.
+    # The official postgis/postgis publishes NO arm64 build for any PostgreSQL 17 tag.
+    # imresamu is the primary maintainer of docker-postgis, same Dockerfile lineage.
     image: imresamu/postgis:17-3.5
     container_name: luxmap_postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-luxmap_dev}
       POSTGRES_USER: ${POSTGRES_USER:-luxmap}
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?chưa set POSTGRES_PASSWORD, hãy chạy `cp .env.example .env`}"
-      # Contract mục 0 + mục 5.2: mọi TIMESTAMPTZ đọc/ghi bằng DateTimeKind.Utc.
-      # Container lệch múi giờ gây lỗi rất khó tìm, nên ép UTC ở cả OS lẫn client.
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set, run `cp .env.example .env`}"
+      # Contract sections 0 and 5.2: every TIMESTAMPTZ is read and written as DateTimeKind.Utc.
+      # A container on the wrong timezone causes very hard-to-find bugs, so UTC is forced at both the
+      # OS and the client level.
       TZ: UTC
       PGTZ: UTC
-    # `-c timezone=UTC` ép thẳng GUC, không phụ thuộc initdb suy ra từ TZ của OS.
+    # `-c timezone=UTC` sets the GUC directly rather than relying on initdb inferring it from the OS TZ.
     command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
     ports:
-      # Bind vào 127.0.0.1: không phơi database ra LAN.
-      # Cổng host đọc từ biến môi trường, mặc định 5433 vì 5432 có thể đã bị
-      # PostgreSQL cài native chiếm.
+      # Bound to 127.0.0.1: the database is never exposed to the LAN.
+      # The host port comes from an environment variable, defaulting to 5433 because 5432 is often
+      # already taken by a natively installed PostgreSQL.
       - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # Chỉ rõ -U/-d: pg_isready mặc định dùng user `root` của container và luôn fail.
+      # -U/-d are explicit: pg_isready otherwise defaults to the container's `root` user and always fails.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-luxmap} -d ${POSTGRES_DB:-luxmap_dev} -q"]
       interval: 10s
       timeout: 5s
@@ -44,8 +45,8 @@ services:
     restart: unless-stopped
     environment:
       TZ: UTC
-    # Cache thuần, không persistence: không có named volume nên dữ liệu vốn đã
-    # mất khi recreate. Tắt hẳn RDB/AOF để tránh ghi đĩa vô ích và để ý định rõ ràng.
+    # Pure cache, no persistence: without a named volume the data is lost on recreate anyway.
+    # RDB/AOF are switched off entirely to avoid pointless disk writes and to make the intent obvious.
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
       - "127.0.0.1:${REDIS_PORT:-6380}:6379"

@@ -1,15 +1,15 @@
 namespace LuxMap.Shared.Contracts.Paging;
 
 /// <summary>
-/// Query <c>?page=1&amp;page_size=50</c> đã chuẩn hoá. Dựng bằng <see cref="Create"/> để chắc chắn
-/// đã kẹp về khoảng hợp lệ.
+/// A normalised <c>?page=1&amp;page_size=50</c> query. Build it with <see cref="Create"/> so the
+/// values are guaranteed to sit inside the allowed range.
 /// </summary>
 public sealed record PageRequest
 {
     public const int FirstPage = 1;
     public const int DefaultPageSize = 50;
 
-    /// <summary>Contract v1.1 mục 0 — <c>page_size</c> tối đa 200.</summary>
+    /// <summary>Contract v1.1 section 0 — <c>page_size</c> caps at 200.</summary>
     public const int MaxPageSize = 200;
 
     private PageRequest(int page, int pageSize)
@@ -22,12 +22,12 @@ public sealed record PageRequest
 
     public int PageSize { get; }
 
-    /// <summary>Số bản ghi bỏ qua — dùng cho <c>Skip()</c> / <c>OFFSET</c>.</summary>
+    /// <summary>Rows to skip — feed straight into <c>Skip()</c> / <c>OFFSET</c>.</summary>
     public int Skip => (Page - FirstPage) * PageSize;
 
     /// <summary>
-    /// Giá trị ngoài khoảng bị KẸP im lặng, không báo lỗi: <c>page_size=500</c> trả về 200 bản ghi
-    /// kèm <c>page_size: 200</c> trong response. Client đọc <c>page_size</c> trả về để biết.
+    /// Out-of-range values are clamped SILENTLY, not rejected: <c>page_size=500</c> returns 200 rows
+    /// and reports <c>page_size: 200</c> in the response. Clients must read <c>page_size</c> back.
     /// </summary>
     public static PageRequest Create(int? page = null, int? pageSize = null)
         => new(

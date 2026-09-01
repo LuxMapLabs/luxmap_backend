@@ -5,8 +5,8 @@ using LuxMap.Shared.Http;
 namespace LuxMap.Api.Http;
 
 /// <summary>
-/// Bắt mọi lỗi chưa xử lý và dựng đúng hình dạng
-/// <c>{ error: { code, message, details } }</c> của Contract mục 0.
+/// Catches everything that escapes and renders the Contract's error shape
+/// <c>{ error: { code, message, details } }</c> (section 0).
 /// </summary>
 public sealed class ExceptionHandlingMiddleware(
     RequestDelegate next,
@@ -21,10 +21,14 @@ public sealed class ExceptionHandlingMiddleware(
         }
         catch (LuxMapException known)
         {
-            logger.LogWarning(
-                known,
-                "Lỗi nghiệp vụ {Code} trên {Path} (correlation {CorrelationId})",
-                known.Code, context.Request.Path, correlation.CorrelationId);
+            // Do NOT pass the exception to the logger. These are ANTICIPATED business failures —
+            // wrong password, expired token, bbox too large — not application faults. Attaching a
+            // stack trace means every mistyped password writes ~3,000 characters of noise that
+            // buries the real errors. Code, path, method and correlation id are enough to investigate.
+            logger.Log(
+                LevelFor(known.StatusCode),
+                "Rejected {Method} {Path}: {Code} — {Reason}",
+                context.Request.Method, context.Request.Path, known.Code, known.Message);
 
             await WriteAsync(context, known.StatusCode, known.Code, known.Message, known.Details, correlation);
         }
@@ -32,11 +36,11 @@ public sealed class ExceptionHandlingMiddleware(
         {
             logger.LogError(
                 unexpected,
-                "Lỗi chưa xử lý trên {Path} (correlation {CorrelationId})",
+                "Unhandled failure on {Path} (correlation {CorrelationId})",
                 context.Request.Path, correlation.CorrelationId);
 
-            // Thông điệp cố ý chung chung: chi tiết ngoại lệ chỉ lộ ở Development.
-            // Tra bằng correlation id trong log, không đẩy stack trace ra cho client.
+            // The message is deliberately generic: exception detail is exposed only in Development.
+            // Look it up in the logs by correlation id; never push a stack trace to the client.
             var details = new Dictionary<string, object?>();
             if (environment.IsDevelopment())
             {
@@ -48,11 +52,17 @@ public sealed class ExceptionHandlingMiddleware(
                 context,
                 HttpStatusCode.InternalServerError,
                 ErrorCodes.InternalError,
-                "Đã xảy ra lỗi không mong muốn. Gửi correlation id cho quản trị để tra log.",
+                "An unexpected error occurred. Send the correlation id to an administrator to trace it.",
                 details,
                 correlation);
         }
     }
+
+    /// <summary>
+    /// 4xx is normal client behaviour, so Warning; only 5xx is our own failure.
+    /// </summary>
+    private static LogLevel LevelFor(HttpStatusCode statusCode)
+        => (int)statusCode >= 500 ? LogLevel.Error : LogLevel.Warning;
 
     internal static async Task WriteAsync(
         HttpContext context,
@@ -64,7 +74,7 @@ public sealed class ExceptionHandlingMiddleware(
     {
         if (context.Response.HasStarted)
         {
-            // Response đã gửi đi rồi thì không ghi đè được — chỉ còn cách cắt kết nối.
+            // The response is already on the wire and cannot be rewritten — aborting is all that is left.
             context.Abort();
             return;
         }

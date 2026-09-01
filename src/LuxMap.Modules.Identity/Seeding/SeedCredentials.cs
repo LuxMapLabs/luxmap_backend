@@ -3,8 +3,8 @@ using LuxMap.Shared.Contracts.Enums;
 namespace LuxMap.Modules.Identity.Seeding;
 
 /// <summary>
-/// Mật khẩu của tài khoản seed. Đọc từ biến môi trường (<c>.env</c>), KHÔNG hard-code trong mã —
-/// mã nguồn là public trong nhóm và sẽ lên GitHub.
+/// Passwords for the seeded accounts. Read from environment variables (<c>.env</c>), NEVER hardcoded —
+/// this source is shared across the team and lives on GitHub.
 /// </summary>
 public sealed class SeedCredentials
 {
@@ -19,10 +19,10 @@ public sealed class SeedCredentials
         UserRole.ManagementAgency => "SEED_AGENCY_PASSWORD",
         UserRole.MaintenanceEngineer => "SEED_ENGINEER_PASSWORD",
         UserRole.FieldCrew => "SEED_CREW_PASSWORD",
-        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Vai trò chưa có biến mật khẩu seed."),
+        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "No seed password variable for this role."),
     };
 
-    /// <summary>Thiếu biến nào thì dừng hẳn với thông điệp rõ, không lặng lẽ đặt mật khẩu mặc định.</summary>
+    /// <summary>Any missing variable stops seeding with a clear message rather than silently defaulting.</summary>
     public static SeedCredentials FromEnvironment()
     {
         var resolved = new Dictionary<UserRole, string>();
@@ -45,8 +45,8 @@ public sealed class SeedCredentials
         if (missing.Count > 0)
         {
             throw new InvalidOperationException(
-                $"Thiếu biến môi trường cho mật khẩu seed: {string.Join(", ", missing)}. "
-                + "Chạy `cp .env.example .env` ở thư mục gốc repo rồi đặt giá trị thật.");
+                $"Missing environment variables for seed passwords: {string.Join(", ", missing)}. "
+                + "Run `cp .env.example .env` at the repository root and set real values.");
         }
 
         return new SeedCredentials(resolved);

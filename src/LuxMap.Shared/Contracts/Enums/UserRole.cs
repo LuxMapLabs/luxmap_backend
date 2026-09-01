@@ -1,28 +1,28 @@
 namespace LuxMap.Shared.Contracts.Enums;
 
 /// <summary>
-/// Bốn vai trò ở CLAUDE.md và Contract mục 7.
+/// The four roles from CLAUDE.md and Contract section 7.
 /// </summary>
 /// <remarks>
-/// ⚠️ KHÔNG có trong Contract v1.1 mục 1 — Contract chỉ liệt kê vai trò bằng tiếng Việt, không
-/// chốt giá trị enum trên dây. Bốn chuỗi dưới đây do BE-06 đặt và sẽ nằm trong claim của JWT,
-/// nên FE và mobile sẽ hardcode chúng. <b>Cần đưa vào Contract ở FW-00 rồi tăng version</b>
-/// trước khi WP5/WP6 code theo.
+/// ⚠️ NOT part of Contract v1.1 section 1 — the Contract only names the roles in prose, it never
+/// fixes their wire values. The four strings below were chosen by BE-06 and end up in the JWT
+/// <c>role</c> claim, so web and mobile will hardcode them. <b>They must be added to the Contract
+/// at FW-00 and the version bumped</b> before WP5/WP6 build against them.
 /// <para>
-/// Không có vai trò Người dân — Contract và CLAUDE.md đều nêu đích danh điều này.
+/// There is no Citizen role — both the Contract and CLAUDE.md state this explicitly.
 /// </para>
 /// </remarks>
 public enum UserRole
 {
-    /// <summary>Cơ quan quản lý — có thể phụ trách nhiều xã.</summary>
+    /// <summary>Managing authority — may cover several communes.</summary>
     ManagementAgency,
 
-    /// <summary>Kỹ sư bảo trì — duyệt sự cố, đúng các xã trong claim.</summary>
+    /// <summary>Maintenance engineer — reviews faults, limited to the communes in the claim.</summary>
     MaintenanceEngineer,
 
-    /// <summary>Tổ khảo sát / sửa chữa — báo sự cố tại chỗ, đúng các xã trong claim.</summary>
+    /// <summary>Survey and repair crew — files faults on site, limited to the communes in the claim.</summary>
     FieldCrew,
 
-    /// <summary>Quản trị — phạm vi toàn hệ thống, claim mang giá trị đặc biệt '*'.</summary>
+    /// <summary>Administrator — system-wide scope, claim carries the special value '*'.</summary>
     Administrator,
 }

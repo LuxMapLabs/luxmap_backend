@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Admin;
 
 /// <summary>
-/// Module Admin — Quản trị danh mục, ngưỡng, node, model version, dashboard (BE-28..BE-35).
-/// Khung rỗng ở BE-01: chưa có entity, chưa có endpoint.
+/// Admin module — Catalogue, thresholds, nodes, model versions, dashboards (BE-28..BE-35).
+/// Empty shell as of BE-01: no entities, no endpoints yet.
 /// </summary>
 public sealed class AdminModule : ILuxMapModule
 {

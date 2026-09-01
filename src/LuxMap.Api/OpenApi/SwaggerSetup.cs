@@ -7,8 +7,8 @@ public static class SwaggerSetup
 {
     public const string DocumentName = "v1";
 
-    /// <summary>Bật/tắt qua cấu hình <c>Swagger:Enabled</c>. Mặc định TẮT (appsettings.json),
-    /// chỉ appsettings.Development.json bật lên.</summary>
+    /// <summary>Toggled by the <c>Swagger:Enabled</c> setting. OFF by default (appsettings.json);
+    /// only appsettings.Development.json turns it on.</summary>
     public static bool SwaggerEnabled(this IConfiguration configuration)
         => configuration.GetValue("Swagger:Enabled", defaultValue: false);
 
@@ -24,20 +24,21 @@ public static class SwaggerSetup
                 Title = "LuxMap API",
                 Version = "v1",
                 Description =
-                    "WP2 — GIS + IoT + Computer Vision quản lý chiếu sáng đường nông thôn. "
-                    + $"Base URL {ApiRoutes.BasePath}. Quy ước theo API Contract v1.1: JSON snake_case, "
-                    + "enum là chuỗi thường, thời gian ISO 8601 UTC hậu tố Z, toạ độ EPSG:4326.",
+                    "WP2 — GIS + IoT + Computer Vision platform for rural street-lighting assets. "
+                    + $"Base URL {ApiRoutes.BasePath}. Conventions from API Contract v1.1: snake_case JSON, "
+                    + "lowercase string enums, ISO 8601 UTC timestamps with a Z suffix, EPSG:4326 coordinates.",
             });
 
             AddBearerSecurity(options);
 
-            // Contract mục 0 phân biệt hai kiểu thời gian. Khai tường minh thay vì tin
-            // Swashbuckle suy đúng: sai chỗ này thì FM-04 sinh Instant thay cho LocalDate.
+            // Contract section 0 distinguishes two time types. Declare them explicitly rather than
+            // trusting Swashbuckle to infer correctly: getting this wrong makes FM-04 generate
+            // Instant where LocalDate belongs.
             options.MapType<DateTime>(() => new OpenApiSchema
             {
                 Type = JsonSchemaType.String,
                 Format = "date-time",
-                Description = "ISO 8601 UTC, hậu tố Z. Ví dụ 2026-08-20T04:00:00Z.",
+                Description = "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             });
             options.MapType<DateTime?>(() => new OpenApiSchema
             {
@@ -48,7 +49,7 @@ public static class SwaggerSetup
             {
                 Type = JsonSchemaType.String,
                 Format = "date",
-                Description = "Ngày không giờ, YYYY-MM-DD. Ví dụ 2023-01-04.",
+                Description = "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             });
             options.MapType<DateOnly?>(() => new OpenApiSchema
             {
@@ -67,8 +68,8 @@ public static class SwaggerSetup
     {
         const string schemeId = "Bearer";
 
-        // BE-05 chỉ khai security scheme cho tài liệu và nút Authorize trên UI.
-        // Chưa validate token — đó là BE-07.
+        // BE-05 only declares the security scheme for the docs and the Authorize button.
+        // Token validation arrives with BE-08.
         options.AddSecurityDefinition(schemeId, new OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -76,7 +77,7 @@ public static class SwaggerSetup
             Scheme = "bearer",
             BearerFormat = "JWT",
             In = ParameterLocation.Header,
-            Description = "Dán JWT vào đây, KHÔNG kèm tiền tố 'Bearer '.",
+            Description = "Paste the JWT here WITHOUT the 'Bearer ' prefix.",
         });
 
         options.AddSecurityRequirement(document => new OpenApiSecurityRequirement

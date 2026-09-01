@@ -4,9 +4,9 @@ using LuxMap.Shared.Contracts.Errors;
 namespace LuxMap.Shared.Http;
 
 /// <summary>
-/// Lỗi nghiệp vụ đã biết trước, mang sẵn mã và HTTP status của Contract.
-/// Ném cái này thay vì trả về lỗi tại chỗ — middleware sẽ dựng đúng hình dạng
-/// <see cref="ApiErrorResponse"/> ở một chỗ duy nhất.
+/// A known business failure carrying the Contract's error code and HTTP status.
+/// Throw this instead of building an error response inline — the middleware then produces the
+/// <see cref="ApiErrorResponse"/> shape in exactly one place.
 /// </summary>
 public class LuxMapException(
     string code,

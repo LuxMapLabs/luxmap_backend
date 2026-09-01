@@ -7,17 +7,18 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace LuxMap.Api.OpenApi;
 
 /// <summary>
-/// Bơm cả 12 enum của Contract mục 1 vào <c>components/schemas</c> kể cả khi chưa DTO nào
-/// tham chiếu tới. OpenAPI chỉ sinh schema cho kiểu được dùng, mà giai đoạn này chưa có
-/// endpoint domain nào — không có filter này thì spec rỗng và FM-04 không sinh được gì.
+/// Injects all 12 Contract section 1 enums into <c>components/schemas</c> even when no DTO
+/// references them yet. OpenAPI only emits schemas for types that are actually used, and at this
+/// stage there are no domain endpoints — without this filter the spec is empty and FM-04 has nothing
+/// to generate from.
 /// <para>
-/// Enum là phần Contract đã khoá cứng nên công bố sớm không sợ đổi. Từ BE-09 trở đi, khi
-/// DTO thật tham chiếu tới chúng, schema ở đây chính là schema được dùng lại.
+/// The enums are the frozen part of the Contract, so publishing them early is safe. From BE-09
+/// onward, when real DTOs reference them, these are the very schemas that get reused.
 /// </para>
 /// </summary>
 public sealed class ContractEnumDocumentFilter : IDocumentFilter
 {
-    /// <summary>Đúng thứ tự Contract mục 1.</summary>
+    /// <summary>In the order given by Contract section 1.</summary>
     private static readonly Type[] ContractEnums =
     [
         typeof(FixtureStatus), typeof(PowerSource), typeof(FixtureType),
@@ -36,7 +37,7 @@ public sealed class ContractEnumDocumentFilter : IDocumentFilter
 
         foreach (var enumType in ContractEnums)
         {
-            // DTO thật đã tham chiếu thì để nguyên schema do Swashbuckle sinh, không ghi đè.
+            // If a real DTO already referenced it, keep Swashbuckle's schema and do not overwrite.
             if (swaggerDoc.Components.Schemas.ContainsKey(enumType.Name))
             {
                 continue;
@@ -57,8 +58,8 @@ public sealed class ContractEnumDocumentFilter : IDocumentFilter
             Type = JsonSchemaType.String,
             Enum = [.. values.Select(value => (JsonNode)JsonValue.Create(value)!)],
             Description =
-                $"Contract v1.1 mục 1 — {JsonNamingPolicy.SnakeCaseLower.ConvertName(enumType.Name)}. "
-                + "Khoá cứng: không thêm giá trị, không đổi tên, không dùng int.",
+                $"Contract v1.1 section 1 — {JsonNamingPolicy.SnakeCaseLower.ConvertName(enumType.Name)}. "
+                + "Frozen: do not add values, do not rename, do not use int.",
         };
     }
 }

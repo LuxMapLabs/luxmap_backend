@@ -5,8 +5,8 @@ using System.Text.Json.Serialization;
 namespace LuxMap.Shared.Serialization;
 
 /// <summary>
-/// Contract v1.1 mục 0: thời gian trên API luôn là ISO 8601 UTC, hậu tố <c>Z</c>.
-/// Chuẩn hoá kind ngay ở biên serialize — không vá tại chỗ gọi.
+/// Contract v1.1 section 0: API timestamps are always ISO 8601 UTC with a <c>Z</c> suffix.
+/// Normalise the kind at the serialization boundary — never patch it at individual call sites.
 /// </summary>
 public sealed class UtcDateTimeConverter : JsonConverter<DateTime>
 {
@@ -19,7 +19,8 @@ public sealed class UtcDateTimeConverter : JsonConverter<DateTime>
 }
 
 /// <summary>
-/// Bản <see cref="DateTimeOffset"/> của <see cref="UtcDateTimeConverter"/> — quy về offset 0 rồi in hậu tố <c>Z</c>.
+/// The <see cref="DateTimeOffset"/> counterpart of <see cref="UtcDateTimeConverter"/> — shifts to
+/// offset zero and writes the <c>Z</c> suffix.
 /// </summary>
 public sealed class UtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
 {
@@ -34,14 +35,16 @@ public sealed class UtcDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
 public static class UtcNormalization
 {
     /// <summary>
-    /// Không mất dữ liệu: <c>F</c> bỏ số 0 thừa ở phần thập phân, và bỏ luôn dấu chấm khi
-    /// phần thập phân bằng 0. Giây tròn in ra <c>2026-08-20T04:00:00Z</c> — đúng như bộ mock FO-26.
+    /// Lossless: capital <c>F</c> drops trailing zeros in the fraction, and drops the decimal point
+    /// too when the fraction is zero. Whole seconds print as <c>2026-08-20T04:00:00Z</c> — exactly
+    /// what the FO-26 mock set uses.
     /// </summary>
     public const string Iso8601Utc = "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'";
 
     /// <summary>
-    /// Npgsql yêu cầu <see cref="DateTimeKind.Utc"/> cho <c>TIMESTAMPTZ</c>. <see cref="DateTimeKind.Unspecified"/>
-    /// được coi là đã ở UTC — mọi thời điểm đi qua biên này theo contract đã là UTC.
+    /// Npgsql requires <see cref="DateTimeKind.Utc"/> for <c>TIMESTAMPTZ</c>.
+    /// <see cref="DateTimeKind.Unspecified"/> is treated as already-UTC — by contract, everything
+    /// crossing this boundary is UTC.
     /// </summary>
     public static DateTime ToUtc(DateTime value) => value.Kind switch
     {

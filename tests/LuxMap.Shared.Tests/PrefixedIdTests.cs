@@ -3,8 +3,8 @@ using LuxMap.Shared.Contracts;
 namespace LuxMap.Shared.Tests;
 
 /// <summary>
-/// Bảng prefix ở Contract mục 0.2. Sai prefix hay sai số chữ số của một entity là sai toàn bộ
-/// ID của entity đó, và Contract mục 5.6 nói rõ sửa sau BE-09 là phải sửa lại hết.
+/// The prefix table from Contract section 0.2. A wrong prefix or padding width corrupts every ID of
+/// that entity, and Contract section 5.6 states plainly that fixing it after BE-09 means redoing all of them.
 /// </summary>
 public class PrefixedIdTests
 {
@@ -56,7 +56,7 @@ public class PrefixedIdTests
     [Fact]
     public void Id_grows_naturally_past_the_padding_width()
     {
-        // Contract mục 0.3: cột thứ 10000 là POLE-10000, không cắt bớt, không tràn.
+        // Contract section 0.3: pole 10000 is POLE-10000 — no truncation, no overflow.
         Assert.Equal("POLE-10000", PrefixedIds.Pole.Format(10_000));
         Assert.Equal("COM-1000", PrefixedIds.AdministrativeUnit.Format(1_000));
     }
@@ -64,7 +64,7 @@ public class PrefixedIdTests
     [Fact]
     public void Sequence_names_are_snake_case_lowercase()
     {
-        // Contract mục 5.1: identifier không quote, nên phải toàn chữ thường.
+        // Contract section 5.1: identifiers are unquoted, so they must be all lowercase.
         foreach (var spec in PrefixedIds.All)
         {
             Assert.Equal(spec.SequenceName.ToLowerInvariant(), spec.SequenceName);

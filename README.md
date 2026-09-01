@@ -4,6 +4,9 @@ Modular monolith ASP.NET Core phục vụ Web SPA (WP5), Android native (WP6) v�
 
 Nguồn sự thật: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) → [`docs/tasks-backend.csv`](docs/tasks-backend.csv) → [`CLAUDE.md`](CLAUDE.md).
 
+📖 **Mới vào dự án?** Đọc [`docs/code-walkthrough.md`](docs/code-walkthrough.md) — hướng dẫn đọc
+code theo thứ tự, giải thích từng cơ chế và vì sao nó tồn tại.
+
 ## Yêu cầu
 
 - .NET SDK 10.0
@@ -273,8 +276,22 @@ lúc khởi động**, không chạy tiếp với giá trị mặc định. Sinh
 openssl rand -base64 48
 ```
 
-BE-07 chỉ **phát** token. Việc **kiểm** token và chặn request theo địa bàn là BE-08 — hiện chưa
-có endpoint nào yêu cầu đăng nhập.
+## Phân quyền
+
+**Mặc định toàn ứng dụng là ĐÓNG** — endpoint mới tự động yêu cầu đăng nhập, muốn mở phải khai
+`[AllowAnonymous]`. Truy vấn tự bị giới hạn trong các xã thuộc claim của người gọi; quên gắn scope
+cho entity mới thì **app không khởi động được**.
+
+👉 **Trước khi viết endpoint mới, đọc [`docs/authorization-guide.md`](docs/authorization-guide.md).**
+Nó nói rõ bạn phải làm gì, và những chỗ dễ lách.
+
+Tóm tắt mã lỗi:
+
+| Tình huống | HTTP | `error.code` |
+|---|---|---|
+| Thiếu / sai / hết hạn token | 401 | `UNAUTHENTICATED` |
+| Sai vai trò, hoặc `commune_id` ngoài phạm vi | 403 | `COMMUNE_FORBIDDEN` |
+| Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` (không phải 403 — 403 sẽ lộ ra là nó tồn tại) |
 
 ## Cấu trúc
 

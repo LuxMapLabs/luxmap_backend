@@ -4,12 +4,12 @@ using LuxMap.Shared.Http;
 namespace LuxMap.Api.Http;
 
 /// <summary>
-/// Nhận correlation id từ client nếu có, không thì tự sinh. Luôn trả lại ở response header
-/// cho MỌI response — 2xx lẫn lỗi — để FE và log nối được cùng một request.
+/// Accepts the client's correlation id when present, generates one otherwise. Always echoes it back
+/// on EVERY response — 2xx and errors alike — so the front end and the logs can be tied together.
 /// </summary>
 public sealed class CorrelationIdMiddleware(RequestDelegate next)
 {
-    /// <summary>Chặn header của client dùng làm vector chèn dữ liệu rác vào log.</summary>
+    /// <summary>Stops the client header being used to push junk into the logs.</summary>
     private const int MaxLength = 128;
 
     public async Task InvokeAsync(HttpContext context, CorrelationIdHolder holder)
@@ -47,7 +47,8 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
             trimmed = trimmed[..MaxLength];
         }
 
-        // Chỉ giữ ký tự an toàn cho header và log; chuỗi lạ thì bỏ, sinh id mới.
+        // Only characters that are safe in a header and in a log line; anything else is discarded
+        // and replaced with a fresh id.
         foreach (var c in trimmed)
         {
             if (!char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_' or '.' or ':'))
@@ -60,7 +61,7 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
     }
 }
 
-/// <summary>Giữ correlation id trong phạm vi một request.</summary>
+/// <summary>Holds the correlation id for the lifetime of one request.</summary>
 public sealed class CorrelationIdHolder : ICorrelationIdAccessor
 {
     public string CorrelationId { get; set; } = string.Empty;

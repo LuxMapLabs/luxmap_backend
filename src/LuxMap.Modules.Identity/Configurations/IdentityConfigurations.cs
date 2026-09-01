@@ -18,7 +18,7 @@ public sealed class AdministrativeUnitConfiguration : IEntityTypeConfiguration<A
         builder.Property(unit => unit.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(unit => unit.UpdatedAt).HasDefaultValueSql("now()");
 
-        // Tên xã là khoá tự nhiên để seed chạy lại được mà không tạo trùng.
+        // The commune name is the natural key that keeps seeding idempotent.
         builder.HasIndex(unit => unit.Name).IsUnique();
     }
 }
@@ -64,7 +64,8 @@ public sealed class AppUserCommuneConfiguration : IEntityTypeConfiguration<AppUs
             .HasForeignKey(assignment => assignment.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Xoá xã đang có người phụ trách phải bị chặn: mất phân công là mất dấu vết phân quyền.
+        // Deleting a commune that still has assignees must be blocked: losing the assignment loses
+        // the authorization trail.
         builder.HasOne(assignment => assignment.Commune)
             .WithMany(unit => unit.UserAssignments)
             .HasForeignKey(assignment => assignment.CommuneId)
@@ -97,13 +98,13 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
             .HasForeignKey(token => token.ReplacedByTokenId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Tra cứu lúc refresh đi thẳng qua index này.
+        // Refresh lookups go straight through this index.
         builder.HasIndex(token => token.TokenHash).IsUnique();
 
-        // Dọn token hết hạn (BE-07) quét theo cột này.
+        // Expired-token cleanup (BE-07) scans on this column.
         builder.HasIndex(token => token.ExpiresAt);
 
-        // Thu hồi cả chuỗi khi phát hiện dùng lại token: một câu UPDATE theo index này.
+        // Revoking an entire chain on replay detection is one UPDATE over this index.
         builder.HasIndex(token => token.ChainId);
     }
 }
