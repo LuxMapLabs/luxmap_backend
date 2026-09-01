@@ -35,6 +35,23 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
 
     public string SegmentId { get; private set; } = null!;
 
+    /// <summary>
+    /// <c>pole_id_seq</c> as it stood before this run, so <see cref="DisposeAsync"/> can hand the
+    /// values back.
+    /// </summary>
+    /// <remarks>
+    /// Plain test hygiene, NOT a workaround for anything: the fixture burns
+    /// <see cref="SyntheticPoleCount"/> sequence values per run against a SHARED development
+    /// database and deletes every row it created, so keeping the values would let a handful of test
+    /// runs push the sequence arbitrarily high for no reason.
+    /// <para>
+    /// ⚠️ It does NOT address the <c>LPAD</c> truncation defect in BE-06 — see
+    /// <c>PrefixedIdOverflowTests</c>. That bug is about production reaching the 10000th pole and is
+    /// still entirely live.
+    /// </para>
+    /// </remarks>
+    private (long Value, bool IsCalled) poleSequence;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
         => builder.UseEnvironment("Production");
 
@@ -48,6 +65,8 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
         db.Set<AdministrativeUnit>().Add(commune);
         await db.SaveChangesAsync();
         CommuneId = commune.CommuneId;
+
+        poleSequence = await ReadPoleSequenceAsync(db);
 
         SegmentId = await ScalarAsync(db, """
             INSERT INTO road_segment (segment_name, road_class, length_m, geom, commune_id, data_source)
@@ -74,6 +93,14 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
             await ExecuteAsync(db, "DELETE FROM feeder WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM road_segment WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM administrative_unit WHERE commune_id = @commune;", ("commune", CommuneId));
+
+            // Every row this fixture created is gone by now, so nothing can collide with the values
+            // being returned.
+            await ExecuteAsync(
+                db,
+                "SELECT setval('pole_id_seq', @value, @called);",
+                ("value", poleSequence.Value),
+                ("called", poleSequence.IsCalled));
         }
 
         await base.DisposeAsync();
@@ -114,6 +141,18 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
         }
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private static async Task<(long Value, bool IsCalled)> ReadPoleSequenceAsync(LuxMapDbContext db)
+    {
+        var connection = db.Database.GetDbConnection();
+        await db.Database.OpenConnectionAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT last_value, is_called FROM pole_id_seq;";
+
+        await using var reader = await command.ExecuteReaderAsync();
+        await reader.ReadAsync();
+        return (reader.GetInt64(0), reader.GetBoolean(1));
     }
 
     private static async Task<string> ScalarAsync(
