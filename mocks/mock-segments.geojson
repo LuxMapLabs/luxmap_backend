@@ -87,7 +87,7 @@
     "road_class": "inter_commune",
     "length_m": 1600,
     "pole_count": 46,
-    "controller_node_id": "NODE-001-CTRL",
+    "controller_node_id": "NODE-0001",
     "has_active_segment_fault": false
    }
   },
@@ -156,11 +156,11 @@
    },
    "properties": {
     "segment_id": "SEG-002",
-    "segment_name": "Tuyen B - duong lien ap",
+    "segment_name": "Tuyen B - duong lien xa",
     "road_class": "inter_commune",
     "length_m": 1200,
     "pole_count": 31,
-    "controller_node_id": "NODE-002-CTRL",
+    "controller_node_id": "NODE-0002",
     "has_active_segment_fault": false
    }
   },
@@ -221,7 +221,7 @@
     "road_class": "inter_village",
     "length_m": 900,
     "pole_count": 26,
-    "controller_node_id": "NODE-003-CTRL",
+    "controller_node_id": "NODE-0003",
     "has_active_segment_fault": true
    }
   }

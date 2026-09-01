@@ -1256,8 +1256,8 @@
    "properties": {
     "pole_id": "POLE-0047",
     "segment_id": "SEG-002",
-    "fixture_status": "out",
-    "status_confidence": 0.91,
+    "fixture_status": "dim",
+    "status_confidence": 0.81,
     "power_source": "solar",
     "fixture_type": "solar_all_in_one",
     "lamp_watt": 60,
@@ -1267,7 +1267,7 @@
     "last_seen_at": "2026-08-18T12:00:00Z",
     "last_sweep_id": "SWEEP-2026-08-19-01",
     "open_fault_count": 1,
-    "has_iot_node": false,
+    "has_iot_node": true,
     "near_sensitive_poi": false
    }
   },
