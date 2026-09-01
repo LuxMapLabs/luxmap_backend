@@ -12,7 +12,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-001-CTRL",
+    "node_id": "NODE-0001",
     "node_role": "segment_controller",
     "segment_id": "SEG-001",
     "pole_id": null,
@@ -31,7 +31,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-002-CTRL",
+    "node_id": "NODE-0002",
     "node_role": "segment_controller",
     "segment_id": "SEG-002",
     "pole_id": null,
@@ -50,7 +50,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-003-CTRL",
+    "node_id": "NODE-0003",
     "node_role": "segment_controller",
     "segment_id": "SEG-003",
     "pole_id": null,
@@ -209,6 +209,25 @@
     "node_status": "online",
     "last_report_at": "2026-08-20T05:00:00Z",
     "battery_pct": 69
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     106.492025,
+     10.965989
+    ]
+   },
+   "properties": {
+    "node_id": "NODE-0047",
+    "node_role": "sampled_fixture",
+    "segment_id": "SEG-002",
+    "pole_id": "POLE-0047",
+    "node_status": "online",
+    "last_report_at": "2026-08-20T06:00:00Z",
+    "battery_pct": 43
    }
   }
  ]
