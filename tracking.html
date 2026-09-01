@@ -51,7 +51,7 @@
 
   <div class="grid">
     <div class="stat"><b>10</b><span>project trong solution</span></div>
-    <div class="stat"><b>247</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>252</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
     <div class="stat"><b>9</b><span>bảng trong database</span></div>
@@ -152,6 +152,12 @@
         <td><code>src/LuxMap.Shared/Contracts/PrefixedId.cs</code>, migration <code>FixPrefixedIdOverflow</code>, <code>tests/LuxMap.Api.Tests/PrefixedIdOverflowTests.cs</code></td>
         <td><code>fix(BE-06): stop LPAD truncating ids past the padding width</code></td>
       </tr>
+      <tr>
+        <td>01/09/2026</td>
+        <td><code>BE-09</code> <code>commune_id</code> thành khoá ngoại thật trên cả 5 bảng — <code>AdministrativeUnit</code> chuyển sang <code>Persistence</code>, chốt chặn khởi động quét theo CỘT chứ không theo interface, thêm <code>seed_key</code> bịt bẫy đổi tên của BE-39</td>
+        <td><code>src/LuxMap.Persistence/AdministrativeUnit.cs</code>, <code>Conventions/CommuneReferenceBuilderExtensions.cs</code>, migration <code>AddCommuneForeignKeys</code>, <code>tests/LuxMap.Api.Tests/CommuneReferenceTests.cs</code></td>
+        <td><code>feat(BE-09): make commune_id a real foreign key on every scoped table</code></td>
+      </tr>
     </table>
   </div>
 
@@ -176,7 +182,7 @@
   <div class="card">
     <ul>
       <li><strong>✅ Đã sửa lỗi BE-06: <code>LPAD</code> cắt bớt ID.</strong> <code>lpad('10000',4,'0')</code> ra <code>'1000'</code>, nên cột thứ 10000 thành <code>POLE-1000</code> và đụng cột thứ 1000 → <code>23505</code>. Vi phạm Contract mục 0.3, ảnh hưởng cả 16 entity. Thay bằng SQL function <code>luxmap_format_id</code> dùng <code>GREATEST(digits, LENGTH(v))</code>, giữ <code>nextval</code> gọi đúng một lần. Migration <code>FixPrefixedIdOverflow</code> đổi <code>DEFAULT</code> 6 cột đang có, không backfill. Kiểm trên DB dựng thuần từ migration: <code>POLE-9999 → POLE-10000 → POLE-10001</code>.</li>
-      <li><strong>BE-09: <code>commune_id</code> trên 5 bảng Assets chưa có khoá ngoại.</strong> <code>administrative_unit</code> thuộc module Identity; khai FK sẽ làm Assets phụ thuộc Identity, và mọi module sau cũng vậy. Cột có index nhưng không có FK. <strong>Rủi ro thật:</strong> <code>commune_id</code> sai tạo ra hàng mà query filter giấu khỏi mọi user, không có gì chỉ ra nguyên nhân — sẽ lộ ra ở BE-12 (import CSV). Nghiêng về chuyển <code>AdministrativeUnit</code> sang <code>LuxMap.Shared</code>. Xem <code>docs/contract-drift.md</code> mục 11.</li>
+      <li><strong>⚠️ ID không còn cố định độ dài — phải báo WP5 và WP6.</strong> Sau bản sửa BE-06, <code>POLE-0001</code> và <code>POLE-10000</code> cùng tồn tại. <strong>Không bao giờ <code>ORDER BY pole_id</code></strong> — so chuỗi thì <code>POLE-10000 &lt; POLE-9999</code>; sắp theo <code>created_at</code>, kiểm lại khi làm BE-14. Regex phía FE/mobile phải là <code>^POLE-\d{4,}$</code>, không phải <code>\d{4}</code>. Xem <code>docs/contract-drift.md</code> mục 14.</li>
       <li><strong>BE-09: bộ hiệu chuẩn FO-07 cần toạ độ thật của phòng đặt máy.</strong> Đã chốt phương án dùng toạ độ thật (giữ <code>NOT NULL</code>, ST_Intersects chạy đúng, pipeline một đường). Chưa có lat/lng — <strong>việc của BE-39</strong>, không chặn BE-09.</li>
       <li><strong>BE-39 phải seed HAI đơn vị hành chính, đúng thứ tự.</strong> COM-001 là xã nghiên cứu, COM-002 là xã đặt bộ hiệu chuẩn — tách địa bàn để query filter BE-08 tự chặn dữ liệu hiệu chuẩn khỏi thống kê COM-001, không phải chỉ dựa vào <code>data_source</code>. Kèm theo: <code>IdentitySeeder</code> đang idempotent theo <strong>tên</strong>, cần đổi sang <code>official_code</code> trước, nếu không đổi tên hiển thị sẽ sinh ra hàng thứ hai.</li>
       <li><strong>Bộ mock đã sửa 4 chỗ ở BE-09 — phải báo WP5 và WP6.</strong> <code>POLE-0047</code> đổi thành <code>dim</code> + có <code>NODE-0047</code>, phân bố thành 70/10/16/7, 12 node, <code>NODE-00x-CTRL</code> đổi thành <code>NODE-000x</code>, tên SEG-002 khớp lại <code>road_class</code>. Contract mục 4 vẫn ghi số cũ — gộp vào lần lên v1.2.</li>

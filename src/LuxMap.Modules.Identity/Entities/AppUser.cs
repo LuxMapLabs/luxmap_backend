@@ -1,3 +1,4 @@
+using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Identity.Entities;
