@@ -51,7 +51,7 @@
 
   <div class="grid">
     <div class="stat"><b>10</b><span>project trong solution</span></div>
-    <div class="stat"><b>237</b><span>test xanh + 1 skip có chủ ý</span></div>
+    <div class="stat"><b>247</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
     <div class="stat"><b>9</b><span>bảng trong database</span></div>
@@ -146,6 +146,12 @@
         <td><code>src/LuxMap.Modules.Assets/Entities/</code>, <code>src/LuxMap.Modules.Assets/Configurations/</code>, migration <code>AddAssetEntities</code>, <code>tests/LuxMap.Api.Tests/SpatialIndexTests.cs</code>, <code>mocks/</code></td>
         <td><code>feat(BE-09): add asset entities, spatial migration and GIST indexes</code></td>
       </tr>
+      <tr>
+        <td>01/09/2026</td>
+        <td><code>BE-06</code> fix — <code>LPAD</code> cắt bớt ID khi vượt độ rộng padding; thay bằng SQL function <code>luxmap_format_id</code>, đổi <code>DEFAULT</code> của 6 cột ID</td>
+        <td><code>src/LuxMap.Shared/Contracts/PrefixedId.cs</code>, migration <code>FixPrefixedIdOverflow</code>, <code>tests/LuxMap.Api.Tests/PrefixedIdOverflowTests.cs</code></td>
+        <td><code>fix(BE-06): stop LPAD truncating ids past the padding width</code></td>
+      </tr>
     </table>
   </div>
 
@@ -169,7 +175,7 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
-      <li><strong>🔴 Lỗi BE-06: <code>LPAD</code> CẮT BỚT ID khi vượt độ rộng.</strong> <code>lpad('10000',4,'0')</code> ra <code>'1000'</code>, nên cột thứ 10000 thành <code>POLE-1000</code> và đụng cột thứ 1000 → <code>23505 duplicate key</code>. Vi phạm thẳng Contract mục 0.3. Vỡ ở hàng thứ 1000 với prefix 3 chữ số, 10000 với 4 chữ số, 1 triệu với <code>FRM</code>/<code>DET</code>. Sửa: <code>LPAD(v, GREATEST(digits, LENGTH(v)), '0')</code> bọc trong một SQL function. <strong>Chưa sửa — là code BE-06, chờ duyệt.</strong> Đã ghi thành <code>PrefixedIdOverflowTests</code> (1 test Skip + 1 test xanh chứng minh bản sửa). Xem <code>docs/contract-drift.md</code> mục 13.</li>
+      <li><strong>✅ Đã sửa lỗi BE-06: <code>LPAD</code> cắt bớt ID.</strong> <code>lpad('10000',4,'0')</code> ra <code>'1000'</code>, nên cột thứ 10000 thành <code>POLE-1000</code> và đụng cột thứ 1000 → <code>23505</code>. Vi phạm Contract mục 0.3, ảnh hưởng cả 16 entity. Thay bằng SQL function <code>luxmap_format_id</code> dùng <code>GREATEST(digits, LENGTH(v))</code>, giữ <code>nextval</code> gọi đúng một lần. Migration <code>FixPrefixedIdOverflow</code> đổi <code>DEFAULT</code> 6 cột đang có, không backfill. Kiểm trên DB dựng thuần từ migration: <code>POLE-9999 → POLE-10000 → POLE-10001</code>.</li>
       <li><strong>BE-09: <code>commune_id</code> trên 5 bảng Assets chưa có khoá ngoại.</strong> <code>administrative_unit</code> thuộc module Identity; khai FK sẽ làm Assets phụ thuộc Identity, và mọi module sau cũng vậy. Cột có index nhưng không có FK. <strong>Rủi ro thật:</strong> <code>commune_id</code> sai tạo ra hàng mà query filter giấu khỏi mọi user, không có gì chỉ ra nguyên nhân — sẽ lộ ra ở BE-12 (import CSV). Nghiêng về chuyển <code>AdministrativeUnit</code> sang <code>LuxMap.Shared</code>. Xem <code>docs/contract-drift.md</code> mục 11.</li>
       <li><strong>BE-09: bộ hiệu chuẩn FO-07 cần toạ độ thật của phòng đặt máy.</strong> Đã chốt phương án dùng toạ độ thật (giữ <code>NOT NULL</code>, ST_Intersects chạy đúng, pipeline một đường). Chưa có lat/lng — <strong>việc của BE-39</strong>, không chặn BE-09.</li>
       <li><strong>BE-39 phải seed HAI đơn vị hành chính, đúng thứ tự.</strong> COM-001 là xã nghiên cứu, COM-002 là xã đặt bộ hiệu chuẩn — tách địa bàn để query filter BE-08 tự chặn dữ liệu hiệu chuẩn khỏi thống kê COM-001, không phải chỉ dựa vào <code>data_source</code>. Kèm theo: <code>IdentitySeeder</code> đang idempotent theo <strong>tên</strong>, cần đổi sang <code>official_code</code> trước, nếu không đổi tên hiển thị sẽ sinh ra hàng thứ hai.</li>
