@@ -45,18 +45,40 @@ public class PrefixedIdTests
     public void Default_value_sql_matches_the_form_contract_section_0_4_prescribes()
     {
         Assert.Equal(
-            "'COM-' || LPAD(nextval('commune_id_seq')::text, 3, '0')",
+            "luxmap_format_id('COM', nextval('commune_id_seq'), 3)",
             PrefixedIds.AdministrativeUnit.DefaultValueSql);
 
         Assert.Equal(
-            "'POLE-' || LPAD(nextval('pole_id_seq')::text, 4, '0')",
+            "luxmap_format_id('POLE', nextval('pole_id_seq'), 4)",
             PrefixedIds.Pole.DefaultValueSql);
+    }
+
+    [Fact]
+    public void Default_value_sql_never_pads_with_a_bare_lpad()
+    {
+        // `lpad(string, length, fill)` TRUNCATES when the string is longer than `length`, so
+        // lpad('10000', 4, '0') is '1000' and the 10000th pole collided with the 1000th. Every
+        // spec goes through luxmap_format_id, which uses greatest(digits, length(...)) instead.
+        foreach (var spec in PrefixedIds.All)
+        {
+            Assert.DoesNotContain("LPAD", spec.DefaultValueSql, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(PrefixedIdSpec.FormatFunction, spec.DefaultValueSql, StringComparison.Ordinal);
+
+            // nextval must appear exactly once: calling it twice would burn two values per row and
+            // put the sequence out of step with the IDs actually issued.
+            Assert.Equal(1, spec.DefaultValueSql.Split("nextval").Length - 1);
+        }
     }
 
     [Fact]
     public void Id_grows_naturally_past_the_padding_width()
     {
         // Contract section 0.3: pole 10000 is POLE-10000 — no truncation, no overflow.
+        //
+        // ⚠️ This test passed all through BE-06 while the database was doing the opposite, because
+        // Format uses PadLeft (which never truncates) and nothing exercised the SQL half. The
+        // matching database-side assertions live in PrefixedIdOverflowTests, which needs a real
+        // PostgreSQL and so cannot live here.
         Assert.Equal("POLE-10000", PrefixedIds.Pole.Format(10_000));
         Assert.Equal("COM-1000", PrefixedIds.AdministrativeUnit.Format(1_000));
     }

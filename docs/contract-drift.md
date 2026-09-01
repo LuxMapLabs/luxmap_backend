@@ -9,7 +9,7 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 
 **Ai cần đọc:** WP5 (Web) và WP6 (Android) — nhiều mục dưới đây các bạn sẽ gặp ngay khi tích hợp.
 
-**Trạng thái code:** BE-00 → BE-09 xong, 237 test xanh + 1 skip (mục 13).
+**Trạng thái code:** BE-00 → BE-09 xong, 247 test xanh.
 
 ---
 
@@ -29,7 +29,7 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 10 | **Contract mục 1 ↔ mục 2.9 mâu thuẫn về `data_source`** | 🔴 Cao | Nội bộ BE, CV-11/CV-18 | Contract — **đã chốt lên v1.2** |
 | 11 | `commune_id` trên 5 bảng Assets chưa có khoá ngoại | 🟡 Vừa | Nội bộ BE, BE-12 | **Chưa quyết** — ranh giới module |
 | 12 | Mock: `POLE-0047` mâu thuẫn giữa 3 file | 🔴 Cao | WP5, WP6, BE-39 | Mock — **đã sửa** |
-| 13 | **`LPAD` cắt bớt ID khi vượt độ rộng — vi phạm mục 0.3** | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **chờ duyệt** |
+| 13 | ~~`LPAD` cắt bớt ID khi vượt độ rộng~~ | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **ĐÃ SỬA** |
 
 ---
 
@@ -403,9 +403,9 @@ dòng nào. Bất biến này đã được khoá thành CHECK constraint ở BE
 
 ---
 
-## 13. `LPAD` cắt bớt ID khi vượt độ rộng — vi phạm Contract mục 0.3 🔴
+## 13. `LPAD` cắt bớt ID khi vượt độ rộng — vi phạm Contract mục 0.3 🔴 ✅ ĐÃ SỬA
 
-**Phát hiện khi làm BE-09, chưa sửa.** Đây là lỗi trong helper sinh ID của BE-06, không phải của BE-09.
+**Phát hiện khi làm BE-09, đã sửa trong cùng nhánh.** Lỗi nằm ở helper sinh ID của BE-06, không phải BE-09.
 
 **Contract mục 0.3 ghi gì:**
 
@@ -471,13 +471,31 @@ $$ SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text
 **Phạm vi sửa:** `PrefixedIdSpec.DefaultValueSql` (một dòng) + một migration đổi `DEFAULT` của **cả
 16 cột ID**. Không đụng dữ liệu đã có — mọi ID hiện tại đều dưới ngưỡng nên không cần backfill.
 
-**Chưa sửa vì đây là code BE-06, cần duyệt.** Đã ghi lại thành test `PrefixedIdOverflowTests` —
-một test `Skip` mô tả đúng lỗi (bỏ `Skip` cùng lúc với bản sửa) và một test xanh chứng minh biểu thức
-thay thế cho ra đúng ID mà mục 0.3 mô tả.
+### Đã sửa — migration `FixPrefixedIdOverflow`
 
-> Comment hiện tại trong `PrefixedId.cs` khẳng định ngược lại sự thật — *"LPAD simply returns the
-> longer number ... no truncation and no overflow"*. Sửa code thì sửa luôn comment đó, vì chính nó
-> làm người đọc tin là đã an toàn.
+`PrefixedIdSpec.DefaultValueSql` giờ sinh ra `luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`.
+Migration tạo function rồi đổi `DEFAULT` của **cả 6 cột ID đang tồn tại** (`COM` `USR` `SEG` `FDR`
+`POLE` `FIX`); 10 entity chưa tạo sẽ dùng biểu thức mới ngay từ migration đầu của chúng. **Không
+backfill dòng nào** — mọi ID hiện có đều dưới ngưỡng.
+
+Kiểm chứng trên database dựng **thuần từ migration**, không vá tay:
+
+```
+setval('pole_id_seq', 9998); INSERT … ×4
+  POLE-9999
+  POLE-10000     ← trước đây là POLE-1000 → 23505
+  POLE-10001
+  POLE-10002
+```
+
+`PrefixedIdOverflowTests` không còn test nào bị `Skip`: chèn thật qua `DEFAULT` ở đúng ngưỡng vỡ,
+kiểm cột thứ 30000 không đụng cột thứ 3000, và đối chiếu **cả 16 prefix** giữa `PrefixedIdSpec.Format`
+của C# và function của database ở cả hai phía ngưỡng. `Format` dùng `PadLeft` nên phía C# vốn đã
+đúng — chỉ phía SQL lệch.
+
+> Comment cũ trong `PrefixedId.cs` khẳng định ngược lại sự thật — *"LPAD simply returns the longer
+> number ... no truncation and no overflow"* — và chính nó làm người đọc tin là đã an toàn. Đã viết
+> lại kèm lý do vì sao phải dùng function chứ không phải biểu thức thẳng.
 
 ---
 
@@ -489,8 +507,7 @@ thay thế cho ra đúng ID mà mục 0.3 mô tả.
 4. Mục 5 cần giao rõ phần tạo tài khoản cho BE-33.
 5. **Mục 11 phải quyết trước BE-12** — import CSV là chỗ `commune_id` sai sẽ thực sự xuất hiện.
 6. **Mục 10 và 12 gộp vào lần lên Contract v1.2**, rồi báo WP5/WP6 vì bộ mock đã đổi.
-7. **Mục 13 nên sửa sớm** — càng để lâu càng nhiều bảng phải đổi `DEFAULT`, và sửa bây giờ thì không
-   phải backfill dòng nào.
+7. ~~Mục 13~~ — **đã sửa**, chỉ cần báo để cả nhóm biết `DEFAULT` của cột ID đã đổi dạng.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.
