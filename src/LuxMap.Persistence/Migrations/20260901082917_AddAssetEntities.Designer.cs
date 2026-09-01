@@ -3,6 +3,7 @@ using System;
 using LuxMap.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LuxMap.Persistence.Migrations
 {
     [DbContext(typeof(LuxMapDbContext))]
-    partial class LuxMapDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260901082917_AddAssetEntities")]
+    partial class AddAssetEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -42,7 +45,7 @@ namespace LuxMap.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("feeder_id")
-                        .HasDefaultValueSql("luxmap_format_id('FDR', nextval('feeder_id_seq'), 3)")
+                        .HasDefaultValueSql("'FDR-' || LPAD(nextval('feeder_id_seq')::text, 3, '0')")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "feeder_id_seq");
 
                     b.Property<string>("CommuneId")
@@ -93,7 +96,7 @@ namespace LuxMap.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("fixture_id")
-                        .HasDefaultValueSql("luxmap_format_id('FIX', nextval('fixture_id_seq'), 4)")
+                        .HasDefaultValueSql("'FIX-' || LPAD(nextval('fixture_id_seq')::text, 4, '0')")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "fixture_id_seq");
 
                     b.Property<string>("CommuneId")
@@ -177,7 +180,7 @@ namespace LuxMap.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("pole_id")
-                        .HasDefaultValueSql("luxmap_format_id('POLE', nextval('pole_id_seq'), 4)")
+                        .HasDefaultValueSql("'POLE-' || LPAD(nextval('pole_id_seq')::text, 4, '0')")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "pole_id_seq");
 
                     b.Property<string>("CommuneId")
@@ -303,7 +306,7 @@ namespace LuxMap.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("segment_id")
-                        .HasDefaultValueSql("luxmap_format_id('SEG', nextval('segment_id_seq'), 3)")
+                        .HasDefaultValueSql("'SEG-' || LPAD(nextval('segment_id_seq')::text, 3, '0')")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "segment_id_seq");
 
                     b.Property<string>("CommuneId")
@@ -368,13 +371,49 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AdministrativeUnit", b =>
+                {
+                    b.Property<string>("CommuneId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id")
+                        .HasDefaultValueSql("'COM-' || LPAD(nextval('commune_id_seq')::text, 3, '0')")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "commune_id_seq");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("CommuneId")
+                        .HasName("pk_administrative_unit");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_administrative_unit_name");
+
+                    b.ToTable("administrative_unit", (string)null);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AppUser", b =>
                 {
                     b.Property<string>("UserId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("user_id")
-                        .HasDefaultValueSql("luxmap_format_id('USR', nextval('user_id_seq'), 3)")
+                        .HasDefaultValueSql("'USR-' || LPAD(nextval('user_id_seq')::text, 3, '0')")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "user_id_seq");
 
                     b.Property<DateTime>("CreatedAt")
@@ -547,69 +586,8 @@ namespace LuxMap.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("LuxMap.Persistence.AdministrativeUnit", b =>
-                {
-                    b.Property<string>("CommuneId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasColumnName("commune_id")
-                        .HasDefaultValueSql("luxmap_format_id('COM', nextval('commune_id_seq'), 3)")
-                        .HasAnnotation("LuxMap:PrefixedIdSequence", "commune_id_seq");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("name");
-
-                    b.Property<string>("SeedKey")
-                        .HasColumnType("text")
-                        .HasColumnName("seed_key");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("CommuneId")
-                        .HasName("pk_administrative_unit");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("ix_administrative_unit_name");
-
-                    b.HasIndex("SeedKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_administrative_unit_seed_key");
-
-                    b.ToTable("administrative_unit", (string)null);
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Assets.Entities.Feeder", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_feeder_administrative_unit_commune_id");
-                });
-
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.Fixture", b =>
                 {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_fixture_administrative_unit_commune_id");
-
                     b.HasOne("LuxMap.Modules.Assets.Entities.Pole", "Pole")
                         .WithMany("Fixtures")
                         .HasForeignKey("PoleId")
@@ -622,13 +600,6 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.Pole", b =>
                 {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pole_administrative_unit_commune_id");
-
                     b.HasOne("LuxMap.Modules.Assets.Entities.Feeder", "Feeder")
                         .WithMany("Poles")
                         .HasForeignKey("FeederId")
@@ -649,13 +620,6 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.PoleCurrentStatus", b =>
                 {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_pole_current_status_administrative_unit_commune_id");
-
                     b.HasOne("LuxMap.Modules.Assets.Entities.Pole", "Pole")
                         .WithOne("CurrentStatus")
                         .HasForeignKey("LuxMap.Modules.Assets.Entities.PoleCurrentStatus", "PoleId")
@@ -666,20 +630,10 @@ namespace LuxMap.Persistence.Migrations
                     b.Navigation("Pole");
                 });
 
-            modelBuilder.Entity("LuxMap.Modules.Assets.Entities.RoadSegment", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_road_segment_administrative_unit_commune_id");
-                });
-
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AppUserCommune", b =>
                 {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", "Commune")
-                        .WithMany()
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AdministrativeUnit", "Commune")
+                        .WithMany("UserAssignments")
                         .HasForeignKey("CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
@@ -732,6 +686,11 @@ namespace LuxMap.Persistence.Migrations
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.RoadSegment", b =>
                 {
                     b.Navigation("Poles");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AdministrativeUnit", b =>
+                {
+                    b.Navigation("UserAssignments");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AppUser", b =>

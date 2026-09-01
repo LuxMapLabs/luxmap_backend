@@ -9,7 +9,7 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 
 **Ai cần đọc:** WP5 (Web) và WP6 (Android) — nhiều mục dưới đây các bạn sẽ gặp ngay khi tích hợp.
 
-**Trạng thái code:** BE-00 → BE-08 xong, 202 test xanh.
+**Trạng thái code:** BE-00 → BE-09 xong, 252 test xanh.
 
 ---
 
@@ -26,6 +26,11 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 7 | `page_size` vượt 200 bị kẹp im lặng | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ hành vi |
 | 8 | Route không tồn tại trả 401 khi chưa đăng nhập | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
 | 9 | `CLAUDE.md` thiếu `data_source` trong khối enum | 🟢 Thấp | Nội bộ BE | `CLAUDE.md` |
+| 10 | **Contract mục 1 ↔ mục 2.9 mâu thuẫn về `data_source`** | 🔴 Cao | Nội bộ BE, CV-11/CV-18 | Contract — **đã chốt lên v1.2** |
+| 11 | ~~`commune_id` trên 5 bảng Assets chưa có khoá ngoại~~ | 🟡 Vừa | Nội bộ BE, BE-12 | **ĐÃ CHỐT** — `AdministrativeUnit` sang `Persistence` |
+| 14 | **ID không còn cố định độ dài — FE/mobile phải sửa regex** | 🔴 Cao | WP5, WP6 | Contract — ghi rõ ở mục 0.3 |
+| 12 | Mock: `POLE-0047` mâu thuẫn giữa 3 file | 🔴 Cao | WP5, WP6, BE-39 | Mock — **đã sửa** |
+| 13 | ~~`LPAD` cắt bớt ID khi vượt độ rộng~~ | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **ĐÃ SỬA** |
 
 ---
 
@@ -246,6 +251,7 @@ xem `docs/authorization-guide.md`.
 | `USR-khang` | `USR-001` — 3 chữ số | `mock-work-orders.json`, trường `assigned_to`, 2 chỗ |
 | `CLU-0001` | `CLS-001` | `mock-work-orders.json`, `cluster_id` |
 | `NODE-0020` … | `NODE-001` — 3 chữ số | `mock-iot-nodes.geojson`, `mock-pole-detail.json` |
+| ~~`NODE-001-CTRL`~~ | Sai **cấu trúc** mục 0.1, không chỉ sai số chữ số | ~~`mock-segments.geojson`, `mock-iot-nodes.geojson`~~ — **đã sửa ở BE-09** |
 | `FRM-88213` | `FRM-000001` — 6 chữ số | `mock-pole-detail.json`, `frame_id` |
 | `SWEEP-2026…` | `SWP-001` | `mock-poles.geojson`, `last_sweep_id` |
 | `SUP-004` | không có trong bảng prefix | `mock-pole-detail.json`, `supplier` |
@@ -254,6 +260,12 @@ xem `docs/authorization-guide.md`.
 
 **Vì sao phải chốt sớm:** **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã
 dựng. Với `assigned_to: "USR-khang"` thì BE-39 **không map được sang user nào**.
+
+> ✅ **Đã xử lý một phần ở BE-09.** Hậu tố `-CTRL` sai cấu trúc mục 0.1 (`<PREFIX>-<số đã pad>` không
+> có phần đuôi chữ) nên đã đổi thành `NODE-0001` / `NODE-0002` / `NODE-0003` ở **cả hai** file
+> `mock-segments.geojson` và `mock-iot-nodes.geojson`. Giữ **4 chữ số** cho khớp với các node còn
+> lại trong bộ mock — câu 3-hay-4 chữ số vẫn còn mở, và phải sửa **một lượt cho toàn bộ node ID**
+> chứ không sửa lắt nhắt. Năm chỗ lệch còn lại chưa đụng tới.
 
 **Đề xuất:** sửa **mock** cho khớp Contract, vì Contract là hợp đồng còn mock là dữ liệu minh hoạ.
 Nhưng WP5/WP6 đang code theo mock nên phải báo trước — đây chính là việc mà `mocks/README.md` đã dặn:
@@ -307,12 +319,242 @@ sẽ tưởng chỉ có 11 enum.
 
 ---
 
+## 10. Contract mục 1 và mục 2.9 mâu thuẫn về `data_source` 🔴
+
+**Mục 1 ghi gì:** *"`data_source` gắn trên `SurveySweep`, `SurveyFrame`, `Fault`,
+`TelemetryReading`, `LuxReading`."* — **`Pole` và `Fixture` không có trong danh sách.**
+
+**Mục 2.9 ghi gì:** *"Đăng ký bộ hiệu chuẩn FO-07 như một `RoadSegment` bình thường với các `Pole`
+và `Fixture` tương ứng, **`data_source = calibration_rig`**"* — **yêu cầu `Pole` và `Fixture` phải
+có trường này.**
+
+Hai mục của cùng một tài liệu nói ngược nhau. `CLAUDE.md` chép lại danh sách của mục 1 nên cũng
+thiếu (xem mục 9).
+
+**Vì sao không thể tránh:** không có `data_source` ở tầng tài sản thì không cách nào tách cột hiệu
+chuẩn khỏi cột thật khi thống kê — mà CV-11, CV-18, IOT-16 đều yêu cầu báo cáo tách riêng, và
+`CLAUDE.md` gọi việc trộn ba nguồn dữ liệu là *"lỗi nghiêm trọng, không phải chi tiết trình bày"*.
+
+**Đã chốt:** mục 2.9 thắng (mới hơn, cụ thể hơn). BE-09 thêm `data_source` vào **`pole`**,
+**`fixture`** và **`road_segment`**. Không thêm vào `feeder` — mạch điện không mang nguồn dữ liệu.
+Contract sẽ **lên v1.2** để bổ sung ba entity này vào danh sách mục 1.
+
+**Cột lưu nhưng KHÔNG emit ra `properties`.** Bộ mock là nguồn chuẩn cho hình dạng response và không
+có trường này, nên FE không phải sửa gì. Xử lý y hệt `road_segment.commune_id`: dùng để **lọc**,
+không xuất hiện trong response. `GET /poles` mặc định loại `data_source = calibration_rig`; muốn xem
+thì thêm query param tường minh.
+
+---
+
+## 11. `commune_id` trên 5 bảng Assets chưa có khoá ngoại 🟡 ✅ ĐÃ CHỐT
+
+**Đã quyết và đã làm.** `AdministrativeUnit` chuyển từ `LuxMap.Modules.Identity` sang
+**`LuxMap.Persistence`**, và cả 5 bảng khai FK thật.
+
+**Vì sao `Persistence` chứ không phải `Shared`:** `Shared` đang là thư viện nhẹ (quy ước
+serialization, contract, enum) và có chỗ dùng nó mà không nên biết gì về EF. Đặt một entity EF vào
+đó thì hoặc `Shared` phải kéo theo EF Core, hoặc entity và cấu hình bị tách hai nơi — cả hai đều tệ
+hơn hiện trạng. `Persistence` đã sở hữu chính cơ chế cần bảng này (`ICommuneScoped`,
+`HasCommuneScope()`, chốt chặn khởi động), và **mọi module đều đã tham chiếu `Persistence`**.
+
+`AdministrativeUnit` không phải khái niệm của Identity — nó là **mốc neo phạm vi** cho 15/16 entity
+toàn hệ. Đây là di chuyển namespace, **không đổi schema**.
+
+**FK khai thật, KHÔNG có navigation property:**
+
+```csharp
+builder.HasCommuneReference(pole => pole.CommuneId);
+// → HasOne<AdministrativeUnit>().WithMany().HasForeignKey(...).OnDelete(Restrict)
+```
+
+Toàn vẹn ở tầng database mà không mở đường cho `pole.Commune.Name` rải khắp module — coupling giữa
+module vẫn chỉ là chuỗi ID. `Restrict`, không bao giờ cascade một đơn vị hành chính.
+
+**Chốt chặn mở rộng:** vế cũ hỏi *"entity implement `ICommuneScoped` đã gọi `HasCommuneScope()`
+chưa"*. Vế mới quét **theo cột**: mọi cột tên `commune_id` không có FK tới `administrative_unit` thì
+**chặn khởi động**. Quét cột chứ không quét interface — bịt luôn lỗ hổng mà XML doc của
+`ICommuneScoped` tự thừa nhận. Đã kiểm bằng cách tạm gỡ FK khỏi `Pole`:
+
+```
+System.InvalidOperationException : Entities have a 'commune_id' column with no foreign key to
+'administrative_unit': Pole. …
+```
+
+`AdministrativeUnit` **không** implement `ICommuneScoped` — lọc chính bảng neo bằng filter toàn cục
+sẽ tạo vòng lặp ngữ nghĩa. Đã ghi vào `CLAUDE.md` để không ai "sửa cho nhất quán".
+
+**Kèm theo — `seed_key` text NULL UNIQUE:** `IdentitySeeder` idempotent theo **tên**, mà tên chính là
+thứ BE-39 sẽ sửa; upsert theo tên sẽ sinh commune **thứ hai** trong khi commune đầu vẫn giữ toàn bộ
+cột. Giờ upsert theo **vai trò**: `study_site` và `calibration_site`. Không thêm `official_code` —
+chưa chọn được địa bàn thì chưa có mã thật, thêm vào là bịa. Đã kiểm: đổi tên thành "Xa Tan Hiep" rồi
+seed lại → tìm thấy theo `seed_key`, không sinh dòng thứ hai.
+
+> BE-39 seed dòng `calibration_site`. Key đã đặt sẵn, chưa tạo dòng vì chưa biết xã nào.
+
+---
+
+## 12. Mock `POLE-0047` mâu thuẫn giữa ba file 🔴 — đã sửa
+
+**Vấn đề:** cùng một cột, ba file nói ba điều khác nhau:
+
+| File | Nói gì |
+|---|---|
+| `mock-poles.geojson` | `fixture_status = out`, `confidence 0.91`, `has_iot_node = false` |
+| `mock-pole-detail.json` | `fixture_status = dim`, `confidence 0.81`, **có** `iot_node = NODE-0047` |
+| `mock-iot-nodes.geojson` | **không tồn tại `NODE-0047`** |
+
+`POLE-0047` chính là cột `mocks/README.md` chỉ định làm case demo runtime suy giảm — BE-39 sẽ không
+seed nổi.
+
+**Đã chốt và đã sửa:** pin yếu làm đèn **mờ dần**, không tắt phụt, nên `dim` là trạng thái đúng.
+
+- `mock-poles.geojson` → `dim` / `0.81` / `has_iot_node = true`
+- `mock-iot-nodes.geojson` → thêm `NODE-0047` (`sampled_fixture`, `SEG-002`, `pole_id: POLE-0047`)
+- Phân bố đổi thành **70 `normal` · 10 `dim` · 16 `out` · 7 `unknown`**, số node thành **12**
+- `mocks/README.md` đã cập nhật theo
+
+Sửa kèm: `SEG-002` có `segment_name` ghi *"duong lien ap"* (liên ấp) nhưng `road_class` là
+`inter_commune` (liên xã) — đổi **tên** cho khớp enum, vì `road_class` đang được FE dùng để lọc và
+vẽ legend, sửa enum đắt hơn nhiều.
+
+> ⚠️ **Contract mục 4 cũng mang những con số này** (*"70 normal / 9 dim / 17 out / 7 unknown"*,
+> *"11 IoT node"*) và giờ đã cũ. Không sửa Contract ở BE-09 — đưa vào cùng lần lên **v1.2**.
+
+**Bất biến vẫn giữ nguyên sau khi sửa:** `status_confidence` null đúng ở 7 cột `unknown`, không lệch
+dòng nào. Bất biến này đã được khoá thành CHECK constraint ở BE-09.
+
+---
+
+## 13. `LPAD` cắt bớt ID khi vượt độ rộng — vi phạm Contract mục 0.3 🔴 ✅ ĐÃ SỬA
+
+**Phát hiện khi làm BE-09, đã sửa trong cùng nhánh.** Lỗi nằm ở helper sinh ID của BE-06, không phải BE-09.
+
+**Contract mục 0.3 ghi gì:**
+
+> *"Khi vượt ngưỡng chữ số, ID dài ra tự nhiên — cột thứ 10000 là `POLE-10000`. Không có cắt bớt,
+> không có tràn số."*
+
+**Code đang làm gì:** `PrefixedIdSpec.DefaultValueSql` sinh ra
+`'POLE-' || LPAD(nextval('pole_id_seq')::text, 4, '0')`.
+
+**Vấn đề:** `lpad(string, length, fill)` của PostgreSQL **CẮT BỚT** khi chuỗi đã dài hơn `length`.
+Nó không trả về chuỗi dài hơn như comment trong code đang khẳng định.
+
+```
+lpad('9999',  4, '0') = '9999'   → POLE-9999
+lpad('10000', 4, '0') = '1000'   → POLE-1000   ← đụng cột thứ 1000
+lpad('10005', 4, '0') = '1000'   → POLE-1000   ← và mọi giá trị 5 chữ số khác
+```
+
+Đo thật trên PostgreSQL 17 trong container BE-02:
+
+| `nextval` | Hiện tại | `to_char(v,'FM0000')` | `LPAD(v, GREATEST(4, LENGTH(v)), '0')` |
+|---|---|---|---|
+| 1 | `POLE-0001` | `POLE-0001` | `POLE-0001` |
+| 9999 | `POLE-9999` | `POLE-9999` | `POLE-9999` |
+| 10000 | **`POLE-1000`** ❌ | `POLE-####` ❌ | `POLE-10000` ✅ |
+| 123456 | **`POLE-1234`** ❌ | `POLE-####` ❌ | `POLE-123456` ✅ |
+
+**Ngưỡng vỡ theo từng entity:**
+
+| Độ rộng | Entity | Vỡ ở hàng thứ |
+|---|---|---|
+| 3 | `SEG` `FDR` `COM` `NODE` `SWP` `EXT` `USR` `CLS` | **1000** |
+| 4 | `POLE` `FIX` `FAULT` `LUX` `WO` `EVD` | **10000** |
+| 6 | `FRM` `DET` | **1000000** |
+
+**`SurveyFrame` là chỗ dễ chạm nhất** — một đợt quét sinh vài trăm khung hình mỗi đêm, 1 triệu frame
+không xa. `SEG` và `FDR` ở 1000 cũng không phải không thể với một dự án mở rộng địa bàn.
+
+**Hư hại:** không ghi dữ liệu sai — lỗi là `23505 duplicate key`, insert hỏng hẳn. Nhưng trong
+transaction thì **một statement lỗi abort cả transaction** (đúng cảnh báo ở `CLAUDE.md`), nên một đợt
+import BE-12 sẽ hỏng trọn gói chứ không hỏng một dòng.
+
+**Vì sao chưa lộ ra:** cả 4 bảng Identity của BE-06 đều chưa tới 1000 hàng. BE-09 chạm phải vì test
+sinh 2500 pole tổng hợp trên một database dev đã có sequence chạy cao.
+
+**Cách sửa — một biểu thức:**
+
+```sql
+LPAD(v::text, GREATEST(<digits>, LENGTH(v::text)), '0')
+```
+
+Cần bọc trong một function SQL nhỏ để `nextval` vẫn chỉ được gọi **đúng một lần** (biểu thức trên
+tham chiếu `v` ba lần, và PostgreSQL không cho subquery trong `DEFAULT`):
+
+```sql
+CREATE FUNCTION luxmap_format_id(prefix text, value bigint, digits int)
+RETURNS text LANGUAGE sql IMMUTABLE AS
+$$ SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text)), '0') $$;
+```
+
+`DEFAULT` thành `luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`.
+
+**Phạm vi sửa:** `PrefixedIdSpec.DefaultValueSql` (một dòng) + một migration đổi `DEFAULT` của **cả
+16 cột ID**. Không đụng dữ liệu đã có — mọi ID hiện tại đều dưới ngưỡng nên không cần backfill.
+
+### Đã sửa — migration `FixPrefixedIdOverflow`
+
+`PrefixedIdSpec.DefaultValueSql` giờ sinh ra `luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`.
+Migration tạo function rồi đổi `DEFAULT` của **cả 6 cột ID đang tồn tại** (`COM` `USR` `SEG` `FDR`
+`POLE` `FIX`); 10 entity chưa tạo sẽ dùng biểu thức mới ngay từ migration đầu của chúng. **Không
+backfill dòng nào** — mọi ID hiện có đều dưới ngưỡng.
+
+Kiểm chứng trên database dựng **thuần từ migration**, không vá tay:
+
+```
+setval('pole_id_seq', 9998); INSERT … ×4
+  POLE-9999
+  POLE-10000     ← trước đây là POLE-1000 → 23505
+  POLE-10001
+  POLE-10002
+```
+
+`PrefixedIdOverflowTests` không còn test nào bị `Skip`: chèn thật qua `DEFAULT` ở đúng ngưỡng vỡ,
+kiểm cột thứ 30000 không đụng cột thứ 3000, và đối chiếu **cả 16 prefix** giữa `PrefixedIdSpec.Format`
+của C# và function của database ở cả hai phía ngưỡng. `Format` dùng `PadLeft` nên phía C# vốn đã
+đúng — chỉ phía SQL lệch.
+
+> Comment cũ trong `PrefixedId.cs` khẳng định ngược lại sự thật — *"LPAD simply returns the longer
+> number ... no truncation and no overflow"* — và chính nó làm người đọc tin là đã an toàn. Đã viết
+> lại kèm lý do vì sao phải dùng function chứ không phải biểu thức thẳng.
+
+---
+
+## 14. ID không còn cố định độ dài — WP5 và WP6 phải sửa 🔴
+
+**Hệ quả của bản sửa ở mục 13**, và là thứ duy nhất trong đó chạm tới FE và mobile.
+
+Contract mục 0.3 vốn đã nói *"ID dài ra tự nhiên"*, nhưng trước đây database làm sai nên trên thực
+tế mọi ID đều đúng N chữ số và không ai va phải. Giờ nó đúng như đặc tả — nghĩa là **`POLE-0001` và
+`POLE-10000` cùng tồn tại**, độ dài khác nhau.
+
+**Ba việc:**
+
+| | Việc | Ai |
+|---|---|---|
+| 1 | **Không bao giờ `ORDER BY pole_id`.** So chuỗi thì `POLE-10000 < POLE-9999`. Sắp theo `created_at` hoặc theo sequence. Lọc theo khoảng trên text cũng sai từ cột thứ 10000 | BE — **kiểm lại khi làm BE-14** |
+| 2 | Regex/validator ID phải nhận độ dài thay đổi: `^POLE-\d{4,}$`, **không phải** `\d{4}` | WP5, WP6 |
+| 3 | Biết rằng định dạng ID là **tối thiểu N chữ số, không phải đúng N** | WP5, WP6 |
+
+Việc 2 và 3 chỉ chạm tới nếu FE/mobile đang validate hoặc parse ID — mà Contract mục 0.3 vốn đã cấm
+parse (*"Client không được phân tích cú pháp ID"*). Nên đây phần lớn là xác nhận lại, không phải
+breaking change. Nhưng **cần báo Ngọc và Khang một dòng** để không ai viết `\d{4}` từ đây về sau.
+
+Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nhưng BE-14 rất dễ viết vào.
+
+---
+
 ## Việc cần quyết trong buổi FW-00
 
 1. **Mục 1, 2, 3 phải chốt trước khi WP5/WP6 code sâu** — cả ba đều là thứ họ sẽ hardcode.
 2. **Mục 6 (mock) phải chốt trước BE-39**, và ai sửa mock thì báo cho WP5/WP6.
 3. Mục 4, 7, 8 chỉ cần ghi vào Contract cho rõ, không đổi code.
 4. Mục 5 cần giao rõ phần tạo tài khoản cho BE-33.
+5. ~~Mục 11~~ — **đã chốt và đã làm**, `AdministrativeUnit` sang `Persistence`, FK khai thật trên cả 5 bảng.
+6. **Mục 10 và 12 gộp vào lần lên Contract v1.2**, rồi báo WP5/WP6 vì bộ mock đã đổi.
+7. ~~Mục 13~~ — **đã sửa**, chỉ cần báo để cả nhóm biết `DEFAULT` của cột ID đã đổi dạng.
+8. **Mục 14 phải báo WP5 và WP6** — một dòng thôi, nhưng phải nói trước khi ai đó hardcode `\d{4}`.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.

@@ -41,23 +41,24 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
-  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 25/08/2026</p>
+  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 01/09/2026</p>
 
   <div class="card">
-    <strong>Tiến độ nền tảng (W1)</strong>
+    <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">Nền tảng W1 và nhóm Identity xong (BE-06 → BE-08). Kế tiếp: GIS tài sản, bắt đầu từ BE-09.</span>
+    <span class="muted">BE-09 xong: 5 bảng tài sản, 3 GIST index, EXPLAIN xác nhận Bitmap Index Scan trên 2501 cột. Kế tiếp: BE-10 quy ước SRID, rồi BE-12 → BE-14.</span>
   </div>
 
   <div class="grid">
     <div class="stat"><b>10</b><span>project trong solution</span></div>
-    <div class="stat"><b>219</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>252</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
-    <div class="stat"><b>4</b><span>bảng trong initial migration</span></div>
+    <div class="stat"><b>9</b><span>bảng trong database</span></div>
+    <div class="stat"><b>3</b><span>cột hình học, đủ GIST index</span></div>
   </div>
 
-  <h2>Sprint hiện tại — Identity</h2>
+  <h2>Sprint hiện tại — GIS tài sản</h2>
   <div class="card">
     <table>
       <tr><th>Mã</th><th>Việc</th><th>Trạng thái</th></tr>
@@ -69,7 +70,9 @@
       <tr><td><code>BE-05</code></td><td>Serilog + Swagger + JWT security scheme</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-06</code></td><td>Entity AdministrativeUnit, AppUser, RefreshToken + initial migration + seed</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-07</code></td><td>API đăng nhập / refresh / logout</td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 3 khoản cần chốt</span></td></tr>
+      <tr><td><code>BE-09</code></td><td>Entity Pole, Fixture, RoadSegment, Feeder (+ pole_current_status) + migration + GIST index</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-10</code></td><td>Quy ước SRID: lưu và trả 4326, tính khoảng cách trên 3405</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
+      <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
     </table>
   </div>
 
@@ -137,6 +140,24 @@
         <td><code>src/LuxMap.Modules.Identity/Auth/</code>, migration <code>AddCaseInsensitiveIdentityIndexes</code>, <code>docs/contract-drift.md</code></td>
         <td><code>feat(BE-07): add open registration that grants no permissions</code></td>
       </tr>
+      <tr>
+        <td>01/09/2026</td>
+        <td><code>BE-09</code> 5 bảng tài sản — Pole và Fixture TÁCH RIÊNG, geometry(Point,4326) + geometry(LineString,4326), 3 GIST index, ID sinh bằng sequence (POLE-0001 · FIX-0001 · SEG-001 · FDR-001)</td>
+        <td><code>src/LuxMap.Modules.Assets/Entities/</code>, <code>src/LuxMap.Modules.Assets/Configurations/</code>, migration <code>AddAssetEntities</code>, <code>tests/LuxMap.Api.Tests/SpatialIndexTests.cs</code>, <code>mocks/</code></td>
+        <td><code>feat(BE-09): add asset entities, spatial migration and GIST indexes</code></td>
+      </tr>
+      <tr>
+        <td>01/09/2026</td>
+        <td><code>BE-06</code> fix — <code>LPAD</code> cắt bớt ID khi vượt độ rộng padding; thay bằng SQL function <code>luxmap_format_id</code>, đổi <code>DEFAULT</code> của 6 cột ID</td>
+        <td><code>src/LuxMap.Shared/Contracts/PrefixedId.cs</code>, migration <code>FixPrefixedIdOverflow</code>, <code>tests/LuxMap.Api.Tests/PrefixedIdOverflowTests.cs</code></td>
+        <td><code>fix(BE-06): stop LPAD truncating ids past the padding width</code></td>
+      </tr>
+      <tr>
+        <td>01/09/2026</td>
+        <td><code>BE-09</code> <code>commune_id</code> thành khoá ngoại thật trên cả 5 bảng — <code>AdministrativeUnit</code> chuyển sang <code>Persistence</code>, chốt chặn khởi động quét theo CỘT chứ không theo interface, thêm <code>seed_key</code> bịt bẫy đổi tên của BE-39</td>
+        <td><code>src/LuxMap.Persistence/AdministrativeUnit.cs</code>, <code>Conventions/CommuneReferenceBuilderExtensions.cs</code>, migration <code>AddCommuneForeignKeys</code>, <code>tests/LuxMap.Api.Tests/CommuneReferenceTests.cs</code></td>
+        <td><code>feat(BE-09): make commune_id a real foreign key on every scoped table</code></td>
+      </tr>
     </table>
   </div>
 
@@ -160,6 +181,11 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>✅ Đã sửa lỗi BE-06: <code>LPAD</code> cắt bớt ID.</strong> <code>lpad('10000',4,'0')</code> ra <code>'1000'</code>, nên cột thứ 10000 thành <code>POLE-1000</code> và đụng cột thứ 1000 → <code>23505</code>. Vi phạm Contract mục 0.3, ảnh hưởng cả 16 entity. Thay bằng SQL function <code>luxmap_format_id</code> dùng <code>GREATEST(digits, LENGTH(v))</code>, giữ <code>nextval</code> gọi đúng một lần. Migration <code>FixPrefixedIdOverflow</code> đổi <code>DEFAULT</code> 6 cột đang có, không backfill. Kiểm trên DB dựng thuần từ migration: <code>POLE-9999 → POLE-10000 → POLE-10001</code>.</li>
+      <li><strong>⚠️ ID không còn cố định độ dài — phải báo WP5 và WP6.</strong> Sau bản sửa BE-06, <code>POLE-0001</code> và <code>POLE-10000</code> cùng tồn tại. <strong>Không bao giờ <code>ORDER BY pole_id</code></strong> — so chuỗi thì <code>POLE-10000 &lt; POLE-9999</code>; sắp theo <code>created_at</code>, kiểm lại khi làm BE-14. Regex phía FE/mobile phải là <code>^POLE-\d{4,}$</code>, không phải <code>\d{4}</code>. Xem <code>docs/contract-drift.md</code> mục 14.</li>
+      <li><strong>BE-09: bộ hiệu chuẩn FO-07 cần toạ độ thật của phòng đặt máy.</strong> Đã chốt phương án dùng toạ độ thật (giữ <code>NOT NULL</code>, ST_Intersects chạy đúng, pipeline một đường). Chưa có lat/lng — <strong>việc của BE-39</strong>, không chặn BE-09.</li>
+      <li><strong>BE-39 phải seed HAI đơn vị hành chính, đúng thứ tự.</strong> COM-001 là xã nghiên cứu, COM-002 là xã đặt bộ hiệu chuẩn — tách địa bàn để query filter BE-08 tự chặn dữ liệu hiệu chuẩn khỏi thống kê COM-001, không phải chỉ dựa vào <code>data_source</code>. Kèm theo: <code>IdentitySeeder</code> đang idempotent theo <strong>tên</strong>, cần đổi sang <code>official_code</code> trước, nếu không đổi tên hiển thị sẽ sinh ra hàng thứ hai.</li>
+      <li><strong>Bộ mock đã sửa 4 chỗ ở BE-09 — phải báo WP5 và WP6.</strong> <code>POLE-0047</code> đổi thành <code>dim</code> + có <code>NODE-0047</code>, phân bố thành 70/10/16/7, 12 node, <code>NODE-00x-CTRL</code> đổi thành <code>NODE-000x</code>, tên SEG-002 khớp lại <code>road_class</code>. Contract mục 4 vẫn ghi số cũ — gộp vào lần lên v1.2.</li>
       <li><strong>Nhánh <code>feat/BE-01-BE-00-foundation</code> chưa push.</strong> 3 commit đã sẵn sàng, chờ mở PR vào <code>main</code>.</li>
       <li><strong>Image PostGIS phải đổi khỏi <code>postgis/postgis</code>.</strong> Repo chính thức không publish bản arm64 cho bất kỳ tag PostgreSQL 17 nào — <code>docker pull</code> báo lỗi thẳng trên Mac Apple Silicon. Đã dùng <code>imresamu/postgis:17-3.5</code> (cùng maintainer, multi-arch) để cả máy Windows lẫn Mac đều chạy native. <strong>BE-36 phải dùng đúng image này cho Testcontainers.</strong></li>
       <li><strong>Tag <code>17-3.5</code> vẫn trôi theo patch.</strong> Hôm nay ra PostgreSQL 17.6 / PostGIS 3.5.3, nhưng tag sẽ tự nhảy khi upstream build lại. Muốn tái lập tuyệt đối kết quả nghiên cứu thì phải pin theo digest.</li>

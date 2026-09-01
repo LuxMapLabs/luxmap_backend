@@ -16,12 +16,13 @@ WP5 và WP6 code giao diện theo bộ này, BE-39 seed database từ chính b�
 
 ## Những gì đã cố ý cài sẵn
 
-- **103 cột**: 70 `normal` · 9 `dim` · 17 `out` · 7 `unknown`
+- **103 cột**: 70 `normal` · 10 `dim` · 16 `out` · 7 `unknown`
 - **`SEG-003`** có một cụm lỗi cả đoạn — dùng test luồng highlight toàn tuyến
   (`has_active_segment_fault = true`)
-- **11 IoT node**
+- **12 IoT node**: 3 `segment_controller` · 9 `sampled_fixture`
 - **`POLE-0047`** là cột solar, có chuỗi runtime suy giảm dần qua 18 đêm —
-  dùng test biểu đồ cảnh báo sớm pin
+  dùng test biểu đồ cảnh báo sớm pin. Mang `fixture_status = dim` và có
+  `NODE-0047`: pin yếu làm đèn **mờ dần**, không tắt phụt
 - Đa số cột có `iot_node = null`, đúng như thực tế kiến trúc sparse IoT
 
 Bảy cột `unknown` không phải lỗi dữ liệu. `unknown` nghĩa là sweep gần nhất
