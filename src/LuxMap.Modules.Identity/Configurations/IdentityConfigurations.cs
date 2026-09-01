@@ -1,27 +1,11 @@
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace LuxMap.Modules.Identity.Configurations;
-
-public sealed class AdministrativeUnitConfiguration : IEntityTypeConfiguration<AdministrativeUnit>
-{
-    public void Configure(EntityTypeBuilder<AdministrativeUnit> builder)
-    {
-        builder.ToTable("administrative_unit");
-        builder.HasKey(unit => unit.CommuneId);
-
-        builder.Property(unit => unit.CommuneId).HasPrefixedId(PrefixedIds.AdministrativeUnit);
-        builder.Property(unit => unit.Name).HasColumnType("text").IsRequired();
-        builder.Property(unit => unit.CreatedAt).HasDefaultValueSql("now()");
-        builder.Property(unit => unit.UpdatedAt).HasDefaultValueSql("now()");
-
-        // The commune name is the natural key that keeps seeding idempotent.
-        builder.HasIndex(unit => unit.Name).IsUnique();
-    }
-}
 
 public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
 {
@@ -56,7 +40,7 @@ public sealed class AppUserCommuneConfiguration : IEntityTypeConfiguration<AppUs
         builder.HasKey(assignment => new { assignment.UserId, assignment.CommuneId });
 
         builder.Property(assignment => assignment.UserId).HasColumnType("text");
-        builder.Property(assignment => assignment.CommuneId).HasColumnType("text");
+        builder.HasCommuneReference(assignment => assignment.CommuneId);
         builder.Property(assignment => assignment.AssignedAt).HasDefaultValueSql("now()");
 
         builder.HasOne(assignment => assignment.User)
@@ -67,7 +51,7 @@ public sealed class AppUserCommuneConfiguration : IEntityTypeConfiguration<AppUs
         // Deleting a commune that still has assignees must be blocked: losing the assignment loses
         // the authorization trail.
         builder.HasOne(assignment => assignment.Commune)
-            .WithMany(unit => unit.UserAssignments)
+            .WithMany()
             .HasForeignKey(assignment => assignment.CommuneId)
             .OnDelete(DeleteBehavior.Restrict);
 

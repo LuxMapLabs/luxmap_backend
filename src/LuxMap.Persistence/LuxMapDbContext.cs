@@ -40,6 +40,10 @@ public class LuxMapDbContext(
 
         modelBuilder.HasPostgresExtension("postgis");
 
+        // Persistence's own assembly first: it owns AdministrativeUnit, the anchor every
+        // commune_id foreign key points at.
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(LuxMapDbContext).Assembly);
+
         foreach (var assembly in catalog.Assemblies)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(assembly);
@@ -52,6 +56,11 @@ public class LuxMapDbContext(
         // Contract section 7. Forgetting the scope means the app WILL NOT START, instead of leaking
         // data silently.
         modelBuilder.ApplyCommuneScope(this);
+
+        // The second half of the same guarantee: ApplyCommuneScope can only see entities that
+        // implement ICommuneScoped, so this one checks for the COLUMN instead and catches the
+        // entity that carries commune_id but never declared itself scoped.
+        modelBuilder.ValidateCommuneReferences();
     }
 }
 

@@ -23,8 +23,9 @@ public sealed class IdentitySeeder(
     public const string PasswordAlgorithm = "pbkdf2-aspnetcore-v3";
 
     /// <summary>
-    /// A placeholder. Neither the mocks nor the Contract give a real commune name; BE-39, which seeds
-    /// the FO-26 mock set, will set the correct one.
+    /// A placeholder NAME. Neither the mocks nor the Contract give a real commune name; BE-39, which
+    /// seeds the FO-26 mock set, will set the correct one — and renaming is safe because the upsert
+    /// keys on <see cref="SeedKeys.StudySite"/>, not on this.
     /// </summary>
     private const string DefaultCommuneName = "Commune 01";
 
@@ -32,30 +33,47 @@ public sealed class IdentitySeeder(
     {
         ArgumentNullException.ThrowIfNull(credentials);
 
-        var commune = await EnsureCommuneAsync(DefaultCommuneName, cancellationToken);
+        var commune = await EnsureCommuneAsync(SeedKeys.StudySite, DefaultCommuneName, cancellationToken);
         await EnsureUsersAsync(credentials, commune, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Identity seeding complete.");
     }
 
-    private async Task<AdministrativeUnit> EnsureCommuneAsync(string name, CancellationToken cancellationToken)
+    /// <summary>
+    /// Finds or creates the commune playing <paramref name="seedKey"/>.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on the ROLE, never on the name. Keying on the name was the original trap: BE-06 seeds
+    /// the placeholder "Commune 01", BE-39 sets the real name, and the next seed run would then find
+    /// nothing to match and create a SECOND commune — with the first one still carrying every pole.
+    /// <para>
+    /// An existing row keeps its name: whatever BE-39 or an administrator set is more current than
+    /// the placeholder here.
+    /// </para>
+    /// </remarks>
+    private async Task<AdministrativeUnit> EnsureCommuneAsync(
+        string seedKey, string fallbackName, CancellationToken cancellationToken)
     {
         var existing = await dbContext.Set<AdministrativeUnit>()
-            .FirstOrDefaultAsync(unit => unit.Name == name, cancellationToken);
+            .FirstOrDefaultAsync(unit => unit.SeedKey == seedKey, cancellationToken);
 
         if (existing is not null)
         {
-            logger.LogInformation("Commune {Name} already exists ({CommuneId}), skipping.", name, existing.CommuneId);
+            logger.LogInformation(
+                "Commune for {SeedKey} already exists ({CommuneId}, named {Name}), skipping.",
+                seedKey, existing.CommuneId, existing.Name);
             return existing;
         }
 
-        var commune = new AdministrativeUnit { Name = name };
+        var commune = new AdministrativeUnit { Name = fallbackName, SeedKey = seedKey };
         dbContext.Set<AdministrativeUnit>().Add(commune);
 
         // Save immediately to obtain the database-generated commune_id for the join table below.
         await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Created commune {Name} with id {CommuneId}.", name, commune.CommuneId);
+        logger.LogInformation(
+            "Created commune {Name} ({SeedKey}) with id {CommuneId}.",
+            fallbackName, seedKey, commune.CommuneId);
 
         return commune;
     }

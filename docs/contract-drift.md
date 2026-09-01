@@ -9,7 +9,7 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 
 **Ai cần đọc:** WP5 (Web) và WP6 (Android) — nhiều mục dưới đây các bạn sẽ gặp ngay khi tích hợp.
 
-**Trạng thái code:** BE-00 → BE-09 xong, 247 test xanh.
+**Trạng thái code:** BE-00 → BE-09 xong, 252 test xanh.
 
 ---
 
@@ -27,7 +27,8 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 8 | Route không tồn tại trả 401 khi chưa đăng nhập | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
 | 9 | `CLAUDE.md` thiếu `data_source` trong khối enum | 🟢 Thấp | Nội bộ BE | `CLAUDE.md` |
 | 10 | **Contract mục 1 ↔ mục 2.9 mâu thuẫn về `data_source`** | 🔴 Cao | Nội bộ BE, CV-11/CV-18 | Contract — **đã chốt lên v1.2** |
-| 11 | `commune_id` trên 5 bảng Assets chưa có khoá ngoại | 🟡 Vừa | Nội bộ BE, BE-12 | **Chưa quyết** — ranh giới module |
+| 11 | ~~`commune_id` trên 5 bảng Assets chưa có khoá ngoại~~ | 🟡 Vừa | Nội bộ BE, BE-12 | **ĐÃ CHỐT** — `AdministrativeUnit` sang `Persistence` |
+| 14 | **ID không còn cố định độ dài — FE/mobile phải sửa regex** | 🔴 Cao | WP5, WP6 | Contract — ghi rõ ở mục 0.3 |
 | 12 | Mock: `POLE-0047` mâu thuẫn giữa 3 file | 🔴 Cao | WP5, WP6, BE-39 | Mock — **đã sửa** |
 | 13 | ~~`LPAD` cắt bớt ID khi vượt độ rộng~~ | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **ĐÃ SỬA** |
 
@@ -345,29 +346,50 @@ thì thêm query param tường minh.
 
 ---
 
-## 11. `commune_id` trên 5 bảng Assets chưa có khoá ngoại 🟡
+## 11. `commune_id` trên 5 bảng Assets chưa có khoá ngoại 🟡 ✅ ĐÃ CHỐT
 
-**Code đang làm gì:** `pole`, `fixture`, `road_segment`, `feeder`, `pole_current_status` đều mang
-`commune_id NOT NULL` **có index** nhưng **không có FK** trỏ tới `administrative_unit`.
+**Đã quyết và đã làm.** `AdministrativeUnit` chuyển từ `LuxMap.Modules.Identity` sang
+**`LuxMap.Persistence`**, và cả 5 bảng khai FK thật.
 
-**Vì sao:** `administrative_unit` thuộc module **Identity**. Khai FK từ Assets sẽ làm
-`LuxMap.Modules.Assets` phụ thuộc `LuxMap.Modules.Identity` — và **mọi module sau (Faults, Survey,
-Telemetry, WorkOrders) sẽ thừa hưởng đúng phụ thuộc đó**, vì tất cả đều mang `commune_id`. Đây là
-quyết định về ranh giới module, không phải về một cái bảng, nên để mở thay vì tự chốt ở BE-09.
+**Vì sao `Persistence` chứ không phải `Shared`:** `Shared` đang là thư viện nhẹ (quy ước
+serialization, contract, enum) và có chỗ dùng nó mà không nên biết gì về EF. Đặt một entity EF vào
+đó thì hoặc `Shared` phải kéo theo EF Core, hoặc entity và cấu hình bị tách hai nơi — cả hai đều tệ
+hơn hiện trạng. `Persistence` đã sở hữu chính cơ chế cần bảng này (`ICommuneScoped`,
+`HasCommuneScope()`, chốt chặn khởi động), và **mọi module đều đã tham chiếu `Persistence`**.
 
-⚠️ **Lỗ hổng là thật:** `commune_id` sai (một dòng CSV gõ nhầm ở BE-12 chẳng hạn) sẽ tạo ra hàng mà
-query filter mục 7 **giấu khỏi mọi user**, không có gì chỉ ra nguyên nhân. Thêm ràng buộc sau là một
-migration nhỏ; gỡ một phụ thuộc module thì không — đó là lý do duy nhất chọn thứ tự này.
+`AdministrativeUnit` không phải khái niệm của Identity — nó là **mốc neo phạm vi** cho 15/16 entity
+toàn hệ. Đây là di chuyển namespace, **không đổi schema**.
 
-**Ba hướng để FW-00 chọn:**
+**FK khai thật, KHÔNG có navigation property:**
 
-| | Hướng | Đánh đổi |
-|---|---|---|
-| (a) | Thêm `ProjectReference` Assets → Identity | Đơn giản nhất, nhưng 5 module sẽ cùng phụ thuộc Identity |
-| (b) | Chuyển `AdministrativeUnit` sang `LuxMap.Shared` hoặc `LuxMap.Persistence` | Đúng bản chất — commune là dữ liệu tham chiếu dùng chung, `ICommuneScoped` vốn đã nằm ở Shared. Nhưng sửa BE-06 |
-| (c) | Giữ nguyên, không FK | Rủi ro dữ liệu mồ côi vô hình |
+```csharp
+builder.HasCommuneReference(pole => pole.CommuneId);
+// → HasOne<AdministrativeUnit>().WithMany().HasForeignKey(...).OnDelete(Restrict)
+```
 
-**Nghiêng về (b).**
+Toàn vẹn ở tầng database mà không mở đường cho `pole.Commune.Name` rải khắp module — coupling giữa
+module vẫn chỉ là chuỗi ID. `Restrict`, không bao giờ cascade một đơn vị hành chính.
+
+**Chốt chặn mở rộng:** vế cũ hỏi *"entity implement `ICommuneScoped` đã gọi `HasCommuneScope()`
+chưa"*. Vế mới quét **theo cột**: mọi cột tên `commune_id` không có FK tới `administrative_unit` thì
+**chặn khởi động**. Quét cột chứ không quét interface — bịt luôn lỗ hổng mà XML doc của
+`ICommuneScoped` tự thừa nhận. Đã kiểm bằng cách tạm gỡ FK khỏi `Pole`:
+
+```
+System.InvalidOperationException : Entities have a 'commune_id' column with no foreign key to
+'administrative_unit': Pole. …
+```
+
+`AdministrativeUnit` **không** implement `ICommuneScoped` — lọc chính bảng neo bằng filter toàn cục
+sẽ tạo vòng lặp ngữ nghĩa. Đã ghi vào `CLAUDE.md` để không ai "sửa cho nhất quán".
+
+**Kèm theo — `seed_key` text NULL UNIQUE:** `IdentitySeeder` idempotent theo **tên**, mà tên chính là
+thứ BE-39 sẽ sửa; upsert theo tên sẽ sinh commune **thứ hai** trong khi commune đầu vẫn giữ toàn bộ
+cột. Giờ upsert theo **vai trò**: `study_site` và `calibration_site`. Không thêm `official_code` —
+chưa chọn được địa bàn thì chưa có mã thật, thêm vào là bịa. Đã kiểm: đổi tên thành "Xa Tan Hiep" rồi
+seed lại → tìm thấy theo `seed_key`, không sinh dòng thứ hai.
+
+> BE-39 seed dòng `calibration_site`. Key đã đặt sẵn, chưa tạo dòng vì chưa biết xã nào.
 
 ---
 
@@ -499,15 +521,40 @@ của C# và function của database ở cả hai phía ngưỡng. `Format` dùn
 
 ---
 
+## 14. ID không còn cố định độ dài — WP5 và WP6 phải sửa 🔴
+
+**Hệ quả của bản sửa ở mục 13**, và là thứ duy nhất trong đó chạm tới FE và mobile.
+
+Contract mục 0.3 vốn đã nói *"ID dài ra tự nhiên"*, nhưng trước đây database làm sai nên trên thực
+tế mọi ID đều đúng N chữ số và không ai va phải. Giờ nó đúng như đặc tả — nghĩa là **`POLE-0001` và
+`POLE-10000` cùng tồn tại**, độ dài khác nhau.
+
+**Ba việc:**
+
+| | Việc | Ai |
+|---|---|---|
+| 1 | **Không bao giờ `ORDER BY pole_id`.** So chuỗi thì `POLE-10000 < POLE-9999`. Sắp theo `created_at` hoặc theo sequence. Lọc theo khoảng trên text cũng sai từ cột thứ 10000 | BE — **kiểm lại khi làm BE-14** |
+| 2 | Regex/validator ID phải nhận độ dài thay đổi: `^POLE-\d{4,}$`, **không phải** `\d{4}` | WP5, WP6 |
+| 3 | Biết rằng định dạng ID là **tối thiểu N chữ số, không phải đúng N** | WP5, WP6 |
+
+Việc 2 và 3 chỉ chạm tới nếu FE/mobile đang validate hoặc parse ID — mà Contract mục 0.3 vốn đã cấm
+parse (*"Client không được phân tích cú pháp ID"*). Nên đây phần lớn là xác nhận lại, không phải
+breaking change. Nhưng **cần báo Ngọc và Khang một dòng** để không ai viết `\d{4}` từ đây về sau.
+
+Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nhưng BE-14 rất dễ viết vào.
+
+---
+
 ## Việc cần quyết trong buổi FW-00
 
 1. **Mục 1, 2, 3 phải chốt trước khi WP5/WP6 code sâu** — cả ba đều là thứ họ sẽ hardcode.
 2. **Mục 6 (mock) phải chốt trước BE-39**, và ai sửa mock thì báo cho WP5/WP6.
 3. Mục 4, 7, 8 chỉ cần ghi vào Contract cho rõ, không đổi code.
 4. Mục 5 cần giao rõ phần tạo tài khoản cho BE-33.
-5. **Mục 11 phải quyết trước BE-12** — import CSV là chỗ `commune_id` sai sẽ thực sự xuất hiện.
+5. ~~Mục 11~~ — **đã chốt và đã làm**, `AdministrativeUnit` sang `Persistence`, FK khai thật trên cả 5 bảng.
 6. **Mục 10 và 12 gộp vào lần lên Contract v1.2**, rồi báo WP5/WP6 vì bộ mock đã đổi.
 7. ~~Mục 13~~ — **đã sửa**, chỉ cần báo để cả nhóm biết `DEFAULT` của cột ID đã đổi dạng.
+8. **Mục 14 phải báo WP5 và WP6** — một dòng thôi, nhưng phải nói trước khi ai đó hardcode `\d{4}`.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.
