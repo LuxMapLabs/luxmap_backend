@@ -40,6 +40,8 @@ data_source : field | public_imagery | calibration_rig | simulated
 
 Gắn trên `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReading`. Mọi API thống kê phải lọc và nhóm được theo trường này (BE-28, BE-30).
 
+**Cộng thêm `Pole`, `Fixture`, `RoadSegment`** (chốt ở BE-09). Contract mục 1 không liệt kê ba cái này nhưng mục 2.9 bắt buộc phải có — không có `data_source` ở tầng tài sản thì không tách được cột hiệu chuẩn khỏi cột thật lúc thống kê. Contract sẽ lên v1.2. **Ba cột này LƯU và LỌC được, nhưng KHÔNG emit ra `properties`** — bộ mock là nguồn chuẩn cho hình dạng response và không có trường này.
+
 **Đây là chiều khác với `source_channel`.** `source_channel` = kênh nào phát hiện ra (`cv` / `iot` / `field_report`). `data_source` = dữ liệu đến từ đâu. Một sự cố có thể mang `source_channel = cv` và `data_source = calibration_rig` cùng lúc.
 
 **Bộ hiệu chuẩn FO-07 được đăng ký như `RoadSegment` thật** (mục 2.9), không tạo thực thể riêng — để pipeline chạy đúng một đường, không rẽ nhánh.
@@ -83,6 +85,7 @@ fault_type     : lamp_out | lamp_dim | segment_outage | node_offline | runtime_d
 fault_status   : detected | confirmed | rejected | in_progress | resolved | verified
 severity       : low | medium | high | critical
 source_channel : cv | iot | field_report        # v1.0 ghi 'manual', đã bỏ
+data_source    : field | public_imagery | calibration_rig | simulated
 wo_status      : open | assigned | in_progress | done | verified | cancelled
 node_role      : segment_controller | sampled_fixture
 node_status    : online | offline | never_reported
@@ -171,10 +174,37 @@ Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (g
 
 Điểm dễ sai:
 
-- **`Pole` và `Fixture` tách riêng** (BE-09). Cột là kết cấu vật lý; bóng là thiết bị gắn trên đó. Một cột mang được nhiều bóng, bóng thay được trong khi cột vẫn tồn tại. Lịch sử tình trạng thuộc về **vị trí cột**.
+- **`Pole` và `Fixture` tách riêng** (BE-09). Cột là kết cấu vật lý; bóng là thiết bị gắn trên đó. Một cột mang được nhiều bóng, bóng thay được trong khi cột vẫn tồn tại. Lịch sử tình trạng thuộc về **vị trí cột** — nên `Fixture` **không có cột trạng thái nào**. CV đọc ảnh đêm: nó thấy một nguồn sáng ở một vị trí, không tách được bóng số 1 với bóng số 2. Và trạng thái theo từng bóng sẽ buộc phải có quy tắc tổng hợp, mà quy tắc đúng thì không tồn tại: hai bóng một `out` một `unknown` đòi hỏi xếp `unknown` vào thang bậc so với `out`, đúng thứ Contract mục 1 cấm.
 - **`SurveyFrame` và `RepairEvidence` là hai luồng ảnh riêng** (BE-11). Ảnh khảo sát là dữ liệu chính, không phải file đính kèm.
 - **`LuxReading`** (BE-42) cần xong ở **W4** — FO-14 đo lux ở W5, FM-14 và CV-12 phụ thuộc.
 - Ảnh **không** nằm trong database. MinIO giữ bytes, row giữ key.
+
+### Hai quy tắc chốt ở BE-09 — áp cho 14 entity còn lại
+
+**1. Khi nào denormalize `commune_id` và implement `ICommuneScoped`.**
+
+> Entity nào **có thể là gốc của một truy vấn** thì mang `commune_id` và implement `ICommuneScoped`.
+> Entity nào **bao giờ cũng đi tới qua một gốc đã scope** thì không.
+
+`Pole` có `commune_id` sẵn. `Fixture` và `PoleCurrentStatus` được **denormalize thêm** — không phải
+vì tiện, mà vì cả hai rất dễ trở thành gốc truy vấn: một dashboard viết
+`context.Set<PoleCurrentStatus>().GroupBy(...)` là rò dữ liệu ngay. Có `ICommuneScoped` thì chốt chặn
+lúc dựng model bắt được; dựa vào "nhớ join" thì chỉ code review bắt được.
+
+`SurveyFrame` và `TelemetryReading` thì **không** — chúng luôn đi qua sweep hoặc node.
+
+⚠️ Chốt chặn chỉ thấy entity **đã** implement interface. Entity có `commune_id` mà quên implement sẽ
+lọt — đó là giới hạn thật.
+
+**2. Tạo schema và quyền ghi là hai chuyện khác nhau.**
+
+`pole_current_status` do **BE-09 tạo bảng** (BE-14 chạy trước BE-15 và cần 4 trường đó), nhưng
+**BE-15/BE-17 sở hữu quyền ghi**. BE-12 (CRUD tài sản + import CSV) **không được đụng vào bảng này**.
+Đó là lý do nó là bảng riêng chứ không phải 4 cột trên `pole` — ranh giới nằm trong lược đồ, không
+chỉ trong quy ước.
+
+Nợ FK duy nhất của BE-09: `pole_current_status.last_sweep_id` là `text` chưa có FK; BE-15 thêm ràng
+buộc trong migration của nó.
 
 ### Vai trò
 
@@ -241,7 +271,7 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 
 `mock-poles.geojson`, `mock-pole-detail.json`, `mock-faults.json`, `mock-work-orders.json`, `mock-iot-nodes.geojson`.
 
-Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 9 `dim` / 17 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **11 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm.
+Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-0047` — pin yếu làm đèn mờ dần, không tắt phụt).
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
 
