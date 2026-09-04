@@ -36,6 +36,89 @@ public class LuxMapDbContext(
     /// </summary>
     internal string CatalogSignature => catalog.Signature;
 
+    /// <summary>Nesting depth of <see cref="EnterUnscopedSystemWriteBackdoor"/>.</summary>
+    private int systemWriteDepth;
+
+    /// <summary>
+    /// ⚠️ <b>A BACKDOOR.</b> Turns OFF the Contract section 7 check on writes until the returned
+    /// handle is disposed.
+    /// </summary>
+    /// <remarks>
+    /// Named to be impossible to reach for by accident. It exists for the two callers that legitimately
+    /// write outside any request — <c>IdentitySeeder</c>, which creates the communes themselves before
+    /// any scope could name them, and the integration-test fixtures, which build data with no HTTP
+    /// context at all.
+    /// <para>
+    /// <b>It is deliberately not implicit.</b> The obvious shortcut would be to let an EMPTY scope
+    /// through, since seeder and fixtures both have one — but an empty scope is also what an
+    /// unauthenticated caller and a token carrying no <c>commune_ids</c> produce. Treating it as
+    /// permission would open the guard precisely to the callers it was written to stop. Opting out
+    /// has to be an act, visible at the call site and in a diff.
+    /// </para>
+    /// <para>
+    /// Never widen this to make a test pass. A test that needs it is telling you it writes as the
+    /// system, and it should say so.
+    /// </para>
+    /// </remarks>
+    public IDisposable EnterUnscopedSystemWriteBackdoor()
+    {
+        systemWriteDepth++;
+        return new SystemWriteBackdoor(this);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Both public overloads of <c>SaveChanges</c> funnel through this one, so guarding here covers
+    /// the parameterless call as well.
+    /// </remarks>
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnforceCommuneWriteScope();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    /// <inheritdoc />
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        EnforceCommuneWriteScope();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Contract section 7 for writes — see <see cref="CommuneWriteGuard"/>.
+    /// </summary>
+    /// <remarks>
+    /// Runs BEFORE the base call on purpose: throwing from inside EF's save pipeline would come back
+    /// wrapped in a <c>DbUpdateException</c>, and the BE-04 middleware would then answer 500 instead
+    /// of the 403 this actually is.
+    /// </remarks>
+    private void EnforceCommuneWriteScope()
+    {
+        if (systemWriteDepth > 0)
+        {
+            return;
+        }
+
+        CommuneWriteGuard.Enforce(ChangeTracker, CurrentCommuneScope);
+    }
+
+    private sealed class SystemWriteBackdoor(LuxMapDbContext context) : IDisposable
+    {
+        private bool disposed;
+
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            context.systemWriteDepth--;
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

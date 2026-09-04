@@ -188,7 +188,7 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
         });
 
     private Task<string> InsertPoleAsync()
-        => fixture.QueryAsync(async db =>
+        => fixture.WriteAsSystemAsync(async db =>
         {
             var pole = new Pole
             {

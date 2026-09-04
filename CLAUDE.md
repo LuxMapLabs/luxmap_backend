@@ -201,6 +201,61 @@ lúc dựng model bắt được; dựa vào "nhớ join" thì chỉ code review
 ⚠️ Chốt chặn chỉ thấy entity **đã** implement interface. Entity có `commune_id` mà quên implement sẽ
 lọt — đó là giới hạn thật.
 
+**1c. `HasQueryFilter` chỉ áp lên ĐỌC. Ghi được canh bởi guard riêng ở `SaveChanges`.**
+
+Đây là chỗ BE-08 từng thủng, và nó thủng **âm thầm**. `HasQueryFilter` chèn `commune_id` vào `WHERE`
+của truy vấn — nó không tham gia `Add()`, `Update()`, `Remove()`. Trước hotfix này, một kỹ sư chỉ có
+`COM-001` gửi `commune_id: "COM-002"` sẽ **ghi thẳng vào DB**. Khoá ngoại không cứu: nó chứng minh xã
+đó **tồn tại**, không nói gì về việc ai được ghi. Rồi chính query filter làm hàng vừa tạo **vô hình với
+người tạo ra nó** — không exception, không log, dữ liệu biến mất.
+
+Vì sao lọt lâu: tiêu chí nghiệm thu của BE-08 trong `tasks-backend.csv` ghi *"Kỹ sư bảo trì chỉ
+**THẤY** tài sản thuộc địa bàn mình"*. **"Thấy" là đọc.** Cả 8 test scope đều là `GET`,
+`ScopeTestController` chỉ có `HttpGet`. Ghi chép lại đây để không ai tưởng BE-08 vốn đã đủ.
+
+**Hai lớp, hai việc khác nhau — cần cả hai:**
+
+| Lớp | Ở đâu | Cho cái gì |
+|---|---|---|
+| `CommuneFilter.Narrow` | Entry point của controller, gọi tường minh | 403 với thông điệp tử tế, nêu đúng `commune_id` bị từ chối. Người dùng hiểu vì sao. |
+| `CommuneWriteGuard` ở `SaveChanges` | `LuxMapDbContext`, tự động | **Backstop không thể quên.** Phủ mọi entity `ICommuneScoped`, kể cả của BE-15/BE-18/BE-21 trước khi chúng được viết. |
+
+Cùng nguyên lý `ValidateCommuneReferences()`: biến quy ước-phải-nhớ thành ràng buộc-không-thể-quên.
+Không dùng `ActionFilter` — attribute phải gắn, mà cái bị quên chính là cái rò.
+
+Guard kiểm `Added`, `Modified` (**cả `OriginalValues` LẪN `CurrentValues`** — đổi commune ra ngoài là
+cho đi tài sản, đổi từ ngoài vào trong là chiếm tài sản, cùng một lỗi) và `Deleted` (trên
+`OriginalValues`).
+
+> 🔴 **ĐIỀU KIỆN PHẢI KIỂM LẠI — không phải ghi chú.**
+>
+> **Guard `SaveChanges` không thấy cascade do DB thực hiện.** `ChangeTracker` chỉ biết những gì EF
+> theo dõi; `ON DELETE CASCADE` chạy trong Postgres, sau khi guard đã xong.
+>
+> **Hiện an toàn**, vì mọi bảng cascade — `fixture`, `pole_current_status` — đều **cùng commune với
+> `pole` cha**. Xoá một pole hợp lệ chỉ kéo theo dữ liệu của chính commune đó.
+>
+> **Bất kỳ FK cascade MỚI nào giữa hai bảng có thể khác commune đều phá vỡ giả định này.** Thêm một
+> cascade như vậy mà không kèm cơ chế canh riêng nghĩa là mở lại đúng lỗ hổng hotfix này vừa bịt —
+> lần này qua đường xoá, và không có test nào hiện tại bắt được. Ai thêm `OnDelete(Cascade)` vào một
+> quan hệ liên-commune phải xử lý việc đó **trong cùng migration**, không để lại sau.
+
+**Cửa sau: `EnterUnscopedSystemWriteBackdoor()`.**
+
+Tên dài và xấu có chủ đích. Dùng ở `IdentitySeeder` (khi BE-39 seed tài sản) và ở fixture test
+(`AssetSchemaFixture.WriteAsSystemAsync`). **Không bao giờ nới nó.**
+
+Đường tắt hấp dẫn nhất là cho **scope rỗng** đi qua, vì seeder và fixture đều có scope rỗng. Nhưng
+scope rỗng cũng chính là scope của **caller chưa đăng nhập** và của **token không có `commune_ids`** —
+coi nó là quyền tức là mở guard cho đúng những người nó sinh ra để chặn. Muốn bỏ qua thì phải **làm
+một hành động**, nhìn thấy được ở call site và trong diff.
+
+Guard ném `LuxMapException` → **403 `COMMUNE_FORBIDDEN`**, ném **TRƯỚC** `base.SaveChanges`: ném từ
+trong pipeline của EF sẽ bị bọc thành `DbUpdateException` và middleware BE-04 trả 500 thay vì 403.
+
+Chi phí đo được: **~3,7 µs mỗi entity** (1 entity 6,0 µs · 50 entity 182,6 µs · 500 entity 1,86 ms).
+Import CSV của BE-12 với 500 dòng tốn dưới 2 ms — nhỏ hơn nhiều so với chính vòng đi-về DB.
+
 **1b. `AdministrativeUnit` nằm ở `LuxMap.Persistence`, và KHÔNG implement `ICommuneScoped`.**
 
 Nó không phải khái niệm của Identity — nó là **mốc neo phạm vi** cho 15/16 entity. Đặt cạnh chính cơ chế thực thi nó (`ICommuneScoped`, `HasCommuneScope()`, `HasCommuneReference()`, chốt chặn khởi động) thì mọi module khai được FK thật qua tham chiếu `Persistence` vốn đã có, không phải phụ thuộc Identity.
