@@ -60,7 +60,7 @@ public class CommuneReferenceTests(AssetSchemaFixture fixture)
     [Fact]
     public async Task An_unknown_commune_is_rejected_by_the_database()
     {
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.QueryAsync(async db =>
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.WriteAsSystemAsync(async db =>
         {
             db.Set<Pole>().Add(new Pole
             {
@@ -82,7 +82,7 @@ public class CommuneReferenceTests(AssetSchemaFixture fixture)
     public async Task A_commune_still_holding_assets_cannot_be_deleted()
     {
         // Restrict, never cascade: deleting an administrative unit must not take its poles with it.
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.QueryAsync(async db =>
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.WriteAsSystemAsync(async db =>
         {
             var commune = await db.Set<AdministrativeUnit>()
                 .SingleAsync(unit => unit.CommuneId == fixture.CommuneId);

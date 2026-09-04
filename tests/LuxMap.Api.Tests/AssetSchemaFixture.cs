@@ -121,6 +121,31 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
         return await query(scope.ServiceProvider.GetRequiredService<LuxMapDbContext>());
     }
 
+    /// <summary>
+    /// Same as <see cref="QueryAsync{T}"/>, but opens the BE-08 system-write backdoor first.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ Use this ONLY where the test is deliberately acting as the system. The empty scope that
+    /// makes it necessary is the same empty scope an unauthenticated caller has, so the guard refuses
+    /// it — correctly. Reaching for this method is a statement that the test builds fixture data
+    /// rather than exercising a user's permissions, and it is spelled differently from
+    /// <see cref="QueryAsync{T}"/> so that choice shows up in a diff.
+    /// <para>
+    /// A test about commune scoping itself must NOT use this. See <c>CommuneWriteScopeTests</c>,
+    /// which drives the guard through real HTTP requests with real claims.
+    /// </para>
+    /// </remarks>
+    public async Task<T> WriteAsSystemAsync<T>(Func<LuxMapDbContext, Task<T>> write)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+
+        using (db.EnterUnscopedSystemWriteBackdoor())
+        {
+            return await write(db);
+        }
+    }
+
     /// <summary>Captures a real <c>EXPLAIN (ANALYZE)</c> plan as text, for the index assertions.</summary>
     public async Task<string> ExplainAsync(string sql, params (string Name, object Value)[] parameters)
     {

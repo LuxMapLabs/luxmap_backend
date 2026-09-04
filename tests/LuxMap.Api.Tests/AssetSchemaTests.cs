@@ -41,7 +41,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     {
         var written = new Point(106.492025, 10.965989) { SRID = Srid };
 
-        var poleId = await fixture.QueryAsync(async db =>
+        var poleId = await fixture.WriteAsSystemAsync(async db =>
         {
             var pole = new Pole
             {
@@ -83,7 +83,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
         ])
         { SRID = Srid };
 
-        var segmentId = await fixture.QueryAsync(async db =>
+        var segmentId = await fixture.WriteAsSystemAsync(async db =>
         {
             var segment = new RoadSegment
             {
@@ -120,7 +120,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     public async Task A_feeder_stores_no_geometry_at_all()
     {
         // Branch C never surveyed the cable routes, so a feeder with no route must still be storable.
-        var feederId = await fixture.QueryAsync(async db =>
+        var feederId = await fixture.WriteAsSystemAsync(async db =>
         {
             var feeder = new Feeder
             {
@@ -150,7 +150,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     {
         var poleId = await NewPoleAsync();
 
-        var fixtureId = await fixture.QueryAsync(async db =>
+        var fixtureId = await fixture.WriteAsSystemAsync(async db =>
         {
             var lamp = new Fixture
             {
@@ -189,7 +189,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     {
         var poleId = await NewPoleAsync();
 
-        await fixture.QueryAsync(async db =>
+        await fixture.WriteAsSystemAsync(async db =>
         {
             db.Set<Fixture>().AddRange(
                 NewFixture(poleId, 100, removed: new DateOnly(2025, 6, 1)),
@@ -215,7 +215,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
         var poleId = await NewPoleAsync();
 
         // `unknown` means the sweep could not cover the pole, so there is no confidence to record.
-        await fixture.QueryAsync(async db =>
+        await fixture.WriteAsSystemAsync(async db =>
         {
             db.Set<PoleCurrentStatus>().Add(new PoleCurrentStatus
             {
@@ -228,7 +228,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
         });
 
         // The other direction: an observed status without a confidence must be rejected by the CHECK.
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.QueryAsync(async db =>
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.WriteAsSystemAsync(async db =>
         {
             var status = await db.Set<PoleCurrentStatus>()
                 .IgnoreQueryFilters()
@@ -247,7 +247,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     {
         var poleId = await NewPoleAsync();
 
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.QueryAsync(async db =>
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.WriteAsSystemAsync(async db =>
         {
             db.Set<PoleCurrentStatus>().Add(new PoleCurrentStatus
             {
@@ -287,7 +287,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     }
 
     private async Task<string> NewPoleAsync()
-        => await fixture.QueryAsync(async db =>
+        => await fixture.WriteAsSystemAsync(async db =>
         {
             var pole = new Pole
             {
