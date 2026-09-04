@@ -15,6 +15,7 @@
     <ProjectReference Include="..\LuxMap.Modules.Telemetry\LuxMap.Modules.Telemetry.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Admin\LuxMap.Modules.Admin.csproj" />
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Infrastructure.Storage\LuxMap.Infrastructure.Storage.csproj" />
     <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
   </ItemGroup>
 

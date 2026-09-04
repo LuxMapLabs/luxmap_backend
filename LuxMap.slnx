@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/LuxMap.Api/LuxMap.Api.csproj" />
+    <Project Path="src/LuxMap.Infrastructure.Storage/LuxMap.Infrastructure.Storage.csproj" />
     <Project Path="src/LuxMap.Modules.Admin/LuxMap.Modules.Admin.csproj" />
     <Project Path="src/LuxMap.Modules.Assets/LuxMap.Modules.Assets.csproj" />
     <Project Path="src/LuxMap.Modules.Faults/LuxMap.Modules.Faults.csproj" />
@@ -13,6 +14,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/LuxMap.Api.Tests/LuxMap.Api.Tests.csproj" />
+    <Project Path="tests/LuxMap.Infrastructure.Storage.Tests/LuxMap.Infrastructure.Storage.Tests.csproj" />
     <Project Path="tests/LuxMap.Persistence.Tests/LuxMap.Persistence.Tests.csproj" />
     <Project Path="tests/LuxMap.Shared.Tests/LuxMap.Shared.Tests.csproj" />
   </Folder>

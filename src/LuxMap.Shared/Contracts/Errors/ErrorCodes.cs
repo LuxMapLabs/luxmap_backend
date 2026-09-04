@@ -34,6 +34,12 @@ public static class ErrorCodes
     /// <summary>500 — unhandled failure. The message is deliberately generic; detail lives in the log under the correlation id.</summary>
     public const string InternalError = "INTERNAL_ERROR";
 
+    /// <summary>
+    /// 415 — the uploaded bytes are not a JPEG (BE-11). Decided by the magic bytes, never by the file
+    /// name or the declared content type, so a renamed PNG is rejected exactly like an honest one.
+    /// </summary>
+    public const string UnsupportedImageFormat = "UNSUPPORTED_IMAGE_FORMAT";
+
     // ── Authentication (BE-07, BE-08) — also absent from Contract v1.1 ───────
 
     /// <summary>

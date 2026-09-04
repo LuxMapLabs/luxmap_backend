@@ -1,5 +1,5 @@
-# BE-02 — local development infrastructure. Exactly two services, nothing else.
-# No pgvector (the project dropped RAG), no MinIO (that is BE-11), no pgAdmin.
+# BE-02 — local development infrastructure. No pgvector (the project dropped RAG), no pgAdmin.
+# BE-11 added the object store: minio, plus the one-shot minio-mc sidecar that creates its buckets.
 
 name: luxmap
 
@@ -57,6 +57,72 @@ services:
       retries: 5
       start_period: 5s
 
+  # BE-11 — object store for survey frames and repair evidence.
+  #
+  # Bound to 127.0.0.1 like the other two, and that is load-bearing rather than habitual: BE-11 serves
+  # every image THROUGH the API so that Contract section 7 commune scoping applies to bytes exactly as
+  # it applies to rows. A presigned URL would be validated by MinIO, which knows nothing about
+  # commune_id. Reachable from outside, this container would become a way around the whole check.
+  minio:
+    # Pinned to a dated release, same discipline as postgis:17-3.5 and redis:8.10.1-alpine. MinIO does
+    # not publish semver tags, so the date IS the version. Multi-arch: amd64 and arm64 both native.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: luxmap_minio
+    restart: unless-stopped
+    environment:
+      # One credential pair serves both the server and the application. Two would drift.
+      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is not set, run `cp .env.example .env`}"
+      MINIO_ROOT_PASSWORD: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is not set, run `cp .env.example .env`}"
+      TZ: UTC
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      # `mc ready` reports the SERVER ready to take requests, which is what the sidecar waits on. A
+      # plain TCP check would pass while MinIO was still initialising and the first mb would fail.
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # BE-11 — creates the two buckets, then exits. It is EXPECTED to show as Exited in
+  # `docker compose ps`; that is success, not a crash.
+  #
+  # Buckets are made here rather than by the application because the repository has no precedent for
+  # touching an external service at startup — not even PostgreSQL is pinged. The app fails fast on
+  # missing CONFIGURATION and nothing else.
+  minio-mc:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: luxmap_minio_mc
+    environment:
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is not set, run `cp .env.example .env`}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is not set, run `cp .env.example .env`}"
+      TZ: UTC
+    depends_on:
+      minio:
+        condition: service_healthy
+    # `restart: no` is required: with the compose default this container would be restarted forever
+    # after each successful run.
+    restart: "no"
+    # Container-to-container, so the service name and the INTERNAL port 9000 — never the host port,
+    # which the developer may have remapped.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set luxmap http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY"
+        mc mb --ignore-existing luxmap/luxmap-survey
+        mc mb --ignore-existing luxmap/luxmap-evidence
+        echo "luxmap-survey and luxmap-evidence are ready"
+
 volumes:
   postgres_data:
     name: luxmap_postgres_data
+
+  minio_data:
+    name: luxmap_minio_data
