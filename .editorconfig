@@ -1,0 +1,13 @@
+# BE-10 — the ONE analyzer rule this repository enforces as an error.
+#
+# RS0030 is Microsoft.CodeAnalysis.BannedApiAnalyzers reporting a symbol listed in BannedSymbols.txt.
+# It is an error rather than a warning because the failure it prevents is silent: a distance in
+# degrees is still a double, still plausible-looking, and still passes every type check.
+#
+# Deliberately narrow. TreatWarningsAsErrors is NOT enabled repository-wide — turning the whole
+# compiler strict is a separate decision with its own cost, and bundling it in here would hide it.
+
+root = true
+
+[*.cs]
+dotnet_diagnostic.RS0030.severity = error

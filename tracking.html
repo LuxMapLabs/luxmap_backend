@@ -46,7 +46,7 @@
   <div class="card">
     <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">BE-09 xong: 5 bảng tài sản, 3 GIST index, EXPLAIN xác nhận Bitmap Index Scan trên 2501 cột. Kế tiếp: BE-10 quy ước SRID, rồi BE-12 → BE-14.</span>
+    <span class="muted">BE-10 xong: khoảng cách tính bằng PostGIS trên EPSG:3405, 4 API trả ĐỘ bị cấm ở compile-time (RS0030). EXPLAIN đo được: bbox prefilter nhanh hơn 37 lần so với predicate khoảng cách trần. Kế tiếp: <strong>BE-42</strong> (hạn W4 — mỗi ngày trễ là một ngày dữ liệu lux mất vĩnh viễn ở FO-14), rồi BE-12 → BE-13 → BE-14.</span>
   </div>
 
   <div class="grid">
@@ -71,7 +71,8 @@
       <tr><td><code>BE-06</code></td><td>Entity AdministrativeUnit, AppUser, RefreshToken + initial migration + seed</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-07</code></td><td>API đăng nhập / refresh / logout</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-09</code></td><td>Entity Pole, Fixture, RoadSegment, Feeder (+ pole_current_status) + migration + GIST index</td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>BE-10</code></td><td>Quy ước SRID: lưu và trả 4326, tính khoảng cách trên 3405</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
+      <tr><td><code>BE-10</code></td><td>Quy ước SRID: lưu và trả 4326, tính khoảng cách trên 3405</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, chặn FO-14 đo lux ở W5</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
     </table>
   </div>
@@ -157,6 +158,12 @@
         <td><code>BE-09</code> <code>commune_id</code> thành khoá ngoại thật trên cả 5 bảng — <code>AdministrativeUnit</code> chuyển sang <code>Persistence</code>, chốt chặn khởi động quét theo CỘT chứ không theo interface, thêm <code>seed_key</code> bịt bẫy đổi tên của BE-39</td>
         <td><code>src/LuxMap.Persistence/AdministrativeUnit.cs</code>, <code>Conventions/CommuneReferenceBuilderExtensions.cs</code>, migration <code>AddCommuneForeignKeys</code>, <code>tests/LuxMap.Api.Tests/CommuneReferenceTests.cs</code></td>
         <td><code>feat(BE-09): make commune_id a real foreign key on every scoped table</code></td>
+      </tr>
+      <tr>
+        <td>04/09/2026</td>
+        <td><code>BE-10</code> <code>SpatialFunctions.DistanceMeters</code> — dịch sang <code>ST_Distance(ST_Transform(a,3405), ST_Transform(b,3405))</code> bằng <code>HasTranslation</code>, KHÔNG migration, KHÔNG function trong DB. 4 API trả ĐỘ bị cấm ở compile-time. Chốt quy ước hai tầng: bbox 4326 lọc thô qua GIST index, khoảng cách 3405 tinh chỉnh sau</td>
+        <td><code>src/LuxMap.Persistence/SpatialFunctions.cs</code>, <code>SpatialConstants.cs</code>, <code>LuxMapDbContext.cs</code>, <code>Directory.Build.props</code>, <code>BannedSymbols.txt</code>, <code>.editorconfig</code>, <code>tests/LuxMap.Api.Tests/SpatialDistanceTests.cs</code>, <code>BannedDistanceApiTests.cs</code></td>
+        <td><code>feat(BE-10): measure distance in EPSG:3405 and ban the degree-returning APIs</code></td>
       </tr>
     </table>
   </div>

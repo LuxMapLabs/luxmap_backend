@@ -2,6 +2,8 @@ using System.Reflection;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LuxMap.Persistence;
 
@@ -52,6 +54,10 @@ public class LuxMapDbContext(
         // Must run AFTER every configuration is applied: scans the model for columns marked by
         // HasPrefixedId and creates the matching sequence, so nobody has to remember to declare one.
         modelBuilder.CreatePrefixedIdSequences();
+
+        // BE-10 — SpatialFunctions.DistanceMeters, translated to PostGIS rather than backed by a
+        // database function, so the whole feature carries no migration.
+        modelBuilder.HasLuxMapSpatialFunctions(this.GetService<IRelationalTypeMappingSource>());
 
         // Contract section 7. Forgetting the scope means the app WILL NOT START, instead of leaking
         // data silently.
