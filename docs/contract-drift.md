@@ -31,6 +31,8 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 14 | **ID không còn cố định độ dài — FE/mobile phải sửa regex** | 🔴 Cao | WP5, WP6 | Contract — ghi rõ ở mục 0.3 |
 | 12 | Mock: `POLE-0047` mâu thuẫn giữa 3 file | 🔴 Cao | WP5, WP6, BE-39 | Mock — **đã sửa** |
 | 13 | ~~`LPAD` cắt bớt ID khi vượt độ rộng~~ | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **ĐÃ SỬA** |
+| 15 | **Mã lỗi thứ 8 ngoài Contract: `UNSUPPORTED_IMAGE_FORMAT`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
+| 16 | **Ràng buộc phiên bản: ImageSharp phải ở 3.x** | 🟡 Vừa | Nội bộ BE, CI | Không phải Contract — quyết định công cụ |
 
 ---
 
@@ -555,6 +557,8 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 6. **Mục 10 và 12 gộp vào lần lên Contract v1.2**, rồi báo WP5/WP6 vì bộ mock đã đổi.
 7. ~~Mục 13~~ — **đã sửa**, chỉ cần báo để cả nhóm biết `DEFAULT` của cột ID đã đổi dạng.
 8. **Mục 14 phải báo WP5 và WP6** — một dòng thôi, nhưng phải nói trước khi ai đó hardcode `\d{4}`.
+9. **Mục 15** — BE-11 thêm `UNSUPPORTED_IMAGE_FORMAT` (415). Mục 2 đang đếm 7 mã ngoài Contract, giờ là **8**. Chỉ cần ghi vào Contract, không đổi code.
+10. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.

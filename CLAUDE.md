@@ -356,7 +356,29 @@ package vào `Shared` (sẽ kéo S3 SDK lẫn image codec vào cả hai assembly
 
 **Bucket do sidecar `minio-mc` tạo**, không phải ứng dụng. .NET chỉ fail-fast trên **cấu hình** thiếu,
 theo khuôn `LuxMapConnectionString` và `JwtOptions.Validate` — repo không có tiền lệ chạm dịch vụ
-ngoài lúc khởi động, kể cả PostgreSQL.
+ngoài lúc khởi động, kể cả PostgreSQL. Sidecar bắt buộc `restart: "no"`: mặc định compose sẽ khởi
+động lại nó **vô hạn** sau mỗi lần chạy thành công.
+
+**Hai ràng buộc về ImageSharp — kiểm chứng bằng test, không phải giả định:**
+
+- **ImageSharp GIỮ EXIF qua resize** (trái với giả định thông thường). Việc bỏ metadata khỏi
+  thumbnail phải **TƯỜNG MINH**: `ExifProfile` / `XmpProfile` / `IptcProfile` = `null`. Không dựa vào
+  hành vi mặc định. Lý do là **bảo mật, không phải dung lượng**: thumbnail là object phục vụ rộng
+  nhất, GPS chụp là trường nhạy cảm nhất — để nguyên là đặt dữ liệu nhạy nhất vào chỗ ít bảo vệ nhất,
+  trong một hệ thống phân quyền theo địa bàn. Canh bằng
+  `The_thumbnail_carries_no_gps_so_a_widely_served_object_cannot_leak_capture_locations`; test đó
+  **không phải chuyện dọn dẹp metadata**, đừng xoá khi refactor.
+
+- **Ghim ImageSharp ở 3.x.** Từ 4.x, task validate lúc build đòi `SixLaborsLicenseKey`, và
+  `ContinueOnError="$(Configuration.StartsWith('Debug'))"` nghĩa là Debug chỉ cảnh báo còn
+  **Release/CI/deploy GÃY**. Điều khoản Split License không đổi; chỉ khác cái cổng kiểm key. Muốn lên
+  4.x phải **xin key TRƯỚC**. Đã đưa vào FW-00.
+
+**Nợ có tên người đòi:** `S3ObjectStore` **chưa có test tự động** — bộ test BE-11 cố ý không cần
+MinIO, nên adapter là mảnh duy nhất không được phủ. Đã kiểm end-to-end thủ công một lần lúc làm
+BE-11 (8.2 KiB gốc + 1.8 KiB thumbnail vào `luxmap-survey`, SHA-256 vòng tròn khớp) nhưng **không có
+gì canh nó từ đó trở đi**. Chủ nợ là **BE-36** (Testcontainers, W17–W18) — thêm MinIO container bên
+cạnh PostGIS. Đừng để nợ này chỉ nằm trong báo cáo một phiên làm việc.
 
 ### Vai trò
 

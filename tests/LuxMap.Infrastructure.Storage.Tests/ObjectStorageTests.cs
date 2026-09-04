@@ -161,6 +161,43 @@ public class ObjectStorageTests
             "The thumbnail must not carry the original's exposure metadata.");
     }
 
+    [Fact]
+    public async Task The_thumbnail_carries_no_gps_so_a_widely_served_object_cannot_leak_capture_locations()
+    {
+        // NOT metadata housekeeping — this is the location-leak guard, and the name says so because
+        // the line it protects (ExifProfile = null in ThumbnailFactory) looks like tidying and would
+        // be a natural thing for someone to delete during a refactor.
+        //
+        // ImageSharp does NOT drop EXIF on resize; decode-resize-encode carries the profiles straight
+        // through. Left alone, every thumbnail would embed the exact coordinates where the photo was
+        // taken. The thumbnail is the object served WIDELY — list views, map popups, caches — while
+        // the original sits behind an authorised read, so that is the most sensitive field landing in
+        // the least protected place, inside a system whose whole authorization model is territorial.
+        var store = Store();
+        using var content = new MemoryStream(TestImages.JpegWithExif());
+
+        var stored = await store.StoreImageAsync(StorageBucket.Survey, FrameId, content);
+
+        using var thumbnail = Image.Load(new MemoryStream(store[StorageBucket.Survey, stored.ThumbnailKey]));
+        var exif = thumbnail.Metadata.ExifProfile;
+
+        Assert.True(
+            exif is null || !exif.TryGetValue(ExifTag.GPSLatitude, out _),
+            "The thumbnail carries GPSLatitude. ThumbnailFactory must null ExifProfile before encoding.");
+        Assert.True(
+            exif is null || !exif.TryGetValue(ExifTag.GPSLongitude, out _),
+            "The thumbnail carries GPSLongitude. ThumbnailFactory must null ExifProfile before encoding.");
+        Assert.True(
+            exif is null || !exif.TryGetValue(ExifTag.GPSImgDirection, out _),
+            "The thumbnail carries GPSImgDirection. ThumbnailFactory must null ExifProfile before encoding.");
+
+        // The counterpart: the ORIGINAL must still have every one of them, or BE-16 has nothing to
+        // validate. Asserting both sides in one test pins which object went through which path.
+        using var original = Image.Load(new MemoryStream(store[StorageBucket.Survey, stored.OriginalKey]));
+        Assert.True(original.Metadata.ExifProfile!.TryGetValue(ExifTag.GPSLatitude, out _));
+        Assert.True(original.Metadata.ExifProfile!.TryGetValue(ExifTag.GPSImgDirection, out _));
+    }
+
     // ── (iv) thumbnail geometry ──────────────────────────────────────────────
 
     [Fact]
