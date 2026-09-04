@@ -1,0 +1,16 @@
+# Review is required HERE and deliberately nowhere else.
+#
+# A gate that every pull request has to pass, on a repository with one backend developer, is a gate
+# that gets bypassed every single time — and a control bypassed 100% of the time is not a control,
+# it just makes the merge history say something untrue. So `dev` requires no approval in general.
+#
+# These two files are different. They are the published contract WP5 and WP6 build against: the web
+# client and the Android client both hardcode the field names, the enum values and the error codes in
+# them. A change here is a change to someone else's code, made without them in the room. That is
+# exactly the case where a second reader is worth waiting for.
+#
+# docs/contract-drift.md is intentionally NOT owned: it is the register of places the code and the
+# Contract disagree, and it has to stay cheap to append to or nobody will write drift down.
+
+/docs/api-contract-v1.1.md      @NTNgoc204 @thinh2509
+/docs/openapi/luxmap-v1.json    @NTNgoc204 @thinh2509
