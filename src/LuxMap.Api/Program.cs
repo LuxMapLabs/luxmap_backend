@@ -10,6 +10,7 @@ using LuxMap.Api.Http;
 using LuxMap.Api.Observability;
 using LuxMap.Api.OpenApi;
 using LuxMap.Api.Seeding;
+using LuxMap.Infrastructure.Storage;
 using LuxMap.Persistence;
 using Serilog;
 using LuxMap.Shared.Modularity;
@@ -59,6 +60,11 @@ builder.Services.AddLuxMapAuthorization();
 builder.Services.AddLuxMapPersistence(
     LuxMapConnectionString.FromEnvironment(),
     modules.Select(module => module.GetType().Assembly));
+
+// BE-11 — MinIO object storage. Registered by the host beside persistence rather than through a
+// module: Survey (BE-15) and WorkOrders (BE-24) both use it, so it belongs to neither.
+// Fails fast on missing configuration only; it does not contact MinIO at startup.
+builder.Services.AddLuxMapObjectStorage(StorageOptions.FromEnvironment());
 
 // Each module registers its own services.
 builder.Services.AddLuxMapModules(builder.Configuration, modules);

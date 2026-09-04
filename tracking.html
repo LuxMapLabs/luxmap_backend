@@ -46,7 +46,7 @@
   <div class="card">
     <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">BE-10 xong: khoảng cách tính bằng PostGIS trên EPSG:3405, 4 API trả ĐỘ bị cấm ở compile-time (RS0030). EXPLAIN đo được: bbox prefilter nhanh hơn 37 lần so với predicate khoảng cách trần. Kế tiếp: <strong>BE-42</strong> (hạn W4 — mỗi ngày trễ là một ngày dữ liệu lux mất vĩnh viễn ở FO-14), rồi BE-12 → BE-13 → BE-14.</span>
+    <span class="muted">BE-11 xong: MinIO + sidecar tạo bucket, ảnh gốc nguyên byte (SHA-256 khớp), EXIF sống sót cho BE-16, thumbnail 320px là object riêng. Chỉ nhận JPEG theo magic bytes. Truy cập qua proxy, KHÔNG presigned — presigned đi vòng qua cả 4 lớp commune scoping. Kế tiếp: <strong>BE-12</strong>, rồi BE-13 → BE-14. <strong>BE-42</strong> vẫn treo hạn W4.</span>
   </div>
 
   <div class="grid">
@@ -72,6 +72,8 @@
       <tr><td><code>BE-07</code></td><td>API đăng nhập / refresh / logout</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-09</code></td><td>Entity Pole, Fixture, RoadSegment, Feeder (+ pole_current_status) + migration + GIST index</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-10</code></td><td>Quy ước SRID: lưu và trả 4326, tính khoảng cách trên 3405</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-11</code></td><td>Lưu trữ ảnh MinIO — hai luồng ảnh riêng, magic bytes, thumbnail</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-12</code></td><td>API CRUD tài sản + import kiểm kê từ CSV</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, chặn FO-14 đo lux ở W5</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
     </table>
@@ -164,6 +166,12 @@
         <td><code>BE-10</code> <code>SpatialFunctions.DistanceMeters</code> — dịch sang <code>ST_Distance(ST_Transform(a,3405), ST_Transform(b,3405))</code> bằng <code>HasTranslation</code>, KHÔNG migration, KHÔNG function trong DB. 4 API trả ĐỘ bị cấm ở compile-time. Chốt quy ước hai tầng: bbox 4326 lọc thô qua GIST index, khoảng cách 3405 tinh chỉnh sau</td>
         <td><code>src/LuxMap.Persistence/SpatialFunctions.cs</code>, <code>SpatialConstants.cs</code>, <code>LuxMapDbContext.cs</code>, <code>Directory.Build.props</code>, <code>BannedSymbols.txt</code>, <code>.editorconfig</code>, <code>tests/LuxMap.Api.Tests/SpatialDistanceTests.cs</code>, <code>BannedDistanceApiTests.cs</code></td>
         <td><code>feat(BE-10): measure distance in EPSG:3405 and ban the degree-returning APIs</code></td>
+      </tr>
+      <tr>
+        <td>04/09/2026</td>
+        <td><code>BE-11</code> Lưu trữ ảnh MinIO — <code>IObjectStore</code> ở Shared, adapter S3 + magic bytes + thumbnail ở project mới <code>LuxMap.Infrastructure.Storage</code>. Hai bucket, key phân tầng, KHÔNG nhúng commune_id. Ảnh gốc nguyên byte; thumbnail bỏ metadata TƯỜNG MINH vì ImageSharp không tự vứt EXIF</td>
+        <td><code>src/LuxMap.Shared/Storage/ObjectStorage.cs</code>, <code>src/LuxMap.Infrastructure.Storage/</code>, <code>tests/LuxMap.Infrastructure.Storage.Tests/</code>, <code>docker-compose.yml</code>, <code>.env.example</code>, <code>Program.cs</code></td>
+        <td><code>feat(BE-11): store images in MinIO behind a vendor-neutral abstraction</code></td>
       </tr>
     </table>
   </div>
