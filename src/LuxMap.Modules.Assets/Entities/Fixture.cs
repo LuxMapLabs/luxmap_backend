@@ -32,7 +32,7 @@ public class Fixture : ICommuneScoped
     public required string PoleId { get; set; }
 
     /// <summary>
-    /// Denormalised from <see cref="Pole"/> so this entity can implement <see cref="ICommuneScoped"/>
+    /// Denormalized from <see cref="Pole"/> so this entity can implement <see cref="ICommuneScoped"/>
     /// and be protected by the model-building guard rather than by remembering to join.
     /// </summary>
     /// <remarks>
