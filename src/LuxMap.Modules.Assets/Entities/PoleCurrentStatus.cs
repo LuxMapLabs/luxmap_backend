@@ -47,7 +47,7 @@ public class PoleCurrentStatus : ICommuneScoped
     public string? LastSweepId { get; set; }
 
     /// <summary>
-    /// Denormalised from <see cref="Pole"/>, for the same reason as on <see cref="Fixture"/>: a
+    /// Denormalized from <see cref="Pole"/>, for the same reason as on <see cref="Fixture"/>: a
     /// dashboard aggregating statuses would otherwise leak across communes the moment someone forgot
     /// a join, and this table is a very natural root for exactly that kind of query.
     /// </summary>
