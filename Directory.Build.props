@@ -1,0 +1,41 @@
+<Project>
+
+  <!--
+    BE-10 — repository-wide build settings. Applies to all 13 projects, src and tests alike; that is
+    the point, since a banned API is only banned if it is banned everywhere.
+  -->
+
+  <ItemGroup>
+    <!--
+      Enforces BannedSymbols.txt as RS0030, raised to an error in .editorconfig.
+
+      What is banned and why: every geometry column here is geometry(...,4326) (Contract section 5.3),
+      and on that SRID the four listed APIs answer in DEGREES rather than metres. For two adjacent
+      poles 34.973 m apart the answer is 0.00032 — wrong by a factor of about 109,290. Nothing at the
+      call site says so, the result is an ordinary double, and no test that does not already know the
+      correct answer would notice. The sanctioned route is SpatialFunctions.DistanceMeters, which
+      transforms to EPSG:3405 inside the SQL tree.
+
+      ⚠️ BannedSymbols.txt holds DATA ONLY — no comments, no blank lines. This analyzer parses every
+      line as a symbol entry, so a '#' line becomes an empty symbol and trips RS0031 ("listed multiple
+      times") across every project. That is why this explanation lives here rather than in the file it
+      describes.
+
+      PrivateAssets=all keeps the analyzer out of any produced package and out of downstream project
+      references — it is a build-time check, not a dependency of the shipped code.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="5.6.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <!--
+      One shared list at the repository root rather than a copy per project: a second copy would
+      drift, and a project silently missing its copy would be unguarded while still looking guarded.
+      MSBuildThisFileDirectory resolves relative to THIS file, so every project points at the same one
+      regardless of its own depth.
+    -->
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
+</Project>

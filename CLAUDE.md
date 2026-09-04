@@ -220,6 +220,60 @@ chỉ trong quy ước.
 Nợ FK duy nhất của BE-09: `pole_current_status.last_sweep_id` là `text` chưa có FK; BE-15 thêm ràng
 buộc trong migration của nó.
 
+### Bốn quy tắc chốt ở BE-10 — khoảng cách và SRID
+
+**1. `SpatialFunctions.DistanceMeters` là đường tính khoảng cách hợp lệ DUY NHẤT.**
+
+Nó dịch sang `ST_Distance(ST_Transform(a,3405), ST_Transform(b,3405))` bằng
+`HasDbFunction().HasTranslation()` — **không có function nào trong DB, không có migration nào**.
+Bốn API còn lại bị cấm ở **compile-time** qua `BannedSymbols.txt` (RS0030 = error trong
+`.editorconfig`): `Geometry.Distance`, `EF.Functions.Distance`, `EF.Functions.IsWithinDistance`,
+`EF.Functions.DistanceKnn`. Trên cột 4326 cả bốn trả **ĐỘ**: cặp cột cách 34.973 m ra `0.00032`,
+sai **109.290 lần**, mà kết quả vẫn là `double` dương trông hợp lý.
+
+⚠️ **Lệnh cấm có lỗ.** BannedApiAnalyzers chỉ khớp khi **mọi tham số được truyền tường minh**.
+`EF.Functions.Distance(a, b, false)` bị bắt; `EF.Functions.Distance(a, b)` — bỏ trống `useSpheroid` —
+**lọt hoàn toàn**, kể cả khi cấm nguyên type bằng `T:`. Đúng dạng người ta hay gõ nhất. Đã bịt bằng
+`BannedDistanceApiTests` quét văn bản mã nguồn; đừng xoá test đó vì tưởng analyzer đã lo.
+
+**2. Quy ước HAI TẦNG cho BE-13, BE-14, BE-29 — bắt buộc.**
+
+`ST_Transform` trên cột đã đánh index **VÔ HIỆU HOÁ index đó**: index dựng trên `geom` (4326), còn
+predicate lại là một hàm của `geom`. Đo thật trên 2500 cột đã `ANALYZE`:
+
+| Truy vấn | Plan | Cost | Buffers | Execution |
+|---|---|---|---|---|
+| Chỉ `ST_Distance(ST_Transform(...)) < 500` | `Seq Scan on pole` | 62608.25 | 77 | 1.082 ms |
+| Thêm `ST_Intersects(geom, envelope)` phía trước | `Bitmap Index Scan on ix_pole_geom` | 86.34 | 5 | 0.029 ms |
+
+**Lọc thô bằng bbox `ST_Intersects` trên 4326 trước** (đi qua GIST index), **rồi mới tinh chỉnh bằng
+khoảng cách 3405** trên tập nhỏ còn lại. Đảo thứ tự là mất index — và ở BE-14 thì đó là ngưỡng 500 ms
+của Contract mục 5.4.
+
+⚠️ **Predicate khoảng cách 3405 KHÔNG BAO GIỜ được là điều kiện dẫn dắt của một join.**
+Plan A ở trên ước lượng `rows=833` — đúng bằng 2500/3, tức PostgreSQL đã rơi về hằng số selectivity
+mặc định cho bất đẳng thức: `ST_Distance(ST_Transform(...))` là hàm của cột, nên **không có thống kê
+nào áp được**. Thực tế trả về **1** dòng — sai **833 lần**.
+
+Ở một truy vấn đơn lẻ thì vô hại: cost quá cao khiến planner vẫn ưu tiên index nếu có. Nhưng khi
+BE-13/BE-14/BE-29 đặt predicate này vào một `JOIN` hoặc subquery, ước lượng sai 833 lần sẽ chọn nhầm
+join strategy (nested loop thay vì hash, hoặc ngược lại) — và **không có gì cảnh báo**: truy vấn vẫn
+ra đúng kết quả, chỉ chậm dần theo dữ liệu cho tới lúc không ai nhớ vì sao. Luôn thu hẹp bằng bbox
+trước để planner có một `rows` thật để làm việc.
+
+**3. Không có API .NET nào trả về `Geometry` đã transform.**
+
+`ST_Transform` chỉ tồn tại **bên trong cây SQL**. Giá trị duy nhất đi ra tầng .NET là `double` mét.
+Không phải chuyện phong cách: toạ độ 3405 rò ra API lệch **226 m** trên bản đồ FE — đủ để đặt cột
+sang tuyến khác, vẫn đủ nhỏ để trông "gần đúng" và không ai nghi ngờ. Chi tiết số liệu ở XML doc của
+`SpatialConstants.SridVn2000`.
+
+**4. `RoadSegment.LengthM` là giá trị KHAI BÁO, không phải giá trị dẫn xuất.**
+
+Đừng "sửa cho đúng" bằng `ST_Length`. Nó là property đã publish ở Contract mục 2.3, và khoảng cách
+3405 là khoảng cách trên **mặt phẳng chiếu** — ngắn hơn trên ellipsoid khoảng **73 ppm** do hệ số tỉ
+lệ lưới UTM. Lấy `ST_Length` ghi đè sẽ làm số liệu FE nhảy mà không ai giải thích được vì sao.
+
 ### Vai trò
 
 **Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.
@@ -324,7 +378,9 @@ W1: nền tảng **BE-01 → BE-00 → BE-02..BE-07**, cộng **FW-00 review Con
 
 Sau đó: GIS tài sản (W2–W4) → khảo sát (W5–W7) → sự cố (W7–W9) → quy trình (W9–W12) → dashboard (W13–W15) → quản trị (W15–W17) → hoàn thiện (W17–W21).
 
-**Đã chốt ở mục 0.1–0.4:** ID sinh bằng **sequence PostgreSQL**, format ngay ở tầng DB qua `DEFAULT 'POLE-' || LPAD(nextval(...)::text, 4, '0')`, EF Core map bằng `.HasDefaultValueSql()` + `.ValueGeneratedOnAdd()`. Sequence an toàn concurrency sẵn, không cần bảng counter. Chấp nhận có khoảng trống trong dãy số khi insert lỗi.
+**Đã chốt ở mục 0.1–0.4:** ID sinh bằng **sequence PostgreSQL**, format ngay ở tầng DB qua `DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`, EF Core map bằng `.HasDefaultValueSql()` + `.ValueGeneratedOnAdd()`. Sequence an toàn concurrency sẵn, không cần bảng counter. Chấp nhận có khoảng trống trong dãy số khi insert lỗi.
+
+> ⚠️ Dòng này trước đây ghi `DEFAULT 'POLE-' || LPAD(nextval(...)::text, 4, '0')`. **Cách đó SAI và đã bị bỏ** ở commit `8ea9930`: `LPAD` của Postgres **cắt bớt** khi chuỗi dài hơn độ rộng, nên cột thứ 10000 nhận `POLE-1000` và đụng khoá với cột thứ 1000. Xem mục 0.3 và `PrefixedId.cs`. Đừng khôi phục lại dạng `LPAD`.
 
 **Client không sinh ID hiển thị.** Thao tác offline mang `client_op_id` (UUID); server gán ID thật khi nhận và trả lại ánh xạ.
 
