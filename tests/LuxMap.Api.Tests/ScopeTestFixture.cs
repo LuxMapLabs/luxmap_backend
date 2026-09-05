@@ -94,6 +94,7 @@ public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLif
         var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
         var userId = await db.Set<AppUser>().Where(u => u.Username == username)
             .Select(u => u.UserId).SingleAsync();
+        #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
         await db.Set<AppUserCommune>().Where(a => a.UserId == userId).ExecuteDeleteAsync();
     }
 
@@ -103,6 +104,7 @@ public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLif
         var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
         await db.Set<AppUser>().Where(u => u.Username == username)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.HasSystemWideScope, value));
+        #pragma warning restore RS0030
     }
 
     private static async Task<string> EnsureCommuneAsync(LuxMapDbContext db, string name)

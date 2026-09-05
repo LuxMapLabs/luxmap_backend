@@ -10,24 +10,6 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace LuxMap.Api.Authorization;
 
-/// <summary>Role policy names. Use the constants; do not scatter magic strings through the code.</summary>
-public static class LuxMapPolicies
-{
-    public const string ManagementAgency = "role:management_agency";
-    public const string MaintenanceEngineer = "role:maintenance_engineer";
-    public const string FieldCrew = "role:field_crew";
-    public const string Administrator = "role:administrator";
-
-    public static string For(UserRole role) => role switch
-    {
-        UserRole.ManagementAgency => ManagementAgency,
-        UserRole.MaintenanceEngineer => MaintenanceEngineer,
-        UserRole.FieldCrew => FieldCrew,
-        UserRole.Administrator => Administrator,
-        _ => throw new ArgumentOutOfRangeException(nameof(role), role, "No policy defined for this role."),
-    };
-}
-
 public static class AuthorizationSetup
 {
     public static IServiceCollection AddLuxMapAuthorization(this IServiceCollection services)

@@ -45,6 +45,12 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 26 | **Ghi vết trên bảng `fault`, không có `FaultHistory`** | 🟡 Vừa | Nội bộ BE, BE-19 | Không phải Contract — quyết định lược đồ |
 | 27 | **Contract không định nghĩa "fault MỞ"** cho `open_fault_count` | 🟡 Vừa | WP5, BE-28, BE-40 | Contract — ghi rõ ba trạng thái |
 | 28 | **`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`) | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa; mục 6 mới ghi file work-orders |
+| 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1 |
+| 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại |
+| 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33, **BE-15/18/21/24** | **FW-00 — chốt MỘT LẦN cho cả nhóm ticket ghi**, không để mỗi ticket tự chọn |
+| 32 | **`external_ref` trên `road_segment`, `feeder`, `pole`** — LƯU và upsert theo, KHÔNG emit | 🟡 Vừa | Nội bộ BE, BE-39 | Không phải Contract — mở rộng mục 22 từ 1 bảng lên 3 |
+| 33 | **Hai mã lỗi mới: `ASSET_NOT_FOUND`, `EXTERNAL_REF_TAKEN`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
+| 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | **Chủ nợ: BE-12b.** Xoá mục này là một tiêu chí nghiệm thu của BE-12b, không phải việc dọn dẹp |
 
 ---
 
@@ -582,7 +588,64 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 19. **Mục 26** — không tạo `FaultHistory`; ghi vết là các cột `reported_by`/`confirmed_by`+`at`/`resolved_by`+`at` trên chính bảng `fault`. Chỉ giữ quyết định **mới nhất**, không giữ chuỗi. **Nếu BE-19 cần đủ chuỗi thì đó là việc của BE-19.**
 20. **Mục 27** — Contract liệt kê 6 `fault_status` và không nói cái nào là "mở", trong khi `open_fault_count` (mục 2.1), BE-28 và BE-40 đều cần. BE-18 chốt `detected | confirmed | in_progress`, đặt ở `FaultStatusSets.Open`. Cần ghi vào Contract.
 21. **Mục 28 — `mock-faults.json` lệch mục 2.4 mười chỗ.** Thiếu `fixture_id`, `data_source`, `status_confidence`, `updated_at`, `work_order_id`, `note`, `reported_by`; thừa `confirmed_by`, `confirmed_at`; và `cluster_id` dùng **`CLU-0001`** trong khi mục 0.2 chốt **`CLS`**. Mục 6 mới ghi lỗi `CLU` ở `mock-work-orders.json`, **thiếu file này**. FE đã code theo mock — phải báo WP5/WP6.
-22. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
+22. **Mục 29 — vì sao KHÔNG dùng `/poles`.** Contract mục 2.1 đã đặc tả `GET /poles` là endpoint bản đồ: `bbox` bắt buộc, `FeatureCollection`, 413 quá 2000 cột. Đó là của **BE-14**. Danh sách kiểm kê trả lời cùng đường dẫn sẽ chiếm mất chỗ, nên BE-12a đi đường riêng `/assets/…`. Cần một mục Contract mới, **đừng gộp vào 2.1**.
+23. **Mục 30 — vì sao 200 chứ không phải 4xx.** Kiểm toàn bộ file trước rồi ghi tập hợp lệ trong một transaction, nên "10 hỏng trong 500, 490 đã ghi" là **thành công một phần thật**, không phải lỗi của request; bọc trong `{error:…}` là nói sai về 490 dòng kia. Tiền lệ có sẵn: `POST /lux-readings` trùng `client_op_id` trả **200** và mục 5.8 gọi đó là hành vi bình thường. **207 đã cân nhắc và loại** — không có trong Contract, không có trong repo. `rows[]` là **mảng** vì dictionary không cam kết thứ tự và khoá số dạng chuỗi cho `"10"` đứng trước `"9"`; cắt ở 100, `total_errors` vẫn đủ.
+24. **Mục 31 — chỗ hở nghiêm trọng nhất của nhóm này.** Mục 7 có bảng phạm vi địa bàn của 4 vai trò và 5 quy tắc lọc, **không một chữ nào** về vai trò nào được ghi. BE-12a chốt: **Quản trị** ghi, ba vai trò kia chỉ đọc. Đây là lần đầu 4 policy của BE-08 chạm dòng sản xuất, nên nó **tạo tiền lệ** cho BE-15, BE-18, BE-21, BE-24. Phải chốt cả nhóm ở FW-00, đừng để mỗi ticket tự quyết. ⚠️ Kèm một cái bẫy phải ghi vào Contract luôn: **policy là MỘT vai trò chính xác, không phải một bậc** — gắn `maintenance_engineer` lên endpoint đọc sẽ chặn luôn Quản trị và Cơ quan quản lý.
+25. **Mục 32** — mục 22 trước đây chỉ đăng ký `pole.external_ref`. BE-12a mở lên ba bảng, vì `poles.csv` phải trỏ tuyến và mạch điện bằng mã của đơn vị quản lý: `SEG-001` do DB sinh lúc INSERT nên người soạn file không biết trước, và nếu template đòi mã đó thì bộ bốn file không nạp được liền mạch. `fixture` cố ý KHÔNG có — một cột mang nhiều bóng, không mã nào chỉ đúng một lần lắp đặt, nên nhập bóng là insert-only.
+26. **Mục 33** — `ASSET_NOT_FOUND` (404, gộp cả "không tồn tại" lẫn "ngoài phạm vi" đúng như mục 7 đòi) và `EXTERNAL_REF_TAKEN` (409). Mục 2 nay đếm **11** mã ngoài Contract.
+27. **Mục 34 — có hạn dùng.** `GET /assets/{segments,feeders,poles}` trả `PagedResult<string>` chỉ gồm ID. Đó là **chỗ giữ chỗ**, không phải thiết kế: BE-12a sở hữu request và phân quyền, còn hình dạng khi đọc là **BE-12b** đang chờ Thịnh/Ngọc. Công bố một hình dạng đoán bây giờ thì FE sẽ bám vào, và gỡ ra khó hơn nhiều so với công bố muộn.
+### 🔴 Ba mục dưới đây cần WP5 (Thịnh/Ngọc) xem TRƯỚC khi BE-12b bắt đầu
+
+Không phải để duyệt lại quyết định của BE-12a, mà vì BE-12b sẽ xây lên trên chúng và sửa sau thì đắt.
+
+| Mục | Cần gì ở FW-00 |
+|---|---|
+| **31 — vai trò nào được ghi** | **Chốt một lần cho CẢ NHÓM** BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24. BE-12a là ticket đầu tiên chạm 4 policy của BE-08 nên nó **tạo tiền lệ**; sáu ticket tự chọn riêng sẽ ra sáu ma trận quyền khác nhau mà không ai giải thích được. **Xem mục 31b ngay dưới — câu hỏi kèm chi phí, không phải câu hỏi trần.** |
+| **29 — nhóm `/api/v1/assets/…`** | Đường dẫn mới, FE cần biết nó tồn tại và **không** phải `/poles` (chỗ đó là của BE-14, mục 2.1). |
+| **30 — hình dạng kết quả import** | Trả 200 kèm `{inserted, updated, failed, total_errors, truncated, rows[]}`. FE cần hình dạng này để dựng màn hình nhập liệu. |
+
+#### 31b — Bốn policy của BE-08 là EXACT-ROLE hay HIERARCHY? Tiền lệ đã tạo rồi.
+
+BE-12a **đã cài đặt xong theo EXACT-ROLE**, nên FW-00 không còn chọn trên giấy trắng: nó xác nhận
+hoặc bắt sửa. Đưa lên bàn kèm chi phí của từng đáp án.
+
+**Hiện trạng — EXACT-ROLE.** `AuthorizationSetup.RolePolicy` dựng mỗi policy bằng
+`RequireClaim(role, "<đúng một giá trị>")`. Nên:
+
+| Endpoint | Ai vào được |
+|---|---|
+| `POST/PUT /assets/*`, `POST /assets/import/*` (`Administrator`) | **chỉ** Quản trị |
+| `GET /assets/*` (không gắn policy) | **cả bốn** vai trò đã đăng nhập |
+
+⚠️ Hệ quả **phản trực giác** phải ghi vào Contract dù chọn hướng nào: gắn
+`maintenance_engineer` lên một endpoint ĐỌC sẽ **chặn luôn Quản trị và Cơ quan quản lý**, vì policy
+là một giá trị claim chứ không phải một ngưỡng. Trông như siết bảo mật, thực chất là chặn hai vai trò
+khỏi dữ liệu của chính họ. Đã canh bằng test
+`The_managing_authority_MAY_read_which_proves_reads_carry_no_role_policy`.
+
+**Chi phí nếu FW-00 xác nhận EXACT-ROLE:** 0. Không sửa gì.
+
+**Chi phí nếu FW-00 chọn HIERARCHY** (Quản trị ⊇ Cơ quan quản lý ⊇ Kỹ sư ⊇ Tổ khảo sát):
+
+| Phải sửa | Quy mô |
+|---|---|
+| `AuthorizationSetup.RolePolicy` — đổi `RequireClaim` thành `RequireAssertion` so theo bậc | **1 hàm**, ~10 dòng |
+| `LuxMapPolicies` — thêm khái niệm thứ bậc | **1 file**, ~15 dòng |
+| `[Authorize(Policy = …)]` ở dòng sản xuất | **6 dòng**, 2 file, cả 6 đều là `Administrator` — bậc cao nhất nên **không dòng nào đổi nghĩa** |
+| Test khẳng định exact-role | **4 assertion** trong `AssetPermissionTests` |
+| `ScopeTestController` | 2 dòng, chỉ trong test |
+
+**Tổng: khoảng 30 dòng, 4 file.** Rẻ, và rẻ **chính vì** BE-12a chỉ dùng bậc cao nhất
+(`Administrator`) cho ghi và không gắn gì cho đọc — không có endpoint nào phụ thuộc vào việc một vai
+trò GIỮA bị loại. Ticket sau mà gắn `maintenance_engineer` hay `field_crew` vào dòng sản xuất thì chi
+phí đổi hướng bắt đầu tăng thật.
+
+**Vì vậy nên chốt TRƯỚC BE-15/BE-18/BE-21/BE-24**, không phải trước BE-12a.
+
+**Mục 34 thì khác** — nó không cần duyệt, nó cần **hết hạn**. `GET /assets/*` đang trả danh sách ID
+là chỗ giữ chỗ; **xoá mục 34 là một tiêu chí nghiệm thu của BE-12b**.
+
+28. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.

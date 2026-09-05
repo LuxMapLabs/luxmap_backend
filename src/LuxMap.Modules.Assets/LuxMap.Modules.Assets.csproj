@@ -5,6 +5,12 @@
     <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- BE-12a ships this module's first controllers, so it needs the URL-segment versioning the
+         Contract section 0 base path /api/v1 is built from — same reference as Identity and Survey. -->
+    <PackageReference Include="Asp.Versioning.Mvc" Version="10.2.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

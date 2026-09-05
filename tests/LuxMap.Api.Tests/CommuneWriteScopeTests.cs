@@ -82,11 +82,13 @@ public class CommuneWriteScopeTests(AssetSchemaFixture fixture) : IAsyncLifetime
 
         await fixture.WriteAsSystemAsync(async db =>
         {
+            #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
             await db.Set<Pole>().IgnoreQueryFilters()
                 .Where(pole => pole.CommuneId == commune).ExecuteDeleteAsync();
 
             return await db.Set<AdministrativeUnit>()
                 .Where(unit => unit.CommuneId == commune).ExecuteDeleteAsync();
+            #pragma warning restore RS0030
         });
     }
 

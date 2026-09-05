@@ -156,7 +156,7 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 | Task | Thiếu |
 |---|---|
 | BE-07 | Endpoint đăng ký / đăng nhập / refresh |
-| BE-12 | CRUD tài sản + import CSV |
+| ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, còn chờ duyệt |
 | BE-15, BE-16 | Upload sweep, validate metadata phơi sáng |
 | BE-27 | Notification — **chốt tên bảng/entity cùng FE2 trước W16** |
 | BE-28→31 | Toàn bộ dashboard và thống kê |
@@ -164,7 +164,10 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 | ~~BE-41~~ | ~~`POST /faults`~~ → **đã đặc tả ở mục 2.8** |
 | ~~BE-42~~ | ~~endpoint lux~~ → **đã đặc tả ở mục 2.9** |
 
-BE-41 và BE-42 đã được đặc tả ở bản hợp nhất (mục 2.8 và 2.9). Phần còn lại trong bảng vẫn chưa có đặc tả — cần thống nhất trước khi hiện thực, đừng tự sinh endpoint rồi coi như xong.
+BE-41 và BE-42 đã được đặc tả ở bản hợp nhất (mục 2.8 và 2.9). **BE-12a** được đặc tả riêng ngoài
+Contract và đã hiện thực — nhóm endpoint `/assets/…`, xem mục BE-12a bên dưới; **BE-12b** (hình dạng
+response khi đọc một tài sản) vẫn đang chờ Thịnh/Ngọc duyệt. Phần còn lại trong bảng vẫn chưa có đặc
+tả — cần thống nhất trước khi hiện thực, đừng tự sinh endpoint rồi coi như xong.
 
 Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (giai đoạn 1 dùng polling), chính sách lưu ảnh dài hạn. Phân quyền theo `commune_id` **đã chốt ở mục 7**, không còn để mở.
 
@@ -253,8 +256,10 @@ một hành động**, nhìn thấy được ở call site và trong diff.
 Guard ném `LuxMapException` → **403 `COMMUNE_FORBIDDEN`**, ném **TRƯỚC** `base.SaveChanges`: ném từ
 trong pipeline của EF sẽ bị bọc thành `DbUpdateException` và middleware BE-04 trả 500 thay vì 403.
 
-Chi phí đo được: **~3,7 µs mỗi entity** (1 entity 6,0 µs · 50 entity 182,6 µs · 500 entity 1,86 ms).
-Import CSV của BE-12 với 500 dòng tốn dưới 2 ms — nhỏ hơn nhiều so với chính vòng đi-về DB.
+> ⚠️ **Con số ~3,7 µs/entity ghi ở đây trước kia ĐO NHẦM ĐỐI TƯỢNG.** Nó là lượt
+> `ChangeTracker.Entries<T>()` **ấm** — không phải việc kiểm phạm vi (0,21 µs), cũng không phải chi
+> phí thật của guard. Số đúng đến từ phép đo **A/B** ở BE-12a: **6–15 µs/entity**, xem mục
+> "Chi phí `CommuneWriteGuard`". **Đừng trích lại 3,7 µs như thể nó là giá của guard.**
 
 **1b. `AdministrativeUnit` nằm ở `LuxMap.Persistence`, và KHÔNG implement `ICommuneScoped`.**
 
@@ -474,9 +479,257 @@ Lux là sự kiện đã xảy ra và là ground truth RQ1 — xoá pole không 
 Cũng để **không tạo bảng cascade thứ ba**: guard `SaveChanges` không thấy cascade do DB thực hiện
 (xem mục 1c). `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
 
-**Không gắn policy vai trò.** Bốn policy của BE-08 vẫn chưa dùng ở dòng sản xuất nào vì chưa ai quyết
+**Không gắn policy vai trò.** (Đúng tại thời điểm BE-42; **BE-12a đã gắn** — xem mục BE-12a.)
+Bốn policy của BE-08 khi đó chưa dùng ở dòng sản xuất nào vì chưa ai quyết
 vai trò nào được ghi gì. Đoán một cái ở đây là vô tình tạo tiền lệ. Phạm vi địa bàn **vẫn được canh**
 — qua lượt đọc pole và qua guard.
+
+### Sáu quy tắc chốt ở BE-12a — nhập và sửa tài sản
+
+**1. Nhóm endpoint là `/api/v1/assets/…`, KHÔNG phải `/poles`.**
+
+Contract mục 2.1 đã đặc tả `GET /poles`: `bbox` bắt buộc, trả `FeatureCollection`, quá 2000 cột →
+413. Đó là **endpoint bản đồ của BE-14**. Một danh sách kiểm kê trả lời cùng đường dẫn sẽ chiếm mất
+chỗ đó. Hai bề mặt, hai việc khác nhau — đừng gộp.
+
+```
+GET/POST  /api/v1/assets/{segments|feeders|poles}      POST /api/v1/assets/fixtures
+PUT       /api/v1/assets/fixtures/{id}/removal
+POST      /api/v1/assets/import/{segments|feeders|poles|fixtures}
+```
+
+**KHÔNG có DELETE.** Xoá pole cascade sang `pole_current_status` (bảng BE-12 bị cấm đụng), và
+`fault` / `lux_reading` trỏ vào pole bằng `Restrict` nên cột nào có dữ liệu nghiên cứu cũng không
+xoá được. Ngừng dùng thiết bị là việc của `fixture.removed_date`.
+
+**2. `external_ref` — khoá tự nhiên DUY NHẤT của lược đồ, trên BA bảng.**
+
+`road_segment`, `feeder`, `pole`. `text NULL` trong DB, **BẮT BUỘC trong file import**, unique là
+**partial index** `(commune_id, external_ref) WHERE external_ref IS NOT NULL`. **KHÔNG emit ra API.**
+
+`fixture` **không có** — một cột mang nhiều bóng qua thời gian nên không mã nào chỉ đúng một lần lắp
+đặt. Vì vậy **nhập bóng là INSERT-ONLY**: cột đã có bóng → lỗi theo dòng. Upsert bừa ở đây sẽ nhân
+đôi lịch sử thiết bị mà không ai phát hiện.
+
+Template tham chiếu bằng `segment_external_ref` / `feeder_external_ref` / `pole_external_ref`, **không
+phải `SEG-001` / `FDR-001`** — mã đó do DB sinh lúc INSERT, người soạn file không biết trước. Trước
+BE-12a bộ bốn file không nạp được liền mạch: phải nạp tuyến, mở DB tra mã, rồi mới điền vào file cột.
+
+Xem quy tắc partial index ngay dưới đây — nó **không** phải chuyện riêng của BE-12a.
+
+**3. Ngữ nghĩa nhập: kiểm TOÀN BỘ trước, ghi tập hợp lệ trong MỘT transaction, trả 200.**
+
+Dòng vi phạm FK / CHECK / enum / phạm vi xã **phải bị bắt ở bước kiểm**, không được lọt xuống bước
+ghi. Lỗi ở bước ghi **rollback cả mẻ, trả 500**, không đổ lỗi cho dòng nào.
+
+> 🔴 **HẠN CHẾ ĐÃ BIẾT — không phải "thiết kế". Upsert KHÔNG nguyên tử.**
+>
+> Bước đọc-trước và bước ghi là hai câu lệnh riêng. **Hai request nạp cùng một file đồng thời**: cả
+> hai đọc không thấy gì, cả hai `Add`, và cái thua đụng `ux_*_commune_external_ref` ngay trong
+> `SaveChanges`. Đó **đúng là** một lỗi mức-dòng lọt xuống bước ghi, và nó nổi lên dưới dạng
+> `DbUpdateException` thô → 500, **không phải** kết quả validate có số dòng.
+>
+> **Chưa sửa ở BE-12a** — một transaction, thua thì không ghi gì, dữ liệu không hỏng, và hai quản trị
+> viên nạp cùng file trong cùng một giây chưa đáng thiết kế riêng. Ghi lại vì **BE-12b kế thừa đúng
+> đường ghi này**, và vì bản sửa đúng là **upsert thật (`ON CONFLICT DO UPDATE`)**, không phải thêm
+> một lượt kiểm nữa — thêm kiểm chỉ thu hẹp cửa sổ chứ không đóng được.
+
+Kết quả: `{inserted, updated, failed, total_errors, truncated, rows[]}`.
+
+- **200 chứ không phải 4xx**, vì các dòng hợp lệ đã ghi thật; bọc trong `{error:…}` là nói sai. Tiền
+  lệ: `POST /lux-readings` trùng `client_op_id` trả 200 (Contract mục 5.8). **Không dùng 207** — nó
+  không có trong Contract và không có trong repo.
+- **`rows[]` là MẢNG, không phải dictionary khoá-là-số-dòng.** Dictionary không cam kết thứ tự, và
+  khoá số dạng chuỗi thì `"10"` đứng trước `"9"` — danh sách người ta đọc sẽ nhảy lung tung.
+- Cắt ở **100** phần tử, `total_errors` vẫn là số thật. Một file sai delimiter làm hỏng mọi dòng;
+  không cắt thì body trả về lớn hơn cả file gửi lên.
+
+**Mỗi request nạp ĐÚNG MỘT loại file.** Đó là thứ làm cho tham chiếu an toàn: tuyến của một cột đã
+được commit ở request trước nên đã có `SEG-001` thật. Nạp cả bốn loại trong một transaction sẽ phải
+phân giải tham chiếu tới hàng chưa có ID. Thứ tự tự thực thi: nạp cột trước tuyến thì **mọi** dòng
+báo `segment_external_ref` không khớp gì cả.
+
+**4. Phân quyền — policy là MỘT vai trò chính xác, KHÔNG phải một bậc.**
+
+| | |
+|---|---|
+| POST / PUT / import | `[Authorize(Policy = LuxMapPolicies.Administrator)]` |
+| GET | **KHÔNG gắn policy nào** |
+
+`SetFallbackPolicy` đã bắt buộc đăng nhập rồi. Gắn `MaintenanceEngineer` lên GET **chặn luôn Quản
+trị và Cơ quan quản lý** — policy là `RequireClaim(role, "maintenance_engineer")`, đúng một giá trị.
+Trông như siết bảo mật, thực chất là chặn hai vai trò khỏi dữ liệu của chính họ. Đã canh bằng test.
+
+Đây là **lần đầu bốn policy của BE-08 được dùng ở dòng sản xuất**. `LuxMapPolicies` vì thế chuyển từ
+`LuxMap.Api` sang **`LuxMap.Shared`**: host tham chiếu module chứ không ngược lại, nên controller
+trong module không thấy được hằng khai ở host.
+
+> ⚠️ **Đây là quyết định KIẾN TRÚC, chưa được chốt ở cấp nhóm — đang chờ FW-00.**
+> Hệ quả: khái niệm authorization rò vào `LuxMap.Shared`, mà `LuxMap.Persistence` và các assembly
+> không-API cũng tham chiếu. Chấp nhận được **nếu** coi `Shared` là nơi chứa hằng liên-tầng — đúng
+> vai trò nó đang giữ cho `ErrorCodes` và `PrefixedIds`. Nếu không chấp nhận thì đường đúng là **mỗi
+> module tự khai tên policy của mình, host đăng ký khớp** — đổi được sau, chỉ là đổi ở nhiều chỗ
+> hơn. Chốt ở FW-00 rồi hãy sửa; đừng để một ticket import quyết thay.
+
+Contract mục 7 **chỉ nói phạm vi địa bàn, không nói vai trò nào được ghi** — đã đăng ký drift 31.
+
+**5. `CommuneFilter.Narrow` giờ có call site thật.**
+
+Trước BE-12a nó không được gọi ở đâu trong `src/`. Nay gọi ở hai chỗ: tham số `?commune_id=` của
+danh sách, và `commune_id` trong body khi tạo tài sản. Nó trả **403 nêu đúng xã bị từ chối**; query
+filter một mình chỉ cho ra 200 rỗng, người dùng không hiểu vì sao.
+
+⚠️ **Guard `SaveChanges` KHÔNG bao giờ nổ trên đường HTTP của BE-12a**, vì mọi lối ghi đã kiểm phạm
+vi ở entry point trước. Đó là phân tầng đúng — nhưng nghĩa là **không thể** viết test HTTP cho guard
+ở ticket này; test guard đi thẳng qua `DbContext`
+(`The_write_guard_still_refuses_a_pole_for_a_foreign_commune_even_with_no_entry_point_check`).
+
+**Trong import thì xã ngoài phạm vi là lỗi THEO DÒNG, không phải 403 cả request** — file là một mẻ,
+một dòng sai không được vứt 499 dòng còn lại.
+
+**6. `commune_id` lấy từ đâu — khác nhau theo bảng, và có lý do.**
+
+| Bảng | Nguồn |
+|---|---|
+| `road_segment`, `feeder`, `pole` | **BODY / file**, kiểm bằng `Narrow` |
+| `fixture` | **Chép từ pole.** Client gửi cũng không đọc |
+
+`pole` **không** suy được từ segment: `road_class = inter_commune` nghĩa là đường chạy **giữa** các
+xã, nên cột của nó nằm ở xã khác với xã sở hữu tuyến là chuyện hợp lệ. Còn `fixture` thì luôn ở
+đúng xã của cột mang nó — cho file khai sẽ để hai giá trị lệch nhau mà không có gì phát hiện.
+
+**Parser CSV tự viết**, ở `LuxMap.Shared/Csv/` (144 dòng code, không thêm package). Xử lý BOM UTF-8,
+CRLF, ô bọc nháy kép chứa dấu phẩy, và tự dò delimiter `,` / `;` bằng cách **chỉ đếm ký tự ngoài
+nháy** — hai dấu phẩy trong `LINESTRING(...)` không được phép thắng phiếu. Đặt ở Shared vì nó không
+kéo theo dependency nào, nên test chạy trong assembly **không cần DB và không cần Docker**.
+
+**GeoJSON parse tay bằng `System.Text.Json`** cho `Point` và `LineString`: NTS lõi **không có
+GeoJSON reader** (namespace `IO` chỉ có GML2, GML3, KML), và thêm `NetTopologySuite.IO.GeoJSON4STJ`
+là thêm package.
+
+> ⚠️ **`ImportGeoJsonAsync` phải là `async`, không được trả thẳng inner Task.** `JsonDocument` giữ
+> bộ nhớ pooled mà mọi `JsonElement` trỏ vào; trả Task từ hàm không-async sẽ dispose document **trước
+> khi** import đọc xong hàng. Đã gặp thật: 500 `INTERNAL_ERROR` khi nạp bộ mock.
+
+> ⚠️ **`WKTReader` trả SRID 0, không phải 4326.** WKT không mang hệ toạ độ nên reader không có gì để
+> đọc. Phải gán SRID **tường minh** trên mọi geometry rời `AssetGeometry`.
+
+**Giới hạn upload 10 MB**, nhận qua `IFormFile`. Mặc định của framework không phải thứ ai cũng nhớ:
+Kestrel `MaxRequestBodySize` = **30.000.000 byte (~28,6 MB)**, **thấp hơn** con số 128 MB của
+`FormOptions.MultipartBodyLengthLimit` mà người ta hay trích; và form **value** bị chặn ở 4 MB, nên
+gửi GeoJSON dưới dạng field sẽ vỡ ở một ngưỡng chẳng liên quan. Repo trước đó chưa cấu hình cái nào.
+
+### Chi phí `CommuneWriteGuard` — đo A/B ở 1000 entity
+
+Con số **~3,7 µs/entity** ghi ở mục BE-09 **đo nhầm đối tượng**: nó là lượt `Entries<T>()` ấm, không
+phải việc kiểm phạm vi. Nhưng cộng các phần lại cũng sai nốt, theo chiều ngược: `Entries<T>()` gọi
+`DetectChanges`, mà `SaveChanges` **đằng nào cũng gọi** — nên guard có thể chỉ **dời** lượt quét đó
+sớm lên chứ không thêm.
+
+**Chỉ có một cách biết: đo cùng một phép ghi, một lần có guard một lần không** (`MeasureAsync` mở
+`EnterUnscopedSystemWriteBackdoor` cho nhánh A). Ghi 1000 `Pole`, rollback, 5 cặp mỗi lần chạy, lấy
+trung vị:
+
+| Lần chạy | `SaveChanges` guard TẮT | guard BẬT | **Chi phí biên** |
+|---|---|---|---|
+| 1 | 91,6 ms | 100,5 ms | 8,88 µs/entity |
+| 2 | 87,2 ms | 96,4 ms | 9,24 µs/entity |
+| 3 | 88,8 ms | 103,6 ms | 14,84 µs/entity |
+| 4 | 88,0 ms | 93,9 ms | 5,92 µs/entity |
+
+**Giả thuyết "guard chỉ dời lượt quét, không thêm gì" BỊ BÁC** — delta dương cả bốn lần.
+
+**Con số phải trích: khoảng 6–15 µs/entity, trung vị ~9** — tức **6–15 ms cho 1000 dòng**, khoảng
+**7–16%** của chính phép ghi. **Đừng trích một con số lẻ**: nhiễu trên DB dev dùng chung lớn hơn tín
+hiệu, và bốn lần chạy chênh nhau 2,5 lần.
+
+Ba số đo trực tiếp, ghi được vì chúng đo đúng thứ chúng nói (`The_parts_of_the_guard_measured_separately`):
+
+| Đo cái gì | µs/entity |
+|---|---|
+| `Entries<T>()` kèm `DetectChanges` | 8,6 – 9,7 |
+| `Entries<T>()` lượt ấm — **con số 3,7 cũ** | 3,7 – 8,5, **không tái lập ổn định** |
+| Vòng kiểm phạm vi — **công việc thật của guard** | **0,21 – 0,23** |
+
+⚠️ **Đừng cộng ba số này lại thành "chi phí guard".** Đó chính là lỗi quy-sai đã sinh ra con số 3,7,
+chỉ lệch chiều ngược. Phép đo A/B là bằng chứng; ba số trên là để hiểu chi phí nằm ở đâu.
+
+> **Nếu có người lấy cớ hiệu năng đòi nới guard:** việc kiểm phạm vi tốn **0,21 µs** — nới nó ra
+> không mua được gì. Đường tối ưu đúng là tắt `AutoDetectChangesEnabled` quanh vòng nạp rồi gọi
+> `DetectChanges()` **một lần** trước `SaveChanges`: bỏ lượt quét thừa, **giữ nguyên** phần kiểm.
+
+### Quy trình: ĐỌC migration sinh ra TRƯỚC khi apply
+
+**Bắt buộc, không phải khuyến nghị.** Sau `dotnet ef migrations add`, mở file `Up()` và `Down()` ra
+đọc **trước** khi `database update`. Kiểm hai câu hỏi:
+
+1. **Có thao tác nào mình không yêu cầu không?** Đặc biệt là `DropIndex`, `DropColumn`,
+   `AlterColumn`. Thêm một cột thì migration chỉ được có `AddColumn` (+ index nếu mình khai).
+2. **`Down()` có đối xứng với `Up()` không?**
+
+**Đây là một LỚP LỖI, không phải hai sự cố rời rạc.** Cả hai lỗi nặng nhất của repo tới giờ đều
+thuộc lớp này — chúng **qua compile, qua toàn bộ test, và chỉ lộ ra khi có người đọc SQL**:
+
+| Lỗi | Qua được gì | Lộ ra khi |
+|---|---|---|
+| **BE-06** — `LPAD` cắt bớt ID, cột thứ 10000 thành `POLE-1000` | compile ✓ test ✓ | đọc lại biểu thức `DEFAULT` |
+| **BE-12a** — EF `DropIndex` ba index `commune_id` khi thêm partial unique index | compile ✓ test ✓ | đọc migration sinh ra |
+
+Không có công cụ nào trong stack bắt được lớp này: analyzer không đọc SQL, test tích hợp chạy trên DB
+đã apply nên nó *thấy* lược đồ mới là bình thường, và cả hai lỗi đều **không ném exception** — chúng
+làm dữ liệu sai hoặc truy vấn chậm dần. Thứ duy nhất bắt được là mắt người, một lần, trước khi apply.
+
+### Quy ước: PARTIAL INDEX không bao giờ thay thế được index khoá ngoại
+
+**Khi thêm bất kỳ index nào dẫn đầu bằng `commune_id`, phải khai lại `HasIndex("CommuneId")` tường
+minh trong cùng cấu hình đó.**
+
+EF Core tạo index cho khoá ngoại bằng **convention**, và convention **bỏ qua** nếu đã có index khác
+dẫn đầu bằng cùng cột. Nó **không phân biệt index đầy đủ với partial index** — đó là toàn bộ vấn đề.
+Một partial index chỉ phủ tập con hàng thoả `WHERE` của nó; nó **không** phục vụ được truy vấn trên
+những hàng còn lại.
+
+Vì sao ở repo này thì nghiêm trọng: **query filter BE-08 đưa `commune_id` vào `WHERE` của MỌI truy
+vấn**. Mất index `commune_id` là mất index của toàn hệ thống, không phải của một tính năng.
+
+Gặp thật ở BE-12a: `HasIndex("CommuneId", "ExternalRef")` với filter `external_ref IS NOT NULL` làm
+migration **DROP cả ba** `ix_pole_commune_id`, `ix_road_segment_commune_id`, `ix_feeder_commune_id`.
+Index còn lại không phủ hàng `external_ref IS NULL` — tức **đa số cột**, những cột nạp từ ảnh công
+khai. Bắt được lúc đọc migration sinh ra, **không phải** lúc chạy: không có lỗi, chỉ chậm dần.
+
+**Ticket sắp đụng vào:** **BE-15** và **BE-17** gần như chắc chắn — bất kỳ unique index nào kiểu
+`(commune_id, <cái gì đó>)`. Mẫu đúng ở `ExternalRefColumn.HasExternalRef`.
+
+Xem quy tắc quy trình ngay dưới đây — không có `DropIndex` nào được phép xuất hiện trong một
+migration mà bạn chỉ định thêm cột.
+
+### Quy ước: `ExecuteUpdate` / `ExecuteDelete` bị CẤM ở compile-time
+
+`CommuneWriteGuard` là override của `SaveChanges` và nó duyệt **ChangeTracker**. `ExecuteUpdate` và
+`ExecuteDelete` dịch thẳng ra SQL, **không đi qua ChangeTracker**, nên chúng **vô hiệu hoá hoàn toàn
+kiểm phạm vi Contract mục 7** ở đường ghi.
+
+Đây là **lỗ hổng kiến trúc**, cùng họ với lỗ hổng BE-08 (query filter chỉ áp lên đọc): guard được
+viết ra để bịt phía ghi, mà một API bulk mở lại đúng cái lỗ đó.
+
+Bốn ký hiệu đã vào `BannedSymbols.txt`, RS0030 = error:
+`ExecuteUpdate`, `ExecuteUpdateAsync`, `ExecuteDelete`, `ExecuteDeleteAsync`.
+
+Đường đúng: **nạp hàng rồi `Remove` / sửa**, để guard nhìn thấy. Nếu thao tác thật sự nằm ngoài mọi
+phạm vi thì **nói ra**: `EnterUnscopedSystemWriteBackdoor()` kèm `#pragma warning disable RS0030`
+giải thích vì sao.
+
+Hai nhóm ngoại lệ đang tồn tại, đều chính đáng và đều đã pragma tường minh:
+
+| Chỗ | Lý do |
+|---|---|
+| `AuthService` (4 chỗ) | `RefreshToken` **không** `ICommuneScoped` — guard chưa bao giờ áp. Và luồng xoay token của BE-07 **phụ thuộc** vào số dòng mà `UPDATE` có điều kiện trả về để phân xử refresh đồng thời; nạp-rồi-sửa không diễn đạt được điều đó mà không tái tạo race. |
+| Teardown của test (13 chỗ) | Xoá hàng loạt là cách duy nhất dọn được dưới scope rỗng. **BE-36 xoá luôn nhu cầu** — mỗi lần chạy một DB sạch. |
+
+⚠️ **BannedApiAnalyzers có lỗ, đã đo ở BE-10:** nó chỉ khớp khi **mọi tham số được truyền tường
+minh**, mà cả hai API bulk đều có `CancellationToken` tuỳ chọn. Nên có thêm `BannedBulkWriteApiTests`
+quét văn bản mã nguồn, khẳng định **mọi** lần gọi nằm trong một vùng `#pragma warning disable RS0030`
+và **không file nào để vùng đó hở tới cuối file**. Đừng xoá test đó vì tưởng analyzer đã lo.
 
 ### Quy ước cho MỌI cột `double precision` đo được
 
@@ -644,6 +897,20 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-0047` — pin yếu làm đèn mờ dần, không tắt phụt).
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
+
+> **Lập trường về `external_ref` của bộ mock — ĐÃ ĐÓNG, không phải nợ mở.**
+>
+> Bộ mock không mang mã kiểm kê nào, nên cách nạp duy nhất là lấy chính `pole_id` / `segment_id` của
+> mock làm `external_ref` (`AssetImportMockSetTests` làm đúng vậy).
+>
+> **Dưới Nhánh C, đó là danh tính ngoài VĨNH VIỄN.** Nhánh C không có thử nghiệm hiện trường (FO-01),
+> nên không có mã kiểm kê thật nào sẽ về, nên **nhu cầu di trú mã không tồn tại trong phạm vi đồ án**.
+> Di trú mã là **ngoài phạm vi**. Giữ nó thành "nợ hạn W5" chỉ đảm bảo tuần W5 có người mở lại ra bàn
+> cho một rủi ro không tồn tại.
+>
+> **Nếu Nhánh C đổi** thì mới cần quyết, và lúc đó dữ kiện này quan trọng: đường "xoá sạch nạp lại"
+> **đóng từ W5**, vì `fault` và `lux_reading` trỏ vào `pole` bằng `Restrict` và FO-14 đo lux ở W5.
+> Sau mốc đó chỉ còn đường `UPDATE pole SET external_ref = …` kèm bảng ánh xạ.
 
 ---
 

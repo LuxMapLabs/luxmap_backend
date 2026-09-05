@@ -3,10 +3,35 @@
 Bốn file CSV để nạp hồ sơ tài sản chiếu sáng. Cột lấy **trực tiếp từ schema thật** trong
 PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy từ entity class.
 
-> ⚠️ **Đây mới là mẫu file, chưa có endpoint import.** BE-12 hiện đang chặn: chưa có file
-> **FO-10** thật để đối chiếu, và Contract v1.1 **không đặc tả endpoint CRUD tài sản nào**
-> (xem `CLAUDE.md` mục "Contract phủ tới đâu"). Tài liệu này để thống nhất hình dạng dữ liệu
-> **trước** khi hiện thực, không phải để coi như đã xong.
+> **Endpoint import đã có (BE-12a).** Mỗi lần nạp MỘT loại file:
+>
+> ```
+> POST /api/v1/assets/import/{segments|feeders|poles|fixtures}
+> multipart/form-data, field `file`, tối đa 10 MB
+> ```
+>
+> Chỉ **Quản trị** được nạp. Trả **200** kèm kết quả `{inserted, updated, failed, total_errors,
+> truncated, rows[]}` — 200 kể cả khi có dòng hỏng, vì những dòng hợp lệ đã ghi thật.
+>
+> ⚠️ **Contract v1.1 vẫn không đặc tả endpoint này.** Cả đường dẫn lẫn hình dạng kết quả đều là
+> drift đã đăng ký, cần chốt ở FW-00. Hình dạng response khi ĐỌC một tài sản thuộc **BE-12b**,
+> đang chờ duyệt — hiện `GET` chỉ trả danh sách ID.
+
+---
+
+## Bản v2 — hai cột đã bị BỎ khỏi `poles.csv`
+
+`segment_name` và `feeder_name` **không còn** trong `poles.csv`. Chúng từng có mặt "chỉ để đọc",
+nhưng trình nhập **không có kênh cảnh báo** — kết quả import chỉ mang lỗi theo dòng — nên một cái tên
+gõ sai sẽ bị nuốt im lặng. Cột trang trí mà không kiểm được thì tệ hơn là không có cột.
+
+Cũng ở bản v2: `poles.csv` tham chiếu bằng `segment_external_ref` / `feeder_external_ref` thay cho
+`segment_id` / `feeder_id`, và `segments.csv` / `feeders.csv` thêm cột `external_ref` bắt buộc.
+
+> ⚠️ **Nếu ai đó đã điền file theo bản cũ**: bỏ hai cột thừa đi là đủ với `poles.csv` — trình nhập
+> bỏ qua cột lạ, nhưng **`segment_id`/`feeder_id` sẽ không được đọc**, phải đổi tên đầu cột thành
+> `segment_external_ref`/`feeder_external_ref` và điền mã của đơn vị thay cho `SEG-001`/`FDR-001`.
+> **Hỏi Khang trước khi phát bản v2** xem đã có ai điền theo bản cũ chưa.
 
 ---
 
@@ -15,6 +40,10 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy
 ```
 1. segments.csv   →  2. feeders.csv   →  3. poles.csv   →  4. fixtures.csv
 ```
+
+**Mỗi lần gọi nạp đúng một loại file**, nên khi nạp `poles.csv` thì các tuyến đã nằm sẵn trong DB
+và đã có mã thật. Nạp sai thứ tự không hỏng dữ liệu — nó **hỏng ở bước kiểm tra**: mọi dòng pole sẽ
+báo `segment_external_ref` không khớp gì cả, và không dòng nào được ghi.
 
 Lý do là **khoá ngoại**, không phải sở thích:
 
@@ -54,45 +83,58 @@ Không điền, không thêm cột. Gửi lên sẽ bị từ chối chứ khôn
 
 ### Tham chiếu bằng mã, tên chỉ để đọc
 
-`commune_id`, `segment_id`, `feeder_id` là **mã** và là thứ được dùng. Các cột `*_name` đi
-kèm chỉ để người nhập đọc cho dễ: nếu tên lệch với mã thì **cảnh báo theo dòng, vẫn nhận
-theo mã**.
+`commune_id` và các cột `*_external_ref` là thứ được dùng, và trong template **không còn cột tên
+nào đi kèm**.
 
-**Không có `commune_name`, và đó là chủ đích.** `segment_name` có nghĩa thật vì một xã có
-nhiều tuyến và `SEG-001` thì không đọc được. Nhưng người soạn file kiểm kê của xã mình biết
-rõ mình đang ở xã nào — thêm `commune_name` vào cả ba file không giúp gì mà **nhân ba cơ hội
-lệch dữ liệu**.
+`poles.csv` từng có `segment_name` / `feeder_name` "chỉ để đọc". Đã **bỏ hẳn**: kết quả import chỉ
+có lỗi theo dòng, **không có kênh cảnh báo**, nên một cái tên gõ sai sẽ bị nuốt im lặng — người
+điền tin là mình đã khai một thứ, hệ thống không khai gì cả, và không ai biết. Cột trang trí mà
+không kiểm được thì tệ hơn là không có cột. Nếu sau này muốn giữ tên để đọc thì phải thêm
+`warnings[]` vào kết quả import trước — đó là đổi hình dạng response, phải qua Thịnh/Ngọc.
 
-### `external_ref` — chỉ tồn tại trong file, không có trong database
+**Không có `commune_name` ở đâu cả, và đó là chủ đích** — cùng một lý do. Người soạn file kiểm kê
+của xã mình biết rõ mình đang ở xã nào; thêm cột tên vào cả ba file không giúp gì mà **nhân ba cơ
+hội lệch dữ liệu**. `segment_name` vẫn là cột **thật** trong `segments.csv` vì nó được LƯU vào
+`road_segment.segment_name`; điều vừa bỏ là bản sao chỉ-để-đọc của nó trong `poles.csv`.
 
-`poles.csv` có cột `external_ref` và `fixtures.csv` trỏ về nó bằng `pole_external_ref`.
+### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 
-Lý do: `pole_id` **chưa tồn tại** lúc soạn file — DB gán khi nhập. Nên bóng đèn phải trỏ
-vào cột bằng một mã của chính đơn vị quản lý (số sơn trên thân cột, số hiệu kiểm kê).
-
-**Đã chốt: `external_ref` SẼ được lưu vào database** (migration thuộc BE-12, chưa làm).
+Ba file `segments.csv`, `feeders.csv`, `poles.csv` đều có cột `external_ref` **bắt buộc**;
+`fixtures.csv` trỏ về cột bằng `pole_external_ref`, còn `poles.csv` trỏ về tuyến và mạch điện bằng
+`segment_external_ref` và `feeder_external_ref`.
 
 ```
-pole.external_ref  text NULL
-UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL
+road_segment.external_ref  text NULL   UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL
+feeder.external_ref        text NULL   UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL
+pole.external_ref          text NULL   UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL
 ```
 
-Ba lý do, không phải một:
+**Vì sao tham chiếu bằng `external_ref` chứ không bằng `SEG-001` / `FDR-001`:** những mã đó do DB
+sinh lúc INSERT, **người soạn file không thể biết trước**. Nếu `poles.csv` đòi `segment_id` thì bộ
+bốn file không nạp được từ đầu đến cuối — phải nạp tuyến, mở DB tra mã, rồi mới điền vào file cột.
+Dùng mã của chính đơn vị quản lý thì soạn xong cả bộ một lần.
+
+Ba lý do lưu cột này vào DB, không phải một:
 
 1. **Nối lại được giữa các đợt nhập.** Không lưu thì không có cách nào biết `CTA-001` trong
    file tháng này là `POLE-0042` đã nhập tháng trước.
-2. **Import trở nên idempotent.** Lược đồ hiện tại **không có khoá tự nhiên nào**, nên nạp
-   lại cùng một file sẽ sinh trùng toàn bộ. `UNIQUE (commune_id, external_ref)` chính là
-   khoá đó.
-3. **Tổ sửa chữa ngoài hiện trường đọc mã sơn trên cột**, không đọc `POLE-0042`. Không có
-   cột này thì không tra ngược được từ thực địa về hệ thống.
+2. **Import trở nên idempotent.** Lược đồ không có khoá tự nhiên nào khác, nên nạp lại cùng một
+   file sẽ sinh trùng toàn bộ. `UNIQUE (commune_id, external_ref)` chính là khoá đó, và
+   **trùng thì UPDATE chứ không phải lỗi**.
+3. **Tổ sửa chữa ngoài hiện trường đọc mã sơn trên cột**, không đọc `POLE-0042`.
 
-**Nullable**, vì cột nạp từ ảnh vệ tinh hoặc GeoJSON công khai không có mã kiểm kê nào.
-Unique là **partial index** (`WHERE external_ref IS NOT NULL`) nên nhiều cột không mã vẫn
-cùng tồn tại trong một xã.
+**`NULL` được phép trong DB** — cột nạp từ ảnh vệ tinh không có mã kiểm kê nào — nên unique là
+**partial index** (`WHERE external_ref IS NOT NULL`), nhiều cột không mã vẫn cùng tồn tại trong một
+xã. Nhưng **trong file import thì bắt buộc**: không có nó thì không upsert được.
 
-**Không emit ra API.** Contract không có trường này; thêm vào response là đổi hình dạng đã
-publish. Lưu và tra được, giống `data_source` ở tầng tài sản. Đã đăng ký drift.
+**Không emit ra API.** Contract không có trường này; thêm vào response là đổi hình dạng đã publish.
+Lưu và tra được, giống `data_source` ở tầng tài sản. Đã đăng ký drift.
+
+> ⚠️ **`fixture` KHÔNG có `external_ref`, và nạp bóng là INSERT-ONLY.**
+> Một cột mang nhiều bóng qua thời gian, nên không mã nào trong file chỉ đúng **một lần lắp đặt**.
+> Nạp lại `fixtures.csv` sẽ báo lỗi từng dòng *"cột này đã có bóng"* thay vì âm thầm nhân đôi lịch
+> sử thiết bị. Thay bóng dùng endpoint CRUD: `PUT /assets/fixtures/{id}/removal` cho bóng cũ, rồi
+> `POST /assets/fixtures` cho bóng mới.
 
 ### Encoding — bẫy Excel thật, không phải lý thuyết
 
@@ -116,6 +158,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
+| `external_ref` | **Có** | text | Mã tuyến của đơn vị quản lý. `poles.csv` trỏ về bằng `segment_external_ref`. Trùng trong cùng xã → **UPDATE** |
 | `segment_name` | **Có** | text | |
 | `road_class` | **Có** | enum | `inter_commune` · `inter_village` — `ck_road_segment_road_class` |
 | `length_m` | **Có** | integer | Mét. **Giá trị KHAI BÁO**, không tính lại từ `geom_wkt` |
@@ -131,6 +174,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc |
 |---|---|---|---|
+| `external_ref` | **Có** | text | Mã mạch điện của đơn vị quản lý. `poles.csv` trỏ về bằng `feeder_external_ref` |
 | `feeder_name` | **Có** | text | |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | Không | LineString | **Nullable** — nhánh C không khảo sát tuyến cáp, để trống thay vì bịa lộ trình |
@@ -142,11 +186,9 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
-| `external_ref` | **Có** | text | Mã của đơn vị quản lý. Chỉ dùng để `fixtures.csv` trỏ về. **Không có trong DB** |
-| `segment_id` | **Có** | mã | FK `road_segment`, NOT NULL |
-| `segment_name` | Không | text | Chỉ để đọc |
-| `feeder_id` | Không | mã | FK `feeder`. **Để trống với cột solar** — cột `solar_all_in_one` không nối lưới nào |
-| `feeder_name` | Không | text | Chỉ để đọc |
+| `external_ref` | **Có** | text | Mã cột của đơn vị quản lý. `fixtures.csv` trỏ về bằng `pole_external_ref`. Trùng trong cùng xã → **UPDATE** |
+| `segment_external_ref` | **Có** | text | Khớp `external_ref` trong `segments.csv`. Không khớp → lỗi theo dòng |
+| `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. **Để trống với cột solar** — cột `solar_all_in_one` không nối lưới nào |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | **Có** | Point | `geometry(Point,4326)`, NOT NULL |
 | `near_sensitive_poi` | Không | bool | `true` / `false`. Mặc định `false`. Gần trường học, chợ, cầu, ngã ba |
@@ -156,7 +198,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
-| `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv` |
+| `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã có bóng → lỗi theo dòng** (insert-only) |
 | `fixture_type` | **Có** | enum | `led_road_lamp` · `solar_all_in_one` — `ck_fixture_fixture_type` |
 | `power_source` | **Có** | enum | `grid` · `solar` — `ck_fixture_power_source` |
 | `lamp_watt` | **Có** | integer | |
@@ -165,8 +207,10 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | `warranty_expiry` | Không | date | Không phải bóng nào cũng có bảo hành |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_fixture_data_source` |
 
-> **Một cột mang được nhiều bóng.** Nhiều dòng cùng `pole_external_ref` là hợp lệ, đó là
-> cách ghi lịch sử thay bóng.
+> **Một cột mang được nhiều bóng** — đó là cách ghi lịch sử thay bóng. Nhưng **import không làm
+> việc đó**: nhiều dòng cùng `pole_external_ref` trong một file, hoặc nạp lại file cho cột đã có
+> bóng, đều bị từ chối theo dòng. Chính vì "một cột nhiều bóng" nên không có khoá tự nhiên nào để
+> upsert, và đoán sai sẽ nhân đôi lịch sử thiết bị mà không ai phát hiện. Thay bóng dùng CRUD.
 >
 > ⚠️ **`fixture` không có cột trạng thái nào.** Tình trạng sáng/mờ/tắt thuộc **vị trí cột**
 > (`pole_current_status`), do luồng xử lý ảnh khảo sát ghi (BE-15/BE-17). Import kiểm kê
@@ -181,8 +225,8 @@ Kiểm chứng template có đủ để nạp lại 103 cột trong `mocks/mock-
 
 | `properties` của mock | Nằm ở đâu |
 |---|---|
-| `pole_id` | ❌ Không có trong template — **DB sinh** qua `luxmap_format_id('POLE', …)` |
-| `segment_id` | ✅ `poles.csv` → `segment_id` |
+| `pole_id` | ⚠️ **DB sinh** qua `luxmap_format_id('POLE', …)`. Khi nạp bộ mock, dùng chính giá trị này làm `external_ref` — đó là mã duy nhất bộ mock có |
+| `segment_id` | ✅ `poles.csv` → `segment_external_ref` (dùng `segment_id` của mock làm mã tuyến) |
 | `commune_id` | ✅ `poles.csv` → `commune_id` |
 | `near_sensitive_poi` | ✅ `poles.csv` → `near_sensitive_poi` |
 | `power_source` | ✅ `fixtures.csv` → `power_source` (**bảng `fixture`**, không phải `pole`) |
@@ -203,6 +247,36 @@ dẫn xuất lúc truy vấn.
 
 Nghĩa là **template đủ để dựng lại phần tài sản của bộ mock**. Phần trạng thái và phần
 thống kê không thuộc kiểm kê — chúng đến từ luồng khảo sát và từ truy vấn.
+
+---
+
+## Kết quả nạp — đọc thế nào
+
+```json
+{
+  "inserted": 490,
+  "updated": 0,
+  "failed": 10,
+  "total_errors": 14,
+  "truncated": false,
+  "rows": [
+    { "row": 12, "column": "road_class", "message": "'lien_xa' is not one of: inter_commune, inter_village." }
+  ]
+}
+```
+
+- **`row` là số dòng TRONG FILE**, header là dòng 1 — mở file ra là thấy đúng chỗ.
+- **`total_errors` có thể lớn hơn `failed`**: một dòng sai ba cột thì đếm ba lỗi, một dòng hỏng.
+- **`rows[]` cắt ở 100 phần tử**, `truncated: true` khi bị cắt. `total_errors` vẫn là số thật.
+- **Toàn bộ file được kiểm TRƯỚC, rồi mới ghi tập hợp lệ trong MỘT transaction.** Dòng sai không
+  bao giờ chạm tới database. Nếu bước ghi hỏng (mất kết nối, deadlock) thì **rollback cả mẻ** và
+  trả 500 — không có ca "ghi được một nửa".
+- **Trả 200 kể cả khi `failed > 0`**, vì những dòng hợp lệ đã ghi thật. Đây là drift đã đăng ký:
+  Contract không phủ hình dạng này.
+
+**Bẫy hay gặp nhất:** cả file báo `Column missing from the header row` ở dòng 1. Gần như luôn là
+file lưu sai định dạng — delimiter `;`, hoặc BOM dính vào tên cột đầu. Trình nhập tự nhận cả hai,
+nhưng nếu tên cột cũng sai chính tả thì nó không đoán hộ.
 
 ---
 
@@ -230,3 +304,18 @@ một trong hai cách:
 
 Cột `solar_all_in_one` thì **đúng là không có feeder** (không nối lưới nào) — chỉ cột lưới
 mới thiếu. Đừng gán feeder cho cột solar để "cho đủ".
+
+### Bốn trường bộ mock còn thiếu để nạp được
+
+Kiểm bằng test `AssetImportMockSetTests` — nó nạp trọn 3 tuyến + 103 cột + 103 bóng qua đúng
+endpoint thật, sau khi bổ sung ba trường đầu:
+
+| Trường | Thiếu ở đâu | Test làm gì |
+|---|---|---|
+| `external_ref` | cả hai file | Lấy chính `pole_id` / `segment_id` của mock — mã của mock **là** mã kiểm kê cho tới khi có mã thật |
+| `commune_id` | `mock-segments.geojson` không có; `mock-poles.geojson` ghi `COM-001` | Ghi đè bằng xã của test |
+| `data_source` | cả hai file | Đặt `public_imagery` — đúng bản chất dữ liệu ảnh đêm công khai của nhánh C |
+| `feeder_id` | cả hai file | **KHÔNG bổ sung.** Test khẳng định cả 103 cột có `feeder_id` NULL, để khoảng trống này không bị che đi |
+
+**BE-39 phải xử lý bốn trường này trước khi seed**, nếu không bộ mock nạp lên sẽ không dựng lại
+được đúng thứ FE đang code theo.
