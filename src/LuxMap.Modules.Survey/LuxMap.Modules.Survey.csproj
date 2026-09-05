@@ -2,6 +2,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <!-- A lux reading is measured AT a pole, so Survey depends on Assets for a real foreign key.
+         The relationship is declared WITHOUT a navigation property, the same convention as
+         HasCommuneReference: full integrity in the database, coupling in the object model kept at
+         the level of an id string. -->
+    <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <!-- measured_by is a real foreign key to app_user, for the same reason: a name in free text is
+         not traceability. Also declared without a navigation property. -->
+    <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

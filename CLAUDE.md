@@ -435,6 +435,49 @@ BE-11 (8.2 KiB gốc + 1.8 KiB thumbnail vào `luxmap-survey`, SHA-256 vòng tr�
 gì canh nó từ đó trở đi**. Chủ nợ là **BE-36** (Testcontainers, W17–W18) — thêm MinIO container bên
 cạnh PostGIS. Đừng để nợ này chỉ nằm trong báo cáo một phiên làm việc.
 
+### Bốn quy tắc chốt ở BE-42 — số đo lux
+
+**1. `LuxReading` KHÔNG phải `luminance_history`. Lẫn hai cái là hỏng nghiên cứu.**
+
+| | `LuxReading` (BE-42) | `luminance_history` (BE-15/BE-17 + CV) |
+|---|---|---|
+| Ai sinh | **Người** cầm máy đo | **CV** xử lý ảnh sweep |
+| Thời gian | `measured_at` | `observed_at` |
+| Giá trị | `lux_value` — **tuyệt đối, đơn vị lux** | `baseline_ratio` — **tỉ lệ, không đơn vị** |
+| Truy vết | `meter_model` | `sweep_id` |
+| ID hiển thị | `LUX-0001` | **không có** |
+
+Contract mục 2.9 gọi lux là **ground truth cho RQ1**: CV-12 dùng nó để **chấm** phân loại của CV.
+Ghi lux vào chuỗi luminance là để CV tự chấm chính mình, và làm lệch luôn biểu đồ của BE-20.
+Chúng gặp nhau **đúng một chỗ**: trường `nearest_luminance` của `GET /lux-readings`, ghép theo
+**THỜI GIAN** ±48 giờ (không phải không gian).
+
+**2. `commune_id` do SERVER tra từ `pole_id`, client gửi là 400.**
+
+Guard `SaveChanges` kiểm một commune **có trong scope không** — nó **không** kiểm commune đó có
+**khớp với pole** không. Nếu client gửi được `commune_id`, họ có thể gửi commune của chính mình kèm
+pole của xã khác: cả hai lớp đều pass, bản ghi vào nhầm xã. Đọc pole trước cũng cho 404 đúng Contract
+mục 7 — pole ngoài phạm vi thì query filter làm nó **không tồn tại**, không phải 403.
+
+Lý lẽ denormalize của `Fixture` (*"không bao giờ là resource riêng"*) **KHÔNG áp dụng** ở đây —
+`LuxReading` có endpoint riêng. Cột vẫn denormalize (bắt buộc, nếu không thì lọt cả query filter lẫn
+guard), nhưng **không emit ra response**.
+
+**3. `nearest_luminance` LUÔN `null` cho tới BE-17 — khác với "không có điểm trong ±48h".**
+
+Bảng `luminance_history` chưa tồn tại. **Khoá vẫn được emit**, không bị bỏ khỏi JSON, để CV-12 bind
+theo hình dạng cuối ngay bây giờ. **Nợ có chủ: BE-15/BE-17** nối nguồn thật và xoá mục drift số 17.
+
+**4. FK `lux_reading → pole` là `Restrict`, KHÔNG `Cascade`.**
+
+Lux là sự kiện đã xảy ra và là ground truth RQ1 — xoá pole không được âm thầm xoá dữ liệu nghiên cứu.
+Cũng để **không tạo bảng cascade thứ ba**: guard `SaveChanges` không thấy cascade do DB thực hiện
+(xem mục 1c). `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
+
+**Không gắn policy vai trò.** Bốn policy của BE-08 vẫn chưa dùng ở dòng sản xuất nào vì chưa ai quyết
+vai trò nào được ghi gì. Đoán một cái ở đây là vô tình tạo tiền lệ. Phạm vi địa bàn **vẫn được canh**
+— qua lượt đọc pole và qua guard.
+
 ### Vai trò
 
 **Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.

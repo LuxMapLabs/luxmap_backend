@@ -40,6 +40,16 @@ public static class ErrorCodes
     /// </summary>
     public const string UnsupportedImageFormat = "UNSUPPORTED_IMAGE_FORMAT";
 
+    /// <summary>
+    /// 400 — the body carried a field the SERVER owns (BE-42): a display id, or <c>commune_id</c>.
+    /// </summary>
+    /// <remarks>
+    /// Rejected loudly rather than ignored. Silently dropping a field the caller believed in leaves
+    /// them thinking they set something they did not — and for <c>commune_id</c> that belief would be
+    /// about which commune owns the record.
+    /// </remarks>
+    public const string ServerOwnedField = "SERVER_OWNED_FIELD";
+
     // ── Authentication (BE-07, BE-08) — also absent from Contract v1.1 ───────
 
     /// <summary>
