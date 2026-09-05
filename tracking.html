@@ -44,14 +44,14 @@
   <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 05/09/2026</p>
 
   <div class="card">
-    <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu, BE-18 đẩy sớm</strong>
+    <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) đang chạy, BE-18 đẩy sớm</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">BE-18 xong — lược đồ <code>fault</code> + <code>fault_cluster</code> đã sẵn cho BE-19 (chuyển trạng thái) và BE-20 (biểu đồ). Ghi vết đặt TRÊN bảng <code>fault</code>, KHÔNG có <code>FaultHistory</code> — chỉ giữ quyết định mới nhất, chuỗi đầy đủ là việc của BE-19 nếu cần. Định nghĩa "fault MỞ" chốt một chỗ duy nhất ở <code>FaultStatusSets.Open</code> = <code>detected | confirmed | in_progress</code> — Contract không nói, mà <code>open_fault_count</code>, BE-28 và BE-40 đều cần cùng một câu trả lời. <code>commune_id</code> có HAI nguồn vì <code>pole_id</code> nullable: có pole thì tra từ pole, không có pole thì lấy từ scope JWT. Toàn bộ 8 khoá ngoại là <code>Restrict</code> — fault là sự kiện đã xảy ra, và cascade còn mở rộng vùng mù của guard <code>SaveChanges</code>. BE-42 xong đúng hạn W4 — FO-14 đo lux ở W5 đã được gỡ chặn. Hotfix BE-08 xong: commune scoping giờ áp lên cả GHI, không chỉ ĐỌC. Kế tiếp: <strong>BE-19</strong>. BE-12 vẫn CHẶN: chưa có file FO-10 và Contract không đặc tả endpoint CRUD tài sản nào.</span>
+    <span class="muted">BE-12a xong — nhập tài sản CSV + GeoJSON, CRUD phần request, và phân quyền. <strong>Đã nạp trọn bộ mock FO-26 qua endpoint thật: 3 tuyến + 103 cột + 103 bóng, nạp lại cho 103 UPDATE chứ không sinh trùng.</strong> <code>external_ref</code> trên ba bảng là khoá tự nhiên duy nhất của lược đồ; <code>fixture</code> KHÔNG có và nhập bóng là insert-only. Đây là lần ĐẦU bốn policy của BE-08 chạm dòng sản xuất: ghi = Quản trị, đọc = không gắn policy nào (gắn vào sẽ chặn luôn Quản trị và Cơ quan quản lý). Parser CSV tự viết 144 dòng, không thêm package. <strong>BE-12b (hình dạng response khi ĐỌC tài sản) còn chờ Thịnh/Ngọc duyệt</strong> — hiện GET chỉ trả danh sách ID. BE-18 xong trước đó: lược đồ <code>fault</code> + <code>fault_cluster</code> sẵn cho BE-19/BE-20. Kế tiếp: <strong>BE-13</strong> → BE-14.</span>
   </div>
 
   <div class="grid">
     <div class="stat"><b>15</b><span>project trong solution</span></div>
-    <div class="stat"><b>341</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>379</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
     <div class="stat"><b>12</b><span>bảng trong database</span></div>
@@ -75,8 +75,9 @@
       <tr><td><code>BE-11</code></td><td>Lưu trữ ảnh MinIO — hai luồng ảnh riêng, magic bytes, thumbnail</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, gỡ chặn FO-14 đo lux ở W5</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-18</code></td><td>Entity Fault + FaultCluster + migration — ghi vết trên bảng <code>fault</code>, <code>FaultStatusSets.Open</code>, 8 FK <code>Restrict</code></td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>BE-12</code></td><td>API CRUD tài sản + import CSV — <strong>CHẶN: chưa có file FO-10 và Contract chưa đặc tả endpoint nào</strong></td><td><span class="tag t-block">Chặn</span></td></tr>
-      <tr><td><code>BE-19</code></td><td>API chuyển trạng thái sự cố — luồng hợp lệ, sai luồng trả 409</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
+      <tr><td><code>BE-12a</code></td><td>Import CSV/GeoJSON + CRUD phần request + phân quyền — <code>external_ref</code>, upsert, insert-only fixture</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-12b</code></td><td>Hình dạng response khi ĐỌC tài sản — <strong>CHỜ Thịnh/Ngọc duyệt</strong>; GET tạm trả danh sách ID</td><td><span class="tag t-block">Chờ duyệt</span></td></tr>
+      <tr><td><code>BE-13</code></td><td>Topology: gán cột vào tuyến và feeder — chặn CV-05, CV-15</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
     </table>
   </div>
@@ -199,6 +200,12 @@
         <td><code>src/LuxMap.Modules.Faults/Entities/</code>, <code>Configurations/FaultConfigurations.cs</code>, <code>src/LuxMap.Shared/Contracts/Enums/FaultStatusSets.cs</code>, migration <code>AddFaultEntities</code>, <code>tests/LuxMap.Api.Tests/FaultSchemaTests.cs</code>, <code>tests/LuxMap.Shared.Tests/FaultStatusSetsTests.cs</code></td>
         <td><code>feat(BE-18): add Fault and FaultCluster entities with audit on the row</code></td>
       </tr>
+      <tr>
+        <td>05/09/2026</td>
+        <td><code>BE-12a</code> Nhập tài sản CSV + GeoJSON, CRUD phần request, phân quyền. <code>external_ref</code> trên <code>road_segment</code>/<code>feeder</code>/<code>pole</code> với partial unique <code>(commune_id, external_ref)</code> — khoá tự nhiên khiến nhập lại thành UPDATE. Template đổi sang tham chiếu bằng <code>*_external_ref</code> để bộ bốn file nạp liền mạch không cần tra mã thủ công. Kiểm TOÀN BỘ file trước, ghi tập hợp lệ trong MỘT transaction, trả 200 kèm kết quả. Parser CSV tự viết (BOM, CRLF, ô nháy kép, dò delimiter). Lần đầu bốn policy BE-08 vào dòng sản xuất</td>
+        <td><code>src/LuxMap.Shared/Csv/CsvDocument.cs</code>, <code>src/LuxMap.Modules.Assets/Import/</code>, <code>Crud/</code>, migration <code>AddAssetExternalRef</code>, <code>docs/templates/*</code>, <code>tests/LuxMap.Shared.Tests/CsvDocumentTests.cs</code>, <code>tests/LuxMap.Api.Tests/AssetImport*.cs</code>, <code>AssetPermissionTests.cs</code>, <code>CommuneWriteGuardCostTests.cs</code></td>
+        <td><code>feat(BE-12a): import assets from CSV and GeoJSON, and gate writes on the administrator role</code></td>
+      </tr>
     </table>
   </div>
 
@@ -222,6 +229,11 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>⏳ BE-12b chưa chốt — <code>GET /assets/*</code> đang trả DANH SÁCH ID.</strong> Hình dạng response khi đọc một tài sản đang chờ Thịnh/Ngọc duyệt. Chỗ giữ chỗ hiện tại dùng <code>PagedResult&lt;string&gt;</code>, tức phong bì phân trang đã publish ở Contract mục 0 với <code>items[]</code> chỉ là ID. <strong>Đủ để xác nhận import ghi được gì, không đủ để FE dựng màn hình.</strong> Đã đăng ký drift 34 — mục drift có hạn dùng, xoá khi BE-12b xong.</li>
+      <li><strong>🔴 Vai trò nào được GHI tài sản là quyết định của BE-12a, KHÔNG có trong Contract.</strong> Mục 7 chỉ có bảng phạm vi địa bàn và 5 quy tắc lọc — không một chữ về quyền ghi. BE-12a chốt Quản trị ghi, ba vai trò kia chỉ đọc, và vì đây là lần đầu 4 policy BE-08 chạm dòng sản xuất nên nó <strong>tạo tiền lệ</strong> cho BE-15, BE-18, BE-21, BE-24. Phải chốt cả nhóm ở FW-00. ⚠️ Kèm cái bẫy: <strong>policy là MỘT vai trò chính xác, không phải một bậc</strong> — gắn <code>maintenance_engineer</code> lên endpoint đọc sẽ chặn luôn Quản trị và Cơ quan quản lý. Drift 31.</li>
+      <li><strong>⚠️ Chi phí <code>CommuneWriteGuard</code>: con số 3,7 µs/entity cũ đo phần RẺ.</strong> <code>ChangeTracker.Entries&lt;T&gt;()</code> gọi <code>DetectChanges</code>, nên guard ép một lượt quét snapshot PHỤ trước <code>SaveChanges</code> vốn cũng tự chạy. Đo lại ở 1000 entity: <code>Entries&lt;T&gt;()</code> kèm DetectChanges <strong>9,69 ms</strong>, vòng kiểm phạm vi <strong>0,21 ms</strong>, guard tổng <strong>9,90 ms</strong>. Kiểm phạm vi gần như miễn phí; DetectChanges là toàn bộ chi phí. Vẫn nhỏ hơn nhiều so với vòng đi-về DB nên <strong>chưa tối ưu gì</strong> — nếu cần thì tắt <code>AutoDetectChangesEnabled</code> quanh vòng nạp, KHÔNG phải nới guard.</li>
+      <li><strong>⚠️ Bộ mock FO-26 thiếu 4 trường để nạp được — BE-39 phải xử lý.</strong> <code>external_ref</code> (cả hai file), <code>commune_id</code> (segments không có; poles ghi <code>COM-001</code>), <code>data_source</code> (cả hai file), <code>feeder_id</code> (drift 23). Test <code>AssetImportMockSetTests</code> bổ sung ba trường đầu và <strong>cố ý KHÔNG bổ sung <code>feeder_id</code></strong>, khẳng định cả 103 cột có <code>feeder_id</code> NULL để khoảng trống không bị che đi.</li>
+      <li><strong>⚠️ EF Core suýt DROP <code>ix_pole_commune_id</code> khi thêm index <code>external_ref</code>.</strong> Convention bỏ index khoá ngoại khi đã có index khác dẫn đầu bằng cùng cột — nhưng index mới là PARTIAL, không phủ hàng <code>external_ref IS NULL</code> (đa số cột nạp từ ảnh công khai), trong khi query filter BE-08 đưa <code>commune_id</code> vào <code>WHERE</code> của mọi truy vấn. Bắt được lúc đọc migration sinh ra. Đã khai lại tường minh trong <code>ExternalRefColumn.HasExternalRef</code> — <strong>đừng xoá tưởng thừa</strong>.</li>
       <li><strong>🔴 <code>pole_current_status.status_confidence</code> nhận <code>NaN</code>, <code>Infinity</code> và giá trị ngoài <code>0..1</code> — CHƯA sửa.</strong> Đã chèn thật <code>42.5</code> và nó vào bảng. CHECK duy nhất trên cột đó (<code>ck_pole_current_status_confidence_matches_status</code>) chỉ ràng buộc NULL-hay-không so với <code>fixture_status</code>, không nói gì về giá trị; XML doc ghi "0..1" mà không có gì thực thi. <strong>Quyền ghi bảng thuộc BE-15/BE-17 nên bản sửa thuộc về đó.</strong> <code>fault.status_confidence</code> của BE-18 không lặp lại lỗi này. Xem <code>docs/contract-drift.md</code> mục 24.</li>
       <li><strong>⚠️ Nợ có chủ — <code>FaultHistory</code> là việc của BE-19 nếu cần chuỗi đầy đủ.</strong> BE-18 chỉ ghi vết quyết định MỚI NHẤT trên bảng <code>fault</code>. Một fault đi <code>detected → confirmed → rejected</code> chỉ còn trạng thái cuối. Contract mục 2.5 chỉ cho đổi ba trường nên số quyết định là hữu hạn, nhưng nếu BE-19/BE-20 cần dựng lại chuỗi thì phải thêm bảng — <strong>đừng để rơi</strong>.</li>
       <li><strong>⚠️ <code>fault_cluster</code> chưa có gì ghi vào.</strong> CV-15 gom cụm, mà CV-15 phụ thuộc <code>BE-13</code> (chưa làm). Bảng và FK đã sẵn để không phải migration lại; <code>clustering_model_version</code> là thứ BE-34 cần để trả lời kết quả nào do model phiên bản nào sinh.</li>

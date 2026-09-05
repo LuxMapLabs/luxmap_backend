@@ -20,6 +20,46 @@ internal static class GeometryColumns
     public static readonly string LineString = $"geometry(LineString,{SpatialConstants.Srid})";
 }
 
+/// <summary>
+/// <c>external_ref</c> — the owning authority's inventory code, and the schema's only natural key.
+/// </summary>
+/// <remarks>
+/// One place rather than three copies, because the three declarations must not drift: the import
+/// upsert keys on exactly this index, so a differing filter or column order on one table would make
+/// that table silently non-idempotent while the other two stayed correct.
+/// <para>
+/// The index is PARTIAL (<c>WHERE external_ref IS NOT NULL</c>) and that is load-bearing, not a
+/// refinement: in PostgreSQL a plain unique index treats NULLs as distinct, so it would technically
+/// work — but the partial form states the intent, keeps the index off every code-less row traced
+/// from public imagery, and is what BE-12a's upsert lookup rides.
+/// </para>
+/// </remarks>
+internal static class ExternalRefColumn
+{
+    public const string NotNullFilter = "external_ref IS NOT NULL";
+
+    public static void HasExternalRef<TEntity>(this EntityTypeBuilder<TEntity> builder, string table)
+        where TEntity : class, IExternallyReferenced
+    {
+        builder.Property(entity => entity.ExternalRef).HasColumnType("text");
+
+        builder.HasIndex("CommuneId", nameof(IExternallyReferenced.ExternalRef))
+            .HasDatabaseName($"ux_{table}_commune_external_ref")
+            .HasFilter(NotNullFilter)
+            .IsUnique();
+
+        // ⚠️ Re-declares ix_<table>_commune_id, which EF Core creates by CONVENTION for the
+        // administrative_unit foreign key. Convention SKIPS that index once another one leads with
+        // the same column — and the index above does. Without this line the migration DROPS
+        // ix_pole_commune_id, ix_road_segment_commune_id and ix_feeder_commune_id, which would be a
+        // silent regression on every single query in the system: the index left standing is PARTIAL,
+        // so it does not cover the rows where external_ref IS NULL, and those are the majority
+        // (everything traced from public imagery). Meanwhile the BE-08 query filter puts commune_id
+        // into the WHERE clause of every read. Verified by generating the migration without it.
+        builder.HasIndex("CommuneId");
+    }
+}
+
 public sealed class RoadSegmentConfiguration : IEntityTypeConfiguration<RoadSegment>
 {
     public void Configure(EntityTypeBuilder<RoadSegment> builder)
@@ -29,6 +69,7 @@ public sealed class RoadSegmentConfiguration : IEntityTypeConfiguration<RoadSegm
 
         builder.Property(segment => segment.SegmentId).HasPrefixedId(PrefixedIds.RoadSegment);
         builder.Property(segment => segment.SegmentName).HasColumnType("text").IsRequired();
+        builder.HasExternalRef("road_segment");
         builder.Property(segment => segment.LengthM).IsRequired();
         builder.Property(segment => segment.Geom).HasColumnType(GeometryColumns.LineString).IsRequired();
         builder.Property(segment => segment.CreatedAt).HasDefaultValueSql("now()");
@@ -56,6 +97,7 @@ public sealed class FeederConfiguration : IEntityTypeConfiguration<Feeder>
 
         builder.Property(feeder => feeder.FeederId).HasPrefixedId(PrefixedIds.Feeder);
         builder.Property(feeder => feeder.FeederName).HasColumnType("text").IsRequired();
+        builder.HasExternalRef("feeder");
         // The only nullable geometry in the module — Branch C never surveyed the cable routes.
         builder.Property(feeder => feeder.Geom).HasColumnType(GeometryColumns.LineString);
         builder.Property(feeder => feeder.CreatedAt).HasDefaultValueSql("now()");
@@ -79,6 +121,7 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
 
         builder.Property(pole => pole.PoleId).HasPrefixedId(PrefixedIds.Pole);
         builder.Property(pole => pole.SegmentId).HasColumnType("text").IsRequired();
+        builder.HasExternalRef("pole");
         builder.Property(pole => pole.FeederId).HasColumnType("text");
         builder.Property(pole => pole.Geom).HasColumnType(GeometryColumns.Point).IsRequired();
         builder.Property(pole => pole.NearSensitivePoi).HasDefaultValue(false);
@@ -142,6 +185,13 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
 
         // "The lamp currently in service on this pole" is the lookup BE-14 makes for every pole in a
         // bbox, so it gets its own partial index rather than filtering the full history each time.
+        //
+        // ⚠️ NOT UNIQUE, and it carries NO business rule. It has already been misread once as
+        // "a pole has at most one active fixture" — it does not say that, and the opposite is the
+        // settled rule: a pole carries several lamps, and replacing one keeps the old row with a
+        // removed_date (see Fixture, and docs/templates/README.md). This is a lookup index, nothing
+        // more. That absence of a natural key is exactly why CSV import treats fixtures as
+        // INSERT-ONLY instead of upserting them.
         builder.HasIndex(fixture => fixture.PoleId)
             .HasDatabaseName("ix_fixture_pole_id_active")
             .HasFilter("removed_date IS NULL");

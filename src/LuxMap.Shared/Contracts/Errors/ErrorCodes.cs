@@ -41,6 +41,34 @@ public static class ErrorCodes
     public const string UnsupportedImageFormat = "UNSUPPORTED_IMAGE_FORMAT";
 
     /// <summary>
+    /// 415 — the upload is not a file type this endpoint reads (BE-12a: <c>.csv</c> or <c>.geojson</c>).
+    /// </summary>
+    /// <remarks>
+    /// The same code the BE-04 status-code page already produces for a bare 415, so a client sees one
+    /// code for one meaning whether the rejection came from the framework or from a handler.
+    /// </remarks>
+    public const string UnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE";
+
+    /// <summary>
+    /// 404 — the asset does not exist, OR it lies outside the caller's commune scope (BE-12a).
+    /// </summary>
+    /// <remarks>
+    /// ONE code for both, deliberately, and Contract section 7 requires it: answering 403 for an
+    /// out-of-scope asset would confirm that the id exists.
+    /// </remarks>
+    public const string AssetNotFound = "ASSET_NOT_FOUND";
+
+    /// <summary>
+    /// 409 — <c>(commune_id, external_ref)</c> is already taken in that commune (BE-12a).
+    /// </summary>
+    /// <remarks>
+    /// The natural key that makes CSV import idempotent. Through CRUD the collision is an explicit
+    /// conflict rather than an upsert: a single POST states an intent to CREATE, and quietly
+    /// overwriting somebody else's row instead would be a different operation than the one asked for.
+    /// </remarks>
+    public const string ExternalRefTaken = "EXTERNAL_REF_TAKEN";
+
+    /// <summary>
     /// 400 — the body carried a field the SERVER owns (BE-42): a display id, or <c>commune_id</c>.
     /// </summary>
     /// <remarks>

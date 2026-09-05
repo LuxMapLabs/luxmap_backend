@@ -128,7 +128,7 @@ public static class ApiPipelineSetup
             403 => (ErrorCodes.CommuneForbidden, "You do not have access to this resource."),
             404 => ("NOT_FOUND", "Resource not found."),
             405 => ("METHOD_NOT_ALLOWED", "That method is not supported on this path."),
-            415 => ("UNSUPPORTED_MEDIA_TYPE", "Unsupported Content-Type."),
+            415 => (ErrorCodes.UnsupportedMediaType, "Unsupported Content-Type."),
             _ => ("REQUEST_FAILED", "The request could not be completed."),
         };
 
