@@ -40,6 +40,11 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 21 | **Mã lỗi thứ 9 ngoài Contract: `SERVER_OWNED_FIELD`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
 | 22 | **`pole.external_ref`** — cột mới, LƯU và TRA được nhưng KHÔNG emit ra API | 🟡 Vừa | Nội bộ BE, tổ sửa chữa | Không phải Contract — quyết định lược đồ, migration thuộc BE-12 |
 | 23 | **Bộ mock FO-26 không mang `feeder_id`** — nạp xong 103 cột chưa gắn mạch điện | 🔴 Cao | CV-15, BE-13, RQ2 | Mock — bổ sung, hoặc gán thủ công có ghi chép |
+| 24 | **`pole_current_status.status_confidence` nhận `NaN`, `Infinity` và giá trị ngoài `0..1`** | 🔴 Cao | CV-11, BE-28, RQ1 | Code BE-15/BE-17 — chưa sửa |
+| 25 | **`commune_id` suy từ scope JWT khi `pole_id` NULL** | 🟡 Vừa | WP6, FM-19 | Contract — thêm vào mục 2.8 |
+| 26 | **Ghi vết trên bảng `fault`, không có `FaultHistory`** | 🟡 Vừa | Nội bộ BE, BE-19 | Không phải Contract — quyết định lược đồ |
+| 27 | **Contract không định nghĩa "fault MỞ"** cho `open_fault_count` | 🟡 Vừa | WP5, BE-28, BE-40 | Contract — ghi rõ ba trạng thái |
+| 28 | **`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`) | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa; mục 6 mới ghi file work-orders |
 
 ---
 
@@ -572,7 +577,12 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 14. **Mục 21** — `SERVER_OWNED_FIELD` (400) khi client gửi `lux_id` hoặc `commune_id`. Mục 2 đang đếm 8 mã ngoài Contract, giờ là **9**.
 15. **Mục 22** — `pole.external_ref` (`text NULL`, `UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL`). Lưu mã kiểm kê của đơn vị quản lý. Ba lý do: nối lại được giữa các đợt nhập; là **khoá tự nhiên duy nhất** khiến import idempotent (lược đồ hiện tại không có cái nào, nên nạp lại cùng file sinh trùng toàn bộ); và tổ sửa chữa ngoài hiện trường đọc mã sơn trên cột chứ không đọc `POLE-0042`. **Không emit ra API** — thêm vào response là đổi hình dạng đã publish. Migration thuộc **BE-12**.
 16. **Mục 23 — chặn RQ2, cần quyết sớm.** `mock-poles.geojson` không có `feeder_id`, nên nạp bộ mock FO-26 cho ra **103 cột không gắn tuyến điện nào**. CV-15 gom cụm theo **mạch điện** (một cầu chì nhảy lan theo feeder, không lan theo đường), và BE-13 tồn tại để trả lời *"mọi cột trên feeder X"* — cả hai đều trả rỗng. Hai đường: bổ sung `feeder_id` vào mock (phải báo WP5/WP6 vì FE đã code theo bộ mock), hoặc gán thủ công sau khi nạp và **ghi lại cách gán** để kết quả gom cụm tái lập được. Cột `solar_all_in_one` đúng là không có feeder — đừng gán bừa cho đủ.
-17. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
+17. **Mục 24 — cột thứ hai cùng lỗi `NaN`, CHƯA sửa.** `pole_current_status.status_confidence` nhận `NaN`, `Infinity`, và **cả giá trị ngoài `0..1`** — đã chèn thật `42.5` và nó vào bảng. CHECK duy nhất trên cột đó chỉ ràng buộc NULL-hay-không so với `fixture_status`; XML doc ghi *"0..1"* mà **không có gì thực thi**. Quyền ghi bảng thuộc **BE-15/BE-17** nên bản sửa thuộc về đó. `fault.status_confidence` của BE-18 **không lặp lại lỗi này** — đã có CHECK đủ.
+18. **Mục 25** — `POST /faults` cho `pole_id` null, nhưng `Fault` phải `ICommuneScoped` nên `commune_id` NOT NULL. `administrative_unit` **không có cột geometry** (cố ý — nhánh C không có ranh giới thật), nên không suy được từ `location`. BE-18 chốt: có pole thì tra từ pole; không có pole thì lấy từ scope JWT, user nhiều commune phải chọn. Cần ghi vào mục 2.8.
+19. **Mục 26** — không tạo `FaultHistory`; ghi vết là các cột `reported_by`/`confirmed_by`+`at`/`resolved_by`+`at` trên chính bảng `fault`. Chỉ giữ quyết định **mới nhất**, không giữ chuỗi. **Nếu BE-19 cần đủ chuỗi thì đó là việc của BE-19.**
+20. **Mục 27** — Contract liệt kê 6 `fault_status` và không nói cái nào là "mở", trong khi `open_fault_count` (mục 2.1), BE-28 và BE-40 đều cần. BE-18 chốt `detected | confirmed | in_progress`, đặt ở `FaultStatusSets.Open`. Cần ghi vào Contract.
+21. **Mục 28 — `mock-faults.json` lệch mục 2.4 mười chỗ.** Thiếu `fixture_id`, `data_source`, `status_confidence`, `updated_at`, `work_order_id`, `note`, `reported_by`; thừa `confirmed_by`, `confirmed_at`; và `cluster_id` dùng **`CLU-0001`** trong khi mục 0.2 chốt **`CLS`**. Mục 6 mới ghi lỗi `CLU` ở `mock-work-orders.json`, **thiếu file này**. FE đã code theo mock — phải báo WP5/WP6.
+22. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.
