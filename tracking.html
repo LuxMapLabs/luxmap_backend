@@ -176,6 +176,24 @@
         <td><code>feat(BE-11): store images in MinIO behind a vendor-neutral abstraction</code></td>
       </tr>
       <tr>
+        <td>04/09/2026</td>
+        <td>Hotfix <code>BE-08</code> — commune scoping chỉ áp lên ĐỌC, không áp lên GHI. <code>HasQueryFilter</code> không tham gia <code>Add()</code>/<code>Update()</code>/<code>Remove()</code>, nên kỹ sư xã A ghi được tài sản cho xã B rồi chính query filter làm hàng đó vô hình với người tạo. Thêm <code>CommuneWriteGuard</code> ở <code>SaveChanges</code>, ném TRƯỚC <code>base.SaveChanges</code> để ra 403 chứ không phải 500. Cửa sau phải bật tường minh</td>
+        <td><code>src/LuxMap.Persistence/CommuneWriteGuard.cs</code>, <code>LuxMapDbContext.cs</code>, <code>tests/LuxMap.Api.Tests/CommuneWriteScopeTests.cs</code></td>
+        <td><code>fix(BE-08): apply commune scoping to writes, not only to reads</code></td>
+      </tr>
+      <tr>
+        <td>05/09/2026</td>
+        <td><code>BE-42</code> Entity <code>LuxReading</code> + API nhập số đo lux — <strong>hạn W4, gỡ chặn FO-14 đo lux ở W5</strong>. Ground truth RQ1, KHÔNG phải <code>luminance_history</code>. <code>commune_id</code> do SERVER tra từ <code>pole_id</code>, client gửi là 400. <code>nearest_luminance</code> ghép theo THỜI GIAN ±48h, tạm null tới BE-17 nhưng khoá vẫn emit để CV-12 bind được ngay. FK <code>Restrict</code> cả <code>pole</code> lẫn <code>app_user</code>. Kèm bản vá chặn <code>NaN</code>/<code>Infinity</code> ở CẢ hai tầng: Postgres xếp <code>NaN</code> lớn hơn mọi số thực nên <code>&gt;= 0</code> không chặn được, và <code>JsonSerializerDefaults.Web</code> nhận luôn chuỗi <code>"NaN"</code></td>
+        <td><code>src/LuxMap.Modules.Survey/Entities/LuxReading.cs</code>, <code>LuxReadings/</code>, migration <code>AddLuxReading</code> + <code>RejectNonFiniteLuxValues</code>, <code>src/LuxMap.Shared/Serialization/FiniteDoubleConverter.cs</code>, <code>tests/LuxMap.Api.Tests/LuxReadingTests.cs</code>, <code>LuxValueFinitenessTests.cs</code></td>
+        <td><code>feat(BE-42): record lux readings as the ground truth CV-12 scores against</code><br><code>fix(BE-42): reject NaN and Infinity in lux_value at both the database and the API</code></td>
+      </tr>
+      <tr>
+        <td>05/09/2026</td>
+        <td><code>BE-12</code> Bộ template CSV nhập tài sản — sinh TỪ lược đồ thật chứ không đoán, 4 file theo đúng thứ tự nạp. Thêm <code>pole.external_ref</code> làm khoá tự nhiên để nhập lại cùng file không sinh trùng. <strong>Chỉ là template, chưa có endpoint import</strong> — BE-12 vẫn chặn vì thiếu file FO-10 và Contract chưa đặc tả endpoint nào</td>
+        <td><code>docs/templates/README.md</code>, <code>docs/templates/{segments,feeders,poles,fixtures}.csv</code></td>
+        <td><code>docs(BE-12): add CSV import templates derived from the real schema</code></td>
+      </tr>
+      <tr>
         <td>05/09/2026</td>
         <td><code>BE-18</code> Entity <code>Fault</code> + <code>FaultCluster</code> — ghi vết đặt TRÊN bảng <code>fault</code> (không có <code>FaultHistory</code>), <code>commune_id</code> có hai nguồn vì <code>pole_id</code> nullable, <code>priority_score</code> là cột LƯU với index <code>DESC NULLS LAST</code>, <code>fault_cluster</code> là bảng thật chứ không phải cột text trần. Toàn bộ 8 FK <code>Restrict</code>. Định nghĩa "fault MỞ" chốt một chỗ ở <code>FaultStatusSets.Open</code></td>
         <td><code>src/LuxMap.Modules.Faults/Entities/</code>, <code>Configurations/FaultConfigurations.cs</code>, <code>src/LuxMap.Shared/Contracts/Enums/FaultStatusSets.cs</code>, migration <code>AddFaultEntities</code>, <code>tests/LuxMap.Api.Tests/FaultSchemaTests.cs</code>, <code>tests/LuxMap.Shared.Tests/FaultStatusSetsTests.cs</code></td>
@@ -208,7 +226,6 @@
       <li><strong>⚠️ Nợ có chủ — <code>FaultHistory</code> là việc của BE-19 nếu cần chuỗi đầy đủ.</strong> BE-18 chỉ ghi vết quyết định MỚI NHẤT trên bảng <code>fault</code>. Một fault đi <code>detected → confirmed → rejected</code> chỉ còn trạng thái cuối. Contract mục 2.5 chỉ cho đổi ba trường nên số quyết định là hữu hạn, nhưng nếu BE-19/BE-20 cần dựng lại chuỗi thì phải thêm bảng — <strong>đừng để rơi</strong>.</li>
       <li><strong>⚠️ <code>fault_cluster</code> chưa có gì ghi vào.</strong> CV-15 gom cụm, mà CV-15 phụ thuộc <code>BE-13</code> (chưa làm). Bảng và FK đã sẵn để không phải migration lại; <code>clustering_model_version</code> là thứ BE-34 cần để trả lời kết quả nào do model phiên bản nào sinh.</li>
       <li><strong>⚠️ <code>mock-faults.json</code> lệch Contract mục 2.4 ở mười chỗ — phải báo WP5 và WP6.</strong> Thiếu <code>fixture_id</code>, <code>data_source</code>, <code>status_confidence</code>, <code>updated_at</code>, <code>work_order_id</code>, <code>note</code>, <code>reported_by</code>; thừa <code>confirmed_by</code>, <code>confirmed_at</code>; và <code>cluster_id</code> dùng <code>CLU-0001</code> trong khi mục 0.2 chốt <code>CLS</code>. Mục "Mock lệch Contract ở 4 prefix khác" bên dưới mới ghi lỗi <code>CLU</code> ở <code>mock-work-orders.json</code>, <strong>thiếu file này</strong>. FE đã code theo mock. Xem <code>docs/contract-drift.md</code> mục 28.</li>
-      <li><strong>⚠️ Bảng "Đã hoàn thành" thiếu ba dòng.</strong> <code>BE-42</code>, hotfix <code>BE-08</code> và bộ template CSV của <code>BE-12</code> đã merge nhưng chưa có dòng trong bảng — bảng Sprint đã ghi Xong nên hai chỗ đang lệch nhau. Bổ sung ở lần cập nhật tới.</li>
       <li><strong>🔧 NỢ VỆ SINH TEST — một vấn đề, ba biểu hiện. Làm SAU BE-42, trước W8.</strong>
       Root cause: <code>LuxMap.Api.Tests</code> chạy trên một PostgreSQL dev có <strong>trạng thái tích luỹ</strong>, và các test class giả định về trạng thái đó theo những cách <strong>không tương thích nhau</strong>. Không phải ba lỗi riêng lẻ.
       <br>(1) <strong>139 commune rác</strong> — <code>ScopeTestFixture.DisposeAsync</code> chỉ drop bảng probe, không xoá commune nó tạo mỗi lần chạy; <code>commune_id_seq</code> đã bị đẩy lên COM-242.
