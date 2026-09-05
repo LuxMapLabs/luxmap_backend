@@ -38,8 +38,23 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
 
         // Contract section 2.9: lux_value is a real number, non-negative. No upper bound — see the
         // remarks on LuxReading.LuxValue for why an implausible reading is kept rather than refused.
+        //
+        // ⚠️ The three terms are NOT redundant. `>= 0` alone lets NaN and Infinity through, because
+        // PostgreSQL orders NaN ABOVE every other float — the opposite of IEEE 754, where every
+        // comparison with NaN is false. So 'NaN' >= 0 and 'Infinity' >= 0 are both TRUE here.
+        //
+        //   lux_value <> 'NaN'         ⚠️ NOT `lux_value = lux_value`. That is the IEEE 754 idiom and
+        //                              it does NOT work in PostgreSQL, which treats NaN as EQUAL to
+        //                              itself — so `x = x` is a real tautology here and catches
+        //                              nothing. Verified: SELECT 'NaN'::float8 = 'NaN'::float8 → t.
+        //   lux_value <> 'Infinity'    -Infinity is already excluded by >= 0; +Infinity is not.
+        //
+        // This matters because lux_value is the ground truth for RQ1: one NaN turns every mean,
+        // deviation and correlation CV-12 computes into NaN. No exception, no log — just numbers
+        // that are no longer numbers.
         builder.ToTable(table => table.HasCheckConstraint(
-            "ck_lux_reading_value_non_negative", "lux_value >= 0"));
+            "ck_lux_reading_value_non_negative",
+            "lux_value >= 0 AND lux_value <> 'NaN'::float8 AND lux_value <> 'Infinity'::float8"));
 
         // The real de-duplication guard. A read-then-write check would let two simultaneous retries
         // both pass and both insert; the index cannot.

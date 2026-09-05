@@ -35,6 +35,11 @@ public static class LuxMapJsonOptions
 
         // Section 0: ISO 8601 UTC with a Z suffix. DateOnly (install_date, warranty_expiry,
         // night_of) already renders as YYYY-MM-DD by default, so it needs no converter.
+        // JsonSerializerDefaults.Web turns on AllowReadingFromString, and for floating-point types
+        // that flag also accepts the strings "NaN", "Infinity" and "-Infinity". Left alone,
+        // {"lux_value": "NaN"} deserialises to double.NaN and nothing reports it.
+        options.Converters.Add(new FiniteDoubleConverter());
+
         options.Converters.Add(new UtcDateTimeConverter());
         options.Converters.Add(new UtcDateTimeOffsetConverter());
     }

@@ -478,6 +478,47 @@ Cũng để **không tạo bảng cascade thứ ba**: guard `SaveChanges` không
 vai trò nào được ghi gì. Đoán một cái ở đây là vô tình tạo tiền lệ. Phạm vi địa bàn **vẫn được canh**
 — qua lượt đọc pole và qua guard.
 
+### Quy ước cho MỌI cột `double precision` đo được
+
+**Cột số thực biểu diễn một đại lượng đo được PHẢI có CHECK loại `NaN` và `±Infinity`.**
+`>= 0` là **không đủ**.
+
+**Vì sao:** Postgres xếp `NaN` **LỚN HƠN mọi số thực** — ngược hoàn toàn với IEEE 754, nơi mọi phép
+so sánh với `NaN` đều false. Nên `'NaN'::float8 >= 0` là **`true`**, và `'Infinity' >= 0` cũng vậy.
+Chỉ `-Infinity` bị `>= 0` chặn.
+
+⚠️ **Idiom `x = x` KHÔNG dùng được ở Postgres.** Trong IEEE 754 thì `NaN <> NaN`, nên `x = x` bắt
+được `NaN`. **Postgres coi `NaN` BẰNG chính nó**, nên `x = x` là tautology thật và bắt được **con số
+không**. Kiểm: `SELECT 'NaN'::float8 = 'NaN'::float8` → `t`.
+
+Khuôn đúng:
+
+```sql
+CHECK (x >= 0 AND x <> 'NaN'::float8 AND x <> 'Infinity'::float8)
+```
+
+**Đây là lỗi câm.** Không exception, không log — chỉ là một hàng trông bình thường trong mọi danh
+sách, rồi mọi phép trung bình, độ lệch chuẩn và tương quan tính từ nó trả về `NaN`.
+
+**Cả JSON cũng hở, không chỉ DB.** `JsonSerializerDefaults.Web` bật `AllowReadingFromString`, và với
+kiểu số thực cờ đó nhận luôn chuỗi `"NaN"` / `"Infinity"`. Đã bịt bằng `FiniteDoubleConverter` ở
+`LuxMapJsonOptions` — **đừng gỡ tưởng thừa**, canh bằng `JsonNumberHandlingTests`. Không dùng
+`JsonNumberHandling.Strict` vì nó chặn luôn số có nháy kép hợp lệ như `"12.4"`, đổi hình dạng wire
+của mọi endpoint để sửa một vấn đề chỉ nằm ở ba literal.
+
+**Ticket sắp tạo cột kiểu này — phải áp quy ước ngay từ migration đầu:**
+
+| Ticket | Cột |
+|---|---|
+| BE-15 / BE-17 | `normalized_luminance`, `baseline_ratio` |
+| BE-33 | `dim_threshold_ratio`, `out_threshold_ratio` |
+
+> 🔴 **`pole_current_status.status_confidence` ĐANG HỞ — chưa sửa, chờ quyết.**
+> Nó nhận `NaN`, `Infinity`, **và cả giá trị ngoài `0..1`** (đã chèn thật `42.5` và nó vào). CHECK duy
+> nhất trên cột đó là `ck_pole_current_status_confidence_matches_status`, chỉ ràng buộc **NULL hay
+> không** so với `fixture_status`, không nói gì về giá trị. XML doc ghi *"0..1"* nhưng **không có
+> ràng buộc nào thực thi**. Quyền ghi bảng đó thuộc **BE-15/BE-17** nên bản sửa thuộc về đó.
+
 ### Vai trò
 
 **Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.
