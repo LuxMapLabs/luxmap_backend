@@ -519,6 +519,63 @@ của mọi endpoint để sửa một vấn đề chỉ nằm ở ba literal.
 > không** so với `fixture_status`, không nói gì về giá trị. XML doc ghi *"0..1"* nhưng **không có
 > ràng buộc nào thực thi**. Quyền ghi bảng đó thuộc **BE-15/BE-17** nên bản sửa thuộc về đó.
 
+### Năm quy tắc chốt ở BE-18 — sự cố
+
+**1. Ghi vết đặt TRÊN bảng `fault`, không có `FaultHistory`.**
+
+Contract mục 2.5 chỉ cho kỹ sư đổi **ba** trường (`fault_status`, `override_fault_type`, `note`), nên
+số quyết định đáng ghi là hữu hạn và biết trước. Cột `reported_by` · `confirmed_by`+`confirmed_at` ·
+`resolved_by`+`resolved_at` trả lời thẳng câu hỏi *ai làm gì*. Một bảng change-log tổng quát nặng hơn
+vấn đề, và vẫn phải quyết "actor là gì khi engine sinh sự cố".
+
+⚠️ **Đánh đổi: chỉ giữ quyết định MỚI NHẤT, không giữ chuỗi.** Một fault đi
+`detected → confirmed → rejected` chỉ còn trạng thái cuối. **Nếu BE-19 cần đủ chuỗi thì
+`FaultHistory` là việc của BE-19 (W8)** — chủ nợ có tên, đừng để nó rơi.
+
+`reported_by` **NULL với fault do CV/IoT sinh**, và đó là câu trả lời đúng chứ không phải dữ liệu
+thiếu — `source_channel` đã nói engine nào. **Không dựng user hệ thống giả**: nó làm mọi dòng trông
+đồng đều trong khi ghi một việc chưa từng xảy ra, rồi lại hiện ra trong mọi thống kê "ai báo sự cố".
+
+**2. `commune_id` có HAI nguồn, vì `pole_id` nullable.**
+
+| Ca | Nguồn |
+|---|---|
+| Có `pole_id` | Server tra từ pole. Client gửi → **400** |
+| `pole_id` NULL | Lấy từ **scope JWT**. Đúng một commune → lấy luôn. Nhiều hơn một → **400**, client phải chọn (và giá trị chọn phải trong scope) |
+
+Không suy được từ `lat`/`lng`: **`administrative_unit` không có cột geometry** — cố ý, nhánh C không
+có nguồn ranh giới thật (`AdministrativeUnit.cs`). Đã đăng ký drift: Contract mục 2.8 không có
+`commune_id` trong body.
+
+**3. `priority_score` là cột LƯU, nullable.**
+
+Contract nói **CV-16 tính** — một tiến trình ngoài API, nên giá trị phải có chỗ ghi vào. Và mục 2.4
+đặt thứ tự mặc định `-priority_score`: sắp theo biểu thức tính lúc query thì **không dùng được index
+và phân trang không ổn định**. Index là `DESC NULLS LAST` — fault CV-16 chưa chấm nằm cuối, không
+phải đầu.
+
+⚠️ **Nợ:** BE-33 đổi trọng số thì phải **tính lại toàn bảng**. Job nền là **BE-26 (W12)**.
+
+**4. `fault_cluster` là BẢNG, không phải cột text trần.**
+
+Contract mục 2.4 chỉ lọc theo `cluster_id` nên một cột text là đủ cho endpoint — nhưng nó sẽ là **ID
+không ràng buộc thứ HAI**, cùng họ với `pole_current_status.last_sweep_id`, và không có gì phát hiện
+một giá trị trỏ vào cụm không tồn tại. Bảng cũng cho lần gom cụm chỗ tự ghi lại:
+`clustering_model_version` là thứ **BE-34** cần để trả lời *kết quả nào do model phiên bản nào sinh*.
+
+Chưa có gì ghi vào bảng này — CV-15 gom cụm, mà CV-15 phụ thuộc **BE-13** (chưa làm).
+
+**5. Toàn bộ FK là `Restrict`. Fault là sự kiện đã xảy ra.**
+
+Xoá cột không làm cho việc "đèn từng hỏng ngày 20/8" chưa từng xảy ra, và cột ghi vết trên chính dòng
+đó **là** tiêu chí nghiệm thu của ticket. Cascade còn mở rộng **vùng mù** ở mục 1c — guard
+`SaveChanges` không thấy cascade do DB thực hiện.
+
+**Định nghĩa "fault MỞ" — một chỗ duy nhất: `FaultStatusSets.Open`.**
+`detected | confirmed | in_progress`. Contract liệt kê 6 trạng thái nhưng **không nói cái nào là mở**,
+trong khi `open_fault_count` (mục 2.1), BE-28 và BE-40 đều cần cùng một câu trả lời. Ba ticket tự
+quyết riêng sẽ ra ba con số khác nhau mà không ai giải thích được. Đã đăng ký drift.
+
 ### Vai trò
 
 **Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.

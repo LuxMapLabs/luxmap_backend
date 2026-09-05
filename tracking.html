@@ -41,20 +41,20 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
-  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 01/09/2026</p>
+  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 05/09/2026</p>
 
   <div class="card">
-    <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu</strong>
+    <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu, BE-18 đẩy sớm</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">BE-42 xong đúng hạn W4 — FO-14 đo lux ở W5 đã được gỡ chặn. LuxReading là ground truth RQ1, KHÔNG phải luminance_history. nearest_luminance tạm null tới BE-17 (đã đăng ký drift, CV-12 phải biết). Hotfix BE-08 xong: commune scoping giờ áp lên cả GHI, không chỉ ĐỌC. BE-11 xong: MinIO + sidecar tạo bucket, ảnh gốc nguyên byte (SHA-256 khớp), EXIF sống sót cho BE-16, thumbnail 320px là object riêng. Chỉ nhận JPEG theo magic bytes. Truy cập qua proxy, KHÔNG presigned — presigned đi vòng qua cả 4 lớp commune scoping. Kế tiếp: <strong>BE-12</strong> — nhưng đang CHẶN: chưa có file FO-10 và Contract không đặc tả endpoint CRUD tài sản nào. Rồi BE-13 → BE-14.</span>
+    <span class="muted">BE-18 xong — lược đồ <code>fault</code> + <code>fault_cluster</code> đã sẵn cho BE-19 (chuyển trạng thái) và BE-20 (biểu đồ). Ghi vết đặt TRÊN bảng <code>fault</code>, KHÔNG có <code>FaultHistory</code> — chỉ giữ quyết định mới nhất, chuỗi đầy đủ là việc của BE-19 nếu cần. Định nghĩa "fault MỞ" chốt một chỗ duy nhất ở <code>FaultStatusSets.Open</code> = <code>detected | confirmed | in_progress</code> — Contract không nói, mà <code>open_fault_count</code>, BE-28 và BE-40 đều cần cùng một câu trả lời. <code>commune_id</code> có HAI nguồn vì <code>pole_id</code> nullable: có pole thì tra từ pole, không có pole thì lấy từ scope JWT. Toàn bộ 8 khoá ngoại là <code>Restrict</code> — fault là sự kiện đã xảy ra, và cascade còn mở rộng vùng mù của guard <code>SaveChanges</code>. BE-42 xong đúng hạn W4 — FO-14 đo lux ở W5 đã được gỡ chặn. Hotfix BE-08 xong: commune scoping giờ áp lên cả GHI, không chỉ ĐỌC. Kế tiếp: <strong>BE-19</strong>. BE-12 vẫn CHẶN: chưa có file FO-10 và Contract không đặc tả endpoint CRUD tài sản nào.</span>
   </div>
 
   <div class="grid">
-    <div class="stat"><b>10</b><span>project trong solution</span></div>
-    <div class="stat"><b>252</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>15</b><span>project trong solution</span></div>
+    <div class="stat"><b>341</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
-    <div class="stat"><b>9</b><span>bảng trong database</span></div>
+    <div class="stat"><b>12</b><span>bảng trong database</span></div>
     <div class="stat"><b>3</b><span>cột hình học, đủ GIST index</span></div>
   </div>
 
@@ -74,7 +74,9 @@
       <tr><td><code>BE-10</code></td><td>Quy ước SRID: lưu và trả 4326, tính khoảng cách trên 3405</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-11</code></td><td>Lưu trữ ảnh MinIO — hai luồng ảnh riêng, magic bytes, thumbnail</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, gỡ chặn FO-14 đo lux ở W5</td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>BE-12</code></td><td>API CRUD tài sản + import CSV — <strong>CHẶN: chưa có file FO-10 và Contract chưa đặc tả endpoint nào</strong></td><td><span class="tag t-next">Kế tiếp</span></td></tr>
+      <tr><td><code>BE-18</code></td><td>Entity Fault + FaultCluster + migration — ghi vết trên bảng <code>fault</code>, <code>FaultStatusSets.Open</code>, 8 FK <code>Restrict</code></td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-12</code></td><td>API CRUD tài sản + import CSV — <strong>CHẶN: chưa có file FO-10 và Contract chưa đặc tả endpoint nào</strong></td><td><span class="tag t-block">Chặn</span></td></tr>
+      <tr><td><code>BE-19</code></td><td>API chuyển trạng thái sự cố — luồng hợp lệ, sai luồng trả 409</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
     </table>
   </div>
@@ -173,6 +175,12 @@
         <td><code>src/LuxMap.Shared/Storage/ObjectStorage.cs</code>, <code>src/LuxMap.Infrastructure.Storage/</code>, <code>tests/LuxMap.Infrastructure.Storage.Tests/</code>, <code>docker-compose.yml</code>, <code>.env.example</code>, <code>Program.cs</code></td>
         <td><code>feat(BE-11): store images in MinIO behind a vendor-neutral abstraction</code></td>
       </tr>
+      <tr>
+        <td>05/09/2026</td>
+        <td><code>BE-18</code> Entity <code>Fault</code> + <code>FaultCluster</code> — ghi vết đặt TRÊN bảng <code>fault</code> (không có <code>FaultHistory</code>), <code>commune_id</code> có hai nguồn vì <code>pole_id</code> nullable, <code>priority_score</code> là cột LƯU với index <code>DESC NULLS LAST</code>, <code>fault_cluster</code> là bảng thật chứ không phải cột text trần. Toàn bộ 8 FK <code>Restrict</code>. Định nghĩa "fault MỞ" chốt một chỗ ở <code>FaultStatusSets.Open</code></td>
+        <td><code>src/LuxMap.Modules.Faults/Entities/</code>, <code>Configurations/FaultConfigurations.cs</code>, <code>src/LuxMap.Shared/Contracts/Enums/FaultStatusSets.cs</code>, migration <code>AddFaultEntities</code>, <code>tests/LuxMap.Api.Tests/FaultSchemaTests.cs</code>, <code>tests/LuxMap.Shared.Tests/FaultStatusSetsTests.cs</code></td>
+        <td><code>feat(BE-18): add Fault and FaultCluster entities with audit on the row</code></td>
+      </tr>
     </table>
   </div>
 
@@ -196,6 +204,11 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>🔴 <code>pole_current_status.status_confidence</code> nhận <code>NaN</code>, <code>Infinity</code> và giá trị ngoài <code>0..1</code> — CHƯA sửa.</strong> Đã chèn thật <code>42.5</code> và nó vào bảng. CHECK duy nhất trên cột đó (<code>ck_pole_current_status_confidence_matches_status</code>) chỉ ràng buộc NULL-hay-không so với <code>fixture_status</code>, không nói gì về giá trị; XML doc ghi "0..1" mà không có gì thực thi. <strong>Quyền ghi bảng thuộc BE-15/BE-17 nên bản sửa thuộc về đó.</strong> <code>fault.status_confidence</code> của BE-18 không lặp lại lỗi này. Xem <code>docs/contract-drift.md</code> mục 24.</li>
+      <li><strong>⚠️ Nợ có chủ — <code>FaultHistory</code> là việc của BE-19 nếu cần chuỗi đầy đủ.</strong> BE-18 chỉ ghi vết quyết định MỚI NHẤT trên bảng <code>fault</code>. Một fault đi <code>detected → confirmed → rejected</code> chỉ còn trạng thái cuối. Contract mục 2.5 chỉ cho đổi ba trường nên số quyết định là hữu hạn, nhưng nếu BE-19/BE-20 cần dựng lại chuỗi thì phải thêm bảng — <strong>đừng để rơi</strong>.</li>
+      <li><strong>⚠️ <code>fault_cluster</code> chưa có gì ghi vào.</strong> CV-15 gom cụm, mà CV-15 phụ thuộc <code>BE-13</code> (chưa làm). Bảng và FK đã sẵn để không phải migration lại; <code>clustering_model_version</code> là thứ BE-34 cần để trả lời kết quả nào do model phiên bản nào sinh.</li>
+      <li><strong>⚠️ <code>mock-faults.json</code> lệch Contract mục 2.4 ở mười chỗ — phải báo WP5 và WP6.</strong> Thiếu <code>fixture_id</code>, <code>data_source</code>, <code>status_confidence</code>, <code>updated_at</code>, <code>work_order_id</code>, <code>note</code>, <code>reported_by</code>; thừa <code>confirmed_by</code>, <code>confirmed_at</code>; và <code>cluster_id</code> dùng <code>CLU-0001</code> trong khi mục 0.2 chốt <code>CLS</code>. Mục "Mock lệch Contract ở 4 prefix khác" bên dưới mới ghi lỗi <code>CLU</code> ở <code>mock-work-orders.json</code>, <strong>thiếu file này</strong>. FE đã code theo mock. Xem <code>docs/contract-drift.md</code> mục 28.</li>
+      <li><strong>⚠️ Bảng "Đã hoàn thành" thiếu ba dòng.</strong> <code>BE-42</code>, hotfix <code>BE-08</code> và bộ template CSV của <code>BE-12</code> đã merge nhưng chưa có dòng trong bảng — bảng Sprint đã ghi Xong nên hai chỗ đang lệch nhau. Bổ sung ở lần cập nhật tới.</li>
       <li><strong>🔧 NỢ VỆ SINH TEST — một vấn đề, ba biểu hiện. Làm SAU BE-42, trước W8.</strong>
       Root cause: <code>LuxMap.Api.Tests</code> chạy trên một PostgreSQL dev có <strong>trạng thái tích luỹ</strong>, và các test class giả định về trạng thái đó theo những cách <strong>không tương thích nhau</strong>. Không phải ba lỗi riêng lẻ.
       <br>(1) <strong>139 commune rác</strong> — <code>ScopeTestFixture.DisposeAsync</code> chỉ drop bảng probe, không xoá commune nó tạo mỗi lần chạy; <code>commune_id_seq</code> đã bị đẩy lên COM-242.

@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LuxMap.Api\LuxMap.Api.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\..\src\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Persistence\LuxMap.Persistence.csproj" />
