@@ -1,0 +1,2 @@
+pole_external_ref,fixture_type,power_source,lamp_watt,install_date,removed_date,warranty_expiry,data_source
+CTA-001,led_road_lamp,grid,100,2022-03-24,,2024-03-24,public_imagery

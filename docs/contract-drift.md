@@ -38,6 +38,8 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 19 | **`measured_by` có ở task list, KHÔNG có ở Contract mục 2.9** | 🟡 Vừa | WP6 | Contract — theo khuôn `reported_by` mục 2.8 |
 | 20 | **`GET /poles/{id}/lux-readings` có phân trang** (mục 2.9 không nhắc) | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
 | 21 | **Mã lỗi thứ 9 ngoài Contract: `SERVER_OWNED_FIELD`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
+| 22 | **`pole.external_ref`** — cột mới, LƯU và TRA được nhưng KHÔNG emit ra API | 🟡 Vừa | Nội bộ BE, tổ sửa chữa | Không phải Contract — quyết định lược đồ, migration thuộc BE-12 |
+| 23 | **Bộ mock FO-26 không mang `feeder_id`** — nạp xong 103 cột chưa gắn mạch điện | 🔴 Cao | CV-15, BE-13, RQ2 | Mock — bổ sung, hoặc gán thủ công có ghi chép |
 
 ---
 
@@ -568,7 +570,9 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 12. **Mục 19** — `tasks-backend.csv` yêu cầu lưu "người đo", Contract mục 2.9 không có trường nào. BE-42 lấy từ JWT theo đúng khuôn `reported_by` ở mục 2.8 dòng 283 (server áp cứng, client không set được), lưu FK tới `app_user`, **không emit ra response**. Nhiều khả năng Contract thiếu sót chứ không phải cố ý.
 13. **Mục 20** — `GET /poles/{id}/lux-readings` được phân trang dù mục 2.9 chỉ nói "sắp theo `measured_at` tăng dần". Lý do: hiệu chuẩn đo gần hàng ngày, một cột rig sẽ tích hàng trăm điểm và response không giới hạn sẽ phình theo thời gian.
 14. **Mục 21** — `SERVER_OWNED_FIELD` (400) khi client gửi `lux_id` hoặc `commune_id`. Mục 2 đang đếm 8 mã ngoài Contract, giờ là **9**.
-15. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
+15. **Mục 22** — `pole.external_ref` (`text NULL`, `UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL`). Lưu mã kiểm kê của đơn vị quản lý. Ba lý do: nối lại được giữa các đợt nhập; là **khoá tự nhiên duy nhất** khiến import idempotent (lược đồ hiện tại không có cái nào, nên nạp lại cùng file sinh trùng toàn bộ); và tổ sửa chữa ngoài hiện trường đọc mã sơn trên cột chứ không đọc `POLE-0042`. **Không emit ra API** — thêm vào response là đổi hình dạng đã publish. Migration thuộc **BE-12**.
+16. **Mục 23 — chặn RQ2, cần quyết sớm.** `mock-poles.geojson` không có `feeder_id`, nên nạp bộ mock FO-26 cho ra **103 cột không gắn tuyến điện nào**. CV-15 gom cụm theo **mạch điện** (một cầu chì nhảy lan theo feeder, không lan theo đường), và BE-13 tồn tại để trả lời *"mọi cột trên feeder X"* — cả hai đều trả rỗng. Hai đường: bổ sung `feeder_id` vào mock (phải báo WP5/WP6 vì FE đã code theo bộ mock), hoặc gán thủ công sau khi nạp và **ghi lại cách gán** để kết quả gom cụm tái lập được. Cột `solar_all_in_one` đúng là không có feeder — đừng gán bừa cho đủ.
+17. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.

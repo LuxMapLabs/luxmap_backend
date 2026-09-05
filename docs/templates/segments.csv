@@ -1,0 +1,2 @@
+segment_name,road_class,length_m,geom_wkt,commune_id,data_source
+Tuyen A - duong lien xa,inter_commune,1600,"LINESTRING(106.4900 10.9700, 106.4950 10.9705, 106.5010 10.9712)",COM-001,public_imagery
