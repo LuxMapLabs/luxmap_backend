@@ -33,7 +33,17 @@ namespace LuxMap.Api.Tests;
 /// </para>
 /// <para>
 /// Assertions are deliberately loose. These print numbers; they are not a performance gate, and a
-/// tight threshold on a shared development machine fails for reasons unrelated to the code.
+/// tight threshold on a shared development machine fails for reasons unrelated to the code. What they
+/// DO assert is that the run measured something real — see the anchors at the end of the paired test.
+/// </para>
+/// <para>
+/// ⚠️ <b>Excluded from <c>dotnet test</c> by default</b>, via <c>Category=Benchmark</c> and the filter
+/// in <c>luxmap.runsettings</c>. A benchmark is not a regression test: this one writes 64,000 rows per
+/// run, which is slow on every pass that gains nothing from it, and its output is a number for a
+/// person to read rather than a pass/fail. Run it deliberately:
+/// <code>dotnet test --settings luxmap.benchmark.runsettings</code>
+/// A command-line <c>--filter</c> will NOT work: VSTest ANDs it with the runsettings filter and the
+/// two cancel out. Verified, not assumed — the naive command matched zero tests.
 /// </para>
 /// </remarks>
 [Collection(nameof(AssetImportCollection))]
@@ -41,10 +51,24 @@ public sealed class CommuneWriteGuardCostTests(AssetImportFixture fixture, ITest
 {
     private const int TrackedEntities = 1000;
 
-    /// <summary>How many A/B pairs to run. The median is reported; the spread is printed too.</summary>
-    private const int Rounds = 5;
+    /// <summary>Paired A/B rounds that count toward the statistics.</summary>
+    private const int Pairs = 30;
+
+    /// <summary>
+    /// Pairs run and thrown away first, so setup and plan caching are not charged to a side.
+    /// </summary>
+    /// <remarks>
+    /// Eight, raised from two after reading a run's raw table: the guard-off column fell from ~90 ms
+    /// to ~55 ms over the first six pairs and only settled from the seventh. Two pairs left the
+    /// system still warming, which put both the largest positive delta and most of the negative ones
+    /// inside the counted sample and widened the spread. The number was chosen from where the column
+    /// flattens, BEFORE the affected run was re-analysed — picking a cut-off after seeing which one
+    /// rescues a result is how a measurement becomes an argument.
+    /// </remarks>
+    private const int WarmUpPairs = 8;
 
     [Fact]
+    [Trait("Category", "Benchmark")]
     public async Task The_parts_of_the_guard_measured_separately()
     {
         await using var scope = fixture.Services.CreateAsyncScope();
@@ -86,61 +110,133 @@ public sealed class CommuneWriteGuardCostTests(AssetImportFixture fixture, ITest
     }
 
     /// <summary>
-    /// The only figure that may be quoted as "what the guard costs": the same 1000-row write, once
-    /// with the guard running and once with it skipped.
+    /// The only figure that may be quoted as "what the guard costs": PAIRED A/B on the same 1000-row
+    /// write, once with the guard running and once with it skipped.
     /// </summary>
     /// <remarks>
-    /// The hypothesis being tested is that the guard adds nothing, because <c>SaveChanges</c> runs
-    /// <c>DetectChanges</c> regardless and the guard merely pulls that pass forward. Both sides do
-    /// identical database work and both roll back, so the difference is the guard and nothing else.
+    /// The hypothesis is that the guard adds nothing, because <c>SaveChanges</c> runs
+    /// <c>DetectChanges</c> regardless and the guard merely pulls that pass forward.
     /// <para>
-    /// The A side opens <c>EnterUnscopedSystemWriteBackdoor</c>, which makes
-    /// <c>CommuneWriteGuard.Enforce</c> return on its first line. The B side runs under a real
-    /// commune claim so the guard walks all 1000 entries. Rounds alternate and the MEDIAN is taken:
-    /// a single pair on a shared machine measures whatever else was running.
+    /// ⚠️ <b>Measured as PAIRS, and the difference is taken inside each pair.</b> Subtracting a median
+    /// of all the A runs from a median of all the B runs is not the same statistic: it lets machine
+    /// drift between the start and the end of the run land entirely on whichever side happened to be
+    /// scheduled there. Two writes run back to back share their conditions, so <c>delta_i = A_i −
+    /// B_i</c> cancels the drift instead of absorbing it. Only the distribution of those deltas is
+    /// reported.
+    /// </para>
+    /// <para>
+    /// B (guard off) is <c>EnterUnscopedSystemWriteBackdoor</c>, opened OUTSIDE the timed region so
+    /// the increment and the disposable are not charged to the measurement. It makes
+    /// <c>EnforceCommuneWriteScope</c> return before <c>CommuneWriteGuard.Enforce</c> is even called,
+    /// which is what "the guard is absent" has to mean. A (guard on) runs under a real commune claim
+    /// so the guard walks all 1000 entries.
+    /// </para>
+    /// <para>
+    /// This test only PRINTS. Whether the numbers may be written into CLAUDE.md is decided by a gate
+    /// stated in the ticket — at least 27 of 30 pairs positive, and IQR below the median — and that
+    /// judgement is not the test's to make, which is why it asserts nothing about the delta.
     /// </para>
     /// </remarks>
     [Fact]
+    [Trait("Category", "Benchmark")]
     public async Task The_MARGINAL_cost_of_the_guard_measured_A_B_on_SaveChanges()
     {
         var segmentId = await SeedSegmentAsync();
 
-        var withoutGuard = new List<double>();
-        var withGuard = new List<double>();
-
-        // One discarded pair first: the first write of a run pays for connection setup and query-plan
-        // caching, and charging that to whichever side happened to go first is how you invent a result.
-        await MeasureAsync(segmentId, guardActive: false);
-        await MeasureAsync(segmentId, guardActive: true);
-
-        for (var round = 0; round < Rounds; round++)
+        // Two discarded pairs: the first writes of a run pay for connection setup and query-plan
+        // caching, and charging that to whichever side goes first is how you invent a result.
+        for (var warmUp = 0; warmUp < WarmUpPairs; warmUp++)
         {
-            withoutGuard.Add(await MeasureAsync(segmentId, guardActive: false));
-            withGuard.Add(await MeasureAsync(segmentId, guardActive: true));
+            await MeasureAsync(segmentId, guardActive: false);
+            await MeasureAsync(segmentId, guardActive: true);
         }
 
-        var offMedian = Median(withoutGuard);
-        var onMedian = Median(withGuard);
-        var marginal = (onMedian - offMedian) * 1000 / TrackedEntities;
+        var pairs = new List<(Timed B, Timed A, double Delta)>();
 
-        output.WriteLine($"rows per write : {TrackedEntities}   rounds: {Rounds} (median reported)");
-        output.WriteLine($"SaveChanges, guard OFF (backdoor) : {offMedian:F1} ms   [{Spread(withoutGuard)}]");
-        output.WriteLine($"SaveChanges, guard ON             : {onMedian:F1} ms   [{Spread(withGuard)}]");
-        output.WriteLine($"MARGINAL cost of the guard        : {onMedian - offMedian:F1} ms total, "
-            + $"{marginal:F2} us/entity");
+        for (var pair = 0; pair < Pairs; pair++)
+        {
+            // B first, then A, back to back — the pair is the unit of measurement.
+            var b = await MeasureAsync(segmentId, guardActive: false);
+            var a = await MeasureAsync(segmentId, guardActive: true);
+            pairs.Add((b, a, a.Milliseconds - b.Milliseconds));
+        }
+
+        var deltas = pairs.Select(pair => pair.Delta).ToList();
+        var positive = deltas.Count(delta => delta > 0);
+        var median = Median(deltas);
+        var (q1, q3) = Quartiles(deltas);
+        var iqr = q3 - q1;
+
+        output.WriteLine($"rows per write : {TrackedEntities}   pairs: {Pairs} "
+            + $"(after {WarmUpPairs} warm-up pairs)   order within a pair: B then A");
+        output.WriteLine(string.Empty);
+        output.WriteLine("pair |    B (ms) |    A (ms) | delta (ms)");
+        for (var i = 0; i < pairs.Count; i++)
+        {
+            output.WriteLine(
+                $"{i + 1,4} | {pairs[i].B.Milliseconds,9:F2} | {pairs[i].A.Milliseconds,9:F2} | {pairs[i].Delta,10:F2}");
+        }
+
+        output.WriteLine(string.Empty);
+        output.WriteLine($"pairs with delta > 0     : {positive}/{Pairs}");
+        output.WriteLine($"median delta             : {median:F2} ms");
+        output.WriteLine($"IQR delta                : {iqr:F2} ms  (Q1 {q1:F2} .. Q3 {q3:F2})");
+        output.WriteLine($"min / max delta          : {deltas.Min():F2} / {deltas.Max():F2} ms");
+        output.WriteLine($"median per entity        : {median * 1000 / TrackedEntities:F2} us");
+        output.WriteLine($"IQR per entity           : {q1 * 1000 / TrackedEntities:F2} .. "
+            + $"{q3 * 1000 / TrackedEntities:F2} us");
+        output.WriteLine(string.Empty);
+
+        // For reference ONLY. Never subtract these: see the note on pairing above.
         output.WriteLine(
-            "This is the number to quote. The separate parts add up to more because Entries<T>() "
-            + "triggers a DetectChanges that SaveChanges would otherwise have run itself.");
+            "[reference, not used for delta] raw median B "
+            + $"{Median(pairs.Select(pair => pair.B.Milliseconds).ToList()):F2} ms, raw median A "
+            + $"{Median(pairs.Select(pair => pair.A.Milliseconds).ToList()):F2} ms");
 
-        // No threshold on the delta: it can legitimately land at or below zero if the guard only moves
-        // the DetectChanges pass. What IS asserted is that the guard does not multiply the write.
-        Assert.True(
-            onMedian < (offMedian * 2) + 50,
-            $"Guard ON ({onMedian:F1} ms) is disproportionate to guard OFF ({offMedian:F1} ms).");
+        output.WriteLine(
+            "Gate for writing this into CLAUDE.md: positive pairs >= 27/30 AND IQR < median.");
+
+        // ── Anchors ────────────────────────────────────────────────────────────────────────────
+        // A measurement that only prints is a silent no-op, and this file would be the worst place in
+        // the repository to allow one: it exists to stop somebody arguing the guard is expensive. If
+        // a future edit stops it measuring anything, these fail instead of printing a tidy table of
+        // meaningless numbers. None of them asserts what the guard COSTS — that judgement is the
+        // ticket's gate, not the test's.
+        Assert.Equal(Pairs, deltas.Count);
+
+        Assert.All(pairs, pair =>
+        {
+            // Every write really wrote all 1000 rows: an empty change tracker would time nothing at
+            // all and still produce a plausible-looking table.
+            Assert.Equal(TrackedEntities, pair.B.RowsWritten);
+            Assert.Equal(TrackedEntities, pair.A.RowsWritten);
+
+            // A zero or negative duration means the clock never ran.
+            Assert.True(pair.B.Milliseconds > 0, "Guard-off write measured no time at all.");
+            Assert.True(pair.A.Milliseconds > 0, "Guard-on write measured no time at all.");
+        });
     }
 
-    /// <summary>One timed write of <see cref="TrackedEntities"/> poles, rolled back. Returns milliseconds.</summary>
-    private async Task<double> MeasureAsync(string segmentId, bool guardActive)
+    /// <summary>
+    /// Q1 and Q3 by nearest rank on the sorted sample — no interpolation, so the values printed are
+    /// observations that really occurred rather than points between them.
+    /// </summary>
+    private static (double Q1, double Q3) Quartiles(List<double> values)
+    {
+        var sorted = values.Order().ToArray();
+        return (sorted[sorted.Length / 4], sorted[sorted.Length * 3 / 4]);
+    }
+
+    /// <summary>A single timed write: how long <c>SaveChanges</c> took, and how many rows it wrote.</summary>
+    /// <remarks>
+    /// The row count is carried out of here ON PURPOSE. A benchmark that only prints is a silent
+    /// no-op: if a future edit left the change tracker empty, every measurement would collapse to
+    /// microseconds and the table would still look like a result. Returning what was actually written
+    /// lets the caller assert the run measured the thing it claims to measure.
+    /// </remarks>
+    private sealed record Timed(double Milliseconds, int RowsWritten);
+
+    private async Task<Timed> MeasureAsync(string segmentId, bool guardActive)
     {
         SetPrincipal(guardActive ? fixture.CommuneId : null);
 
@@ -156,11 +252,11 @@ public sealed class CommuneWriteGuardCostTests(AssetImportFixture fixture, ITest
             TrackPoles(db, segmentId, TrackedEntities);
 
             var timer = Stopwatch.StartNew();
-            await db.SaveChangesAsync();
+            var written = await db.SaveChangesAsync();
             timer.Stop();
 
             await transaction.RollbackAsync();
-            return timer.Elapsed.TotalMilliseconds;
+            return new Timed(timer.Elapsed.TotalMilliseconds, written);
         }
         finally
         {
@@ -259,7 +355,4 @@ public sealed class CommuneWriteGuardCostTests(AssetImportFixture fixture, ITest
         var sorted = values.Order().ToArray();
         return sorted[sorted.Length / 2];
     }
-
-    private static string Spread(List<double> values)
-        => $"min {values.Min():F1} / max {values.Max():F1}";
 }
