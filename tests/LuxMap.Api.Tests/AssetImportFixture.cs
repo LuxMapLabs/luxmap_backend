@@ -30,10 +30,23 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
 
     public string AdminUsername { get; private set; } = null!;
 
+    /// <summary>
+    /// An administrator whose scope covers BOTH communes.
+    /// </summary>
+    /// <remarks>
+    /// Exists for exactly one question: when the query filter admits rows from two communes at once,
+    /// is the upsert key the composite <c>(commune_id, external_ref)</c> or the code alone? With the
+    /// single-commune account the filter hides the other row before the key is ever consulted, so
+    /// that account cannot tell the two implementations apart.
+    /// </remarks>
+    public string BothCommunesUsername { get; private set; } = null!;
+
     /// <summary>From <c>.env</c>, exactly as BE-06 reads it. Never a literal in the test source.</summary>
     public string AdminPassword { get; } = AuthTestExtensions.SeedPassword("SEED_ADMIN_PASSWORD");
 
     private string userId = null!;
+
+    private string bothCommunesUserId = null!;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
         => builder.UseEnvironment("Production");
@@ -77,6 +90,28 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
             userId = user.UserId;
             db.Set<AppUserCommune>().Add(new AppUserCommune { UserId = userId, CommuneId = CommuneId });
             await db.SaveChangesAsync();
+
+            BothCommunesUsername = $"be12b-{Guid.NewGuid():N}"[..20];
+            var wide = new AppUser
+            {
+                Username = BothCommunesUsername,
+                Email = $"{BothCommunesUsername}@luxmap.local",
+                FullName = "BE-12a administrator over two communes",
+                Role = UserRole.Administrator,
+                HasSystemWideScope = false,
+                PasswordHash = string.Empty,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+            };
+
+            wide.PasswordHash = new PasswordHasher<AppUser>().HashPassword(wide, AdminPassword);
+            db.Set<AppUser>().Add(wide);
+            await db.SaveChangesAsync();
+
+            bothCommunesUserId = wide.UserId;
+            db.Set<AppUserCommune>().AddRange(
+                new AppUserCommune { UserId = bothCommunesUserId, CommuneId = CommuneId },
+                new AppUserCommune { UserId = bothCommunesUserId, CommuneId = ForeignCommuneId });
+            await db.SaveChangesAsync();
         }
     }
 
@@ -94,9 +129,9 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 "DELETE FROM pole WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
-                "DELETE FROM refresh_token WHERE user_id = @u;",
-                "DELETE FROM app_user_commune WHERE user_id = @u;",
-                "DELETE FROM app_user WHERE user_id = @u;",
+                "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w;",
+                "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w;",
+                "DELETE FROM app_user WHERE user_id = @u OR user_id = @w;",
                 "DELETE FROM administrative_unit WHERE commune_id = @c OR commune_id = @f;",
             })
             {
@@ -112,6 +147,15 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
     {
         var client = CreateClient();
         var tokens = await (await client.PostLoginAsync(AdminUsername, AdminPassword)).ReadTokensAsync();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
+        return client;
+    }
+
+    /// <summary>An <see cref="HttpClient"/> for the administrator scoped to BOTH communes.</summary>
+    public async Task<HttpClient> BothCommunesClientAsync()
+    {
+        var client = CreateClient();
+        var tokens = await (await client.PostLoginAsync(BothCommunesUsername, AdminPassword)).ReadTokensAsync();
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }
@@ -138,7 +182,8 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
 
-        foreach (var (name, value) in new[] { ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId) })
+        foreach (var (name, value) in new[]
+                 { ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", bothCommunesUserId) })
         {
             var parameter = command.CreateParameter();
             parameter.ParameterName = name;

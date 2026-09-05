@@ -600,9 +600,47 @@ Không phải để duyệt lại quyết định của BE-12a, mà vì BE-12b s
 
 | Mục | Cần gì ở FW-00 |
 |---|---|
-| **31 — vai trò nào được ghi** | **Chốt một lần cho CẢ NHÓM** BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24. BE-12a là ticket đầu tiên chạm 4 policy của BE-08 nên nó **tạo tiền lệ**; sáu ticket tự chọn riêng sẽ ra sáu ma trận quyền khác nhau mà không ai giải thích được. ⚠️ Kèm cái bẫy phải ghi vào Contract: **policy là MỘT vai trò chính xác, không phải một bậc** — gắn `maintenance_engineer` lên endpoint đọc là chặn luôn Quản trị và Cơ quan quản lý. |
+| **31 — vai trò nào được ghi** | **Chốt một lần cho CẢ NHÓM** BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24. BE-12a là ticket đầu tiên chạm 4 policy của BE-08 nên nó **tạo tiền lệ**; sáu ticket tự chọn riêng sẽ ra sáu ma trận quyền khác nhau mà không ai giải thích được. **Xem mục 31b ngay dưới — câu hỏi kèm chi phí, không phải câu hỏi trần.** |
 | **29 — nhóm `/api/v1/assets/…`** | Đường dẫn mới, FE cần biết nó tồn tại và **không** phải `/poles` (chỗ đó là của BE-14, mục 2.1). |
 | **30 — hình dạng kết quả import** | Trả 200 kèm `{inserted, updated, failed, total_errors, truncated, rows[]}`. FE cần hình dạng này để dựng màn hình nhập liệu. |
+
+#### 31b — Bốn policy của BE-08 là EXACT-ROLE hay HIERARCHY? Tiền lệ đã tạo rồi.
+
+BE-12a **đã cài đặt xong theo EXACT-ROLE**, nên FW-00 không còn chọn trên giấy trắng: nó xác nhận
+hoặc bắt sửa. Đưa lên bàn kèm chi phí của từng đáp án.
+
+**Hiện trạng — EXACT-ROLE.** `AuthorizationSetup.RolePolicy` dựng mỗi policy bằng
+`RequireClaim(role, "<đúng một giá trị>")`. Nên:
+
+| Endpoint | Ai vào được |
+|---|---|
+| `POST/PUT /assets/*`, `POST /assets/import/*` (`Administrator`) | **chỉ** Quản trị |
+| `GET /assets/*` (không gắn policy) | **cả bốn** vai trò đã đăng nhập |
+
+⚠️ Hệ quả **phản trực giác** phải ghi vào Contract dù chọn hướng nào: gắn
+`maintenance_engineer` lên một endpoint ĐỌC sẽ **chặn luôn Quản trị và Cơ quan quản lý**, vì policy
+là một giá trị claim chứ không phải một ngưỡng. Trông như siết bảo mật, thực chất là chặn hai vai trò
+khỏi dữ liệu của chính họ. Đã canh bằng test
+`The_managing_authority_MAY_read_which_proves_reads_carry_no_role_policy`.
+
+**Chi phí nếu FW-00 xác nhận EXACT-ROLE:** 0. Không sửa gì.
+
+**Chi phí nếu FW-00 chọn HIERARCHY** (Quản trị ⊇ Cơ quan quản lý ⊇ Kỹ sư ⊇ Tổ khảo sát):
+
+| Phải sửa | Quy mô |
+|---|---|
+| `AuthorizationSetup.RolePolicy` — đổi `RequireClaim` thành `RequireAssertion` so theo bậc | **1 hàm**, ~10 dòng |
+| `LuxMapPolicies` — thêm khái niệm thứ bậc | **1 file**, ~15 dòng |
+| `[Authorize(Policy = …)]` ở dòng sản xuất | **6 dòng**, 2 file, cả 6 đều là `Administrator` — bậc cao nhất nên **không dòng nào đổi nghĩa** |
+| Test khẳng định exact-role | **4 assertion** trong `AssetPermissionTests` |
+| `ScopeTestController` | 2 dòng, chỉ trong test |
+
+**Tổng: khoảng 30 dòng, 4 file.** Rẻ, và rẻ **chính vì** BE-12a chỉ dùng bậc cao nhất
+(`Administrator`) cho ghi và không gắn gì cho đọc — không có endpoint nào phụ thuộc vào việc một vai
+trò GIỮA bị loại. Ticket sau mà gắn `maintenance_engineer` hay `field_crew` vào dòng sản xuất thì chi
+phí đổi hướng bắt đầu tăng thật.
+
+**Vì vậy nên chốt TRƯỚC BE-15/BE-18/BE-21/BE-24**, không phải trước BE-12a.
 
 **Mục 34 thì khác** — nó không cần duyệt, nó cần **hết hạn**. `GET /assets/*` đang trả danh sách ID
 là chỗ giữ chỗ; **xoá mục 34 là một tiêu chí nghiệm thu của BE-12b**.

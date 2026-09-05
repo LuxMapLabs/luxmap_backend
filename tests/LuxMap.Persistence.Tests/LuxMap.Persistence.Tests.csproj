@@ -20,7 +20,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <!-- The module assemblies are referenced so BannedBulkWriteApiTests can RESOLVE the entity type a
+         bulk write targets and ask whether it implements ICommuneScoped. They are plain class
+         libraries: this assembly still needs no database and no Docker, which is the whole reason the
+         compile-time guards live here. -->
     <ProjectReference Include="..\..\src\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\..\src\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\src\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+    <ProjectReference Include="..\..\src\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
   </ItemGroup>
 
 </Project>

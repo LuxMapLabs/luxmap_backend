@@ -19,6 +19,22 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy
 
 ---
 
+## Bản v2 — hai cột đã bị BỎ khỏi `poles.csv`
+
+`segment_name` và `feeder_name` **không còn** trong `poles.csv`. Chúng từng có mặt "chỉ để đọc",
+nhưng trình nhập **không có kênh cảnh báo** — kết quả import chỉ mang lỗi theo dòng — nên một cái tên
+gõ sai sẽ bị nuốt im lặng. Cột trang trí mà không kiểm được thì tệ hơn là không có cột.
+
+Cũng ở bản v2: `poles.csv` tham chiếu bằng `segment_external_ref` / `feeder_external_ref` thay cho
+`segment_id` / `feeder_id`, và `segments.csv` / `feeders.csv` thêm cột `external_ref` bắt buộc.
+
+> ⚠️ **Nếu ai đó đã điền file theo bản cũ**: bỏ hai cột thừa đi là đủ với `poles.csv` — trình nhập
+> bỏ qua cột lạ, nhưng **`segment_id`/`feeder_id` sẽ không được đọc**, phải đổi tên đầu cột thành
+> `segment_external_ref`/`feeder_external_ref` và điền mã của đơn vị thay cho `SEG-001`/`FDR-001`.
+> **Hỏi Khang trước khi phát bản v2** xem đã có ai điền theo bản cũ chưa.
+
+---
+
 ## Thứ tự import — bắt buộc theo đúng thứ tự này
 
 ```

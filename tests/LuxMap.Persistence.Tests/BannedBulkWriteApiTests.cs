@@ -1,3 +1,5 @@
+using LuxMap.Shared.Authorization;
+
 namespace LuxMap.Persistence.Tests;
 
 /// <summary>
@@ -134,9 +136,172 @@ public class BannedBulkWriteApiTests
         Assert.True(offenders.Count == 0, string.Join(Environment.NewLine, offenders));
     }
 
-    private static IEnumerable<string> SourceFiles(string root)
+    /// <summary>
+    /// A bulk write exempted in PRODUCTION code must target an entity the guard never covered anyway.
+    /// </summary>
+    /// <remarks>
+    /// This is the condition the pragma rests on, and until now it was only asserted in a comment.
+    /// <c>AuthService</c> may bypass the guard because <c>RefreshToken</c> is not
+    /// <see cref="ICommuneScoped"/> — the guard was never going to see it. The day somebody makes
+    /// <c>RefreshToken</c> scoped, or slips a scoped entity into an existing exempt region, that
+    /// justification silently stops being true and commune scoping disappears from a write path with
+    /// nothing to say so. Checking it turns a hand-written exception into a self-guarding one.
+    /// <para>
+    /// ⚠️ <b><c>src/</c> only.</b> Test teardown deliberately bulk-deletes scoped entities — poles,
+    /// faults, lux readings — acting as the system to clean up under an empty scope, which is the one
+    /// case where targeting a scoped entity is the point. Those are covered by
+    /// <see cref="Every_bulk_write_sits_inside_an_explicit_RS0030_exemption"/> instead, and BE-36
+    /// removes them altogether.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_exempted_bulk_write_in_production_targets_a_commune_scoped_entity()
     {
-        foreach (var directory in new[] { "src", "tests" })
+        var root = RepositoryRoot();
+        var scoped = ScopedEntityNames();
+        var offenders = new List<string>();
+
+        foreach (var file in SourceFiles(root, "src"))
+        {
+            var exempt = false;
+            var lines = File.ReadAllLines(file);
+
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (lines[i].Contains(Disable, StringComparison.Ordinal))
+                {
+                    exempt = true;
+                }
+                else if (lines[i].Contains(Restore, StringComparison.Ordinal))
+                {
+                    exempt = false;
+                }
+
+                if (!exempt || !BulkWriteCalls.Any(call => lines[i].Contains(call, StringComparison.Ordinal)))
+                {
+                    continue;
+                }
+
+                var entity = TargetEntity(lines, i);
+                if (entity is null)
+                {
+                    offenders.Add(
+                        $"{Path.GetRelativePath(root, file)}:{i + 1} — could not tell which entity this "
+                        + "targets. Write it as dbContext.Set<Entity>() so the exemption can be checked.");
+                }
+                else if (scoped.Contains(entity))
+                {
+                    offenders.Add(
+                        $"{Path.GetRelativePath(root, file)}:{i + 1} targets {entity}, which IS "
+                        + "ICommuneScoped — the exemption's justification does not hold.");
+                }
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "An RS0030 exemption in production is only defensible when the guard had nothing to say "
+            + "about that entity in the first place:"
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, offenders));
+    }
+
+    /// <summary>
+    /// The scope lookup itself resolves both ways — otherwise the check above could pass by mistake.
+    /// </summary>
+    /// <remarks>
+    /// The negative half is the one that matters: <c>RefreshToken</c> being outside
+    /// <see cref="ICommuneScoped"/> is the entire justification for the <c>AuthService</c> exemption.
+    /// If somebody makes it scoped, this fails here with a message saying so, next to the check that
+    /// then starts rejecting the exemption.
+    /// </remarks>
+    [Fact]
+    public void The_scoped_entity_lookup_resolves_real_types_in_both_directions()
+    {
+        var scoped = ScopedEntityNames();
+
+        Assert.Contains("Pole", scoped);
+        Assert.Contains("Fixture", scoped);
+        Assert.Contains("Fault", scoped);
+        Assert.Contains("LuxReading", scoped);
+
+        Assert.DoesNotContain("RefreshToken", scoped);
+        Assert.DoesNotContain("AppUser", scoped);
+
+        // The anchor table is deliberately NOT scoped — filtering it would hide the row that defines a
+        // commune behind the scope derived from it.
+        Assert.DoesNotContain("AdministrativeUnit", scoped);
+    }
+
+    /// <summary>Every entity type in the modules that implements <see cref="ICommuneScoped"/>.</summary>
+    /// <remarks>
+    /// Built from EXPLICIT assembly references rather than by scanning <c>AppDomain</c>. A referenced
+    /// assembly is loaded lazily, and a <c>_ = typeof(X)</c> that only exists to force the load has no
+    /// side effect the compiler is obliged to keep — the first version of this method scanned the app
+    /// domain, found nothing, and would have passed vacuously if the <c>Assert.NotEmpty</c> below had
+    /// not been there.
+    /// <para>
+    /// A new module with scoped entities has to be added here. That is not a gap the test can close
+    /// for itself, but it is a two-line change next to a project reference, both visible in a diff.
+    /// </para>
+    /// </remarks>
+    private static HashSet<string> ScopedEntityNames()
+    {
+        System.Reflection.Assembly[] modules =
+        [
+            typeof(Modules.Assets.Entities.Pole).Assembly,
+            typeof(Modules.Faults.Entities.Fault).Assembly,
+            typeof(Modules.Survey.Entities.LuxReading).Assembly,
+            typeof(Modules.Identity.Entities.AppUser).Assembly,
+            typeof(AdministrativeUnit).Assembly,
+        ];
+
+        var names = modules
+            .Distinct()
+            .SelectMany(SafeTypes)
+            .Where(type => type is { IsClass: true, IsAbstract: false } && typeof(ICommuneScoped).IsAssignableFrom(type))
+            .Select(type => type.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // An empty set would make the whole test pass by finding nothing to object to, which is worse
+        // than failing. It has already happened once — see the remarks.
+        Assert.NotEmpty(names);
+        return names;
+    }
+
+    private static IEnumerable<Type> SafeTypes(System.Reflection.Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (System.Reflection.ReflectionTypeLoadException exception)
+        {
+            return exception.Types.Where(type => type is not null)!;
+        }
+    }
+
+    /// <summary>
+    /// The entity a bulk write targets, read from the nearest <c>Set&lt;X&gt;()</c> at or above the
+    /// call — the statement may be split over several lines.
+    /// </summary>
+    private static string? TargetEntity(string[] lines, int callLine)
+    {
+        for (var i = callLine; i >= Math.Max(0, callLine - 10); i--)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(lines[i], @"Set<(\w+)>\s*\(");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> SourceFiles(string root, params string[] directories)
+    {
+        foreach (var directory in directories.Length > 0 ? directories : ["src", "tests"])
         {
             foreach (var file in Directory.EnumerateFiles(
                 Path.Combine(root, directory), "*.cs", SearchOption.AllDirectories))

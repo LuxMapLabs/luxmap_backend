@@ -256,10 +256,10 @@ một hành động**, nhìn thấy được ở call site và trong diff.
 Guard ném `LuxMapException` → **403 `COMMUNE_FORBIDDEN`**, ném **TRƯỚC** `base.SaveChanges`: ném từ
 trong pipeline của EF sẽ bị bọc thành `DbUpdateException` và middleware BE-04 trả 500 thay vì 403.
 
-> ⚠️ **Con số ~3,7 µs/entity ghi ở đây trước kia ĐO NHẦM ĐỐI TƯỢNG.** Nó là chi phí của lượt
-> `ChangeTracker.Entries<T>()` **ấm**, không phải chi phí kiểm phạm vi và cũng không phải chi phí
-> thật của guard. Số đúng, đo lại ở BE-12a với 1000 entity — xem mục "Chi phí `CommuneWriteGuard`"
-> bên dưới. **Đừng trích lại con số 3,7 µs như thể nó là giá của guard.**
+> ⚠️ **Con số ~3,7 µs/entity ghi ở đây trước kia ĐO NHẦM ĐỐI TƯỢNG.** Nó là lượt
+> `ChangeTracker.Entries<T>()` **ấm** — không phải việc kiểm phạm vi (0,21 µs), cũng không phải chi
+> phí thật của guard. Số đúng đến từ phép đo **A/B** ở BE-12a: **6–15 µs/entity**, xem mục
+> "Chi phí `CommuneWriteGuard`". **Đừng trích lại 3,7 µs như thể nó là giá của guard.**
 
 **1b. `AdministrativeUnit` nằm ở `LuxMap.Persistence`, và KHÔNG implement `ICommuneScoped`.**
 
@@ -619,31 +619,65 @@ Kestrel `MaxRequestBodySize` = **30.000.000 byte (~28,6 MB)**, **thấp hơn** c
 `FormOptions.MultipartBodyLengthLimit` mà người ta hay trích; và form **value** bị chặn ở 4 MB, nên
 gửi GeoJSON dưới dạng field sẽ vỡ ở một ngưỡng chẳng liên quan. Repo trước đó chưa cấu hình cái nào.
 
-### Chi phí `CommuneWriteGuard` — đo lại ở 1000 entity
+### Chi phí `CommuneWriteGuard` — đo A/B ở 1000 entity
 
-Con số **~3,7 µs/entity** ghi ở mục BE-09 **đo nhầm đối tượng**: nó là lượt `Entries<T>()` **ấm**,
-tức phần rẻ nhất trong ba phần. Nó cũng bỏ sót số hạng thật sự tăng. `ChangeTracker.Entries<T>()` **gọi `DetectChanges`** (tài liệu EF Core nói thẳng), nên guard
-ép **một lượt quét snapshot PHỤ** ngay trước `SaveChanges` — vốn cũng tự chạy `DetectChanges`. Đó là
-O(entity × property), không phải O(entity).
+Con số **~3,7 µs/entity** ghi ở mục BE-09 **đo nhầm đối tượng**: nó là lượt `Entries<T>()` ấm, không
+phải việc kiểm phạm vi. Nhưng cộng các phần lại cũng sai nốt, theo chiều ngược: `Entries<T>()` gọi
+`DetectChanges`, mà `SaveChanges` **đằng nào cũng gọi** — nên guard có thể chỉ **dời** lượt quét đó
+sớm lên chứ không thêm.
 
-Đo thật, 1000 `Pole` đang tracked (`CommuneWriteGuardCostTests`):
+**Chỉ có một cách biết: đo cùng một phép ghi, một lần có guard một lần không** (`MeasureAsync` mở
+`EnterUnscopedSystemWriteBackdoor` cho nhánh A). Ghi 1000 `Pole`, rollback, 5 cặp mỗi lần chạy, lấy
+trung vị:
 
-| Đo cái gì | Tổng | Mỗi entity |
+| Lần chạy | `SaveChanges` guard TẮT | guard BẬT | **Chi phí biên** |
+|---|---|---|---|
+| 1 | 91,6 ms | 100,5 ms | 8,88 µs/entity |
+| 2 | 87,2 ms | 96,4 ms | 9,24 µs/entity |
+| 3 | 88,8 ms | 103,6 ms | 14,84 µs/entity |
+| 4 | 88,0 ms | 93,9 ms | 5,92 µs/entity |
+
+**Giả thuyết "guard chỉ dời lượt quét, không thêm gì" BỊ BÁC** — delta dương cả bốn lần.
+
+**Con số phải trích: khoảng 6–15 µs/entity, trung vị ~9** — tức **6–15 ms cho 1000 dòng**, khoảng
+**7–16%** của chính phép ghi. **Đừng trích một con số lẻ**: nhiễu trên DB dev dùng chung lớn hơn tín
+hiệu, và bốn lần chạy chênh nhau 2,5 lần.
+
+Ba số đo trực tiếp, ghi được vì chúng đo đúng thứ chúng nói (`The_parts_of_the_guard_measured_separately`):
+
+| Đo cái gì | µs/entity |
+|---|---|
+| `Entries<T>()` kèm `DetectChanges` | 8,6 – 9,7 |
+| `Entries<T>()` lượt ấm — **con số 3,7 cũ** | 3,7 – 8,5, **không tái lập ổn định** |
+| Vòng kiểm phạm vi — **công việc thật của guard** | **0,21 – 0,23** |
+
+⚠️ **Đừng cộng ba số này lại thành "chi phí guard".** Đó chính là lỗi quy-sai đã sinh ra con số 3,7,
+chỉ lệch chiều ngược. Phép đo A/B là bằng chứng; ba số trên là để hiểu chi phí nằm ở đâu.
+
+> **Nếu có người lấy cớ hiệu năng đòi nới guard:** việc kiểm phạm vi tốn **0,21 µs** — nới nó ra
+> không mua được gì. Đường tối ưu đúng là tắt `AutoDetectChangesEnabled` quanh vòng nạp rồi gọi
+> `DetectChanges()` **một lần** trước `SaveChanges`: bỏ lượt quét thừa, **giữ nguyên** phần kiểm.
+
+### Quy trình: ĐỌC migration sinh ra TRƯỚC khi apply
+
+**Bắt buộc, không phải khuyến nghị.** Sau `dotnet ef migrations add`, mở file `Up()` và `Down()` ra
+đọc **trước** khi `database update`. Kiểm hai câu hỏi:
+
+1. **Có thao tác nào mình không yêu cầu không?** Đặc biệt là `DropIndex`, `DropColumn`,
+   `AlterColumn`. Thêm một cột thì migration chỉ được có `AddColumn` (+ index nếu mình khai).
+2. **`Down()` có đối xứng với `Up()` không?**
+
+**Đây là một LỚP LỖI, không phải hai sự cố rời rạc.** Cả hai lỗi nặng nhất của repo tới giờ đều
+thuộc lớp này — chúng **qua compile, qua toàn bộ test, và chỉ lộ ra khi có người đọc SQL**:
+
+| Lỗi | Qua được gì | Lộ ra khi |
 |---|---|---|
-| `Entries<T>()` **kèm** `DetectChanges` — số hạng tăng theo dữ liệu | 9,69 ms | **9,69 µs** |
-| `Entries<T>()` lượt ấm — **đây chính là con số 3,7 µs cũ** | 3,69 ms | 3,69 µs |
-| Vòng kiểm phạm vi — **công việc thật sự của guard** | 0,21 ms | **0,21 µs** |
-| **Guard tổng, đây là con số phải trích** | **9,90 ms** | **9,90 µs** |
+| **BE-06** — `LPAD` cắt bớt ID, cột thứ 10000 thành `POLE-1000` | compile ✓ test ✓ | đọc lại biểu thức `DEFAULT` |
+| **BE-12a** — EF `DropIndex` ba index `commune_id` khi thêm partial unique index | compile ✓ test ✓ | đọc migration sinh ra |
 
-`DetectChanges` chiếm **98%**. Việc kiểm phạm vi — thứ mà con số 3,7 µs bị gán cho — thật ra nhỏ hơn
-**17 lần** so với chính con số đó.
-
-Ở 1000 entity guard tốn ~10 ms, vẫn nhỏ hơn nhiều so với 1000 vòng đi-về DB, nên **chưa tối ưu gì**.
-
-> **Nếu sau này có người lấy cớ hiệu năng đòi nới guard:** đường tối ưu đúng là tắt
-> `AutoDetectChangesEnabled` quanh vòng nạp rồi gọi `DetectChanges()` **một lần** trước
-> `SaveChanges`. Nó bỏ đúng lượt quét thừa mà **giữ nguyên** phần kiểm phạm vi — vốn chỉ tốn 0,21 µs.
-> Nới guard không mua được gì cả: 98% chi phí nằm ở chỗ khác.
+Không có công cụ nào trong stack bắt được lớp này: analyzer không đọc SQL, test tích hợp chạy trên DB
+đã apply nên nó *thấy* lược đồ mới là bình thường, và cả hai lỗi đều **không ném exception** — chúng
+làm dữ liệu sai hoặc truy vấn chậm dần. Thứ duy nhất bắt được là mắt người, một lần, trước khi apply.
 
 ### Quy ước: PARTIAL INDEX không bao giờ thay thế được index khoá ngoại
 
@@ -666,9 +700,8 @@ khai. Bắt được lúc đọc migration sinh ra, **không phải** lúc chạ
 **Ticket sắp đụng vào:** **BE-15** và **BE-17** gần như chắc chắn — bất kỳ unique index nào kiểu
 `(commune_id, <cái gì đó>)`. Mẫu đúng ở `ExternalRefColumn.HasExternalRef`.
 
-> **Luôn ĐỌC migration sinh ra trước khi apply.** Cả lỗi này lẫn lỗi `LPAD` của BE-06 đều lọt qua
-> compile, qua test, và chỉ lộ ra khi có người đọc SQL. Không có `DropIndex` nào được xuất hiện
-> trong một migration mà bạn chỉ định thêm cột.
+Xem quy tắc quy trình ngay dưới đây — không có `DropIndex` nào được phép xuất hiện trong một
+migration mà bạn chỉ định thêm cột.
 
 ### Quy ước: `ExecuteUpdate` / `ExecuteDelete` bị CẤM ở compile-time
 
@@ -865,23 +898,19 @@ Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` 
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
 
-> 🔴 **Nợ có tên, PHẢI quyết TRƯỚC khi seed dữ liệu thật: `external_ref` của bộ mock.**
+> **Lập trường về `external_ref` của bộ mock — ĐÃ ĐÓNG, không phải nợ mở.**
 >
-> Bộ mock không mang mã kiểm kê nào, nên cách duy nhất nạp được là lấy chính `pole_id` /
-> `segment_id` của mock làm `external_ref` (`AssetImportMockSetTests` làm đúng vậy). Nhưng khoá
-> upsert là `(commune_id, external_ref)` — nên **khi mã kiểm kê THẬT từ FO-10 về, cùng một cột vật
-> lý sẽ mang mã khác, upsert sẽ INSERT hàng MỚI chứ không update**, và địa bàn có hai bản ghi cho
-> một cái cột.
+> Bộ mock không mang mã kiểm kê nào, nên cách nạp duy nhất là lấy chính `pole_id` / `segment_id` của
+> mock làm `external_ref` (`AssetImportMockSetTests` làm đúng vậy).
 >
-> Hai đường, **quyết bây giờ rẻ hơn quyết lúc đã có dữ liệu thật**:
+> **Dưới Nhánh C, đó là danh tính ngoài VĨNH VIỄN.** Nhánh C không có thử nghiệm hiện trường (FO-01),
+> nên không có mã kiểm kê thật nào sẽ về, nên **nhu cầu di trú mã không tồn tại trong phạm vi đồ án**.
+> Di trú mã là **ngoài phạm vi**. Giữ nó thành "nợ hạn W5" chỉ đảm bảo tuần W5 có người mở lại ra bàn
+> cho một rủi ro không tồn tại.
 >
-> 1. **Đường di trú mã** — `UPDATE pole SET external_ref = <mã thật> WHERE external_ref = <mã mock>`,
->    cần một bảng ánh xạ mock→thật do FO-10 cung cấp. Giữ được `POLE-xxxx` đã sinh, nên mọi
->    `fault`/`lux_reading` trỏ vào cột vẫn đúng.
-> 2. **Xoá sạch rồi nạp lại** — chỉ làm được **trước khi** có bất kỳ `fault` hay `lux_reading` nào,
->    vì hai FK đó là `Restrict`. Sau W5 (FO-14 đo lux) thì đường này **đóng lại**.
->
-> Nghĩa là hạn thực tế của quyết định này là **trước W5**, không phải trước BE-39.
+> **Nếu Nhánh C đổi** thì mới cần quyết, và lúc đó dữ kiện này quan trọng: đường "xoá sạch nạp lại"
+> **đóng từ W5**, vì `fault` và `lux_reading` trỏ vào `pole` bằng `Restrict` và FO-14 đo lux ở W5.
+> Sau mốc đó chỉ còn đường `UPDATE pole SET external_ref = …` kèm bảng ánh xạ.
 
 ---
 

@@ -229,18 +229,18 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     }
 
     /// <summary>
-    /// The upsert key is <c>(commune_id, external_ref)</c>, matching the unique index — NOT
-    /// <c>external_ref</c> alone.
+    /// A row in a commune the caller cannot see is invisible to the upsert, so the same inventory code
+    /// is free to reuse.
     /// </summary>
     /// <remarks>
-    /// Worth pinning because the two halves live in different places and only agree by construction:
-    /// the SQL narrows on <c>external_ref</c> (plus the BE-08 filter), and the composite key is
-    /// applied when the result is indexed in memory. Matching on the code alone would let two
-    /// communes that both number a road "TUYEN-A" overwrite each other's row — silently, since
-    /// nothing in the schema forbids the code being reused across communes.
+    /// ⚠️ This pins the BE-08 QUERY FILTER, not the upsert key — it would pass just as well if the key
+    /// were <c>external_ref</c> alone, because the foreign row never reaches the dictionary to collide
+    /// with. The key itself is pinned by
+    /// <see cref="The_upsert_key_is_the_COMPOSITE_when_both_communes_are_inside_the_scope"/>, which is
+    /// the case where the filter admits both rows.
     /// </remarks>
     [Fact]
-    public async Task Two_communes_using_the_same_inventory_code_do_not_overwrite_each_other()
+    public async Task A_row_in_an_unreachable_commune_does_not_block_reusing_its_inventory_code()
     {
         var tag = Tag();
         var shared = $"{tag}-TUYEN-A";
@@ -286,6 +286,70 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
         Assert.Equal(2, rows.Count);
         Assert.Contains(rows, row => row.CommuneId == fixture.CommuneId && row.SegmentName == "Tuyen cua xa minh");
         Assert.Contains(rows, row => row.CommuneId == fixture.ForeignCommuneId && row.SegmentName == "Tuyen cua xa khac");
+    }
+
+    /// <summary>
+    /// The upsert key is <c>(commune_id, external_ref)</c> — the unique index — and NOT the code alone.
+    /// </summary>
+    /// <remarks>
+    /// The discriminating case, and the only one that is: a caller whose <c>commune_ids</c> covers BOTH
+    /// communes. The query filter now admits both rows carrying the same code, so they meet in the same
+    /// lookup and the key is the only thing keeping them apart.
+    /// <para>
+    /// With a key of <c>external_ref</c> alone this test cannot pass: building the lookup would either
+    /// throw on the duplicate key or silently keep one row, and the import would then UPDATE the wrong
+    /// commune's asset — overwriting a road in a commune the operator never named.
+    /// </para>
+    /// <para>
+    /// It matters because the two halves live apart and agree only by construction: the SQL narrows on
+    /// <c>external_ref</c>, and the composite key is applied when the result is indexed in memory.
+    /// Nothing in the schema forbids two communes numbering a road the same way.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task The_upsert_key_is_the_COMPOSITE_when_both_communes_are_inside_the_scope()
+    {
+        var tag = Tag();
+        var shared = $"{tag}-TUYEN-A";
+        var client = await fixture.BothCommunesClientAsync();
+
+        // Both rows are created through the API by the two-commune administrator, so both are plainly
+        // inside the scope — no backdoor, nothing hidden by the filter.
+        foreach (var (commune, name) in new[]
+                 { (fixture.CommuneId, "Tuyen xa mot"), (fixture.ForeignCommuneId, "Tuyen xa hai") })
+        {
+            var created = await ImportAsync(client, "segments", "segments.csv",
+                SegmentHeader
+                + $"\n{shared},{name},inter_commune,100,"
+                + $"\"LINESTRING(106.49 10.97, 106.50 10.98)\",{commune},public_imagery");
+
+            Assert.Equal(1, created.GetProperty("inserted").GetInt32());
+        }
+
+        // Sanity: this caller really can see both, which is what makes the case discriminating.
+        Assert.Equal(2, await fixture.QueryAsync(db => db.Set<RoadSegment>().IgnoreQueryFilters()
+            .CountAsync(segment => segment.ExternalRef == shared)));
+
+        // Now update ONLY the second commune's row.
+        var updated = await ImportAsync(client, "segments", "segments.csv",
+            SegmentHeader
+            + $"\n{shared},Tuyen xa hai - da doi ten,inter_commune,100,"
+            + $"\"LINESTRING(106.49 10.97, 106.50 10.98)\",{fixture.ForeignCommuneId},public_imagery");
+
+        Assert.Equal(1, updated.GetProperty("updated").GetInt32());
+        Assert.Equal(0, updated.GetProperty("inserted").GetInt32());
+
+        var rows = await fixture.QueryAsync(db => db.Set<RoadSegment>().IgnoreQueryFilters()
+            .Where(segment => segment.ExternalRef == shared)
+            .Select(segment => new { segment.CommuneId, segment.SegmentName })
+            .ToListAsync());
+
+        Assert.Equal(2, rows.Count);
+
+        // The other commune's road is untouched. Matching on the code alone would have renamed it.
+        Assert.Contains(rows, row => row.CommuneId == fixture.CommuneId && row.SegmentName == "Tuyen xa mot");
+        Assert.Contains(rows, row =>
+            row.CommuneId == fixture.ForeignCommuneId && row.SegmentName == "Tuyen xa hai - da doi ten");
     }
 
     private static string Tag() => $"T{Guid.NewGuid():N}"[..9].ToUpperInvariant();
