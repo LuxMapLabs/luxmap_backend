@@ -256,8 +256,10 @@ một hành động**, nhìn thấy được ở call site và trong diff.
 Guard ném `LuxMapException` → **403 `COMMUNE_FORBIDDEN`**, ném **TRƯỚC** `base.SaveChanges`: ném từ
 trong pipeline của EF sẽ bị bọc thành `DbUpdateException` và middleware BE-04 trả 500 thay vì 403.
 
-Chi phí đo được: **~3,7 µs mỗi entity** (1 entity 6,0 µs · 50 entity 182,6 µs · 500 entity 1,86 ms).
-Import CSV của BE-12 với 500 dòng tốn dưới 2 ms — nhỏ hơn nhiều so với chính vòng đi-về DB.
+> ⚠️ **Con số ~3,7 µs/entity ghi ở đây trước kia ĐO NHẦM ĐỐI TƯỢNG.** Nó là chi phí của lượt
+> `ChangeTracker.Entries<T>()` **ấm**, không phải chi phí kiểm phạm vi và cũng không phải chi phí
+> thật của guard. Số đúng, đo lại ở BE-12a với 1000 entity — xem mục "Chi phí `CommuneWriteGuard`"
+> bên dưới. **Đừng trích lại con số 3,7 µs như thể nó là giá của guard.**
 
 **1b. `AdministrativeUnit` nằm ở `LuxMap.Persistence`, và KHÔNG implement `ICommuneScoped`.**
 
@@ -477,7 +479,8 @@ Lux là sự kiện đã xảy ra và là ground truth RQ1 — xoá pole không 
 Cũng để **không tạo bảng cascade thứ ba**: guard `SaveChanges` không thấy cascade do DB thực hiện
 (xem mục 1c). `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
 
-**Không gắn policy vai trò.** Bốn policy của BE-08 vẫn chưa dùng ở dòng sản xuất nào vì chưa ai quyết
+**Không gắn policy vai trò.** (Đúng tại thời điểm BE-42; **BE-12a đã gắn** — xem mục BE-12a.)
+Bốn policy của BE-08 khi đó chưa dùng ở dòng sản xuất nào vì chưa ai quyết
 vai trò nào được ghi gì. Đoán một cái ở đây là vô tình tạo tiền lệ. Phạm vi địa bàn **vẫn được canh**
 — qua lượt đọc pole và qua guard.
 
@@ -512,18 +515,24 @@ Template tham chiếu bằng `segment_external_ref` / `feeder_external_ref` / `p
 phải `SEG-001` / `FDR-001`** — mã đó do DB sinh lúc INSERT, người soạn file không biết trước. Trước
 BE-12a bộ bốn file không nạp được liền mạch: phải nạp tuyến, mở DB tra mã, rồi mới điền vào file cột.
 
-> ⚠️ **Bẫy đã gặp thật khi làm migration.** Khai `HasIndex("CommuneId", "ExternalRef")` khiến EF Core
-> **DROP `ix_pole_commune_id`**, vì convention bỏ index khoá ngoại khi đã có index khác dẫn đầu bằng
-> cùng cột. Nhưng index mới là **PARTIAL** — nó không phủ hàng `external_ref IS NULL`, tức đa số cột
-> nạp từ ảnh công khai — trong khi query filter BE-08 đưa `commune_id` vào `WHERE` của **mọi** truy
-> vấn. Phải khai lại `builder.HasIndex("CommuneId")` tường minh. Đã bịt trong
-> `ExternalRefColumn.HasExternalRef`; **đừng xoá dòng đó tưởng thừa.**
+Xem quy tắc partial index ngay dưới đây — nó **không** phải chuyện riêng của BE-12a.
 
 **3. Ngữ nghĩa nhập: kiểm TOÀN BỘ trước, ghi tập hợp lệ trong MỘT transaction, trả 200.**
 
 Dòng vi phạm FK / CHECK / enum / phạm vi xã **phải bị bắt ở bước kiểm**, không được lọt xuống bước
-ghi. "Lỗi lúc ghi" chỉ còn những thứ không đoán trước được (deadlock, mất kết nối) — và những thứ đó
-**rollback cả mẻ, trả 500**, không đổ lỗi cho dòng nào.
+ghi. Lỗi ở bước ghi **rollback cả mẻ, trả 500**, không đổ lỗi cho dòng nào.
+
+> 🔴 **HẠN CHẾ ĐÃ BIẾT — không phải "thiết kế". Upsert KHÔNG nguyên tử.**
+>
+> Bước đọc-trước và bước ghi là hai câu lệnh riêng. **Hai request nạp cùng một file đồng thời**: cả
+> hai đọc không thấy gì, cả hai `Add`, và cái thua đụng `ux_*_commune_external_ref` ngay trong
+> `SaveChanges`. Đó **đúng là** một lỗi mức-dòng lọt xuống bước ghi, và nó nổi lên dưới dạng
+> `DbUpdateException` thô → 500, **không phải** kết quả validate có số dòng.
+>
+> **Chưa sửa ở BE-12a** — một transaction, thua thì không ghi gì, dữ liệu không hỏng, và hai quản trị
+> viên nạp cùng file trong cùng một giây chưa đáng thiết kế riêng. Ghi lại vì **BE-12b kế thừa đúng
+> đường ghi này**, và vì bản sửa đúng là **upsert thật (`ON CONFLICT DO UPDATE`)**, không phải thêm
+> một lượt kiểm nữa — thêm kiểm chỉ thu hẹp cửa sổ chứ không đóng được.
 
 Kết quả: `{inserted, updated, failed, total_errors, truncated, rows[]}`.
 
@@ -555,7 +564,14 @@ Trông như siết bảo mật, thực chất là chặn hai vai trò khỏi d�
 `LuxMap.Api` sang **`LuxMap.Shared`**: host tham chiếu module chứ không ngược lại, nên controller
 trong module không thấy được hằng khai ở host.
 
-Contract mục 7 **chỉ nói phạm vi địa bàn, không nói vai trò nào được ghi** — đã đăng ký drift.
+> ⚠️ **Đây là quyết định KIẾN TRÚC, chưa được chốt ở cấp nhóm — đang chờ FW-00.**
+> Hệ quả: khái niệm authorization rò vào `LuxMap.Shared`, mà `LuxMap.Persistence` và các assembly
+> không-API cũng tham chiếu. Chấp nhận được **nếu** coi `Shared` là nơi chứa hằng liên-tầng — đúng
+> vai trò nó đang giữ cho `ErrorCodes` và `PrefixedIds`. Nếu không chấp nhận thì đường đúng là **mỗi
+> module tự khai tên policy của mình, host đăng ký khớp** — đổi được sau, chỉ là đổi ở nhiều chỗ
+> hơn. Chốt ở FW-00 rồi hãy sửa; đừng để một ticket import quyết thay.
+
+Contract mục 7 **chỉ nói phạm vi địa bàn, không nói vai trò nào được ghi** — đã đăng ký drift 31.
 
 **5. `CommuneFilter.Narrow` giờ có call site thật.**
 
@@ -605,24 +621,82 @@ gửi GeoJSON dưới dạng field sẽ vỡ ở một ngưỡng chẳng liên q
 
 ### Chi phí `CommuneWriteGuard` — đo lại ở 1000 entity
 
-Con số **~3,7 µs/entity** trong repo trước đây đo trên ChangeTracker nhỏ và **bỏ sót số hạng thật sự
-tăng**. `ChangeTracker.Entries<T>()` **gọi `DetectChanges`** (tài liệu EF Core nói thẳng), nên guard
+Con số **~3,7 µs/entity** ghi ở mục BE-09 **đo nhầm đối tượng**: nó là lượt `Entries<T>()` **ấm**,
+tức phần rẻ nhất trong ba phần. Nó cũng bỏ sót số hạng thật sự tăng. `ChangeTracker.Entries<T>()` **gọi `DetectChanges`** (tài liệu EF Core nói thẳng), nên guard
 ép **một lượt quét snapshot PHỤ** ngay trước `SaveChanges` — vốn cũng tự chạy `DetectChanges`. Đó là
 O(entity × property), không phải O(entity).
 
 Đo thật, 1000 `Pole` đang tracked (`CommuneWriteGuardCostTests`):
 
-| | Tổng | Mỗi entity |
+| Đo cái gì | Tổng | Mỗi entity |
 |---|---|---|
-| `Entries<T>()` **kèm** `DetectChanges` | 9,69 ms | 9,69 µs |
-| `Entries<T>()` lượt sau (không có gì đổi) | 3,69 ms | 3,69 µs |
-| Vòng kiểm phạm vi | **0,21 ms** | **0,21 µs** |
-| **Guard tổng** | **9,90 ms** | 9,90 µs |
+| `Entries<T>()` **kèm** `DetectChanges` — số hạng tăng theo dữ liệu | 9,69 ms | **9,69 µs** |
+| `Entries<T>()` lượt ấm — **đây chính là con số 3,7 µs cũ** | 3,69 ms | 3,69 µs |
+| Vòng kiểm phạm vi — **công việc thật sự của guard** | 0,21 ms | **0,21 µs** |
+| **Guard tổng, đây là con số phải trích** | **9,90 ms** | **9,90 µs** |
 
-**Việc kiểm phạm vi gần như miễn phí; `DetectChanges` là toàn bộ chi phí.** Con số 3,7 µs cũ chính là
-lượt `Entries<T>()` ấm — nó đo phần rẻ. Ở 1000 entity guard tốn ~10 ms, vẫn nhỏ hơn nhiều so với
-1000 vòng đi-về DB. **Chưa tối ưu gì** — nếu sau này cần, đường đúng là tắt `AutoDetectChangesEnabled`
-quanh vòng nạp rồi gọi `DetectChanges` một lần, **không phải** nới guard.
+`DetectChanges` chiếm **98%**. Việc kiểm phạm vi — thứ mà con số 3,7 µs bị gán cho — thật ra nhỏ hơn
+**17 lần** so với chính con số đó.
+
+Ở 1000 entity guard tốn ~10 ms, vẫn nhỏ hơn nhiều so với 1000 vòng đi-về DB, nên **chưa tối ưu gì**.
+
+> **Nếu sau này có người lấy cớ hiệu năng đòi nới guard:** đường tối ưu đúng là tắt
+> `AutoDetectChangesEnabled` quanh vòng nạp rồi gọi `DetectChanges()` **một lần** trước
+> `SaveChanges`. Nó bỏ đúng lượt quét thừa mà **giữ nguyên** phần kiểm phạm vi — vốn chỉ tốn 0,21 µs.
+> Nới guard không mua được gì cả: 98% chi phí nằm ở chỗ khác.
+
+### Quy ước: PARTIAL INDEX không bao giờ thay thế được index khoá ngoại
+
+**Khi thêm bất kỳ index nào dẫn đầu bằng `commune_id`, phải khai lại `HasIndex("CommuneId")` tường
+minh trong cùng cấu hình đó.**
+
+EF Core tạo index cho khoá ngoại bằng **convention**, và convention **bỏ qua** nếu đã có index khác
+dẫn đầu bằng cùng cột. Nó **không phân biệt index đầy đủ với partial index** — đó là toàn bộ vấn đề.
+Một partial index chỉ phủ tập con hàng thoả `WHERE` của nó; nó **không** phục vụ được truy vấn trên
+những hàng còn lại.
+
+Vì sao ở repo này thì nghiêm trọng: **query filter BE-08 đưa `commune_id` vào `WHERE` của MỌI truy
+vấn**. Mất index `commune_id` là mất index của toàn hệ thống, không phải của một tính năng.
+
+Gặp thật ở BE-12a: `HasIndex("CommuneId", "ExternalRef")` với filter `external_ref IS NOT NULL` làm
+migration **DROP cả ba** `ix_pole_commune_id`, `ix_road_segment_commune_id`, `ix_feeder_commune_id`.
+Index còn lại không phủ hàng `external_ref IS NULL` — tức **đa số cột**, những cột nạp từ ảnh công
+khai. Bắt được lúc đọc migration sinh ra, **không phải** lúc chạy: không có lỗi, chỉ chậm dần.
+
+**Ticket sắp đụng vào:** **BE-15** và **BE-17** gần như chắc chắn — bất kỳ unique index nào kiểu
+`(commune_id, <cái gì đó>)`. Mẫu đúng ở `ExternalRefColumn.HasExternalRef`.
+
+> **Luôn ĐỌC migration sinh ra trước khi apply.** Cả lỗi này lẫn lỗi `LPAD` của BE-06 đều lọt qua
+> compile, qua test, và chỉ lộ ra khi có người đọc SQL. Không có `DropIndex` nào được xuất hiện
+> trong một migration mà bạn chỉ định thêm cột.
+
+### Quy ước: `ExecuteUpdate` / `ExecuteDelete` bị CẤM ở compile-time
+
+`CommuneWriteGuard` là override của `SaveChanges` và nó duyệt **ChangeTracker**. `ExecuteUpdate` và
+`ExecuteDelete` dịch thẳng ra SQL, **không đi qua ChangeTracker**, nên chúng **vô hiệu hoá hoàn toàn
+kiểm phạm vi Contract mục 7** ở đường ghi.
+
+Đây là **lỗ hổng kiến trúc**, cùng họ với lỗ hổng BE-08 (query filter chỉ áp lên đọc): guard được
+viết ra để bịt phía ghi, mà một API bulk mở lại đúng cái lỗ đó.
+
+Bốn ký hiệu đã vào `BannedSymbols.txt`, RS0030 = error:
+`ExecuteUpdate`, `ExecuteUpdateAsync`, `ExecuteDelete`, `ExecuteDeleteAsync`.
+
+Đường đúng: **nạp hàng rồi `Remove` / sửa**, để guard nhìn thấy. Nếu thao tác thật sự nằm ngoài mọi
+phạm vi thì **nói ra**: `EnterUnscopedSystemWriteBackdoor()` kèm `#pragma warning disable RS0030`
+giải thích vì sao.
+
+Hai nhóm ngoại lệ đang tồn tại, đều chính đáng và đều đã pragma tường minh:
+
+| Chỗ | Lý do |
+|---|---|
+| `AuthService` (4 chỗ) | `RefreshToken` **không** `ICommuneScoped` — guard chưa bao giờ áp. Và luồng xoay token của BE-07 **phụ thuộc** vào số dòng mà `UPDATE` có điều kiện trả về để phân xử refresh đồng thời; nạp-rồi-sửa không diễn đạt được điều đó mà không tái tạo race. |
+| Teardown của test (13 chỗ) | Xoá hàng loạt là cách duy nhất dọn được dưới scope rỗng. **BE-36 xoá luôn nhu cầu** — mỗi lần chạy một DB sạch. |
+
+⚠️ **BannedApiAnalyzers có lỗ, đã đo ở BE-10:** nó chỉ khớp khi **mọi tham số được truyền tường
+minh**, mà cả hai API bulk đều có `CancellationToken` tuỳ chọn. Nên có thêm `BannedBulkWriteApiTests`
+quét văn bản mã nguồn, khẳng định **mọi** lần gọi nằm trong một vùng `#pragma warning disable RS0030`
+và **không file nào để vùng đó hở tới cuối file**. Đừng xoá test đó vì tưởng analyzer đã lo.
 
 ### Quy ước cho MỌI cột `double precision` đo được
 
@@ -790,6 +864,24 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-0047` — pin yếu làm đèn mờ dần, không tắt phụt).
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
+
+> 🔴 **Nợ có tên, PHẢI quyết TRƯỚC khi seed dữ liệu thật: `external_ref` của bộ mock.**
+>
+> Bộ mock không mang mã kiểm kê nào, nên cách duy nhất nạp được là lấy chính `pole_id` /
+> `segment_id` của mock làm `external_ref` (`AssetImportMockSetTests` làm đúng vậy). Nhưng khoá
+> upsert là `(commune_id, external_ref)` — nên **khi mã kiểm kê THẬT từ FO-10 về, cùng một cột vật
+> lý sẽ mang mã khác, upsert sẽ INSERT hàng MỚI chứ không update**, và địa bàn có hai bản ghi cho
+> một cái cột.
+>
+> Hai đường, **quyết bây giờ rẻ hơn quyết lúc đã có dữ liệu thật**:
+>
+> 1. **Đường di trú mã** — `UPDATE pole SET external_ref = <mã thật> WHERE external_ref = <mã mock>`,
+>    cần một bảng ánh xạ mock→thật do FO-10 cung cấp. Giữ được `POLE-xxxx` đã sinh, nên mọi
+>    `fault`/`lux_reading` trỏ vào cột vẫn đúng.
+> 2. **Xoá sạch rồi nạp lại** — chỉ làm được **trước khi** có bất kỳ `fault` hay `lux_reading` nào,
+>    vì hai FK đó là `Restrict`. Sau W5 (FO-14 đo lux) thì đường này **đóng lại**.
+>
+> Nghĩa là hạn thực tế của quyết định này là **trước W5**, không phải trước BE-39.
 
 ---
 

@@ -16,9 +16,23 @@ namespace LuxMap.Modules.Assets.Import;
 /// <remarks>
 /// <b>Validate the whole file, then write the valid rows in one transaction.</b> A row is rejected
 /// only for something checkable up front — a missing cell, an enum outside Contract section 1, an
-/// unresolvable reference, a commune outside scope. Anything that fails at write time is by
-/// definition NOT one of those (a deadlock, a dropped connection), so it aborts the whole batch and
+/// unresolvable reference, a commune outside scope. A write-time failure aborts the whole batch and
 /// surfaces as 500 rather than being blamed on a row.
+/// <para>
+/// ⚠️ <b>KNOWN LIMITATION — the upsert is not atomic, so one row-level failure CAN still reach the
+/// write.</b> The lookup below reads existing rows and then adds or mutates them; read and write are
+/// separate statements. Two imports of the same file running at once both read nothing, both
+/// <c>Add</c>, and the second loses to <c>ux_*_commune_external_ref</c> inside
+/// <c>SaveChanges</c> — arriving as a raw <c>DbUpdateException</c> and a 500, not as a validated row
+/// error carrying a line number.
+/// </para>
+/// <para>
+/// Left as it is for BE-12a: the batch is one transaction, so the loser writes nothing and no data is
+/// corrupted, and a second administrator uploading the same inventory file at the same second is not
+/// a case worth designing for yet. It is written down because <b>BE-12b inherits this write path</b>,
+/// and because the honest fix is a real upsert (<c>ON CONFLICT DO UPDATE</c>) rather than another
+/// pre-check, which would only narrow the window.
+/// </para>
 /// <para>
 /// <b>One kind of file per request.</b> That is what makes references safe: a pole's segment was
 /// committed by an earlier request, so it already has its database-generated <c>SEG-001</c>. Loading

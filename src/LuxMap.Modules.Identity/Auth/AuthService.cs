@@ -207,6 +207,13 @@ public sealed class AuthService(
         var hash = RefreshTokenGenerator.Hash(refreshToken);
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+#pragma warning disable RS0030 // ExecuteUpdateAsync is banned — see BannedSymbols.txt
+        // Justified, and NOT a candidate for rewriting. The ban exists because a bulk write skips the
+        // ChangeTracker and therefore CommuneWriteGuard, so Contract section 7 goes unenforced.
+        // RefreshToken is not ICommuneScoped: it has no commune_id, the guard never applied to it, and
+        // there is nothing here for the ban to protect. BE-07's rotation additionally DEPENDS on the
+        // row count a conditional UPDATE returns to settle concurrent refreshes — load-then-mutate
+        // cannot express that without reintroducing the race.
         await dbContext.Set<RefreshToken>()
             .Where(token => token.TokenHash == hash && token.RevokedAt == null)
             .ExecuteUpdateAsync(
@@ -214,6 +221,7 @@ public sealed class AuthService(
                     .SetProperty(token => token.RevokedAt, now)
                     .SetProperty(token => token.RevokedReason, RefreshTokenRevocationReason.Logout),
                 ct);
+#pragma warning restore RS0030
     }
 
     /// <summary>
@@ -226,6 +234,7 @@ public sealed class AuthService(
     {
         await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
 
+#pragma warning disable RS0030 // RefreshToken is not ICommuneScoped — see the note above
         var claimed = await dbContext.Set<RefreshToken>()
             .Where(token => token.Id == current.Id && token.RevokedAt == null)
             .ExecuteUpdateAsync(
@@ -233,6 +242,7 @@ public sealed class AuthService(
                     .SetProperty(token => token.RevokedAt, now)
                     .SetProperty(token => token.RevokedReason, RefreshTokenRevocationReason.Rotation),
                 ct);
+#pragma warning restore RS0030
 
         if (claimed == 0)
         {
@@ -248,11 +258,13 @@ public sealed class AuthService(
             current.UserId, current.ChainId, current.ChainAbsoluteExpiry, now, ct);
         await dbContext.SaveChangesAsync(ct);
 
+#pragma warning disable RS0030 // RefreshToken is not ICommuneScoped — see the note above
         await dbContext.Set<RefreshToken>()
             .Where(token => token.Id == current.Id)
             .ExecuteUpdateAsync(
                 setters => setters.SetProperty(token => token.ReplacedByTokenId, issued.Entity.Id),
                 ct);
+#pragma warning restore RS0030
 
         await transaction.CommitAsync(ct);
 
@@ -284,6 +296,7 @@ public sealed class AuthService(
             token.Id, sinceRevoked.TotalSeconds, token.ChainId);
 
         // Only the chain containing this token. The user's other chains are untouched.
+#pragma warning disable RS0030 // RefreshToken is not ICommuneScoped — see the note above
         await dbContext.Set<RefreshToken>()
             .Where(other => other.ChainId == token.ChainId && other.RevokedAt == null)
             .ExecuteUpdateAsync(
@@ -291,6 +304,7 @@ public sealed class AuthService(
                     .SetProperty(other => other.RevokedAt, now)
                     .SetProperty(other => other.RevokedReason, RefreshTokenRevocationReason.ReuseDetected),
                 ct);
+#pragma warning restore RS0030
     }
 
     private async Task<(RefreshToken Entity, string RawToken)> IssueRefreshTokenAsync(

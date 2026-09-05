@@ -38,6 +38,7 @@ public class FaultSchemaTests(AssetSchemaFixture fixture) : IAsyncLifetime
 
         await fixture.WriteAsSystemAsync(async db =>
         {
+            #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
             await db.Set<Fault>().IgnoreQueryFilters()
                 .Where(f => faultIds.Contains(f.FaultId)).ExecuteDeleteAsync();
             await db.Set<FaultCluster>().IgnoreQueryFilters()
@@ -134,6 +135,7 @@ public class FaultSchemaTests(AssetSchemaFixture fixture) : IAsyncLifetime
 
         await fixture.WriteAsSystemAsync(db => db.Set<AdministrativeUnit>()
             .Where(u => u.CommuneId == foreignCommune).ExecuteDeleteAsync());
+            #pragma warning restore RS0030
     }
 
     // ── (ii) and (iii) pole_id OR location ───────────────────────────────────

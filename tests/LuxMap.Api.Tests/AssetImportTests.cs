@@ -228,6 +228,66 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
         Assert.Equal(0, result.GetProperty("failed").GetInt32());
     }
 
+    /// <summary>
+    /// The upsert key is <c>(commune_id, external_ref)</c>, matching the unique index — NOT
+    /// <c>external_ref</c> alone.
+    /// </summary>
+    /// <remarks>
+    /// Worth pinning because the two halves live in different places and only agree by construction:
+    /// the SQL narrows on <c>external_ref</c> (plus the BE-08 filter), and the composite key is
+    /// applied when the result is indexed in memory. Matching on the code alone would let two
+    /// communes that both number a road "TUYEN-A" overwrite each other's row — silently, since
+    /// nothing in the schema forbids the code being reused across communes.
+    /// </remarks>
+    [Fact]
+    public async Task Two_communes_using_the_same_inventory_code_do_not_overwrite_each_other()
+    {
+        var tag = Tag();
+        var shared = $"{tag}-TUYEN-A";
+
+        // The foreign commune's row is planted as the system, because the test administrator is
+        // scoped to one commune and must not be able to reach the other.
+        await fixture.QueryAsync(async db =>
+        {
+            using (db.EnterUnscopedSystemWriteBackdoor())
+            {
+                db.Set<RoadSegment>().Add(new RoadSegment
+                {
+                    ExternalRef = shared,
+                    SegmentName = "Tuyen cua xa khac",
+                    RoadClass = LuxMap.Shared.Contracts.Enums.RoadClass.InterVillage,
+                    LengthM = 500,
+                    Geom = new NetTopologySuite.Geometries.LineString(
+                        [new(106.40, 10.90), new(106.41, 10.91)]) { SRID = 4326 },
+                    CommuneId = fixture.ForeignCommuneId,
+                    DataSource = LuxMap.Shared.Contracts.Enums.DataSource.PublicImagery,
+                });
+
+                return await db.SaveChangesAsync();
+            }
+        });
+
+        var client = await fixture.AdminClientAsync();
+        var result = await ImportAsync(client, "segments", "segments.csv",
+            SegmentHeader
+            + $"\n{shared},Tuyen cua xa minh,inter_commune,1600,"
+            + $"\"LINESTRING(106.4900 10.9700, 106.4950 10.9705)\",{fixture.CommuneId},public_imagery");
+
+        // INSERT, not UPDATE: the code collides but the commune does not, so this is a different row.
+        Assert.Equal(1, result.GetProperty("inserted").GetInt32());
+        Assert.Equal(0, result.GetProperty("updated").GetInt32());
+
+        var rows = await fixture.QueryAsync(db => db.Set<RoadSegment>().IgnoreQueryFilters()
+            .Where(segment => segment.ExternalRef == shared)
+            .OrderBy(segment => segment.CommuneId)
+            .Select(segment => new { segment.CommuneId, segment.SegmentName })
+            .ToListAsync());
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, row => row.CommuneId == fixture.CommuneId && row.SegmentName == "Tuyen cua xa minh");
+        Assert.Contains(rows, row => row.CommuneId == fixture.ForeignCommuneId && row.SegmentName == "Tuyen cua xa khac");
+    }
+
     private static string Tag() => $"T{Guid.NewGuid():N}"[..9].ToUpperInvariant();
 
     private async Task SeedPoleAsync(HttpClient client, string tag)

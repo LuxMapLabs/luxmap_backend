@@ -1,2 +1,2 @@
-external_ref,segment_external_ref,segment_name,feeder_external_ref,feeder_name,commune_id,geom_wkt,near_sensitive_poi,data_source
-CTA-001,TUYEN-A,Tuyen A - duong lien xa,FDR-A,Tuyen dien FDR-A,COM-001,POINT(106.4900 10.9700),false,public_imagery
+external_ref,segment_external_ref,feeder_external_ref,commune_id,geom_wkt,near_sensitive_poi,data_source
+CTA-001,TUYEN-A,FDR-A,COM-001,POINT(106.4900 10.9700),false,public_imagery

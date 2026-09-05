@@ -205,9 +205,11 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
     private Task SetLockedAsync(string username, bool locked)
         => factory.QueryAsync(async db =>
         {
+            #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
             await db.Set<AppUser>()
                 .Where(u => u.Username == username)
                 .ExecuteUpdateAsync(s => s.SetProperty(u => u.IsLocked, locked));
+            #pragma warning restore RS0030
             return 0;
         });
 }

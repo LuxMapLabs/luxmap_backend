@@ -67,14 +67,19 @@ Không điền, không thêm cột. Gửi lên sẽ bị từ chối chứ khôn
 
 ### Tham chiếu bằng mã, tên chỉ để đọc
 
-`commune_id` và các cột `*_external_ref` là thứ được dùng. Các cột `segment_name` và `feeder_name`
-trong `poles.csv` **chỉ để người nhập đọc cho dễ và bị BỎ QUA khi nạp** — kết quả import chỉ có lỗi
-theo dòng, không có kênh cảnh báo, nên tên lệch sẽ không được báo. Đừng dựa vào chúng.
+`commune_id` và các cột `*_external_ref` là thứ được dùng, và trong template **không còn cột tên
+nào đi kèm**.
 
-**Không có `commune_name`, và đó là chủ đích.** `segment_name` có nghĩa thật vì một xã có
-nhiều tuyến và `SEG-001` thì không đọc được. Nhưng người soạn file kiểm kê của xã mình biết
-rõ mình đang ở xã nào — thêm `commune_name` vào cả ba file không giúp gì mà **nhân ba cơ hội
-lệch dữ liệu**.
+`poles.csv` từng có `segment_name` / `feeder_name` "chỉ để đọc". Đã **bỏ hẳn**: kết quả import chỉ
+có lỗi theo dòng, **không có kênh cảnh báo**, nên một cái tên gõ sai sẽ bị nuốt im lặng — người
+điền tin là mình đã khai một thứ, hệ thống không khai gì cả, và không ai biết. Cột trang trí mà
+không kiểm được thì tệ hơn là không có cột. Nếu sau này muốn giữ tên để đọc thì phải thêm
+`warnings[]` vào kết quả import trước — đó là đổi hình dạng response, phải qua Thịnh/Ngọc.
+
+**Không có `commune_name` ở đâu cả, và đó là chủ đích** — cùng một lý do. Người soạn file kiểm kê
+của xã mình biết rõ mình đang ở xã nào; thêm cột tên vào cả ba file không giúp gì mà **nhân ba cơ
+hội lệch dữ liệu**. `segment_name` vẫn là cột **thật** trong `segments.csv` vì nó được LƯU vào
+`road_segment.segment_name`; điều vừa bỏ là bản sao chỉ-để-đọc của nó trong `poles.csv`.
 
 ### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 
@@ -167,9 +172,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 |---|---|---|---|
 | `external_ref` | **Có** | text | Mã cột của đơn vị quản lý. `fixtures.csv` trỏ về bằng `pole_external_ref`. Trùng trong cùng xã → **UPDATE** |
 | `segment_external_ref` | **Có** | text | Khớp `external_ref` trong `segments.csv`. Không khớp → lỗi theo dòng |
-| `segment_name` | Không | text | Chỉ để đọc, **bị bỏ qua khi nạp** |
 | `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. **Để trống với cột solar** — cột `solar_all_in_one` không nối lưới nào |
-| `feeder_name` | Không | text | Chỉ để đọc, **bị bỏ qua khi nạp** |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | **Có** | Point | `geometry(Point,4326)`, NOT NULL |
 | `near_sensitive_poi` | Không | bool | `true` / `false`. Mặc định `false`. Gần trường học, chợ, cầu, ngã ba |

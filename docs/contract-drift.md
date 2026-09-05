@@ -47,10 +47,10 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 28 | **`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`) | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa; mục 6 mới ghi file work-orders |
 | 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1 |
 | 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại |
-| 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33 | Contract — ghi rõ; BE-12a chốt Quản trị |
+| 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33, **BE-15/18/21/24** | **FW-00 — chốt MỘT LẦN cho cả nhóm ticket ghi**, không để mỗi ticket tự chọn |
 | 32 | **`external_ref` trên `road_segment`, `feeder`, `pole`** — LƯU và upsert theo, KHÔNG emit | 🟡 Vừa | Nội bộ BE, BE-39 | Không phải Contract — mở rộng mục 22 từ 1 bảng lên 3 |
 | 33 | **Hai mã lỗi mới: `ASSET_NOT_FOUND`, `EXTERNAL_REF_TAKEN`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
-| 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | Tạm thời — BE-12b thay khi Thịnh/Ngọc duyệt |
+| 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | **Chủ nợ: BE-12b.** Xoá mục này là một tiêu chí nghiệm thu của BE-12b, không phải việc dọn dẹp |
 
 ---
 
@@ -594,6 +594,19 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 25. **Mục 32** — mục 22 trước đây chỉ đăng ký `pole.external_ref`. BE-12a mở lên ba bảng, vì `poles.csv` phải trỏ tuyến và mạch điện bằng mã của đơn vị quản lý: `SEG-001` do DB sinh lúc INSERT nên người soạn file không biết trước, và nếu template đòi mã đó thì bộ bốn file không nạp được liền mạch. `fixture` cố ý KHÔNG có — một cột mang nhiều bóng, không mã nào chỉ đúng một lần lắp đặt, nên nhập bóng là insert-only.
 26. **Mục 33** — `ASSET_NOT_FOUND` (404, gộp cả "không tồn tại" lẫn "ngoài phạm vi" đúng như mục 7 đòi) và `EXTERNAL_REF_TAKEN` (409). Mục 2 nay đếm **11** mã ngoài Contract.
 27. **Mục 34 — có hạn dùng.** `GET /assets/{segments,feeders,poles}` trả `PagedResult<string>` chỉ gồm ID. Đó là **chỗ giữ chỗ**, không phải thiết kế: BE-12a sở hữu request và phân quyền, còn hình dạng khi đọc là **BE-12b** đang chờ Thịnh/Ngọc. Công bố một hình dạng đoán bây giờ thì FE sẽ bám vào, và gỡ ra khó hơn nhiều so với công bố muộn.
+### 🔴 Ba mục dưới đây cần WP5 (Thịnh/Ngọc) xem TRƯỚC khi BE-12b bắt đầu
+
+Không phải để duyệt lại quyết định của BE-12a, mà vì BE-12b sẽ xây lên trên chúng và sửa sau thì đắt.
+
+| Mục | Cần gì ở FW-00 |
+|---|---|
+| **31 — vai trò nào được ghi** | **Chốt một lần cho CẢ NHÓM** BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24. BE-12a là ticket đầu tiên chạm 4 policy của BE-08 nên nó **tạo tiền lệ**; sáu ticket tự chọn riêng sẽ ra sáu ma trận quyền khác nhau mà không ai giải thích được. ⚠️ Kèm cái bẫy phải ghi vào Contract: **policy là MỘT vai trò chính xác, không phải một bậc** — gắn `maintenance_engineer` lên endpoint đọc là chặn luôn Quản trị và Cơ quan quản lý. |
+| **29 — nhóm `/api/v1/assets/…`** | Đường dẫn mới, FE cần biết nó tồn tại và **không** phải `/poles` (chỗ đó là của BE-14, mục 2.1). |
+| **30 — hình dạng kết quả import** | Trả 200 kèm `{inserted, updated, failed, total_errors, truncated, rows[]}`. FE cần hình dạng này để dựng màn hình nhập liệu. |
+
+**Mục 34 thì khác** — nó không cần duyệt, nó cần **hết hạn**. `GET /assets/*` đang trả danh sách ID
+là chỗ giữ chỗ; **xoá mục 34 là một tiêu chí nghiệm thu của BE-12b**.
+
 28. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh

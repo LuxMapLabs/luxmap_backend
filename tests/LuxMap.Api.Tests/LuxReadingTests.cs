@@ -53,11 +53,13 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     public async Task DisposeAsync()
         => await fixture.WriteAsSystemAsync(async db =>
         {
+            #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
             await db.Set<LuxReading>().IgnoreQueryFilters()
                 .Where(reading => createdLuxIds.Contains(reading.LuxId)).ExecuteDeleteAsync();
 
             return await db.Set<Pole>().IgnoreQueryFilters()
                 .Where(pole => createdPoleIds.Contains(pole.PoleId)).ExecuteDeleteAsync();
+            #pragma warning restore RS0030
         });
 
     /// <summary>

@@ -96,14 +96,18 @@ public sealed class AssetImportMockSetTests(AssetImportFixture fixture, ITestOut
     /// The batch is one transaction: a failure at WRITE time takes the whole file with it.
     /// </summary>
     /// <remarks>
-    /// ⚠️ Driven through the DbContext, not the endpoint, and the reason is the design rather than
-    /// convenience. B4 requires that anything checkable — a missing cell, a bad enum, an unresolvable
-    /// reference, a foreign commune — is caught during validation and never reaches the write. Having
-    /// done that, the import has NO reachable row-level write failure left to stage over HTTP; what
-    /// remains is the unforeseeable (a deadlock, a dropped connection), which is exactly why those
-    /// abort the batch and answer 500 instead of being blamed on a row. So the test drives the
-    /// mechanism the import relies on: many valid rows plus one the database refuses, in one
-    /// transaction, and nothing survives.
+    /// ⚠️ Driven through the DbContext rather than the endpoint, because the failure it stages cannot
+    /// be produced by a single HTTP request. Everything checkable — a missing cell, a bad enum, an
+    /// unresolvable reference, a foreign commune — is caught during validation, so no ONE upload
+    /// reaches the write with a bad row in it.
+    /// <para>
+    /// That is NOT the same as saying no row-level failure can reach the write. The upsert reads then
+    /// adds, and those are separate statements: two imports of the same file at once both read
+    /// nothing, both add, and the loser hits the unique index inside <c>SaveChanges</c>. See the note
+    /// on <c>AssetImportService</c> — a known limitation, not a design guarantee. This test covers the
+    /// mechanism that keeps that case harmless: many valid rows plus one the database refuses, one
+    /// transaction, nothing survives.
+    /// </para>
     /// </remarks>
     [Fact]
     public async Task One_failing_row_at_write_time_rolls_the_entire_batch_back()
