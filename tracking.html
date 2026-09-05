@@ -46,7 +46,7 @@
   <div class="card">
     <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) bắt đầu</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">Hotfix BE-08 xong: commune scoping giờ áp lên cả GHI, không chỉ ĐỌC (guard ở SaveChanges, 10 test có sẵn chuyển đỏ khi viết xong). BE-11 xong: MinIO + sidecar tạo bucket, ảnh gốc nguyên byte (SHA-256 khớp), EXIF sống sót cho BE-16, thumbnail 320px là object riêng. Chỉ nhận JPEG theo magic bytes. Truy cập qua proxy, KHÔNG presigned — presigned đi vòng qua cả 4 lớp commune scoping. Kế tiếp: <strong>BE-12</strong>, rồi BE-13 → BE-14. <strong>BE-42</strong> vẫn treo hạn W4.</span>
+    <span class="muted">BE-42 xong đúng hạn W4 — FO-14 đo lux ở W5 đã được gỡ chặn. LuxReading là ground truth RQ1, KHÔNG phải luminance_history. nearest_luminance tạm null tới BE-17 (đã đăng ký drift, CV-12 phải biết). Hotfix BE-08 xong: commune scoping giờ áp lên cả GHI, không chỉ ĐỌC. BE-11 xong: MinIO + sidecar tạo bucket, ảnh gốc nguyên byte (SHA-256 khớp), EXIF sống sót cho BE-16, thumbnail 320px là object riêng. Chỉ nhận JPEG theo magic bytes. Truy cập qua proxy, KHÔNG presigned — presigned đi vòng qua cả 4 lớp commune scoping. Kế tiếp: <strong>BE-12</strong> — nhưng đang CHẶN: chưa có file FO-10 và Contract không đặc tả endpoint CRUD tài sản nào. Rồi BE-13 → BE-14.</span>
   </div>
 
   <div class="grid">
@@ -73,8 +73,8 @@
       <tr><td><code>BE-09</code></td><td>Entity Pole, Fixture, RoadSegment, Feeder (+ pole_current_status) + migration + GIST index</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-10</code></td><td>Quy ước SRID: lưu và trả 4326, tính khoảng cách trên 3405</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-11</code></td><td>Lưu trữ ảnh MinIO — hai luồng ảnh riêng, magic bytes, thumbnail</td><td><span class="tag t-done">Xong</span></td></tr>
-      <tr><td><code>BE-12</code></td><td>API CRUD tài sản + import kiểm kê từ CSV</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
-      <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, chặn FO-14 đo lux ở W5</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
+      <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, gỡ chặn FO-14 đo lux ở W5</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-12</code></td><td>API CRUD tài sản + import CSV — <strong>CHẶN: chưa có file FO-10 và Contract chưa đặc tả endpoint nào</strong></td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
     </table>
   </div>

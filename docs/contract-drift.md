@@ -33,6 +33,11 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 13 | ~~`LPAD` cắt bớt ID khi vượt độ rộng~~ | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **ĐÃ SỬA** |
 | 15 | **Mã lỗi thứ 8 ngoài Contract: `UNSUPPORTED_IMAGE_FORMAT`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
 | 16 | **Ràng buộc phiên bản: ImageSharp phải ở 3.x** | 🟡 Vừa | Nội bộ BE, CI | Không phải Contract — quyết định công cụ |
+| 17 | **`nearest_luminance` luôn `null` cho tới BE-17** | 🔴 Cao | CV-12 | Không sửa Contract — nợ hiện thực, BE-15/BE-17 nối nguồn |
+| 18 | **Mục 2.9 thiếu bảng bắt buộc/không** — `pole_id` đã chốt BẮT BUỘC | 🟡 Vừa | WP6, CV-12 | Contract — thêm bảng như mục 2.8 |
+| 19 | **`measured_by` có ở task list, KHÔNG có ở Contract mục 2.9** | 🟡 Vừa | WP6 | Contract — theo khuôn `reported_by` mục 2.8 |
+| 20 | **`GET /poles/{id}/lux-readings` có phân trang** (mục 2.9 không nhắc) | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
+| 21 | **Mã lỗi thứ 9 ngoài Contract: `SERVER_OWNED_FIELD`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
 
 ---
 
@@ -558,7 +563,12 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 7. ~~Mục 13~~ — **đã sửa**, chỉ cần báo để cả nhóm biết `DEFAULT` của cột ID đã đổi dạng.
 8. **Mục 14 phải báo WP5 và WP6** — một dòng thôi, nhưng phải nói trước khi ai đó hardcode `\d{4}`.
 9. **Mục 15** — BE-11 thêm `UNSUPPORTED_IMAGE_FORMAT` (415). Mục 2 đang đếm 7 mã ngoài Contract, giờ là **8**. Chỉ cần ghi vào Contract, không đổi code.
-10. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
+10. **Mục 17 — CV-12 PHẢI biết trước.** `GET /lux-readings` trả `nearest_luminance` là `null` cho **mọi** bản ghi cho tới khi BE-15/BE-17 tạo `luminance_history`. Đây **KHÁC** với ngữ nghĩa Contract định nghĩa (*"null nếu không có điểm nào trong ±48 giờ"*): hiện tại null nghĩa là **bảng nguồn chưa tồn tại**, không phải "đã tìm và không thấy". CV-12 không phân biệt được hai ca này qua API. **Nợ có chủ: BE-15/BE-17** nối nguồn thật rồi xoá mục này.
+11. **Mục 18** — mục 2.9 không có bảng `| Trường | Bắt buộc | Ghi chú |` như mục 2.8, nên `pole_id`, `meter_model`, `note`, `client_op_id` đều không rõ. BE-42 chốt `pole_id` và `client_op_id` **bắt buộc**, `meter_model` và `note` tuỳ chọn. Cần ghi vào Contract.
+12. **Mục 19** — `tasks-backend.csv` yêu cầu lưu "người đo", Contract mục 2.9 không có trường nào. BE-42 lấy từ JWT theo đúng khuôn `reported_by` ở mục 2.8 dòng 283 (server áp cứng, client không set được), lưu FK tới `app_user`, **không emit ra response**. Nhiều khả năng Contract thiếu sót chứ không phải cố ý.
+13. **Mục 20** — `GET /poles/{id}/lux-readings` được phân trang dù mục 2.9 chỉ nói "sắp theo `measured_at` tăng dần". Lý do: hiệu chuẩn đo gần hàng ngày, một cột rig sẽ tích hàng trăm điểm và response không giới hạn sẽ phình theo thời gian.
+14. **Mục 21** — `SERVER_OWNED_FIELD` (400) khi client gửi `lux_id` hoặc `commune_id`. Mục 2 đang đếm 8 mã ngoài Contract, giờ là **9**.
+15. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
 
 Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
 export ở `README.md` để WP6 sinh lại DTO.
