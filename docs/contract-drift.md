@@ -44,7 +44,7 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 25 | **`commune_id` suy từ scope JWT khi `pole_id` NULL** | 🟡 Vừa | WP6, FM-19 | Contract — thêm vào mục 2.8 |
 | 26 | **Ghi vết trên bảng `fault`, không có `FaultHistory`** | 🟡 Vừa | Nội bộ BE, BE-19 | Không phải Contract — quyết định lược đồ |
 | 27 | **Contract không định nghĩa "fault MỞ"** cho `open_fault_count` | 🟡 Vừa | WP5, BE-28, BE-40 | Contract — ghi rõ ba trạng thái |
-| ~~28~~ | ~~**`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`)~~ | 🔴 Cao | WP5, WP6, BE-39 | **ĐÓNG 06/09/2026, nhánh `chore/mock-hygiene`** — mock đã khớp mục 2.4; `CLU`→`CLS` sửa ở cả `mock-work-orders.json`. **Vẫn phải báo WP5/WP6: hình dạng đã đổi.** |
+| ~~28~~ | ~~**`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`)~~ | 🔴 Cao | WP5, WP6, BE-39 | **ĐÓNG 06/09/2026, commit `07ebe37`** — mock đã khớp mục 2.4; `CLU`→`CLS` sửa ở cả `mock-work-orders.json`. **Vẫn phải báo WP5/WP6: hình dạng đã đổi.** |
 | 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1 |
 | 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại |
 | 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33, **BE-15/18/21/24** | **FW-00 — chốt MỘT LẦN cho cả nhóm ticket ghi**, không để mỗi ticket tự chọn |
