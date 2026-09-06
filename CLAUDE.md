@@ -258,8 +258,9 @@ trong pipeline của EF sẽ bị bọc thành `DbUpdateException` và middlewar
 
 > ⚠️ **Con số ~3,7 µs/entity ghi ở đây trước kia ĐO NHẦM ĐỐI TƯỢNG.** Nó là lượt
 > `ChangeTracker.Entries<T>()` **ấm** — không phải việc kiểm phạm vi (0,21 µs), cũng không phải chi
-> phí thật của guard. Số đúng đến từ phép đo **A/B** ở BE-12a: **6–15 µs/entity**, xem mục
-> "Chi phí `CommuneWriteGuard`". **Đừng trích lại 3,7 µs như thể nó là giá của guard.**
+> phí thật của guard. Phép đo **A/B** ở BE-12a cho kết luận là **không đo nổi**: chi phí guard nhỏ
+> hơn nhiễu của chính phép ghi. Xem mục "Chi phí `CommuneWriteGuard`". **Đừng trích lại 3,7 µs — và
+> cũng đừng trích con số nào khác** như thể nó là giá của guard.
 
 **1b. `AdministrativeUnit` nằm ở `LuxMap.Persistence`, và KHÔNG implement `ICommuneScoped`.**
 
@@ -619,29 +620,40 @@ Kestrel `MaxRequestBodySize` = **30.000.000 byte (~28,6 MB)**, **thấp hơn** c
 `FormOptions.MultipartBodyLengthLimit` mà người ta hay trích; và form **value** bị chặn ở 4 MB, nên
 gửi GeoJSON dưới dạng field sẽ vỡ ở một ngưỡng chẳng liên quan. Repo trước đó chưa cấu hình cái nào.
 
-### Chi phí `CommuneWriteGuard` — đo A/B ở 1000 entity
+### Chi phí `CommuneWriteGuard` — đo A/B bắt cặp, KHÔNG kết luận được con số
 
 Con số **~3,7 µs/entity** ghi ở mục BE-09 **đo nhầm đối tượng**: nó là lượt `Entries<T>()` ấm, không
 phải việc kiểm phạm vi. Nhưng cộng các phần lại cũng sai nốt, theo chiều ngược: `Entries<T>()` gọi
 `DetectChanges`, mà `SaveChanges` **đằng nào cũng gọi** — nên guard có thể chỉ **dời** lượt quét đó
 sớm lên chứ không thêm.
 
-**Chỉ có một cách biết: đo cùng một phép ghi, một lần có guard một lần không** (`MeasureAsync` mở
-`EnterUnscopedSystemWriteBackdoor` cho nhánh A). Ghi 1000 `Pole`, rollback, 5 cặp mỗi lần chạy, lấy
-trung vị:
+**Chi phí biên của guard nằm dưới ngưỡng phân giải của phép đo.** Đo A/B bắt cặp trên 1000 entity
+(`SaveChanges` có guard vs không, D1 = `EnterUnscopedSystemWriteBackdoor`), 30 cặp sau 8 cặp
+warm-up: **trung vị delta ~8 µs/entity**, nhưng **IQR (14,3 ms) rộng hơn trung vị (8,5 ms)** và chỉ
+**20/30 cặp dương**, không đạt ngưỡng 27/30. **Kết luận dùng được: chi phí guard nhỏ hơn nhiễu của
+chính phép ghi nó bảo vệ** (~8 ms trên nền ~55 ms cho 1000 dòng). **Không có con số điểm nào đáng
+trích.**
 
-| Lần chạy | `SaveChanges` guard TẮT | guard BẬT | **Chi phí biên** |
+Ba số 9,69 / 3,69 / 0,21 là **phân rã bên trong guard đo trong bộ nhớ**, KHÔNG phải chi phí biên —
+**đừng cộng, đừng trích** khi nói guard tốn bao nhiêu.
+
+> **Giả thuyết "guard chỉ dời `DetectChanges` sang sớm hơn" chưa bị bác cũng chưa được xác nhận ở độ
+> phân giải này.** 20/30 cặp dương và trung vị dương thì nghiêng về việc guard **thêm** chi phí thật,
+> nhưng không qua cổng nên chưa kết luận được. Đó là câu hỏi còn mở cho ai muốn đo lại.
+
+⚠️ **Đừng đo lại bằng chính cách này.** Ba lượt chạy đã cho ba kết quả trượt cổng, và lượt cuối lộ ra
+một **nhiễu có chu kỳ**: 10 cặp delta âm rơi vào **đúng các cặp 1, 4, 7, 10, … — chu kỳ 3, không sót
+cặp nào**, và nhánh B ở đúng những cặp đó vọt lên ~60–70 ms. Đó là **hiện tượng hệ thống**, không
+phải nhiễu ngẫu nhiên, nên tăng số lượt sẽ không làm nó biến mất. Muốn đo lại thì phải tìm ra chu kỳ
+3 ấy là gì trước (checkpoint của PostgreSQL? xoay vòng connection pool?), hoặc bỏ hẳn phép ghi thật.
+
+Bốn lượt đã chạy, để không ai lặp lại:
+
+| Lượt | Cấu hình | Kết quả | Cổng |
 |---|---|---|---|
-| 1 | 91,6 ms | 100,5 ms | 8,88 µs/entity |
-| 2 | 87,2 ms | 96,4 ms | 9,24 µs/entity |
-| 3 | 88,8 ms | 103,6 ms | 14,84 µs/entity |
-| 4 | 88,0 ms | 93,9 ms | 5,92 µs/entity |
-
-**Giả thuyết "guard chỉ dời lượt quét, không thêm gì" BỊ BÁC** — delta dương cả bốn lần.
-
-**Con số phải trích: khoảng 6–15 µs/entity, trung vị ~9** — tức **6–15 ms cho 1000 dòng**, khoảng
-**7–16%** của chính phép ghi. **Đừng trích một con số lẻ**: nhiễu trên DB dev dùng chung lớn hơn tín
-hiệu, và bốn lần chạy chênh nhau 2,5 lần.
+| 1–4 | 5 cặp, 1 cặp warm-up, trung-vị-A trừ trung-vị-B | 5,92 – 14,84 µs/entity | không có cổng; **cách trừ đã sai** |
+| 5 | 30 cặp, 2 cặp warm-up, delta trong cặp | 26/30 dương · trung vị 6,45 · IQR 9,56 | **trượt cả hai** |
+| 6 | 30 cặp, **8 cặp** warm-up, delta trong cặp | 20/30 dương · trung vị 8,46 · IQR 14,33 | **trượt cả hai, tệ hơn** |
 
 Ba số đo trực tiếp, ghi được vì chúng đo đúng thứ chúng nói (`The_parts_of_the_guard_measured_separately`):
 
@@ -652,7 +664,8 @@ Ba số đo trực tiếp, ghi được vì chúng đo đúng thứ chúng nói 
 | Vòng kiểm phạm vi — **công việc thật của guard** | **0,21 – 0,23** |
 
 ⚠️ **Đừng cộng ba số này lại thành "chi phí guard".** Đó chính là lỗi quy-sai đã sinh ra con số 3,7,
-chỉ lệch chiều ngược. Phép đo A/B là bằng chứng; ba số trên là để hiểu chi phí nằm ở đâu.
+chỉ lệch chiều ngược. Chúng chỉ để hiểu chi phí **nằm ở đâu** bên trong guard — phép đo A/B, thứ duy
+nhất trả lời được guard tốn thêm bao nhiêu, **không kết luận được**.
 
 > **Nếu có người lấy cớ hiệu năng đòi nới guard:** việc kiểm phạm vi tốn **0,21 µs** — nới nó ra
 > không mua được gì. Đường tối ưu đúng là tắt `AutoDetectChangesEnabled` quanh vòng nạp rồi gọi

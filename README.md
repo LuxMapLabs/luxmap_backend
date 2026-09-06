@@ -22,6 +22,18 @@ dotnet build
 dotnet test
 ```
 
+Benchmark bị **loại khỏi lượt chạy mặc định** (`luxmap.runsettings`, lọc `Category!=Benchmark`) —
+chúng đo số cho người đọc, không phải test hồi quy, và một phép đo thời gian trên máy dùng chung là
+chỗ sinh flake tự nhiên. Chạy có chủ đích:
+
+```bash
+dotnet test --settings luxmap.benchmark.runsettings
+```
+
+> `--filter "Category=Benchmark"` **không dùng được**: VSTest lấy giao của filter dòng lệnh với
+> filter trong runsettings, ra `(Category!=Benchmark)&(Category=Benchmark)` — khớp 0 test. File
+> settings thứ hai **thay thế** file mặc định thay vì giao với nó.
+
 ```bash
 dotnet run --project src/LuxMap.Api
 ```

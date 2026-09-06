@@ -5,6 +5,16 @@
     the point, since a banned API is only banned if it is banned everywhere.
   -->
 
+  <PropertyGroup>
+    <!--
+      Makes a bare `dotnet test` pick up luxmap.runsettings, which keeps Category=Benchmark out of the
+      default run. Set here rather than left to a command-line flag for the same reason BannedSymbols
+      lives at the root: a rule that has to be remembered on every invocation is a rule that is not
+      applied on the invocation that mattered.
+    -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)luxmap.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
+
   <ItemGroup>
     <!--
       Enforces BannedSymbols.txt as RS0030, raised to an error in .editorconfig.

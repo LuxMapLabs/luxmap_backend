@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The opposite of luxmap.runsettings: run ONLY the benchmarks.
+
+  Why a second settings file rather than a command-line filter. VSTest ANDs the runsettings
+  TestCaseFilter with the one passed on the command line, so with luxmap.runsettings in force
+  (Directory.Build.props applies it to every dotnet test), asking for Category=Benchmark yields
+  (Category!=Benchmark) AND (Category=Benchmark) and matches nothing at all. Passing this file with
+  the settings switch REPLACES the default one instead of combining with it.
+
+  Verified, not assumed: the naive command was tried first and matched zero tests.
+
+  Usage: dotnet test, with the settings switch pointing at this file.
+-->
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>Category=Benchmark</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>

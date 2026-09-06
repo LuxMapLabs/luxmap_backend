@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Applied to every `dotnet test` in this repository without anyone having to remember a flag:
+  Directory.Build.props points RunSettingsFilePath here.
+
+  The one thing it does is keep BENCHMARKS out of the default run. A benchmark is not a regression
+  test. CommuneWriteGuardCostTests writes 64,000 rows to produce a number a person then reads, so
+  running it on every pass costs time no reviewer gains anything from. Worse, a timing measurement on
+  a shared machine is the natural home of a flaky failure, and one flaky test teaches people to rerun
+  the suite until it goes green, which is how a real failure gets missed.
+
+  Run them on purpose with:  dotnet test  and the settings switch pointing at
+  luxmap.benchmark.runsettings. A command-line filter will NOT work: VSTest ANDs it with the filter
+  below, so asking for Category=Benchmark matches nothing.
+-->
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>Category!=Benchmark</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>
