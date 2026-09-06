@@ -59,24 +59,43 @@ FE cần đọc lại: mục 1 (enum đổi), 2.4 (hình dạng item), 0.2 (pref
 
 Bốn dòng đầu đã dùng trong bộ mock FO-26, không đổi:
 
-| Entity | Prefix | Ví dụ |
-|---|---|---|
-| `Pole` | `POLE` | `POLE-0001` |
-| `Fault` | `FAULT` | `FAULT-0001` |
-| `RoadSegment` | `SEG` | `SEG-001` |
-| `AdministrativeUnit` | `COM` | `COM-001` |
-| `Fixture` | `FIX` | `FIX-0001` |
-| `Feeder` | `FDR` | `FDR-001` |
-| `IotNode` | `NODE` | `NODE-001` |
-| `SurveySweep` | `SWP` | `SWP-001` |
-| `SurveyFrame` | `FRM` | `FRM-000001` |
-| `Detection` | `DET` | `DET-000001` |
-| `LuxReading` | `LUX` | `LUX-0001` |
-| `WorkOrder` | `WO` | `WO-0001` |
-| `RepairEvidence` | `EVD` | `EVD-0001` |
-| `ExternalUnit` | `EXT` | `EXT-001` |
-| `AppUser` | `USR` | `USR-001` |
-| Cụm sự cố (`cluster_id`) | `CLS` | `CLS-001` |
+| Entity | Prefix | Ví dụ | Khuôn (SÀN, không phải trần) |
+|---|---|---|---|
+| `Pole` | `POLE` | `POLE-0001` | `^POLE-[0-9]{4,}$` |
+| `Fault` | `FAULT` | `FAULT-0001` | `^FAULT-[0-9]{4,}$` |
+| `RoadSegment` | `SEG` | `SEG-001` | `^SEG-[0-9]{3,}$` |
+| `AdministrativeUnit` | `COM` | `COM-001` | `^COM-[0-9]{3,}$` |
+| `Fixture` | `FIX` | `FIX-0001` | `^FIX-[0-9]{4,}$` |
+| `Feeder` | `FDR` | `FDR-001` | `^FDR-[0-9]{3,}$` |
+| `IotNode` | `NODE` | `NODE-001` | `^NODE-[0-9]{3,}$` |
+| `SurveySweep` | `SWP` | `SWP-001` | `^SWP-[0-9]{3,}$` |
+| `SurveyFrame` | `FRM` | `FRM-000001` | `^FRM-[0-9]{6,}$` |
+| `Detection` | `DET` | `DET-000001` | `^DET-[0-9]{6,}$` |
+| `LuxReading` | `LUX` | `LUX-0001` | `^LUX-[0-9]{4,}$` |
+| `WorkOrder` | `WO` | `WO-0001` | `^WO-[0-9]{4,}$` |
+| `RepairEvidence` | `EVD` | `EVD-0001` | `^EVD-[0-9]{4,}$` |
+| `ExternalUnit` | `EXT` | `EXT-001` | `^EXT-[0-9]{3,}$` |
+| `AppUser` | `USR` | `USR-001` | `^USR-[0-9]{3,}$` |
+| Cụm sự cố (`cluster_id`) | `CLS` | `CLS-001` | `^CLS-[0-9]{3,}$` |
+
+**Số chữ số là TỐI THIỂU, không cố định** — ID dài ra khi vượt ngưỡng padding, và **không có giới hạn
+trên**. `POLE-9999` kế tiếp là `POLE-10000`, không phải một ID bốn chữ số nào khác.
+
+**ID là chuỗi đục:** client **không** parse thành số, **không** so sánh theo thứ tự số học, **không**
+giả định độ dài. Sắp xếp theo ID là sai từ ID thứ 10000 trở đi — `POLE-10000` đứng TRƯỚC `POLE-9999`
+khi so chuỗi.
+
+**Khuôn ở cột cuối là SÀN để validate, không phải trần.** Nó dùng `[0-9]` chứ không phải `\d`: trong
+.NET và nhiều engine khác `\d` khớp cả chữ số Unicode (`٠١٢` Ả Rập-Ấn Độ, `०१२` Devanagari), nên
+`\d{4,}` nhận những chuỗi không bao giờ là ID hợp lệ.
+
+> ⚠️ **Client validate chặt hơn khuôn này sẽ TỪ CHỐI ID hợp lệ khi dữ liệu vượt ngưỡng.** Cụ thể:
+> `{4}` không dấu phẩy sẽ hỏng ở cột thứ 10000. **Khuôn này chưa được đối chiếu với client hiện có
+> tại thời điểm ghi** — WP5 và WP6 phải tự kiểm regex phía mình.
+> **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
+
+Mục này **bổ sung** cho §0.3, **không thay thế**: §0.3 nói bằng lời rằng ID là chuỗi đục và dài ra
+được; cột khuôn ở đây là dạng máy đọc được của đúng điều đó.
 
 `LuminanceBaseline` và `TelemetryReading` **không có ID hiển thị** — khoá theo `(pole_id, ...)` và `(node_id, reading_time)`, không bao giờ tham chiếu trực tiếp từ FE.
 
@@ -88,15 +107,33 @@ Khi vượt ngưỡng chữ số, ID dài ra tự nhiên — cột thứ 10000 l
 
 ### 0.4 Cách sinh ID — phía server
 
-Dùng **sequence của PostgreSQL**, sinh chuỗi ngay ở tầng DB:
+Dùng **sequence của PostgreSQL**, sinh chuỗi ngay ở tầng DB, qua một hàm định dạng:
 
 ```sql
+CREATE FUNCTION luxmap_format_id(prefix text, value bigint, digits integer) RETURNS text
+LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text)), '0')
+$$;
+
 CREATE SEQUENCE pole_id_seq;
 
 ALTER TABLE pole
   ALTER COLUMN pole_id
-  SET DEFAULT 'POLE-' || LPAD(nextval('pole_id_seq')::text, 4, '0');
+  SET DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4);
 ```
+
+> 🔴 **KHÔNG dùng `LPAD(nextval(...)::text, 4, '0')` — bản Contract trước ghi như vậy và nó SAI.**
+> `lpad` của PostgreSQL **CẮT BỚT** khi chuỗi đã dài hơn độ rộng: `lpad('10000', 4, '0')` cho ra
+> `'1000'`. Cột thứ 10000 sẽ được gán `POLE-1000` và **đụng ID của cột thứ 1000** — vi phạm §0.3
+> ngay phía trên, và là lỗi **câm**: không exception, chỉ là một `23505 duplicate key` ở một hàng
+> trông bình thường.
+>
+> `greatest(digits, length(...))` cho ra đúng hành vi §0.3 mô tả. Phải là một **hàm** chứ không phải
+> biểu thức thẳng, vì biểu thức đó gọi giá trị ba lần mà PostgreSQL không cho dùng subquery hay CTE
+> trong `DEFAULT` của cột — hàm là cách giữ `nextval` được gọi **đúng một lần** mỗi hàng.
+>
+> Code backend đã sửa từ commit `8ea9930`; **Contract lệch code kể từ đó tới nay**. Đây là **sửa
+> lỗi**, không phải mở rộng. **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
 
 EF Core map bằng `.HasDefaultValueSql(...)` kèm `.ValueGeneratedOnAdd()`.
 

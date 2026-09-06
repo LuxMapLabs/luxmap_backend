@@ -198,6 +198,38 @@ Sự thật đã kiểm: mục 2.4 hứa `work_order_id`, nhưng `\d fault` **kh
 
 **Nợ có tên: BE-21.** Không phải "sẽ làm sau".
 
+### D — §0.4 sửa lỗi `LPAD` (KHÔNG phải mở rộng)
+
+| | |
+|---|---|
+| **Decision** | Thay `LPAD(nextval(...)::text, 4, '0')` ở §0.4 bằng `luxmap_format_id(prefix, nextval(seq), digits)` |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | §0.4 · drift 39 · không đụng code (code đã đúng từ `8ea9930`) |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc |
+
+**Đây là SỬA LỖI, không phải mở rộng** — nên tách khỏi A/B/C và tách thành commit riêng.
+
+`lpad` của PostgreSQL **CẮT BỚT** khi chuỗi đã dài hơn độ rộng: `lpad('10000', 4, '0')` → `'1000'`.
+Cột thứ 10000 nhận `POLE-1000` và **đụng ID của cột thứ 1000**. Không exception, chỉ một
+`23505 duplicate key` ở một hàng trông bình thường.
+
+Điều đó **mâu thuẫn §0.3 nằm ngay mười dòng phía trên**, vốn hứa ID dài ra tự nhiên. Và mâu thuẫn
+schema thật: backend đã bỏ `LPAD` ở commit `8ea9930` (drift 13), nhưng **Contract chưa được sửa
+theo** — lệch từ đó tới nay.
+
+Chữ ký hàm chép từ `pg_proc`, không viết từ trí nhớ:
+
+```sql
+luxmap_format_id(prefix text, value bigint, digits integer) RETURNS text
+    SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text)), '0')
+```
+
+⚠️ Phải là **hàm** chứ không phải biểu thức thẳng: biểu thức gọi giá trị ba lần, mà PostgreSQL không
+cho subquery hay CTE trong `DEFAULT` của cột — hàm là cách giữ `nextval` được gọi **đúng một lần**
+mỗi hàng.
+
+
 ---
 
 ## Tóm tắt
@@ -242,6 +274,7 @@ Sự thật đã kiểm: mục 2.4 hứa `work_order_id`, nhưng `\d fault` **kh
 | 36 | **`open_fault_count` của `mock-poles.geojson` lệch `mock-faults.json` ở 2 cột** | 🟡 Vừa | WP5, BE-39 | Mock — chặn bởi mục 27; xem mục 36b |
 | 37 | **Contract chưa đặc tả KHUÔN ID** — không mục nào cho regex, chỉ có ví dụ ở mục 0.2 | 🔴 Cao | WP5, **WP6**, FM-17 | Contract — thêm; đã quyết ở **A**, xem "Quyết định đã đăng ký" |
 | 38 | **`work_order_id` (mục 2.4) chưa có chỗ chứa** — `fault` không có cột, bảng `work_order` chưa tồn tại | 🟡 Vừa | WP5, WP6, BE-21 | Đã quyết ở **C** — emit `null`, nợ có tên |
+| 39 | 🔴 **§0.4 dạy `LPAD(...)` — cơ chế SAI, cắt ID khi vượt độ rộng.** Contract lệch code từ commit `8ea9930` | 🔴 Cao | WP5, WP6, BE-39 | Contract — **ĐÃ SỬA 07/09/2026** (`SELF-SIGNED`); xem **D** |
 
 ---
 
