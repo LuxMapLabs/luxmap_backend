@@ -2022,7 +2022,7 @@
     "commune_id": "COM-001",
     "last_seen_at": "2026-08-17T12:00:00Z",
     "last_sweep_id": "SWEEP-2026-08-19-01",
-    "open_fault_count": 1,
+    "open_fault_count": 2,
     "has_iot_node": true,
     "near_sensitive_poi": false
    }
@@ -2049,7 +2049,7 @@
     "commune_id": "COM-001",
     "last_seen_at": "2026-08-19T12:00:00Z",
     "last_sweep_id": "SWEEP-2026-08-19-01",
-    "open_fault_count": 0,
+    "open_fault_count": 1,
     "has_iot_node": true,
     "near_sensitive_poi": false
    }

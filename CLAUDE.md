@@ -837,10 +837,47 @@ Xoá cột không làm cho việc "đèn từng hỏng ngày 20/8" chưa từng 
 đó **là** tiêu chí nghiệm thu của ticket. Cascade còn mở rộng **vùng mù** ở mục 1c — guard
 `SaveChanges` không thấy cascade do DB thực hiện.
 
-**Định nghĩa "fault MỞ" — một chỗ duy nhất: `FaultStatusSets.Open`.**
-`detected | confirmed | in_progress`. Contract liệt kê 6 trạng thái nhưng **không nói cái nào là mở**,
-trong khi `open_fault_count` (mục 2.1), BE-28 và BE-40 đều cần cùng một câu trả lời. Ba ticket tự
-quyết riêng sẽ ra ba con số khác nhau mà không ai giải thích được. Đã đăng ký drift.
+**Định nghĩa "fault MỞ" — CHỐT, một chỗ duy nhất: `FaultStatusSets.Open`.**
+
+```
+open fault  ==  fault_status ∈ { detected, confirmed, in_progress }
+```
+
+Contract liệt kê 6 trạng thái nhưng **không nói cái nào là mở** — `open_fault_count` xuất hiện đúng
+một lần ở mục 2.1, trong một khối code, **không kèm câu mô tả nào**; `has_open_fault` và
+`open_faults[]` cũng vậy. Trong khi đó `open_fault_count`, BE-28 và BE-40 đều cần **cùng một** câu
+trả lời. Ba ticket tự quyết riêng sẽ ra ba con số khác nhau mà không ai giải thích được.
+
+Ba trạng thái bị loại vì **ba lý do khác nhau** — đó là lý do tập này được viết ra tường minh thay vì
+diễn đạt kiểu "chưa xong": `rejected` = kỹ sư kết luận nó chưa từng là sự cố (dương tính giả),
+`resolved` = đã sửa, `verified` = đã nghiệm thu. Chỉ cái đầu là phán xét về **bản thân sự cố**.
+
+> 🔴 **KHÔNG viết lại tập trạng thái này ở bất kỳ đâu khác.** Không `IN ('detected', …)` trong SQL,
+> không `new[] { … }` trong LINQ, không danh sách chép tay trong test. Cần biết một fault có mở
+> không thì gọi **`FaultStatusSets.IsOpen(status)`**; cần cả tập thì dùng **`FaultStatusSets.Open`**.
+> Bản sao thứ hai sẽ đúng vào ngày nó được viết và sai vào ngày định nghĩa đổi, **và không có gì phát
+> hiện được** — cùng loại lỗi câm mà `commune_id` mồ côi và `LPAD` cắt ID đã gây ra.
+
+**Drift 27 giờ ĐÃ CÓ câu trả lời**, và đó là quyết định **nội bộ backend**, không phải đổi Contract:
+Contract không định nghĩa nên không có gì để mâu thuẫn. Vẫn giữ mục drift để nêu ở FW-00 — WP5 cần
+biết con số họ nhận được đếm theo tập nào.
+
+**Hai test canh, và chúng bắt hai thứ KHÁC nhau** (`OpenFaultCountTests`, ở `LuxMap.Shared.Tests` nên
+chạy được cả khi không có Docker):
+
+| Test | Canh gì | Đỏ khi |
+|---|---|---|
+| `The_count_on_every_pole_matches_the_faults_that_are_actually_open` | **DỮ LIỆU** — `open_fault_count` của cả 103 cột trong `mock-poles.geojson` khớp số đếm thật từ `mock-faults.json` | ai đó thêm/sửa fault mà quên cập nhật count |
+| `Only_detected_confirmed_and_in_progress_count_as_open` | **ĐỊNH NGHĨA** — dựng fault trong bộ nhớ phủ cả 6 trạng thái | ai đó đổi tập trong `FaultStatusSets.Open` |
+
+⚠️ **Không gộp hai test làm một.** Kiểm bằng phá hoại: thêm `FaultStatus.Rejected` vào
+`FaultStatusSets.Open` làm test **định nghĩa ĐỎ** nhưng test **dữ liệu vẫn XANH** — vì cả 28 fault
+trong bộ mock hiện đều mở (21 `detected` + 7 `confirmed`, không có `rejected`/`resolved`/`verified`
+nào), nên nới định nghĩa không đổi con số nào. Test dữ liệu **không thể** phân biệt các định nghĩa
+"open" khác nhau cho tới khi bộ mock có fault đã đóng.
+
+**Hai test dùng CHUNG một hàm đếm** (`CountByPole`). Nếu tách thành hai đường thì test định nghĩa
+không còn bảo vệ test dữ liệu — nó sẽ chỉ khẳng định một ý kiến riêng.
 
 ### Vai trò
 
