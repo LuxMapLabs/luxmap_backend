@@ -13,6 +13,98 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 
 ---
 
+## Nguyên tắc vận hành quyết định (FW-00, chốt 07/09/2026)
+
+Năm nguyên tắc dưới đây nói về **cách quyết**, không phải quyết cái gì. Chúng đứng trước bảng drift
+vì mọi mục trong bảng đó đều đi qua chúng.
+
+### 1. Mọi quyết định ghi ngay trong buổi họp
+
+Vào **file này**, ngay khi chốt, không để ghi sau. Bốn trường bắt buộc:
+
+| Trường | Nghĩa |
+|---|---|
+| **Decision** | Chốt cái gì, đủ cụ thể để người không dự họp làm theo được |
+| **Decision maker** | Tên người, không phải "cả nhóm" |
+| **Date** | Ngày tuyệt đối `DD/MM/YYYY`, không phải "tuần trước" |
+| **Scope** | Ticket / endpoint / file nào chịu ảnh hưởng |
+
+> **Quyết định không sống trong repo thì coi như chưa xảy ra.** Không phải quy tắc hành chính: một
+> quyết định chỉ nằm trong trí nhớ sẽ được nhớ khác nhau bởi ba người, và cái được nhớ khác nhau thì
+> không phải quyết định — nó là ba quyết định.
+
+### 2. Drift 31 nâng thành Contract rule
+
+> 🟡 **Mục này CHỜ FW-00 chốt. CHƯA vào Contract.** Đang là đề xuất, và tới khi được duyệt thì
+> `api-contract-v1.1.md` không thay đổi một chữ nào.
+
+**Policy là MỘT vai trò chính xác, không phải một bậc.** `RequireClaim(role, "<một giá trị>")` khớp
+đúng một vai trò; nó **không** có nghĩa "từ cấp này trở lên". Gắn `maintenance_engineer` lên một
+endpoint ĐỌC sẽ **chặn luôn Quản trị và Cơ quan quản lý** — trông như siết bảo mật, thực chất là chặn
+hai vai trò khỏi dữ liệu của chính họ.
+
+Bảng vai trò được GHI, áp cho **BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24**:
+
+| Nhóm endpoint | Ticket | Vai trò được GHI | Đọc |
+|---|---|---|---|
+| `/assets/*` — CRUD tài sản, import | BE-12a | Quản trị | mọi vai trò đã đăng nhập |
+| Sweep, frame, luminance | BE-15, BE-17 | *chờ chốt* | mọi vai trò đã đăng nhập |
+| Fault — chuyển trạng thái | BE-18, BE-19 | *chờ chốt* | mọi vai trò đã đăng nhập |
+| Work order, evidence | BE-21, BE-24 | *chờ chốt* | mọi vai trò đã đăng nhập |
+
+**Đọc KHÔNG gắn policy nào** — `SetFallbackPolicy` đã bắt buộc đăng nhập, và nêu tên một vai trò ở đó
+là loại trừ ba vai trò kia chứ không phải đặt sàn.
+
+Chốt **một lần cho cả nhóm**: BE-12a đã hiện thực nên tiền lệ đã tạo, sáu ticket tự chọn riêng sẽ ra
+sáu ma trận quyền khác nhau mà không ai giải thích được. Chi phí đảo hướng đo ở mục 31b.
+
+### 3. Absence rule — N = 3 ngày làm việc
+
+Người duyệt im lặng quá **3 ngày làm việc** thì:
+
+| Loại thay đổi | Im lặng nghĩa là |
+|---|---|
+| **KHÔNG chạm bề mặt API** — mock, quyết định nội bộ, dọn dẹp, test | **APPROVE** |
+| **CHẠM bề mặt API** — endpoint, response shape, query param, mã lỗi, enum | **ESCALATE** — không bao giờ là approve |
+
+**Fallback signer: Dylan.**
+
+> 🔴 **Dylan đồng thời là người đề xuất phần lớn drift trong file này.** Escalation vì thế quay về
+> chính người đề xuất, và một chữ ký như vậy **không phải là duyệt độc lập**.
+
+Hệ quả bắt buộc:
+
+- Mọi quyết định đi qua đường này **phải đánh dấu `SELF-SIGNED`**, kèm **lý do escalate**: ai vắng,
+  từ ngày nào.
+- Tự động vào **đầu agenda FW kế tiếp** để Thịnh/Ngọc xác nhận hoặc lật.
+- Quyết định `SELF-SIGNED` **chạm bề mặt API** **KHÔNG được coi là ổn định** cho tới khi có xác nhận
+  ở FW kế tiếp. Ticket xây lên trên nó **phải biết nền là tạm** — ghi vào mô tả ticket, không chỉ
+  biết trong đầu.
+
+### 4. Không có "bàn thêm" vô thời hạn
+
+Chưa quyết được thì phải có **owner + deadline**. Thiếu **một trong hai** thì:
+
+- coi như **CHƯA giải quyết**,
+- **tự động lên đầu agenda FW kế tiếp**,
+- và mọi ticket phụ thuộc **vẫn BLOCKED**.
+
+> "Để bàn thêm" không có owner là cách một quyết định biến mất mà vẫn trông như đang được xử lý.
+
+### 5. Ghi ở đúng tầng
+
+| Loại | Ghi vào |
+|---|---|
+| **Deviation** — code lệch Contract, mock lệch Contract | `docs/contract-drift.md` |
+| **Luật áp nhiều ticket** — quy tắc chung cho FE/BE/mobile | `docs/api-contract-v1.1.md` (sau khi duyệt, tăng version) |
+| **Ràng buộc kỹ thuật nội bộ** — bẫy, quy ước, thứ dễ sai âm thầm | `CLAUDE.md` |
+| **Tiến độ** — trạng thái ticket, việc tồn đọng | `tracking.html` |
+
+Ghi sai tầng cũng tệ như không ghi: một ràng buộc kỹ thuật nằm trong `tracking.html` sẽ trôi mất khi
+mục đó được đóng, còn một deviation nằm trong `CLAUDE.md` sẽ không bao giờ tới tay WP5/WP6.
+
+---
+
 ## Tóm tắt
 
 | # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Đề xuất sửa bên nào |

@@ -20,6 +20,37 @@ Khi phát hiện mâu thuẫn: làm theo Contract, ghi lại chỗ lệch, nêu 
 
 ---
 
+## Ghi phát hiện vào ĐÚNG tầng
+
+Nguyên tắc vận hành quyết định của nhóm nằm ở **đầu `docs/contract-drift.md`** (FW-00, chốt
+07/09/2026) — năm mục, nói về *cách quyết* chứ không phải quyết cái gì. Đọc khi cần biết ai ký, im
+lặng bao lâu thì tính là gì, và một quyết định treo thì đi đâu.
+
+**Mục 5 là mục áp dụng thường xuyên nhất**, vì nó quyết định file nào nhận phát hiện vừa tìm ra:
+
+| Loại phát hiện | Ghi vào |
+|---|---|
+| **Deviation** — code lệch Contract, mock lệch Contract | `docs/contract-drift.md` |
+| **Luật áp nhiều ticket** — quy tắc chung cho FE/BE/mobile | `docs/api-contract-v1.1.md`, **chỉ sau khi duyệt và tăng version** |
+| **Ràng buộc kỹ thuật nội bộ** — bẫy, quy ước, thứ dễ sai âm thầm | **File này** |
+| **Tiến độ** — trạng thái ticket, việc tồn đọng | `tracking.html` |
+
+**Ghi sai tầng cũng tệ như không ghi:**
+
+- Một **ràng buộc kỹ thuật** nhét vào `tracking.html` sẽ **trôi mất khi mục đó được đóng** — bài học
+  còn nguyên trong repo này: quy tắc `LPAD` cắt ID và quy tắc partial index đều phải nằm ở đây mới
+  còn tác dụng ở ticket sau.
+- Một **deviation** nhét vào `CLAUDE.md` **không bao giờ tới tay WP5/WP6** — họ không đọc file này.
+- Một **quyết định nội bộ** đẩy thẳng vào Contract là đổi thứ FE đã code theo mà chưa ai duyệt.
+
+⚠️ Ba mục còn lại đáng nhớ khi làm việc một mình: quyết định **không ghi vào repo thì coi như chưa
+xảy ra**; im lặng quá 3 ngày làm việc là **approve với thay đổi không chạm bề mặt API** nhưng
+**ESCALATE với thay đổi có chạm** — không bao giờ là approve; và một quyết định `SELF-SIGNED` chạm bề
+mặt API **chưa ổn định** cho tới khi FW kế tiếp xác nhận, nên ticket xây lên trên nó **phải ghi rõ nền
+là tạm**.
+
+---
+
 ## Phạm vi đã chốt — Nhánh C
 
 Chốt 24/08/2026 (FO-01). **Không có thử nghiệm hiện trường.** Ba nguồn dữ liệu:
