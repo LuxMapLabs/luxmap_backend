@@ -151,6 +151,12 @@ ngoài phạm vi trả 404 thay vì 403, và cùng lý lẽ `INVALID_CREDENTIALS
 - **Contract hiện chưa đặc tả khuôn ID ở đâu cả** — mục 0.2 chỉ có bảng ví dụ. Đây là phần **thêm
   mới**, không phải sửa.
 
+> ✅ **ĐÃ GHI VÀO CONTRACT 07/09/2026** (nhánh `docs/contract-id-format-and-pole-filter`):
+> `pole_id` là param thứ **12** ở §2.4 kèm quy tắc 200-rỗng; khuôn ID vào **§0.2 dưới dạng cột thứ
+> tư, phủ CẢ 16 prefix** chứ không phải bốn regex rời — digits đọc từ `PrefixedIds` và đối chiếu với
+> `column_default` của live schema (9 prefix đã có bảng, khớp cả 9; 7 prefix còn lại thuộc entity
+> chưa tồn tại). **Chưa implement** `?pole_id=` — đó là ticket sau.
+
 > ⚠️ **Điểm khuôn ID CHƯA đối chiếu với regex trong code mobile — Ngọc phải kiểm khi về.**
 > Nếu WP6 đang validate bằng `\d{4}` cố định thì **lỗi đã có sẵn ở đó từ trước**, không phải do
 > quyết định này sinh ra: nó sẽ từ chối `POLE-10000` ngay khi cột thứ 10000 xuất hiện. Filter mới chỉ
@@ -198,6 +204,10 @@ Sự thật đã kiểm: mục 2.4 hứa `work_order_id`, nhưng `\d fault` **kh
 
 **Nợ có tên: BE-21.** Không phải "sẽ làm sau".
 
+> ✅ **ĐÃ GHI VÀO CONTRACT 07/09/2026.** §2.4 nay nói rõ `work_order_id` **luôn trả `null`**, khoá
+> vẫn có mặt trong JSON, và client **không xây UI phụ thuộc trường này**. Trường **không bị gỡ** khỏi
+> §2.4 — gỡ rồi thêm lại là đổi hình dạng đã publish hai lần.
+
 ### D — §0.4 sửa lỗi `LPAD` (KHÔNG phải mở rộng)
 
 | | |
@@ -229,6 +239,40 @@ luxmap_format_id(prefix text, value bigint, digits integer) RETURNS text
 cho subquery hay CTE trong `DEFAULT` của cột — hàm là cách giữ `nextval` được gọi **đúng một lần**
 mỗi hàng.
 
+### E — OpenAPI spec KHÔNG sửa tay
+
+| | |
+|---|---|
+| **Decision** | **Không** sửa `docs/openapi/luxmap-v1.json`. Ghi nhận khoảng cách thay vì vá tay |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | `docs/openapi/luxmap-v1.json` · drift 40 |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc |
+
+Hiện trạng đo được: **4 path, tất cả `/auth`** (`login`, `logout`, `refresh`, `register`); **20
+schema** gồm 12 enum + 8 DTO auth; **không một `pattern` nào**. Không có `/faults`, `/poles`,
+`/segments` — nghĩa là **không có chỗ** để thêm param `pole_id` hay gắn khuôn ID.
+
+🔴 **Sửa tay sẽ bị xoá.** File được **sinh ra** bằng lệnh ở `README.md:241`:
+
+```bash
+dotnet build src/LuxMap.Api && Swagger__Enabled=true dotnet swagger tofile \
+  --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+```
+
+Lần export kế tiếp ghi đè toàn bộ. Và `docs/backend-report.md:583` đã ghi: *"Chưa có CI. Không có gì
+tự động phát hiện `luxmap-v1.json` đã cũ."* — nên **không ai bắt được lúc nó bị mất**.
+
+**Đường đúng:** `pattern` vào spec khi endpoint được hiện thực, qua `[RegularExpression]` trên DTO,
+rồi export lại. Khuôn ở §0.2 là nguồn để chép sang.
+
+🔴 **WP6 sinh DTO Kotlin từ file này (FM-04) — đây là điểm nặng nhất của mục này.** Spec phủ 4
+endpoint auth và không gì khác, nên WP6 **không có DTO nào** cho `/faults`, `/poles`, `/segments`:
+phải đọc Contract bằng mắt rồi **gõ tay** từng tên trường, từng enum, từng kiểu.
+
+Nghĩa là mục này **không còn là nợ tài liệu** mà là **nguồn lệch trực tiếp giữa BE và mobile** — mỗi
+trường gõ tay là một cơ hội sai chính tả hoặc sai kiểu, và **không có gì đối chiếu lại**: spec không
+phủ endpoint đó nên không sinh được DTO để so. **Ưu tiên ngang mục 38 (`work_order`) ở FW-00.**
 
 ---
 
@@ -275,6 +319,7 @@ mỗi hàng.
 | 37 | **Contract chưa đặc tả KHUÔN ID** — không mục nào cho regex, chỉ có ví dụ ở mục 0.2 | 🔴 Cao | WP5, **WP6**, FM-17 | Contract — thêm; đã quyết ở **A**, xem "Quyết định đã đăng ký" |
 | 38 | **`work_order_id` (mục 2.4) chưa có chỗ chứa** — `fault` không có cột, bảng `work_order` chưa tồn tại | 🟡 Vừa | WP5, WP6, BE-21 | Đã quyết ở **C** — emit `null`, nợ có tên |
 | 39 | 🔴 **§0.4 dạy `LPAD(...)` — cơ chế SAI, cắt ID khi vượt độ rộng.** Contract lệch code từ commit `8ea9930` | 🔴 Cao | WP5, WP6, BE-39 | Contract — **ĐÃ SỬA 07/09/2026** (`SELF-SIGNED`); xem **D** |
+| 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E** |
 
 ---
 
@@ -818,7 +863,7 @@ Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nh
 25. **Mục 32** — mục 22 trước đây chỉ đăng ký `pole.external_ref`. BE-12a mở lên ba bảng, vì `poles.csv` phải trỏ tuyến và mạch điện bằng mã của đơn vị quản lý: `SEG-001` do DB sinh lúc INSERT nên người soạn file không biết trước, và nếu template đòi mã đó thì bộ bốn file không nạp được liền mạch. `fixture` cố ý KHÔNG có — một cột mang nhiều bóng, không mã nào chỉ đúng một lần lắp đặt, nên nhập bóng là insert-only.
 26. **Mục 33** — `ASSET_NOT_FOUND` (404, gộp cả "không tồn tại" lẫn "ngoài phạm vi" đúng như mục 7 đòi) và `EXTERNAL_REF_TAKEN` (409). Mục 2 nay đếm **11** mã ngoài Contract.
 27. **Mục 34 — có hạn dùng.** `GET /assets/{segments,feeders,poles}` trả `PagedResult<string>` chỉ gồm ID. Đó là **chỗ giữ chỗ**, không phải thiết kế: BE-12a sở hữu request và phân quyền, còn hình dạng khi đọc là **BE-12b** đang chờ Thịnh/Ngọc. Công bố một hình dạng đoán bây giờ thì FE sẽ bám vào, và gỡ ra khó hơn nhiều so với công bố muộn.
-### 🔴 Ba mục dưới đây cần WP5 (Thịnh/Ngọc) xem TRƯỚC khi BE-12b bắt đầu
+### 🔴 Năm mục dưới đây cần WP5 (Thịnh/Ngọc) xem TRƯỚC khi BE-12b bắt đầu
 
 Không phải để duyệt lại quyết định của BE-12a, mà vì BE-12b sẽ xây lên trên chúng và sửa sau thì đắt.
 
@@ -827,6 +872,8 @@ Không phải để duyệt lại quyết định của BE-12a, mà vì BE-12b s
 | **31 — vai trò nào được ghi** | **Chốt một lần cho CẢ NHÓM** BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24. BE-12a là ticket đầu tiên chạm 4 policy của BE-08 nên nó **tạo tiền lệ**; sáu ticket tự chọn riêng sẽ ra sáu ma trận quyền khác nhau mà không ai giải thích được. **Xem mục 31b ngay dưới — câu hỏi kèm chi phí, không phải câu hỏi trần.** |
 | **29 — nhóm `/api/v1/assets/…`** | Đường dẫn mới, FE cần biết nó tồn tại và **không** phải `/poles` (chỗ đó là của BE-14, mục 2.1). |
 | **30 — hình dạng kết quả import** | Trả 200 kèm `{inserted, updated, failed, total_errors, truncated, rows[]}`. FE cần hình dạng này để dựng màn hình nhập liệu. |
+| **40 — OpenAPI spec chỉ phủ 4 endpoint `/auth`** | 🔴 **Ưu tiên ngang mục 38 (`work_order`).** Đây **không còn là nợ tài liệu** mà là **nguồn lệch trực tiếp giữa BE và mobile**: FM-04 sinh DTO Kotlin **từ file này**, nên WP6 hiện **không có DTO nào** cho `/faults`, `/poles`, `/segments` — phải đọc Contract bằng mắt rồi **gõ tay** từng trường. Mỗi lần gõ tay là một cơ hội lệch, và không có gì đối chiếu lại. Cần chốt: ai chạy lại export, mốc nào, và có đưa vào CI không (`backend-report.md:583` ghi hiện **không có gì tự động phát hiện spec đã cũ**). |
+| **38 — `work_order_id` chưa có chỗ chứa** | Contract mục 2.4 hứa trường này; `fault` không có cột, bảng `work_order` = 0 bảng. Đã quyết emit `null` (**C**), nhưng lược đồ work order vẫn cần lịch — nợ mang tên **BE-21**. |
 
 #### 31b — Bốn policy của BE-08 là EXACT-ROLE hay HIERARCHY? Tiền lệ đã tạo rồi.
 

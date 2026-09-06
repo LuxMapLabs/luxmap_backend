@@ -238,7 +238,20 @@ Response: `FeatureCollection` của `LineString`.
 
 ### 2.4 `GET /api/v1/faults` — danh sách lỗi (phân trang, KHÔNG phải GeoJSON)
 
-Query: `bbox`, `status`, `severity`, `fault_type`, `source_channel`, `data_source`, `segment_id`, `cluster_id`, `sort` (mặc định `-priority_score`), `page`, `page_size`.
+Query: `bbox`, `status`, `severity`, `fault_type`, `source_channel`, `data_source`, `pole_id`, `segment_id`, `cluster_id`, `sort` (mặc định `-priority_score`), `page`, `page_size`.
+
+**`pole_id` nhận MỘT giá trị, không phải danh sách** — khác `status` (CSV enum ở §2.1). Lọc theo cột
+là câu hỏi về một cột.
+
+> 🔴 **Cột không tồn tại và cột ngoài phạm vi xã trả về GIỐNG HỆT nhau: `200` + mảng rỗng.**
+> Không 404, không 403, không thông điệp phân biệt.
+>
+> Đây **không phải** chỗ để "cho thân thiện hơn". Nếu cột không tồn tại trả 404 còn cột ngoài phạm vi
+> trả mảng rỗng, thì hai câu trả lời khác nhau **tiết lộ rằng cột đó tồn tại ở xã khác** — filter trở
+> thành **kênh dò sự tồn tại**. Cùng lý lẽ §7 dùng để bắt truy cập trực tiếp ngoài phạm vi trả **404
+> chứ không phải 403**, và cùng lý lẽ `INVALID_CREDENTIALS` gộp sai-tên-đăng-nhập với sai-mật-khẩu.
+>
+> **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
 
 Hình dạng mỗi item:
 
@@ -256,6 +269,15 @@ Xem `mock-faults.json`.
 - `location` luôn có, để FE vẫn chấm được lên bản đồ khi cần.
 - `priority_score` là số thực do CV-16 tính. **Client không sắp xếp lại phía mình** — thứ tự mặc định do server quyết.
 - `cluster_id` khác null nghĩa là sự cố thuộc một cụm cấp đoạn; FE nên gộp hiển thị thay vì liệt kê từng dòng.
+
+> 🔴 **`work_order_id` hiện LUÔN trả `null`.** Bảng `work_order` chưa tồn tại và `fault` chưa có cột
+> tương ứng — trường vẫn được phát ra để client bind đúng hình dạng cuối ngay bây giờ, nhưng
+> **không xây UI phụ thuộc vào trường này** cho tới khi có lược đồ work order.
+>
+> Khoá **luôn có mặt** với giá trị `null`; nó không bị bỏ khỏi JSON. Khoá vắng mặt khác khoá `null`,
+> và client không nên phải viết hai nhánh cho cùng một thứ.
+>
+> Nợ có tên: **BE-21**. **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
 
 ---
 
