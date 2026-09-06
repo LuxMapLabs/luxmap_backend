@@ -44,13 +44,15 @@ Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệ
 | 25 | **`commune_id` suy từ scope JWT khi `pole_id` NULL** | 🟡 Vừa | WP6, FM-19 | Contract — thêm vào mục 2.8 |
 | 26 | **Ghi vết trên bảng `fault`, không có `FaultHistory`** | 🟡 Vừa | Nội bộ BE, BE-19 | Không phải Contract — quyết định lược đồ |
 | 27 | **Contract không định nghĩa "fault MỞ"** cho `open_fault_count` | 🟡 Vừa | WP5, BE-28, BE-40 | Contract — ghi rõ ba trạng thái |
-| 28 | **`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`) | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa; mục 6 mới ghi file work-orders |
+| ~~28~~ | ~~**`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`)~~ | 🔴 Cao | WP5, WP6, BE-39 | **ĐÓNG 06/09/2026, commit `07ebe37`** — mock đã khớp mục 2.4; `CLU`→`CLS` sửa ở cả `mock-work-orders.json`. **Vẫn phải báo WP5/WP6: hình dạng đã đổi.** |
 | 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1 |
 | 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại |
 | 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33, **BE-15/18/21/24** | **FW-00 — chốt MỘT LẦN cho cả nhóm ticket ghi**, không để mỗi ticket tự chọn |
 | 32 | **`external_ref` trên `road_segment`, `feeder`, `pole`** — LƯU và upsert theo, KHÔNG emit | 🟡 Vừa | Nội bộ BE, BE-39 | Không phải Contract — mở rộng mục 22 từ 1 bảng lên 3 |
 | 33 | **Hai mã lỗi mới: `ASSET_NOT_FOUND`, `EXTERNAL_REF_TAKEN`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
 | 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | **Chủ nợ: BE-12b.** Xoá mục này là một tiêu chí nghiệm thu của BE-12b, không phải việc dọn dẹp |
+| 35 | **`GET /faults` KHÔNG có query `pole_id`** — mục 2.4 liệt kê 11 param, không có cái nào lọc theo cột | 🟡 Vừa | WP5, WP6, FM-17 | **Chờ Ngọc quyết** — xem mục 35b |
+| 36 | **`open_fault_count` của `mock-poles.geojson` lệch `mock-faults.json` ở 2 cột** | 🟡 Vừa | WP5, BE-39 | Mock — chặn bởi mục 27; xem mục 36b |
 
 ---
 
@@ -641,6 +643,54 @@ trò GIỮA bị loại. Ticket sau mà gắn `maintenance_engineer` hay `field_
 phí đổi hướng bắt đầu tăng thật.
 
 **Vì vậy nên chốt TRƯỚC BE-15/BE-18/BE-21/BE-24**, không phải trước BE-12a.
+
+#### 35b — `GET /faults?pole_id=` : dữ kiện để Ngọc quyết
+
+**Contract mục 2.4 liệt kê ĐÚNG 11 query param**, chép nguyên văn:
+
+```
+bbox, status, severity, fault_type, source_channel, data_source,
+segment_id, cluster_id, sort, page, page_size
+```
+
+**Không có `pole_id`.** Nên thêm nó là **mở rộng bề mặt API đã publish**, không phải sửa lỗi — đó là
+lý do phần B chờ duyệt chứ không tự làm.
+
+Ba dữ kiện đã kiểm, để câu hỏi không phải câu hỏi trần:
+
+1. **Lọc được `segment_id` nhưng không lọc được `pole_id`** là bất đối xứng nằm trong chính mục 2.4:
+   `fault` có cả hai cột, và cả hai đều đã có index (`ix_fault_pole_id`, `ix_fault_segment_id`).
+   Không có rào cản kỹ thuật nào.
+2. **Mục 2.2 `GET /poles/{id}` đã trả `open_faults[]`**, nên màn chi tiết cột **không cần** param này.
+   Ai cần nó là người muốn danh sách phân trang của một cột — chưa rõ màn hình nào.
+3. Thêm param là **cộng thêm**, không phá gì: client cũ không gửi thì hành vi không đổi.
+
+**Câu hỏi cho Ngọc:** có màn hình nào cần lọc fault theo một cột mà mục 2.2 chưa phục vụ không? Có →
+thêm vào mục 2.4 rồi mới hiện thực. Không → đóng mục 35, và ghi rõ trong Contract rằng lọc theo cột
+đi qua mục 2.2.
+
+#### 36b — `open_fault_count`: bị CHẶN bởi mục 27, không sửa lẻ được
+
+`mock-poles.geojson` lệch `mock-faults.json` ở **đúng hai cột**:
+
+| Cột | `open_fault_count` khai | fault mở thật | Ghi chú |
+|---|---|---|---|
+| `POLE-0075` | 1 | **2** — `FAULT-0016` (`lamp_dim`, cv) + `FAULT-0028` (`runtime_decline`, iot) | Hai fault này **cố ý**: CLAUDE.md ghi *"Một cột có thể mang cả hai cùng lúc"*. **Con đếm sai, không phải fault sai.** |
+| `POLE-0076` | 0 | **1** — `FAULT-0027` (`runtime_decline`, iot) | Cột mang `fixture_status = normal`, và điều đó **hợp lý**: runtime suy giảm do IoT phát hiện, đèn vẫn sáng bình thường trên ảnh đêm |
+
+Tổng: `open_fault_count` cộng lại **26**, số fault mở **28**. Chênh đúng 2.
+
+⚠️ **`open_fault_count` KHÔNG nằm trong mục "Những gì đã cố ý cài sẵn"** của `mocks/README.md` —
+mục đó chỉ liệt kê 5 thứ (phân bố status 103 cột, cụm `SEG-003`, 12 node, `POLE-0047`, sparse IoT).
+Nên đây là **lỗi thật**, không phải fixture cố ý.
+
+🔴 **Nhưng không sửa được trước mục 27.** Tính lại `open_fault_count` đòi định nghĩa "fault MỞ", mà
+mục 27 ghi rõ Contract **không định nghĩa** nó; BE-18 chốt `detected | confirmed | in_progress` ở
+`FaultStatusSets.Open` nhưng đó là quyết định nội bộ chưa được duyệt. Chốt sai thì phải đếm lại lần
+nữa.
+
+**Thứ tự bắt buộc: chốt mục 27 → tính lại `open_fault_count` cho CẢ 103 cột**, không chỉ hai chỗ đã
+biết. Sửa lẻ hai cột sẽ để 101 cột còn lại không ai kiểm.
 
 **Mục 34 thì khác** — nó không cần duyệt, nó cần **hết hạn**. `GET /assets/*` đang trả danh sách ID
 là chỗ giữ chỗ; **xoá mục 34 là một tiêu chí nghiệm thu của BE-12b**.

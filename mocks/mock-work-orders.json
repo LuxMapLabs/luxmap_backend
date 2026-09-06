@@ -7,7 +7,7 @@
    "work_order_id": "WO-0001",
    "title": "Su co ca doan - Tuyen C",
    "segment_id": "SEG-003",
-   "cluster_id": "CLU-0001",
+   "cluster_id": "CLS-001",
    "fault_ids": [
     "FAULT-0018",
     "FAULT-0019",
