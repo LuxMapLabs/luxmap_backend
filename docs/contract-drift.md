@@ -105,6 +105,101 @@ mục đó được đóng, còn một deviation nằm trong `CLAUDE.md` sẽ kh
 
 ---
 
+## Quyết định đã đăng ký
+
+Theo **nguyên tắc 1** ở trên: bốn trường bắt buộc, ghi ngay, vào repo.
+
+> 🔴 **CẢ BA đều `SELF-SIGNED`.** Thịnh và Ngọc vắng; cả ba đi qua **absence rule** (nguyên tắc 3)
+> với người ký dự phòng là **chính người đề xuất**. Đây **không phải duyệt độc lập**. Cả ba nằm ở
+> **đầu agenda FW-00 kế tiếp** để Thịnh/Ngọc xác nhận hoặc lật.
+>
+> **A và C chạm bề mặt API**, nên theo nguyên tắc 3 chúng **CHƯA ổn định** — ticket xây lên trên phải
+> ghi rõ trong mô tả rằng nền là tạm. **B là thông qua theo hạn, không phải đã duyệt.**
+
+### A — `GET /faults` thêm `pole_id`, và khuôn ID ASCII
+
+| | |
+|---|---|
+| **Decision** | Thêm **một** query param `pole_id` vào mục 2.4; đồng thời đặc tả **khuôn ID** cho Contract |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | BE-xx phần B · mục 2.4 · khuôn ID áp cho toàn Contract |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc. Chạm bề mặt API → escalate, không phải approve |
+
+**Cardinality: MỘT giá trị, không phải danh sách.** Khác `status` (CSV enum ở mục 2.1) — lọc theo một
+cột là câu hỏi về một cột.
+
+🔴 **Pole không tồn tại và pole ngoài phạm vi xã: CẢ HAI trả `200` + mảng rỗng, KHÔNG phân biệt.**
+
+Đây là điểm dễ bị "sửa cho thân thiện" nhất và **không được sửa**. Nếu pole không tồn tại trả 404 còn
+pole ngoài phạm vi trả mảng rỗng, thì hai câu trả lời khác nhau **tiết lộ cột đó có tồn tại ở xã
+khác** — filter biến thành **kênh dò sự tồn tại**. Cùng lý lẽ mục 7 dùng để bắt truy cập trực tiếp
+ngoài phạm vi trả 404 thay vì 403, và cùng lý lẽ `INVALID_CREDENTIALS` gộp sai-tên với sai-mật-khẩu.
+
+**Khuôn ID — ASCII-only, số chữ số là TỐI THIỂU, không cố định:**
+
+```
+^POLE-[0-9]{4,}$      ^SEG-[0-9]{3,}$      ^CLS-[0-9]{3,}$      ^FAULT-[0-9]{4,}$
+```
+
+- **`[0-9]` chứ không phải `\d`.** Trong .NET và nhiều engine khác, `\d` mặc định khớp **chữ số
+  Unicode** — chữ số Ả Rập-Ấn Độ `٠١٢`, chữ số Devanagari `०१२` — nên `\d{4}` nhận những chuỗi không
+  bao giờ là ID hợp lệ. `[0-9]` nói đúng ý.
+- **`{4,}` chứ không phải `{4}`.** Mục 0.3 chốt độ rộng là **tối thiểu**: cột thứ 10000 là
+  `POLE-10000`, không phải `POLE-1000`.
+- **ID là CHUỖI.** Không parse thành số, không so sánh số học, **không giới hạn trên**.
+- **Contract hiện chưa đặc tả khuôn ID ở đâu cả** — mục 0.2 chỉ có bảng ví dụ. Đây là phần **thêm
+  mới**, không phải sửa.
+
+> ⚠️ **Điểm khuôn ID CHƯA đối chiếu với regex trong code mobile — Ngọc phải kiểm khi về.**
+> Nếu WP6 đang validate bằng `\d{4}` cố định thì **lỗi đã có sẵn ở đó từ trước**, không phải do
+> quyết định này sinh ra: nó sẽ từ chối `POLE-10000` ngay khi cột thứ 10000 xuất hiện. Filter mới chỉ
+> làm nó **phơi ra sớm hơn**. Kiểm cả hai điểm: `{4}` cố định, và `\d` thay vì `[0-9]`.
+
+### B — Drift 29 / 30 / 34 thông qua theo hạn
+
+| | |
+|---|---|
+| **Decision** | **THÔNG QUA THEO HẠN** — không chặn BE-12b nữa |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | BE-12b · drift 29, 30, 34 |
+| **Lý do escalate** | Đã merge trong `dev` (PR #22). Thịnh/Ngọc **chưa phản hồi**, quá 3 ngày làm việc |
+
+🔴 **"Thông qua theo hạn" KHÔNG phải "đã duyệt".** Ba mục **vẫn ở đầu agenda FW-00**. Sự khác nhau
+không phải chữ nghĩa: *đã duyệt* nghĩa là có người đọc và đồng ý; *thông qua theo hạn* nghĩa là
+**không ai đọc**, và công việc đi tiếp vì dừng lại còn tốn hơn. Nếu FW-00 lật một trong ba, phần đã
+xây lên trên phải sửa.
+
+### C — `work_order_id` emit `null`
+
+| | |
+|---|---|
+| **Decision** | `GET /faults` **emit `work_order_id: null`**. KHÔNG làm bảng `work_order` lúc này, KHÔNG gỡ trường khỏi mục 2.4 |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | `GET /faults` · drift 38 · nợ chuyển cho BE-21 |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc. Chạm bề mặt API → escalate |
+
+Sự thật đã kiểm: mục 2.4 hứa `work_order_id`, nhưng `\d fault` **không có cột đó** và
+`information_schema` cho `work_order%` trả về **0 bảng**.
+
+**`null` là lựa chọn duy nhất không đóng cửa nào:**
+
+| Đường | Đóng cửa gì |
+|---|---|
+| **Emit `null`** ✅ | Không đóng gì. FE bind được hình dạng cuối ngay; ngày có schema thì giá trị xuất hiện, **không đổi contract** |
+| Gỡ trường khỏi mục 2.4 | Đổi hình dạng đã publish, rồi phải đổi **lần nữa** khi thêm lại |
+| Làm bảng `work_order` bây giờ | Kéo BE-21 vào một ticket không phải của nó, quyết lược đồ work order mà không có ai duyệt |
+| Bỏ trường khỏi response | Khoá vắng mặt khác khoá `null` — FE phải viết hai nhánh cho cùng một thứ |
+
+**Mock đã điền giá trị THẬT**, đọc từ `fault_ids` của `mock-work-orders.json` (11 fault có WO, 17
+`null`), nên ngày có schema thì seed khớp ngay — không phải điền lại.
+
+**Nợ có tên: BE-21.** Không phải "sẽ làm sau".
+
+---
+
 ## Tóm tắt
 
 | # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Đề xuất sửa bên nào |
@@ -137,14 +232,16 @@ mục đó được đóng, còn một deviation nằm trong `CLAUDE.md` sẽ kh
 | 26 | **Ghi vết trên bảng `fault`, không có `FaultHistory`** | 🟡 Vừa | Nội bộ BE, BE-19 | Không phải Contract — quyết định lược đồ |
 | 27 | **Contract không định nghĩa "fault MỞ"** cho `open_fault_count` | 🟡 Vừa | WP5, BE-28, BE-40 | Contract — ghi rõ ba trạng thái |
 | ~~28~~ | ~~**`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`)~~ | 🔴 Cao | WP5, WP6, BE-39 | **ĐÓNG 06/09/2026, commit `07ebe37`** — mock đã khớp mục 2.4; `CLU`→`CLS` sửa ở cả `mock-work-orders.json`. **Vẫn phải báo WP5/WP6: hình dạng đã đổi.** |
-| 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1 |
-| 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại |
+| 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1. **THÔNG QUA THEO HẠN 07/09/2026 (`SELF-SIGNED`)** — xem **B** |
+| 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại. **THÔNG QUA THEO HẠN 07/09/2026 (`SELF-SIGNED`)** — xem **B** |
 | 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33, **BE-15/18/21/24** | **FW-00 — chốt MỘT LẦN cho cả nhóm ticket ghi**, không để mỗi ticket tự chọn |
 | 32 | **`external_ref` trên `road_segment`, `feeder`, `pole`** — LƯU và upsert theo, KHÔNG emit | 🟡 Vừa | Nội bộ BE, BE-39 | Không phải Contract — mở rộng mục 22 từ 1 bảng lên 3 |
 | 33 | **Hai mã lỗi mới: `ASSET_NOT_FOUND`, `EXTERNAL_REF_TAKEN`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
-| 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | **Chủ nợ: BE-12b.** Xoá mục này là một tiêu chí nghiệm thu của BE-12b, không phải việc dọn dẹp |
-| 35 | **`GET /faults` KHÔNG có query `pole_id`** — mục 2.4 liệt kê 11 param, không có cái nào lọc theo cột | 🟡 Vừa | WP5, WP6, FM-17 | **Chờ Ngọc quyết** — xem mục 35b |
+| 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | **Chủ nợ: BE-12b.** Xoá mục này là một tiêu chí nghiệm thu của BE-12b. **THÔNG QUA THEO HẠN 07/09/2026 (`SELF-SIGNED`)** — xem **B** |
+| 35 | **`GET /faults` KHÔNG có query `pole_id`** — mục 2.4 liệt kê 11 param, không có cái nào lọc theo cột | 🟡 Vừa | WP5, WP6, FM-17 | **ĐÃ QUYẾT 07/09/2026 (`SELF-SIGNED`)** — thêm param; xem **A** và mục 35b |
 | 36 | **`open_fault_count` của `mock-poles.geojson` lệch `mock-faults.json` ở 2 cột** | 🟡 Vừa | WP5, BE-39 | Mock — chặn bởi mục 27; xem mục 36b |
+| 37 | **Contract chưa đặc tả KHUÔN ID** — không mục nào cho regex, chỉ có ví dụ ở mục 0.2 | 🔴 Cao | WP5, **WP6**, FM-17 | Contract — thêm; đã quyết ở **A**, xem "Quyết định đã đăng ký" |
+| 38 | **`work_order_id` (mục 2.4) chưa có chỗ chứa** — `fault` không có cột, bảng `work_order` chưa tồn tại | 🟡 Vừa | WP5, WP6, BE-21 | Đã quyết ở **C** — emit `null`, nợ có tên |
 
 ---
 
