@@ -1,10 +1,10 @@
-# LuxMap — API Contract v1.1 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.2 (BẢN HỢP NHẤT)
 
-**Trạng thái:** Bản hợp nhất, thay thế cả `api-contract-v1.md` và bản bổ sung v1.1 rời. Đây là tài liệu duy nhất cần đọc.
-**Ngày chốt v1.0:** 2026-08-23 · **Ngày hợp nhất v1.1:** 2026-08-24
+**Trạng thái:** Bản hợp nhất, thay thế cả `api-contract-v1.md` và bản bổ sung v1.1 rời. Đây là tài liệu duy nhất cần đọc. Tên file giữ `api-contract-v1.1.md` để mọi liên kết cũ vẫn đúng.
+**Ngày chốt v1.0:** 2026-08-23 · **Ngày hợp nhất v1.1:** 2026-08-24 · **v1.2:** 2026-09-11 (mục 2.10 Auth)
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng version. Không đổi ngầm.
 
-> **Về cách đánh số.** Task list v2.1 đã publish và trỏ tới số mục của v1.0 (mục 1, mục 2.1–2.3, mục 2.4, mục 2.5, mục 3). Vì vậy toàn bộ đánh số cũ được **giữ nguyên**, nội dung mới nối vào sau dưới dạng mục 2.8, 2.9 và mục 7. Thứ tự nhìn hơi lạ nhưng mọi tham chiếu trong task list vẫn đúng.
+> **Về cách đánh số.** Task list v2.1 đã publish và trỏ tới số mục của v1.0 (mục 1, mục 2.1–2.3, mục 2.4, mục 2.5, mục 3). Vì vậy toàn bộ đánh số cũ được **giữ nguyên**, nội dung mới nối vào sau dưới dạng mục 2.8, 2.9, 2.10 và mục 7. Thứ tự nhìn hơi lạ nhưng mọi tham chiếu trong task list vẫn đúng.
 
 ---
 
@@ -20,8 +20,10 @@
 | 2.9 | **Mới** — nhóm endpoint lux readings (BE-42) |
 | 6 | Gỡ "phân quyền theo `commune_id`" khỏi danh sách chưa chốt |
 | 7 | **Mới** — đặc tả phân quyền theo địa bàn (BE-08) |
+| 2.10 | **Mới (v1.2)** — nhóm Auth: 4 endpoint mobile (hình dạng BE-07, không đổi) + 3 endpoint web dùng cookie `HttpOnly` |
 
 FE cần đọc lại: mục 1 (enum đổi), 2.4 (hình dạng item), 0.2 (prefix ID cho entity mới).
+**v1.2:** WP5 đọc toàn bộ mục 2.10 (nhóm web là mới). WP6 đọc mục 2.10.1 và 2.10.4 — hình dạng không đổi, chỉ được ghi thành văn.
 
 ---
 
@@ -38,7 +40,7 @@ FE cần đọc lại: mục 1 (enum đổi), 2.4 (hình dạng item), 0.2 (pref
 | ID | Chuỗi có prefix — xem 0.1–0.4 | Dễ debug, FE không cần đoán kiểu |
 | Phân trang | `?page=1&page_size=50` → `{page, page_size, total, items[]}` | `page_size` tối đa 200 |
 | Lỗi | `{ "error": { "code": "...", "message": "...", "details": {} } }` | HTTP code chuẩn |
-| Auth | `Authorization: Bearer <jwt>` | FE mock bằng token giả giai đoạn đầu |
+| Auth | `Authorization: Bearer <jwt>` | FE mock bằng token giả giai đoạn đầu. Cách lấy token: mục 2.10 |
 
 ### Quy tắc GeoJSON
 
@@ -382,6 +384,156 @@ Dùng cho CV-12 kéo toàn bộ số đo về đối chiếu hàng loạt. Mỗi
 Ghép cặp ở server thay vì để CV-12 tự ghép: logic tìm điểm gần nhất phải giống hệt giữa lần chạy phân tích và lần chạy báo cáo. Nếu mỗi bên tự ghép thì hai con số sẽ khác nhau mà không ai biết vì sao.
 
 **Bộ hiệu chuẩn được mô hình hoá như tài sản thật.** Đăng ký bộ hiệu chuẩn FO-07 như một `RoadSegment` bình thường (ví dụ `SEG-900`) với các `Pole` và `Fixture` tương ứng, `data_source = calibration_rig`. Nhờ vậy toàn bộ pipeline chạy không cần nhánh riêng — baseline, phân loại, lux, biểu đồ lịch sử đều dùng chung một đường. Nếu tách thành thực thể riêng thì mọi truy vấn phải xử lý hai trường hợp, và phần kiểm chứng ở CV-09 sẽ không chạy đúng đường mà hệ thống thật chạy.
+
+### 2.10 Auth — `/api/v1/auth` (BE-07; nhóm web mới ở v1.2)
+
+Hai nhóm endpoint. **Client chọn nhóm bằng đường dẫn** — server không đoán client là ai từ bất kỳ header nào.
+
+| Nhóm | Dành cho | Refresh token đi qua | Trạng thái |
+|---|---|---|---|
+| `/api/v1/auth/{login,register,refresh,logout}` | Mobile (WP6) và mọi client không phải browser | Body JSON `refresh_token` | **CONTRACT** — hình dạng đang chạy từ BE-07, không đổi |
+| `/api/v1/auth/web/{login,refresh,logout}` | Web SPA (WP5), gọi **từ browser** | Cookie `HttpOnly` — **không bao giờ** nằm trong body | **CONTRACT** — mới ở v1.2 |
+
+Cả 7 endpoint **không cần access token**. Access token luôn nằm trong body response và được dùng như mục 0 (`Authorization: Bearer <jwt>`). **Access token không bao giờ nằm trong cookie.**
+
+#### 2.10.1 Nhóm mobile
+
+**`POST /api/v1/auth/login`**
+
+```json
+{ "username": "engineer", "password": "..." }
+```
+
+`200` — **đúng bốn trường, không hơn**:
+
+```json
+{ "access_token": "<jwt>", "refresh_token": "<chuỗi mờ>", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+`expires_in` là lifetime của **access** token, tính bằng giây.
+
+**`POST /api/v1/auth/refresh`** — body `{ "refresh_token": "..." }` → `200`, cùng bốn trường. Mỗi lần refresh trả **refresh token MỚI** và thu hồi token cũ ngay. Client **phải lưu token mới**: giữ token cũ thì lần refresh sau nhận `401`.
+
+**`POST /api/v1/auth/logout`** — body `{ "refresh_token": "..." }` → **`204`** với mọi giá trị token, kể cả token đã thu hồi hoặc không tồn tại. Thiếu trường `refresh_token` → `400 VALIDATION_FAILED`.
+
+**`POST /api/v1/auth/register`**
+
+```json
+{ "username": "...", "email": "...", "full_name": "...", "password": "..." }
+```
+
+`201`:
+
+```json
+{ "user_id": "USR-005", "username": "...", "email": "...", "full_name": "...",
+  "role": "field_crew", "commune_ids": [],
+  "message": "Account created. An administrator must assign communes before any data becomes visible." }
+```
+
+- Server áp cứng `role` và `commune_ids`; client **không set được** — trường thừa trong body bị bỏ qua.
+- Mật khẩu tối thiểu **12 ký tự**, không ràng buộc thành phần.
+- Trùng username hoặc email → `409 IDENTIFIER_TAKEN`.
+- **Không trả token** — gọi `login` riêng. Tài khoản mới thấy danh sách rỗng cho tới khi được gán địa bàn: đó là đúng, không phải lỗi.
+
+Giới hạn độ dài từng trường của cả nhóm: xem `docs/openapi/luxmap-v1.json`.
+
+#### 2.10.2 Nhóm web
+
+**`POST /api/v1/auth/web/login`**
+
+```json
+{ "username": "engineer", "password": "...", "remember_me": true }
+```
+
+`remember_me` là boolean, **không bắt buộc**; thiếu thì coi là `false`.
+
+`200` — **đúng ba trường**, không có `refresh_token`:
+
+```json
+{ "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+kèm `Set-Cookie` mang refresh token (mục 2.10.3).
+
+Nếu request đã mang cookie web còn hiệu lực, server **thu hồi phiên đó** rồi mới mở phiên mới. Đây là cách **duy nhất** để đổi giữa "ghi nhớ đăng nhập" và "không ghi nhớ": đăng nhập lại. Cookie thiếu, hỏng, hoặc không thuộc nhóm web → bỏ qua, không lỗi. Đăng nhập thất bại thì không có gì bị thu hồi.
+
+**`POST /api/v1/auth/web/refresh`** — **không có body**; refresh token đọc từ cookie.
+
+- `200` — cùng ba trường, kèm `Set-Cookie` mang token mới.
+- Không có cookie, hoặc cookie không hợp lệ → `401 INVALID_REFRESH_TOKEN`. **Nhánh lỗi không đụng tới cookie** — không xoá, không ghi đè.
+- Body gửi kèm bị bỏ qua: `refresh_token` trong body **không bao giờ** được đọc ở nhóm này.
+
+**`POST /api/v1/auth/web/logout`** — **không có body**. Thu hồi token trong cookie nếu hợp lệ, **luôn** kèm `Set-Cookie` xoá cookie, **luôn** trả `204`.
+
+**Chặn theo `Origin` — áp cho cả ba endpoint web, xét trước mọi thứ khác.** Request phải mang header `Origin` khớp **chính xác** một origin trong danh sách cho phép của server (cấu hình khi deploy). Thiếu `Origin`, `Origin` lạ, hoặc `Origin: null` → **`403 ORIGIN_NOT_ALLOWED`**.
+
+Lớp này tách biệt với CORS: CORS quyết browser có được **đọc** response hay không; lớp này quyết request có được **xử lý** hay không.
+
+**CORS:** với origin trong danh sách, API trả `Access-Control-Allow-Origin` bằng **đúng origin đó** (không bao giờ `*`) cùng `Access-Control-Allow-Credentials: true`, và expose header `X-Correlation-Id`.
+
+#### 2.10.3 Cookie refresh token (nhóm web)
+
+| Thuộc tính | Giá trị |
+|---|---|
+| Tên | `__Secure-luxmap_rt` |
+| `HttpOnly` | có — JavaScript không đọc được |
+| `Secure` | có |
+| `SameSite` | `Lax` |
+| `Path` | `/api/v1/auth/web` — browser chỉ gửi cookie tới ba endpoint web |
+| `Domain` | không set (host-only) |
+| `Expires` | `remember_me = true`: thời điểm hết hạn của refresh token. `remember_me = false`: **không set** — cookie phiên |
+
+Các thuộc tính là **hằng số của API**, không đổi theo môi trường. Giá trị cookie là chuỗi mờ — client không đọc, không parse.
+
+#### 2.10.4 Loại phiên và thời hạn
+
+| Loại phiên | Tạo bởi | Refresh token hết hạn | Trần tuyệt đối |
+|---|---|---|---|
+| `mobile` | `POST /auth/login` | 30 ngày, **trượt** — mỗi lần refresh tính lại từ lúc đó | 90 ngày kể từ lần đăng nhập |
+| `web_persistent` | `POST /auth/web/login`, `remember_me = true` | 14 ngày, trượt | 90 ngày kể từ lần đăng nhập |
+| `web_session` | `POST /auth/web/login`, `remember_me` là `false` hoặc thiếu | **12 giờ tuyệt đối** kể từ lần đăng nhập — refresh **không** kéo dài | 12 giờ |
+
+Access token sống **60 phút** (`expires_in`), như nhau ở cả hai nhóm.
+
+- Refresh **giữ nguyên** loại phiên. Loại phiên chỉ được quyết lúc đăng nhập.
+- Phiên `web_session` hết hạn ở server sau 12 giờ, kể cả khi browser khôi phục cookie phiên (session restore).
+- **Token của nhóm này không dùng được ở nhóm kia.** Token web gửi tới `/auth/refresh`, hoặc token mobile gửi tới `/auth/web/refresh` → `401 INVALID_REFRESH_TOKEN`, token **không** bị thu hồi. Logout sai nhóm → `204`, không thu hồi gì.
+- **Dùng lại token đã bị thay** (cả hai nhóm): trong 30 giây sau khi bị thay → `401`, phiên vẫn sống (coi là retry khi mạng yếu). Sau 30 giây → `401` **và thu hồi toàn bộ phiên đăng nhập đó**. Phiên đăng nhập khác của cùng user không bị ảnh hưởng.
+- Hai request refresh cùng lúc bằng một token: **đúng một** request thắng, request kia `401`. Ở nhóm web, hai tab refresh cùng lúc sẽ gặp đúng trường hợp này — FE nên gom refresh thành một lượt duy nhất xuyên tab.
+
+#### 2.10.5 Claim trong access token
+
+| Claim | Kiểu | Ví dụ |
+|---|---|---|
+| `sub` | chuỗi | `USR-001` |
+| `role` | **chuỗi đơn**, không phải mảng | `maintenance_engineer` |
+| `commune_ids` | **luôn là mảng** | `["COM-001"]` · Quản trị: `["*"]` |
+| `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
+
+#### 2.10.6 Mã lỗi nhóm Auth
+
+Hình dạng lỗi chung của mục 0.
+
+| Mã | HTTP | Khi nào | Nhóm |
+|---|---|---|---|
+| `VALIDATION_FAILED` | 400 | Body sai định dạng hoặc thiếu trường | mobile; `web/login` |
+| `INVALID_CREDENTIALS` | 401 | Sai tài khoản **hoặc** sai mật khẩu — cố ý chung một mã | cả hai |
+| `ACCOUNT_LOCKED` | 403 | Đúng mật khẩu nhưng tài khoản bị khoá; áp cả ở refresh | cả hai |
+| `INVALID_REFRESH_TOKEN` | 401 | Refresh token thiếu, sai, hết hạn, đã thu hồi, bị dùng lại, hoặc sai nhóm — cố ý chung một mã | cả hai |
+| `ORIGIN_NOT_ALLOWED` | 403 | `Origin` thiếu, lạ, hoặc `null` | chỉ web |
+| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username hoặc email | `register` |
+
+#### 2.10.7 Ràng buộc triển khai nhóm web
+
+**FE và API phải CÙNG SITE** — cùng scheme `https` và cùng registrable domain (eTLD+1):
+
+- Cùng site: `app.example.vn` và `api.example.vn`.
+- Khác site: `app.example.vn` và `api.other.vn`.
+- Domain nằm trong Public Suffix List (ví dụ `*.vercel.app`, `*.azurewebsites.net`): **mỗi subdomain là một site riêng** — `a.vercel.app` và `b.vercel.app` là khác site.
+
+Triển khai khác site **không được hỗ trợ**: với `SameSite=Lax`, browser không gửi cookie trong request cross-site, nên `web/refresh` luôn nhận `401`.
+
+**Gọi từ browser, không gọi từ server của FE.** Mọi call `/api/v1/auth/web/*` — **kể cả `login`** — phải đi **từ browser**, với `credentials: 'include'` (fetch) hoặc `withCredentials: true` (XHR/axios). Thiếu option này, browser bỏ qua `Set-Cookie` của response cross-origin. **Không gọi nhóm auth từ Next.js server** (route handler, server action, SSR): request đó không mang `Origin` của browser nên nhận `403`, và cookie không bao giờ tới được browser.
 
 ---
 
