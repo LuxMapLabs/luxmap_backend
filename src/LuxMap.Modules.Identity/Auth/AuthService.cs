@@ -22,8 +22,16 @@ public sealed class AuthService(
 
     /// <param name="kind">Decided by the endpoint group that received the sign-in, and fixed for the
     /// whole chain from here on (Contract section 2.10.4).</param>
+    /// <param name="supersededWebRefreshToken">The web cookie the browser sent with this sign-in, if any.
+    /// A LIVE web token is revoked (reason <c>logout</c>) in the same transaction that opens the new
+    /// chain; a missing, unknown, expired, revoked or mobile token is ignored. Only a SUCCESSFUL
+    /// sign-in revokes anything.</param>
     public async Task<AuthResult> LoginAsync(
-        string username, string password, RefreshTokenSessionKind kind, CancellationToken ct = default)
+        string username,
+        string password,
+        RefreshTokenSessionKind kind,
+        string? supersededWebRefreshToken,
+        CancellationToken ct = default)
     {
         var normalized = (username ?? string.Empty).Trim();
 
@@ -53,16 +61,25 @@ public sealed class AuthService(
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+        // One transaction: the superseded web session dies only if the new chain is actually opened.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+
+        if (!string.IsNullOrWhiteSpace(supersededWebRefreshToken))
+        {
+            await RevokeSupersededWebTokenAsync(supersededWebRefreshToken, now, ct);
+        }
+
         // Every sign-in opens ONE new chain, so revoking this chain never touches another device.
         var chainId = Guid.NewGuid();
         var chainAbsoluteExpiry = ChainCeiling(kind, now);
 
         var refresh = await IssueRefreshTokenAsync(user.UserId, chainId, chainAbsoluteExpiry, kind, now, ct);
         await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
 
         logger.LogInformation(
             "Sign-in succeeded for {UserId}, opened {SessionKind} chain {ChainId}.", user.UserId, kind, chainId);
-        return AuthResult.Success(await BuildTokensAsync(user, refresh.RawToken, ct));
+        return AuthResult.Success(await BuildTokensAsync(user, refresh.Entity, refresh.RawToken, ct));
     }
 
     /// <summary>
@@ -284,7 +301,7 @@ public sealed class AuthService(
 
         await transaction.CommitAsync(ct);
 
-        return AuthResult.Success(await BuildTokensAsync(current.User, issued.RawToken, ct));
+        return AuthResult.Success(await BuildTokensAsync(current.User, issued.Entity, issued.RawToken, ct));
     }
 
     private async Task HandleRevokedTokenAsync(RefreshToken token, DateTime now, CancellationToken ct)
@@ -321,6 +338,35 @@ public sealed class AuthService(
                     .SetProperty(other => other.RevokedReason, RefreshTokenRevocationReason.ReuseDetected),
                 ct);
 #pragma warning restore RS0030
+    }
+
+    /// <summary>
+    /// A web sign-in on a browser that already holds a LIVE web session revokes that session first,
+    /// so switching between "remember me" and not always goes through a new chain (Contract section
+    /// 2.10.2). Matches — and changes — nothing for an unknown, expired, revoked or mobile token.
+    /// </summary>
+    private async Task RevokeSupersededWebTokenAsync(string rawToken, DateTime now, CancellationToken ct)
+    {
+        var hash = RefreshTokenGenerator.Hash(rawToken);
+
+#pragma warning disable RS0030 // RefreshToken is not ICommuneScoped — see the note in LogoutAsync
+        var revoked = await dbContext.Set<RefreshToken>()
+            .Where(token => token.TokenHash == hash
+                            && token.RevokedAt == null
+                            && token.ExpiresAt > now
+                            && token.ChainAbsoluteExpiry > now)
+            .Where(AuthEndpointGroup.Web.Owns())
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.RevokedAt, now)
+                    .SetProperty(token => token.RevokedReason, RefreshTokenRevocationReason.Logout),
+                ct);
+#pragma warning restore RS0030
+
+        if (revoked > 0)
+        {
+            logger.LogInformation("Web sign-in replaced a live web session on the same browser; revoked its token.");
+        }
     }
 
     /// <summary>
@@ -368,7 +414,8 @@ public sealed class AuthService(
         return (entity, raw);
     }
 
-    private async Task<AuthTokens> BuildTokensAsync(AppUser user, string rawRefreshToken, CancellationToken ct)
+    private async Task<AuthTokens> BuildTokensAsync(
+        AppUser user, RefreshToken refresh, string rawRefreshToken, CancellationToken ct)
     {
         var communeIds = user.HasSystemWideScope
             ? [AuthClaims.AllCommunes]
@@ -379,6 +426,7 @@ public sealed class AuthService(
                 .ToArrayAsync(ct);
 
         var access = accessTokenIssuer.Issue(user, communeIds);
-        return new AuthTokens(access.Token, rawRefreshToken, access.ExpiresInSeconds);
+        return new AuthTokens(
+            access.Token, rawRefreshToken, access.ExpiresInSeconds, refresh.ExpiresAt, refresh.SessionKind);
     }
 }
