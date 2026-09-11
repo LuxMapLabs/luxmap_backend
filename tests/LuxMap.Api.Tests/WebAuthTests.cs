@@ -418,6 +418,7 @@ public class WebAuthTests(AuthTestFactory factory, ITestOutputHelper output)
             factory.Clock.Advance(TimeSpan.FromMinutes(5));
 
             string next;
+            DateTimeOffset? cookieExpires = null;
             if (kind == RefreshTokenSessionKind.Mobile)
             {
                 next = (await (await Mobile.PostRefreshAsync(token)).ReadTokensAsync()).RefreshToken;
@@ -428,23 +429,26 @@ public class WebAuthTests(AuthTestFactory factory, ITestOutputHelper output)
                 Assert.Equal(HttpStatusCode.OK, response.StatusCode);
                 var cookie = response.AuthCookie()!;
                 next = cookie.Value.ToString();
-
-                if (kind == RefreshTokenSessionKind.WebSession)
-                {
-                    Assert.Null(cookie.Expires);
-                }
-                else
-                {
-                    Assert.NotNull(cookie.Expires);
-                }
+                cookieExpires = cookie.Expires;
             }
 
+            // The stored kind first — it is the property under test; the cookie's shape follows from it.
             var before = (await RowAsync(token))!.SessionKind;
             var after = (await RowAsync(next))!.SessionKind;
-            output.WriteLine($"  round {round}: {before} -> {after}");
+            output.WriteLine($"  round {round}: {before} -> {after}, cookie expires: {cookieExpires?.ToString("O") ?? "none"}");
 
             Assert.Equal(kind, before);
             Assert.Equal(before, after);
+
+            if (kind == RefreshTokenSessionKind.WebSession)
+            {
+                Assert.Null(cookieExpires);
+            }
+            else if (kind == RefreshTokenSessionKind.WebPersistent)
+            {
+                Assert.NotNull(cookieExpires);
+            }
+
             token = next;
         }
     }
