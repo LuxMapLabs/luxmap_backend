@@ -373,7 +373,7 @@ gì, một lần sau khi có nhóm web.
 | 37 | **Contract chưa đặc tả KHUÔN ID** — không mục nào cho regex, chỉ có ví dụ ở mục 0.2 | 🔴 Cao | WP5, **WP6**, FM-17 | Contract — thêm; đã quyết ở **A**, xem "Quyết định đã đăng ký" |
 | 38 | **`work_order_id` (mục 2.4) chưa có chỗ chứa** — `fault` không có cột, bảng `work_order` chưa tồn tại | 🟡 Vừa | WP5, WP6, BE-21 | Đã quyết ở **C** — emit `null`, nợ có tên |
 | 39 | 🔴 **§0.4 dạy `LPAD(...)` — cơ chế SAI, cắt ID khi vượt độ rộng.** Contract lệch code từ commit `8ea9930` | 🔴 Cao | WP5, WP6, BE-39 | Contract — **ĐÃ SỬA 07/09/2026** (`SELF-SIGNED`); xem **D** |
-| 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E** |
+| 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E**. **Đóng một phần 11/09/2026:** sinh lại từ code, spec nay có thêm 8 path `/assets…` và `/lux-readings…`. `/faults`, `/poles`, `/segments` vẫn thiếu vì **chưa có code** |
 | 41 | **Auth web qua cookie `HttpOnly`** — nhóm `/api/v1/auth/web/*` mới, nhóm mobile không đổi | 🔴 Cao | WP5, WP6 | **ĐÃ CHỐT 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
 
 ---
