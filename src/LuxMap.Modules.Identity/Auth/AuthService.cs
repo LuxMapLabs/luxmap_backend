@@ -321,6 +321,7 @@ public sealed class AuthService(
             UserId = userId,
             ChainId = chainId,
             ChainAbsoluteExpiry = chainAbsoluteExpiry,
+            SessionKind = RefreshTokenSessionKind.Mobile,
             TokenHash = RefreshTokenGenerator.Hash(raw),
             ExpiresAt = expiresAt,
             CreatedAt = now,

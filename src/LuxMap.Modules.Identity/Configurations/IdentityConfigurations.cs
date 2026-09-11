@@ -71,6 +71,7 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
         builder.Property(token => token.TokenHash).HasColumnType("text").IsRequired();
         builder.Property(token => token.CreatedAt).HasDefaultValueSql("now()");
         builder.HasContractEnum(token => token.RevokedReason);
+        builder.HasContractEnum(token => token.SessionKind);
 
         builder.HasOne(token => token.User)
             .WithMany(user => user.RefreshTokens)
