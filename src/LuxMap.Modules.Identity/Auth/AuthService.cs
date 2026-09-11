@@ -14,12 +14,16 @@ public sealed class AuthService(
     LuxMapDbContext dbContext,
     AccessTokenIssuer accessTokenIssuer,
     JwtOptions options,
+    WebAuthOptions webOptions,
     TimeProvider timeProvider,
     ILogger<AuthService> logger)
 {
     private readonly PasswordHasher<AppUser> passwordHasher = new();
 
-    public async Task<AuthResult> LoginAsync(string username, string password, CancellationToken ct = default)
+    /// <param name="kind">Decided by the endpoint group that received the sign-in, and fixed for the
+    /// whole chain from here on (Contract section 2.10.4).</param>
+    public async Task<AuthResult> LoginAsync(
+        string username, string password, RefreshTokenSessionKind kind, CancellationToken ct = default)
     {
         var normalized = (username ?? string.Empty).Trim();
 
@@ -51,12 +55,13 @@ public sealed class AuthService(
 
         // Every sign-in opens ONE new chain, so revoking this chain never touches another device.
         var chainId = Guid.NewGuid();
-        var chainAbsoluteExpiry = now.AddDays(options.RefreshAbsoluteDays);
+        var chainAbsoluteExpiry = ChainCeiling(kind, now);
 
-        var refresh = await IssueRefreshTokenAsync(user.UserId, chainId, chainAbsoluteExpiry, now, ct);
+        var refresh = await IssueRefreshTokenAsync(user.UserId, chainId, chainAbsoluteExpiry, kind, now, ct);
         await dbContext.SaveChangesAsync(ct);
 
-        logger.LogInformation("Sign-in succeeded for {UserId}, opened chain {ChainId}.", user.UserId, chainId);
+        logger.LogInformation(
+            "Sign-in succeeded for {UserId}, opened {SessionKind} chain {ChainId}.", user.UserId, kind, chainId);
         return AuthResult.Success(await BuildTokensAsync(user, refresh.RawToken, ct));
     }
 
@@ -157,7 +162,10 @@ public sealed class AuthService(
     private static bool IsUniqueViolation(DbUpdateException exception)
         => exception.InnerException is PostgresException { SqlState: "23505" };
 
-    public async Task<AuthResult> RefreshAsync(string refreshToken, CancellationToken ct = default)
+    /// <param name="group">The endpoint group the token arrived at. A token issued by the other group
+    /// is treated exactly like an unknown one: 401, nothing revoked, no reuse detection.</param>
+    public async Task<AuthResult> RefreshAsync(
+        string? refreshToken, AuthEndpointGroup group, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
@@ -167,9 +175,13 @@ public sealed class AuthService(
         var hash = RefreshTokenGenerator.Hash(refreshToken);
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+        // The group filter runs IN the lookup, before any revoked/expired branch: a token of the other
+        // group is never loaded, so it can neither be rotated nor trip reuse detection.
         var existing = await dbContext.Set<RefreshToken>()
             .Include(token => token.User)
-            .FirstOrDefaultAsync(token => token.TokenHash == hash, ct);
+            .Where(token => token.TokenHash == hash)
+            .Where(group.Owns())
+            .FirstOrDefaultAsync(ct);
 
         if (existing is null)
         {
@@ -195,10 +207,11 @@ public sealed class AuthService(
         return await RotateAsync(existing, now, ct);
     }
 
-    public async Task LogoutAsync(string? refreshToken, CancellationToken ct = default)
+    public async Task LogoutAsync(string? refreshToken, AuthEndpointGroup group, CancellationToken ct = default)
     {
         // Idempotent: an unknown or already-revoked token is not an error, and NEVER triggers theft
-        // detection — an old client retrying is ordinary behaviour.
+        // detection — an old client retrying is ordinary behaviour. A token of the other endpoint
+        // group is not matched at all, so it stays alive.
         if (string.IsNullOrWhiteSpace(refreshToken))
         {
             return;
@@ -216,6 +229,7 @@ public sealed class AuthService(
         // cannot express that without reintroducing the race.
         await dbContext.Set<RefreshToken>()
             .Where(token => token.TokenHash == hash && token.RevokedAt == null)
+            .Where(group.Owns())
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(token => token.RevokedAt, now)
@@ -254,8 +268,10 @@ public sealed class AuthService(
             return AuthResult.Fail(AuthFailure.InvalidRefreshToken);
         }
 
+        // The kind is COPIED from the token being replaced — never taken from the endpoint doing the
+        // refresh. Switching kind takes a new sign-in, which opens a new chain.
         var issued = await IssueRefreshTokenAsync(
-            current.UserId, current.ChainId, current.ChainAbsoluteExpiry, now, ct);
+            current.UserId, current.ChainId, current.ChainAbsoluteExpiry, current.SessionKind, now, ct);
         await dbContext.SaveChangesAsync(ct);
 
 #pragma warning disable RS0030 // RefreshToken is not ICommuneScoped — see the note above
@@ -307,13 +323,34 @@ public sealed class AuthService(
 #pragma warning restore RS0030
     }
 
+    /// <summary>
+    /// The chain's absolute ceiling, fixed at sign-in (Contract section 2.10.4): 12 hours for a web
+    /// session, the shared 90-day ceiling for the other two kinds.
+    /// </summary>
+    private DateTime ChainCeiling(RefreshTokenSessionKind kind, DateTime signedInAt)
+        => kind == RefreshTokenSessionKind.WebSession
+            ? signedInAt.Add(webOptions.SessionLifetime)
+            : signedInAt.AddDays(options.RefreshAbsoluteDays);
+
     private async Task<(RefreshToken Entity, string RawToken)> IssueRefreshTokenAsync(
-        string userId, Guid chainId, DateTime chainAbsoluteExpiry, DateTime now, CancellationToken ct)
+        string userId,
+        Guid chainId,
+        DateTime chainAbsoluteExpiry,
+        RefreshTokenSessionKind kind,
+        DateTime now,
+        CancellationToken ct)
     {
         var raw = RefreshTokenGenerator.CreateRawToken();
 
-        // Slides 30 days forward but never past the chain's absolute ceiling.
-        var sliding = now.AddDays(options.RefreshSlidingDays);
+        // Slides forward but never past the chain's absolute ceiling. A web session has no sliding
+        // part: every token in its chain expires with the chain, 12 hours after sign-in.
+        var sliding = kind switch
+        {
+            RefreshTokenSessionKind.Mobile => now.AddDays(options.RefreshSlidingDays),
+            RefreshTokenSessionKind.WebPersistent => now.AddDays(webOptions.PersistentSlidingDays),
+            RefreshTokenSessionKind.WebSession => chainAbsoluteExpiry,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown session kind."),
+        };
         var expiresAt = sliding < chainAbsoluteExpiry ? sliding : chainAbsoluteExpiry;
 
         var entity = new RefreshToken
@@ -321,7 +358,7 @@ public sealed class AuthService(
             UserId = userId,
             ChainId = chainId,
             ChainAbsoluteExpiry = chainAbsoluteExpiry,
-            SessionKind = RefreshTokenSessionKind.Mobile,
+            SessionKind = kind,
             TokenHash = RefreshTokenGenerator.Hash(raw),
             ExpiresAt = expiresAt,
             CreatedAt = now,
