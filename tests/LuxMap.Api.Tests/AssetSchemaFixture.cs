@@ -53,7 +53,7 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
     private (long Value, bool IsCalled) poleSequence;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
-        => builder.UseEnvironment("Production");
+        => builder.UseEnvironment("Production").UseTestCorsOrigin();
 
     public async Task InitializeAsync()
     {
