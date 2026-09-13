@@ -27,6 +27,7 @@ public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLif
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Production");
+        builder.UseTestCorsOrigin();
         builder.ConfigureServices(services =>
         {
             services.AddControllers().AddApplicationPart(typeof(ScopeTestController).Assembly);

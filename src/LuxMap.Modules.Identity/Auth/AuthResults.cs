@@ -18,7 +18,15 @@ public enum AuthFailure
 /// <param name="AccessToken">The JWT.</param>
 /// <param name="RefreshToken">The raw string, returned THIS ONCE only; the database keeps just its hash.</param>
 /// <param name="ExpiresInSeconds">Lifetime of the ACCESS token, in seconds.</param>
-public sealed record AuthTokens(string AccessToken, string RefreshToken, int ExpiresInSeconds);
+/// <param name="RefreshTokenExpiresAt">When the refresh token stops working — the web cookie's
+/// <c>Expires</c> for a persistent session. Never sent in a body.</param>
+/// <param name="SessionKind">The chain's session kind, which decides the web cookie's shape.</param>
+public sealed record AuthTokens(
+    string AccessToken,
+    string RefreshToken,
+    int ExpiresInSeconds,
+    DateTime RefreshTokenExpiresAt,
+    LuxMap.Modules.Identity.Entities.RefreshTokenSessionKind SessionKind);
 
 public sealed record AuthResult(AuthTokens? Tokens, AuthFailure? Failure)
 {

@@ -36,7 +36,12 @@ public sealed class IdentityModule : ILuxMapModule
         // A missing key STOPS startup rather than quietly running with a default.
         options.Validate();
 
+        var webOptions = configuration.GetSection(WebAuthOptions.SectionName).Get<WebAuthOptions>()
+            ?? new WebAuthOptions();
+        webOptions.Validate();
+
         services.AddSingleton(options);
+        services.AddSingleton(webOptions);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AccessTokenIssuer>();
         services.AddScoped<AuthService>();

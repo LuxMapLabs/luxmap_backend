@@ -32,30 +32,33 @@ public static class KnownErrors
     public static readonly KnownError CommuneForbidden =
         new(ErrorCodes.CommuneForbidden, HttpStatusCode.Forbidden, "section 7");
 
-    // BE-07 — the /auth group. Not specified by the Contract yet; raise at FW-00.
+    // The /auth group — Contract v1.2 section 2.10.6.
     public static readonly KnownError InvalidCredentials =
-        new(ErrorCodes.InvalidCredentials, HttpStatusCode.Unauthorized, "BE-07, not yet in the Contract");
+        new(ErrorCodes.InvalidCredentials, HttpStatusCode.Unauthorized, "section 2.10.6");
 
     public static readonly KnownError AccountLocked =
-        new(ErrorCodes.AccountLocked, HttpStatusCode.Forbidden, "BE-07, not yet in the Contract");
+        new(ErrorCodes.AccountLocked, HttpStatusCode.Forbidden, "section 2.10.6");
 
     public static readonly KnownError InvalidRefreshToken =
-        new(ErrorCodes.InvalidRefreshToken, HttpStatusCode.Unauthorized, "BE-07, not yet in the Contract");
+        new(ErrorCodes.InvalidRefreshToken, HttpStatusCode.Unauthorized, "section 2.10.6");
+
+    public static readonly KnownError OriginNotAllowed =
+        new(ErrorCodes.OriginNotAllowed, HttpStatusCode.Forbidden, "section 2.10.2");
 
     /// <summary>BE-08 — also absent from the Contract.</summary>
     public static readonly KnownError Unauthenticated =
         new(ErrorCodes.Unauthenticated, HttpStatusCode.Unauthorized, "BE-08, not yet in the Contract");
 
-    /// <summary>BE-07 open registration — also absent from the Contract.</summary>
+    /// <summary>BE-07 open registration.</summary>
     public static readonly KnownError IdentifierTaken =
-        new(ErrorCodes.IdentifierTaken, HttpStatusCode.Conflict, "BE-07, not yet in the Contract");
+        new(ErrorCodes.IdentifierTaken, HttpStatusCode.Conflict, "section 2.10.6");
 
     public static IReadOnlyList<KnownError> All { get; } =
     [
         BboxTooLarge, PoleNotFound, LocationRequired,
         FaultTypeNotReportable, DuplicateOp, CommuneForbidden,
         InvalidCredentials, AccountLocked, InvalidRefreshToken, Unauthenticated,
-        IdentifierTaken,
+        IdentifierTaken, OriginNotAllowed,
     ];
 
     public static KnownError? Find(string code)

@@ -78,7 +78,7 @@ public static class ErrorCodes
     /// </remarks>
     public const string ServerOwnedField = "SERVER_OWNED_FIELD";
 
-    // ── Authentication (BE-07, BE-08) — also absent from Contract v1.1 ───────
+    // ── Authentication — Contract v1.2 section 2.10.6, except UNAUTHENTICATED (BE-08) ───
 
     /// <summary>
     /// 401 — wrong username OR wrong password. Deliberately ONE code for both: splitting them
@@ -94,6 +94,12 @@ public static class ErrorCodes
     /// distinguishing them helps an attacker probe which tokens once existed.
     /// </summary>
     public const string InvalidRefreshToken = "INVALID_REFRESH_TOKEN";
+
+    /// <summary>
+    /// 403 — a <c>/api/v1/auth/web/*</c> request whose <c>Origin</c> is missing, not on the
+    /// allowlist, or <c>null</c> (section 2.10.2).
+    /// </summary>
+    public const string OriginNotAllowed = "ORIGIN_NOT_ALLOWED";
 
     /// <summary>
     /// 401 — access token missing, badly signed, expired, wrong issuer, or wrong audience.

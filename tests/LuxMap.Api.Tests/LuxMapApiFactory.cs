@@ -10,6 +10,7 @@ public sealed class LuxMapApiFactory : WebApplicationFactory<Program>
     {
         // Production, to prove a 500 does NOT leak exception detail to the client.
         builder.UseEnvironment("Production");
+        builder.UseTestCorsOrigin();
 
         builder.ConfigureServices(services =>
             services.AddControllers().AddApplicationPart(typeof(TestEndpointsController).Assembly));
@@ -25,6 +26,7 @@ public sealed class LuxMapSwaggerFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        builder.UseTestCorsOrigin();
         builder.UseSetting("Swagger:Enabled", "true");
 
         builder.ConfigureServices(services =>

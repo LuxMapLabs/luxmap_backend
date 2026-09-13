@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using LuxMap.Modules.Identity.Entities;
 using Microsoft.AspNetCore.Http;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Errors;
@@ -29,7 +30,9 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await authService.LoginAsync(request.Username!, request.Password!, cancellationToken);
+        var result = await authService.LoginAsync(
+            request.Username!, request.Password!, RefreshTokenSessionKind.Mobile,
+            supersededWebRefreshToken: null, cancellationToken);
         return Respond(result);
     }
 
@@ -89,7 +92,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         [FromBody] RefreshRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await authService.RefreshAsync(request.RefreshToken!, cancellationToken);
+        var result = await authService.RefreshAsync(request.RefreshToken!, AuthEndpointGroup.Mobile, cancellationToken);
         return Respond(result);
     }
 
@@ -101,7 +104,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         [FromBody] LogoutRequest request,
         CancellationToken cancellationToken)
     {
-        await authService.LogoutAsync(request.RefreshToken, cancellationToken);
+        await authService.LogoutAsync(request.RefreshToken, AuthEndpointGroup.Mobile, cancellationToken);
         return NoContent();
     }
 
@@ -112,25 +115,6 @@ public sealed class AuthController(AuthService authService) : ControllerBase
             return Ok(AuthTokenResponse.From(result.Tokens!));
         }
 
-        // Throw LuxMapException so the BE-04 middleware builds the body — one error shape for every API.
-        throw result.Failure switch
-        {
-            AuthFailure.AccountLocked => new LuxMapException(
-                KnownErrors.AccountLocked.Code,
-                KnownErrors.AccountLocked.StatusCode,
-                "This account is locked. Contact an administrator."),
-
-            AuthFailure.InvalidRefreshToken => new LuxMapException(
-                KnownErrors.InvalidRefreshToken.Code,
-                KnownErrors.InvalidRefreshToken.StatusCode,
-                "The refresh token is not valid."),
-
-            // Wrong username and wrong password SHARE one body: separating them reveals which
-            // accounts exist. Never point details at a specific field.
-            _ => new LuxMapException(
-                KnownErrors.InvalidCredentials.Code,
-                KnownErrors.InvalidCredentials.StatusCode,
-                "Incorrect username or password."),
-        };
+        throw AuthFailureErrors.ToException(result.Failure);
     }
 }

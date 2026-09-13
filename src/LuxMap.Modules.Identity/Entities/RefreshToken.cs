@@ -32,6 +32,16 @@ public class RefreshToken
     /// </summary>
     public DateTime ChainAbsoluteExpiry { get; set; }
 
+    /// <summary>
+    /// Which endpoint group opened the chain (Contract section 2.10.4). Every token in a chain carries
+    /// the same value: rotation copies it and never re-derives it from the endpoint doing the refresh.
+    /// </summary>
+    /// <remarks>
+    /// <c>required</c>, and the column has no database default: forgetting it is a compile error rather
+    /// than a session quietly issued under the wrong lifetime.
+    /// </remarks>
+    public required RefreshTokenSessionKind SessionKind { get; set; }
+
     /// <summary>Null means not revoked.</summary>
     public DateTime? RevokedAt { get; set; }
 

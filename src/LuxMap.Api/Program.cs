@@ -50,6 +50,10 @@ builder.Services.AddLuxMapJsonConventions();
 // BE-04 — /api/v1 versioning, correlation id, and mapping validation failures onto the Contract shape.
 builder.Services.AddLuxMapApiConventions();
 
+// Contract section 2.10 — credentialed CORS for the web SPA. Stops startup if Cors:AllowedOrigins is
+// missing or malformed.
+builder.Services.AddLuxMapCors(builder.Configuration);
+
 // BE-05 — Swagger plus the JWT security scheme. Only enabled when Swagger:Enabled = true.
 builder.Services.AddLuxMapSwagger();
 
@@ -85,6 +89,7 @@ if (SeedCommand.IsRequested(args))
 app.UseLuxMapCorrelationId();
 app.UseLuxMapRequestLogging();
 app.UseLuxMapErrorHandling();
+app.UseLuxMapCors();
 
 app.UseLuxMapSwagger();
 app.UseHttpsRedirection();

@@ -118,8 +118,9 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
     public async Task Every_known_contract_error_code_is_registered_with_its_status()
     {
         // 6 codes specified by the Contract + 3 /auth codes from BE-07 + 1 authentication code from
-        // BE-08 + 1 registration code from the BE-07 open-registration supplement.
-        Assert.Equal(11, KnownErrors.All.Count);
+        // BE-08 + 1 registration code from the BE-07 open-registration supplement + 1 web-auth origin
+        // code from Contract v1.2 section 2.10.
+        Assert.Equal(12, KnownErrors.All.Count);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, KnownErrors.Find(ErrorCodes.BboxTooLarge)!.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, KnownErrors.Find(ErrorCodes.PoleNotFound)!.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, KnownErrors.Find(ErrorCodes.LocationRequired)!.StatusCode);
@@ -139,5 +140,8 @@ public class ErrorShapeTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApi
 
         // Open registration — a duplicate identifier is a conflict, not a validation failure.
         Assert.Equal(HttpStatusCode.Conflict, KnownErrors.Find(ErrorCodes.IdentifierTaken)!.StatusCode);
+
+        // Contract v1.2 section 2.10.2 — a web-auth request from a missing or foreign Origin.
+        Assert.Equal(HttpStatusCode.Forbidden, KnownErrors.Find(ErrorCodes.OriginNotAllowed)!.StatusCode);
     }
 }

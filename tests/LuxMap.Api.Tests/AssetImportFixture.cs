@@ -49,7 +49,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
     private string bothCommunesUserId = null!;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
-        => builder.UseEnvironment("Production");
+        => builder.UseEnvironment("Production").UseTestCorsOrigin();
 
     public async Task InitializeAsync()
     {

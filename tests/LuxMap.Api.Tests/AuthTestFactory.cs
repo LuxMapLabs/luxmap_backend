@@ -20,6 +20,7 @@ public sealed class AuthTestFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Production");
+        builder.UseTestCorsOrigin();
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<TimeProvider>();

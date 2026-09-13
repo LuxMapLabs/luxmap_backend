@@ -274,17 +274,71 @@ Nghĩa là mục này **không còn là nợ tài liệu** mà là **nguồn l�
 trường gõ tay là một cơ hội sai chính tả hoặc sai kiểu, và **không có gì đối chiếu lại**: spec không
 phủ endpoint đó nên không sinh được DTO để so. **Ưu tiên ngang mục 38 (`work_order`) ở FW-00.**
 
+### F — Auth web qua cookie `HttpOnly`, tách endpoint; mobile giữ nguyên
+
+| | |
+|---|---|
+| **Decision** | Thêm nhóm `/api/v1/auth/web/{login,refresh,logout}` cho browser: refresh token **chỉ** đi qua cookie `__Secure-luxmap_rt` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/api/v1/auth/web`), không bao giờ nằm trong body. Nhóm `/api/v1/auth/{login,register,refresh,logout}` **giữ nguyên** DTO, response, TTL 30/90 và reuse detection. Ghi thành **Contract v1.2 mục 2.10**; đóng drift 1 và 5 |
+| **Decision maker** | **Dylan** |
+| **Date** | 11/09/2026 |
+| **Scope** | `/api/v1/auth/*` · Contract v1.2 mục 2.10 · bảng `refresh_token` (cột mới `session_kind`) · `Program.cs` (CORS) · `docs/openapi/luxmap-v1.json` (sinh lại) · drift 1, 5, 40, 41 |
+
+> **KHÔNG `SELF-SIGNED`.** F không đi qua absence rule (nguyên tắc 3): Dylan quyết và chịu trách nhiệm
+> trực tiếp, không chờ Thịnh/Ngọc xác nhận. Khác A–E.
+
+**Vì sao tách endpoint thay vì một endpoint phân mode theo header `Origin`** — đo ở phiên khảo sát:
+
+- `RefreshRequest` / `LogoutRequest` có `[Required] refresh_token` → request web không body bị **400
+  trước khi vào controller**.
+- Test khoá login/refresh trả **đúng bốn trường**; bỏ `refresh_token` ở web là phá hình dạng đó.
+- WP6 sinh DTO Kotlin **từ spec** (FM-04), spec **sinh từ code** (quyết định E): đổi một field sang
+  optional/nullable là đổi kiểu phía mobile ở lần codegen kế tiếp, dù runtime không đổi.
+- Swagger UI chạy trong browser nên sẽ rơi vào "web mode" — thử API bằng Swagger hết thấy
+  `refresh_token`.
+- FE gọi qua server (Next.js) thì API không thấy `Origin` và âm thầm rơi sang mode mobile.
+
+Tách đường dẫn thì nhóm mobile **không đổi một byte**, và client nói rõ mình là ai bằng URL nó gọi.
+
+**Các quyết định con:**
+
+| | Quyết định |
+|---|---|
+| Loại phiên | Cột `refresh_token.session_kind` ∈ `mobile` \| `web_persistent` \| `web_session`, `NOT NULL`, có CHECK. Hàng cũ backfill `mobile` (trước F mọi token đều cấp qua body). Không giữ default — quên set thì insert lỗi. Refresh **copy nguyên** loại phiên, không bao giờ đổi |
+| TTL | `mobile` 30 ngày trượt / trần 90 — **không đổi**. `web_persistent` 14 ngày trượt / trần 90. `web_session` **12 giờ tuyệt đối** từ lúc đăng nhập, refresh không kéo dài. `remember_me` thiếu = `false` |
+| Ràng buộc nhóm | Token web ở endpoint mobile, hoặc ngược lại: refresh → `401`, không thu hồi, không kích hoạt reuse detection; logout → `204`, không thu hồi |
+| Reuse detection | Giữ nguyên hành vi BE-07, áp cho cả nhóm web |
+| Logout | Kết thúc phiên hiện tại |
+| Cookie khi refresh lỗi | **Không đụng**. Chỉ `web/logout` xoá cookie; `web/login` ghi đè. Lý do: hai tab refresh cùng lúc, tab thua nhận `401` — nếu response đó xoá cookie thì xoá luôn cookie mới của tab thắng |
+| Đổi loại phiên | Chỉ bằng đăng nhập lại. `web/login` mang cookie web còn hiệu lực → thu hồi token đó (`revoked_reason = logout`) rồi mới mở chuỗi mới |
+| `Origin` | Mọi `/web/*` bắt buộc `Origin` nằm trong `Cors:AllowedOrigins`; thiếu, lạ, hoặc `null` → `403 ORIGIN_NOT_ALLOWED`. Tách biệt với CORS |
+| CORS | `Cors:AllowedOrigins` **bắt buộc**, app dừng lúc khởi động nếu rỗng hoặc có entry không phải origin `https` tuyệt đối (không path, không `/` cuối, không `*`) |
+| Triển khai | FE và API **cùng site**. Khác site không hỗ trợ. Định nghĩa ở mục 2.10.7 |
+| FE | Mọi call `/web/*` đi từ browser với `credentials: 'include'`; không gọi auth từ Next.js server |
+
+**Mã lỗi mới:** `ORIGIN_NOT_ALLOWED` (403). Drift 2: bốn mã `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`,
+`INVALID_REFRESH_TOKEN`, `IDENTIFIER_TAKEN` nay nằm trong mục 2.10.6; mục 2 **vẫn mở** cho
+`VALIDATION_FAILED`, `INTERNAL_ERROR`, `UNAUTHENTICATED`.
+
+**Spec:** sinh lại hai lần, không sửa tay (theo **E**) — một lần đồng bộ với code hiện có trước khi đổi
+gì, một lần sau khi có nhóm web.
+
+⚠️ **Chưa xác minh — không phải evidence:**
+
+- **FE tuân thủ ràng buộc gọi từ browser.** Code WP5 không nằm trong repo này.
+- **Mobile có lưu `refresh_token` mới sau mỗi lần refresh không.** Vấn đề có sẵn từ BE-07, không do F
+  sinh ra — nếu không lưu, phiên đã văng từ trước. Ngọc cần kiểm.
+
 ---
 
 ## Tóm tắt
 
 | # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Đề xuất sửa bên nào |
 |---|---|---|---|---|
-| 1 | Nhóm endpoint `/auth` chưa có trong Contract | 🔴 Cao | WP5, WP6 | Contract — thêm mục 2.10 |
+| ~~1~~ | ~~Nhóm endpoint `/auth` chưa có trong Contract~~ | 🔴 Cao | WP5, WP6 | **ĐÓNG 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
 | 2 | 7 mã lỗi chưa có trong Contract | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 0 |
 | 3 | Giá trị `user_role` chưa có trong Contract mục 1 | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 1 |
 | 4 | Correlation id nằm ở cả header lẫn body | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ |
-| 5 | **Endpoint đăng ký — đã ĐẢO NGƯỢC quyết định cũ** | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 2.10 |
+| ~~5~~ | ~~**Endpoint đăng ký — đã ĐẢO NGƯỢC quyết định cũ**~~ | 🔴 Cao | WP5, WP6 | **ĐÓNG 11/09/2026** — `register` đã ghi vào Contract v1.2 mục 2.10.1; xem **F** |
 | 6 | Bộ mock FO-26 lệch bảng prefix mục 0.2 | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa 6 chỗ |
 | 7 | `page_size` vượt 200 bị kẹp im lặng | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ hành vi |
 | 8 | Route không tồn tại trả 401 khi chưa đăng nhập | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
@@ -319,11 +373,15 @@ phủ endpoint đó nên không sinh được DTO để so. **Ưu tiên ngang m�
 | 37 | **Contract chưa đặc tả KHUÔN ID** — không mục nào cho regex, chỉ có ví dụ ở mục 0.2 | 🔴 Cao | WP5, **WP6**, FM-17 | Contract — thêm; đã quyết ở **A**, xem "Quyết định đã đăng ký" |
 | 38 | **`work_order_id` (mục 2.4) chưa có chỗ chứa** — `fault` không có cột, bảng `work_order` chưa tồn tại | 🟡 Vừa | WP5, WP6, BE-21 | Đã quyết ở **C** — emit `null`, nợ có tên |
 | 39 | 🔴 **§0.4 dạy `LPAD(...)` — cơ chế SAI, cắt ID khi vượt độ rộng.** Contract lệch code từ commit `8ea9930` | 🔴 Cao | WP5, WP6, BE-39 | Contract — **ĐÃ SỬA 07/09/2026** (`SELF-SIGNED`); xem **D** |
-| 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E** |
+| 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E**. **Đóng một phần 11/09/2026:** sinh lại từ code, spec nay có thêm 8 path `/assets…` và `/lux-readings…`. `/faults`, `/poles`, `/segments` vẫn thiếu vì **chưa có code** |
+| 41 | **Auth web qua cookie `HttpOnly`** — nhóm `/api/v1/auth/web/*` mới, nhóm mobile không đổi | 🔴 Cao | WP5, WP6 | **ĐÃ CHỐT 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
 
 ---
 
 ## 1. Nhóm endpoint `/auth` chưa có trong Contract 🔴
+
+> ✅ **ĐÓNG 11/09/2026.** Nhóm `/auth` nay là Contract **v1.2 mục 2.10**, giữ nguyên hình dạng dưới
+> đây, cộng thêm nhóm web. Xem quyết định **F**. Phần dưới giữ lại làm lịch sử.
 
 **Contract đang ghi gì:** không có gì. Mục *"Contract phủ tới đâu"* liệt kê BE-07 là
 *"Endpoint đăng ký / đăng nhập / refresh"* nằm trong nhóm **chưa có đặc tả**.
@@ -428,6 +486,9 @@ báo lỗi, còn header phục vụ trường hợp response thành công.
 ---
 
 ## 5. Endpoint đăng ký — ĐÃ ĐẢO NGƯỢC quyết định trước đó 🔴
+
+> ✅ **ĐÓNG 11/09/2026.** `POST /api/v1/auth/register` đã ghi vào Contract **v1.2 mục 2.10.1**, đúng
+> hình dạng đề xuất ở cuối mục này. Xem quyết định **F**.
 
 > ⚠️ **Mục này thay thế hoàn toàn nội dung cũ.** Trước đây mục 5 ghi *"đã bỏ endpoint đăng ký"*.
 > Quyết định đó **đã bị đảo**. Phần dưới giải thích vì sao đảo được mà vẫn an toàn — người đọc ở
