@@ -86,8 +86,12 @@ Nạp xong chạy lại `docker compose up -d`; compose khớp theo digest nên 
 |---|---|---|
 | PostgreSQL + PostGIS | **5433** | 5432 |
 | Redis | **6380** | 6379 |
+| MinIO — S3 API | **9000** | 9000 |
+| MinIO — web console | **9001** | 9001 |
 
-Mặc định KHÔNG phải 5432/6379: máy dev thường đã có PostgreSQL hoặc Redis cài native chiếm sẵn. Cả hai chỉ bind vào `127.0.0.1`, không phơi ra LAN.
+Postgres và Redis cố ý KHÔNG dùng 5432/6379: máy dev thường đã có bản cài native chiếm sẵn. MinIO giữ nguyên 9000/9001 vì hiếm khi đụng thứ gì.
+
+Cả bốn cổng chỉ bind vào `127.0.0.1`, không phơi ra LAN. Riêng MinIO đó là ràng buộc bảo mật chứ không phải thói quen: BE-11 phục vụ mọi byte ảnh **qua API** để phạm vi xã (Contract mục 7) áp cho ảnh đúng như áp cho hàng dữ liệu. MinIO không biết `commune_id` là gì, nên chạm thẳng vào nó là đi vòng qua trọn bộ lớp kiểm tra đó.
 
 Chuỗi kết nối dev:
 
