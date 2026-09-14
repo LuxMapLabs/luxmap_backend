@@ -1,3 +1,4 @@
+using LuxMap.Modules.Identity.Auth.Web;
 using LuxMap.Shared.Contracts;
 using Microsoft.OpenApi;
 
@@ -30,6 +31,8 @@ public static class SwaggerSetup
             });
 
             AddBearerSecurity(options);
+            AddRefreshTokenCookieSecurity(options);
+            options.OperationFilter<RefreshTokenCookieOperationFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than
             // trusting Swashbuckle to infer correctly: getting this wrong makes FM-04 generate
@@ -83,6 +86,22 @@ public static class SwaggerSetup
         options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
             [new OpenApiSecuritySchemeReference(schemeId, document)] = [],
+        });
+    }
+
+    /// <summary>
+    /// Declared here, applied per operation by <see cref="RefreshTokenCookieOperationFilter"/>
+    /// (Contract section 2.10.3).
+    /// </summary>
+    private static void AddRefreshTokenCookieSecurity(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
+    {
+        options.AddSecurityDefinition(RefreshTokenCookieOperationFilter.SchemeId, new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Cookie,
+            Name = RefreshTokenCookie.Name,
+            Description = "The web refresh token. HttpOnly: set by /api/v1/auth/web/login and /refresh, sent "
+                + "back by the browser, never readable from JavaScript.",
         });
     }
 
