@@ -31,6 +31,7 @@ namespace LuxMap.Modules.Identity.Auth.Web;
 public sealed class WebAuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]
+    [SetsRefreshTokenCookie]
     [ProducesResponseType<WebAuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
@@ -50,6 +51,8 @@ public sealed class WebAuthController(AuthService authService) : ControllerBase
 
     /// <summary>No body. The refresh token is read from the cookie and from nowhere else.</summary>
     [HttpPost("refresh")]
+    [ReadsRefreshTokenCookie]
+    [SetsRefreshTokenCookie]
     [ProducesResponseType<WebAuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -62,6 +65,8 @@ public sealed class WebAuthController(AuthService authService) : ControllerBase
 
     /// <summary>No body. Always 204, and always clears the cookie.</summary>
     [HttpPost("logout")]
+    [ReadsRefreshTokenCookie]
+    [SetsRefreshTokenCookie]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> LogoutAsync(CancellationToken cancellationToken)
