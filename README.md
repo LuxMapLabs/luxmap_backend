@@ -258,16 +258,22 @@ dotnet tool restore
 ```
 
 ```bash
-dotnet build src/LuxMap.Api && Swagger__Enabled=true dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+dotnet build src/LuxMap.Api && Swagger__Enabled=true Cors__AllowedOrigins__0=https://localhost:3000 dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
 ```
 
 Lệnh này dựng host thật nên cần `.env` (hoặc `POSTGRES_PASSWORD`) như mọi lần chạy khác; không
 cần database đang chạy vì chỉ đọc cấu hình chứ không kết nối.
 
+`Cors__AllowedOrigins__0` là **bắt buộc** dù việc xuất spec chẳng liên quan gì tới CORS: swagger CLI
+dựng host ở môi trường Production, mà ngoài Development thì `CorsSetup` dừng khởi động nếu danh sách
+rỗng. Thiếu nó thì lệnh chết với `Cors:AllowedOrigins is empty` — và vì CLI ghi file **sau** khi
+dựng host xong, `luxmap-v1.json` vẫn nằm nguyên bản cũ, dễ tưởng là spec không có gì thay đổi.
+Giá trị nào cũng được miễn là origin https hợp lệ; nó không đi vào spec.
+
 Trên PowerShell, đặt biến trước rồi gọi lệnh:
 
 ```bash
-$env:Swagger__Enabled="true"; dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+$env:Swagger__Enabled="true"; $env:Cors__AllowedOrigins__0="https://localhost:3000"; dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
 ```
 
 ## Xác thực
