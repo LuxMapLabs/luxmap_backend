@@ -52,13 +52,33 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Lần đầu sẽ kéo image (~150 MB) và chạy `initdb`, mất khoảng 30–60 giây. Kiểm tra:
+Lần đầu sẽ kéo image (~340 MB cho cả bốn) và chạy `initdb`, mất khoảng 30–60 giây. Kiểm tra:
 
 ```bash
 docker compose ps
 ```
 
-Cả hai service phải ở trạng thái `healthy`. Nếu `postgres` còn `starting`, chờ thêm — healthcheck có `start_period` 30 giây.
+Ba service `postgres`, `redis` và `minio` phải ở trạng thái `healthy`. Nếu `postgres` còn `starting`, chờ thêm — healthcheck có `start_period` 30 giây.
+
+Sidecar `luxmap_minio_mc` **không** hiện ở đây: nó tạo hai bucket rồi thoát. `docker compose ps -a` sẽ thấy nó ở `Exited (0)` — đó là thành công, không phải crash.
+
+### Khi cache image còn rỗng
+
+Image MinIO kéo từ `quay.io` chứ không phải Docker Hub — Docker Hub đã gỡ `minio/*`, và `docker login` không giúp được gì. `docker-compose.yml` đã pin sẵn registry và digest, nên `docker compose up -d` chạy đúng mà không cần cấu hình thêm.
+
+Nếu `quay.io` cũng không kéo được, nạp từ bản tarball ngoại tuyến (amd64 + arm64, hỏi BE1 xin file):
+
+```bash
+docker load -i luxmap-minio-images.tar
+```
+
+Kiểm tra file trước khi nạp — `shasum -a 256` (macOS/Linux) hoặc `Get-FileHash` (PowerShell) phải ra:
+
+```
+6832673c39f69e84cb1411fe52e462912ffe2affcb5923bfe572cad75f11c03c
+```
+
+Nạp xong chạy lại `docker compose up -d`; compose khớp theo digest nên nó dùng luôn image vừa nạp, không kéo mạng.
 
 ### Cổng
 

@@ -451,6 +451,20 @@ theo khuôn `LuxMapConnectionString` và `JwtOptions.Validate` — repo không c
 ngoài lúc khởi động, kể cả PostgreSQL. Sidecar bắt buộc `restart: "no"`: mặc định compose sẽ khởi
 động lại nó **vô hạn** sau mỗi lần chạy thành công.
 
+**Image MinIO kéo từ `quay.io`, không phải Docker Hub — pin bằng INDEX digest.**
+
+Docker Hub đã gỡ hẳn `minio/minio` và `minio/mc`: API repository trả **404** chứ không phải 401, nên
+`docker login` vô ích. Registry riêng của MinIO trên quay.io còn phục vụ đúng hai tag đang pin, cùng
+bytes — digest manifest list ở quay trùng khít digest của image Docker Hub còn trong cache.
+
+⚠️ **Digest phải là digest của MANIFEST LIST, không phải per-platform.** Pin nhầm digest arm64 sẽ làm
+**mọi máy Windows/x86 của nhóm không kéo nổi image**, và lỗi chỉ lộ trên máy người khác chứ không bao
+giờ trên máy vừa sửa. Lấy bằng `docker buildx imagetools inspect <ref>`, đọc dòng `Digest:` cấp cao
+nhất — `docker manifest inspect` **không** in số đó.
+
+Dòng release OSS đứng yên ở `RELEASE.2025-09-07` ⇒ đây là **hoãn, không phải giải**. **BE-36**
+(Testcontainers, W17–W18) thừa hưởng ràng buộc này: container MinIO nó thêm phải trỏ `quay.io`.
+
 **Hai ràng buộc về ImageSharp — kiểm chứng bằng test, không phải giả định:**
 
 - **ImageSharp GIỮ EXIF qua resize** (trái với giả định thông thường). Việc bỏ metadata khỏi
