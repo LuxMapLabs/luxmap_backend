@@ -66,7 +66,8 @@ services:
   minio:
     # Pinned to a dated release, same discipline as postgis:17-3.5 and redis:8.10.1-alpine. MinIO does
     # not publish semver tags, so the date IS the version. Multi-arch: amd64 and arm64 both native.
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # Docker Hub removed minio/*; this is MinIO's own quay.io registry, pinned to the index digest.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     container_name: luxmap_minio
     restart: unless-stopped
     environment:
@@ -96,7 +97,8 @@ services:
   # touching an external service at startup — not even PostgreSQL is pinged. The app fails fast on
   # missing CONFIGURATION and nothing else.
   minio-mc:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    # Docker Hub removed minio/*; this is MinIO's own quay.io registry, pinned to the index digest.
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
     container_name: luxmap_minio_mc
     environment:
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is not set, run `cp .env.example .env`}"
