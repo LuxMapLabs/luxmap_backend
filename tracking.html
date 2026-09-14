@@ -41,17 +41,17 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
-  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 05/09/2026</p>
+  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 14/09/2026</p>
 
   <div class="card">
     <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) đang chạy, BE-18 đẩy sớm</strong>
     <div class="bar"><i style="width:100%"></i></div>
-    <span class="muted">BE-12a xong — nhập tài sản CSV + GeoJSON, CRUD phần request, và phân quyền. <strong>Đã nạp trọn bộ mock FO-26 qua endpoint thật: 3 tuyến + 103 cột + 103 bóng, nạp lại cho 103 UPDATE chứ không sinh trùng.</strong> <code>external_ref</code> trên ba bảng là khoá tự nhiên duy nhất của lược đồ; <code>fixture</code> KHÔNG có và nhập bóng là insert-only. Đây là lần ĐẦU bốn policy của BE-08 chạm dòng sản xuất: ghi = Quản trị, đọc = không gắn policy nào (gắn vào sẽ chặn luôn Quản trị và Cơ quan quản lý). Parser CSV tự viết 144 dòng, không thêm package. <strong>BE-12b (hình dạng response khi ĐỌC tài sản) còn chờ Thịnh/Ngọc duyệt</strong> — hiện GET chỉ trả danh sách ID. BE-18 xong trước đó: lược đồ <code>fault</code> + <code>fault_cluster</code> sẵn cho BE-19/BE-20. Kế tiếp: <strong>BE-13</strong> → BE-14.</span>
+    <span class="muted">BE-12a xong — nhập tài sản CSV + GeoJSON, CRUD phần request, và phân quyền. <strong>Đã nạp trọn bộ mock FO-26 qua endpoint thật: 3 tuyến + 103 cột + 103 bóng, nạp lại cho 103 UPDATE chứ không sinh trùng.</strong> <code>external_ref</code> trên ba bảng là khoá tự nhiên duy nhất của lược đồ; <code>fixture</code> KHÔNG có và nhập bóng là insert-only. Đây là lần ĐẦU bốn policy của BE-08 chạm dòng sản xuất: ghi = Quản trị, đọc = không gắn policy nào (gắn vào sẽ chặn luôn Quản trị và Cơ quan quản lý). Parser CSV tự viết 144 dòng, không thêm package. <strong>BE-12b (hình dạng response khi ĐỌC tài sản) còn chờ Thịnh/Ngọc duyệt</strong> — hiện GET chỉ trả danh sách ID. BE-18 xong trước đó: lược đồ <code>fault</code> + <code>fault_cluster</code> sẵn cho BE-19/BE-20. <strong>BE-AUTH xong 13–14/09:</strong> đăng nhập web bằng cookie HttpOnly + CORS có allowlist, Contract lên <strong>v1.2</strong> với mục 2.10. Hạ tầng: image MinIO chuyển sang quay.io sau khi Docker Hub gỡ <code>minio/*</code>. Kế tiếp: <strong>BE-13</strong> → BE-14.</span>
   </div>
 
   <div class="grid">
     <div class="stat"><b>15</b><span>project trong solution</span></div>
-    <div class="stat"><b>379</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>443</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
     <div class="stat"><b>12</b><span>bảng trong database</span></div>
@@ -76,6 +76,7 @@
       <tr><td><code>BE-42</code></td><td>Entity LuxReading + API nhập số đo lux — <strong>hạn W4</strong>, gỡ chặn FO-14 đo lux ở W5</td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-18</code></td><td>Entity Fault + FaultCluster + migration — ghi vết trên bảng <code>fault</code>, <code>FaultStatusSets.Open</code>, 8 FK <code>Restrict</code></td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-12a</code></td><td>Import CSV/GeoJSON + CRUD phần request + phân quyền — <code>external_ref</code>, upsert, insert-only fixture</td><td><span class="tag t-done">Xong</span></td></tr>
+      <tr><td><code>BE-AUTH</code></td><td>Đăng nhập web bằng cookie HttpOnly + CORS allowlist + spec khai cookie — Contract mục 2.10, <strong>ngoài tasks-backend.csv</strong></td><td><span class="tag t-done">Xong</span></td></tr>
       <tr><td><code>BE-12b</code></td><td>Hình dạng response khi ĐỌC tài sản — <strong>CHỜ Thịnh/Ngọc duyệt</strong>; GET tạm trả danh sách ID. <strong>Tiêu chí nghiệm thu gồm: xoá drift 34, và xử lý hạn chế upsert-không-nguyên-tử kế thừa từ BE-12a</strong></td><td><span class="tag t-block">Chờ duyệt</span></td></tr>
       <tr><td><code>BE-13</code></td><td>Topology: gán cột vào tuyến và feeder — chặn CV-05, CV-15</td><td><span class="tag t-next">Kế tiếp</span></td></tr>
       <tr><td><code>FW-00</code></td><td>Review Contract cùng cả nhóm</td><td><span class="tag t-block">Đang tồn 12 khoản cần chốt</span></td></tr>
@@ -206,6 +207,24 @@
         <td><code>src/LuxMap.Shared/Csv/CsvDocument.cs</code>, <code>src/LuxMap.Modules.Assets/Import/</code>, <code>Crud/</code>, migration <code>AddAssetExternalRef</code>, <code>docs/templates/*</code>, <code>tests/LuxMap.Shared.Tests/CsvDocumentTests.cs</code>, <code>tests/LuxMap.Api.Tests/AssetImport*.cs</code>, <code>AssetPermissionTests.cs</code>, <code>CommuneWriteGuardCostTests.cs</code></td>
         <td><code>feat(BE-12a): import assets from CSV and GeoJSON, and gate writes on the administrator role</code></td>
       </tr>
+      <tr>
+        <td>13/09/2026</td>
+        <td><code>BE-AUTH</code> Đăng nhập web bằng cookie HttpOnly — Contract mục 2.10, spec lên <strong>v1.2</strong>. Nhóm <code>/auth/web/*</code> riêng: refresh token đi trong cookie <code>__Secure-luxmap_rt</code>, <strong>không bao giờ trong body</strong>, nên JavaScript không đọc được. Thuộc tính cookie là HẰNG trong code chứ không phải cấu hình — chúng thuộc Contract, không để một deployment nới ra. <code>Path</code> hẹp về đúng <code>/api/v1/auth/web</code> nên endpoint dữ liệu không bao giờ nhận cookie, và MỘT builder dùng chung cho <code>Append</code> lẫn <code>Delete</code> vì trình duyệt chỉ xoá cookie khi <code>Set-Cookie</code> xoá lặp đúng <code>Path</code>. Thêm <code>session_kind</code> trên mọi refresh token (<code>mobile</code> / <code>web_persistent</code> 14 ngày trượt / <code>web_session</code> 12 giờ tuyệt đối), quyết MỘT LẦN lúc login và chép nguyên qua mọi lượt xoay; token bị buộc vào đúng nhóm endpoint đã phát nó. CORS có allowlist bắt buộc, <strong>dừng khởi động</strong> nếu rỗng hoặc sai khuôn — chỉ nhận origin https tuyệt đối, không path, không dấu <code>/</code> cuối, không <code>*</code>; dùng policy MẶC ĐỊNH không tên để guard <code>ORIGIN_NOT_ALLOWED</code> và CORS đọc chung một danh sách</td>
+        <td><code>src/LuxMap.Modules.Identity/Auth/Web/</code>, <code>Auth/WebAuthOptions.cs</code>, <code>Entities/RefreshTokenSessionKind.cs</code>, migration <code>AddRefreshTokenSessionKind</code>, <code>src/LuxMap.Api/Http/CorsSetup.cs</code>, <code>docs/api-contract-v1.1.md</code> mục 2.10, <code>tests/LuxMap.Api.Tests/WebAuthTests.cs</code>, <code>CorsTests.cs</code></td>
+        <td><code>feat(api): add credentialed CORS with a validated origin allowlist</code><br><code>feat(identity): record the session kind on every refresh token</code><br><code>feat(identity): issue lifetimes by session kind and bind tokens to their endpoint group</code><br><code>feat(identity): add the web auth endpoints with an HttpOnly refresh-token cookie</code><br><span class="muted">PR #29</span></td>
+      </tr>
+      <tr>
+        <td>14/09/2026</td>
+        <td><code>BE-AUTH</code> Spec khai cái cookie mà Swashbuckle không thấy được. Cookie không phải parameter cũng không phải trường body, nên spec mô tả <code>/auth/web/refresh</code> và <code>/logout</code> thành lệnh gọi <strong>không nhận gì cả</strong> — mà WP5/WP6 sinh client từ chính file đó. Hai attribute <strong>chỉ để tài liệu</strong> (runtime không đọc) đánh dấu endpoint nào set cookie, endpoint nào được cookie xác thực; một <code>IOperationFilter</code> dịch chúng thành spec: header <code>Set-Cookie</code> trên mọi 2xx, và security requirement <strong>THAY THẾ</strong> yêu cầu Bearer toàn tài liệu ở hai endpoint dùng cookie — chúng không bao giờ nhận access token, hiện ô bearer ở đó là nói sai. Mô tả 403 nói rõ hai nguyên nhân khác nhau <code>ORIGIN_NOT_ALLOWED</code> và <code>ACCOUNT_LOCKED</code>. Test khẳng định SPEC SINH RA chứ không phải C#, và ghim 4 schema auth mobile để chắc việc cookie không xê dịch hình dạng FM-04 sinh Kotlin</td>
+        <td><code>src/LuxMap.Api/OpenApi/RefreshTokenCookieOperationFilter.cs</code>, <code>SwaggerSetup.cs</code>, <code>src/LuxMap.Modules.Identity/Auth/Web/RefreshTokenCookieAttributes.cs</code>, <code>docs/openapi/luxmap-v1.json</code>, <code>tests/LuxMap.Api.Tests/WebAuthOpenApiTests.cs</code></td>
+        <td><code>feat(openapi): document the web refresh-token cookie Swashbuckle cannot see</code><br><span class="muted">PR #30</span></td>
+      </tr>
+      <tr>
+        <td>14/09/2026</td>
+        <td>Hạ tầng — <code>docker compose up -d</code> hỏng vì <strong>Docker Hub đã gỡ <code>minio/minio</code> và <code>minio/mc</code></strong>. API repository trả <strong>404</strong> chứ không phải 401, nên <code>docker login</code> vô ích. Chuyển sang registry riêng của MinIO trên <code>quay.io</code>, <strong>giữ nguyên hai tag</strong> và pin thêm digest — cùng bytes, digest manifest list ở quay trùng khít digest của image Docker Hub còn trong cache. ⚠️ Digest phải là digest <strong>MANIFEST LIST</strong>: pin nhầm digest arm64 thì mọi máy Windows/x86 của nhóm không kéo nổi image, và lỗi chỉ lộ trên máy người khác. Sidecar <code>minio-mc</code>, healthcheck <code>mc ready local</code> và volume <code>luxmap_minio_data</code> giữ nguyên, không đụng. Kèm bản tarball ngoại tuyến hai kiến trúc để dựng được khi quay.io cũng chết, và sửa lệnh export OpenAPI trong README — nó đã hỏng từ khi <code>CorsSetup</code> vào repo và <strong>hỏng câm</strong>: CLI ghi file sau khi dựng host, host chết thì spec nằm nguyên bản cũ, đọc ra thành "spec không đổi"</td>
+        <td><code>docker-compose.yml</code>, <code>CLAUDE.md</code> (mục BE-11), <code>README.md</code></td>
+        <td><code>build(docker): pull minio and mc from quay.io pinned by index digest</code><br><code>docs: record why the MinIO images come from quay.io and how to build with a cold cache</code><br><code>docs: make the OpenAPI export command work again after the CORS allowlist landed</code><br><code>docs: list the MinIO ports and say why loopback is load-bearing there</code><br><span class="muted">PR #31, #32</span></td>
+      </tr>
     </table>
   </div>
 
@@ -294,6 +313,7 @@
       <li><strong>BE-00 và BE-04 chồng phạm vi.</strong> Task list giao middleware lỗi + correlation id + phân trang cho BE-04. BE-00 chỉ định nghĩa KIỂU; middleware để nguyên cho BE-04.</li>
       <li><strong>Chưa chốt (Contract mục 6):</strong> vector tile khi vượt ~5000 cột · realtime khi sweep xong · chính sách lưu ảnh dài hạn.</li>
       <li><strong>Chưa có đặc tả:</strong> BE-07, BE-12, BE-15/16, BE-27, BE-28→31, BE-33→35. Không tự sinh endpoint trước khi thống nhất.</li>
+      <li><strong>🔴 MinIO OSS đã EOL — quay.io chỉ là HOÃN, không phải giải. Cần chốt ở FW-00.</strong> Docker Hub <strong>gỡ hẳn</strong> <code>minio/minio</code> và <code>minio/mc</code>: API repository trả <strong>404</strong>, không phải 401 — <code>docker login</code> không cứu được, và bất kỳ máy nào cache lạnh đều <strong>không dựng nổi môi trường dev</strong>. Đã chuyển sang <code>quay.io</code> giữ nguyên tag, pin index digest, cùng bytes. Nhưng dòng release OSS <strong>đứng yên ở <code>RELEASE.2025-09-07</code></strong> — không còn bản vá CVE cho tag đang pin, và quay.io là registry của <strong>cùng nhà cung cấp đang EOL sản phẩm</strong>. Ba phương án đã khảo sát: (a) quay.io giữ tag — <em>đã chọn, chi phí thấp nhất</em>; (b) mirror cộng đồng <code>alpine/minio</code> — <strong>không có tag đang pin</strong> và <strong>không mirror <code>mc</code></strong>; (c) đổi object store S3-compatible khác — giải thật nhưng mở lại BE-11 đã đóng, và <code>S3ObjectStore</code> <strong>chưa có test tự động</strong> (nợ BE-36) nên không có gì canh việc đổi. ⚠️ <strong>BE-36 (Testcontainers, W17–W18) thừa hưởng</strong>: container MinIO nó thêm phải trỏ quay.io. Có tarball ngoại tuyến hai kiến trúc trên Drive nhóm (<code>sha256 6832673c…</code>, README ghi cách kiểm) để không phụ thuộc registry lúc dựng máy mới.</li>
     </ul>
   </div>
 
