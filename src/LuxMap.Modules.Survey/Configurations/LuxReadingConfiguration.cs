@@ -62,7 +62,7 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
             .IsUnique()
             .HasDatabaseName("ux_lux_reading_client_op_id");
 
-        // Serves GET /poles/{pole_id}/lux-readings, which reads one pole's series ordered by time.
+        // Serves GET /lux-readings/poles/{pole_id}, which reads one pole's series ordered by time.
         builder.HasIndex(reading => new { reading.PoleId, reading.MeasuredAt })
             .HasDatabaseName("ix_lux_reading_pole_id_measured_at");
 

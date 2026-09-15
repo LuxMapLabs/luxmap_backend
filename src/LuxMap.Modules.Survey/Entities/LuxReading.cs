@@ -43,7 +43,7 @@ public class LuxReading : ICommuneScoped
     /// <remarks>
     /// Contract section 2.9 has no required/optional table (section 2.8 does), so this was settled
     /// explicitly and recorded as drift. It is required because everything else in 2.9 depends on
-    /// it: <c>GET /poles/{id}/lux-readings</c> is a series per pole, <c>nearest_luminance</c> pairs
+    /// it: <c>GET /lux-readings/poles/{id}</c> is a series per pole, <c>nearest_luminance</c> pairs
     /// against "the same pole", and <see cref="CommuneId"/> is derived from it. The FO-07 calibration
     /// rig is registered as real poles (section 2.9), so rig measurements carry one too.
     /// </remarks>
