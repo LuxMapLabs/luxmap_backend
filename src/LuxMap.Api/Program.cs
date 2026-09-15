@@ -52,7 +52,7 @@ builder.Services.AddLuxMapApiConventions();
 
 // Contract section 2.10 — credentialed CORS for the web SPA. Stops startup if Cors:AllowedOrigins is
 // missing or malformed.
-builder.Services.AddLuxMapCors(builder.Configuration);
+builder.Services.AddLuxMapCors(builder.Configuration, builder.Environment);
 
 // BE-05 — Swagger plus the JWT security scheme. Only enabled when Swagger:Enabled = true.
 builder.Services.AddLuxMapSwagger();
@@ -92,7 +92,14 @@ app.UseLuxMapErrorHandling();
 app.UseLuxMapCors();
 
 app.UseLuxMapSwagger();
-app.UseHttpsRedirection();
+
+// Not in Development. The web SPA's dev server is plain http, and a redirect answers the browser's
+// OPTIONS preflight with a 307 before the CORS middleware ever runs — the request then fails with a
+// CORS error that names nothing about redirects.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Must sit INSIDE UseStatusCodePages (that is, after UseLuxMapErrorHandling), otherwise 401/403
 // still return an empty body instead of the Contract's error shape.
