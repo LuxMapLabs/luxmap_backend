@@ -11,6 +11,11 @@ namespace LuxMap.Api.Http;
 /// <c>appsettings.Development.json</c>; a deployment supplies <c>Cors__AllowedOrigins__0</c>, ... from
 /// the environment.
 /// <para>
+/// Development, and ONLY Development, also accepts an <c>http</c> origin on a loopback host, because
+/// that is what a Vite dev server actually serves on. Outside Development the rule is unchanged, so a
+/// deployment cannot inherit the relaxation by copying a dev value.
+/// </para>
+/// <para>
 /// The same list backs the <c>ORIGIN_NOT_ALLOWED</c> guard on <c>/api/v1/auth/web/*</c>: that guard
 /// reads it through the default CORS policy, so there is exactly one allowlist.
 /// </para>
@@ -26,7 +31,12 @@ public sealed record CorsOriginsOptions
     /// origin with no path, no trailing slash, no default port and no wildcard. Anything else could
     /// never match a real request, so accepting it would only hide a typo until the first login.
     /// </summary>
-    public void Validate()
+    /// <param name="allowInsecureLoopback">
+    /// Development only. Widens the scheme rule to <c>http</c> for <c>localhost</c>, <c>127.0.0.1</c>
+    /// and <c>[::1]</c> — nothing else. A plain-http origin on any other host stays rejected even in
+    /// Development: the point is to reach a dev server on this machine, not to turn the check off.
+    /// </param>
+    public void Validate(bool allowInsecureLoopback = false)
     {
         if (AllowedOrigins.Length == 0)
         {
@@ -37,34 +47,47 @@ public sealed record CorsOriginsOptions
 
         foreach (var origin in AllowedOrigins)
         {
-            if (!IsCanonicalHttpsOrigin(origin))
+            if (!IsAcceptableOrigin(origin, allowInsecureLoopback))
             {
                 throw new InvalidOperationException(
-                    $"{SectionName}:AllowedOrigins entry '{origin}' is not an https origin. Expected "
-                    + "scheme://host[:port] exactly as a browser sends it: https only, no path, no "
-                    + "trailing slash, no default port, no '*'.");
+                    $"{SectionName}:AllowedOrigins entry '{origin}' is not an acceptable origin. Expected "
+                    + "scheme://host[:port] exactly as a browser sends it: no path, no trailing slash, "
+                    + "no default port, no '*'. https everywhere; http only on localhost, 127.0.0.1 or "
+                    + "[::1], and only in Development.");
             }
         }
     }
 
-    private static bool IsCanonicalHttpsOrigin(string? origin)
-        => !string.IsNullOrWhiteSpace(origin)
-           && !origin.Contains('*', StringComparison.Ordinal)
-           && Uri.TryCreate(origin, UriKind.Absolute, out var uri)
-           && uri.Scheme == Uri.UriSchemeHttps
-           && string.Equals(origin, uri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
+    private static bool IsAcceptableOrigin(string? origin, bool allowInsecureLoopback)
+    {
+        if (string.IsNullOrWhiteSpace(origin)
+            || origin.Contains('*', StringComparison.Ordinal)
+            || !Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+            // The canonical form is what closes the door on a path, a trailing slash or a default
+            // port sneaking in: a browser never sends those, so an entry carrying one can only be a
+            // typo that would fail silently at the first request.
+            || !string.Equals(origin, uri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return uri.Scheme == Uri.UriSchemeHttps
+               || (allowInsecureLoopback && uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback);
+    }
 }
 
 public static class CorsSetup
 {
-    public static IServiceCollection AddLuxMapCors(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddLuxMapCors(
+        this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
 
         var options = configuration.GetSection(CorsOriginsOptions.SectionName).Get<CorsOriginsOptions>()
             ?? new CorsOriginsOptions();
-        options.Validate();
+        options.Validate(allowInsecureLoopback: environment.IsDevelopment());
 
         // The DEFAULT policy, deliberately unnamed: the web auth Origin guard asks the policy provider
         // for it with no name, so the guard and CORS can never disagree about the list.
