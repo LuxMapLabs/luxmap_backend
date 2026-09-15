@@ -4,9 +4,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Auth;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
 namespace LuxMap.Api.Tests;
@@ -17,13 +19,63 @@ namespace LuxMap.Api.Tests;
 /// decoded token, not against the endpoint's own response.
 /// </summary>
 [Collection(nameof(ScopeCollection))]
-public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper output)
+public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper output) : IAsyncLifetime
 {
     private HttpClient Client => factory.CreateClient();
 
     private const string StrongPassword = "a-perfectly-fine-passphrase";
 
-    private static string UniqueName() => $"newcomer{Guid.NewGuid():N}"[..20];
+    /// <summary>Every account this test class registered, so <see cref="DisposeAsync"/> can remove them.</summary>
+    private readonly List<string> registered = [];
+
+    /// <summary>
+    /// A fresh account name, recorded so it can be deleted afterwards.
+    /// </summary>
+    /// <remarks>
+    /// Registration goes through the real endpoint, so the row is created by the application and no
+    /// fixture owns it. Nothing removed these: 857 of them had accumulated on the shared development
+    /// database before anyone counted. Recording the name here is what makes teardown EXACT — matching
+    /// on a <c>newcomer%</c> prefix would also catch a run happening beside this one.
+    /// </remarks>
+    private string UniqueName()
+    {
+        var name = $"newcomer{Guid.NewGuid():N}"[..20];
+        registered.Add(name);
+        return name;
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Deletes the accounts this class registered, newest first.
+    /// </summary>
+    /// <remarks>
+    /// xUnit builds one instance per test, so this runs per test and each one cleans up only its own
+    /// rows. <c>refresh_token</c> would cascade with the user, but the tests that sign in leave rows
+    /// behind that are easier to reason about deleted explicitly, in foreign-key order.
+    /// </remarks>
+    public async Task DisposeAsync()
+    {
+        if (registered.Count == 0)
+        {
+            return;
+        }
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+
+        var names = registered.ToArray();
+        var ids = await db.Set<AppUser>()
+            .Where(user => names.Contains(user.Username))
+            .Select(user => user.UserId)
+            .ToArrayAsync();
+
+        #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
+        await db.Set<RefreshToken>().Where(t => ids.Contains(t.UserId)).ExecuteDeleteAsync();
+        await db.Set<AppUserCommune>().Where(a => ids.Contains(a.UserId)).ExecuteDeleteAsync();
+        await db.Set<AppUser>().Where(u => ids.Contains(u.UserId)).ExecuteDeleteAsync();
+        #pragma warning restore RS0030
+    }
 
     private static JsonElement DecodePayload(string jwt)
     {
@@ -196,8 +248,8 @@ public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper outpu
             email = $"{name}@luxmap.local",
             full_name = "Would-be assigned",
             password = StrongPassword,
-            commune_ids = new[] { ScopeTestFixture.InScopeCommune },
-            commune_id = ScopeTestFixture.InScopeCommune,
+            commune_ids = new[] { factory.InScopeCommune },
+            commune_id = factory.InScopeCommune,
         });
 
         response.EnsureSuccessStatusCode();

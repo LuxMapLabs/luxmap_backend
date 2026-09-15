@@ -33,7 +33,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         var seen = await CommunesSeenAsync(client);
 
         output.WriteLine($"  no commune_id supplied → sees [{string.Join(", ", seen)}]");
-        Assert.Equal([ScopeTestFixture.InScopeCommune], seen);
+        Assert.Equal([factory.InScopeCommune], seen);
         Assert.DoesNotContain(factory.OutOfScopeCommune, seen);
     }
 
@@ -57,7 +57,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         finally
         {
             await factory.RemoveAllCommunesAsync("agency");
-            await factory.AssignCommuneAsync("agency", ScopeTestFixture.InScopeCommune);
+            await factory.AssignCommuneAsync("agency", factory.InScopeCommune);
         }
     }
 
@@ -80,7 +80,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
     {
         var client = await AuthenticatedAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var response = await client.GetAsync(
-            $"/api/v1/_scope/probes?commune_id={ScopeTestFixture.InScopeCommune}&commune_id={factory.OutOfScopeCommune}");
+            $"/api/v1/_scope/probes?commune_id={factory.InScopeCommune}&commune_id={factory.OutOfScopeCommune}");
 
         output.WriteLine($"  one allowed commune + one forbidden → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -120,7 +120,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
         }
         finally
         {
-            await factory.AssignCommuneAsync("crew", ScopeTestFixture.InScopeCommune);
+            await factory.AssignCommuneAsync("crew", factory.InScopeCommune);
         }
     }
 
@@ -132,7 +132,7 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
 
         output.WriteLine($"  administrator [\"*\"] → sees [{string.Join(", ", seen)}]");
 
-        Assert.Contains(ScopeTestFixture.InScopeCommune, seen);
+        Assert.Contains(factory.InScopeCommune, seen);
         Assert.Contains(factory.SecondCommune, seen);
         Assert.Contains(factory.OutOfScopeCommune, seen);
 

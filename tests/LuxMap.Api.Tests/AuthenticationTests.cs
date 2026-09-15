@@ -98,13 +98,13 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
 
             // FindAll, not FindFirst — FindFirst would only see the first element.
             Assert.Equal(2, communes.Length);
-            Assert.Contains(ScopeTestFixture.InScopeCommune, communes);
+            Assert.Contains(factory.InScopeCommune, communes);
             Assert.Contains(factory.SecondCommune, communes);
         }
         finally
         {
             await factory.RemoveAllCommunesAsync("agency");
-            await factory.AssignCommuneAsync("agency", ScopeTestFixture.InScopeCommune);
+            await factory.AssignCommuneAsync("agency", factory.InScopeCommune);
         }
     }
 
