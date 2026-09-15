@@ -370,7 +370,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         }
 
         var json = JsonDocument.Parse(
-            await client.GetStringAsync($"/api/v1/poles/{poleId}/lux-readings"));
+            await client.GetStringAsync($"/api/v1/lux-readings/poles/{poleId}"));
 
         var items = json.RootElement.GetProperty("items").EnumerateArray().ToArray();
 

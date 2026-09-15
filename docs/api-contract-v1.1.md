@@ -1,7 +1,7 @@
-# LuxMap — API Contract v1.2 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.3 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, thay thế cả `api-contract-v1.md` và bản bổ sung v1.1 rời. Đây là tài liệu duy nhất cần đọc. Tên file giữ `api-contract-v1.1.md` để mọi liên kết cũ vẫn đúng.
-**Ngày chốt v1.0:** 2026-08-23 · **Ngày hợp nhất v1.1:** 2026-08-24 · **v1.2:** 2026-09-11 (mục 2.10 Auth)
+**Ngày chốt v1.0:** 2026-08-23 · **Ngày hợp nhất v1.1:** 2026-08-24 · **v1.2:** 2026-09-11 (mục 2.10 Auth) · **v1.3:** 2026-09-15 (đổi đường dẫn mục 2.9)
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng version. Không đổi ngầm.
 
 > **Về cách đánh số.** Task list v2.1 đã publish và trỏ tới số mục của v1.0 (mục 1, mục 2.1–2.3, mục 2.4, mục 2.5, mục 3). Vì vậy toàn bộ đánh số cũ được **giữ nguyên**, nội dung mới nối vào sau dưới dạng mục 2.8, 2.9, 2.10 và mục 7. Thứ tự nhìn hơi lạ nhưng mọi tham chiếu trong task list vẫn đúng.
@@ -21,9 +21,11 @@
 | 6 | Gỡ "phân quyền theo `commune_id`" khỏi danh sách chưa chốt |
 | 7 | **Mới** — đặc tả phân quyền theo địa bàn (BE-08) |
 | 2.10 | **Mới (v1.2)** — nhóm Auth: 4 endpoint mobile (hình dạng BE-07, không đổi) + 3 endpoint web dùng cookie `HttpOnly` |
+| 2.9 | **BREAKING (v1.3)** — `GET /poles/{pole_id}/lux-readings` → **`GET /lux-readings/poles/{pole_id}`**. Gom cả ba endpoint lux về một tiền tố |
 
 FE cần đọc lại: mục 1 (enum đổi), 2.4 (hình dạng item), 0.2 (prefix ID cho entity mới).
 **v1.2:** WP5 đọc toàn bộ mục 2.10 (nhóm web là mới). WP6 đọc mục 2.10.1 và 2.10.4 — hình dạng không đổi, chỉ được ghi thành văn.
+**v1.3:** **FM-14 và CV-12 bắt buộc sửa đường dẫn.** Chỉ đổi đường dẫn — query, body và hình dạng response giữ nguyên.
 
 ---
 
@@ -375,7 +377,9 @@ Ground truth cho RQ1. CV-12 đối chiếu số đo lux với phân loại của
 `lux_value` là số thực, đơn vị lux, không âm. `measured_at` phải là ISO 8601 UTC hậu tố `Z`. `data_source` bắt buộc — trong Nhánh C hầu hết là `calibration_rig`.
 Response `201` kèm `lux_id`. Trùng `client_op_id` → **200** và trả bản ghi đã có.
 
-**`GET /api/v1/poles/{pole_id}/lux-readings`** — chuỗi số đo của một cột, sắp theo `measured_at` tăng dần. Dùng cho panel chi tiết cột.
+**`GET /api/v1/lux-readings/poles/{pole_id}`** — chuỗi số đo của một cột, sắp theo `measured_at` tăng dần. Dùng cho panel chi tiết cột.
+
+> ⚠️ **Đổi ở v1.3 — BREAKING.** Trước đó là `GET /api/v1/poles/{pole_id}/lux-readings`. Client gọi đường dẫn cũ sẽ nhận **404**, không phải lỗi có thông điệp. FM-14 và CV-12 phải sửa.
 
 **`GET /api/v1/lux-readings`** — query: `pole_id`, `from`, `to`, `data_source`, `page`, `page_size`. Phân trang chuẩn.
 

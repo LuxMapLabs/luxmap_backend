@@ -1221,7 +1221,7 @@
         }
       }
     },
-    "/api/v1/poles/{poleId}/lux-readings": {
+    "/api/v1/lux-readings/poles/{poleId}": {
       "get": {
         "tags": [
           "LuxReadings"

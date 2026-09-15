@@ -48,7 +48,8 @@ public sealed class LuxReadingsController(LuxReadingService service) : Controlle
     }
 
     /// <summary>One pole's series, oldest first. Paged — see <see cref="LuxReadingService.ForPoleAsync"/>.</summary>
-    [HttpGet("poles/{poleId}/lux-readings")]
+    // Contract section 2.9 as of v1.3. Was /poles/{pole_id}/lux-readings through v1.2.
+    [HttpGet("lux-readings/poles/{poleId}")]
     [ProducesResponseType<PagedResult<LuxReadingResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PagedResult<LuxReadingResponse>>> ForPoleAsync(
