@@ -35,6 +35,20 @@ public sealed class AuthTestFactory : WebApplicationFactory<Program>
         return await query(scope.ServiceProvider.GetRequiredService<LuxMapDbContext>());
     }
 
+    /// <summary>
+    /// The commune the BE-06 seeder puts the seeded users in, read through its
+    /// <see cref="SeedKeys.StudySite"/> key.
+    /// </summary>
+    /// <remarks>
+    /// The id itself comes from a sequence, so it records which run happened to create the row first
+    /// — never anything a test may assert against as a constant.
+    /// </remarks>
+    public Task<string> SeededCommuneIdAsync()
+        => QueryAsync(db => db.Set<AdministrativeUnit>()
+            .Where(unit => unit.SeedKey == SeedKeys.StudySite)
+            .Select(unit => unit.CommuneId)
+            .SingleAsync());
+
     public Task<RefreshToken?> FindTokenAsync(string rawToken)
     {
         var hash = Modules.Identity.Auth.RefreshTokenGenerator.Hash(rawToken);

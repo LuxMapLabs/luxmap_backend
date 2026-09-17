@@ -36,7 +36,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
 
         var communes = payload.GetProperty("commune_ids");
         Assert.Equal(JsonValueKind.Array, communes.ValueKind);
-        Assert.Equal(["COM-001"], communes.EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal([await factory.SeededCommuneIdAsync()], communes.EnumerateArray().Select(v => v.GetString()));
 
         Assert.Equal("luxmap-api", payload.GetProperty("iss").GetString());
         Assert.Equal("luxmap-clients", payload.GetProperty("aud").GetString());
