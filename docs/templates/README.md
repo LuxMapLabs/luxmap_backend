@@ -19,6 +19,38 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy
 
 ---
 
+## Hai bộ file: `*.csv` để điền, `*.example.csv` để chạy thử
+
+| File | Nội dung | Dùng khi |
+|---|---|---|
+| `segments.csv` · `feeders.csv` · `poles.csv` · `fixtures.csv` | **Chỉ dòng header** | Phát cho đơn vị điền dữ liệu thật |
+| `segments.example.csv` · … · `fixtures.example.csv` | Header **+ một dòng chạy được** | Chạy thử pipeline trước khi có dữ liệu thật |
+
+**Quy tắc, áp cho cả bốn loại:**
+
+> File template **không được chứa bất kỳ mã nào bắt buộc phải tồn tại trong database**.
+> Chỉ `*.example.csv` mới được.
+
+Trước đây mỗi template mang sẵn một dòng mẫu dùng `COM-001`. Cái xã đó **không còn tồn tại** — id
+commune do sequence sinh, nên nó chỉ ghi lại lần seed nào chạy trước, không phải một sự thật về lược
+đồ. Ai copy template rồi nạp nguyên xi sẽ nhận `'COM-001' is not a known commune.`
+
+Đã cân nhắc và **loại** hai cách khác: đổi thẳng mã trong template sang mã seed hiện tại thì buộc một
+file dùng chung vào **một** database dev cụ thể, và BE-39 seed lại là sai tiếp; còn thay bằng chỗ giữ
+chỗ kiểu `<MA_XA_CUA_BAN>` thì template mất luôn khả năng chạy thử, mà người ta vẫn copy nguyên chỗ
+giữ chỗ như thường.
+
+Tách file làm điều mà một lời dặn trong README không làm được: biến "đừng copy mã này" từ thứ
+**phải nhớ** thành thứ **không tồn tại để mà copy**.
+
+⚠️ `*.example.csv` dùng mã xã seed **của database dev hiện tại**. BE-39 seed lại sinh mã khác thì
+**chỉ sửa file example** — template không đụng tới.
+
+Nạp nhầm file template trắng **không hỏng gì**: không có dòng dữ liệu nên kết quả là
+`{inserted: 0, updated: 0, failed: 0, total_errors: 0}`, không phải lỗi.
+
+---
+
 ## Bản v2 — hai cột đã bị BỎ khỏi `poles.csv`
 
 `segment_name` và `feeder_name` **không còn** trong `poles.csv`. Chúng từng có mặt "chỉ để đọc",

@@ -375,6 +375,7 @@ gì, một lần sau khi có nhóm web.
 | 39 | 🔴 **§0.4 dạy `LPAD(...)` — cơ chế SAI, cắt ID khi vượt độ rộng.** Contract lệch code từ commit `8ea9930` | 🔴 Cao | WP5, WP6, BE-39 | Contract — **ĐÃ SỬA 07/09/2026** (`SELF-SIGNED`); xem **D** |
 | 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E**. **Đóng một phần 11/09/2026:** sinh lại từ code, spec nay có thêm 8 path `/assets…` và `/lux-readings…`. `/faults`, `/poles`, `/segments` vẫn thiếu vì **chưa có code** |
 | 41 | **Auth web qua cookie `HttpOnly`** — nhóm `/api/v1/auth/web/*` mới, nhóm mobile không đổi | 🔴 Cao | WP5, WP6 | **ĐÃ CHỐT 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
+| 42 | **Ba tên tuyến lệch giữa `mocks/` của BE và `src/data/` của FE** — `segment_name` của cả `SEG-001`, `SEG-002`, `SEG-003` | 🟡 Vừa | WP5 | Mock — **chưa quyết bên nào đúng**; xem mục 42 |
 
 ---
 
@@ -868,6 +869,34 @@ của C# và function của database ở cả hai phía ngưỡng. `Format` dùn
 > Comment cũ trong `PrefixedId.cs` khẳng định ngược lại sự thật — *"LPAD simply returns the longer
 > number ... no truncation and no overflow"* — và chính nó làm người đọc tin là đã an toàn. Đã viết
 > lại kèm lý do vì sao phải dùng function chứ không phải biểu thức thẳng.
+
+---
+
+## 42. Ba tên tuyến lệch giữa mock của BE và mock của FE 🟡
+
+Phát hiện 17/09/2026 khi so trực tiếp hai thư mục, không phải suy đoán:
+
+```
+$ diff mocks/mock-segments.geojson  ../luxmap-web/src/data/mock-segments.geo.json
+SEG-001.segment_name: BE='Tuyen A - duong lien xa'  FE='Tuyen A - Tinh lo 8'
+SEG-002.segment_name: BE='Tuyen B - duong lien xa'  FE='Tuyen B - Nguyen Van Ni'
+SEG-003.segment_name: BE='Tuyen C - duong ra cau'   FE='Tuyen C - Huynh Van Co'
+```
+
+Ngoài ba tên này, hai file **khớp hoàn toàn**: cùng 3 feature, cùng bộ `segment_id`, cùng bộ khoá
+`properties`, mọi giá trị khác bằng nhau. `mock-iot-nodes` khớp tuyệt đối (12/12).
+
+**Chưa quyết được bên nào đúng, và đó là lý do nó là drift chứ không phải một bản vá.** FE mang tên
+đường có thật (Tỉnh lộ 8, Nguyễn Văn Ni, Huỳnh Văn Cò); BE mang tên mô tả chung. Không dữ kiện nào
+trong repo phân xử được — cần người biết địa bàn nói.
+
+⚠️ `segment_name` **là cột thật**, `road_segment.segment_name text NOT NULL`, và Contract mục 2.3
+emit nó ra `properties`. Nên đây không phải chuyện trang trí: bên nào thắng thì **BE-39 seed theo bên
+đó**, và màn hình FE sẽ hiện đúng tên ấy.
+
+**Hai mục lệch còn lại của cùng đợt so sánh đã có chủ:** `POLE-0075.open_fault_count` (BE=2, FE=1) và
+`POLE-0076.open_fault_count` (BE=1, FE=0) — đó là **mục 36**, đã sửa phía BE và có test canh
+(`OpenFaultCountTests`). FE cần kéo lại `mock-poles.geo.json`.
 
 ---
 
