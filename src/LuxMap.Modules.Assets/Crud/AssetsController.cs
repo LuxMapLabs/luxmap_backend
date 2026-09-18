@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text.Json;
 using Asp.Versioning;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Errors;
@@ -99,6 +101,55 @@ public sealed class AssetsController(
         => CreatedAsset("fixtures", await service.CreateFixtureAsync(request, ct));
 
     /// <summary>
+    /// Deletes a pole outright. <b>204</b>, or <b>409</b> when a foreign key refuses.
+    /// </summary>
+    /// <remarks>
+    /// Poles are the one asset with a DELETE, and fixtures deliberately still have none: retiring a
+    /// lamp is a real event that <c>removed_date</c> records, while a pole row typed in by mistake is
+    /// not an event at all. Marking such a row retired would write down something that never happened.
+    /// <para>
+    /// Nothing checks in code whether the pole may go — <c>fault</c> and <c>lux_reading</c> hold it
+    /// with RESTRICT, so the database answers, and the 409 carries the constraint that said no.
+    /// </para>
+    /// </remarks>
+    [HttpDelete("poles/{poleId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeletePoleAsync(string poleId, CancellationToken ct)
+    {
+        await service.DeletePoleAsync(poleId, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Sets or clears the pole's feeder. <b>204</b>, never the updated object.
+    /// </summary>
+    /// <remarks>
+    /// The topology repair BE-13 and RQ2 both stand on: <c>pole.feeder_id</c> is nullable and the FO-26
+    /// mock set carries none, so most poles arrive with no circuit recorded and something has to be
+    /// able to fill it in afterwards.
+    /// <para>
+    /// Answers 204 with no body on purpose. Echoing the updated pole would publish a read shape, and
+    /// that decision belongs to <b>BE-12b</b>.
+    /// </para>
+    /// </remarks>
+    [HttpPut("poles/{poleId}/feeder")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetPoleFeederAsync(
+        string poleId, [FromBody] SetPoleFeederRequest request, CancellationToken ct)
+    {
+        await service.SetPoleFeederAsync(poleId, request.ReadFeederId(), ct);
+        return NoContent();
+    }
+
+    /// <summary>
     /// Retires a lamp by setting <c>removed_date</c>. There is no DELETE — the equipment history is
     /// the reason the table exists.
     /// </summary>
@@ -130,6 +181,45 @@ public sealed class AssetsController(
     /// </summary>
     private IReadOnlyList<string>? Narrow(string[]? communeId)
         => CommuneFilter.Narrow(scopeAccessor.Scope, communeId);
+}
+
+/// <summary>
+/// Body of the feeder assignment endpoint: <c>{ "feeder_id": "FDR-001" }</c> or
+/// <c>{ "feeder_id": null }</c>.
+/// </summary>
+/// <remarks>
+/// ⚠️ <b>Held as a <see cref="JsonElement"/> so an ABSENT key and an explicit <c>null</c> stay
+/// distinguishable.</b> Everywhere else in this module a required field is <c>nullable +
+/// [Required]</c>, but that pattern cannot express this endpoint: <c>[Required]</c> rejects
+/// <c>null</c>, and <c>null</c> is a legitimate value here — a <c>solar_all_in_one</c> pole is on no
+/// circuit at all.
+/// <para>
+/// Dropping the distinction and reading a missing key as <c>null</c> was the alternative, and it
+/// would mean an empty or malformed body silently CLEARS a pole's circuit. This module already
+/// decided that question the other way for <c>SERVER_OWNED_FIELD</c>: reject loudly rather than act
+/// on a guess about what the caller meant.
+/// </para>
+/// </remarks>
+public sealed record SetPoleFeederRequest
+{
+    public JsonElement FeederId { get; init; }
+
+    /// <summary>The feeder id, or <c>null</c> to clear. Throws when the key was not sent at all.</summary>
+    public string? ReadFeederId() => FeederId.ValueKind switch
+    {
+        JsonValueKind.String => FeederId.GetString(),
+        JsonValueKind.Null => null,
+        JsonValueKind.Undefined => throw new LuxMapException(
+            ErrorCodes.ValidationFailed,
+            HttpStatusCode.BadRequest,
+            "feeder_id is required. Send null to record that the pole is on no circuit.",
+            new Dictionary<string, object?> { ["feeder_id"] = "missing" }),
+        _ => throw new LuxMapException(
+            ErrorCodes.ValidationFailed,
+            HttpStatusCode.BadRequest,
+            "feeder_id must be a string or null.",
+            new Dictionary<string, object?> { ["feeder_id"] = FeederId.ValueKind.ToString().ToLowerInvariant() }),
+    };
 }
 
 /// <summary>Body of the fixture retirement endpoint.</summary>

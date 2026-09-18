@@ -1032,6 +1032,9 @@ FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** 
 ## Quy ước làm việc
 
 - Nhánh Git mang mã task: `feat/BE-09-pole-fixture-entity`, `feat/BE-43-sync-bundle`.
+- **Stage theo đường dẫn tường minh. Không bao giờ `git add -A` hay `git add .`** — nó quét cả file
+  untracked không liên quan. Đã xảy ra ở BE-12: `AGENTS.md` (1055 dòng, có sẵn trong working tree)
+  bị nuốt vào commit đầu của ticket.
 - Mã task: `BE-` backend · `IOT-` telemetry · `CV-` vision/analytics · `FW-` web · `FM-` mobile · `FO-` field ops.
 - Mọi API cùng định dạng response, có correlation id (BE-04).
 - Test tích hợp chạy trên PostGIS thật, phủ truy vấn không gian và bbox.
