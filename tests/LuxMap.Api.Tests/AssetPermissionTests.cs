@@ -4,6 +4,7 @@ using System.Text;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,8 +31,15 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
         var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
 
         var response = await client.PostAsJsonAsync("/api/v1/assets/segments", NewSegment());
+        var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        // ROLE_FORBIDDEN, not COMMUNE_FORBIDDEN (BE-REVIEW-02, D-4): the engineer is inside their
+        // territory; it is the ROLE the policy refused. Before D-4 every bare 403 was reported as a
+        // commune problem and the front end would have said "outside your area".
+        Assert.Contains(ErrorCodes.RoleForbidden, body);
+        Assert.DoesNotContain(ErrorCodes.CommuneForbidden, body);
     }
 
     [Fact]

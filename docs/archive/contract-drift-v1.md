@@ -1,0 +1,1150 @@
+# Chỗ lệch giữa code và Contract — nội dung mang vào FW-00
+
+**Mục đích:** danh sách những chỗ code hiện tại và `api-contract-v1.1.md` / `tasks-backend.csv`
+không khớp nhau, để cả nhóm quyết trong buổi review FW-00.
+
+**Đây là tài liệu ĐỀ XUẤT, không phải quyết định.** Không sửa Contract, không sửa task list dựa
+trên file này — mọi thay đổi phải được cả BE và FE duyệt rồi tăng version, đúng nguyên tắc ở đầu
+Contract: *"Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng version. Không đổi ngầm."*
+
+**Ai cần đọc:** WP5 (Web) và WP6 (Android) — nhiều mục dưới đây các bạn sẽ gặp ngay khi tích hợp.
+
+**Trạng thái code:** BE-00 → BE-09 xong, 252 test xanh.
+
+---
+
+## Nguyên tắc vận hành quyết định (FW-00, chốt 07/09/2026)
+
+Năm nguyên tắc dưới đây nói về **cách quyết**, không phải quyết cái gì. Chúng đứng trước bảng drift
+vì mọi mục trong bảng đó đều đi qua chúng.
+
+### 1. Mọi quyết định ghi ngay trong buổi họp
+
+Vào **file này**, ngay khi chốt, không để ghi sau. Bốn trường bắt buộc:
+
+| Trường | Nghĩa |
+|---|---|
+| **Decision** | Chốt cái gì, đủ cụ thể để người không dự họp làm theo được |
+| **Decision maker** | Tên người, không phải "cả nhóm" |
+| **Date** | Ngày tuyệt đối `DD/MM/YYYY`, không phải "tuần trước" |
+| **Scope** | Ticket / endpoint / file nào chịu ảnh hưởng |
+
+> **Quyết định không sống trong repo thì coi như chưa xảy ra.** Không phải quy tắc hành chính: một
+> quyết định chỉ nằm trong trí nhớ sẽ được nhớ khác nhau bởi ba người, và cái được nhớ khác nhau thì
+> không phải quyết định — nó là ba quyết định.
+
+### 2. Drift 31 nâng thành Contract rule
+
+> 🟡 **Mục này CHỜ FW-00 chốt. CHƯA vào Contract.** Đang là đề xuất, và tới khi được duyệt thì
+> `api-contract-v1.1.md` không thay đổi một chữ nào.
+
+**Policy là MỘT vai trò chính xác, không phải một bậc.** `RequireClaim(role, "<một giá trị>")` khớp
+đúng một vai trò; nó **không** có nghĩa "từ cấp này trở lên". Gắn `maintenance_engineer` lên một
+endpoint ĐỌC sẽ **chặn luôn Quản trị và Cơ quan quản lý** — trông như siết bảo mật, thực chất là chặn
+hai vai trò khỏi dữ liệu của chính họ.
+
+Bảng vai trò được GHI, áp cho **BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24**:
+
+| Nhóm endpoint | Ticket | Vai trò được GHI | Đọc |
+|---|---|---|---|
+| `/assets/*` — CRUD tài sản, import | BE-12a | Quản trị | mọi vai trò đã đăng nhập |
+| Sweep, frame, luminance | BE-15, BE-17 | *chờ chốt* | mọi vai trò đã đăng nhập |
+| Fault — chuyển trạng thái | BE-18, BE-19 | *chờ chốt* | mọi vai trò đã đăng nhập |
+| Work order, evidence | BE-21, BE-24 | *chờ chốt* | mọi vai trò đã đăng nhập |
+
+**Đọc KHÔNG gắn policy nào** — `SetFallbackPolicy` đã bắt buộc đăng nhập, và nêu tên một vai trò ở đó
+là loại trừ ba vai trò kia chứ không phải đặt sàn.
+
+Chốt **một lần cho cả nhóm**: BE-12a đã hiện thực nên tiền lệ đã tạo, sáu ticket tự chọn riêng sẽ ra
+sáu ma trận quyền khác nhau mà không ai giải thích được. Chi phí đảo hướng đo ở mục 31b.
+
+### 3. Absence rule — N = 3 ngày làm việc
+
+Người duyệt im lặng quá **3 ngày làm việc** thì:
+
+| Loại thay đổi | Im lặng nghĩa là |
+|---|---|
+| **KHÔNG chạm bề mặt API** — mock, quyết định nội bộ, dọn dẹp, test | **APPROVE** |
+| **CHẠM bề mặt API** — endpoint, response shape, query param, mã lỗi, enum | **ESCALATE** — không bao giờ là approve |
+
+**Fallback signer: Dylan.**
+
+> 🔴 **Dylan đồng thời là người đề xuất phần lớn drift trong file này.** Escalation vì thế quay về
+> chính người đề xuất, và một chữ ký như vậy **không phải là duyệt độc lập**.
+
+Hệ quả bắt buộc:
+
+- Mọi quyết định đi qua đường này **phải đánh dấu `SELF-SIGNED`**, kèm **lý do escalate**: ai vắng,
+  từ ngày nào.
+- Tự động vào **đầu agenda FW kế tiếp** để Thịnh/Ngọc xác nhận hoặc lật.
+- Quyết định `SELF-SIGNED` **chạm bề mặt API** **KHÔNG được coi là ổn định** cho tới khi có xác nhận
+  ở FW kế tiếp. Ticket xây lên trên nó **phải biết nền là tạm** — ghi vào mô tả ticket, không chỉ
+  biết trong đầu.
+
+### 4. Không có "bàn thêm" vô thời hạn
+
+Chưa quyết được thì phải có **owner + deadline**. Thiếu **một trong hai** thì:
+
+- coi như **CHƯA giải quyết**,
+- **tự động lên đầu agenda FW kế tiếp**,
+- và mọi ticket phụ thuộc **vẫn BLOCKED**.
+
+> "Để bàn thêm" không có owner là cách một quyết định biến mất mà vẫn trông như đang được xử lý.
+
+### 5. Ghi ở đúng tầng
+
+| Loại | Ghi vào |
+|---|---|
+| **Deviation** — code lệch Contract, mock lệch Contract | `docs/contract-drift.md` |
+| **Luật áp nhiều ticket** — quy tắc chung cho FE/BE/mobile | `docs/api-contract-v1.1.md` (sau khi duyệt, tăng version) |
+| **Ràng buộc kỹ thuật nội bộ** — bẫy, quy ước, thứ dễ sai âm thầm | `CLAUDE.md` |
+| **Tiến độ** — trạng thái ticket, việc tồn đọng | `tracking.html` |
+
+Ghi sai tầng cũng tệ như không ghi: một ràng buộc kỹ thuật nằm trong `tracking.html` sẽ trôi mất khi
+mục đó được đóng, còn một deviation nằm trong `CLAUDE.md` sẽ không bao giờ tới tay WP5/WP6.
+
+---
+
+## Quyết định đã đăng ký
+
+Theo **nguyên tắc 1** ở trên: bốn trường bắt buộc, ghi ngay, vào repo.
+
+> 🔴 **CẢ BA đều `SELF-SIGNED`.** Thịnh và Ngọc vắng; cả ba đi qua **absence rule** (nguyên tắc 3)
+> với người ký dự phòng là **chính người đề xuất**. Đây **không phải duyệt độc lập**. Cả ba nằm ở
+> **đầu agenda FW-00 kế tiếp** để Thịnh/Ngọc xác nhận hoặc lật.
+>
+> **A và C chạm bề mặt API**, nên theo nguyên tắc 3 chúng **CHƯA ổn định** — ticket xây lên trên phải
+> ghi rõ trong mô tả rằng nền là tạm. **B là thông qua theo hạn, không phải đã duyệt.**
+
+### A — `GET /faults` thêm `pole_id`, và khuôn ID ASCII
+
+| | |
+|---|---|
+| **Decision** | Thêm **một** query param `pole_id` vào mục 2.4; đồng thời đặc tả **khuôn ID** cho Contract |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | BE-xx phần B · mục 2.4 · khuôn ID áp cho toàn Contract |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc. Chạm bề mặt API → escalate, không phải approve |
+
+**Cardinality: MỘT giá trị, không phải danh sách.** Khác `status` (CSV enum ở mục 2.1) — lọc theo một
+cột là câu hỏi về một cột.
+
+🔴 **Pole không tồn tại và pole ngoài phạm vi xã: CẢ HAI trả `200` + mảng rỗng, KHÔNG phân biệt.**
+
+Đây là điểm dễ bị "sửa cho thân thiện" nhất và **không được sửa**. Nếu pole không tồn tại trả 404 còn
+pole ngoài phạm vi trả mảng rỗng, thì hai câu trả lời khác nhau **tiết lộ cột đó có tồn tại ở xã
+khác** — filter biến thành **kênh dò sự tồn tại**. Cùng lý lẽ mục 7 dùng để bắt truy cập trực tiếp
+ngoài phạm vi trả 404 thay vì 403, và cùng lý lẽ `INVALID_CREDENTIALS` gộp sai-tên với sai-mật-khẩu.
+
+**Khuôn ID — ASCII-only, số chữ số là TỐI THIỂU, không cố định:**
+
+```
+^POLE-[0-9]{4,}$      ^SEG-[0-9]{3,}$      ^CLS-[0-9]{3,}$      ^FAULT-[0-9]{4,}$
+```
+
+- **`[0-9]` chứ không phải `\d`.** Trong .NET và nhiều engine khác, `\d` mặc định khớp **chữ số
+  Unicode** — chữ số Ả Rập-Ấn Độ `٠١٢`, chữ số Devanagari `०१२` — nên `\d{4}` nhận những chuỗi không
+  bao giờ là ID hợp lệ. `[0-9]` nói đúng ý.
+- **`{4,}` chứ không phải `{4}`.** Mục 0.3 chốt độ rộng là **tối thiểu**: cột thứ 10000 là
+  `POLE-10000`, không phải `POLE-1000`.
+- **ID là CHUỖI.** Không parse thành số, không so sánh số học, **không giới hạn trên**.
+- **Contract hiện chưa đặc tả khuôn ID ở đâu cả** — mục 0.2 chỉ có bảng ví dụ. Đây là phần **thêm
+  mới**, không phải sửa.
+
+> ✅ **ĐÃ GHI VÀO CONTRACT 07/09/2026** (nhánh `docs/contract-id-format-and-pole-filter`):
+> `pole_id` là param thứ **12** ở §2.4 kèm quy tắc 200-rỗng; khuôn ID vào **§0.2 dưới dạng cột thứ
+> tư, phủ CẢ 16 prefix** chứ không phải bốn regex rời — digits đọc từ `PrefixedIds` và đối chiếu với
+> `column_default` của live schema (9 prefix đã có bảng, khớp cả 9; 7 prefix còn lại thuộc entity
+> chưa tồn tại). **Chưa implement** `?pole_id=` — đó là ticket sau.
+
+> ⚠️ **Điểm khuôn ID CHƯA đối chiếu với regex trong code mobile — Ngọc phải kiểm khi về.**
+> Nếu WP6 đang validate bằng `\d{4}` cố định thì **lỗi đã có sẵn ở đó từ trước**, không phải do
+> quyết định này sinh ra: nó sẽ từ chối `POLE-10000` ngay khi cột thứ 10000 xuất hiện. Filter mới chỉ
+> làm nó **phơi ra sớm hơn**. Kiểm cả hai điểm: `{4}` cố định, và `\d` thay vì `[0-9]`.
+
+### B — Drift 29 / 30 / 34 thông qua theo hạn
+
+| | |
+|---|---|
+| **Decision** | **THÔNG QUA THEO HẠN** — không chặn BE-12b nữa |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | BE-12b · drift 29, 30, 34 |
+| **Lý do escalate** | Đã merge trong `dev` (PR #22). Thịnh/Ngọc **chưa phản hồi**, quá 3 ngày làm việc |
+
+🔴 **"Thông qua theo hạn" KHÔNG phải "đã duyệt".** Ba mục **vẫn ở đầu agenda FW-00**. Sự khác nhau
+không phải chữ nghĩa: *đã duyệt* nghĩa là có người đọc và đồng ý; *thông qua theo hạn* nghĩa là
+**không ai đọc**, và công việc đi tiếp vì dừng lại còn tốn hơn. Nếu FW-00 lật một trong ba, phần đã
+xây lên trên phải sửa.
+
+### C — `work_order_id` emit `null`
+
+| | |
+|---|---|
+| **Decision** | `GET /faults` **emit `work_order_id: null`**. KHÔNG làm bảng `work_order` lúc này, KHÔNG gỡ trường khỏi mục 2.4 |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | `GET /faults` · drift 38 · nợ chuyển cho BE-21 |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc. Chạm bề mặt API → escalate |
+
+Sự thật đã kiểm: mục 2.4 hứa `work_order_id`, nhưng `\d fault` **không có cột đó** và
+`information_schema` cho `work_order%` trả về **0 bảng**.
+
+**`null` là lựa chọn duy nhất không đóng cửa nào:**
+
+| Đường | Đóng cửa gì |
+|---|---|
+| **Emit `null`** ✅ | Không đóng gì. FE bind được hình dạng cuối ngay; ngày có schema thì giá trị xuất hiện, **không đổi contract** |
+| Gỡ trường khỏi mục 2.4 | Đổi hình dạng đã publish, rồi phải đổi **lần nữa** khi thêm lại |
+| Làm bảng `work_order` bây giờ | Kéo BE-21 vào một ticket không phải của nó, quyết lược đồ work order mà không có ai duyệt |
+| Bỏ trường khỏi response | Khoá vắng mặt khác khoá `null` — FE phải viết hai nhánh cho cùng một thứ |
+
+**Mock đã điền giá trị THẬT**, đọc từ `fault_ids` của `mock-work-orders.json` (11 fault có WO, 17
+`null`), nên ngày có schema thì seed khớp ngay — không phải điền lại.
+
+**Nợ có tên: BE-21.** Không phải "sẽ làm sau".
+
+> ✅ **ĐÃ GHI VÀO CONTRACT 07/09/2026.** §2.4 nay nói rõ `work_order_id` **luôn trả `null`**, khoá
+> vẫn có mặt trong JSON, và client **không xây UI phụ thuộc trường này**. Trường **không bị gỡ** khỏi
+> §2.4 — gỡ rồi thêm lại là đổi hình dạng đã publish hai lần.
+
+### D — §0.4 sửa lỗi `LPAD` (KHÔNG phải mở rộng)
+
+| | |
+|---|---|
+| **Decision** | Thay `LPAD(nextval(...)::text, 4, '0')` ở §0.4 bằng `luxmap_format_id(prefix, nextval(seq), digits)` |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | §0.4 · drift 39 · không đụng code (code đã đúng từ `8ea9930`) |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc |
+
+**Đây là SỬA LỖI, không phải mở rộng** — nên tách khỏi A/B/C và tách thành commit riêng.
+
+`lpad` của PostgreSQL **CẮT BỚT** khi chuỗi đã dài hơn độ rộng: `lpad('10000', 4, '0')` → `'1000'`.
+Cột thứ 10000 nhận `POLE-1000` và **đụng ID của cột thứ 1000**. Không exception, chỉ một
+`23505 duplicate key` ở một hàng trông bình thường.
+
+Điều đó **mâu thuẫn §0.3 nằm ngay mười dòng phía trên**, vốn hứa ID dài ra tự nhiên. Và mâu thuẫn
+schema thật: backend đã bỏ `LPAD` ở commit `8ea9930` (drift 13), nhưng **Contract chưa được sửa
+theo** — lệch từ đó tới nay.
+
+Chữ ký hàm chép từ `pg_proc`, không viết từ trí nhớ:
+
+```sql
+luxmap_format_id(prefix text, value bigint, digits integer) RETURNS text
+    SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text)), '0')
+```
+
+⚠️ Phải là **hàm** chứ không phải biểu thức thẳng: biểu thức gọi giá trị ba lần, mà PostgreSQL không
+cho subquery hay CTE trong `DEFAULT` của cột — hàm là cách giữ `nextval` được gọi **đúng một lần**
+mỗi hàng.
+
+### E — OpenAPI spec KHÔNG sửa tay
+
+| | |
+|---|---|
+| **Decision** | **Không** sửa `docs/openapi/luxmap-v1.json`. Ghi nhận khoảng cách thay vì vá tay |
+| **Decision maker** | **Dylan** — `SELF-SIGNED` |
+| **Date** | 07/09/2026 |
+| **Scope** | `docs/openapi/luxmap-v1.json` · drift 40 |
+| **Lý do escalate** | Thịnh và Ngọc vắng, quá 3 ngày làm việc |
+
+Hiện trạng đo được: **4 path, tất cả `/auth`** (`login`, `logout`, `refresh`, `register`); **20
+schema** gồm 12 enum + 8 DTO auth; **không một `pattern` nào**. Không có `/faults`, `/poles`,
+`/segments` — nghĩa là **không có chỗ** để thêm param `pole_id` hay gắn khuôn ID.
+
+🔴 **Sửa tay sẽ bị xoá.** File được **sinh ra** bằng lệnh ở `README.md:241`:
+
+```bash
+dotnet build src/LuxMap.Api && Swagger__Enabled=true dotnet swagger tofile \
+  --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+```
+
+Lần export kế tiếp ghi đè toàn bộ. Và `docs/backend-report.md:583` đã ghi: *"Chưa có CI. Không có gì
+tự động phát hiện `luxmap-v1.json` đã cũ."* — nên **không ai bắt được lúc nó bị mất**.
+
+**Đường đúng:** `pattern` vào spec khi endpoint được hiện thực, qua `[RegularExpression]` trên DTO,
+rồi export lại. Khuôn ở §0.2 là nguồn để chép sang.
+
+🔴 **WP6 sinh DTO Kotlin từ file này (FM-04) — đây là điểm nặng nhất của mục này.** Spec phủ 4
+endpoint auth và không gì khác, nên WP6 **không có DTO nào** cho `/faults`, `/poles`, `/segments`:
+phải đọc Contract bằng mắt rồi **gõ tay** từng tên trường, từng enum, từng kiểu.
+
+Nghĩa là mục này **không còn là nợ tài liệu** mà là **nguồn lệch trực tiếp giữa BE và mobile** — mỗi
+trường gõ tay là một cơ hội sai chính tả hoặc sai kiểu, và **không có gì đối chiếu lại**: spec không
+phủ endpoint đó nên không sinh được DTO để so. **Ưu tiên ngang mục 38 (`work_order`) ở FW-00.**
+
+### F — Auth web qua cookie `HttpOnly`, tách endpoint; mobile giữ nguyên
+
+| | |
+|---|---|
+| **Decision** | Thêm nhóm `/api/v1/auth/web/{login,refresh,logout}` cho browser: refresh token **chỉ** đi qua cookie `__Secure-luxmap_rt` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/api/v1/auth/web`), không bao giờ nằm trong body. Nhóm `/api/v1/auth/{login,register,refresh,logout}` **giữ nguyên** DTO, response, TTL 30/90 và reuse detection. Ghi thành **Contract v1.2 mục 2.10**; đóng drift 1 và 5 |
+| **Decision maker** | **Dylan** |
+| **Date** | 11/09/2026 |
+| **Scope** | `/api/v1/auth/*` · Contract v1.2 mục 2.10 · bảng `refresh_token` (cột mới `session_kind`) · `Program.cs` (CORS) · `docs/openapi/luxmap-v1.json` (sinh lại) · drift 1, 5, 40, 41 |
+
+> **KHÔNG `SELF-SIGNED`.** F không đi qua absence rule (nguyên tắc 3): Dylan quyết và chịu trách nhiệm
+> trực tiếp, không chờ Thịnh/Ngọc xác nhận. Khác A–E.
+
+**Vì sao tách endpoint thay vì một endpoint phân mode theo header `Origin`** — đo ở phiên khảo sát:
+
+- `RefreshRequest` / `LogoutRequest` có `[Required] refresh_token` → request web không body bị **400
+  trước khi vào controller**.
+- Test khoá login/refresh trả **đúng bốn trường**; bỏ `refresh_token` ở web là phá hình dạng đó.
+- WP6 sinh DTO Kotlin **từ spec** (FM-04), spec **sinh từ code** (quyết định E): đổi một field sang
+  optional/nullable là đổi kiểu phía mobile ở lần codegen kế tiếp, dù runtime không đổi.
+- Swagger UI chạy trong browser nên sẽ rơi vào "web mode" — thử API bằng Swagger hết thấy
+  `refresh_token`.
+- FE gọi qua server (Next.js) thì API không thấy `Origin` và âm thầm rơi sang mode mobile.
+
+Tách đường dẫn thì nhóm mobile **không đổi một byte**, và client nói rõ mình là ai bằng URL nó gọi.
+
+**Các quyết định con:**
+
+| | Quyết định |
+|---|---|
+| Loại phiên | Cột `refresh_token.session_kind` ∈ `mobile` \| `web_persistent` \| `web_session`, `NOT NULL`, có CHECK. Hàng cũ backfill `mobile` (trước F mọi token đều cấp qua body). Không giữ default — quên set thì insert lỗi. Refresh **copy nguyên** loại phiên, không bao giờ đổi |
+| TTL | `mobile` 30 ngày trượt / trần 90 — **không đổi**. `web_persistent` 14 ngày trượt / trần 90. `web_session` **12 giờ tuyệt đối** từ lúc đăng nhập, refresh không kéo dài. `remember_me` thiếu = `false` |
+| Ràng buộc nhóm | Token web ở endpoint mobile, hoặc ngược lại: refresh → `401`, không thu hồi, không kích hoạt reuse detection; logout → `204`, không thu hồi |
+| Reuse detection | Giữ nguyên hành vi BE-07, áp cho cả nhóm web |
+| Logout | Kết thúc phiên hiện tại |
+| Cookie khi refresh lỗi | **Không đụng**. Chỉ `web/logout` xoá cookie; `web/login` ghi đè. Lý do: hai tab refresh cùng lúc, tab thua nhận `401` — nếu response đó xoá cookie thì xoá luôn cookie mới của tab thắng |
+| Đổi loại phiên | Chỉ bằng đăng nhập lại. `web/login` mang cookie web còn hiệu lực → thu hồi token đó (`revoked_reason = logout`) rồi mới mở chuỗi mới |
+| `Origin` | Mọi `/web/*` bắt buộc `Origin` nằm trong `Cors:AllowedOrigins`; thiếu, lạ, hoặc `null` → `403 ORIGIN_NOT_ALLOWED`. Tách biệt với CORS |
+| CORS | `Cors:AllowedOrigins` **bắt buộc**, app dừng lúc khởi động nếu rỗng hoặc có entry không phải origin `https` tuyệt đối (không path, không `/` cuối, không `*`) |
+| Triển khai | FE và API **cùng site**. Khác site không hỗ trợ. Định nghĩa ở mục 2.10.7 |
+| FE | Mọi call `/web/*` đi từ browser với `credentials: 'include'`; không gọi auth từ Next.js server |
+
+**Mã lỗi mới:** `ORIGIN_NOT_ALLOWED` (403). Drift 2: bốn mã `INVALID_CREDENTIALS`, `ACCOUNT_LOCKED`,
+`INVALID_REFRESH_TOKEN`, `IDENTIFIER_TAKEN` nay nằm trong mục 2.10.6; mục 2 **vẫn mở** cho
+`VALIDATION_FAILED`, `INTERNAL_ERROR`, `UNAUTHENTICATED`.
+
+**Spec:** sinh lại hai lần, không sửa tay (theo **E**) — một lần đồng bộ với code hiện có trước khi đổi
+gì, một lần sau khi có nhóm web.
+
+⚠️ **Chưa xác minh — không phải evidence:**
+
+- **FE tuân thủ ràng buộc gọi từ browser.** Code WP5 không nằm trong repo này.
+- **Mobile có lưu `refresh_token` mới sau mỗi lần refresh không.** Vấn đề có sẵn từ BE-07, không do F
+  sinh ra — nếu không lưu, phiên đã văng từ trước. Ngọc cần kiểm.
+
+---
+
+## Tóm tắt
+
+| # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Đề xuất sửa bên nào |
+|---|---|---|---|---|
+| ~~1~~ | ~~Nhóm endpoint `/auth` chưa có trong Contract~~ | 🔴 Cao | WP5, WP6 | **ĐÓNG 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
+| 2 | 7 mã lỗi chưa có trong Contract | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 0 |
+| 3 | Giá trị `user_role` chưa có trong Contract mục 1 | 🔴 Cao | WP5, WP6 | Contract — thêm vào mục 1 |
+| 4 | Correlation id nằm ở cả header lẫn body | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ |
+| ~~5~~ | ~~**Endpoint đăng ký — đã ĐẢO NGƯỢC quyết định cũ**~~ | 🔴 Cao | WP5, WP6 | **ĐÓNG 11/09/2026** — `register` đã ghi vào Contract v1.2 mục 2.10.1; xem **F** |
+| 6 | Bộ mock FO-26 lệch bảng prefix mục 0.2 | 🔴 Cao | WP5, WP6, BE-39 | Mock — sửa 6 chỗ |
+| 7 | `page_size` vượt 200 bị kẹp im lặng | 🟡 Vừa | WP5, WP6 | Contract — ghi rõ hành vi |
+| 8 | Route không tồn tại trả 401 khi chưa đăng nhập | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
+| 9 | `CLAUDE.md` thiếu `data_source` trong khối enum | 🟢 Thấp | Nội bộ BE | `CLAUDE.md` |
+| 10 | **Contract mục 1 ↔ mục 2.9 mâu thuẫn về `data_source`** | 🔴 Cao | Nội bộ BE, CV-11/CV-18 | Contract — **đã chốt lên v1.2** |
+| 11 | ~~`commune_id` trên 5 bảng Assets chưa có khoá ngoại~~ | 🟡 Vừa | Nội bộ BE, BE-12 | **ĐÃ CHỐT** — `AdministrativeUnit` sang `Persistence` |
+| 14 | **ID không còn cố định độ dài — FE/mobile phải sửa regex** | 🔴 Cao | WP5, WP6 | Contract — ghi rõ ở mục 0.3 |
+| 12 | Mock: `POLE-0047` mâu thuẫn giữa 3 file | 🔴 Cao | WP5, WP6, BE-39 | Mock — **đã sửa** |
+| 13 | ~~`LPAD` cắt bớt ID khi vượt độ rộng~~ | 🔴 Cao | Toàn bộ 16 entity | Code BE-06 — **ĐÃ SỬA** |
+| 15 | **Mã lỗi thứ 8 ngoài Contract: `UNSUPPORTED_IMAGE_FORMAT`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
+| 16 | **Ràng buộc phiên bản: ImageSharp phải ở 3.x** | 🟡 Vừa | Nội bộ BE, CI | Không phải Contract — quyết định công cụ |
+| 17 | **`nearest_luminance` luôn `null` cho tới BE-17** | 🔴 Cao | CV-12 | Không sửa Contract — nợ hiện thực, BE-15/BE-17 nối nguồn |
+| 18 | **Mục 2.9 thiếu bảng bắt buộc/không** — `pole_id` đã chốt BẮT BUỘC | 🟡 Vừa | WP6, CV-12 | Contract — thêm bảng như mục 2.8 |
+| 19 | **`measured_by` có ở task list, KHÔNG có ở Contract mục 2.9** | 🟡 Vừa | WP6 | Contract — theo khuôn `reported_by` mục 2.8 |
+| 20 | **`GET /lux-readings/poles/{id}` có phân trang** (mục 2.9 không nhắc) | 🟢 Thấp | WP5, WP6 | Contract — ghi rõ |
+| 21 | **Mã lỗi thứ 9 ngoài Contract: `SERVER_OWNED_FIELD`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
+| 22 | **`pole.external_ref`** — cột mới, LƯU và TRA được nhưng KHÔNG emit ra API | 🟡 Vừa | Nội bộ BE, tổ sửa chữa | Không phải Contract — quyết định lược đồ, migration thuộc BE-12 |
+| 23 | **Bộ mock FO-26 không mang `feeder_id`** — nạp xong 103 cột chưa gắn mạch điện | 🔴 Cao | CV-15, BE-13, RQ2 | Mock — bổ sung, hoặc gán thủ công có ghi chép |
+| 24 | **`pole_current_status.status_confidence` nhận `NaN`, `Infinity` và giá trị ngoài `0..1`** | 🔴 Cao | CV-11, BE-28, RQ1 | Code BE-15/BE-17 — chưa sửa |
+| 25 | **`commune_id` suy từ scope JWT khi `pole_id` NULL** | 🟡 Vừa | WP6, FM-19 | Contract — thêm vào mục 2.8 |
+| 26 | **Ghi vết trên bảng `fault`, không có `FaultHistory`** | 🟡 Vừa | Nội bộ BE, BE-19 | Không phải Contract — quyết định lược đồ |
+| 27 | **Contract không định nghĩa "fault MỞ"** cho `open_fault_count` | 🟡 Vừa | WP5, BE-28, BE-40 | Contract — ghi rõ ba trạng thái |
+| ~~28~~ | ~~**`mock-faults.json` lệch mục 2.4 mười chỗ** (thiếu 7 trường, thừa 2, `CLU` thay `CLS`)~~ | 🔴 Cao | WP5, WP6, BE-39 | **ĐÓNG 06/09/2026, commit `07ebe37`** — mock đã khớp mục 2.4; `CLU`→`CLS` sửa ở cả `mock-work-orders.json`. **Vẫn phải báo WP5/WP6: hình dạng đã đổi.** |
+| 29 | **Nhóm endpoint `/api/v1/assets/…`** — CRUD tài sản + import, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm mục mới, KHÔNG gộp vào 2.1. **THÔNG QUA THEO HẠN 07/09/2026 (`SELF-SIGNED`)** — xem **B** |
+| 30 | **Hình dạng kết quả import** `{inserted, updated, failed, total_errors, truncated, rows[]}`, trả **200** khi có dòng hỏng | 🟡 Vừa | WP5 | Contract — thêm; 207 đã cân nhắc và loại. **THÔNG QUA THEO HẠN 07/09/2026 (`SELF-SIGNED`)** — xem **B** |
+| 31 | **Vai trò nào được GHI tài sản** — mục 7 chỉ nói phạm vi địa bàn | 🔴 Cao | WP5, WP6, BE-33, **BE-15/18/21/24** | **FW-00 — chốt MỘT LẦN cho cả nhóm ticket ghi**, không để mỗi ticket tự chọn |
+| 32 | **`external_ref` trên `road_segment`, `feeder`, `pole`** — LƯU và upsert theo, KHÔNG emit | 🟡 Vừa | Nội bộ BE, BE-39 | Không phải Contract — mở rộng mục 22 từ 1 bảng lên 3 |
+| 33 | **Hai mã lỗi mới: `ASSET_NOT_FOUND`, `EXTERNAL_REF_TAKEN`** | 🟡 Vừa | WP5, WP6 | Contract — gộp vào mục 2 |
+| 34 | **`GET /assets/*` trả danh sách ID, không phải entity** — chỗ giữ chỗ cho BE-12b | 🟡 Vừa | WP5 | **Chủ nợ: BE-12b.** Xoá mục này là một tiêu chí nghiệm thu của BE-12b. **THÔNG QUA THEO HẠN 07/09/2026 (`SELF-SIGNED`)** — xem **B** |
+| 35 | **`GET /faults` KHÔNG có query `pole_id`** — mục 2.4 liệt kê 11 param, không có cái nào lọc theo cột | 🟡 Vừa | WP5, WP6, FM-17 | **ĐÃ QUYẾT 07/09/2026 (`SELF-SIGNED`)** — thêm param; xem **A** và mục 35b |
+| 36 | **`open_fault_count` của `mock-poles.geojson` lệch `mock-faults.json` ở 2 cột** | 🟡 Vừa | WP5, BE-39 | Mock — chặn bởi mục 27; xem mục 36b |
+| 37 | **Contract chưa đặc tả KHUÔN ID** — không mục nào cho regex, chỉ có ví dụ ở mục 0.2 | 🔴 Cao | WP5, **WP6**, FM-17 | Contract — thêm; đã quyết ở **A**, xem "Quyết định đã đăng ký" |
+| 38 | **`work_order_id` (mục 2.4) chưa có chỗ chứa** — `fault` không có cột, bảng `work_order` chưa tồn tại | 🟡 Vừa | WP5, WP6, BE-21 | Đã quyết ở **C** — emit `null`, nợ có tên |
+| 39 | 🔴 **§0.4 dạy `LPAD(...)` — cơ chế SAI, cắt ID khi vượt độ rộng.** Contract lệch code từ commit `8ea9930` | 🔴 Cao | WP5, WP6, BE-39 | Contract — **ĐÃ SỬA 07/09/2026** (`SELF-SIGNED`); xem **D** |
+| 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E**. **Đóng một phần 11/09/2026:** sinh lại từ code, spec nay có thêm 8 path `/assets…` và `/lux-readings…`. `/faults`, `/poles`, `/segments` vẫn thiếu vì **chưa có code** |
+| 41 | **Auth web qua cookie `HttpOnly`** — nhóm `/api/v1/auth/web/*` mới, nhóm mobile không đổi | 🔴 Cao | WP5, WP6 | **ĐÃ CHỐT 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
+| 42 | **Ba tên tuyến lệch giữa `mocks/` của BE và `src/data/` của FE** — `segment_name` của cả `SEG-001`, `SEG-002`, `SEG-003` | 🟡 Vừa | WP5 | Mock — **chưa quyết bên nào đúng**; xem mục 42 |
+| 43 | **`DELETE /assets/poles/{id}` + `PUT /assets/poles/{id}/feeder` + mã lỗi `ASSET_IN_USE`** — cả ba đều mới, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm vào mục `/assets/…`. **`SELF-SIGNED` 18/09/2026**; xem mục 43 |
+
+---
+
+## 1. Nhóm endpoint `/auth` chưa có trong Contract 🔴
+
+> ✅ **ĐÓNG 11/09/2026.** Nhóm `/auth` nay là Contract **v1.2 mục 2.10**, giữ nguyên hình dạng dưới
+> đây, cộng thêm nhóm web. Xem quyết định **F**. Phần dưới giữ lại làm lịch sử.
+
+**Contract đang ghi gì:** không có gì. Mục *"Contract phủ tới đâu"* liệt kê BE-07 là
+*"Endpoint đăng ký / đăng nhập / refresh"* nằm trong nhóm **chưa có đặc tả**.
+
+**Code đang làm gì:** ba endpoint đã chạy, 202 test phủ.
+
+```
+POST /api/v1/auth/login     { "username": "...", "password": "..." }
+POST /api/v1/auth/refresh   { "refresh_token": "..." }
+POST /api/v1/auth/logout    { "refresh_token": "..." }
+```
+
+Response của `login` và `refresh` — **đúng bốn trường, không hơn**:
+
+```json
+{ "access_token": "...", "refresh_token": "...", "token_type": "Bearer", "expires_in": 3600 }
+```
+
+`expires_in` là lifetime của **access** token, tính bằng giây. `logout` luôn trả `204`, kể cả khi
+token đã thu hồi hoặc không tồn tại.
+
+Claim trong access token:
+
+| Claim | Kiểu | Ví dụ |
+|---|---|---|
+| `sub` | chuỗi | `USR-001` |
+| `role` | **chuỗi đơn**, không phải mảng | `maintenance_engineer` |
+| `commune_ids` | **luôn là mảng** | `["COM-001"]` · Quản trị: `["*"]` |
+| `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
+
+**Đề xuất:** bổ sung thành **mục 2.10 (Auth)** của Contract, giữ nguyên hình dạng đang có — WP6 đã
+sinh DTO từ `docs/openapi/luxmap-v1.json`, đổi bây giờ là breaking change.
+
+**Ảnh hưởng:** WP5 và WP6 cần biết chính xác tên trường và tên claim. FM-05 phụ thuộc trực tiếp.
+
+---
+
+## 2. Bảy mã lỗi chưa có trong Contract 🔴
+
+**Contract đang ghi gì:** mục 0 chốt hình dạng `{ error: { code, message, details } }` và các mục
+2.1, 2.8, 7 nêu đích danh 6 mã: `BBOX_TOO_LARGE`, `POLE_NOT_FOUND`, `LOCATION_REQUIRED`,
+`FAULT_TYPE_NOT_REPORTABLE`, `DUPLICATE_OP`, `COMMUNE_FORBIDDEN`.
+
+**Code đang làm gì:** phải thêm 7 mã nữa để mọi API cùng một hình dạng lỗi:
+
+| Mã | HTTP | Khi nào | Thuộc |
+|---|---|---|---|
+| `VALIDATION_FAILED` | 400 | Body sai định dạng hoặc thiếu trường. Chi tiết từng field nằm trong `details` | BE-04 |
+| `INTERNAL_ERROR` | 500 | Lỗi chưa xử lý. Thông điệp cố ý chung chung | BE-04 |
+| `INVALID_CREDENTIALS` | 401 | Sai tài khoản **hoặc** sai mật khẩu — cố ý dùng chung một mã | BE-07 |
+| `ACCOUNT_LOCKED` | 403 | Đúng mật khẩu nhưng tài khoản bị khoá | BE-07 |
+| `INVALID_REFRESH_TOKEN` | 401 | Refresh token sai / hết hạn / đã thu hồi / bị dùng lại — chung một mã | BE-07 |
+| `UNAUTHENTICATED` | 401 | Access token thiếu / sai chữ ký / hết hạn / sai `iss` / sai `aud` — chung một mã | BE-08 |
+| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username hoặc email | BE-07 (bổ sung) |
+
+**Vì sao gộp mã:** phân biệt "sai tài khoản" với "sai mật khẩu" là nói cho kẻ tấn công biết tài
+khoản nào tồn tại. Tương tự với refresh token và access token. **Đây là chủ ý, đừng tách ra.**
+
+**Đề xuất:** thêm cả 7 vào mục 0 của Contract.
+
+**Ảnh hưởng:** WP5 và WP6 đang phải tự đoán 7 mã này.
+
+---
+
+## 3. Giá trị vai trò chưa có trong Contract mục 1 🔴
+
+**Contract đang ghi gì:** mục 7 liệt kê 4 vai trò **bằng tiếng Việt** (Kỹ sư bảo trì, Tổ khảo sát /
+sửa chữa, Cơ quan quản lý, Quản trị) nhưng **không chốt giá trị enum trên dây**. Mục 1 không có
+`user_role`.
+
+**Code đang làm gì:** BE-06 đặt 4 chuỗi, đã nằm trong CHECK constraint của DB và trong claim `role`
+của JWT:
+
+```
+management_agency · maintenance_engineer · field_crew · administrator
+```
+
+**Đề xuất:** thêm `user_role` vào **mục 1** với đúng 4 giá trị trên, và ghi rõ ánh xạ sang tên
+tiếng Việt ở mục 7.
+
+**Ảnh hưởng:** WP5 và WP6 sẽ hardcode 4 chuỗi này để hiện giao diện theo vai trò. **Chốt trước khi
+họ code, đổi sau là breaking change với cả hai.**
+
+---
+
+## 4. Correlation id nằm ở cả header lẫn body 🟡
+
+**Contract đang ghi gì:** mục 0 chốt body lỗi đúng ba khoá `{ code, message, details }` rồi ghi
+thêm *"+ correlation id"* — **không nói nằm ở đâu**.
+
+**Quyết định ban đầu (BE-00):** chỉ ở header `X-Correlation-Id`, để body giữ đúng ba khoá đã publish.
+
+**Code hiện tại (BE-04 trở đi):** ở **cả hai** — header `X-Correlation-Id` trên mọi response, và
+`error.details.correlation_id` trong body lỗi.
+
+Không phá hình dạng ba khoá vì `details` là bag tự do. Nhưng đây là **thay đổi so với quyết định
+ban đầu** nên cần thống nhất lại.
+
+**Đề xuất:** giữ nguyên hành vi hiện tại và ghi rõ vào Contract mục 0 — FE lấy từ body tiện hơn khi
+báo lỗi, còn header phục vụ trường hợp response thành công.
+
+---
+
+## 5. Endpoint đăng ký — ĐÃ ĐẢO NGƯỢC quyết định trước đó 🔴
+
+> ✅ **ĐÓNG 11/09/2026.** `POST /api/v1/auth/register` đã ghi vào Contract **v1.2 mục 2.10.1**, đúng
+> hình dạng đề xuất ở cuối mục này. Xem quyết định **F**.
+
+> ⚠️ **Mục này thay thế hoàn toàn nội dung cũ.** Trước đây mục 5 ghi *"đã bỏ endpoint đăng ký"*.
+> Quyết định đó **đã bị đảo**. Phần dưới giải thích vì sao đảo được mà vẫn an toàn — người đọc ở
+> FW-00 cần hiểu cơ chế thay thế, không chỉ biết là đã đảo.
+
+**Task list đang ghi gì:** dòng BE-07 — *"API đăng ký / đăng nhập / refresh token"*.
+
+**Contract đang ghi gì:** không có gì. Cả nhóm `/auth` chưa được đặc tả (xem mục 1).
+
+**Code đang làm gì:** có `POST /api/v1/auth/register`, **mở, không cần mã mời, không cần duyệt trước**.
+
+### Vì sao trước đây bỏ
+
+Lập luận cũ: LuxMap không có vai trò Người dân, cả 4 vai trò đều là cán bộ nội bộ, nên **không có
+cách hợp lý nào để người tự đăng ký nhận vai trò và địa bàn**. Lập luận đó vẫn đúng — chỉ là nó
+chứng minh sai kết luận.
+
+### Vì sao giờ mở lại được
+
+Vì tách hai thứ vốn bị gộp làm một:
+
+> **Đăng ký tạo ra DANH TÍNH. Đăng ký KHÔNG tạo ra QUYỀN.**
+
+Tài khoản mới nhận:
+
+| | |
+|---|---|
+| `role` | `field_crew` — vai trò hẹp nhất trong bốn |
+| `commune_ids` | **RỖNG** — không xã nào |
+| trạng thái | mở, không khoá |
+
+Người dùng **đăng nhập được ngay**, nhưng **không thấy một bản ghi nào** cho tới khi quản trị gán
+địa bàn. Việc gán thuộc **BE-33**.
+
+### Cơ chế an toàn — dựa trên thứ đã có sẵn, không phải thứ mới
+
+An toàn KHÔNG đến từ endpoint đăng ký. Nó đến từ cơ chế lọc của BE-08, vốn đã tồn tại và đã có test
+trước khi endpoint này ra đời:
+
+- BE-07 phát `commune_ids: []` cho tài khoản không có xã — đã đo bằng token thật
+- BE-08 `CommuneScopeAccessor` fail đóng: 0 phần tử → `CommuneScope.Empty`
+- Query filter của BE-08 không cho một hàng nào lọt qua
+- Tra cứu trực tiếp theo ID → **404**, không phải 403, nên không lộ cả sự tồn tại
+
+Ba đường leo thang đặc quyền hiển nhiên nhất đã có test riêng: gửi kèm `role`, `commune_ids: ["*"]`,
+`commune_ids: ["COM-001"]` trong body — **cả ba bị bỏ qua hoàn toàn**, vì DTO không có property nào
+để nhận chúng.
+
+### Chọn `field_crew` làm vai trò thấp nhất — vì sao
+
+| Vai trò | Nếu bị gán nhầm địa bàn thì thiệt hại |
+|---|---|
+| `field_crew` | Báo sự cố nhiễu — nhưng kỹ sư vẫn phải duyệt |
+| `maintenance_engineer` | **Bác bỏ được sự cố thật** → che mất hỏng hóc |
+| `management_agency` | Nhìn xuyên nhiều xã |
+
+CLAUDE.md: *"kỹ sư duyệt chứ không tạo"*. `field_crew` là vai trò tác nghiệp đầu vào, quyền hẹp nhất.
+
+Đã cân nhắc thêm vai trò thứ năm kiểu `pending` — bỏ, vì an toàn đến từ `commune_ids` rỗng chứ không
+từ tên vai trò, mà thêm giá trị enum thì WP5/WP6 phải hardcode thêm và BE-08 phải thêm policy.
+
+### Chống dò tài khoản — chọn trả lỗi rõ
+
+Đăng ký mở tạo ra một lỗ rò không có ở hệ thống nội bộ: thử đăng ký để biết username nào đã tồn tại.
+**Chọn (a) trả lỗi rõ** kèm `409 IDENTIFIER_TAKEN`.
+
+Lý do trong bối cảnh cụ thể: hệ thống nội bộ, không có API công khai cho người dân, chạy trong mạng
+cơ quan, khoảng chục tài khoản với username đoán được sẵn (`admin`, `engineer`, `crew`). Trả cùng
+một response cho cả thành công lẫn trùng sẽ khiến người đăng ký thật nhận "thành công" rồi không
+đăng nhập được — một lỗi dùng hàng ngày, đổi lấy việc chống một mối đe doạ gần như không áp dụng.
+
+⚠️ **Nếu hệ thống ra Internet thì phải xem lại** — và cách đúng lúc đó là rate limit cả `/login` lẫn
+`/register`, không phải làm mờ response.
+
+### Đề xuất cho Contract
+
+Bổ sung vào **mục 2.10 (Auth)** cùng với login/refresh/logout:
+
+```
+POST /api/v1/auth/register
+{ "username": "...", "email": "...", "full_name": "...", "password": "..." }
+
+201 Created
+{ "user_id": "USR-005", "username": "...", "email": "...", "full_name": "...",
+  "role": "field_crew", "commune_ids": [],
+  "message": "Account created. An administrator must assign communes before any data becomes visible." }
+```
+
+Ghi rõ trong Contract: **server áp cứng `role` và `commune_ids`, client không set được**; mật khẩu
+tối thiểu **12 ký tự**, không ràng buộc thành phần (NIST SP 800-63B: độ dài hơn quy tắc thành phần);
+trùng định danh → **409 `IDENTIFIER_TAKEN`**; **không trả token** — gọi `/auth/login` riêng.
+
+**Ảnh hưởng:** WP5 cần màn đăng ký và phải hiển thị được thông điệp "chưa được gán địa bàn". WP6
+tương tự nếu mobile cho đăng ký. **Cả hai phải biết tài khoản mới sẽ thấy danh sách rỗng — đó là
+đúng, không phải lỗi API.**
+
+**Còn nợ:** chưa có UI gán vai trò/địa bàn cho tới BE-33. Trong lúc chờ, quản trị gán bằng SQL —
+xem `docs/authorization-guide.md`.
+
+---
+
+## 6. Bộ mock FO-26 lệch bảng prefix Contract mục 0.2 🔴
+
+**Contract đang ghi gì:** mục 0.2 chốt bảng prefix, mục 0.1 chốt số chữ số pad.
+
+**Mock đang ghi gì:**
+
+| Trong mock | Contract quy định | Ở file nào |
+|---|---|---|
+| `USR-khang` | `USR-001` — 3 chữ số | `mock-work-orders.json`, trường `assigned_to`, 2 chỗ |
+| `CLU-0001` | `CLS-001` | `mock-work-orders.json`, `cluster_id` |
+| `NODE-0020` … | `NODE-001` — 3 chữ số | `mock-iot-nodes.geojson`, `mock-pole-detail.json` |
+| ~~`NODE-001-CTRL`~~ | Sai **cấu trúc** mục 0.1, không chỉ sai số chữ số | ~~`mock-segments.geojson`, `mock-iot-nodes.geojson`~~ — **đã sửa ở BE-09** |
+| `FRM-88213` | `FRM-000001` — 6 chữ số | `mock-pole-detail.json`, `frame_id` |
+| `SWEEP-2026…` | `SWP-001` | `mock-poles.geojson`, `last_sweep_id` |
+| `SUP-004` | không có trong bảng prefix | `mock-pole-detail.json`, `supplier` |
+
+**Code đang làm gì:** theo Contract. BE-06 sinh `USR-001`…`USR-004` bằng sequence PostgreSQL.
+
+**Vì sao phải chốt sớm:** **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã
+dựng. Với `assigned_to: "USR-khang"` thì BE-39 **không map được sang user nào**.
+
+> ✅ **Đã xử lý một phần ở BE-09.** Hậu tố `-CTRL` sai cấu trúc mục 0.1 (`<PREFIX>-<số đã pad>` không
+> có phần đuôi chữ) nên đã đổi thành `NODE-0001` / `NODE-0002` / `NODE-0003` ở **cả hai** file
+> `mock-segments.geojson` và `mock-iot-nodes.geojson`. Giữ **4 chữ số** cho khớp với các node còn
+> lại trong bộ mock — câu 3-hay-4 chữ số vẫn còn mở, và phải sửa **một lượt cho toàn bộ node ID**
+> chứ không sửa lắt nhắt. Năm chỗ lệch còn lại chưa đụng tới.
+
+**Đề xuất:** sửa **mock** cho khớp Contract, vì Contract là hợp đồng còn mock là dữ liệu minh hoạ.
+Nhưng WP5/WP6 đang code theo mock nên phải báo trước — đây chính là việc mà `mocks/README.md` đã dặn:
+*"Sửa file ở đây thì phải báo WP5 và WP6."*
+
+Riêng `SUP-004`: cần quyết `supplier` là entity có ID hiển thị (thì phải thêm prefix vào mục 0.2)
+hay chỉ là chuỗi tự do.
+
+---
+
+## 7. `page_size` vượt 200 bị kẹp im lặng 🟡
+
+**Contract đang ghi gì:** mục 0 — *"`page_size` tối đa 200"*. Không nói xử lý thế nào khi vượt.
+
+**Code đang làm gì:** kẹp im lặng về 200, trả HTTP 200 với `page_size: 200` trong response. Không
+báo lỗi.
+
+**Hệ quả cho FE:** phải đọc `page_size` **trong response** để tính số trang, không được giả định
+bằng giá trị đã gửi lên. Gửi `page_size=500` mà tính trang theo 500 là sai.
+
+**Đề xuất:** ghi rõ hành vi kẹp vào Contract mục 0.
+
+---
+
+## 8. Route không tồn tại trả 401 khi chưa đăng nhập 🟢
+
+**Contract đang ghi gì:** không đề cập.
+
+**Code đang làm gì:** BE-08 đặt mặc định toàn ứng dụng là phải xác thực, và ràng buộc đó áp cả cho
+request tới route không tồn tại. Nên:
+
+- chưa đăng nhập + route sai → **401 `UNAUTHENTICATED`**
+- đã đăng nhập + route sai → **404 `NOT_FOUND`**
+
+**Đây là chủ ý:** người lạ không dò được route nào có thật.
+
+**Đề xuất:** ghi một dòng vào Contract để FE không nhầm 401 này là "token hỏng" khi thật ra là gõ
+sai URL.
+
+---
+
+## 9. `CLAUDE.md` thiếu `data_source` trong khối enum 🟢
+
+Khối *"Enum — khoá cứng, Contract mục 1"* trong `CLAUDE.md` liệt kê 12 enum nhưng **thiếu
+`data_source`**, dù chính file đó mô tả kỹ `data_source` ở phần Nhánh C.
+
+Contract mục 1 có đủ. Code theo Contract — đã hiện thực đủ cả `data_source`.
+
+**Đề xuất:** thêm một dòng vào `CLAUDE.md`. Không ảnh hưởng code, nhưng người mới đọc `CLAUDE.md`
+sẽ tưởng chỉ có 11 enum.
+
+---
+
+## 10. Contract mục 1 và mục 2.9 mâu thuẫn về `data_source` 🔴
+
+**Mục 1 ghi gì:** *"`data_source` gắn trên `SurveySweep`, `SurveyFrame`, `Fault`,
+`TelemetryReading`, `LuxReading`."* — **`Pole` và `Fixture` không có trong danh sách.**
+
+**Mục 2.9 ghi gì:** *"Đăng ký bộ hiệu chuẩn FO-07 như một `RoadSegment` bình thường với các `Pole`
+và `Fixture` tương ứng, **`data_source = calibration_rig`**"* — **yêu cầu `Pole` và `Fixture` phải
+có trường này.**
+
+Hai mục của cùng một tài liệu nói ngược nhau. `CLAUDE.md` chép lại danh sách của mục 1 nên cũng
+thiếu (xem mục 9).
+
+**Vì sao không thể tránh:** không có `data_source` ở tầng tài sản thì không cách nào tách cột hiệu
+chuẩn khỏi cột thật khi thống kê — mà CV-11, CV-18, IOT-16 đều yêu cầu báo cáo tách riêng, và
+`CLAUDE.md` gọi việc trộn ba nguồn dữ liệu là *"lỗi nghiêm trọng, không phải chi tiết trình bày"*.
+
+**Đã chốt:** mục 2.9 thắng (mới hơn, cụ thể hơn). BE-09 thêm `data_source` vào **`pole`**,
+**`fixture`** và **`road_segment`**. Không thêm vào `feeder` — mạch điện không mang nguồn dữ liệu.
+Contract sẽ **lên v1.2** để bổ sung ba entity này vào danh sách mục 1.
+
+**Cột lưu nhưng KHÔNG emit ra `properties`.** Bộ mock là nguồn chuẩn cho hình dạng response và không
+có trường này, nên FE không phải sửa gì. Xử lý y hệt `road_segment.commune_id`: dùng để **lọc**,
+không xuất hiện trong response. `GET /poles` mặc định loại `data_source = calibration_rig`; muốn xem
+thì thêm query param tường minh.
+
+---
+
+## 11. `commune_id` trên 5 bảng Assets chưa có khoá ngoại 🟡 ✅ ĐÃ CHỐT
+
+**Đã quyết và đã làm.** `AdministrativeUnit` chuyển từ `LuxMap.Modules.Identity` sang
+**`LuxMap.Persistence`**, và cả 5 bảng khai FK thật.
+
+**Vì sao `Persistence` chứ không phải `Shared`:** `Shared` đang là thư viện nhẹ (quy ước
+serialization, contract, enum) và có chỗ dùng nó mà không nên biết gì về EF. Đặt một entity EF vào
+đó thì hoặc `Shared` phải kéo theo EF Core, hoặc entity và cấu hình bị tách hai nơi — cả hai đều tệ
+hơn hiện trạng. `Persistence` đã sở hữu chính cơ chế cần bảng này (`ICommuneScoped`,
+`HasCommuneScope()`, chốt chặn khởi động), và **mọi module đều đã tham chiếu `Persistence`**.
+
+`AdministrativeUnit` không phải khái niệm của Identity — nó là **mốc neo phạm vi** cho 15/16 entity
+toàn hệ. Đây là di chuyển namespace, **không đổi schema**.
+
+**FK khai thật, KHÔNG có navigation property:**
+
+```csharp
+builder.HasCommuneReference(pole => pole.CommuneId);
+// → HasOne<AdministrativeUnit>().WithMany().HasForeignKey(...).OnDelete(Restrict)
+```
+
+Toàn vẹn ở tầng database mà không mở đường cho `pole.Commune.Name` rải khắp module — coupling giữa
+module vẫn chỉ là chuỗi ID. `Restrict`, không bao giờ cascade một đơn vị hành chính.
+
+**Chốt chặn mở rộng:** vế cũ hỏi *"entity implement `ICommuneScoped` đã gọi `HasCommuneScope()`
+chưa"*. Vế mới quét **theo cột**: mọi cột tên `commune_id` không có FK tới `administrative_unit` thì
+**chặn khởi động**. Quét cột chứ không quét interface — bịt luôn lỗ hổng mà XML doc của
+`ICommuneScoped` tự thừa nhận. Đã kiểm bằng cách tạm gỡ FK khỏi `Pole`:
+
+```
+System.InvalidOperationException : Entities have a 'commune_id' column with no foreign key to
+'administrative_unit': Pole. …
+```
+
+`AdministrativeUnit` **không** implement `ICommuneScoped` — lọc chính bảng neo bằng filter toàn cục
+sẽ tạo vòng lặp ngữ nghĩa. Đã ghi vào `CLAUDE.md` để không ai "sửa cho nhất quán".
+
+**Kèm theo — `seed_key` text NULL UNIQUE:** `IdentitySeeder` idempotent theo **tên**, mà tên chính là
+thứ BE-39 sẽ sửa; upsert theo tên sẽ sinh commune **thứ hai** trong khi commune đầu vẫn giữ toàn bộ
+cột. Giờ upsert theo **vai trò**: `study_site` và `calibration_site`. Không thêm `official_code` —
+chưa chọn được địa bàn thì chưa có mã thật, thêm vào là bịa. Đã kiểm: đổi tên thành "Xa Tan Hiep" rồi
+seed lại → tìm thấy theo `seed_key`, không sinh dòng thứ hai.
+
+> BE-39 seed dòng `calibration_site`. Key đã đặt sẵn, chưa tạo dòng vì chưa biết xã nào.
+
+---
+
+## 12. Mock `POLE-0047` mâu thuẫn giữa ba file 🔴 — đã sửa
+
+**Vấn đề:** cùng một cột, ba file nói ba điều khác nhau:
+
+| File | Nói gì |
+|---|---|
+| `mock-poles.geojson` | `fixture_status = out`, `confidence 0.91`, `has_iot_node = false` |
+| `mock-pole-detail.json` | `fixture_status = dim`, `confidence 0.81`, **có** `iot_node = NODE-0047` |
+| `mock-iot-nodes.geojson` | **không tồn tại `NODE-0047`** |
+
+`POLE-0047` chính là cột `mocks/README.md` chỉ định làm case demo runtime suy giảm — BE-39 sẽ không
+seed nổi.
+
+**Đã chốt và đã sửa:** pin yếu làm đèn **mờ dần**, không tắt phụt, nên `dim` là trạng thái đúng.
+
+- `mock-poles.geojson` → `dim` / `0.81` / `has_iot_node = true`
+- `mock-iot-nodes.geojson` → thêm `NODE-0047` (`sampled_fixture`, `SEG-002`, `pole_id: POLE-0047`)
+- Phân bố đổi thành **70 `normal` · 10 `dim` · 16 `out` · 7 `unknown`**, số node thành **12**
+- `mocks/README.md` đã cập nhật theo
+
+Sửa kèm: `SEG-002` có `segment_name` ghi *"duong lien ap"* (liên ấp) nhưng `road_class` là
+`inter_commune` (liên xã) — đổi **tên** cho khớp enum, vì `road_class` đang được FE dùng để lọc và
+vẽ legend, sửa enum đắt hơn nhiều.
+
+> ⚠️ **Contract mục 4 cũng mang những con số này** (*"70 normal / 9 dim / 17 out / 7 unknown"*,
+> *"11 IoT node"*) và giờ đã cũ. Không sửa Contract ở BE-09 — đưa vào cùng lần lên **v1.2**.
+
+**Bất biến vẫn giữ nguyên sau khi sửa:** `status_confidence` null đúng ở 7 cột `unknown`, không lệch
+dòng nào. Bất biến này đã được khoá thành CHECK constraint ở BE-09.
+
+---
+
+## 13. `LPAD` cắt bớt ID khi vượt độ rộng — vi phạm Contract mục 0.3 🔴 ✅ ĐÃ SỬA
+
+**Phát hiện khi làm BE-09, đã sửa trong cùng nhánh.** Lỗi nằm ở helper sinh ID của BE-06, không phải BE-09.
+
+**Contract mục 0.3 ghi gì:**
+
+> *"Khi vượt ngưỡng chữ số, ID dài ra tự nhiên — cột thứ 10000 là `POLE-10000`. Không có cắt bớt,
+> không có tràn số."*
+
+**Code đang làm gì:** `PrefixedIdSpec.DefaultValueSql` sinh ra
+`'POLE-' || LPAD(nextval('pole_id_seq')::text, 4, '0')`.
+
+**Vấn đề:** `lpad(string, length, fill)` của PostgreSQL **CẮT BỚT** khi chuỗi đã dài hơn `length`.
+Nó không trả về chuỗi dài hơn như comment trong code đang khẳng định.
+
+```
+lpad('9999',  4, '0') = '9999'   → POLE-9999
+lpad('10000', 4, '0') = '1000'   → POLE-1000   ← đụng cột thứ 1000
+lpad('10005', 4, '0') = '1000'   → POLE-1000   ← và mọi giá trị 5 chữ số khác
+```
+
+Đo thật trên PostgreSQL 17 trong container BE-02:
+
+| `nextval` | Hiện tại | `to_char(v,'FM0000')` | `LPAD(v, GREATEST(4, LENGTH(v)), '0')` |
+|---|---|---|---|
+| 1 | `POLE-0001` | `POLE-0001` | `POLE-0001` |
+| 9999 | `POLE-9999` | `POLE-9999` | `POLE-9999` |
+| 10000 | **`POLE-1000`** ❌ | `POLE-####` ❌ | `POLE-10000` ✅ |
+| 123456 | **`POLE-1234`** ❌ | `POLE-####` ❌ | `POLE-123456` ✅ |
+
+**Ngưỡng vỡ theo từng entity:**
+
+| Độ rộng | Entity | Vỡ ở hàng thứ |
+|---|---|---|
+| 3 | `SEG` `FDR` `COM` `NODE` `SWP` `EXT` `USR` `CLS` | **1000** |
+| 4 | `POLE` `FIX` `FAULT` `LUX` `WO` `EVD` | **10000** |
+| 6 | `FRM` `DET` | **1000000** |
+
+**`SurveyFrame` là chỗ dễ chạm nhất** — một đợt quét sinh vài trăm khung hình mỗi đêm, 1 triệu frame
+không xa. `SEG` và `FDR` ở 1000 cũng không phải không thể với một dự án mở rộng địa bàn.
+
+**Hư hại:** không ghi dữ liệu sai — lỗi là `23505 duplicate key`, insert hỏng hẳn. Nhưng trong
+transaction thì **một statement lỗi abort cả transaction** (đúng cảnh báo ở `CLAUDE.md`), nên một đợt
+import BE-12 sẽ hỏng trọn gói chứ không hỏng một dòng.
+
+**Vì sao chưa lộ ra:** cả 4 bảng Identity của BE-06 đều chưa tới 1000 hàng. BE-09 chạm phải vì test
+sinh 2500 pole tổng hợp trên một database dev đã có sequence chạy cao.
+
+**Cách sửa — một biểu thức:**
+
+```sql
+LPAD(v::text, GREATEST(<digits>, LENGTH(v::text)), '0')
+```
+
+Cần bọc trong một function SQL nhỏ để `nextval` vẫn chỉ được gọi **đúng một lần** (biểu thức trên
+tham chiếu `v` ba lần, và PostgreSQL không cho subquery trong `DEFAULT`):
+
+```sql
+CREATE FUNCTION luxmap_format_id(prefix text, value bigint, digits int)
+RETURNS text LANGUAGE sql IMMUTABLE AS
+$$ SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text)), '0') $$;
+```
+
+`DEFAULT` thành `luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`.
+
+**Phạm vi sửa:** `PrefixedIdSpec.DefaultValueSql` (một dòng) + một migration đổi `DEFAULT` của **cả
+16 cột ID**. Không đụng dữ liệu đã có — mọi ID hiện tại đều dưới ngưỡng nên không cần backfill.
+
+### Đã sửa — migration `FixPrefixedIdOverflow`
+
+`PrefixedIdSpec.DefaultValueSql` giờ sinh ra `luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`.
+Migration tạo function rồi đổi `DEFAULT` của **cả 6 cột ID đang tồn tại** (`COM` `USR` `SEG` `FDR`
+`POLE` `FIX`); 10 entity chưa tạo sẽ dùng biểu thức mới ngay từ migration đầu của chúng. **Không
+backfill dòng nào** — mọi ID hiện có đều dưới ngưỡng.
+
+Kiểm chứng trên database dựng **thuần từ migration**, không vá tay:
+
+```
+setval('pole_id_seq', 9998); INSERT … ×4
+  POLE-9999
+  POLE-10000     ← trước đây là POLE-1000 → 23505
+  POLE-10001
+  POLE-10002
+```
+
+`PrefixedIdOverflowTests` không còn test nào bị `Skip`: chèn thật qua `DEFAULT` ở đúng ngưỡng vỡ,
+kiểm cột thứ 30000 không đụng cột thứ 3000, và đối chiếu **cả 16 prefix** giữa `PrefixedIdSpec.Format`
+của C# và function của database ở cả hai phía ngưỡng. `Format` dùng `PadLeft` nên phía C# vốn đã
+đúng — chỉ phía SQL lệch.
+
+> Comment cũ trong `PrefixedId.cs` khẳng định ngược lại sự thật — *"LPAD simply returns the longer
+> number ... no truncation and no overflow"* — và chính nó làm người đọc tin là đã an toàn. Đã viết
+> lại kèm lý do vì sao phải dùng function chứ không phải biểu thức thẳng.
+
+---
+
+## 43. `DELETE` và `PUT feeder` cho pole, kèm mã lỗi `ASSET_IN_USE` 🟡
+
+`SELF-SIGNED` 18/09/2026 — Dylan. Chạm bề mặt API (endpoint mới + mã lỗi mới) nên theo FW-00 mục 3
+**KHÔNG ổn định** cho tới khi FW kế tiếp xác nhận.
+
+| | |
+|---|---|
+| `DELETE /api/v1/assets/poles/{pole_id}` | 204 · 404 `ASSET_NOT_FOUND` · 409 `ASSET_IN_USE` · 403 |
+| `PUT /api/v1/assets/poles/{pole_id}/feeder` | Body `{"feeder_id": "FDR-001"}` hoặc `{"feeder_id": null}` → 204 |
+| `ASSET_IN_USE` | 409 — khoá ngoại từ chối xoá |
+
+### Vì sao pole có DELETE mà fixture thì không
+
+Không mâu thuẫn, vì hai thứ khác nhau. `fixture.removed_date` ghi một **sự kiện có thật**: bóng đã
+lắp, rồi được thay. Một dòng `pole` gõ nhầm **chưa bao giờ là cột đèn đứng ngoài đường rồi bị dỡ** —
+đánh dấu nó "đã ngừng dùng" là ghi vào hồ sơ một việc không xảy ra.
+
+Soft-delete cũng thêm một cột mà **mọi truy vấn về sau phải nhớ lọc**, ngược hướng repo đang đi
+(`CommuneWriteGuard`, `HasCommuneReference`, chốt chặn khởi động — đều biến quy-ước-phải-nhớ thành
+ràng-buộc-không-thể-quên).
+
+### Cái gì bảo vệ dữ liệu nghiên cứu
+
+**RESTRICT, không phải một luật trong code.** `fault` và `lux_reading` trỏ vào `pole` bằng `RESTRICT`,
+nên cột nào mang dữ liệu nghiên cứu là DB từ chối, bất kể client gọi thế nào. Kiểm trước trong code
+chỉ là ý kiến thứ hai, và nó **lệch được** khỏi ràng buộc mà nó nhân bản.
+
+⚠️ **Nó từ chối cả ở tầng sâu hơn một bậc, và đây là ca không nhìn ra được từ pole.** `fixture`
+CASCADE từ `pole`, nên lệnh xoá chạm tới bóng đèn — và nếu có `fault` trỏ vào bóng đó thì cascade vấp
+`fk_fault_fixture_fixture_id`, PostgreSQL abort cả câu lệnh. **Cột trông như không ai tham chiếu mà
+vẫn không xoá được.** Vì thế `details` trả về `constraint` và `table` lấy thẳng từ
+`PostgresException` — client không có cách nào khác để biết vì sao.
+
+Đã kiểm chứng bằng bốn phép thử sabotage trên DB thật trước khi viết dòng code nào (T1, T2a, T2b,
+T2c). T2c cho ra lỗi trên bảng **`fixture`**, không phải `pole` — chứng tỏ cascade đã chạy rồi mới
+vấp RESTRICT.
+
+> ⚠️ **GIỚI HẠN ĐÃ BIẾT — cascade `pole → pole_current_status` CHƯA chạy thật.** Nó mới chỉ được xác
+> minh qua khai báo khoá ngoại (`ON DELETE CASCADE` trong `\d pole`). Bảng đang **rỗng** vì chưa có
+> gì ghi vào nó, và BE-12 bị cấm ghi. **Phải quay lại chạy khi BE-15/BE-17 có dữ liệu** — đó là lúc
+> đóng được giới hạn này, không sớm hơn.
+
+### D-10 — feeder khác xã: đã vá MỘT PHẦN
+
+Một helper dùng chung chặn ở **cả** `POST /assets/poles` và `PUT /assets/poles/{id}/feeder`. Trước
+đó chỉ `PUT` có kiểm, `POST` để hở.
+
+🔴 **Đây là kiểm ở TẦNG ỨNG DỤNG, không phải ràng buộc DB.** Đường ghi mới nào quên gọi helper —
+seeder, `psql` gõ tay, một endpoint sau này — là mở lại đúng lỗ hổng đó. Cùng loại với thứ
+`CommuneWriteGuard` sinh ra để thay thế: biến quy-ước-phải-nhớ thành ràng-buộc-không-thể-quên.
+
+**Dạng cuối là khoá ngoại ghép.** Ghi nguyên văn để không mất, cần migration ⇒ **ticket riêng**:
+
+```sql
+CREATE UNIQUE INDEX ux_feeder_id_commune ON feeder (feeder_id, commune_id);
+ALTER TABLE pole ADD CONSTRAINT fk_pole_feeder_same_commune
+  FOREIGN KEY (feeder_id, commune_id) REFERENCES feeder (feeder_id, commune_id);
+```
+
+Áp cùng cách cho `segment_id`.
+
+⚠️ **`segment_id` mang ĐÚNG lỗ hổng đó và CHƯA vá.** `CreatePoleAsync` gọi `RequireAsync<RoadSegment>`
+— chứng minh tuyến tồn tại và nhìn thấy được, không chứng minh cùng xã. Cố ý để nguyên ở ticket này.
+
+### Bỏ qua review của CODEOWNERS
+
+PR này merge **không qua phê duyệt** của `@NTNgoc204` / `@thinh2509` dù nó chạm
+`docs/openapi/luxmap-v1.json`. Quyết định của Dylan 18/09/2026, `SELF-SIGNED`. Cổng CODEOWNERS dựng
+lên chính vì file này là bề mặt WP5/WP6 code theo, nên việc bỏ qua nó **là một phần của mục drift
+này**, không phải chi tiết quy trình bên lề.
+
+### `null` là giá trị, không phải thiếu
+
+`PUT /…/feeder` nhận `null` để ghi nhận "cột này không nằm trên tuyến điện nào" — `solar_all_in_one`
+đúng là như vậy. Thân request giữ trường bằng `JsonElement` để phân biệt **khoá vắng mặt** với
+**`null` tường minh**; khoá vắng mặt là **400**. Đọc khoá thiếu thành `null` sẽ khiến một body rỗng
+hoặc hỏng **âm thầm xoá** mạch điện của cột.
+
+⚠️ **Feeder phải cùng xã với pole, và `CommuneWriteGuard` KHÔNG bắt được.** Guard đọc `commune_id`
+**của chính hàng đang ghi**; xã của pole nằm trong phạm vi nên lệnh ghi đi qua dù feeder thuộc xã
+nào. Người có hai xã có thể nối cột của xã này vào mạch của xã kia. Kiểm ở tầng service là thứ duy
+nhất đứng đó.
+
+> 🔴 **`POST /assets/poles` có ĐÚNG lỗ hổng đó và CHƯA sửa.** `CreatePoleAsync` gọi
+> `RequireAsync<Feeder>` nên feeder phải tồn tại và phải nhìn thấy được, nhưng **không kiểm nó cùng
+> xã với pole**. Ngoài phạm vi ticket này — xem **D-10**.
+
+---
+
+## 42. Ba tên tuyến lệch giữa mock của BE và mock của FE 🟡
+
+Phát hiện 17/09/2026 khi so trực tiếp hai thư mục, không phải suy đoán:
+
+```
+$ diff mocks/mock-segments.geojson  ../luxmap-web/src/data/mock-segments.geo.json
+SEG-001.segment_name: BE='Tuyen A - duong lien xa'  FE='Tuyen A - Tinh lo 8'
+SEG-002.segment_name: BE='Tuyen B - duong lien xa'  FE='Tuyen B - Nguyen Van Ni'
+SEG-003.segment_name: BE='Tuyen C - duong ra cau'   FE='Tuyen C - Huynh Van Co'
+```
+
+Ngoài ba tên này, hai file **khớp hoàn toàn**: cùng 3 feature, cùng bộ `segment_id`, cùng bộ khoá
+`properties`, mọi giá trị khác bằng nhau. `mock-iot-nodes` khớp tuyệt đối (12/12).
+
+**Chưa quyết được bên nào đúng, và đó là lý do nó là drift chứ không phải một bản vá.** FE mang tên
+đường có thật (Tỉnh lộ 8, Nguyễn Văn Ni, Huỳnh Văn Cò); BE mang tên mô tả chung. Không dữ kiện nào
+trong repo phân xử được — cần người biết địa bàn nói.
+
+⚠️ `segment_name` **là cột thật**, `road_segment.segment_name text NOT NULL`, và Contract mục 2.3
+emit nó ra `properties`. Nên đây không phải chuyện trang trí: bên nào thắng thì **BE-39 seed theo bên
+đó**, và màn hình FE sẽ hiện đúng tên ấy.
+
+**Hai mục lệch còn lại của cùng đợt so sánh đã có chủ:** `POLE-0075.open_fault_count` (BE=2, FE=1) và
+`POLE-0076.open_fault_count` (BE=1, FE=0) — đó là **mục 36**, đã sửa phía BE và có test canh
+(`OpenFaultCountTests`). FE cần kéo lại `mock-poles.geo.json`.
+
+---
+
+## 14. ID không còn cố định độ dài — WP5 và WP6 phải sửa 🔴
+
+**Hệ quả của bản sửa ở mục 13**, và là thứ duy nhất trong đó chạm tới FE và mobile.
+
+Contract mục 0.3 vốn đã nói *"ID dài ra tự nhiên"*, nhưng trước đây database làm sai nên trên thực
+tế mọi ID đều đúng N chữ số và không ai va phải. Giờ nó đúng như đặc tả — nghĩa là **`POLE-0001` và
+`POLE-10000` cùng tồn tại**, độ dài khác nhau.
+
+**Ba việc:**
+
+| | Việc | Ai |
+|---|---|---|
+| 1 | **Không bao giờ `ORDER BY pole_id`.** So chuỗi thì `POLE-10000 < POLE-9999`. Sắp theo `created_at` hoặc theo sequence. Lọc theo khoảng trên text cũng sai từ cột thứ 10000 | BE — **kiểm lại khi làm BE-14** |
+| 2 | Regex/validator ID phải nhận độ dài thay đổi: `^POLE-\d{4,}$`, **không phải** `\d{4}` | WP5, WP6 |
+| 3 | Biết rằng định dạng ID là **tối thiểu N chữ số, không phải đúng N** | WP5, WP6 |
+
+Việc 2 và 3 chỉ chạm tới nếu FE/mobile đang validate hoặc parse ID — mà Contract mục 0.3 vốn đã cấm
+parse (*"Client không được phân tích cú pháp ID"*). Nên đây phần lớn là xác nhận lại, không phải
+breaking change. Nhưng **cần báo Ngọc và Khang một dòng** để không ai viết `\d{4}` từ đây về sau.
+
+Việc 1 là của backend và có thật: chưa có code nào sắp theo ID, nhưng BE-14 rất dễ viết vào.
+
+---
+
+## Việc cần quyết trong buổi FW-00
+
+1. **Mục 1, 2, 3 phải chốt trước khi WP5/WP6 code sâu** — cả ba đều là thứ họ sẽ hardcode.
+2. **Mục 6 (mock) phải chốt trước BE-39**, và ai sửa mock thì báo cho WP5/WP6.
+3. Mục 4, 7, 8 chỉ cần ghi vào Contract cho rõ, không đổi code.
+4. Mục 5 cần giao rõ phần tạo tài khoản cho BE-33.
+5. ~~Mục 11~~ — **đã chốt và đã làm**, `AdministrativeUnit` sang `Persistence`, FK khai thật trên cả 5 bảng.
+6. **Mục 10 và 12 gộp vào lần lên Contract v1.2**, rồi báo WP5/WP6 vì bộ mock đã đổi.
+7. ~~Mục 13~~ — **đã sửa**, chỉ cần báo để cả nhóm biết `DEFAULT` của cột ID đã đổi dạng.
+8. **Mục 14 phải báo WP5 và WP6** — một dòng thôi, nhưng phải nói trước khi ai đó hardcode `\d{4}`.
+9. **Mục 15** — BE-11 thêm `UNSUPPORTED_IMAGE_FORMAT` (415). Mục 2 đang đếm 7 mã ngoài Contract, giờ là **8**. Chỉ cần ghi vào Contract, không đổi code.
+10. **Mục 17 — CV-12 PHẢI biết trước.** `GET /lux-readings` trả `nearest_luminance` là `null` cho **mọi** bản ghi cho tới khi BE-15/BE-17 tạo `luminance_history`. Đây **KHÁC** với ngữ nghĩa Contract định nghĩa (*"null nếu không có điểm nào trong ±48 giờ"*): hiện tại null nghĩa là **bảng nguồn chưa tồn tại**, không phải "đã tìm và không thấy". CV-12 không phân biệt được hai ca này qua API. **Nợ có chủ: BE-15/BE-17** nối nguồn thật rồi xoá mục này.
+11. **Mục 18** — mục 2.9 không có bảng `| Trường | Bắt buộc | Ghi chú |` như mục 2.8, nên `pole_id`, `meter_model`, `note`, `client_op_id` đều không rõ. BE-42 chốt `pole_id` và `client_op_id` **bắt buộc**, `meter_model` và `note` tuỳ chọn. Cần ghi vào Contract.
+12. **Mục 19** — `tasks-backend.csv` yêu cầu lưu "người đo", Contract mục 2.9 không có trường nào. BE-42 lấy từ JWT theo đúng khuôn `reported_by` ở mục 2.8 dòng 283 (server áp cứng, client không set được), lưu FK tới `app_user`, **không emit ra response**. Nhiều khả năng Contract thiếu sót chứ không phải cố ý.
+13. **Mục 20** — `GET /lux-readings/poles/{id}` được phân trang dù mục 2.9 chỉ nói "sắp theo `measured_at` tăng dần". Lý do: hiệu chuẩn đo gần hàng ngày, một cột rig sẽ tích hàng trăm điểm và response không giới hạn sẽ phình theo thời gian.
+14. **Mục 21** — `SERVER_OWNED_FIELD` (400) khi client gửi `lux_id` hoặc `commune_id`. Mục 2 đang đếm 8 mã ngoài Contract, giờ là **9**.
+15. **Mục 22** — `pole.external_ref` (`text NULL`, `UNIQUE (commune_id, external_ref) WHERE external_ref IS NOT NULL`). Lưu mã kiểm kê của đơn vị quản lý. Ba lý do: nối lại được giữa các đợt nhập; là **khoá tự nhiên duy nhất** khiến import idempotent (lược đồ hiện tại không có cái nào, nên nạp lại cùng file sinh trùng toàn bộ); và tổ sửa chữa ngoài hiện trường đọc mã sơn trên cột chứ không đọc `POLE-0042`. **Không emit ra API** — thêm vào response là đổi hình dạng đã publish. Migration thuộc **BE-12**.
+16. **Mục 23 — chặn RQ2, cần quyết sớm.** `mock-poles.geojson` không có `feeder_id`, nên nạp bộ mock FO-26 cho ra **103 cột không gắn tuyến điện nào**. CV-15 gom cụm theo **mạch điện** (một cầu chì nhảy lan theo feeder, không lan theo đường), và BE-13 tồn tại để trả lời *"mọi cột trên feeder X"* — cả hai đều trả rỗng. Hai đường: bổ sung `feeder_id` vào mock (phải báo WP5/WP6 vì FE đã code theo bộ mock), hoặc gán thủ công sau khi nạp và **ghi lại cách gán** để kết quả gom cụm tái lập được. Cột `solar_all_in_one` đúng là không có feeder — đừng gán bừa cho đủ.
+17. **Mục 24 — cột thứ hai cùng lỗi `NaN`, CHƯA sửa.** `pole_current_status.status_confidence` nhận `NaN`, `Infinity`, và **cả giá trị ngoài `0..1`** — đã chèn thật `42.5` và nó vào bảng. CHECK duy nhất trên cột đó chỉ ràng buộc NULL-hay-không so với `fixture_status`; XML doc ghi *"0..1"* mà **không có gì thực thi**. Quyền ghi bảng thuộc **BE-15/BE-17** nên bản sửa thuộc về đó. `fault.status_confidence` của BE-18 **không lặp lại lỗi này** — đã có CHECK đủ.
+18. **Mục 25** — `POST /faults` cho `pole_id` null, nhưng `Fault` phải `ICommuneScoped` nên `commune_id` NOT NULL. `administrative_unit` **không có cột geometry** (cố ý — nhánh C không có ranh giới thật), nên không suy được từ `location`. BE-18 chốt: có pole thì tra từ pole; không có pole thì lấy từ scope JWT, user nhiều commune phải chọn. Cần ghi vào mục 2.8.
+19. **Mục 26** — không tạo `FaultHistory`; ghi vết là các cột `reported_by`/`confirmed_by`+`at`/`resolved_by`+`at` trên chính bảng `fault`. Chỉ giữ quyết định **mới nhất**, không giữ chuỗi. **Nếu BE-19 cần đủ chuỗi thì đó là việc của BE-19.**
+20. **Mục 27** — Contract liệt kê 6 `fault_status` và không nói cái nào là "mở", trong khi `open_fault_count` (mục 2.1), BE-28 và BE-40 đều cần. BE-18 chốt `detected | confirmed | in_progress`, đặt ở `FaultStatusSets.Open`. Cần ghi vào Contract.
+21. **Mục 28 — `mock-faults.json` lệch mục 2.4 mười chỗ.** Thiếu `fixture_id`, `data_source`, `status_confidence`, `updated_at`, `work_order_id`, `note`, `reported_by`; thừa `confirmed_by`, `confirmed_at`; và `cluster_id` dùng **`CLU-0001`** trong khi mục 0.2 chốt **`CLS`**. Mục 6 mới ghi lỗi `CLU` ở `mock-work-orders.json`, **thiếu file này**. FE đã code theo mock — phải báo WP5/WP6.
+22. **Mục 29 — vì sao KHÔNG dùng `/poles`.** Contract mục 2.1 đã đặc tả `GET /poles` là endpoint bản đồ: `bbox` bắt buộc, `FeatureCollection`, 413 quá 2000 cột. Đó là của **BE-14**. Danh sách kiểm kê trả lời cùng đường dẫn sẽ chiếm mất chỗ, nên BE-12a đi đường riêng `/assets/…`. Cần một mục Contract mới, **đừng gộp vào 2.1**.
+23. **Mục 30 — vì sao 200 chứ không phải 4xx.** Kiểm toàn bộ file trước rồi ghi tập hợp lệ trong một transaction, nên "10 hỏng trong 500, 490 đã ghi" là **thành công một phần thật**, không phải lỗi của request; bọc trong `{error:…}` là nói sai về 490 dòng kia. Tiền lệ có sẵn: `POST /lux-readings` trùng `client_op_id` trả **200** và mục 5.8 gọi đó là hành vi bình thường. **207 đã cân nhắc và loại** — không có trong Contract, không có trong repo. `rows[]` là **mảng** vì dictionary không cam kết thứ tự và khoá số dạng chuỗi cho `"10"` đứng trước `"9"`; cắt ở 100, `total_errors` vẫn đủ.
+24. **Mục 31 — chỗ hở nghiêm trọng nhất của nhóm này.** Mục 7 có bảng phạm vi địa bàn của 4 vai trò và 5 quy tắc lọc, **không một chữ nào** về vai trò nào được ghi. BE-12a chốt: **Quản trị** ghi, ba vai trò kia chỉ đọc. Đây là lần đầu 4 policy của BE-08 chạm dòng sản xuất, nên nó **tạo tiền lệ** cho BE-15, BE-18, BE-21, BE-24. Phải chốt cả nhóm ở FW-00, đừng để mỗi ticket tự quyết. ⚠️ Kèm một cái bẫy phải ghi vào Contract luôn: **policy là MỘT vai trò chính xác, không phải một bậc** — gắn `maintenance_engineer` lên endpoint đọc sẽ chặn luôn Quản trị và Cơ quan quản lý.
+25. **Mục 32** — mục 22 trước đây chỉ đăng ký `pole.external_ref`. BE-12a mở lên ba bảng, vì `poles.csv` phải trỏ tuyến và mạch điện bằng mã của đơn vị quản lý: `SEG-001` do DB sinh lúc INSERT nên người soạn file không biết trước, và nếu template đòi mã đó thì bộ bốn file không nạp được liền mạch. `fixture` cố ý KHÔNG có — một cột mang nhiều bóng, không mã nào chỉ đúng một lần lắp đặt, nên nhập bóng là insert-only.
+26. **Mục 33** — `ASSET_NOT_FOUND` (404, gộp cả "không tồn tại" lẫn "ngoài phạm vi" đúng như mục 7 đòi) và `EXTERNAL_REF_TAKEN` (409). Mục 2 nay đếm **11** mã ngoài Contract.
+27. **Mục 34 — có hạn dùng.** `GET /assets/{segments,feeders,poles}` trả `PagedResult<string>` chỉ gồm ID. Đó là **chỗ giữ chỗ**, không phải thiết kế: BE-12a sở hữu request và phân quyền, còn hình dạng khi đọc là **BE-12b** đang chờ Thịnh/Ngọc. Công bố một hình dạng đoán bây giờ thì FE sẽ bám vào, và gỡ ra khó hơn nhiều so với công bố muộn.
+### 🔴 Năm mục dưới đây cần WP5 (Thịnh/Ngọc) xem TRƯỚC khi BE-12b bắt đầu
+
+Không phải để duyệt lại quyết định của BE-12a, mà vì BE-12b sẽ xây lên trên chúng và sửa sau thì đắt.
+
+| Mục | Cần gì ở FW-00 |
+|---|---|
+| **31 — vai trò nào được ghi** | **Chốt một lần cho CẢ NHÓM** BE-12a / BE-15 / BE-17 / BE-18 / BE-21 / BE-24. BE-12a là ticket đầu tiên chạm 4 policy của BE-08 nên nó **tạo tiền lệ**; sáu ticket tự chọn riêng sẽ ra sáu ma trận quyền khác nhau mà không ai giải thích được. **Xem mục 31b ngay dưới — câu hỏi kèm chi phí, không phải câu hỏi trần.** |
+| **29 — nhóm `/api/v1/assets/…`** | Đường dẫn mới, FE cần biết nó tồn tại và **không** phải `/poles` (chỗ đó là của BE-14, mục 2.1). |
+| **30 — hình dạng kết quả import** | Trả 200 kèm `{inserted, updated, failed, total_errors, truncated, rows[]}`. FE cần hình dạng này để dựng màn hình nhập liệu. |
+| **40 — OpenAPI spec chỉ phủ 4 endpoint `/auth`** | 🔴 **Ưu tiên ngang mục 38 (`work_order`).** Đây **không còn là nợ tài liệu** mà là **nguồn lệch trực tiếp giữa BE và mobile**: FM-04 sinh DTO Kotlin **từ file này**, nên WP6 hiện **không có DTO nào** cho `/faults`, `/poles`, `/segments` — phải đọc Contract bằng mắt rồi **gõ tay** từng trường. Mỗi lần gõ tay là một cơ hội lệch, và không có gì đối chiếu lại. Cần chốt: ai chạy lại export, mốc nào, và có đưa vào CI không (`backend-report.md:583` ghi hiện **không có gì tự động phát hiện spec đã cũ**). |
+| **38 — `work_order_id` chưa có chỗ chứa** | Contract mục 2.4 hứa trường này; `fault` không có cột, bảng `work_order` = 0 bảng. Đã quyết emit `null` (**C**), nhưng lược đồ work order vẫn cần lịch — nợ mang tên **BE-21**. |
+
+#### 31b — Bốn policy của BE-08 là EXACT-ROLE hay HIERARCHY? Tiền lệ đã tạo rồi.
+
+BE-12a **đã cài đặt xong theo EXACT-ROLE**, nên FW-00 không còn chọn trên giấy trắng: nó xác nhận
+hoặc bắt sửa. Đưa lên bàn kèm chi phí của từng đáp án.
+
+**Hiện trạng — EXACT-ROLE.** `AuthorizationSetup.RolePolicy` dựng mỗi policy bằng
+`RequireClaim(role, "<đúng một giá trị>")`. Nên:
+
+| Endpoint | Ai vào được |
+|---|---|
+| `POST/PUT /assets/*`, `POST /assets/import/*` (`Administrator`) | **chỉ** Quản trị |
+| `GET /assets/*` (không gắn policy) | **cả bốn** vai trò đã đăng nhập |
+
+⚠️ Hệ quả **phản trực giác** phải ghi vào Contract dù chọn hướng nào: gắn
+`maintenance_engineer` lên một endpoint ĐỌC sẽ **chặn luôn Quản trị và Cơ quan quản lý**, vì policy
+là một giá trị claim chứ không phải một ngưỡng. Trông như siết bảo mật, thực chất là chặn hai vai trò
+khỏi dữ liệu của chính họ. Đã canh bằng test
+`The_managing_authority_MAY_read_which_proves_reads_carry_no_role_policy`.
+
+**Chi phí nếu FW-00 xác nhận EXACT-ROLE:** 0. Không sửa gì.
+
+**Chi phí nếu FW-00 chọn HIERARCHY** (Quản trị ⊇ Cơ quan quản lý ⊇ Kỹ sư ⊇ Tổ khảo sát):
+
+| Phải sửa | Quy mô |
+|---|---|
+| `AuthorizationSetup.RolePolicy` — đổi `RequireClaim` thành `RequireAssertion` so theo bậc | **1 hàm**, ~10 dòng |
+| `LuxMapPolicies` — thêm khái niệm thứ bậc | **1 file**, ~15 dòng |
+| `[Authorize(Policy = …)]` ở dòng sản xuất | **6 dòng**, 2 file, cả 6 đều là `Administrator` — bậc cao nhất nên **không dòng nào đổi nghĩa** |
+| Test khẳng định exact-role | **4 assertion** trong `AssetPermissionTests` |
+| `ScopeTestController` | 2 dòng, chỉ trong test |
+
+**Tổng: khoảng 30 dòng, 4 file.** Rẻ, và rẻ **chính vì** BE-12a chỉ dùng bậc cao nhất
+(`Administrator`) cho ghi và không gắn gì cho đọc — không có endpoint nào phụ thuộc vào việc một vai
+trò GIỮA bị loại. Ticket sau mà gắn `maintenance_engineer` hay `field_crew` vào dòng sản xuất thì chi
+phí đổi hướng bắt đầu tăng thật.
+
+**Vì vậy nên chốt TRƯỚC BE-15/BE-18/BE-21/BE-24**, không phải trước BE-12a.
+
+#### 35b — `GET /faults?pole_id=` : dữ kiện để Ngọc quyết
+
+**Contract mục 2.4 liệt kê ĐÚNG 11 query param**, chép nguyên văn:
+
+```
+bbox, status, severity, fault_type, source_channel, data_source,
+segment_id, cluster_id, sort, page, page_size
+```
+
+**Không có `pole_id`.** Nên thêm nó là **mở rộng bề mặt API đã publish**, không phải sửa lỗi — đó là
+lý do phần B chờ duyệt chứ không tự làm.
+
+Ba dữ kiện đã kiểm, để câu hỏi không phải câu hỏi trần:
+
+1. **Lọc được `segment_id` nhưng không lọc được `pole_id`** là bất đối xứng nằm trong chính mục 2.4:
+   `fault` có cả hai cột, và cả hai đều đã có index (`ix_fault_pole_id`, `ix_fault_segment_id`).
+   Không có rào cản kỹ thuật nào.
+2. **Mục 2.2 `GET /poles/{id}` đã trả `open_faults[]`**, nên màn chi tiết cột **không cần** param này.
+   Ai cần nó là người muốn danh sách phân trang của một cột — chưa rõ màn hình nào.
+3. Thêm param là **cộng thêm**, không phá gì: client cũ không gửi thì hành vi không đổi.
+
+**Câu hỏi cho Ngọc:** có màn hình nào cần lọc fault theo một cột mà mục 2.2 chưa phục vụ không? Có →
+thêm vào mục 2.4 rồi mới hiện thực. Không → đóng mục 35, và ghi rõ trong Contract rằng lọc theo cột
+đi qua mục 2.2.
+
+#### 36b — `open_fault_count`: bị CHẶN bởi mục 27, không sửa lẻ được
+
+`mock-poles.geojson` lệch `mock-faults.json` ở **đúng hai cột**:
+
+| Cột | `open_fault_count` khai | fault mở thật | Ghi chú |
+|---|---|---|---|
+| `POLE-0075` | 1 | **2** — `FAULT-0016` (`lamp_dim`, cv) + `FAULT-0028` (`runtime_decline`, iot) | Hai fault này **cố ý**: CLAUDE.md ghi *"Một cột có thể mang cả hai cùng lúc"*. **Con đếm sai, không phải fault sai.** |
+| `POLE-0076` | 0 | **1** — `FAULT-0027` (`runtime_decline`, iot) | Cột mang `fixture_status = normal`, và điều đó **hợp lý**: runtime suy giảm do IoT phát hiện, đèn vẫn sáng bình thường trên ảnh đêm |
+
+Tổng: `open_fault_count` cộng lại **26**, số fault mở **28**. Chênh đúng 2.
+
+⚠️ **`open_fault_count` KHÔNG nằm trong mục "Những gì đã cố ý cài sẵn"** của `mocks/README.md` —
+mục đó chỉ liệt kê 5 thứ (phân bố status 103 cột, cụm `SEG-003`, 12 node, `POLE-0047`, sparse IoT).
+Nên đây là **lỗi thật**, không phải fixture cố ý.
+
+🔴 **Nhưng không sửa được trước mục 27.** Tính lại `open_fault_count` đòi định nghĩa "fault MỞ", mà
+mục 27 ghi rõ Contract **không định nghĩa** nó; BE-18 chốt `detected | confirmed | in_progress` ở
+`FaultStatusSets.Open` nhưng đó là quyết định nội bộ chưa được duyệt. Chốt sai thì phải đếm lại lần
+nữa.
+
+**Thứ tự bắt buộc: chốt mục 27 → tính lại `open_fault_count` cho CẢ 103 cột**, không chỉ hai chỗ đã
+biết. Sửa lẻ hai cột sẽ để 101 cột còn lại không ai kiểm.
+
+**Mục 34 thì khác** — nó không cần duyệt, nó cần **hết hạn**. `GET /assets/*` đang trả danh sách ID
+là chỗ giữ chỗ; **xoá mục 34 là một tiêu chí nghiệm thu của BE-12b**.
+
+28. **Mục 16 — ràng buộc phiên bản, KHÔNG phải chi tiết triển khai.** ImageSharp bị ghim ở 3.x vì từ 4.x task validate lúc build đòi `SixLaborsLicenseKey`, và `ContinueOnError` chỉ bật ở Debug → **mọi build Release, CI và deploy sẽ GÃY**. Điều khoản Split License không đổi, chỉ khác cái cổng kiểm key. Ai nâng cấp phải **xin key TRƯỚC**, không phải sau khi thấy build đỏ.
+
+Sau khi chốt, Contract tăng version và **cập nhật lại `docs/openapi/luxmap-v1.json`** bằng lệnh
+export ở `README.md` để WP6 sinh lại DTO.

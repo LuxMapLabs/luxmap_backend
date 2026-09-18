@@ -45,9 +45,10 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
     /// database and deletes every row it created, so keeping the values would let a handful of test
     /// runs push the sequence arbitrarily high for no reason.
     /// <para>
-    /// ⚠️ It does NOT address the <c>LPAD</c> truncation defect in BE-06 — see
-    /// <c>PrefixedIdOverflowTests</c>. That bug is about production reaching the 10000th pole and is
-    /// still entirely live.
+    /// It has nothing to do with the old <c>LPAD</c> truncation defect of BE-06, which was fixed in
+    /// <c>FixPrefixedIdOverflow</c> (commit <c>8ea9930</c>) and is pinned by
+    /// <c>PrefixedIdOverflowTests</c>; resetting the sequence here is only hygiene for the shared
+    /// development database.
     /// </para>
     /// </remarks>
     private (long Value, bool IsCalled) poleSequence;

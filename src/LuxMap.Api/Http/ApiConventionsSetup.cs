@@ -125,7 +125,13 @@ public static class ApiPipelineSetup
             // BE-08 — ASP.NET Core returns an EMPTY BODY for 401/403; the Contract demands one shape
             // for every response, so they are rebuilt here.
             401 => (ErrorCodes.Unauthenticated, "Authentication required."),
-            403 => (ErrorCodes.CommuneForbidden, "You do not have access to this resource."),
+
+            // The authorization middleware recorded which kind of refusal this was (D-4); with no
+            // record the territorial code stays, as before.
+            403 => (
+                context.HttpContext.Items[Authorization.ForbiddenCodeResultHandler.ItemKey] as string
+                    ?? ErrorCodes.CommuneForbidden,
+                "You do not have access to this resource."),
             404 => ("NOT_FOUND", "Resource not found."),
             405 => ("METHOD_NOT_ALLOWED", "That method is not supported on this path."),
             415 => (ErrorCodes.UnsupportedMediaType, "Unsupported Content-Type."),

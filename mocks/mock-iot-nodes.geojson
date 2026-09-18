@@ -12,7 +12,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0001",
+    "node_id": "NODE-001",
     "node_role": "segment_controller",
     "segment_id": "SEG-001",
     "pole_id": null,
@@ -31,7 +31,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0002",
+    "node_id": "NODE-002",
     "node_role": "segment_controller",
     "segment_id": "SEG-002",
     "pole_id": null,
@@ -50,7 +50,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0003",
+    "node_id": "NODE-003",
     "node_role": "segment_controller",
     "segment_id": "SEG-003",
     "pole_id": null,
@@ -69,7 +69,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0039",
+    "node_id": "NODE-039",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-001",
     "pole_id": "POLE-0039",
@@ -88,7 +88,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0076",
+    "node_id": "NODE-076",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-002",
     "pole_id": "POLE-0076",
@@ -107,7 +107,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0075",
+    "node_id": "NODE-075",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-002",
     "pole_id": "POLE-0075",
@@ -126,7 +126,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0085",
+    "node_id": "NODE-085",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-003",
     "pole_id": "POLE-0085",
@@ -145,7 +145,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0063",
+    "node_id": "NODE-063",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-002",
     "pole_id": "POLE-0063",
@@ -164,7 +164,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0020",
+    "node_id": "NODE-020",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-001",
     "pole_id": "POLE-0020",
@@ -183,7 +183,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0058",
+    "node_id": "NODE-058",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-002",
     "pole_id": "POLE-0058",
@@ -202,7 +202,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0069",
+    "node_id": "NODE-069",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-002",
     "pole_id": "POLE-0069",
@@ -221,7 +221,7 @@
     ]
    },
    "properties": {
-    "node_id": "NODE-0047",
+    "node_id": "NODE-047",
     "node_role": "sampled_fixture",
     "segment_id": "SEG-002",
     "pole_id": "POLE-0047",

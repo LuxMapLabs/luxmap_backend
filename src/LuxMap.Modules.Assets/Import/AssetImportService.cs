@@ -243,10 +243,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     private async Task<WritePlan> PlanPolesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<Pole>(readers, pole => pole.ExternalRef, cancellationToken);
-        var segments = await ReferenceIndexAsync<RoadSegment>(
-            readers, "segment_external_ref", segment => segment.ExternalRef, cancellationToken);
-        var feeders = await ReferenceIndexAsync<Feeder>(
-            readers, "feeder_external_ref", feeder => feeder.ExternalRef, cancellationToken);
+        var segments = await ReferenceIndexAsync<RoadSegment>(readers, "segment_external_ref", cancellationToken);
+        var feeders = await ReferenceIndexAsync<Feeder>(readers, "feeder_external_ref", cancellationToken);
 
         int inserted = 0, updated = 0;
 
@@ -263,6 +261,20 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             // Nullable on purpose: a solar_all_in_one pole is connected to no circuit at all.
             var feeder = Resolve(reader, feeders, "feeder_external_ref", required: false);
 
+            // The feeder must sit in the pole's own commune (BE-REVIEW-02, F-01). CommuneWriteGuard
+            // cannot see this — it checks the commune of the row being written, which is in scope —
+            // and the CRUD paths already refuse it through RequireFeederInCommuneAsync. This is the
+            // third write path, and it had the hole open. The SEGMENT is deliberately NOT checked:
+            // road_class = inter_commune means a road running BETWEEN communes, so a pole in another
+            // commune than its segment's owner is legitimate (CLAUDE.md, BE-12a rule 6).
+            if (feeder is not null && communeId is not null
+                && !string.Equals(feeder.CommuneId, communeId, StringComparison.Ordinal))
+            {
+                reader.Fail(
+                    "feeder_external_ref",
+                    $"'{reader.Optional("feeder_external_ref")}' belongs to commune '{feeder.CommuneId}', not to the pole's commune '{communeId}'.");
+            }
+
             if (!reader.IsValid)
             {
                 continue;
@@ -270,8 +282,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
 
             if (existing.TryGetValue((communeId!, externalRef!), out var pole))
             {
-                pole.SegmentId = segment!;
-                pole.FeederId = feeder;
+                pole.SegmentId = segment!.Id;
+                pole.FeederId = feeder?.Id;
                 pole.Geom = geometry!;
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
@@ -283,8 +295,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             var created = new Pole
             {
                 ExternalRef = externalRef,
-                SegmentId = segment!,
-                FeederId = feeder,
+                SegmentId = segment!.Id,
+                FeederId = feeder?.Id,
                 CommuneId = communeId!,
                 Geom = geometry!,
                 NearSensitivePoi = nearPoi,
@@ -306,20 +318,22 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     /// <remarks>
     /// There is no natural key to upsert on. A pole carries several lamps over its life and the
     /// history is the point, so nothing in the file identifies a particular installation. Re-running
-    /// a fixtures file therefore reports one error per row rather than silently doubling the
-    /// equipment history. Replacing a lamp goes through CRUD, which can say which row it means.
+    /// a fixtures file therefore reports one error per ACTIVE row rather than silently doubling the
+    /// equipment history (D-11: one lamp in service per pole). Replacing a lamp goes through CRUD,
+    /// which can say which row it means.
     /// </remarks>
     private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
-        var poles = await ReferenceIndexAsync<Pole>(
-            readers, "pole_external_ref", pole => pole.ExternalRef, cancellationToken);
+        var poles = await ReferenceIndexAsync<Pole>(readers, "pole_external_ref", cancellationToken);
 
-        var occupied = await OccupiedPolesAsync(poles.Values.SelectMany(ids => ids).ToArray(), cancellationToken);
+        var occupied = await OccupiedPolesAsync(
+            poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray(), cancellationToken);
         var inserted = 0;
 
         foreach (var reader in readers)
         {
-            var poleId = Resolve(reader, poles, "pole_external_ref", required: true);
+            var pole = Resolve(reader, poles, "pole_external_ref", required: true);
+            var poleId = pole?.Id;
             var fixtureType = reader.RequiredEnum<FixtureType>("fixture_type");
             var powerSource = reader.RequiredEnum<PowerSource>("power_source");
             var watt = reader.RequiredInt("lamp_watt");
@@ -328,12 +342,21 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             var warranty = reader.Date("warranty_expiry", required: false);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
 
-            if (poleId is not null && !occupied.Add(poleId))
+            // One lamp in service per pole (BE-REVIEW-02, D-11). A row with removed_date is history
+            // and neither occupies the pole nor is refused by an active lamp already there; only an
+            // ACTIVE row can collide, whether the other one is in the database or earlier in this file.
+            if (installDate is not null && removedDate is not null && removedDate < installDate)
+            {
+                reader.Fail("removed_date", $"'{removedDate:yyyy-MM-dd}' is before install_date '{installDate:yyyy-MM-dd}'.");
+            }
+
+            if (poleId is not null && removedDate is null && !occupied.Add(poleId))
             {
                 reader.Fail(
                     "pole_external_ref",
-                    "That pole already carries a fixture. Import creates equipment records, it never "
-                    + "replaces them — use the fixtures endpoint to record a lamp change.");
+                    "That pole already carries a lamp in service. Import creates equipment records, it "
+                    + "never replaces them — retire the current lamp (PUT /assets/fixtures/{id}/removal) "
+                    + "before recording its replacement.");
             }
 
             if (!reader.IsValid)
@@ -343,16 +366,12 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
 
             // Copied from the pole, never read from the file. A fixture is always in the commune of
             // the pole carrying it, and letting the file say otherwise would let the two drift with
-            // nothing to detect it.
-            var commune = await dbContext.Set<Pole>().AsNoTracking()
-                .Where(pole => pole.PoleId == poleId)
-                .Select(pole => pole.CommuneId)
-                .SingleAsync(cancellationToken);
-
+            // nothing to detect it. The reference index already carries the commune (BE-REVIEW-02,
+            // F-03): this used to be one extra query per row.
             dbContext.Set<Fixture>().Add(new Fixture
             {
                 PoleId = poleId!,
-                CommuneId = commune,
+                CommuneId = pole!.CommuneId,
                 FixtureType = fixtureType,
                 PowerSource = powerSource,
                 LampWatt = watt,
@@ -428,9 +447,12 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         return rows.ToDictionary(row => (row.CommuneId, externalRef(row)!), StringTupleComparer.Instance);
     }
 
+    /// <summary>A row another file refers to by <c>external_ref</c>: its id and the commune it sits in.</summary>
+    private sealed record ReferencedAsset(string Id, string CommuneId);
+
     /// <summary>
-    /// Maps each referenced <c>external_ref</c> to the ids that carry it, across everything the caller
-    /// can see.
+    /// Maps each referenced <c>external_ref</c> to the rows that carry it, across everything the
+    /// caller can see — id AND commune, because a reference across communes is a row error.
     /// </summary>
     /// <remarks>
     /// A list rather than a single id because <c>external_ref</c> is unique per COMMUNE, not globally.
@@ -438,12 +460,11 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     /// guessing between them would attach poles to the wrong road; <see cref="Resolve"/> reports the
     /// ambiguity instead.
     /// </remarks>
-    private async Task<Dictionary<string, List<string>>> ReferenceIndexAsync<TEntity>(
+    private async Task<Dictionary<string, List<ReferencedAsset>>> ReferenceIndexAsync<TEntity>(
         List<ImportRowReader> readers,
         string column,
-        Func<TEntity, string?> externalRef,
         CancellationToken cancellationToken)
-        where TEntity : class, IExternallyReferenced
+        where TEntity : class, ICommuneScoped, IExternallyReferenced
     {
         var wanted = readers.Select(reader => reader.Row[column])
             .Where(value => value is not null)
@@ -455,28 +476,31 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             return [];
         }
 
+        // Three columns, not the whole row: a pole's geometry is the widest thing on the table and
+        // nothing here reads it. The primary key is reached by name because the three asset types
+        // share no base type (same reasoning as AssetCrudService.ListAsync).
+        var key = dbContext.Model.FindEntityType(typeof(TEntity))!.FindPrimaryKey()!.Properties.Single().Name;
+
         var rows = await dbContext.Set<TEntity>().AsNoTracking()
             .Where(entity => entity.ExternalRef != null && wanted.Contains(entity.ExternalRef))
+            .Select(entity => new
+            {
+                Ref = entity.ExternalRef!,
+                Id = EF.Property<string>(entity, key),
+                entity.CommuneId,
+            })
             .ToListAsync(cancellationToken);
 
         return rows
-            .GroupBy(row => externalRef(row)!, StringComparer.Ordinal)
+            .GroupBy(row => row.Ref, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => group.Select(KeyOf).ToList(),
+                group => group.Select(row => new ReferencedAsset(row.Id, row.CommuneId)).ToList(),
                 StringComparer.Ordinal);
     }
 
-    private static string KeyOf<TEntity>(TEntity entity) => entity switch
-    {
-        RoadSegment segment => segment.SegmentId,
-        Feeder feeder => feeder.FeederId,
-        Pole pole => pole.PoleId,
-        _ => throw new NotSupportedException($"{typeof(TEntity).Name} is not referenced by external_ref."),
-    };
-
-    private static string? Resolve(
-        ImportRowReader reader, Dictionary<string, List<string>> index, string column, bool required)
+    private static ReferencedAsset? Resolve(
+        ImportRowReader reader, Dictionary<string, List<ReferencedAsset>> index, string column, bool required)
     {
         var value = required ? reader.Required(column) : reader.Optional(column);
         if (value is null)
@@ -506,8 +530,9 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             return new HashSet<string>(StringComparer.Ordinal);
         }
 
+        // Only lamps still in service occupy a pole; a retired one leaves room for its replacement.
         var occupied = await dbContext.Set<Fixture>().AsNoTracking()
-            .Where(fixture => poleIds.Contains(fixture.PoleId))
+            .Where(fixture => poleIds.Contains(fixture.PoleId) && fixture.RemovedDate == null)
             .Select(fixture => fixture.PoleId)
             .Distinct()
             .ToListAsync(cancellationToken);

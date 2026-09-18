@@ -143,7 +143,7 @@ cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bu
 | Tình huống | HTTP | `error.code` |
 |---|---|---|
 | Thiếu / sai / hết hạn token, sai `iss`, sai `aud` | 401 | `UNAUTHENTICATED` |
-| Sai vai trò | 403 | `COMMUNE_FORBIDDEN` |
+| Sai vai trò | 403 | `ROLE_FORBIDDEN` (BE-REVIEW-02 D-4; trước đó là `COMMUNE_FORBIDDEN`) |
 | `commune_id` ngoài phạm vi | 403 | `COMMUNE_FORBIDDEN` |
 | `["*"]` lệch vai trò | 403 | `COMMUNE_FORBIDDEN` |
 | Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` |

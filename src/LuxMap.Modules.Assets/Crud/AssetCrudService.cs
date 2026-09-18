@@ -16,10 +16,10 @@ namespace LuxMap.Modules.Assets.Crud;
 /// Asset CRUD (BE-12a) — the write half of asset management, plus a listing that returns ids only.
 /// </summary>
 /// <remarks>
-/// ⚠️ <b>No delete.</b> Removing a pole cascades into <c>pole_current_status</c>, a table BE-12 must
-/// never touch, and <c>fault</c> and <c>lux_reading</c> both point at poles with <c>Restrict</c>, so
-/// any pole carrying research data could not be deleted anyway. Retiring equipment is what
-/// <c>fixture.removed_date</c> is for.
+/// <b>Poles are the one asset with a DELETE</b> (BE-12, drift 43); fixtures have none. A pole row typed
+/// in by mistake was never a pole that stood and was taken down, so deleting it records nothing false,
+/// and the foreign keys — <c>fault</c> and <c>lux_reading</c> hold it with <c>Restrict</c> — decide
+/// whether it may go. Retiring a lamp is a real event, which is what <c>fixture.removed_date</c> is for.
 /// </remarks>
 public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor)
 {
@@ -106,6 +106,19 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == request.PoleId, "pole", ct);
 
+        // At most ONE lamp in service per pole (BE-REVIEW-02, D-11). A row that arrives already
+        // retired is history and may coexist with the active one. The friendly check is here; the
+        // partial unique index ux_fixture_pole_id_active is the guard that cannot be raced past —
+        // see the catch around SaveChanges below.
+        if (request.RemovedDate is null)
+        {
+            await RejectActiveFixtureAsync(pole.PoleId, ct);
+        }
+        else
+        {
+            RequireRemovedAfterInstall(request.RemovedDate.Value, request.InstallDate!.Value);
+        }
+
         var fixture = new Fixture
         {
             PoleId = pole.PoleId,
@@ -125,7 +138,18 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         };
 
         dbContext.Set<Fixture>().Add(fixture);
-        await dbContext.SaveChangesAsync(ct);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (IsActiveFixtureCollision(failure))
+        {
+            // Two requests passed the check above at the same time; the index settled it.
+            dbContext.ChangeTracker.Clear();
+            throw ActiveFixtureConflict(pole.PoleId);
+        }
+
         return fixture.FixtureId;
     }
 
@@ -210,9 +234,25 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     }
 
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
+    /// <remarks>
+    /// Once only, and never before the lamp was installed (BE-REVIEW-02, Q-4). A second retirement
+    /// would silently rewrite a date that is part of the equipment history; the database CHECK
+    /// <c>ck_fixture_removed_after_install</c> stands behind the ordering rule for every other writer.
+    /// </remarks>
     public async Task RetireFixtureAsync(string fixtureId, DateOnly removedDate, CancellationToken ct)
     {
         var fixture = await RequireAsync<Fixture>(candidate => candidate.FixtureId == fixtureId, "fixture", ct);
+
+        if (fixture.RemovedDate is { } already)
+        {
+            throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                HttpStatusCode.BadRequest,
+                "That lamp is already retired; its removed_date is part of the equipment history and is not rewritten.",
+                new Dictionary<string, object?> { ["removed_date"] = already.ToString("yyyy-MM-dd") });
+        }
+
+        RequireRemovedAfterInstall(removedDate, fixture.InstallDate);
 
         fixture.RemovedDate = removedDate;
         fixture.UpdatedAt = DateTime.UtcNow;
@@ -323,9 +363,12 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
 
         if (!string.Equals(feeder.CommuneId, communeId, StringComparison.Ordinal))
         {
+            // 409 CROSS_COMMUNE_REFERENCE, not 403 (BE-REVIEW-02, D-5): both communes may be inside
+            // the caller's scope, so nothing is forbidden to them — the two rows just may not be
+            // joined. That is a consistency conflict, the mirror of ASSET_IN_USE on the way out.
             throw new LuxMapException(
-                ErrorCodes.CommuneForbidden,
-                HttpStatusCode.Forbidden,
+                ErrorCodes.CrossCommuneReference,
+                HttpStatusCode.Conflict,
                 "That feeder belongs to a different commune than the pole.",
                 new Dictionary<string, object?>
                 {
@@ -334,6 +377,48 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 });
         }
     }
+
+    private static void RequireRemovedAfterInstall(DateOnly removedDate, DateOnly installDate)
+    {
+        if (removedDate < installDate)
+        {
+            throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                HttpStatusCode.BadRequest,
+                "removed_date must be on or after install_date.",
+                new Dictionary<string, object?>
+                {
+                    ["removed_date"] = removedDate.ToString("yyyy-MM-dd"),
+                    ["install_date"] = installDate.ToString("yyyy-MM-dd"),
+                });
+        }
+    }
+
+    private async Task RejectActiveFixtureAsync(string poleId, CancellationToken ct)
+    {
+        var occupied = await dbContext.Set<Fixture>().AsNoTracking()
+            .AnyAsync(fixture => fixture.PoleId == poleId && fixture.RemovedDate == null, ct);
+
+        if (occupied)
+        {
+            throw ActiveFixtureConflict(poleId);
+        }
+    }
+
+    private static LuxMapException ActiveFixtureConflict(string poleId)
+        => new(
+            ErrorCodes.PoleHasActiveFixture,
+            HttpStatusCode.Conflict,
+            "That pole already carries a lamp in service. Retire it (PUT /assets/fixtures/{id}/removal) before recording its replacement.",
+            new Dictionary<string, object?> { ["pole_id"] = poleId });
+
+    /// <summary>PostgreSQL <c>23505</c> on the one-active-lamp index.</summary>
+    private static bool IsActiveFixtureCollision(DbUpdateException failure)
+        => failure.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ux_fixture_pole_id_active",
+        };
 
     /// <summary>What refused the delete, taken from the database's own answer.</summary>
     /// <remarks>

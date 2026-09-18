@@ -186,15 +186,24 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
         // "The lamp currently in service on this pole" is the lookup BE-14 makes for every pole in a
         // bbox, so it gets its own partial index rather than filtering the full history each time.
         //
-        // ⚠️ NOT UNIQUE, and it carries NO business rule. It has already been misread once as
-        // "a pole has at most one active fixture" — it does not say that, and the opposite is the
-        // settled rule: a pole carries several lamps, and replacing one keeps the old row with a
-        // removed_date (see Fixture, and docs/templates/README.md). This is a lookup index, nothing
-        // more. That absence of a natural key is exactly why CSV import treats fixtures as
-        // INSERT-ONLY instead of upserting them.
+        // UNIQUE since BE-REVIEW-02 (D-11): a pole carries AT MOST ONE lamp in service at a time.
+        // That is now a business rule, decided by Dylan on 18/09/2026, and this index is what
+        // enforces it. Three places used to disagree — import refused any pole that had EVER had a
+        // lamp, CRUD allowed any number of active lamps, and BE-14 was going to flatten "the active
+        // fixture" (singular). The history is untouched: replacing a lamp still keeps the old row
+        // with a removed_date, and the index only sees rows where removed_date IS NULL. CV cannot
+        // tell two lamps on one pole apart anyway (see Fixture), and every pole in the FO-26 mock set
+        // carries exactly one.
         builder.HasIndex(fixture => fixture.PoleId)
-            .HasDatabaseName("ix_fixture_pole_id_active")
+            .IsUnique()
+            .HasDatabaseName("ux_fixture_pole_id_active")
             .HasFilter("removed_date IS NULL");
+
+        // A lamp cannot be taken down before it was put up (BE-REVIEW-02, Q-4). The API checks it
+        // first to answer 400 with the field named; this is the backstop for every other write path.
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_fixture_removed_after_install",
+            "removed_date IS NULL OR removed_date >= install_date"));
     }
 }
 
@@ -230,8 +239,24 @@ public sealed class PoleCurrentStatusConfiguration : IEntityTypeConfiguration<Po
         // The invariant the mock set exhibits on all 103 poles: confidence is absent exactly when the
         // status is `unknown`. Enforced in BOTH directions — no confidence without an observation, no
         // observation without a confidence.
-        builder.ToTable(table => table.HasCheckConstraint(
-            "ck_pole_current_status_confidence_matches_status",
-            "(status_confidence IS NULL) = (fixture_status = 'unknown')"));
+        builder.ToTable(table =>
+        {
+            table.HasCheckConstraint(
+                "ck_pole_current_status_confidence_matches_status",
+                "(status_confidence IS NULL) = (fixture_status = 'unknown')");
+
+            // 0..1 and FINITE (BE-REVIEW-02, M-6 — drift 24). The XML doc promised 0..1 for months
+            // while the column accepted 42.5, NaN and Infinity; a real INSERT proved it. NaN is the
+            // silent one: PostgreSQL sorts it ABOVE every float, so `>= 0` and `<= 1` alone would
+            // still let it in, and it is compared with `<> 'NaN'` because `x = x` is a tautology
+            // here (NaN equals itself in PostgreSQL). Same three-term shape as lux_value and
+            // fault.status_confidence. Sweep processing (BE-15/BE-17) owns the writes to this table;
+            // the constraint is in place before the first row lands.
+            table.HasCheckConstraint(
+                "ck_pole_current_status_confidence_range",
+                "status_confidence IS NULL OR (status_confidence >= 0 AND status_confidence <= 1 "
+                + "AND status_confidence <> 'NaN'::float8 AND status_confidence <> 'Infinity'::float8 "
+                + "AND status_confidence <> '-Infinity'::float8)");
+        });
     }
 }

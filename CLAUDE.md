@@ -10,7 +10,7 @@ Không có consumer nào khác. Không có API công khai cho người dân.
 
 Ba tài liệu, thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất, chốt 24/08/2026. **Thắng mọi thứ khác.** Đã gộp v1.0 và bản bổ sung; không cần đọc `api-contract-v1.md` nữa.
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.4** (18/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.3, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.4.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
 2. **`docs/tasks-backend.csv`** — task list v2.1, phạm vi và lịch.
 3. File này — quy ước làm việc và những chỗ dễ sai. Không phải đặc tả.
 
@@ -89,7 +89,7 @@ Gắn trên `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReadi
 - **ID là chuỗi có prefix:** `POLE-0001`, `FAULT-0001`, `SEG-001`, `COM-001`. Không phải `int`, không phải `Guid`. Bảng prefix đầy đủ và cách sinh ở **mục 0.1–0.4**.
 - **⚠️ ID là TỐI THIỂU N chữ số, không phải ĐÚNG N.** Contract mục 0.3: vượt ngưỡng thì ID dài ra — cột thứ 10000 là `POLE-10000`, **không phải** `POLE-1000`. Hai hệ quả:
   - **Không bao giờ `ORDER BY pole_id`.** So chuỗi thì `POLE-10000 < POLE-9999`. Sắp theo `created_at` hoặc theo sequence. Lọc theo khoảng trên text cũng sai từ cột thứ 10000.
-  - Regex/validator phía FE và mobile phải là `^POLE-\d{4,}$`, **không phải** `\d{4}`.
+  - Regex/validator phía FE và mobile phải là `^POLE-[0-9]{4,}$`, **không phải** `[0-9]{4}` — và `[0-9]`, không `\d` (`\d` khớp chữ số Unicode).
 - **Cách sinh ID — mô tả chuẩn, mọi chỗ khác trỏ về đây.** ID sinh ở tầng DB qua `DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`. Tên sequence theo khuôn `<thing>_id_seq` — `pole_id_seq`, `fixture_id_seq`, `segment_id_seq`… (bảng đầy đủ ở `PrefixedId.cs`).
   - **Không dùng `LPAD(nextval(...)::text, 4, '0')`.** `LPAD` của Postgres **cắt bớt** khi giá trị dài hơn độ rộng: `nextval` = 12345 với width 4 cho ra `'2345'`. Kết quả là ID trùng, sai **câm** — không ràng buộc nào bắt được. Đã lật ở commit `8ea9930`.
 - **Phân trang:** `?page=1&page_size=50` → `{page, page_size, total, items[]}`. `page_size` **tối đa 200**.
@@ -186,7 +186,7 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 
 | Task | Thiếu |
 |---|---|
-| BE-07 | Endpoint đăng ký / đăng nhập / refresh |
+| ~~BE-07~~ | ~~Endpoint đăng ký / đăng nhập / refresh~~ → **đã đặc tả ở Contract mục 4 (v1.2)** |
 | ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, còn chờ duyệt |
 | BE-15, BE-16 | Upload sweep, validate metadata phơi sáng |
 | BE-27 | Notification — **chốt tên bảng/entity cùng FE2 trước W16** |
@@ -208,7 +208,7 @@ Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (g
 
 `Pole` · `Fixture` · `RoadSegment` · `Feeder` · `IotNode` · `TelemetryReading` ·
 `SurveySweep` · `SurveyFrame` · `Detection` · `LuminanceBaseline` · `LuxReading` ·
-`Fault` · `FaultType` · `FaultHistory` · `WorkOrder` · `ExternalUnit` · `RepairEvidence` ·
+`Fault` · `FaultCluster` · `WorkOrder` · `ExternalUnit` · `RepairEvidence` ·
 `AdministrativeUnit` · `AppUser` · `RefreshToken`
 
 Điểm dễ sai:
@@ -276,8 +276,9 @@ cho đi tài sản, đổi từ ngoài vào trong là chiếm tài sản, cùng 
 
 **Cửa sau: `EnterUnscopedSystemWriteBackdoor()`.**
 
-Tên dài và xấu có chủ đích. Dùng ở `IdentitySeeder` (khi BE-39 seed tài sản) và ở fixture test
-(`AssetSchemaFixture.WriteAsSystemAsync`). **Không bao giờ nới nó.**
+Tên dài và xấu có chủ đích. Hiện chỉ dùng ở fixture test (`AssetSchemaFixture.WriteAsSystemAsync`,
+`AssetImportFixture`, `PoleWriteTests`…); `IdentitySeeder` chưa cần vì nó chỉ ghi entity không
+`ICommuneScoped`. BE-39 seed tài sản sẽ là caller thật đầu tiên trong `src/`. **Không bao giờ nới nó.**
 
 Đường tắt hấp dẫn nhất là cho **scope rỗng** đi qua, vì seeder và fixture đều có scope rỗng. Nhưng
 scope rỗng cũng chính là scope của **caller chưa đăng nhập** và của **token không có `commune_ids`** —
@@ -384,7 +385,7 @@ request kế tiếp; URL đã ký vẫn sống tới lúc hết hạn — dù li
 rò qua header `Referer`.
 
 Khớp luôn Contract mục 2.7 (`GET /api/v1/frames/{frame_id}/thumbnail` → JPEG) và
-`mock-pole-detail.json` (`"thumbnail_url": "/api/v1/frames/FRM-88213/thumbnail"` — đường dẫn tương
+`mock-pole-detail.json` (`"thumbnail_url": "/api/v1/frames/FRM-088213/thumbnail"` — đường dẫn tương
 đối, không host, không chữ ký). FE đã dựng theo hình dạng đó.
 
 **2. Hai bucket, key phân tầng, KHÔNG nhúng `commune_id`.**
@@ -544,9 +545,10 @@ PUT       /api/v1/assets/fixtures/{id}/removal
 POST      /api/v1/assets/import/{segments|feeders|poles|fixtures}
 ```
 
-**KHÔNG có DELETE.** Xoá pole cascade sang `pole_current_status` (bảng BE-12 bị cấm đụng), và
-`fault` / `lux_reading` trỏ vào pole bằng `Restrict` nên cột nào có dữ liệu nghiên cứu cũng không
-xoá được. Ngừng dùng thiết bị là việc của `fixture.removed_date`.
+**Chỉ pole có DELETE** (`DELETE /assets/poles/{id}`, BE-12 — drift 43, xác nhận 18/09/2026); fixture
+**không**. Khoá ngoại quyết định: `fault` / `lux_reading` trỏ vào pole bằng `Restrict` nên cột nào có
+dữ liệu nghiên cứu cũng không xoá được (409 `ASSET_IN_USE`, kể cả khi ràng buộc vấp ở bóng của cột).
+Ngừng dùng thiết bị là việc của `fixture.removed_date`.
 
 **2. `external_ref` — khoá tự nhiên DUY NHẤT của lược đồ, trên BA bảng.**
 
@@ -924,6 +926,48 @@ nào), nên nới định nghĩa không đổi con số nào. Test dữ liệu *
 **Hai test dùng CHUNG một hàm đếm** (`CountByPole`). Nếu tách thành hai đường thì test định nghĩa
 không còn bảo vệ test dữ liệu — nó sẽ chỉ khẳng định một ý kiến riêng.
 
+### Tám ràng buộc chốt ở BE-REVIEW-02 (18/09/2026)
+
+**1. Mạch điện của cột phải cùng xã với cột — ở MỌI đường ghi, cho tới khi có FK ghép.**
+`RequireFeederInCommuneAsync` (POST/PUT) và kiểm theo dòng trong `PlanPolesAsync` (import) là ba nơi
+hiện có; đường ghi mới (seeder BE-39, sync BE-43) **phải gọi cùng kiểm**. Vi phạm → 409
+`CROSS_COMMUNE_REFERENCE`, không phải 403. **Tuyến thì KHÔNG kiểm**: `road_class = inter_commune` là
+đường chạy giữa các xã, cột ở xã khác với chủ tuyến là hợp lệ. Dạng cuối là FK ghép
+`(feeder_id, commune_id)` — ticket riêng trước BE-13 (Contract O-7).
+
+**2. `DateTime` trên query string KHÔNG đi qua `UtcDateTimeConverter`.** Converter đó chỉ áp cho JSON.
+Query binder trả `Kind=Unspecified` khi thiếu `Z`, và `.ToUniversalTime()` trên nó dịch theo múi giờ
+máy chủ (đo được 7 giờ trên máy Asia/Saigon). Chuẩn hoá bằng `UtcNormalization.ToUtc` — Unspecified
+= UTC, đúng Contract. Test `A_from_or_to_bound_without_a_Z_suffix…` chỉ đỏ trên máy không phải UTC,
+đừng xoá vì thấy nó "luôn xanh" trên CI.
+
+**3. Một cột có tối đa MỘT bóng đang dùng.** `ux_fixture_pole_id_active` là UNIQUE partial
+(`pole_id WHERE removed_date IS NULL`). Thay bóng = ngừng dùng bóng cũ rồi ghi bóng mới; bóng có
+`removed_date` là lịch sử, không chặn và không bị chặn. CRUD trả 409 `POLE_HAS_ACTIVE_FIXTURE`, import
+báo theo dòng. BE-14 flatten từ **bóng đang dùng** — nay là duy nhất, không cần quy tắc tổng hợp.
+
+**4. `removed_date >= install_date` và ngừng dùng đúng một lần.** CHECK
+`ck_fixture_removed_after_install` ở DB; API trả 400 `VALIDATION_FAILED` nêu cả hai ngày; PUT lần hai
+là 400 — `removed_date` là lịch sử thiết bị, không ghi đè.
+
+**5. `pole_current_status.status_confidence` đã có CHECK hữu hạn 0..1** (`ck_pole_current_status_confidence_range`,
+đóng drift 24). BE-15/BE-17 ghi vào bảng này phải qua nó; NaN/Infinity/42.5 giờ là 500 chứ không âm
+thầm vào — hãy validate ở API trước cho ra 400.
+
+**6. 403 có HAI mã.** `ROLE_FORBIDDEN` khi policy vai trò từ chối (`ForbiddenCodeResultHandler` ghi lý do
+lên `HttpContext.Items`, trang status-code đọc lại); `COMMUNE_FORBIDDEN` chỉ cho địa bàn và cho claim
+`["*"]` lệch vai trò. Đừng ném `COMMUNE_FORBIDDEN` cho việc không phải địa bàn.
+
+**7. DB dev dùng chung bị test đẩy sequence.** `pole_id_seq` ở 396 625 với 0 cột (đo 18/09/2026):
+cột thật đầu tiên trên DB này là `POLE-396626`. Hệ quả cho **BE-39**: seed bộ mock phải INSERT ID tường
+minh (`POLE-0001…`) rồi `setval` sequence lên trên giá trị lớn nhất — ngoại lệ hệ thống đã chốt (D-6),
+ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản seed nó đăng nhập (N-5);
+`AuthTestFactory` chưa — BE-36 (Testcontainers) là bản sửa gốc.
+
+**8. Spec hợp nhất `docs/openapi/luxmap-v1.4.json` là file SINH.** Sinh bằng
+`python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
+**sau mỗi lần** xuất `luxmap-v1.json`, rồi `npx @redocly/cli lint`. Không sửa tay cả hai.
+
 ### Vai trò
 
 **Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.
@@ -942,7 +986,7 @@ Vi phạm thì hệ thống vẫn chạy, số liệu vẫn ra, nhưng kết qu�
 - **Không so sánh độ sáng giữa hai cột khác nhau.**
 - **`unknown` đếm riêng, không gộp vào `out`.**
 - **Mọi phát hiện tự động ghi kèm phiên bản model và firmware** (BE-34). Không tái lập được thì không phải kết quả.
-- **Mọi quyết định của kỹ sư vào `FaultHistory`** (BE-18).
+- **Mọi quyết định của kỹ sư ghi vết trên chính dòng `fault`** (`confirmed_by/at`, `resolved_by/at` — BE-18). Chuỗi đầy đủ (`FaultHistory`) chỉ dựng nếu BE-19 cần.
 - **Sự cố cấp đoạn là một nguyên nhân, không phải N sự cố bóng.** CV-15 sinh `cluster_id` và `fault_type = segment_outage`.
 - **Telemetry ingest idempotent theo `(node_id, reading_time)`** (IOT-09). Store-and-forward chắc chắn gửi trùng — đó là hoạt động bình thường.
 - **Phiên đêm cắt qua nửa đêm.** Không tính runtime theo ngày lịch.
@@ -989,7 +1033,7 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 
 `mock-poles.geojson`, `mock-pole-detail.json`, `mock-faults.json`, `mock-work-orders.json`, `mock-iot-nodes.geojson`.
 
-Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-0047` — pin yếu làm đèn mờ dần, không tắt phụt).
+Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-047` — pin yếu làm đèn mờ dần, không tắt phụt).
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
 
@@ -1041,7 +1085,7 @@ FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** 
 
 ## Thứ tự hiện tại
 
-W1: nền tảng **BE-01 → BE-00 → BE-02..BE-07**, cộng **FW-00 review Contract cùng cả nhóm**. BE-01 phải trước BE-00 — chưa có solution thì không áp quy ước vào đâu được.
+W1 (xong): nền tảng **BE-01 → BE-00 → BE-02..BE-07**. W2–W3 (đang): GIS tài sản — BE-09/10/11/12a/12 xong, BE-42 và BE-18 đẩy sớm, BE-REVIEW-02 xong 18/09/2026. **Kế tiếp: BE-13** (trước đó: ticket FK ghép — Contract O-7).
 
 Sau đó: GIS tài sản (W2–W4) → khảo sát (W5–W7) → sự cố (W7–W9) → quy trình (W9–W12) → dashboard (W13–W15) → quản trị (W15–W17) → hoàn thiện (W17–W21).
 

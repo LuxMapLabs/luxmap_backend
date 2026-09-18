@@ -2,7 +2,7 @@
 
 Modular monolith ASP.NET Core phục vụ Web SPA (WP5), Android native (WP6) và engine CV (WP4).
 
-Nguồn sự thật: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) → [`docs/tasks-backend.csv`](docs/tasks-backend.csv) → [`CLAUDE.md`](CLAUDE.md).
+Nguồn sự thật: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) (Contract **v1.4**, bản hợp nhất) → [`docs/tasks-backend.csv`](docs/tasks-backend.csv) → [`CLAUDE.md`](CLAUDE.md). Chỗ lệch mới ghi vào [`docs/contract-drift.md`](docs/contract-drift.md); log cũ ở `docs/archive/`.
 
 📖 **Mới vào dự án?** Đọc [`docs/code-walkthrough.md`](docs/code-walkthrough.md) — hướng dẫn đọc
 code theo thứ tự, giải thích từng cơ chế và vì sao nó tồn tại.
@@ -38,7 +38,7 @@ dotnet test --settings luxmap.benchmark.runsettings
 dotnet run --project src/LuxMap.Api
 ```
 
-Hiện chưa có endpoint nào — BE-01/BE-00 chỉ dựng khung và quy ước, nên `/` trả 404 là đúng.
+`/` không có route — 401 khi chưa đăng nhập, 404 khi đã đăng nhập (mặc định đóng). Endpoint đang chạy: `/api/v1/auth/*`, `/api/v1/assets/*`, `/api/v1/lux-readings*` — xem Contract.
 
 ## Chạy môi trường dev
 
@@ -268,6 +268,12 @@ dotnet build src/LuxMap.Api && Swagger__Enabled=true Cors__AllowedOrigins__0=htt
 Lệnh này dựng host thật nên cần `.env` (hoặc `POSTGRES_PASSWORD`) như mọi lần chạy khác; không
 cần database đang chạy vì chỉ đọc cấu hình chứ không kết nối.
 
+Sau đó sinh lại bản hợp nhất khớp Contract (21 operation từ code + 15 endpoint chưa có code) và lint:
+
+```bash
+python3 docs/openapi/tools/gen_consolidated_spec.py && npx @redocly/cli lint docs/openapi/luxmap-v1.4.json
+```
+
 `Cors__AllowedOrigins__0` là **bắt buộc** dù việc xuất spec chẳng liên quan gì tới CORS: swagger CLI
 dựng host ở môi trường Production, mà ngoài Development thì `CorsSetup` dừng khởi động nếu danh sách
 rỗng. Thiếu nó thì lệnh chết với `Cors:AllowedOrigins is empty` — và vì CLI ghi file **sau** khi
@@ -282,12 +288,17 @@ $env:Swagger__Enabled="true"; $env:Cors__AllowedOrigins__0="https://localhost:30
 
 ## Xác thực
 
-Ba endpoint, đều **không cần** access token:
+Bảy endpoint, đều **không cần** access token — nhóm mobile (token trong body) và nhóm web
+(`/api/v1/auth/web/*`, refresh token chỉ trong cookie `__Secure-luxmap_rt`). Đặc tả đầy đủ: Contract mục 4.
 
 ```bash
-POST /api/v1/auth/login     { "username": "...", "password": "..." }
-POST /api/v1/auth/refresh   { "refresh_token": "..." }
-POST /api/v1/auth/logout    { "refresh_token": "..." }
+POST /api/v1/auth/login      { "username": "...", "password": "..." }
+POST /api/v1/auth/register   { "username": "...", "email": "...", "full_name": "...", "password": "..." }
+POST /api/v1/auth/refresh    { "refresh_token": "..." }
+POST /api/v1/auth/logout     { "refresh_token": "..." }
+POST /api/v1/auth/web/login  { "username": "...", "password": "...", "remember_me": true }
+POST /api/v1/auth/web/refresh   (không body — cookie)
+POST /api/v1/auth/web/logout    (không body — cookie)
 ```
 
 Login và refresh trả đúng bốn trường: `access_token`, `refresh_token`, `token_type`, `expires_in`.
@@ -332,7 +343,8 @@ Tóm tắt mã lỗi:
 | Tình huống | HTTP | `error.code` |
 |---|---|---|
 | Thiếu / sai / hết hạn token | 401 | `UNAUTHENTICATED` |
-| Sai vai trò, hoặc `commune_id` ngoài phạm vi | 403 | `COMMUNE_FORBIDDEN` |
+| Sai vai trò (policy từ chối) | 403 | `ROLE_FORBIDDEN` |
+| `commune_id` ngoài phạm vi, hoặc claim `["*"]` lệch vai trò | 403 | `COMMUNE_FORBIDDEN` |
 | Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` (không phải 403 — 403 sẽ lộ ra là nó tồn tại) |
 
 ## Cấu trúc

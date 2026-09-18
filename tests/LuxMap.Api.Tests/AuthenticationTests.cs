@@ -152,7 +152,10 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
 
         output.WriteLine($"  field_crew calling an engineer-only endpoint → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        await AssertContractErrorAsync(response, ErrorCodes.CommuneForbidden);
+
+        // ROLE_FORBIDDEN since BE-REVIEW-02 (D-4): the crew member is inside their territory, it is
+        // the ROLE the policy refused. COMMUNE_FORBIDDEN is reserved for a commune outside the scope.
+        await AssertContractErrorAsync(response, ErrorCodes.RoleForbidden);
     }
 
     [Fact]

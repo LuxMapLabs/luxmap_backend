@@ -1,67 +1,54 @@
-# LuxMap — API Contract v1.3 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.4 (BẢN HỢP NHẤT)
 
-**Trạng thái:** Bản hợp nhất, thay thế cả `api-contract-v1.md` và bản bổ sung v1.1 rời. Đây là tài liệu duy nhất cần đọc. Tên file giữ `api-contract-v1.1.md` để mọi liên kết cũ vẫn đúng.
-**Ngày chốt v1.0:** 2026-08-23 · **Ngày hợp nhất v1.1:** 2026-08-24 · **v1.2:** 2026-09-11 (mục 2.10 Auth) · **v1.3:** 2026-09-15 (đổi đường dẫn mục 2.9)
-**Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng version. Không đổi ngầm.
+**Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
+`docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
+`api-contract-v1.1.md`** để mọi liên kết cũ vẫn đúng (quyết định D-1, Dylan, 18/09/2026).
+**Ngày chốt v1.0:** 23/08/2026 · **v1.1:** 24/08/2026 · **v1.2:** 11/09/2026 (mục 4 Auth) ·
+**v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02).
+**Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
+version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-> **Về cách đánh số.** Task list v2.1 đã publish và trỏ tới số mục của v1.0 (mục 1, mục 2.1–2.3, mục 2.4, mục 2.5, mục 3). Vì vậy toàn bộ đánh số cũ được **giữ nguyên**, nội dung mới nối vào sau dưới dạng mục 2.8, 2.9, 2.10 và mục 7. Thứ tự nhìn hơi lạ nhưng mọi tham chiếu trong task list vẫn đúng.
+**Bản máy đọc:** `docs/openapi/luxmap-v1.4.json` — khớp 1-1 với tài liệu này (36 operation: 21
+`implemented`, 15 `not_implemented`), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
+`docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
----
+**Ký hiệu**
 
-## Nhật ký thay đổi so với v1.0
-
-| Mục | Thay đổi |
+| Ký hiệu | Nghĩa |
 |---|---|
-| 1 | `source_channel`: `manual` → **`field_report`** |
-| 1 | Thêm enum **`data_source`** |
-| 0 | Bổ sung quy ước ID đầy đủ: bảng prefix, cách sinh, quy tắc opaque |
-| 2.4 | Chốt hình dạng từng item của `GET /faults` |
-| 2.8 | **Mới** — `POST /faults` (BE-41) |
-| 2.9 | **Mới** — nhóm endpoint lux readings (BE-42) |
-| 6 | Gỡ "phân quyền theo `commune_id`" khỏi danh sách chưa chốt |
-| 7 | **Mới** — đặc tả phân quyền theo địa bàn (BE-08) |
-| 2.10 | **Mới (v1.2)** — nhóm Auth: 4 endpoint mobile (hình dạng BE-07, không đổi) + 3 endpoint web dùng cookie `HttpOnly` |
-| 2.9 | **BREAKING (v1.3)** — `GET /poles/{pole_id}/lux-readings` → **`GET /lux-readings/poles/{pole_id}`**. Gom cả ba endpoint lux về một tiền tố |
+| `implemented` | Code trên `dev` đang phục vụ đúng như mô tả |
+| `[NOT IMPLEMENTED]` | Contract đã đặc tả, code chưa có. **Không xoá.** Ticket ghi kèm |
+| `[OPEN → O-n]` | Chưa chốt; nội dung ở **mục 9** |
 
-FE cần đọc lại: mục 1 (enum đổi), 2.4 (hình dạng item), 0.2 (prefix ID cho entity mới).
-**v1.2:** WP5 đọc toàn bộ mục 2.10 (nhóm web là mới). WP6 đọc mục 2.10.1 và 2.10.4 — hình dạng không đổi, chỉ được ghi thành văn.
-**v1.3:** **FM-14 và CV-12 bắt buộc sửa đường dẫn.** Chỉ đổi đường dẫn — query, body và hình dạng response giữ nguyên.
+> **Về cách đánh số.** Task list v2.1 trỏ tới số mục của v1.0 (mục 1, 2.1–2.5, 3). Bảng ánh xạ cũ → mới:
+> §0 → 1 · §1 → 3.1 · §2.1 → 5.1 · §2.2 → 5.1 · §2.3 → 5.2 · §2.4/2.5/2.8 → 5.4 · §2.6 → 5.5 ·
+> §2.7 → 5.6 · §2.9 → 5.7 · §2.10 → 4 · §3 → 5.8 · §5 → 6 · §6 → 7 · §7 → 2.
 
 ---
 
-## 0. Quy ước toàn cục (khoá cứng)
+## 1. Tổng quan và quy ước toàn cục (khoá cứng)
+
+### 1.1 Bảng quy ước
 
 | Hạng mục | Quyết định | Ghi chú |
 |---|---|---|
-| Base URL | `/api/v1` | |
-| Định dạng JSON | **snake_case** | .NET set `JsonNamingPolicy.SnakeCaseLower` |
-| Hệ toạ độ API | **EPSG:4326** (WGS84) | GeoJSON thứ tự `[lng, lat]` |
-| EPSG:3405 (VN-2000) | Chỉ dùng nội bộ DB / xuất báo cáo | **Không bao giờ trả ra API.** FE không reproject. |
-| Thời gian | ISO 8601 UTC, hậu tố `Z` | DB `TIMESTAMPTZ`; Npgsql yêu cầu `DateTimeKind.Utc` |
-| Ngày (không giờ) | `YYYY-MM-DD` | `install_date`, `warranty_expiry`, `night_of` |
-| ID | Chuỗi có prefix — xem 0.1–0.4 | Dễ debug, FE không cần đoán kiểu |
-| Phân trang | `?page=1&page_size=50` → `{page, page_size, total, items[]}` | `page_size` tối đa 200 |
-| Lỗi | `{ "error": { "code": "...", "message": "...", "details": {} } }` | HTTP code chuẩn |
-| Auth | `Authorization: Bearer <jwt>` | FE mock bằng token giả giai đoạn đầu. Cách lấy token: mục 2.10 |
+| Base URL | `/api/v1` | Version nằm trong URL, không header |
+| JSON | **snake_case** | `JsonNamingPolicy.SnakeCaseLower` |
+| Enum | **chuỗi thường** | Không bao giờ int |
+| Hệ toạ độ API | **EPSG:4326**, GeoJSON `[lng, lat]` | EPSG:3405 chỉ nội bộ DB / báo cáo, **không bao giờ ra API** |
+| Thời gian | ISO 8601 UTC hậu tố `Z` | DB `TIMESTAMPTZ`. Giá trị **không có** hậu tố (kể cả trên query string) được đọc là UTC, không bao giờ là giờ máy chủ |
+| Ngày không giờ | `YYYY-MM-DD` | `install_date`, `removed_date`, `warranty_expiry`, `night_of`, `due_date` |
+| ID | Chuỗi có prefix — mục 1.2 | Chuỗi đục |
+| Phân trang | `?page=1&page_size=50` → `{page, page_size, total, items[]}` | mục 1.3 |
+| Lỗi | `{ "error": { "code", "message", "details" } }` | mục 1.4 |
+| Correlation id | Header `X-Correlation-Id` trên **mọi** response; trên response lỗi thêm `error.details.correlation_id` | Client gửi lên (≤128 ký tự `[A-Za-z0-9-_.:]`) thì server dùng lại, ngoài khuôn hoặc thiếu thì server sinh |
+| Auth | `Authorization: Bearer <jwt>` | mục 4 |
 
-### Quy tắc GeoJSON
-
-- Mọi endpoint bản đồ trả về **`FeatureCollection`** chuẩn.
-- Toàn bộ dữ liệu nghiệp vụ nằm trong `feature.properties` (phẳng, không lồng nhau) → gán trực tiếp vào MapLibre layer, không cần transform.
-- `feature.id` **không dùng**; dùng `properties.pole_id`.
-
-### 0.1 Dạng ID
+### 1.2 ID — dạng, bảng prefix, cách sinh
 
 ```
 <PREFIX>-<số thứ tự đã pad 0>
 ```
-
-- Prefix: **chữ in hoa, 2–5 ký tự, gợi nhớ được**. Không dùng prefix 2 ký tự trừ khi là viết tắt đã quen (`WO` = work order).
-- Số chữ số: **4** cho thực thể khối lượng lớn, **3** cho thực thể khối lượng nhỏ, **6** cho frame và detection.
-
-### 0.2 Bảng prefix
-
-Bốn dòng đầu đã dùng trong bộ mock FO-26, không đổi:
 
 | Entity | Prefix | Ví dụ | Khuôn (SÀN, không phải trần) |
 |---|---|---|---|
@@ -82,72 +69,131 @@ Bốn dòng đầu đã dùng trong bộ mock FO-26, không đổi:
 | `AppUser` | `USR` | `USR-001` | `^USR-[0-9]{3,}$` |
 | Cụm sự cố (`cluster_id`) | `CLS` | `CLS-001` | `^CLS-[0-9]{3,}$` |
 
-**Số chữ số là TỐI THIỂU, không cố định** — ID dài ra khi vượt ngưỡng padding, và **không có giới hạn
-trên**. `POLE-9999` kế tiếp là `POLE-10000`, không phải một ID bốn chữ số nào khác.
-
-**ID là chuỗi đục:** client **không** parse thành số, **không** so sánh theo thứ tự số học, **không**
-giả định độ dài. Sắp xếp theo ID là sai từ ID thứ 10000 trở đi — `POLE-10000` đứng TRƯỚC `POLE-9999`
-khi so chuỗi.
-
-**Khuôn ở cột cuối là SÀN để validate, không phải trần.** Nó dùng `[0-9]` chứ không phải `\d`: trong
-.NET và nhiều engine khác `\d` khớp cả chữ số Unicode (`٠١٢` Ả Rập-Ấn Độ, `०१२` Devanagari), nên
-`\d{4,}` nhận những chuỗi không bao giờ là ID hợp lệ.
-
-> ⚠️ **Client validate chặt hơn khuôn này sẽ TỪ CHỐI ID hợp lệ khi dữ liệu vượt ngưỡng.** Cụ thể:
-> `{4}` không dấu phẩy sẽ hỏng ở cột thứ 10000. **Khuôn này chưa được đối chiếu với client hiện có
-> tại thời điểm ghi** — WP5 và WP6 phải tự kiểm regex phía mình.
-> **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
-
-Mục này **bổ sung** cho §0.3, **không thay thế**: §0.3 nói bằng lời rằng ID là chuỗi đục và dài ra
-được; cột khuôn ở đây là dạng máy đọc được của đúng điều đó.
-
-`LuminanceBaseline` và `TelemetryReading` **không có ID hiển thị** — khoá theo `(pole_id, ...)` và `(node_id, reading_time)`, không bao giờ tham chiếu trực tiếp từ FE.
-
-### 0.3 ID là chuỗi mờ (opaque)
-
-**Client không được phân tích cú pháp ID.** Không tách prefix, không parse số, không so sánh thứ tự, không giả định độ dài cố định.
-
-Khi vượt ngưỡng chữ số, ID dài ra tự nhiên — cột thứ 10000 là `POLE-10000`. Không có cắt bớt, không có tràn số.
-
-### 0.4 Cách sinh ID — phía server
-
-Dùng **sequence của PostgreSQL**, sinh chuỗi ngay ở tầng DB, qua một hàm định dạng:
+- **Số chữ số là TỐI THIỂU, không cố định.** `POLE-9999` kế tiếp là `POLE-10000`. Client **không** parse,
+  **không** so sánh thứ tự, **không** giả định độ dài. Khuôn dùng `[0-9]` chứ không `\d` (`\d` khớp cả
+  chữ số Unicode). Xác nhận 18/09/2026 (trước là `SELF-SIGNED` 07/09).
+- **Sinh ở server** bằng sequence PostgreSQL và hàm:
 
 ```sql
 CREATE FUNCTION luxmap_format_id(prefix text, value bigint, digits integer) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT AS $$
     SELECT prefix || '-' || lpad(value::text, greatest(digits, length(value::text)), '0')
 $$;
-
-CREATE SEQUENCE pole_id_seq;
-
-ALTER TABLE pole
-  ALTER COLUMN pole_id
-  SET DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4);
+ALTER TABLE pole ALTER COLUMN pole_id SET DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4);
 ```
 
-> 🔴 **KHÔNG dùng `LPAD(nextval(...)::text, 4, '0')` — bản Contract trước ghi như vậy và nó SAI.**
-> `lpad` của PostgreSQL **CẮT BỚT** khi chuỗi đã dài hơn độ rộng: `lpad('10000', 4, '0')` cho ra
-> `'1000'`. Cột thứ 10000 sẽ được gán `POLE-1000` và **đụng ID của cột thứ 1000** — vi phạm §0.3
-> ngay phía trên, và là lỗi **câm**: không exception, chỉ là một `23505 duplicate key` ở một hàng
-> trông bình thường.
->
-> `greatest(digits, length(...))` cho ra đúng hành vi §0.3 mô tả. Phải là một **hàm** chứ không phải
-> biểu thức thẳng, vì biểu thức đó gọi giá trị ba lần mà PostgreSQL không cho dùng subquery hay CTE
-> trong `DEFAULT` của cột — hàm là cách giữ `nextval` được gọi **đúng một lần** mỗi hàng.
->
-> Code backend đã sửa từ commit `8ea9930`; **Contract lệch code kể từ đó tới nay**. Đây là **sửa
-> lỗi**, không phải mở rộng. **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
+  🔴 **Không dùng `LPAD(nextval(...)::text, 4, '0')` trần** — nó **cắt bớt** khi vượt độ rộng (cột thứ
+  10000 thành `POLE-1000`, đụng cột thứ 1000). Phải là **hàm** để `nextval` chỉ gọi một lần mỗi hàng.
+- `LuminanceBaseline`, `TelemetryReading`, `RefreshToken` không có ID hiển thị.
+- **Client không sinh ID hiển thị.** Thao tác offline mang `client_op_id` (UUID); server trả ánh xạ.
+  Ngoại lệ **duy nhất**: bộ seed demo BE-39 được INSERT ID tường minh rồi `setval` sequence (D-6), vì
+  FE đã hardcode `POLE-0047`; đó là hành động của hệ thống, không phải của client.
 
-EF Core map bằng `.HasDefaultValueSql(...)` kèm `.ValueGeneratedOnAdd()`.
+### 1.3 Phân trang
 
-Sequence an toàn với concurrency sẵn — không cần lock hay bảng counter tự chế, và import hàng loạt (BE-12) không phải xử lý gì thêm. Chấp nhận: sequence không rollback nên insert lỗi để lại khoảng trống trong dãy số. ID chỉ cần duy nhất, không cần liên tục.
+`{page, page_size, total, items[]}`. `total` là tổng dòng khớp bộ lọc. `page_size` tối đa **200**;
+vượt thì **kẹp im lặng** về 200 và response ghi `page_size: 200` — client phải đọc `page_size` trong
+response. `page`/`page_size` không phải số → dùng mặc định (1 / 50), không lỗi.
 
-**Client không sinh ID hiển thị.** Thao tác offline mang `client_op_id` (UUID client sinh) làm khoá khử trùng lặp; server gán ID thật khi nhận và trả lại ánh xạ `client_op_id → <id thật>` để client cập nhật cache cục bộ.
+### 1.4 Mô hình lỗi và mã lỗi
+
+```json
+{ "error": { "code": "BBOX_TOO_LARGE", "message": "...", "details": { "correlation_id": "..." } } }
+```
+
+`details` là túi ngữ cảnh tự do, **luôn có mặt**, luôn chứa `correlation_id`. `message` để người đọc,
+client **không** parse.
+
+| Mã | HTTP | Khi nào |
+|---|---|---|
+| `VALIDATION_FAILED` | 400 | Body/query sai định dạng hoặc thiếu trường; chi tiết từng field trong `details` |
+| `LOCATION_REQUIRED` | 400 | `POST /faults` không `pole_id` và không `location` |
+| `FAULT_TYPE_NOT_REPORTABLE` | 400 | `POST /faults` với `fault_type` chỉ engine sinh |
+| `SERVER_OWNED_FIELD` | 400 | Body mang trường server sở hữu (`lux_id`, `commune_id` ở `POST /lux-readings`) |
+| `UNAUTHENTICATED` | 401 | Access token thiếu / sai chữ ký / hết hạn / sai `iss` / sai `aud` — một mã. **Route không tồn tại khi chưa đăng nhập cũng trả 401** (không dò được route) |
+| `INVALID_CREDENTIALS` | 401 | Sai tài khoản **hoặc** mật khẩu — một mã |
+| `INVALID_REFRESH_TOKEN` | 401 | Refresh token thiếu/sai/hết hạn/thu hồi/dùng lại/sai nhóm — một mã |
+| `ACCOUNT_LOCKED` | 403 | Đúng mật khẩu, tài khoản khoá (cả login lẫn refresh) |
+| `COMMUNE_FORBIDDEN` | 403 | `commune_id` ngoài phạm vi claim (mục 2), hoặc claim `["*"]` lệch vai trò |
+| `ROLE_FORBIDDEN` | 403 | Đã đăng nhập nhưng **vai trò** không được policy của endpoint cho phép (v1.4, D-4) |
+| `ORIGIN_NOT_ALLOWED` | 403 | `Origin` thiếu / lạ / `null` — chỉ nhóm `/auth/web/*` |
+| `POLE_NOT_FOUND` | 404 | `pole_id` không tồn tại **hoặc ngoài phạm vi** — cùng một câu trả lời |
+| `ASSET_NOT_FOUND` | 404 | Tài sản (`/assets/…`) không tồn tại **hoặc ngoài phạm vi** |
+| `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
+| `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
+| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username/email |
+| `EXTERNAL_REF_TAKEN` | 409 | `(commune_id, external_ref)` đã có |
+| `ASSET_IN_USE` | 409 | `DELETE` bị khoá ngoại từ chối; `details.constraint`, `details.table` |
+| `CROSS_COMMUNE_REFERENCE` | 409 | Gắn cột vào mạch điện **khác xã** với cột (v1.4, D-5) |
+| `POLE_HAS_ACTIVE_FIXTURE` | 409 | Cột đã có bóng đang dùng; ngừng dùng trước (v1.4, D-11) |
+| `BBOX_TOO_LARGE` | 413 | bbox quá 2000 cột |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | Upload không phải `.csv`/`.geojson`, hoặc `Content-Type` sai |
+| `UNSUPPORTED_IMAGE_FORMAT` | 415 | Ảnh không phải JPEG theo magic bytes `FF D8 FF` |
+| `DUPLICATE_OP` | **200** | `client_op_id` đã xử lý — trả bản ghi đã có, **không phải lỗi** |
+| `INTERNAL_ERROR` | 500 | Lỗi chưa xử lý; thông điệp chung, tra log bằng `correlation_id` |
+| `REQUEST_FAILED` | khác | Mọi status khác không có mã riêng |
+
+### 1.5 GeoJSON và toạ độ
+
+- Endpoint bản đồ trả **`FeatureCollection`** chuẩn; dữ liệu nghiệp vụ **phẳng** trong
+  `feature.properties`; **không dùng `feature.id`**, dùng `properties.<x>_id`.
+- API luôn EPSG:4326. FE không reproject. Không tính khoảng cách bằng trừ toạ độ.
+
+### 1.6 Hai chiều dữ liệu: `source_channel` và `data_source`
+
+`source_channel` = kênh phát hiện (`cv | iot | field_report`). `data_source` = dữ liệu đến từ đâu
+(`field | public_imagery | calibration_rig | simulated`). Một bản ghi mang cả hai.
+
+`data_source` gắn trên **tám** entity: `Pole`, `Fixture`, `RoadSegment` (lưu, lọc được, **không emit**
+ra `properties`), `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReading` (emit).
+`Feeder` không có. **Mọi endpoint thống kê phải lọc và nhóm được theo trường này**, và **không bao giờ
+trả một con số gộp ba nguồn**. `GET /poles` và `GET /segments` **mặc định loại `calibration_rig`**;
+muốn thấy bộ hiệu chuẩn thì truyền `data_source=calibration_rig` tường minh (v1.4, D-13). Giá trị
+`field` giữ cho tương lai; Nhánh C không sinh bản ghi nào mang nó.
 
 ---
 
-## 1. Enum — KHOÁ CỨNG (FE hardcode được, không cần gọi API)
+## 2. Phân quyền — theo địa bàn và theo vai trò
+
+JWT mang claim `commune_ids` (mảng). Quản trị mang `["*"]`.
+
+| Vai trò | Giá trị enum `user_role` | Phạm vi địa bàn |
+|---|---|---|
+| Cơ quan quản lý | `management_agency` | Có thể gồm nhiều xã |
+| Kỹ sư bảo trì | `maintenance_engineer` | Đúng các xã trong claim |
+| Tổ khảo sát / sửa chữa | `field_crew` | Đúng các xã trong claim |
+| Quản trị | `administrator` | Toàn hệ thống, `*` |
+
+**Quy tắc địa bàn**
+
+- **Lọc ở server, luôn luôn.** Query param `commune_id` chỉ **thu hẹp**; ngoài phạm vi → **403
+  `COMMUNE_FORBIDDEN`** (kể cả khi chỉ một trong nhiều giá trị sai). Truy cập trực tiếp tài nguyên
+  ngoài phạm vi → **404**, không 403 (403 sẽ lộ rằng nó tồn tại). `GET /sync/bundle` chỉ đóng gói
+  dữ liệu trong phạm vi claim.
+- Tài khoản mới đăng ký có `commune_ids: []`, đăng nhập được nhưng **không thấy gì** cho tới khi Quản trị
+  gán địa bàn (BE-33).
+
+**Quy tắc vai trò (v1.4, D-14 — EXACT-ROLE)**
+
+- Policy là **một vai trò chính xác, không phải một bậc**: `role:maintenance_engineer` chỉ nhận đúng
+  kỹ sư, không nhận Quản trị. Vì thế **endpoint ĐỌC không gắn policy vai trò** — mọi vai trò đã đăng
+  nhập đều đọc được trong phạm vi địa bàn của mình.
+- Bảng GHI:
+
+| Nhóm endpoint | Được GHI | Ghi chú |
+|---|---|---|
+| `/assets/*` (POST/PUT/DELETE/import) | **Quản trị** | Đã hiện thực (BE-12a/BE-12) |
+| `/lux-readings` (POST) | Mọi vai trò đã đăng nhập, trong phạm vi địa bàn | Đã hiện thực (BE-42) |
+| `/auth/*` | Không cần token | |
+| Sweep/frame (BE-15/17), fault (BE-19/41), work order (BE-21/24) | **Chốt trước khi hiện thực từng ticket**, theo cùng nguyên tắc EXACT-ROLE | `[OPEN → O-2]` |
+
+- Sai vai trò → **403 `ROLE_FORBIDDEN`**. Đây là mã khác `COMMUNE_FORBIDDEN`.
+
+---
+
+## 3. Mô hình miền, enum, máy trạng thái
+
+### 3.1 Enum — KHOÁ CỨNG (FE hardcode được)
 
 ```
 fixture_status : normal | dim | out | unknown
@@ -162,271 +208,69 @@ wo_status      : open | assigned | in_progress | done | verified | cancelled
 node_role      : segment_controller | sampled_fixture
 node_status    : online | offline | never_reported
 road_class     : inter_commune | inter_village
+user_role      : management_agency | maintenance_engineer | field_crew | administrator
 ```
 
-**Lưu ý cho FE:**
+- `unknown` ≠ lỗi (sweep gần nhất không phủ được cột). Ký hiệu riêng, **không gộp vào `out`**.
+- `dim` là giá trị cốt lõi của đề tài → màu phải phân biệt rõ ở cả zoom xa.
+- `runtime_decline` chỉ từ IoT; `lamp_dim`/`lamp_out` chỉ từ CV; một cột có thể mang cả hai.
 
-- `unknown` ≠ lỗi. Nghĩa là sweep gần nhất không phủ được cột đó (bị che, ảnh hỏng, chưa quét). Phải có màu/ký hiệu riêng, **không gộp vào `out`**.
-- `dim` là trạng thái trung gian và là giá trị cốt lõi của đề tài → màu phải phân biệt rõ ở cả zoom xa. Không dùng vàng nhạt dễ chìm trên nền bản đồ.
-- `runtime_decline` chỉ đến từ IoT, `lamp_dim`/`lamp_out` chỉ đến từ CV. Một cột có thể có **cả hai** cùng lúc.
+### 3.2 Máy trạng thái `fault_status`
 
-**`source_channel` và `data_source` là hai chiều khác nhau.** `source_channel` cho biết *kênh nào phát hiện ra*; `data_source` cho biết *dữ liệu đến từ đâu*. Một sự cố có thể mang `source_channel = cv` và `data_source = calibration_rig` cùng lúc.
+```
+detected → confirmed | rejected
+confirmed → in_progress → resolved → verified
+```
 
-`data_source` gắn trên `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReading`. **Mọi endpoint thống kê phải lọc và nhóm được theo trường này** — CV-11, CV-18 và IOT-16 đều yêu cầu báo cáo tách riêng theo nguồn dữ liệu, không lưu từ lúc ingest thì tới lúc thống kê không tách ra được. Giá trị `field` giữ cho tương lai; phạm vi hiện tại không sinh bản ghi nào mang giá trị này.
+Chuyển sai luồng → **409**.
+
+**Fault MỞ** = `fault_status ∈ { detected, confirmed, in_progress }` (v1.4, O-7). Đây là tập dùng cho
+`open_fault_count`, `has_open_fault`, `open_faults[]`, BE-28 và BE-40. `rejected` = chưa từng là sự
+cố; `resolved` = đã sửa; `verified` = đã nghiệm thu.
+
+`wo_status` chưa có luồng đặc tả → `[OPEN → O-3]`.
+
+### 3.3 Thực thể và quy tắc dữ liệu
+
+`Pole` · `Fixture` · `RoadSegment` · `Feeder` · `IotNode` · `TelemetryReading` · `SurveySweep` ·
+`SurveyFrame` · `Detection` · `LuminanceBaseline` · `LuxReading` · `Fault` · `FaultCluster` ·
+`WorkOrder` · `ExternalUnit` · `RepairEvidence` · `AdministrativeUnit` · `AppUser` · `RefreshToken`.
+
+- `Pole` và `Fixture` tách riêng; trạng thái thuộc **vị trí cột** (`pole_current_status`), bóng không có
+  trạng thái. **Một cột có tối đa MỘT bóng đang dùng** (`removed_date IS NULL`); thay bóng = ngừng dùng
+  bóng cũ (`removed_date`) rồi ghi bóng mới; bóng đã ngừng dùng là lịch sử (v1.4, D-11).
+  `removed_date >= install_date`, và ngừng dùng **đúng một lần** (v1.4, Q-4).
+- Mạch điện (`feeder`) của một cột phải **cùng xã** với cột; tuyến (`segment`) thì **không** bắt buộc
+  — `road_class = inter_commune` là đường chạy giữa các xã (v1.4, D-5/F-01).
+- `status_confidence` (cả `pole_current_status` lẫn `fault`) là số **hữu hạn trong `0..1`**, `null` khi
+  và chỉ khi `fixture_status = unknown` (ràng buộc DB).
+- Bộ hiệu chuẩn FO-07 được đăng ký như `RoadSegment`/`Pole`/`Fixture` thật với
+  `data_source = calibration_rig` — pipeline chạy đúng một đường.
+- `LuxReading` (người đo, giá trị tuyệt đối) **không phải** `luminance_history` (CV, tỉ lệ so với baseline
+  của chính cột). Chúng chỉ gặp nhau ở `nearest_luminance` (mục 5.7).
 
 ---
 
-## 2. Endpoints
+## 4. Xác thực — `/api/v1/auth` — `implemented`
 
-### 2.1 `GET /api/v1/poles` — cột đèn trên bản đồ
+Hai nhóm, client chọn bằng đường dẫn. Cả 7 endpoint không cần access token. Access token sống 60
+phút, luôn ở body, không bao giờ trong cookie.
 
-Query params:
+### 4.1 Nhóm mobile
 
-| Param | Kiểu | Bắt buộc | Ví dụ |
-|---|---|---|---|
-| `bbox` | `minLng,minLat,maxLng,maxLat` | **Có** | `106.48,10.96,106.52,10.99` |
-| `status` | CSV enum | Không | `dim,out` |
-| `power_source` | enum | Không | `solar` |
-| `segment_id` | string | Không | `SEG-001` |
-| `commune_id` | string | Không | `COM-001` |
-| `has_open_fault` | bool | Không | `true` |
-
-**Bắt buộc truyền `bbox`.** Không có endpoint "lấy tất cả" — tránh FE vô tình kéo vài nghìn cột.
-Nếu bbox trả > 2000 cột → BE trả `413` kèm `error.code = "BBOX_TOO_LARGE"`, FE hiển thị "Phóng to để xem chi tiết".
-
-Response: `FeatureCollection` — xem `mock-poles.geojson`.
-
-`properties` của mỗi cột:
-
-```
-pole_id, segment_id, fixture_status, status_confidence (0..1|null),
-power_source, fixture_type, lamp_watt, install_date, warranty_expiry,
-commune_id, last_seen_at, last_sweep_id, open_fault_count,
-has_iot_node (bool), near_sensitive_poi (bool)
-```
-
-> `near_sensitive_poi` = gần trường học/chợ/cầu/ngã ba. Dùng cho ưu tiên sửa chữa — FE nên có icon phụ.
-
----
-
-### 2.2 `GET /api/v1/poles/{pole_id}` — chi tiết + lịch sử
-
-Trả về đầy đủ để dựng panel chi tiết **trong 1 request** (không bắt FE gọi 4 lần).
-Xem `mock-pole-detail.json`. Gồm:
-
-- `fixture` — thông số lắp đặt, bảo hành
-- `current_status` — trạng thái hiện tại + kênh xác định (`cv`/`iot`)
-- `iot_node` — `null` nếu cột không có node (đa số cột sẽ là `null`)
-- `luminance_baseline` — `baseline_value`, `dim_threshold_ratio` (0.80), `out_threshold_ratio` (0.15)
-- `luminance_history[]` — chuỗi thời gian đã chuẩn hoá, mỗi điểm có `baseline_ratio` + `classified_as`
-- `runtime_history[]` — chỉ có khi cột có IoT node; `runtime_hours` theo từng đêm
-- `open_faults[]`
-- `recent_frames[]` — ảnh tham chiếu, có `thumbnail_url`
-
-**Điểm FE cần nắm:** biểu đồ độ sáng phải vẽ **`baseline_ratio`** (tỉ lệ so với chính cột đó), **không phải** giá trị tuyệt đối, và phải kẻ đường ngưỡng `dim_threshold_ratio`. Đây là cách duy nhất người dùng hiểu vì sao hệ thống gọi một cột là `dim`.
-
-Ngưỡng `dim_threshold_ratio` và `out_threshold_ratio` **cấu hình được qua BE-33**, không hard-code.
-
----
-
-### 2.3 `GET /api/v1/segments` — đoạn đường
-
-Query: `bbox` (bắt buộc), `commune_id`.
-Response: `FeatureCollection` của `LineString`.
-
-`properties`: `segment_id, segment_name, road_class, length_m, pole_count, controller_node_id, has_active_segment_fault`
-
-> Khi `has_active_segment_fault = true` → FE highlight **cả tuyến**, không chỉ từng điểm. Đây là output của Spatial Fault Clustering (lỗi breaker / đứt dây), khác về bản chất với lỗi từng bóng.
-
----
-
-### 2.4 `GET /api/v1/faults` — danh sách lỗi (phân trang, KHÔNG phải GeoJSON)
-
-Query: `bbox`, `status`, `severity`, `fault_type`, `source_channel`, `data_source`, `pole_id`, `segment_id`, `cluster_id`, `sort` (mặc định `-priority_score`), `page`, `page_size`.
-
-**`pole_id` nhận MỘT giá trị, không phải danh sách** — khác `status` (CSV enum ở §2.1). Lọc theo cột
-là câu hỏi về một cột.
-
-> 🔴 **Cột không tồn tại và cột ngoài phạm vi xã trả về GIỐNG HỆT nhau: `200` + mảng rỗng.**
-> Không 404, không 403, không thông điệp phân biệt.
->
-> Đây **không phải** chỗ để "cho thân thiện hơn". Nếu cột không tồn tại trả 404 còn cột ngoài phạm vi
-> trả mảng rỗng, thì hai câu trả lời khác nhau **tiết lộ rằng cột đó tồn tại ở xã khác** — filter trở
-> thành **kênh dò sự tồn tại**. Cùng lý lẽ §7 dùng để bắt truy cập trực tiếp ngoài phạm vi trả **404
-> chứ không phải 403**, và cùng lý lẽ `INVALID_CREDENTIALS` gộp sai-tên-đăng-nhập với sai-mật-khẩu.
->
-> **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
-
-Hình dạng mỗi item:
-
-```
-fault_id, pole_id (nullable), fixture_id (nullable), segment_id (nullable),
-location { lat, lng },
-fault_type, fault_status, severity, source_channel, data_source,
-priority_score, status_confidence (0..1 | null),
-cluster_id (nullable), detected_at, updated_at,
-work_order_id (nullable), note, reported_by (nullable)
-```
-
-Xem `mock-faults.json`.
-
-- `location` luôn có, để FE vẫn chấm được lên bản đồ khi cần.
-- `priority_score` là số thực do CV-16 tính. **Client không sắp xếp lại phía mình** — thứ tự mặc định do server quyết.
-- `cluster_id` khác null nghĩa là sự cố thuộc một cụm cấp đoạn; FE nên gộp hiển thị thay vì liệt kê từng dòng.
-
-> 🔴 **`work_order_id` hiện LUÔN trả `null`.** Bảng `work_order` chưa tồn tại và `fault` chưa có cột
-> tương ứng — trường vẫn được phát ra để client bind đúng hình dạng cuối ngay bây giờ, nhưng
-> **không xây UI phụ thuộc vào trường này** cho tới khi có lược đồ work order.
->
-> Khoá **luôn có mặt** với giá trị `null`; nó không bị bỏ khỏi JSON. Khoá vắng mặt khác khoá `null`,
-> và client không nên phải viết hai nhánh cho cùng một thứ.
->
-> Nợ có tên: **BE-21**. **`SELF-SIGNED` 07/09/2026** — xem `docs/contract-drift.md`.
-
----
-
-### 2.5 `PATCH /api/v1/faults/{fault_id}` — kỹ sư xác nhận/bác bỏ
-
-```json
-{ "fault_status": "confirmed", "override_fault_type": "lamp_dim", "note": "Đã kiểm tra tại chỗ" }
-```
-
-- Chỉ cho phép: `detected → confirmed | rejected`, `confirmed → in_progress → resolved → verified`
-- BE trả `409` nếu chuyển trạng thái không hợp lệ → FE disable nút thay vì để user bấm rồi lỗi.
-
----
-
-### 2.6 Work Orders
-
-- `GET /api/v1/work-orders` — query: `wo_status`, `assigned_to`, `segment_id`, phân trang. Xem `mock-work-orders.json`.
-- `POST /api/v1/work-orders` — body: `{ title, fault_ids[], assigned_to?, due_date? }`
-- `PATCH /api/v1/work-orders/{id}` — đổi `wo_status`, gán người
-- `POST /api/v1/work-orders/{id}/evidence` — `multipart/form-data`: `file`, `kind=before|after`, `captured_at`, `lat`, `lng`
-
-### 2.7 IoT & Sweeps (ưu tiên thấp cho FE giai đoạn 1)
-
-- `GET /api/v1/iot-nodes?bbox=` → `FeatureCollection` (xem `mock-iot-nodes.geojson`)
-- `GET /api/v1/sweeps` → lịch sử các đợt quét: `sweep_id, started_at, ended_at, segment_ids[], frame_count, coverage_pct, processing_status, data_source`
-- `GET /api/v1/frames/{frame_id}/thumbnail` → ảnh JPEG
-
----
-
-### 2.8 `POST /api/v1/faults` — báo sự cố tại hiện trường (BE-41)
-
-Cho tổ khảo sát báo sự cố phát sinh tại chỗ (FM-19).
-
-```json
-{
-  "client_op_id": "uuid-do-client-sinh",
-  "pole_id": "POLE-0123",
-  "fixture_id": "FIX-0145",
-  "location": { "lat": 10.9712, "lng": 106.4983 },
-  "fault_type": "lamp_out",
-  "severity": "medium",
-  "note": "Bóng vỡ, thấy khi đi qua",
-  "photo_frame_id": null
-}
-```
-
-| Trường | Bắt buộc | Ghi chú |
-|---|---|---|
-| `client_op_id` | Có | UUID client sinh, khử trùng lặp khi retry hoặc đồng bộ offline |
-| `pole_id` | **Không** | Null khi sự cố ở cột chưa có trong hồ sơ tài sản |
-| `fixture_id` | Không | Chỉ khi cột mang nhiều bóng và biết rõ bóng nào |
-| `location` | **Có khi `pole_id` null** | Bắt buộc để kỹ sư tìm được chỗ; bỏ qua nếu đã có `pole_id` |
-| `fault_type` | Có | Không nhận `segment_outage`, `node_offline`, `runtime_decline` — ba loại này chỉ engine sinh |
-| `severity` | Không | Mặc định `medium` |
-| `note` | Có | Tối thiểu 10 ký tự |
-| `photo_frame_id` | Không | Ảnh chụp tại chỗ, upload trước qua luồng evidence |
-
-**Server áp cứng, client không set được:** `source_channel` = `field_report`, `data_source` = `field`, `fault_status` = **`detected`**, `reported_by` = user trong JWT.
-
-`fault_status` khởi tạo là `detected` chứ không phải `confirmed`, kể cả khi người báo là cán bộ. Sự cố do người báo vẫn đi qua đúng một luồng duyệt như sự cố do engine sinh — kỹ sư xác nhận, không ai tạo thẳng ra sự cố đã xác nhận.
-
-**Response `201`:** đối tượng fault đầy đủ, cùng dạng một item của mục 2.4, kèm `fault_id` đã gán và `client_op_id` gửi lên.
-
-| Code | HTTP | Khi nào |
-|---|---|---|
-| `POLE_NOT_FOUND` | 404 | `pole_id` không tồn tại |
-| `LOCATION_REQUIRED` | 400 | Không có `pole_id` mà cũng không có `location` |
-| `FAULT_TYPE_NOT_REPORTABLE` | 400 | `fault_type` thuộc nhóm chỉ engine sinh |
-| `DUPLICATE_OP` | **200** | `client_op_id` đã xử lý — trả lại fault đã tạo, **không phải lỗi** |
-
-`DUPLICATE_OP` trả 200 chứ không phải 409, vì client retry là hành vi bình thường ở chế độ offline.
-
----
-
-### 2.9 Lux readings (BE-42)
-
-Ground truth cho RQ1. CV-12 đối chiếu số đo lux với phân loại của hệ thống.
-
-**`POST /api/v1/lux-readings`**
-
-```json
-{
-  "client_op_id": "uuid",
-  "pole_id": "POLE-0047",
-  "measured_at": "2026-10-02T19:42:00Z",
-  "lux_value": 12.4,
-  "meter_model": "UNI-T UT383",
-  "data_source": "calibration_rig",
-  "note": "Mức suy giảm 60%"
-}
-```
-
-`lux_value` là số thực, đơn vị lux, không âm. `measured_at` phải là ISO 8601 UTC hậu tố `Z`. `data_source` bắt buộc — trong Nhánh C hầu hết là `calibration_rig`.
-Response `201` kèm `lux_id`. Trùng `client_op_id` → **200** và trả bản ghi đã có.
-
-**`GET /api/v1/lux-readings/poles/{pole_id}`** — chuỗi số đo của một cột, sắp theo `measured_at` tăng dần. Dùng cho panel chi tiết cột.
-
-> ⚠️ **Đổi ở v1.3 — BREAKING.** Trước đó là `GET /api/v1/poles/{pole_id}/lux-readings`. Client gọi đường dẫn cũ sẽ nhận **404**, không phải lỗi có thông điệp. FM-14 và CV-12 phải sửa.
-
-**`GET /api/v1/lux-readings`** — query: `pole_id`, `from`, `to`, `data_source`, `page`, `page_size`. Phân trang chuẩn.
-
-Dùng cho CV-12 kéo toàn bộ số đo về đối chiếu hàng loạt. Mỗi item kèm sẵn **`nearest_luminance`** — điểm `luminance_history` gần nhất về thời gian của cùng cột, gồm `baseline_ratio`, `classified_as` và `observed_at`; `null` nếu không có điểm nào trong ±48 giờ.
-
-Ghép cặp ở server thay vì để CV-12 tự ghép: logic tìm điểm gần nhất phải giống hệt giữa lần chạy phân tích và lần chạy báo cáo. Nếu mỗi bên tự ghép thì hai con số sẽ khác nhau mà không ai biết vì sao.
-
-**Bộ hiệu chuẩn được mô hình hoá như tài sản thật.** Đăng ký bộ hiệu chuẩn FO-07 như một `RoadSegment` bình thường (ví dụ `SEG-900`) với các `Pole` và `Fixture` tương ứng, `data_source = calibration_rig`. Nhờ vậy toàn bộ pipeline chạy không cần nhánh riêng — baseline, phân loại, lux, biểu đồ lịch sử đều dùng chung một đường. Nếu tách thành thực thể riêng thì mọi truy vấn phải xử lý hai trường hợp, và phần kiểm chứng ở CV-09 sẽ không chạy đúng đường mà hệ thống thật chạy.
-
-### 2.10 Auth — `/api/v1/auth` (BE-07; nhóm web mới ở v1.2)
-
-Hai nhóm endpoint. **Client chọn nhóm bằng đường dẫn** — server không đoán client là ai từ bất kỳ header nào.
-
-| Nhóm | Dành cho | Refresh token đi qua | Trạng thái |
-|---|---|---|---|
-| `/api/v1/auth/{login,register,refresh,logout}` | Mobile (WP6) và mọi client không phải browser | Body JSON `refresh_token` | **CONTRACT** — hình dạng đang chạy từ BE-07, không đổi |
-| `/api/v1/auth/web/{login,refresh,logout}` | Web SPA (WP5), gọi **từ browser** | Cookie `HttpOnly` — **không bao giờ** nằm trong body | **CONTRACT** — mới ở v1.2 |
-
-Cả 7 endpoint **không cần access token**. Access token luôn nằm trong body response và được dùng như mục 0 (`Authorization: Bearer <jwt>`). **Access token không bao giờ nằm trong cookie.**
-
-#### 2.10.1 Nhóm mobile
-
-**`POST /api/v1/auth/login`**
-
-```json
-{ "username": "engineer", "password": "..." }
-```
-
-`200` — **đúng bốn trường, không hơn**:
+**`POST /api/v1/auth/login`** — body `{ "username", "password" }` → `200` đúng bốn trường:
 
 ```json
 { "access_token": "<jwt>", "refresh_token": "<chuỗi mờ>", "token_type": "Bearer", "expires_in": 3600 }
 ```
 
-`expires_in` là lifetime của **access** token, tính bằng giây.
+**`POST /api/v1/auth/refresh`** — body `{ "refresh_token" }` → `200` cùng bốn trường; token cũ thu
+hồi ngay; client **phải lưu token mới**.
 
-**`POST /api/v1/auth/refresh`** — body `{ "refresh_token": "..." }` → `200`, cùng bốn trường. Mỗi lần refresh trả **refresh token MỚI** và thu hồi token cũ ngay. Client **phải lưu token mới**: giữ token cũ thì lần refresh sau nhận `401`.
+**`POST /api/v1/auth/logout`** — body `{ "refresh_token" }` → **`204`** với mọi giá trị; thiếu trường
+→ `400 VALIDATION_FAILED`.
 
-**`POST /api/v1/auth/logout`** — body `{ "refresh_token": "..." }` → **`204`** với mọi giá trị token, kể cả token đã thu hồi hoặc không tồn tại. Thiếu trường `refresh_token` → `400 VALIDATION_FAILED`.
-
-**`POST /api/v1/auth/register`**
-
-```json
-{ "username": "...", "email": "...", "full_name": "...", "password": "..." }
-```
-
-`201`:
+**`POST /api/v1/auth/register`** — body `{ "username", "email", "full_name", "password" }` → `201`:
 
 ```json
 { "user_id": "USR-005", "username": "...", "email": "...", "full_name": "...",
@@ -434,176 +278,282 @@ Cả 7 endpoint **không cần access token**. Access token luôn nằm trong bo
   "message": "Account created. An administrator must assign communes before any data becomes visible." }
 ```
 
-- Server áp cứng `role` và `commune_ids`; client **không set được** — trường thừa trong body bị bỏ qua.
-- Mật khẩu tối thiểu **12 ký tự**, không ràng buộc thành phần.
-- Trùng username hoặc email → `409 IDENTIFIER_TAKEN`.
-- **Không trả token** — gọi `login` riêng. Tài khoản mới thấy danh sách rỗng cho tới khi được gán địa bàn: đó là đúng, không phải lỗi.
+Server áp cứng `role` và `commune_ids` (trường thừa bị bỏ qua); mật khẩu tối thiểu **12 ký tự**, không
+ràng buộc thành phần; trùng → `409 IDENTIFIER_TAKEN`; **không trả token**. Giới hạn độ dài: OpenAPI.
 
-Giới hạn độ dài từng trường của cả nhóm: xem `docs/openapi/luxmap-v1.json`.
+### 4.2 Nhóm web
 
-#### 2.10.2 Nhóm web
+**`POST /api/v1/auth/web/login`** — body `{ "username", "password", "remember_me"? }` (`remember_me`
+thiếu = `false`) → `200` đúng ba trường `{ access_token, token_type, expires_in }` + `Set-Cookie`.
+Cookie web còn hiệu lực trong request bị thu hồi trước khi mở phiên mới (cách duy nhất để đổi
+"ghi nhớ"/"không ghi nhớ"). Đăng nhập thất bại không thu hồi gì.
 
-**`POST /api/v1/auth/web/login`**
+**`POST /api/v1/auth/web/refresh`** — không body; đọc cookie → `200` ba trường + `Set-Cookie` mới.
+Cookie thiếu/sai → `401 INVALID_REFRESH_TOKEN`, **không đụng cookie**. Body gửi kèm bị bỏ qua.
 
-```json
-{ "username": "engineer", "password": "...", "remember_me": true }
-```
+**`POST /api/v1/auth/web/logout`** — không body; luôn `204`, luôn `Set-Cookie` xoá.
 
-`remember_me` là boolean, **không bắt buộc**; thiếu thì coi là `false`.
+**Chặn `Origin`** cho cả ba, xét trước mọi thứ khác: thiếu / lạ / `null` → `403 ORIGIN_NOT_ALLOWED`.
+Tách biệt với CORS. **CORS:** `Access-Control-Allow-Origin` = đúng origin (không `*`),
+`Allow-Credentials: true`, expose `X-Correlation-Id`.
 
-`200` — **đúng ba trường**, không có `refresh_token`:
-
-```json
-{ "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600 }
-```
-
-kèm `Set-Cookie` mang refresh token (mục 2.10.3).
-
-Nếu request đã mang cookie web còn hiệu lực, server **thu hồi phiên đó** rồi mới mở phiên mới. Đây là cách **duy nhất** để đổi giữa "ghi nhớ đăng nhập" và "không ghi nhớ": đăng nhập lại. Cookie thiếu, hỏng, hoặc không thuộc nhóm web → bỏ qua, không lỗi. Đăng nhập thất bại thì không có gì bị thu hồi.
-
-**`POST /api/v1/auth/web/refresh`** — **không có body**; refresh token đọc từ cookie.
-
-- `200` — cùng ba trường, kèm `Set-Cookie` mang token mới.
-- Không có cookie, hoặc cookie không hợp lệ → `401 INVALID_REFRESH_TOKEN`. **Nhánh lỗi không đụng tới cookie** — không xoá, không ghi đè.
-- Body gửi kèm bị bỏ qua: `refresh_token` trong body **không bao giờ** được đọc ở nhóm này.
-
-**`POST /api/v1/auth/web/logout`** — **không có body**. Thu hồi token trong cookie nếu hợp lệ, **luôn** kèm `Set-Cookie` xoá cookie, **luôn** trả `204`.
-
-**Chặn theo `Origin` — áp cho cả ba endpoint web, xét trước mọi thứ khác.** Request phải mang header `Origin` khớp **chính xác** một origin trong danh sách cho phép của server (cấu hình khi deploy). Thiếu `Origin`, `Origin` lạ, hoặc `Origin: null` → **`403 ORIGIN_NOT_ALLOWED`**.
-
-Lớp này tách biệt với CORS: CORS quyết browser có được **đọc** response hay không; lớp này quyết request có được **xử lý** hay không.
-
-**CORS:** với origin trong danh sách, API trả `Access-Control-Allow-Origin` bằng **đúng origin đó** (không bao giờ `*`) cùng `Access-Control-Allow-Credentials: true`, và expose header `X-Correlation-Id`.
-
-#### 2.10.3 Cookie refresh token (nhóm web)
+### 4.3 Cookie refresh token
 
 | Thuộc tính | Giá trị |
 |---|---|
 | Tên | `__Secure-luxmap_rt` |
-| `HttpOnly` | có — JavaScript không đọc được |
-| `Secure` | có |
+| `HttpOnly` / `Secure` | có / có |
 | `SameSite` | `Lax` |
-| `Path` | `/api/v1/auth/web` — browser chỉ gửi cookie tới ba endpoint web |
+| `Path` | `/api/v1/auth/web` |
 | `Domain` | không set (host-only) |
-| `Expires` | `remember_me = true`: thời điểm hết hạn của refresh token. `remember_me = false`: **không set** — cookie phiên |
+| `Expires` | `remember_me = true`: hạn refresh token; ngược lại **không set** (cookie phiên) |
 
-Các thuộc tính là **hằng số của API**, không đổi theo môi trường. Giá trị cookie là chuỗi mờ — client không đọc, không parse.
+Hằng số của API, không đổi theo môi trường. Giá trị là chuỗi mờ.
 
-#### 2.10.4 Loại phiên và thời hạn
+### 4.4 Loại phiên và thời hạn
 
-| Loại phiên | Tạo bởi | Refresh token hết hạn | Trần tuyệt đối |
+| Loại | Tạo bởi | Refresh token | Trần |
 |---|---|---|---|
-| `mobile` | `POST /auth/login` | 30 ngày, **trượt** — mỗi lần refresh tính lại từ lúc đó | 90 ngày kể từ lần đăng nhập |
-| `web_persistent` | `POST /auth/web/login`, `remember_me = true` | 14 ngày, trượt | 90 ngày kể từ lần đăng nhập |
-| `web_session` | `POST /auth/web/login`, `remember_me` là `false` hoặc thiếu | **12 giờ tuyệt đối** kể từ lần đăng nhập — refresh **không** kéo dài | 12 giờ |
+| `mobile` | `/auth/login` | 30 ngày, trượt | 90 ngày |
+| `web_persistent` | `/auth/web/login`, `remember_me=true` | 14 ngày, trượt | 90 ngày |
+| `web_session` | `/auth/web/login`, `remember_me` false/thiếu | **12 giờ tuyệt đối** | 12 giờ |
 
-Access token sống **60 phút** (`expires_in`), như nhau ở cả hai nhóm.
+- Refresh giữ nguyên loại phiên. Token nhóm này không dùng được ở nhóm kia (`401`, không thu hồi);
+  logout sai nhóm → `204`, không thu hồi gì.
+- Dùng lại token đã thay: trong 30 s → `401`, phiên vẫn sống; sau 30 s → `401` **và thu hồi cả chuỗi
+  đăng nhập đó**. Phiên khác của cùng user không bị ảnh hưởng.
+- Hai refresh cùng lúc bằng một token: đúng **một** thắng. Web nên gom refresh xuyên tab.
 
-- Refresh **giữ nguyên** loại phiên. Loại phiên chỉ được quyết lúc đăng nhập.
-- Phiên `web_session` hết hạn ở server sau 12 giờ, kể cả khi browser khôi phục cookie phiên (session restore).
-- **Token của nhóm này không dùng được ở nhóm kia.** Token web gửi tới `/auth/refresh`, hoặc token mobile gửi tới `/auth/web/refresh` → `401 INVALID_REFRESH_TOKEN`, token **không** bị thu hồi. Logout sai nhóm → `204`, không thu hồi gì.
-- **Dùng lại token đã bị thay** (cả hai nhóm): trong 30 giây sau khi bị thay → `401`, phiên vẫn sống (coi là retry khi mạng yếu). Sau 30 giây → `401` **và thu hồi toàn bộ phiên đăng nhập đó**. Phiên đăng nhập khác của cùng user không bị ảnh hưởng.
-- Hai request refresh cùng lúc bằng một token: **đúng một** request thắng, request kia `401`. Ở nhóm web, hai tab refresh cùng lúc sẽ gặp đúng trường hợp này — FE nên gom refresh thành một lượt duy nhất xuyên tab.
-
-#### 2.10.5 Claim trong access token
+### 4.5 Claim trong access token
 
 | Claim | Kiểu | Ví dụ |
 |---|---|---|
 | `sub` | chuỗi | `USR-001` |
-| `role` | **chuỗi đơn**, không phải mảng | `maintenance_engineer` |
-| `commune_ids` | **luôn là mảng** | `["COM-001"]` · Quản trị: `["*"]` |
+| `role` | chuỗi đơn (mục 3.1 `user_role`) | `maintenance_engineer` |
+| `commune_ids` | luôn là mảng | `["COM-001"]` · Quản trị `["*"]` |
 | `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
 
-#### 2.10.6 Mã lỗi nhóm Auth
+### 4.6 Ràng buộc triển khai web
 
-Hình dạng lỗi chung của mục 0.
+FE và API **cùng site** (cùng `https`, cùng eTLD+1; domain trong Public Suffix List thì mỗi subdomain
+là một site). Gọi `/auth/web/*` **từ browser** với `credentials: 'include'`; không gọi từ server của
+FE (không có `Origin` → 403, cookie không tới browser).
 
-| Mã | HTTP | Khi nào | Nhóm |
+---
+
+## 5. Endpoint theo resource
+
+### 5.1 Cột đèn — `[NOT IMPLEMENTED]` (BE-14, BE-20)
+
+**`GET /api/v1/poles`** — Query: `bbox` **bắt buộc** (`minLng,minLat,maxLng,maxLat`), `status` (CSV
+enum), `power_source`, `segment_id`, `commune_id`, `has_open_fault`, `data_source` (mặc định loại
+`calibration_rig`, mục 1.6). Quá 2000 cột → `413 BBOX_TOO_LARGE`, FE hiển thị "Phóng to để xem chi
+tiết". Response `FeatureCollection` (xem `mock-poles.geojson`), `properties`:
+
+```
+pole_id, segment_id, fixture_status, status_confidence (0..1|null), power_source, fixture_type,
+lamp_watt, install_date, warranty_expiry, commune_id, last_seen_at, last_sweep_id,
+open_fault_count, has_iot_node, near_sensitive_poi
+```
+
+`status_confidence` là `null` **khi và chỉ khi** `fixture_status = unknown`. Các trường lắp đặt lấy từ
+bóng **đang dùng** (duy nhất, mục 3.3). `data_source`, `external_ref`, `feeder_id` **không** emit.
+`near_sensitive_poi` = gần trường học/chợ/cầu/ngã ba, do người vận hành đặt.
+
+**`GET /api/v1/poles/{pole_id}`** — Đủ trong **một** request, hình dạng theo `mock-pole-detail.json`:
+`pole_id, segment_id, segment_name, commune_id, location{lat,lng}, fixture{fixture_type, power_source,
+lamp_watt, install_date, warranty_expiry}, current_status{fixture_status, status_confidence,
+determined_at, source_channel}, iot_node{node_id, node_status, last_report_at}|null,
+luminance_baseline{baseline_value, baseline_window_nights, dim_threshold_ratio, out_threshold_ratio,
+computed_at}, luminance_history[]{observed_at, sweep_id, normalized_luminance, baseline_ratio,
+classified_as}, runtime_history[]{night_of, runtime_hours, on_at, off_at, source} (chỉ khi có node),
+open_faults[]{fault_id, fault_type, severity, fault_status, priority_score}, recent_frames[]{frame_id,
+sweep_id, captured_at, thumbnail_url, distance_m, heading_deg}`.
+
+`baseline_ratio` và `classified_as` **tính ở backend**; FE vẽ `baseline_ratio` kèm đường ngưỡng
+`dim_threshold_ratio`. Ngưỡng cấu hình qua BE-33 (mặc định 0.80 / 0.15), không hard-code. `thumbnail_url`
+là đường dẫn **tương đối qua API**, không presigned. Ngoài phạm vi → `404`.
+
+### 5.2 Đoạn đường — `[NOT IMPLEMENTED]` (BE-14)
+
+**`GET /api/v1/segments`** — Query `bbox` bắt buộc, `commune_id`, `data_source` (mặc định loại
+`calibration_rig`). `FeatureCollection` của `LineString`; `properties`: `segment_id, segment_name,
+road_class, length_m, pole_count, controller_node_id, has_active_segment_fault`. `length_m` là giá trị
+**khai báo**. `has_active_segment_fault = true` → FE highlight cả tuyến (đầu ra CV-15).
+
+### 5.3 Quản lý kiểm kê tài sản — `/api/v1/assets/…` — `implemented`
+
+Tách khỏi `/poles` (endpoint bản đồ, mục 5.1). Ghi = **Quản trị**; đọc = mọi vai trò đã đăng nhập.
+
+| Endpoint | Body / Query | Trả về |
+|---|---|---|
+| **`GET /api/v1/assets/segments`** | `commune_id[]`, `page`, `page_size` | `PagedResult<string>` — **chỉ ID**. Chỗ giữ chỗ tới BE-12b |
+| **`GET /api/v1/assets/feeders`** | như trên | như trên |
+| **`GET /api/v1/assets/poles`** | như trên | như trên |
+| **`POST /api/v1/assets/segments`** | `{external_ref?, segment_name, road_class, length_m, geom_wkt, commune_id, data_source}` | `201` + `Location`, không body; `400` xã không tồn tại; `403` xã ngoài phạm vi; `409 EXTERNAL_REF_TAKEN` |
+| **`POST /api/v1/assets/feeders`** | `{external_ref?, feeder_name, commune_id, geom_wkt?}` | `201` + `Location` |
+| **`POST /api/v1/assets/poles`** | `{external_ref?, segment_id, feeder_id?, commune_id, geom_wkt, near_sensitive_poi?, data_source}` | `201` + `Location`; `404 ASSET_NOT_FOUND` tuyến/mạch; `409 CROSS_COMMUNE_REFERENCE` mạch khác xã |
+| **`POST /api/v1/assets/fixtures`** | `{pole_id, fixture_type, power_source, lamp_watt, install_date, removed_date?, warranty_expiry?, data_source}` — `commune_id` chép từ cột | `201` + `Location`; `409 POLE_HAS_ACTIVE_FIXTURE`; `400` nếu `removed_date < install_date` |
+| **`DELETE /api/v1/assets/poles/{poleId}`** | — | `204`; `404 ASSET_NOT_FOUND`; `409 ASSET_IN_USE` (khoá ngoại từ chối — kể cả qua bóng của cột) |
+| **`PUT /api/v1/assets/poles/{poleId}/feeder`** | `{"feeder_id": "FDR-001" \| null}` — khoá **bắt buộc**, `null` = không mạch | `204`; thiếu khoá → `400`; `409 CROSS_COMMUNE_REFERENCE` |
+| **`PUT /api/v1/assets/fixtures/{fixtureId}/removal`** | `{removed_date}` | `204`; `400` nếu trước `install_date` hoặc đã ngừng dùng |
+| **`POST /api/v1/assets/import/{kind}`** | multipart `file` ≤ 10 MB, `kind ∈ segments\|feeders\|poles\|fixtures`, `.csv`/`.geojson`/`.json` | **`200`** `{inserted, updated, failed, total_errors, truncated, rows[]{row, column, message}}` — 200 kể cả khi có dòng hỏng; `rows[]` cắt ở 100; `400` kind sai; `415` đuôi file sai |
+
+Nhập: kiểm **toàn bộ** file trước, ghi tập hợp lệ trong **một** transaction. Upsert theo
+`(commune_id, external_ref)` cho tuyến/mạch/cột; bóng **insert-only** (từ chối khi cột đang có bóng
+dùng; bóng đã ngừng dùng không chặn). Xã ngoài phạm vi, mạch khác xã, `removed_date < install_date`
+là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự tự thực thi qua `*_external_ref`. Mẫu:
+`docs/templates/`. `external_ref` **không** emit ra API.
+
+### 5.4 Sự cố
+
+**`GET /api/v1/faults`** — `[NOT IMPLEMENTED]` (BE-40). Phân trang JSON, **không** GeoJSON. Query:
+`bbox, status, severity, fault_type, source_channel, data_source, pole_id, segment_id, cluster_id,
+sort (mặc định -priority_score), page, page_size`. `pole_id` nhận **một** giá trị; cột không tồn tại và
+cột ngoài phạm vi trả **giống hệt**: `200` + rỗng (kênh dò sự tồn tại bị đóng). Mỗi item:
+
+```
+fault_id, pole_id|null, fixture_id|null, segment_id|null, location{lat,lng},
+fault_type, fault_status, severity, source_channel, data_source,
+priority_score|null, status_confidence (0..1|null), cluster_id|null, detected_at, updated_at,
+work_order_id|null, note, reported_by|null
+```
+
+Xem `mock-faults.json`. `priority_score` do CV-16 tính, client không sắp lại. `cluster_id` khác null →
+FE gộp hiển thị. `work_order_id` **luôn `null`** cho tới BE-21, khoá vẫn có mặt — không xây UI phụ
+thuộc nó.
+
+**`PATCH /api/v1/faults/{fault_id}`** — `[NOT IMPLEMENTED]` (BE-19). Body
+`{ fault_status, override_fault_type?, note? }`; sai luồng (mục 3.2) → `409` để FE disable nút trước.
+
+**`POST /api/v1/faults`** — `[NOT IMPLEMENTED]` (BE-41). Tổ khảo sát báo tại chỗ (FM-19). Body:
+
+| Trường | Bắt buộc | Ghi chú |
+|---|---|---|
+| `client_op_id` | Có | UUID, khử trùng lặp |
+| `pole_id` | Không | null khi cột chưa có trong hồ sơ |
+| `fixture_id` | Không | Chỉ khi biết rõ bóng |
+| `location` | Có khi `pole_id` null | |
+| `commune_id` | Có khi `pole_id` null **và** user có nhiều xã | Có pole thì server tra từ pole, client gửi → `400`; không pole và user đúng một xã → lấy từ claim (v1.4, O-10) |
+| `fault_type` | Có | không nhận `segment_outage`, `node_offline`, `runtime_decline` |
+| `severity` | Không | mặc định `medium` |
+| `note` | Có | ≥ 10 ký tự |
+| `photo_frame_id` | Không | Ảnh upload trước qua luồng evidence |
+
+Server áp cứng `source_channel = field_report`, `data_source = field`, `fault_status = detected`
+(kể cả cán bộ báo), `reported_by` = JWT. `201` item đầy đủ kèm `client_op_id`; trùng → **`200
+DUPLICATE_OP`**; `404 POLE_NOT_FOUND`; `400 LOCATION_REQUIRED` / `FAULT_TYPE_NOT_REPORTABLE`.
+
+### 5.5 Phiếu công việc — `[NOT IMPLEMENTED]` (BE-21..BE-24)
+
+- **`GET /api/v1/work-orders`** — query `wo_status`, `assigned_to`, `segment_id`, phân trang; item theo
+  `mock-work-orders.json`: `work_order_id, title, segment_id, cluster_id, fault_ids[], wo_status,
+  assigned_to, priority_score, created_at, due_date`.
+- **`POST /api/v1/work-orders`** — `{ title, fault_ids[], assigned_to?, due_date? }` → `201`.
+- **`PATCH /api/v1/work-orders/{work_order_id}`** — đổi `wo_status`, gán người; luồng: `[OPEN → O-3]`.
+- **`POST /api/v1/work-orders/{work_order_id}/evidence`** — `multipart/form-data`: `file` (JPEG theo
+  magic bytes), `kind=before|after`, `captured_at`, `lat`, `lng`; sai định dạng → `415
+  UNSUPPORTED_IMAGE_FORMAT`.
+
+### 5.6 IoT, sweep, ảnh — `[NOT IMPLEMENTED]`
+
+- **`GET /api/v1/iot-nodes`** — `bbox` bắt buộc → `FeatureCollection`; `properties` theo
+  `mock-iot-nodes.geojson`: `node_id, node_role, node_status, pole_id, segment_id, battery_pct,
+  last_report_at` (BE-14).
+- **`GET /api/v1/sweeps`** — `sweep_id, started_at, ended_at, segment_ids[], frame_count, coverage_pct,
+  processing_status, data_source` (BE-17). Enum `processing_status`: `[OPEN → O-4]`.
+- **`GET /api/v1/frames/{frame_id}/thumbnail`** — JPEG, **proxy qua API, không presigned** (phạm vi
+  địa bàn áp cho ảnh như cho hàng); kích thước 320 px cạnh dài / q80 là **tạm**: `[OPEN → O-4]` (BE-15).
+
+### 5.7 Số đo lux — `implemented`
+
+Ground truth cho RQ1; CV-12 đối chiếu với phân loại của hệ thống.
+
+**`POST /api/v1/lux-readings`**
+
+```json
+{ "client_op_id": "uuid", "pole_id": "POLE-0047", "measured_at": "2026-10-02T19:42:00Z",
+  "lux_value": 12.4, "meter_model": "UNI-T UT383", "data_source": "calibration_rig", "note": "..." }
+```
+
+| Trường | Bắt buộc | Ghi chú |
+|---|---|---|
+| `client_op_id` | Có | UUID, khử trùng lặp |
+| `pole_id` | Có | Bộ hiệu chuẩn cũng là cột thật |
+| `measured_at` | Có | ISO 8601 UTC `Z` |
+| `lux_value` | Có | Số thực, không âm, **hữu hạn** (NaN/Infinity → `400`); không có trần — trên 200 lux chỉ log cảnh báo, vẫn lưu |
+| `data_source` | Có | Nhánh C hầu hết là `calibration_rig` |
+| `meter_model`, `note` | Không | |
+| `lux_id`, `commune_id` | **Cấm** | Server sở hữu → `400 SERVER_OWNED_FIELD`; `commune_id` tra từ cột |
+
+`measured_by` = user trong JWT, lưu FK, **không emit**. `201` kèm `lux_id`; trùng `client_op_id` →
+**`200`** bản ghi đã có; `404 POLE_NOT_FOUND` (cả khi ngoài phạm vi). Response: `lux_id, client_op_id,
+pole_id, measured_at, lux_value, meter_model, data_source, note`.
+
+**`GET /api/v1/lux-readings/poles/{poleId}`** — chuỗi của một cột, sắp `measured_at` tăng dần, **có phân
+trang** (một cột rig tích hàng trăm điểm). **Đổi đường dẫn ở v1.3 (BREAKING)** — đường cũ
+`/poles/{id}/lux-readings` trả 404.
+
+**`GET /api/v1/lux-readings`** — query `pole_id, from, to, data_source, page, page_size`. `from`/`to`
+là biên **đóng** hai đầu; thiếu hậu tố `Z` được đọc là UTC. Mỗi item kèm
+`nearest_luminance{baseline_ratio, classified_as, observed_at}|null` — điểm `luminance_history` gần
+nhất theo **thời gian** ±48 giờ của cùng cột, ghép ở server. ⚠️ **Hiện luôn `null`** cho tới khi BE-17
+tạo `luminance_history` — khác với "không có điểm trong ±48 giờ"; CV-12 không phân biệt được hai ca
+qua API. Nợ có chủ: BE-15/BE-17.
+
+### 5.8 Đồng bộ offline — `[NOT IMPLEMENTED]` (BE-43)
+
+- **`GET /api/v1/sync/bundle`** — `?segment_id=&since=` → `{generated_at, poles (5.1), segments (5.2),
+  open_faults[] (item 5.4), work_orders[] (item 5.5)}`, trong phạm vi claim. Hình dạng đề xuất, chốt
+  ở FW kế tiếp: `[OPEN → O-5]`.
+- **`POST /api/v1/sync/push`** — `{operations[]{client_op_id, op_type, payload}}` → `{applied[]{client_op_id,
+  id}, conflicts[]{client_op_id, reason, server_state}}`; khử trùng lặp theo `client_op_id`; xung đột:
+  **server thắng**. Hình dạng đề xuất: `[OPEN → O-5]`.
+
+---
+
+## 6. Việc BE phải khớp
+
+1. Bảng/cột `snake_case` thường, không quote. 2. `TIMESTAMPTZ` với `DateTimeKind.Utc`.
+3. `geometry(Point|LineString, 4326)` + GIST; bbox dùng `ST_Intersects` với index, không quét bảng.
+4. bbox < 500 ms với 2000 cột. 5. Enum chuỗi thường. 6. ID bằng sequence + `luxmap_format_id`.
+7. `data_source` trên tám entity (mục 1.6). 8. `client_op_id` khử trùng lặp: `POST /faults`,
+`POST /lux-readings`, `POST /sync/push` — trùng trả **200**. 9. Bộ hiệu chuẩn là `RoadSegment` thật.
+10. Mọi cột `double precision` đo được có CHECK hữu hạn (`<> 'NaN'`, `<> 'Infinity'`).
+
+## 7. Chưa chốt (chưa chặn FE)
+
+Vector tile khi vượt ~5000 cột; realtime khi sweep xong (giai đoạn 1 polling); lưu ảnh dài hạn.
+
+## 8. Bộ mock FO-26 và việc FE làm được ngay
+
+`mocks/`: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), cụm lỗi cả đoạn trên `SEG-003`,
+**12 IoT node**, `POLE-0047` (solar, `dim`, `NODE-047`, runtime suy giảm 18 đêm). Mock đã khớp bảng
+prefix mục 1.2 từ 18/09/2026 (`NODE-047`, `SWP-001..030`, `FRM-088213`, `USR-004`; bỏ `supplier`) —
+**WP5/WP6 phải kéo lại**. Việc FE làm được ngay: map shell MapLibre + 4 file mock; symbology 4 màu +
+grid/solar + icon `has_iot_node`/`near_sensitive_poi`; cluster ở zoom xa; panel chi tiết với 2 biểu đồ
+(`baseline_ratio` + ngưỡng, `runtime_hours`); state map vào URL; bảng lỗi theo `priority_score`;
+highlight `SEG-003`.
+
+## 9. Open items
+
+| O | Nội dung | Owner | Hạn |
 |---|---|---|---|
-| `VALIDATION_FAILED` | 400 | Body sai định dạng hoặc thiếu trường | mobile; `web/login` |
-| `INVALID_CREDENTIALS` | 401 | Sai tài khoản **hoặc** sai mật khẩu — cố ý chung một mã | cả hai |
-| `ACCOUNT_LOCKED` | 403 | Đúng mật khẩu nhưng tài khoản bị khoá; áp cả ở refresh | cả hai |
-| `INVALID_REFRESH_TOKEN` | 401 | Refresh token thiếu, sai, hết hạn, đã thu hồi, bị dùng lại, hoặc sai nhóm — cố ý chung một mã | cả hai |
-| `ORIGIN_NOT_ALLOWED` | 403 | `Origin` thiếu, lạ, hoặc `null` | chỉ web |
-| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username hoặc email | `register` |
+| **O-1** | Tên tuyến `segment_name` BE ≠ FE (`SEG-001..003`) — cần người biết địa bàn | Thịnh/Ngọc | FW kế tiếp |
+| **O-2** | Vai trò được GHI cho sweep/frame (BE-15/17), fault (BE-19/41), work order (BE-21/24) — theo EXACT-ROLE | Dylan + WP5/WP6 | trước BE-15 |
+| **O-3** | Máy trạng thái `wo_status` (BE-22) | Dylan | trước BE-21 |
+| **O-4** | Enum `processing_status` của sweep; kích thước thumbnail (320/q80 tạm) | Dylan + WP5 | FW kế tiếp, trước W6 |
+| **O-5** | Hình dạng `sync/bundle` / `sync/push` (đề xuất ở 5.8) | Dylan + WP6 | FW kế tiếp, trước W14 |
+| **O-6** | `feeder_id` cho 103 cột mock: file gán riêng `mocks/mock-pole-feeders.csv` (D-7) — cần người biết mạch điện; chặn RQ2/CV-15 | Dylan + FO | trước BE-13 |
+| **O-7** | FK ghép `(feeder_id, commune_id)` (D-10) — ticket riêng trước BE-13; tới lúc đó mọi đường ghi phải gọi kiểm cùng xã | BE1 | trước BE-13 |
+| **O-8** | Thư viện Redocly `license` cho spec; server staging/prod trong `servers` | Dylan | khi có |
 
-#### 2.10.7 Ràng buộc triển khai nhóm web
+## 10. Changelog
 
-**FE và API phải CÙNG SITE** — cùng scheme `https` và cùng registrable domain (eTLD+1):
-
-- Cùng site: `app.example.vn` và `api.example.vn`.
-- Khác site: `app.example.vn` và `api.other.vn`.
-- Domain nằm trong Public Suffix List (ví dụ `*.vercel.app`, `*.azurewebsites.net`): **mỗi subdomain là một site riêng** — `a.vercel.app` và `b.vercel.app` là khác site.
-
-Triển khai khác site **không được hỗ trợ**: với `SameSite=Lax`, browser không gửi cookie trong request cross-site, nên `web/refresh` luôn nhận `401`.
-
-**Gọi từ browser, không gọi từ server của FE.** Mọi call `/api/v1/auth/web/*` — **kể cả `login`** — phải đi **từ browser**, với `credentials: 'include'` (fetch) hoặc `withCredentials: true` (XHR/axios). Thiếu option này, browser bỏ qua `Set-Cookie` của response cross-origin. **Không gọi nhóm auth từ Next.js server** (route handler, server action, SSR): request đó không mang `Origin` của browser nên nhận `403`, và cookie không bao giờ tới được browser.
-
----
-
-## 3. Đồng bộ offline (Field Module)
-
-- `GET /api/v1/sync/bundle?segment_id=SEG-001&since=<iso>` → gói gọn: poles + segments + open faults + work orders được giao, để cache xuống máy.
-- `POST /api/v1/sync/push` → đẩy thay đổi offline lên, mỗi item có `client_op_id` (UUID do client sinh).
-- **Idempotency:** BE khử trùng lặp theo `client_op_id`. FE cứ retry thoải mái, không sợ tạo trùng.
-- Xung đột: server thắng, trả `conflicts[]` để FE hiển thị cho người dùng xử lý.
-- `sync/bundle` chỉ đóng gói dữ liệu **trong phạm vi địa bàn của user** — xem mục 7.
-
----
-
-## 4. Việc FE làm được NGAY (không chờ BE)
-
-1. Dựng map shell với MapLibre GL JS + nền OSM raster, load thẳng 4 file mock kèm theo.
-2. Chốt symbology: 4 màu trạng thái + phân biệt grid/solar + icon phụ cho `has_iot_node` và `near_sensitive_poi` + legend.
-3. Cluster ở zoom xa, hiện từng cột ở zoom gần (MapLibre có sẵn `cluster: true`).
-4. Panel chi tiết cột từ `mock-pole-detail.json` — gồm 2 biểu đồ: `baseline_ratio` theo đêm (có đường ngưỡng), và `runtime_hours` theo đêm.
-5. Đồng bộ state map vào URL: `?lat=&lng=&zoom=&pole=&status=`
-6. Bảng danh sách lỗi sắp theo `priority_score`, click → bay tới cột trên bản đồ.
-7. Highlight `SEG-003` để test luồng hiển thị lỗi cả đoạn.
-
-Mock data đã cố tình cài sẵn: 103 cột (70 normal / 9 dim / 17 out / 7 unknown), một cụm lỗi cả đoạn trên `SEG-003`, 11 IoT node, và một cột solar (`POLE-0047`) có chuỗi runtime suy giảm dần 18 đêm — dùng để test biểu đồ cảnh báo sớm pin.
-
----
-
-## 5. Việc BE phải khớp
-
-1. Bảng/cột PostgreSQL đặt **snake_case toàn chữ thường**, không quote.
-2. Mọi `TIMESTAMPTZ` ghi/đọc bằng `DateTimeKind.Utc` — sai kind Npgsql sẽ ném exception.
-3. Cột hình học lưu `geometry(Point, 4326)` / `geometry(LineString, 4326)`, có **GIST index** — query `bbox` bắt buộc dùng `ST_Intersects` với index, không quét bảng.
-4. Endpoint `bbox` phải trả trong **< 500ms với 2000 cột**.
-5. Trả đúng enum ở dạng chuỗi thường, **không trả số** (int enum của .NET sẽ làm hỏng FE).
-6. Sinh ID bằng sequence PostgreSQL theo bảng prefix mục 0.2 — **quyết trước BE-09**, sửa sau là phải sửa toàn bộ entity.
-7. Thêm `data_source` vào `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReading`; mọi API thống kê lọc và nhóm được theo trường này.
-8. `client_op_id` khử trùng lặp áp dụng cho `POST /faults`, `POST /lux-readings` và `POST /sync/push` — trùng thì trả **200**, không phải lỗi.
-9. Đăng ký bộ hiệu chuẩn như `RoadSegment` thật, không tạo thực thể riêng.
-
----
-
-## 6. Chưa chốt (chưa chặn FE)
-
-- Vector tile thay GeoJSON khi vượt ~5000 cột
-- Cơ chế realtime (WebSocket/SSE) khi sweep xử lý xong — giai đoạn 1 dùng polling
-- Định dạng lưu ảnh gốc & chính sách lưu trữ dài hạn
-
-*(Phân quyền chi tiết theo `commune_id` đã chuyển sang mục 7 — không còn để mở.)*
-
----
-
-## 7. Phân quyền theo địa bàn (BE-08)
-
-JWT mang claim `commune_ids` — mảng các `COM-xxx` mà user được phép truy cập.
-
-| Vai trò | Phạm vi |
-|---|---|
-| Kỹ sư bảo trì | Đúng các xã trong claim |
-| Tổ khảo sát / sửa chữa | Đúng các xã trong claim |
-| Cơ quan quản lý | Có thể gồm nhiều xã |
-| Quản trị | Toàn hệ thống, claim mang giá trị đặc biệt `*` |
-
-Quy tắc:
-
-- **Lọc ở server, luôn luôn.** Mọi truy vấn tự động giới hạn trong phạm vi claim, kể cả khi client không truyền gì.
-- Query param `commune_id` là bộ lọc **thu hẹp trong phạm vi được phép**, không phải cách mở rộng phạm vi.
-- Yêu cầu `commune_id` ngoài phạm vi → **403** `COMMUNE_FORBIDDEN`.
-- Truy cập trực tiếp một tài nguyên ngoài phạm vi (ví dụ `GET /poles/POLE-9999`) → **404**, không phải 403. Trả 403 sẽ tiết lộ tài nguyên đó tồn tại.
-- `GET /sync/bundle` chỉ đóng gói dữ liệu trong phạm vi claim.
+| Phiên bản | Ngày | Thay đổi |
+|---|---|---|
+| v1.4 | 18/09/2026 | Hợp nhất ba nguồn. Gộp và đóng drift 2, 3, 4, 6, 7, 8, 10, 12, 14, 15, 17–21, 27–31, 33–39, 43 và quyết định A–E; mã lỗi mới `ROLE_FORBIDDEN` (D-4), `CROSS_COMMUNE_REFERENCE` (D-5), `POLE_HAS_ACTIVE_FIXTURE` (D-11); một bóng đang dùng/cột (D-11) và `removed_date >= install_date` (Q-4); `data_source` tám entity + mặc định loại `calibration_rig` (D-13); `user_role` + EXACT-ROLE + bảng ghi (D-14); fault MỞ (O-7 cũ); `commune_id` trong `POST /faults` (O-10 cũ); `from`/`to` không `Z` = UTC (D-12); `status_confidence` hữu hạn 0..1; mock đổi ID (D-9); §4 số liệu mock cập nhật. Đánh số mục lại, bảng ánh xạ ở đầu file |
+| v1.3 | 15/09/2026 | **BREAKING** `GET /poles/{id}/lux-readings` → `GET /lux-readings/poles/{id}` |
+| v1.2 | 11/09/2026 | Nhóm Auth (mobile + web cookie) |
+| v1.1 | 24/08/2026 | `manual` → `field_report`; `data_source`; quy ước ID; hình dạng item `GET /faults`; `POST /faults`; lux; phân quyền địa bàn |
+| v1.0 | 23/08/2026 | Bản đầu |

@@ -3,6 +3,7 @@ using System;
 using LuxMap.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LuxMap.Persistence.Migrations
 {
     [DbContext(typeof(LuxMapDbContext))]
-    partial class LuxMapDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260918155017_FixtureRemovedAfterInstall")]
+    partial class FixtureRemovedAfterInstall
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -317,8 +320,6 @@ namespace LuxMap.Persistence.Migrations
                     b.ToTable("pole_current_status", null, t =>
                         {
                             t.HasCheckConstraint("ck_pole_current_status_confidence_matches_status", "(status_confidence IS NULL) = (fixture_status = 'unknown')");
-
-                            t.HasCheckConstraint("ck_pole_current_status_confidence_range", "status_confidence IS NULL OR (status_confidence >= 0 AND status_confidence <= 1 AND status_confidence <> 'NaN'::float8 AND status_confidence <> 'Infinity'::float8 AND status_confidence <> '-Infinity'::float8)");
 
                             t.HasCheckConstraint("ck_pole_current_status_fixture_status", "\"fixture_status\" IN ('normal', 'dim', 'out', 'unknown')");
                         });
