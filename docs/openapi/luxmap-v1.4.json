@@ -2,8 +2,8 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "DRAFT hợp nhất (BE-REVIEW-02, 18/09/2026) — KHÔNG phải spec sinh từ code. Sinh từ docs/openapi/luxmap-v1.json (21 operation đã hiện thực) cộng các endpoint Contract chưa có code, đánh dấu x-luxmap-status = not_implemented. Số hiệu phiên bản chờ Dylan (D-1). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
-    "version": "1.2-draft"
+    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.4, 18/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 21 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "version": "1.4"
   },
   "paths": {
     "/api/v1/assets/import/{kind}": {
@@ -136,7 +136,7 @@
         "summary": "Nạp MỘT loại file kiểm kê (segments|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
         "operationId": "postAssetsImportKind",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/segments": {
@@ -218,7 +218,7 @@
         "summary": "Danh sách ID tuyến (chỗ giữ chỗ BE-12b)",
         "operationId": "getAssetsSegments",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       },
       "post": {
         "tags": [
@@ -321,7 +321,7 @@
         "summary": "Tạo tuyến đường; 201 + Location, không body",
         "operationId": "postAssetsSegments",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/feeders": {
@@ -383,7 +383,7 @@
         "summary": "Danh sách ID mạch điện (chỗ giữ chỗ BE-12b)",
         "operationId": "getAssetsFeeders",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       },
       "post": {
         "tags": [
@@ -466,7 +466,7 @@
         "summary": "Tạo mạch điện; 201 + Location, không body",
         "operationId": "postAssetsFeeders",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/poles": {
@@ -528,7 +528,7 @@
         "summary": "Danh sách ID cột (chỗ giữ chỗ BE-12b)",
         "operationId": "getAssetsPoles",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       },
       "post": {
         "tags": [
@@ -617,6 +617,26 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -631,7 +651,7 @@
         "summary": "Tạo cột; 201 + Location, không body",
         "operationId": "postAssetsPoles",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/fixtures": {
@@ -702,6 +722,26 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -716,7 +756,7 @@
         "summary": "Ghi một lần lắp bóng; commune_id chép từ cột",
         "operationId": "postAssetsFixtures",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/poles/{poleId}": {
@@ -812,7 +852,7 @@
         "summary": "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
         "operationId": "deleteAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/poles/{poleId}/feeder": {
@@ -913,6 +953,26 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -927,7 +987,7 @@
         "summary": "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
         "operationId": "putAssetsPolesPoleidFeeder",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/assets/fixtures/{fixtureId}/removal": {
@@ -968,6 +1028,26 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -1002,7 +1082,7 @@
         "summary": "Ngừng dùng bóng bằng removed_date; không có DELETE",
         "operationId": "putAssetsFixturesFixtureidRemoval",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift 29/33/34/43 — CONFIRM"
+        "x-luxmap-contract": "§5.3"
       }
     },
     "/api/v1/auth/login": {
@@ -1114,7 +1194,7 @@
         "summary": "Đăng nhập mobile; trả đúng bốn trường",
         "operationId": "postAuthLogin",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.1",
+        "x-luxmap-contract": "§4.1",
         "security": []
       }
     },
@@ -1207,7 +1287,7 @@
         "summary": "Đăng ký mở; tạo danh tính, không tạo quyền",
         "operationId": "postAuthRegister",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.1",
+        "x-luxmap-contract": "§4.1",
         "security": []
       }
     },
@@ -1320,7 +1400,7 @@
         "summary": "Xoay vòng refresh token (mobile)",
         "operationId": "postAuthRefresh",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.1",
+        "x-luxmap-contract": "§4.1",
         "security": []
       }
     },
@@ -1376,7 +1456,7 @@
         "summary": "Thu hồi refresh token (mobile); luôn 204",
         "operationId": "postAuthLogout",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.1",
+        "x-luxmap-contract": "§4.1",
         "security": []
       }
     },
@@ -1519,7 +1599,7 @@
         "summary": "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",
         "operationId": "postLuxReadings",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.9"
+        "x-luxmap-contract": "§5.7"
       },
       "get": {
         "tags": [
@@ -1603,7 +1683,7 @@
         "summary": "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
         "operationId": "getLuxReadings",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.9"
+        "x-luxmap-contract": "§5.7"
       }
     },
     "/api/v1/lux-readings/poles/{poleId}": {
@@ -1683,7 +1763,7 @@
         "summary": "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
         "operationId": "getLuxReadingsPolesPoleid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.9"
+        "x-luxmap-contract": "§5.7"
       }
     },
     "/api/v1/auth/web/login": {
@@ -1803,7 +1883,7 @@
         "summary": "Đăng nhập web; refresh token vào cookie",
         "operationId": "postAuthWebLogin",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.2",
+        "x-luxmap-contract": "§4.2",
         "security": []
       }
     },
@@ -1890,7 +1970,7 @@
         "summary": "Xoay vòng refresh token từ cookie; không body",
         "operationId": "postAuthWebRefresh",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.2"
+        "x-luxmap-contract": "§4.2"
       }
     },
     "/api/v1/auth/web/logout": {
@@ -1939,7 +2019,7 @@
         "summary": "Thu hồi token trong cookie, luôn xoá cookie, luôn 204",
         "operationId": "postAuthWebLogout",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§2.10.2"
+        "x-luxmap-contract": "§4.2"
       }
     },
     "/api/v1/poles": {
@@ -1948,10 +2028,10 @@
           "Poles"
         ],
         "summary": "[NOT IMPLEMENTED] Cột đèn trên bản đồ theo bbox (FeatureCollection)",
-        "description": "Contract §2.1. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.1. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
         "operationId": "getPoles",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.1",
+        "x-luxmap-contract": "§5.1",
         "x-luxmap-ticket": "BE-14",
         "parameters": [
           {
@@ -2006,6 +2086,15 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DataSource"
+            },
+            "description": "Mặc định LOẠI calibration_rig; truyền tường minh để thấy bộ hiệu chuẩn (Contract §1.6)"
           }
         ],
         "responses": {
@@ -2068,10 +2157,10 @@
           "Poles"
         ],
         "summary": "[NOT IMPLEMENTED] Chi tiết cột + lịch sử, đủ trong MỘT request",
-        "description": "Contract §2.2. Chưa có code — ticket BE-20. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.1. Chưa có code — ticket BE-20. Giữ trong Contract, không xoá.",
         "operationId": "getPolesPoleId",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.2",
+        "x-luxmap-contract": "§5.1",
         "x-luxmap-ticket": "BE-20",
         "parameters": [
           {
@@ -2123,10 +2212,10 @@
           "Segments"
         ],
         "summary": "[NOT IMPLEMENTED] Đoạn đường theo bbox (FeatureCollection của LineString)",
-        "description": "Contract §2.3. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.2. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
         "operationId": "getSegments",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.3",
+        "x-luxmap-contract": "§5.2",
         "x-luxmap-ticket": "BE-14",
         "parameters": [
           {
@@ -2146,6 +2235,15 @@
             "schema": {
               "$ref": "#/components/schemas/CommuneId"
             }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DataSource"
+            },
+            "description": "Mặc định LOẠI calibration_rig (Contract §1.6)"
           }
         ],
         "responses": {
@@ -2198,10 +2296,10 @@
           "Faults"
         ],
         "summary": "[NOT IMPLEMENTED] Danh sách sự cố — phân trang JSON, KHÔNG phải GeoJSON",
-        "description": "Contract §2.4. Chưa có code — ticket BE-40. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.4. Chưa có code — ticket BE-40. Giữ trong Contract, không xoá.",
         "operationId": "getFaults",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.4",
+        "x-luxmap-contract": "§5.4",
         "x-luxmap-ticket": "BE-40",
         "parameters": [
           {
@@ -2265,7 +2363,7 @@
             "schema": {
               "$ref": "#/components/schemas/PoleId"
             },
-            "description": "MỘT giá trị. Cột không tồn tại và cột ngoài phạm vi trả GIỐNG NHAU: 200 + rỗng (quyết định A, SELF-SIGNED 07/09/2026 — CONFIRM)"
+            "description": "MỘT giá trị. Cột không tồn tại và cột ngoài phạm vi trả GIỐNG NHAU: 200 + rỗng (Contract §5.4)"
           },
           {
             "name": "segment_id",
@@ -2314,7 +2412,7 @@
               "maximum": 200,
               "default": 50
             },
-            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (drift 7, CONFIRM)"
+            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (Contract §1.3)"
           }
         ],
         "responses": {
@@ -2355,10 +2453,10 @@
           "Faults"
         ],
         "summary": "[NOT IMPLEMENTED] Tổ khảo sát báo sự cố tại hiện trường",
-        "description": "Contract §2.8. Chưa có code — ticket BE-41. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.4. Chưa có code — ticket BE-41. Giữ trong Contract, không xoá.",
         "operationId": "postFaults",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.8",
+        "x-luxmap-contract": "§5.4",
         "x-luxmap-ticket": "BE-41",
         "requestBody": {
           "required": true,
@@ -2430,10 +2528,10 @@
           "Faults"
         ],
         "summary": "[NOT IMPLEMENTED] Kỹ sư xác nhận / bác bỏ / phân loại lại",
-        "description": "Contract §2.5. Chưa có code — ticket BE-19. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.4. Chưa có code — ticket BE-19. Giữ trong Contract, không xoá.",
         "operationId": "patchFaultsFaultId",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.5",
+        "x-luxmap-contract": "§5.4",
         "x-luxmap-ticket": "BE-19",
         "parameters": [
           {
@@ -2515,10 +2613,10 @@
           "WorkOrders"
         ],
         "summary": "[NOT IMPLEMENTED] Danh sách phiếu công việc (phân trang)",
-        "description": "Contract §2.6. Chưa có code — ticket BE-21. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.5. Chưa có code — ticket BE-21. Giữ trong Contract, không xoá.",
         "operationId": "getWorkOrders",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.6",
+        "x-luxmap-contract": "§5.5",
         "x-luxmap-ticket": "BE-21",
         "parameters": [
           {
@@ -2568,7 +2666,7 @@
               "maximum": 200,
               "default": 50
             },
-            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (drift 7, CONFIRM)"
+            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (Contract §1.3)"
           }
         ],
         "responses": {
@@ -2599,10 +2697,10 @@
           "WorkOrders"
         ],
         "summary": "[NOT IMPLEMENTED] Tạo phiếu công việc từ các sự cố",
-        "description": "Contract §2.6. Chưa có code — ticket BE-21. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.5. Chưa có code — ticket BE-21. Giữ trong Contract, không xoá.",
         "operationId": "postWorkOrders",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.6",
+        "x-luxmap-contract": "§5.5",
         "x-luxmap-ticket": "BE-21",
         "requestBody": {
           "required": true,
@@ -2654,10 +2752,10 @@
           "WorkOrders"
         ],
         "summary": "[NOT IMPLEMENTED] Đổi wo_status, gán người",
-        "description": "Contract §2.6. Chưa có code — ticket BE-22/BE-23. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.5. Chưa có code — ticket BE-22/BE-23. Giữ trong Contract, không xoá.",
         "operationId": "patchWorkOrdersWorkOrderId",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.6",
+        "x-luxmap-contract": "§5.5",
         "x-luxmap-ticket": "BE-22/BE-23",
         "parameters": [
           {
@@ -2701,7 +2799,7 @@
             }
           },
           "409": {
-            "description": "Chuyển trạng thái sai luồng (BE-22 — luồng chưa đặc tả)",
+            "description": "Chuyển trạng thái sai luồng (luồng wo_status: Open item O-3)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2729,10 +2827,10 @@
           "WorkOrders"
         ],
         "summary": "[NOT IMPLEMENTED] Ảnh before/after cho phiếu (multipart)",
-        "description": "Contract §2.6. Chưa có code — ticket BE-24. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.5. Chưa có code — ticket BE-24. Giữ trong Contract, không xoá.",
         "operationId": "postWorkOrdersWorkOrderIdEvidence",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.6",
+        "x-luxmap-contract": "§5.5",
         "x-luxmap-ticket": "BE-24",
         "parameters": [
           {
@@ -2769,7 +2867,7 @@
             }
           },
           "415": {
-            "description": "UNSUPPORTED_IMAGE_FORMAT — không phải JPEG theo magic bytes (drift 15, CONFIRM)",
+            "description": "UNSUPPORTED_IMAGE_FORMAT — không phải JPEG theo magic bytes",
             "content": {
               "application/json": {
                 "schema": {
@@ -2797,10 +2895,10 @@
           "IotSweeps"
         ],
         "summary": "[NOT IMPLEMENTED] IoT node theo bbox (FeatureCollection)",
-        "description": "Contract §2.7. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.6. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
         "operationId": "getIotNodes",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.7",
+        "x-luxmap-contract": "§5.6",
         "x-luxmap-ticket": "BE-14",
         "parameters": [
           {
@@ -2854,10 +2952,10 @@
           "IotSweeps"
         ],
         "summary": "[NOT IMPLEMENTED] Lịch sử các đợt quét",
-        "description": "Contract §2.7. Chưa có code — ticket BE-17. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.6. Chưa có code — ticket BE-17. Giữ trong Contract, không xoá.",
         "operationId": "getSweeps",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.7",
+        "x-luxmap-contract": "§5.6",
         "x-luxmap-ticket": "BE-17",
         "parameters": [
           {
@@ -2882,7 +2980,7 @@
               "maximum": 200,
               "default": 50
             },
-            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (drift 7, CONFIRM)"
+            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (Contract §1.3)"
           }
         ],
         "responses": {
@@ -2915,10 +3013,10 @@
           "IotSweeps"
         ],
         "summary": "[NOT IMPLEMENTED] Thumbnail JPEG của một khung hình — proxy qua API, không presigned",
-        "description": "Contract §2.7. Chưa có code — ticket BE-15. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.6. Chưa có code — ticket BE-15. Giữ trong Contract, không xoá.",
         "operationId": "getFramesFrameIdThumbnail",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§2.7",
+        "x-luxmap-contract": "§5.6",
         "x-luxmap-ticket": "BE-15",
         "parameters": [
           {
@@ -2932,7 +3030,7 @@
         ],
         "responses": {
           "200": {
-            "description": "JPEG (320px cạnh dài, q80 — TẠM, chờ FW-00)",
+            "description": "JPEG (320px cạnh dài, q80 — TẠM, Open item O-4)",
             "content": {
               "image/jpeg": {
                 "schema": {
@@ -2971,10 +3069,10 @@
           "Sync"
         ],
         "summary": "[NOT IMPLEMENTED] Gói dữ liệu theo segment để cache offline",
-        "description": "Contract §3. Chưa có code — ticket BE-43. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.8. Chưa có code — ticket BE-43. Giữ trong Contract, không xoá.",
         "operationId": "getSyncBundle",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§3",
+        "x-luxmap-contract": "§5.8",
         "x-luxmap-ticket": "BE-43",
         "parameters": [
           {
@@ -2998,7 +3096,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Bundle trong phạm vi địa bàn của user (§7)",
+            "description": "Bundle trong phạm vi địa bàn của user (§2)",
             "content": {
               "application/json": {
                 "schema": {
@@ -3036,10 +3134,10 @@
           "Sync"
         ],
         "summary": "[NOT IMPLEMENTED] Đẩy thay đổi offline; khử trùng lặp theo client_op_id; server thắng khi xung đột",
-        "description": "Contract §3. Chưa có code — ticket BE-43. Giữ trong Contract, không xoá.",
+        "description": "Contract §5.8. Chưa có code — ticket BE-43. Giữ trong Contract, không xoá.",
         "operationId": "postSyncPush",
         "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§3",
+        "x-luxmap-contract": "§5.8",
         "x-luxmap-ticket": "BE-43",
         "requestBody": {
           "required": true,
@@ -3100,7 +3198,7 @@
           "details": {
             "type": "object",
             "additionalProperties": {},
-            "description": "Túi ngữ cảnh tự do. Luôn có mặt (rỗng = {}). Luôn chứa correlation_id (drift 4, CONFIRM)."
+            "description": "Túi ngữ cảnh tự do. Luôn có mặt và luôn chứa correlation_id (Contract §1.4)."
           }
         },
         "additionalProperties": false
@@ -3871,47 +3969,47 @@
       "PoleId": {
         "type": "string",
         "pattern": "^POLE-[0-9]{4,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (4), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (4), không phải trần. Chuỗi đục, không parse."
       },
       "FaultId": {
         "type": "string",
         "pattern": "^FAULT-[0-9]{4,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (4), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (4), không phải trần. Chuỗi đục, không parse."
       },
       "SegmentId": {
         "type": "string",
         "pattern": "^SEG-[0-9]{3,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
       },
       "CommuneId": {
         "type": "string",
         "pattern": "^COM-[0-9]{3,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
       },
       "NodeId": {
         "type": "string",
         "pattern": "^NODE-[0-9]{3,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
       },
       "SweepId": {
         "type": "string",
         "pattern": "^SWP-[0-9]{3,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
       },
       "FrameId": {
         "type": "string",
         "pattern": "^FRM-[0-9]{6,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (6), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (6), không phải trần. Chuỗi đục, không parse."
       },
       "WorkOrderId": {
         "type": "string",
         "pattern": "^WO-[0-9]{4,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (4), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (4), không phải trần. Chuỗi đục, không parse."
       },
       "ClusterId": {
         "type": "string",
         "pattern": "^CLS-[0-9]{3,}$",
-        "description": "Contract §0.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
+        "description": "Contract §1.2 — số chữ số là SÀN (3), không phải trần. Chuỗi đục, không parse."
       },
       "LatLng": {
         "type": "object",
@@ -3994,7 +4092,7 @@
       "PoleProperties": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §2.1 — 15 thuộc tính phẳng. Không có data_source / external_ref / feeder_id (không emit).",
+        "description": "Contract §5.1 — 15 thuộc tính phẳng. Không có data_source / external_ref / feeder_id (không emit).",
         "required": [
           "pole_id",
           "segment_id",
@@ -4056,13 +4154,13 @@
           "last_sweep_id": {
             "type": "string",
             "nullable": true,
-            "description": "Mock dùng SWEEP-2026-…; Contract §0.2 quy định SWP-001 (drift 6, CONFLICT)"
+            "pattern": "^SWP-[0-9]{3,}$"
           },
           "open_fault_count": {
             "type": "integer",
             "format": "int32",
             "minimum": 0,
-            "description": "Đếm theo FaultStatusSets.Open = detected|confirmed|in_progress (drift 27, CONFIRM)"
+            "description": "Đếm theo tập fault MỞ = detected|confirmed|in_progress (Contract §3.2)"
           },
           "has_iot_node": {
             "type": "boolean"
@@ -4121,7 +4219,7 @@
       "SegmentProperties": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §2.3 — 7 thuộc tính. commune_id / data_source / external_ref KHÔNG emit.",
+        "description": "Contract §5.2 — 7 thuộc tính. commune_id / data_source / external_ref KHÔNG emit.",
         "required": [
           "segment_id",
           "segment_name",
@@ -4236,7 +4334,7 @@
             "nullable": true
           }
         },
-        "description": "Mock-pole-detail có thêm supplier: 'SUP-004' — prefix không có trong §0.2 (drift 6, CONFLICT); KHÔNG đưa vào draft."
+        "description": "Thông số lắp đặt của bóng ĐANG DÙNG (duy nhất, Contract §3.3)."
       },
       "PoleCurrentStatus": {
         "type": "object",
@@ -4429,11 +4527,10 @@
         ],
         "properties": {
           "frame_id": {
-            "type": "string",
-            "description": "Mock dùng FRM-88213 (5 chữ số); §0.2 quy định 6 (drift 6)"
+            "$ref": "#/components/schemas/FrameId"
           },
           "sweep_id": {
-            "type": "string"
+            "$ref": "#/components/schemas/SweepId"
           },
           "captured_at": {
             "type": "string",
@@ -4456,7 +4553,7 @@
       "PoleDetail": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §2.2 — đủ trong MỘT request. Hình dạng theo mock-pole-detail.json.",
+        "description": "Contract §5.1 — đủ trong MỘT request. Hình dạng theo mock-pole-detail.json.",
         "required": [
           "pole_id",
           "segment_id",
@@ -4536,7 +4633,7 @@
       "FaultItem": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §2.4 — một item. work_order_id LUÔN null cho tới BE-21 (quyết định C, CONFIRM).",
+        "description": "Contract §5.4 — một item. work_order_id LUÔN null cho tới BE-21.",
         "required": [
           "fault_id",
           "location",
@@ -4665,7 +4762,7 @@
         "required": [
           "fault_status"
         ],
-        "description": "Contract §2.5. Chuyển sai luồng → 409.",
+        "description": "Contract §5.4 (PATCH). Chuyển sai luồng → 409.",
         "properties": {
           "fault_status": {
             "$ref": "#/components/schemas/FaultStatus"
@@ -4693,7 +4790,7 @@
           "fault_type",
           "note"
         ],
-        "description": "Contract §2.8. Server áp cứng source_channel=field_report, data_source=field, fault_status=detected, reported_by=JWT. commune_id khi pole_id null (drift 25) CHƯA vào body — Open item.",
+        "description": "Contract §5.4 (POST). Server áp cứng source_channel=field_report, data_source=field, fault_status=detected, reported_by=JWT.",
         "properties": {
           "client_op_id": {
             "type": "string",
@@ -4718,6 +4815,12 @@
             ],
             "type": "object",
             "description": "Bắt buộc khi pole_id null (LOCATION_REQUIRED)"
+          },
+          "commune_id": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^COM-[0-9]{3,}$",
+            "description": "Chỉ khi pole_id null VÀ user có nhiều xã. Có pole thì server tra từ pole (gửi → 400)."
           },
           "fault_type": {
             "$ref": "#/components/schemas/FaultType"
@@ -4760,12 +4863,12 @@
             }
           }
         ],
-        "description": "§2.8: item §2.4 kèm client_op_id đã gửi lên."
+        "description": "§5.4: item kèm client_op_id đã gửi lên."
       },
       "WorkOrderItem": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Hình dạng theo mock-work-orders.json (§2.6 không liệt kê trường). assigned_to trong mock là USR-khang (drift 6).",
+        "description": "Contract §5.5 — hình dạng theo mock-work-orders.json.",
         "required": [
           "work_order_id",
           "title",
@@ -4801,7 +4904,8 @@
           },
           "assigned_to": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "pattern": "^USR-[0-9]{3,}$"
           },
           "priority_score": {
             "type": "number",
@@ -4882,7 +4986,7 @@
       "PatchWorkOrderRequest": {
         "type": "object",
         "additionalProperties": false,
-        "description": "§2.6: đổi wo_status, gán người. Máy trạng thái thuộc BE-22 — chưa đặc tả luồng.",
+        "description": "§5.5: đổi wo_status, gán người. Luồng wo_status: Open item O-3.",
         "properties": {
           "wo_status": {
             "nullable": true,
@@ -4938,7 +5042,7 @@
       "IotNodeProperties": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Theo mock-iot-nodes.geojson. Mock dùng NODE-0047 (4 chữ số) trong khi §0.2 chốt 3 (drift 6).",
+        "description": "Contract §5.6 — theo mock-iot-nodes.geojson.",
         "required": [
           "node_id",
           "node_role",
@@ -5024,7 +5128,7 @@
       "SweepItem": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §2.7. processing_status chưa có enum trong §1 — Open item.",
+        "description": "Contract §5.6. processing_status chưa có enum — Open item O-4.",
         "required": [
           "sweep_id",
           "started_at",
@@ -5106,7 +5210,7 @@
       "SyncBundle": {
         "type": "object",
         "additionalProperties": false,
-        "description": "[PENDING DYLAN] Contract §3 chỉ liệt kê bốn khối; hình dạng từng khối SUY RA từ §2.1/§2.3/§2.4/§2.6.",
+        "description": "Contract §5.8 — hình dạng đề xuất, chốt ở FW kế tiếp (Open item O-5).",
         "required": [
           "poles",
           "segments",
@@ -5147,7 +5251,7 @@
           "op_type",
           "payload"
         ],
-        "description": "[PENDING DYLAN] Chưa đặc tả; op_type dự kiến: create_fault | create_lux_reading | patch_fault | patch_work_order.",
+        "description": "Contract §5.8 — hình dạng đề xuất (Open item O-5); op_type dự kiến: create_fault | create_lux_reading | patch_fault | patch_work_order.",
         "properties": {
           "client_op_id": {
             "type": "string",
@@ -5206,7 +5310,7 @@
           "applied",
           "conflicts"
         ],
-        "description": "[PENDING DYLAN] Xung đột: server thắng, trả conflicts[]. Ánh xạ client_op_id → id thật (§0.4).",
+        "description": "Contract §5.8 — xung đột: server thắng, trả conflicts[]. Ánh xạ client_op_id → id thật (§1.2). Hình dạng đề xuất (Open item O-5).",
         "properties": {
           "applied": {
             "type": "array",
@@ -5260,47 +5364,47 @@
   "tags": [
     {
       "name": "Auth",
-      "description": "Nhóm mobile — Contract §2.10.1. Refresh token trong body."
+      "description": "Nhóm mobile — Contract §4.1. Refresh token trong body."
     },
     {
       "name": "WebAuth",
-      "description": "Nhóm web — Contract §2.10.2. Refresh token chỉ trong cookie HttpOnly __Secure-luxmap_rt."
+      "description": "Nhóm web — Contract §4.2. Refresh token chỉ trong cookie HttpOnly __Secure-luxmap_rt."
     },
     {
       "name": "Assets",
-      "description": "Quản lý kiểm kê tài sản — /assets/… (drift 29/43, CONFIRM). Không phải endpoint bản đồ §2.1."
+      "description": "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản trị."
     },
     {
       "name": "AssetImport",
-      "description": "Nhập tài sản CSV/GeoJSON theo từng loại file (drift 30, CONFIRM)."
+      "description": "Nhập tài sản CSV/GeoJSON theo từng loại file — Contract §5.3."
     },
     {
       "name": "LuxReadings",
-      "description": "Số đo lux — Contract §2.9. Ground truth RQ1."
+      "description": "Số đo lux — Contract §5.7. Ground truth RQ1."
     },
     {
       "name": "Poles",
-      "description": "Cột đèn trên bản đồ — Contract §2.1, §2.2. CHƯA HIỆN THỰC (BE-14, BE-20)."
+      "description": "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."
     },
     {
       "name": "Segments",
-      "description": "Đoạn đường — Contract §2.3. CHƯA HIỆN THỰC (BE-14)."
+      "description": "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."
     },
     {
       "name": "Faults",
-      "description": "Sự cố — Contract §2.4, §2.5, §2.8. CHƯA HIỆN THỰC (BE-40, BE-19, BE-41)."
+      "description": "Sự cố — Contract §5.4. CHƯA HIỆN THỰC (BE-40, BE-19, BE-41)."
     },
     {
       "name": "WorkOrders",
-      "description": "Phiếu công việc — Contract §2.6. CHƯA HIỆN THỰC (BE-21..BE-24)."
+      "description": "Phiếu công việc — Contract §5.5. CHƯA HIỆN THỰC (BE-21..BE-24)."
     },
     {
       "name": "IotSweeps",
-      "description": "IoT node, sweep, thumbnail — Contract §2.7. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."
+      "description": "IoT node, sweep, thumbnail — Contract §5.6. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."
     },
     {
       "name": "Sync",
-      "description": "Đồng bộ offline — Contract §3. CHƯA HIỆN THỰC (BE-43)."
+      "description": "Đồng bộ offline — Contract §5.8. CHƯA HIỆN THỰC (BE-43)."
     }
   ],
   "servers": [
