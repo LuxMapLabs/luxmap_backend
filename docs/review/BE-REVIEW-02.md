@@ -480,3 +480,65 @@ Gom toàn bộ D-item, Q-item và Open item `[PENDING DYLAN]` của draft. Số 
   còn middleware/binder); không sync-over-async trong `src/`; không `TODO/FIXME`; không `Console.Write`;
   không `.Find()`; JSON pipeline cấu hình cả MVC lẫn minimal API; `PageQuery` binder tránh bẫy prefix.
 - **API versioning:** đã có (`Asp.Versioning`, `/api/v{version}` → `/api/v1` trong spec, test canh).
+
+---
+
+## 8. PHASE 2 — đã áp dụng (18/09/2026, Dylan duyệt toàn bộ đề xuất mục 5)
+
+Nhánh `docs/BE-REVIEW-02`, mỗi concern một commit, chưa push.
+
+| Commit | Concern | Test canh (sabotage cả hai chiều) |
+|---|---|---|
+| `c1d73cc` | **D-5 / F-09** — mạch khác xã → 409 `CROSS_COMMUNE_REFERENCE` | `PoleWriteTests` (2 test đổi kỳ vọng) |
+| `8edccbc` | **F-01** — import kiểm mạch cùng xã (tuyến KHÔNG kiểm: `inter_commune` hợp lệ theo CLAUDE.md) | `A_pole_whose_feeder_sits_in_another_commune…` — vô hiệu kiểm → **đỏ**; khôi phục → xanh; cùng test chứng minh mạch cùng xã đi qua |
+| `3886112` | **F-03** — bỏ N+1 ở nạp bóng, index tham chiếu chỉ project id + commune | `AssetImportTests` (15) |
+| `c5c2267` | **F-02 / D-12** — `from`/`to` không `Z` = UTC | `A_from_or_to_bound_without_a_Z_suffix…` — code cũ trên máy `+07` → **đỏ** (`Expected 1, Actual 0`); code mới → xanh |
+| `d169853` | **D-4 / F-04** — `ROLE_FORBIDDEN` qua `ForbiddenCodeResultHandler` | `A_maintenance_engineer_may_NOT_create_an_asset` — bỏ nhánh đọc lý do → **đỏ**; `Wildcard_claim…` vẫn `COMMUNE_FORBIDDEN` |
+| `de3665c` | **D-11 / F-10** — `ux_fixture_pole_id_active` UNIQUE; 409 `POLE_HAS_ACTIVE_FIXTURE`; import chỉ chặn bóng đang dùng | `FixtureCardinalityTests` (5) — hạ index xuống không-unique trên DB → **đỏ**; khôi phục → xanh; bóng đã ngừng dùng vẫn ghi được |
+| `1a77e99` | **Q-4 / F-11** — `ck_fixture_removed_after_install`; PUT removal 400 khi trước install hoặc lặp | `FixtureRetirementTests` (5) — drop CHECK → **đỏ**; khôi phục → xanh; ngừng dùng đúng ngày lắp vẫn hợp lệ |
+| `a22fa44` | **M-6 / F-15** — `ck_pole_current_status_confidence_range` (đóng drift 24) | `AssetSchemaTests` +7 (42.5, −0.1, NaN, +∞ đỏ; 0 / 0.81 / 1 xanh) — drop CHECK → **4 đỏ**; khôi phục → xanh |
+| `01ed1cf` | **N-5 / F-06** — fixture dọn token của tài khoản seed nó đăng nhập | Đếm `refresh_token` trước/sau một lượt: 6216 → 6216 (trước đó mỗi lượt +7) |
+| `f353911` | **F-08** — 4 chú thích sai | — |
+| `026110b` | **D-9** — mock đổi ID theo §0.2 (`NODE-0nn`, `SWP-001..030`, `FRM-088213`, `USR-004`, bỏ `supplier`) | `OpenFaultCountTests`, `AssetImportMockSetTests` xanh |
+| `2fab05e` | Spec xuất lại từ code + khai 409/400 mới trên controller | — |
+| `5903252` | **D-1, D-2, D-3, D-13, D-14, O-4..O-13** — Contract v1.4 (`api-contract-v1.1.md`), `luxmap-v1.4.json`, `docs/openapi/tools/gen_consolidated_spec.py`, drift archive + log mới, CLAUDE.md (8 ràng buộc mới, 8 chỗ stale sửa), README | md ↔ json 36/36 |
+| `98b8654` | Probe BE-08 `Wrong_role_returns_403…` đổi kỳ vọng sang `ROLE_FORBIDDEN` (suite đầy đủ bắt được — lượt chạy theo class ở commit D-4 không gồm nó) | — |
+
+**Ba migration, đọc trước khi apply, mỗi cái đúng một thao tác + `Down()` đối xứng:**
+`OneActiveFixturePerPole` (DropIndex `ix_fixture_pole_id_active` → CreateIndex UNIQUE
+`ux_fixture_pole_id_active`; `ix_fixture_commune_id` còn nguyên), `FixtureRemovedAfterInstall`
+(AddCheckConstraint), `PoleCurrentStatusConfidenceRange` (AddCheckConstraint). Đã apply lên DB dev.
+
+**Không làm, và vì sao:** D-6 (seeder BE-39) và D-7 (`mocks/mock-pole-feeders.csv`) là quyết định về
+việc chưa tới lượt / cần dữ liệu từ người biết địa bàn — đã ghi vào Contract (1.2, O-6) và drift log;
+D-8 không có đề xuất; D-10 là ticket riêng (O-7); N-5 chỉ phủ `AssetImportFixture` — các class dùng
+`AuthTestFactory` vẫn để lại token cho tới BE-36.
+
+### Output cuối (thật)
+
+```
+$ dotnet build -c Release
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+$ dotnet test -c Release --no-build
+Passed!  - Failed: 0, Passed: 147, Skipped: 0, Total: 147 - LuxMap.Shared.Tests.dll
+Passed!  - Failed: 0, Passed:  20, Skipped: 0, Total:  20 - LuxMap.Persistence.Tests.dll
+Passed!  - Failed: 0, Passed:  18, Skipped: 0, Total:  18 - LuxMap.Infrastructure.Storage.Tests.dll
+Passed!  - Failed: 0, Passed: 293, Skipped: 0, Total: 293 - LuxMap.Api.Tests.dll
+→ 478 test xanh (Phase 1: 459)
+
+$ npx @redocly/cli@latest lint docs/openapi/luxmap-v1.4.json
+  3:3      warning  info-license           Info object should contain `license` field.
+  5412:14  warning  no-server-example.com  Server `url` should not point to example.com or localhost.
+  5416:14  warning  no-server-example.com  Server `url` should not point to example.com or localhost.
+Woohoo! Your API description is valid. 🎉  You have 3 warnings.
+
+$ md <-> json 1-1: json ops 36, md ops 36, missing none/none; implemented 21, not_implemented 15
+```
+
+**Còn nợ sau Phase 2 (đã ghi ở Contract mục 9 / drift log):** O-1 tên tuyến; O-2 ma trận ghi cho
+sweep/fault/work order; O-3 `wo_status`; O-4 `processing_status` + thumbnail; O-5 hình dạng sync;
+O-6 `feeder_id` mock; O-7 FK ghép; M-1 BE-36; M-5 rate limit; M-7 CI lint spec; N-6 `SwaggerSetup`
+(spec sinh từ code vẫn 23 lỗi lint — bản hợp nhất thì sạch).
