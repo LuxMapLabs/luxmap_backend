@@ -7,6 +7,7 @@ using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
+using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -147,15 +148,20 @@ public sealed class LuxReadingService(LuxMapDbContext dbContext, ILogger<LuxRead
             query = query.Where(reading => reading.PoleId == poleId);
         }
 
+        // Query-string dates do NOT pass through UtcDateTimeConverter — that is a JSON converter — so
+        // a value without a Z suffix arrives as Kind=Unspecified. ToUniversalTime() would then read it
+        // as LOCAL time and shift it by the server's zone (7 h on an Asia/Saigon host, measured in
+        // BE-REVIEW-02 F-02). UtcNormalization.ToUtc treats Unspecified as UTC, which is what the
+        // Contract says every timestamp on the wire is (D-12). Both bounds are inclusive.
         if (from is not null)
         {
-            var lower = DateTime.SpecifyKind(from.Value.ToUniversalTime(), DateTimeKind.Utc);
+            var lower = UtcNormalization.ToUtc(from.Value);
             query = query.Where(reading => reading.MeasuredAt >= lower);
         }
 
         if (to is not null)
         {
-            var upper = DateTime.SpecifyKind(to.Value.ToUniversalTime(), DateTimeKind.Utc);
+            var upper = UtcNormalization.ToUtc(to.Value);
             query = query.Where(reading => reading.MeasuredAt <= upper);
         }
 

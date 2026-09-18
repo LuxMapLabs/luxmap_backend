@@ -355,6 +355,41 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, nearest.ValueKind);
     }
 
+    /// <summary>
+    /// <c>from</c>/<c>to</c> without a <c>Z</c> suffix are read as UTC, never as the server's local
+    /// time (BE-REVIEW-02, F-02 / D-12).
+    /// </summary>
+    /// <remarks>
+    /// The query-string binder hands the service <c>Kind=Unspecified</c>; the old code called
+    /// <c>ToUniversalTime()</c> on it, which on a machine in Asia/Saigon moved both bounds back by
+    /// seven hours and dropped the reading that sits exactly on the bound. On a host whose clock is
+    /// UTC the old code passed this test by luck — the test is still worth having, because the fix
+    /// has to hold on every developer machine and the build agents are not all UTC.
+    /// </remarks>
+    [Fact]
+    public async Task A_from_or_to_bound_without_a_Z_suffix_is_read_as_UTC_not_as_server_local_time()
+    {
+        using var client = await ClientAsync(AdminUser);
+        var poleId = await NewPoleAsync();
+
+        var body = (Dictionary<string, object?>)Body(poleId);
+        body["measured_at"] = "2026-10-01T00:00:00Z";
+        var (_, created) = await PostAsync(client, body);
+        createdLuxIds.Add(created.GetProperty("lux_id").GetString()!);
+
+        // Both bounds land EXACTLY on the reading; any shift in either direction excludes it.
+        var json = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/v1/lux-readings?pole_id={poleId}&from=2026-10-01T00:00:00&to=2026-10-01T00:00:00"));
+
+        Assert.Equal(1, json.RootElement.GetProperty("total").GetInt32());
+
+        // And the Z form still means the same instant.
+        var withZ = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/v1/lux-readings?pole_id={poleId}&from=2026-10-01T00:00:00Z&to=2026-10-01T00:00:00Z"));
+
+        Assert.Equal(1, withZ.RootElement.GetProperty("total").GetInt32());
+    }
+
     [Fact]
     public async Task The_per_pole_endpoint_omits_nearest_luminance_and_sorts_oldest_first()
     {
