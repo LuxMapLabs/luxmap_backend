@@ -352,6 +352,55 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
             row.CommuneId == fixture.ForeignCommuneId && row.SegmentName == "Tuyen xa hai - da doi ten");
     }
 
+    /// <summary>
+    /// The import path refuses a feeder from another commune — the same rule the CRUD POST and PUT
+    /// enforce (BE-REVIEW-02, F-01).
+    /// </summary>
+    /// <remarks>
+    /// The two-commune administrator is required: with a single-commune account the query filter
+    /// hides the foreign feeder and the row would fail on "matches nothing", proving the filter rather
+    /// than this check. Sabotage runs both ways in one test: the foreign feeder is refused, and the
+    /// SAME file with a feeder in the pole's own commune goes through — a check that refused every
+    /// feeder would pass the first half and never be noticed.
+    /// </remarks>
+    [Fact]
+    public async Task A_pole_whose_feeder_sits_in_another_commune_is_refused_per_row_and_the_same_commune_goes_through()
+    {
+        var client = await fixture.BothCommunesClientAsync();
+        var tag = Tag();
+
+        var segments = await ImportAsync(client, "segments", "segments.csv",
+            SegmentHeader
+            + $"\n{tag}-S1,Tuyen,inter_commune,1600,\"LINESTRING(106.4900 10.9700, 106.4950 10.9705)\","
+            + $"{fixture.CommuneId},public_imagery");
+        Assert.Equal(1, segments.GetProperty("inserted").GetInt32());
+
+        var feeders = await ImportAsync(client, "feeders", "feeders.csv",
+            "external_ref,feeder_name,commune_id"
+            + $"\n{tag}-FOREIGN,Mach xa khac,{fixture.ForeignCommuneId}"
+            + $"\n{tag}-HOME,Mach cung xa,{fixture.CommuneId}");
+        Assert.Equal(2, feeders.GetProperty("inserted").GetInt32());
+
+        var refused = await ImportAsync(client, "poles", "poles.csv",
+            PoleHeader
+            + $"\n{tag}-P1,{tag}-S1,{tag}-FOREIGN,{fixture.CommuneId},POINT(106.4900 10.9700),false,public_imagery");
+
+        Assert.Equal(0, refused.GetProperty("inserted").GetInt32());
+        Assert.Equal(1, refused.GetProperty("failed").GetInt32());
+        var error = refused.GetProperty("rows")[0];
+        Assert.Equal("feeder_external_ref", error.GetProperty("column").GetString());
+        Assert.Contains(fixture.ForeignCommuneId, error.GetProperty("message").GetString()!);
+        Assert.Equal(0, await CountPolesAsync(tag));
+
+        var accepted = await ImportAsync(client, "poles", "poles.csv",
+            PoleHeader
+            + $"\n{tag}-P1,{tag}-S1,{tag}-HOME,{fixture.CommuneId},POINT(106.4900 10.9700),false,public_imagery");
+
+        Assert.Equal(1, accepted.GetProperty("inserted").GetInt32());
+        Assert.Equal(0, accepted.GetProperty("failed").GetInt32());
+        Assert.Equal(1, await CountPolesAsync(tag));
+    }
+
     private static string Tag() => $"T{Guid.NewGuid():N}"[..9].ToUpperInvariant();
 
     private async Task SeedPoleAsync(HttpClient client, string tag)

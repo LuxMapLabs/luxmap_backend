@@ -263,6 +263,20 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             // Nullable on purpose: a solar_all_in_one pole is connected to no circuit at all.
             var feeder = Resolve(reader, feeders, "feeder_external_ref", required: false);
 
+            // The feeder must sit in the pole's own commune (BE-REVIEW-02, F-01). CommuneWriteGuard
+            // cannot see this — it checks the commune of the row being written, which is in scope —
+            // and the CRUD paths already refuse it through RequireFeederInCommuneAsync. This is the
+            // third write path, and it had the hole open. The SEGMENT is deliberately NOT checked:
+            // road_class = inter_commune means a road running BETWEEN communes, so a pole in another
+            // commune than its segment's owner is legitimate (CLAUDE.md, BE-12a rule 6).
+            if (feeder is not null && communeId is not null
+                && !string.Equals(feeder.CommuneId, communeId, StringComparison.Ordinal))
+            {
+                reader.Fail(
+                    "feeder_external_ref",
+                    $"'{reader.Optional("feeder_external_ref")}' belongs to commune '{feeder.CommuneId}', not to the pole's commune '{communeId}'.");
+            }
+
             if (!reader.IsValid)
             {
                 continue;
@@ -270,8 +284,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
 
             if (existing.TryGetValue((communeId!, externalRef!), out var pole))
             {
-                pole.SegmentId = segment!;
-                pole.FeederId = feeder;
+                pole.SegmentId = segment!.Id;
+                pole.FeederId = feeder?.Id;
                 pole.Geom = geometry!;
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
@@ -283,8 +297,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             var created = new Pole
             {
                 ExternalRef = externalRef,
-                SegmentId = segment!,
-                FeederId = feeder,
+                SegmentId = segment!.Id,
+                FeederId = feeder?.Id,
                 CommuneId = communeId!,
                 Geom = geometry!,
                 NearSensitivePoi = nearPoi,
@@ -314,12 +328,13 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         var poles = await ReferenceIndexAsync<Pole>(
             readers, "pole_external_ref", pole => pole.ExternalRef, cancellationToken);
 
-        var occupied = await OccupiedPolesAsync(poles.Values.SelectMany(ids => ids).ToArray(), cancellationToken);
+        var occupied = await OccupiedPolesAsync(
+            poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray(), cancellationToken);
         var inserted = 0;
 
         foreach (var reader in readers)
         {
-            var poleId = Resolve(reader, poles, "pole_external_ref", required: true);
+            var poleId = Resolve(reader, poles, "pole_external_ref", required: true)?.Id;
             var fixtureType = reader.RequiredEnum<FixtureType>("fixture_type");
             var powerSource = reader.RequiredEnum<PowerSource>("power_source");
             var watt = reader.RequiredInt("lamp_watt");
@@ -428,9 +443,12 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         return rows.ToDictionary(row => (row.CommuneId, externalRef(row)!), StringTupleComparer.Instance);
     }
 
+    /// <summary>A row another file refers to by <c>external_ref</c>: its id and the commune it sits in.</summary>
+    private sealed record ReferencedAsset(string Id, string CommuneId);
+
     /// <summary>
-    /// Maps each referenced <c>external_ref</c> to the ids that carry it, across everything the caller
-    /// can see.
+    /// Maps each referenced <c>external_ref</c> to the rows that carry it, across everything the
+    /// caller can see — id AND commune, because a reference across communes is a row error.
     /// </summary>
     /// <remarks>
     /// A list rather than a single id because <c>external_ref</c> is unique per COMMUNE, not globally.
@@ -438,12 +456,12 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     /// guessing between them would attach poles to the wrong road; <see cref="Resolve"/> reports the
     /// ambiguity instead.
     /// </remarks>
-    private async Task<Dictionary<string, List<string>>> ReferenceIndexAsync<TEntity>(
+    private async Task<Dictionary<string, List<ReferencedAsset>>> ReferenceIndexAsync<TEntity>(
         List<ImportRowReader> readers,
         string column,
         Func<TEntity, string?> externalRef,
         CancellationToken cancellationToken)
-        where TEntity : class, IExternallyReferenced
+        where TEntity : class, ICommuneScoped, IExternallyReferenced
     {
         var wanted = readers.Select(reader => reader.Row[column])
             .Where(value => value is not null)
@@ -463,7 +481,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             .GroupBy(row => externalRef(row)!, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => group.Select(KeyOf).ToList(),
+                group => group.Select(row => new ReferencedAsset(KeyOf(row), row.CommuneId)).ToList(),
                 StringComparer.Ordinal);
     }
 
@@ -475,8 +493,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         _ => throw new NotSupportedException($"{typeof(TEntity).Name} is not referenced by external_ref."),
     };
 
-    private static string? Resolve(
-        ImportRowReader reader, Dictionary<string, List<string>> index, string column, bool required)
+    private static ReferencedAsset? Resolve(
+        ImportRowReader reader, Dictionary<string, List<ReferencedAsset>> index, string column, bool required)
     {
         var value = required ? reader.Required(column) : reader.Optional(column);
         if (value is null)
