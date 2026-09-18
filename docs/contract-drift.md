@@ -376,6 +376,7 @@ gì, một lần sau khi có nhóm web.
 | 40 | **`openapi/luxmap-v1.json` chỉ phủ 4 endpoint `/auth`** — không có `/faults`, `/poles`, `/segments`; không có `pattern` nào | 🔴 Cao | **WP6** (sinh DTO Kotlin) | Không sửa tay — file SINH TỰ ĐỘNG; xem **E**. **Đóng một phần 11/09/2026:** sinh lại từ code, spec nay có thêm 8 path `/assets…` và `/lux-readings…`. `/faults`, `/poles`, `/segments` vẫn thiếu vì **chưa có code** |
 | 41 | **Auth web qua cookie `HttpOnly`** — nhóm `/api/v1/auth/web/*` mới, nhóm mobile không đổi | 🔴 Cao | WP5, WP6 | **ĐÃ CHỐT 11/09/2026** — Contract v1.2 mục 2.10; xem **F** |
 | 42 | **Ba tên tuyến lệch giữa `mocks/` của BE và `src/data/` của FE** — `segment_name` của cả `SEG-001`, `SEG-002`, `SEG-003` | 🟡 Vừa | WP5 | Mock — **chưa quyết bên nào đúng**; xem mục 42 |
+| 43 | **`DELETE /assets/poles/{id}` + `PUT /assets/poles/{id}/feeder` + mã lỗi `ASSET_IN_USE`** — cả ba đều mới, không có trong Contract | 🟡 Vừa | WP5, WP6 | Contract — thêm vào mục `/assets/…`. **`SELF-SIGNED` 18/09/2026**; xem mục 43 |
 
 ---
 
@@ -869,6 +870,61 @@ của C# và function của database ở cả hai phía ngưỡng. `Format` dùn
 > Comment cũ trong `PrefixedId.cs` khẳng định ngược lại sự thật — *"LPAD simply returns the longer
 > number ... no truncation and no overflow"* — và chính nó làm người đọc tin là đã an toàn. Đã viết
 > lại kèm lý do vì sao phải dùng function chứ không phải biểu thức thẳng.
+
+---
+
+## 43. `DELETE` và `PUT feeder` cho pole, kèm mã lỗi `ASSET_IN_USE` 🟡
+
+`SELF-SIGNED` 18/09/2026 — Dylan. Chạm bề mặt API (endpoint mới + mã lỗi mới) nên theo FW-00 mục 3
+**KHÔNG ổn định** cho tới khi FW kế tiếp xác nhận.
+
+| | |
+|---|---|
+| `DELETE /api/v1/assets/poles/{pole_id}` | 204 · 404 `ASSET_NOT_FOUND` · 409 `ASSET_IN_USE` · 403 |
+| `PUT /api/v1/assets/poles/{pole_id}/feeder` | Body `{"feeder_id": "FDR-001"}` hoặc `{"feeder_id": null}` → 204 |
+| `ASSET_IN_USE` | 409 — khoá ngoại từ chối xoá |
+
+### Vì sao pole có DELETE mà fixture thì không
+
+Không mâu thuẫn, vì hai thứ khác nhau. `fixture.removed_date` ghi một **sự kiện có thật**: bóng đã
+lắp, rồi được thay. Một dòng `pole` gõ nhầm **chưa bao giờ là cột đèn đứng ngoài đường rồi bị dỡ** —
+đánh dấu nó "đã ngừng dùng" là ghi vào hồ sơ một việc không xảy ra.
+
+Soft-delete cũng thêm một cột mà **mọi truy vấn về sau phải nhớ lọc**, ngược hướng repo đang đi
+(`CommuneWriteGuard`, `HasCommuneReference`, chốt chặn khởi động — đều biến quy-ước-phải-nhớ thành
+ràng-buộc-không-thể-quên).
+
+### Cái gì bảo vệ dữ liệu nghiên cứu
+
+**RESTRICT, không phải một luật trong code.** `fault` và `lux_reading` trỏ vào `pole` bằng `RESTRICT`,
+nên cột nào mang dữ liệu nghiên cứu là DB từ chối, bất kể client gọi thế nào. Kiểm trước trong code
+chỉ là ý kiến thứ hai, và nó **lệch được** khỏi ràng buộc mà nó nhân bản.
+
+⚠️ **Nó từ chối cả ở tầng sâu hơn một bậc, và đây là ca không nhìn ra được từ pole.** `fixture`
+CASCADE từ `pole`, nên lệnh xoá chạm tới bóng đèn — và nếu có `fault` trỏ vào bóng đó thì cascade vấp
+`fk_fault_fixture_fixture_id`, PostgreSQL abort cả câu lệnh. **Cột trông như không ai tham chiếu mà
+vẫn không xoá được.** Vì thế `details` trả về `constraint` và `table` lấy thẳng từ
+`PostgresException` — client không có cách nào khác để biết vì sao.
+
+Đã kiểm chứng bằng bốn phép thử sabotage trên DB thật trước khi viết dòng code nào (T1, T2a, T2b,
+T2c). T2c cho ra lỗi trên bảng **`fixture`**, không phải `pole` — chứng tỏ cascade đã chạy rồi mới
+vấp RESTRICT.
+
+### `null` là giá trị, không phải thiếu
+
+`PUT /…/feeder` nhận `null` để ghi nhận "cột này không nằm trên tuyến điện nào" — `solar_all_in_one`
+đúng là như vậy. Thân request giữ trường bằng `JsonElement` để phân biệt **khoá vắng mặt** với
+**`null` tường minh**; khoá vắng mặt là **400**. Đọc khoá thiếu thành `null` sẽ khiến một body rỗng
+hoặc hỏng **âm thầm xoá** mạch điện của cột.
+
+⚠️ **Feeder phải cùng xã với pole, và `CommuneWriteGuard` KHÔNG bắt được.** Guard đọc `commune_id`
+**của chính hàng đang ghi**; xã của pole nằm trong phạm vi nên lệnh ghi đi qua dù feeder thuộc xã
+nào. Người có hai xã có thể nối cột của xã này vào mạch của xã kia. Kiểm ở tầng service là thứ duy
+nhất đứng đó.
+
+> 🔴 **`POST /assets/poles` có ĐÚNG lỗ hổng đó và CHƯA sửa.** `CreatePoleAsync` gọi
+> `RequireAsync<Feeder>` nên feeder phải tồn tại và phải nhìn thấy được, nhưng **không kiểm nó cùng
+> xã với pole**. Ngoài phạm vi ticket này — xem **D-10**.
 
 ---
 
