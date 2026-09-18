@@ -317,6 +317,52 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    // ── POST: the same check, on the other write path (D-10) ──────────────────────────────
+
+    /// <summary>
+    /// Creating a pole with a feeder from another commune is refused, exactly as the PUT is.
+    /// </summary>
+    /// <remarks>
+    /// This path had the hole open while the PUT was closed: <c>CreatePoleAsync</c> proved the feeder
+    /// existed and was visible, never that it was in the pole's commune. Both now go through one
+    /// helper, and this test is what stops them drifting apart again.
+    /// <para>
+    /// The two-commune administrator is required here. With a single-commune account the query filter
+    /// hides the foreign feeder and the answer is 404, which would prove the filter rather than the
+    /// check.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Creating_a_pole_with_a_feeder_from_another_commune_is_refused()
+    {
+        var client = await fixture.BothCommunesClientAsync();
+        var segmentId = await NewSegmentAsync(fixture.CommuneId);
+        var foreignFeederId = await NewFeederAsync(fixture.ForeignCommuneId);
+
+        var response = await client.PostAsJsonAsync(PoleRoute, NewPoleBody(segmentId, foreignFeederId));
+        var body = await ReadErrorAsync(response);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(ErrorCodes.CommuneForbidden, body.GetProperty("code").GetString());
+    }
+
+    /// <summary>The other half of the sabotage: a feeder in the SAME commune still goes through.</summary>
+    /// <remarks>
+    /// Without this, a check that simply refused every feeder would pass the test above and nobody
+    /// would know until the first real import.
+    /// </remarks>
+    [Fact]
+    public async Task Creating_a_pole_with_a_feeder_in_its_own_commune_still_succeeds()
+    {
+        var client = await fixture.BothCommunesClientAsync();
+        var segmentId = await NewSegmentAsync(fixture.CommuneId);
+        var feederId = await NewFeederAsync(fixture.CommuneId);
+
+        var response = await client.PostAsJsonAsync(PoleRoute, NewPoleBody(segmentId, feederId));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -337,6 +383,36 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
 
     private static async Task<JsonElement> ReadErrorAsync(HttpResponseMessage response)
         => JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("error");
+
+    private object NewPoleBody(string segmentId, string? feederId) => new
+    {
+        segment_id = segmentId,
+        feeder_id = feederId,
+        commune_id = fixture.CommuneId,
+        geom_wkt = "POINT(106.49 10.97)",
+        data_source = "public_imagery",
+    };
+
+    private Task<string> NewSegmentAsync(string communeId)
+        => fixture.QueryAsync(async db =>
+        {
+            using (db.EnterUnscopedSystemWriteBackdoor())
+            {
+                var segment = new RoadSegment
+                {
+                    SegmentName = "pole write probe",
+                    RoadClass = RoadClass.InterVillage,
+                    LengthM = 100,
+                    Geom = new LineString([new Coordinate(106.49, 10.97), new Coordinate(106.50, 10.98)]) { SRID = 4326 },
+                    CommuneId = communeId,
+                    DataSource = DataSource.PublicImagery,
+                };
+
+                db.Set<RoadSegment>().Add(segment);
+                await db.SaveChangesAsync();
+                return segment.SegmentId;
+            }
+        });
 
     private Task<int> CountPolesAsync(string poleId)
         => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().CountAsync(p => p.PoleId == poleId));

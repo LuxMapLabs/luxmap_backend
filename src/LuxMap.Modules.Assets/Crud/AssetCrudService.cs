@@ -80,10 +80,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         // which is the 404 Contract section 7 asks for rather than a 403 that would confirm it exists.
         await RequireAsync<RoadSegment>(segment => segment.SegmentId == request.SegmentId, "road segment", ct);
 
-        if (request.FeederId is not null)
-        {
-            await RequireAsync<Feeder>(feeder => feeder.FeederId == request.FeederId, "feeder", ct);
-        }
+        await RequireFeederInCommuneAsync(request.FeederId, communeId, ct);
 
         var pole = new Pole
         {
@@ -205,23 +202,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
 
-        if (feederId is not null)
-        {
-            var feeder = await RequireAsync<Feeder>(candidate => candidate.FeederId == feederId, "feeder", ct);
-
-            if (!string.Equals(feeder.CommuneId, pole.CommuneId, StringComparison.Ordinal))
-            {
-                throw new LuxMapException(
-                    ErrorCodes.CommuneForbidden,
-                    HttpStatusCode.Forbidden,
-                    "That feeder belongs to a different commune than the pole.",
-                    new Dictionary<string, object?>
-                    {
-                        ["pole_commune_id"] = pole.CommuneId,
-                        ["feeder_commune_id"] = feeder.CommuneId,
-                    });
-            }
-        }
+        await RequireFeederInCommuneAsync(feederId, pole.CommuneId, ct);
 
         pole.FeederId = feederId;
         pole.UpdatedAt = DateTime.UtcNow;
@@ -304,6 +285,53 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 HttpStatusCode.Conflict,
                 "That inventory code is already used in this commune.",
                 new Dictionary<string, object?> { ["external_ref"] = externalRef, ["commune_id"] = communeId });
+        }
+    }
+
+    /// <summary>
+    /// The feeder exists, the caller can see it, and it is in <paramref name="communeId"/>.
+    /// </summary>
+    /// <remarks>
+    /// <c>null</c> passes: a <c>solar_all_in_one</c> pole is on no circuit at all, which is a fact
+    /// rather than a missing value.
+    /// <para>
+    /// ⚠️ <b><c>CommuneWriteGuard</c> cannot do this one.</b> The guard reads the <c>commune_id</c> OF
+    /// THE ROW BEING WRITTEN — the pole's own commune, which is in scope — so the write passes however
+    /// foreign the feeder is. A caller holding two communes could otherwise wire a pole in one to a
+    /// circuit in the other, and nothing downstream would notice.
+    /// </para>
+    /// <para>
+    /// Shared by <see cref="CreatePoleAsync"/> and <see cref="SetPoleFeederAsync"/> deliberately. The
+    /// check lived only on the PUT at first and the POST had the hole open; one function called from
+    /// both is what stops the two paths from disagreeing again.
+    /// </para>
+    /// <para>
+    /// 🔴 This is an APPLICATION check, not a constraint. A new write path that forgets to call it —
+    /// a seeder, psql by hand — reopens the hole. The form that cannot be forgotten is a composite
+    /// foreign key on <c>(feeder_id, commune_id)</c>, which needs a migration and is its own ticket;
+    /// see <c>docs/contract-drift.md</c> item 43. <c>segment_id</c> carries the same hole, unpatched.
+    /// </para>
+    /// </remarks>
+    private async Task RequireFeederInCommuneAsync(string? feederId, string communeId, CancellationToken ct)
+    {
+        if (feederId is null)
+        {
+            return;
+        }
+
+        var feeder = await RequireAsync<Feeder>(candidate => candidate.FeederId == feederId, "feeder", ct);
+
+        if (!string.Equals(feeder.CommuneId, communeId, StringComparison.Ordinal))
+        {
+            throw new LuxMapException(
+                ErrorCodes.CommuneForbidden,
+                HttpStatusCode.Forbidden,
+                "That feeder belongs to a different commune than the pole.",
+                new Dictionary<string, object?>
+                {
+                    ["pole_commune_id"] = communeId,
+                    ["feeder_commune_id"] = feeder.CommuneId,
+                });
         }
     }
 
