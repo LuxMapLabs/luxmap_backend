@@ -8,6 +8,7 @@ using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Npgsql;
 
 namespace LuxMap.Modules.Assets.Crud;
 
@@ -131,6 +132,56 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         return fixture.FixtureId;
     }
 
+    /// <summary>
+    /// Deletes a pole. The foreign keys decide whether it may go.
+    /// </summary>
+    /// <remarks>
+    /// No soft delete, deliberately. A retirement column would record something that did not happen in
+    /// the case this exists to serve — a row typed in by mistake was never a pole that stood and was
+    /// taken down — and it would add a filter every future query has to remember, which is the
+    /// opposite of the direction this repository keeps moving in.
+    /// <para>
+    /// <b>The protection is RESTRICT, not a rule in code.</b> <c>fault</c> and <c>lux_reading</c>
+    /// reference <c>pole</c> with it, so a pole carrying research data cannot be removed however the
+    /// caller asks. Checking in code first would only be a second opinion that can drift from it.
+    /// </para>
+    /// <para>
+    /// ⚠️ <b>It refuses one level deeper too.</b> <c>fixture</c> CASCADES from <c>pole</c>, so the
+    /// delete removes the lamps — and a <c>fault</c> against one of those lamps makes that cascade hit
+    /// <c>fk_fault_fixture_fixture_id</c>. PostgreSQL aborts the whole statement, so nothing is left
+    /// half-deleted, but the pole itself looks unreferenced. That is why the refusal explains itself.
+    /// </para>
+    /// </remarks>
+    public async Task DeletePoleAsync(string poleId, CancellationToken ct)
+    {
+        // Tracked, and through the query filter: a pole outside the caller's scope is simply not
+        // there, which is the 404 Contract section 7 asks for rather than a 403 that would confirm the
+        // id exists. Tracking also puts the deletion in front of CommuneWriteGuard, which checks
+        // EntityState.Deleted against OriginalValues.
+        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+
+        dbContext.Set<Pole>().Remove(pole);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (IsForeignKeyViolation(failure))
+        {
+            // Caught HERE, around SaveChanges, rather than from inside an interceptor. Throwing from
+            // within EF's pipeline would let EF wrap it in a DbUpdateException of its own and the
+            // BE-04 middleware would answer 500 — the trap CommuneWriteGuard documents at its own
+            // throw site.
+            dbContext.ChangeTracker.Clear();
+
+            throw new LuxMapException(
+                ErrorCodes.AssetInUse,
+                HttpStatusCode.Conflict,
+                "That pole still has records pointing at it, so it cannot be deleted.",
+                DescribeRefusal((PostgresException)failure.InnerException!));
+        }
+    }
+
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
     public async Task RetireFixtureAsync(string fixtureId, DateOnly removedDate, CancellationToken ct)
     {
@@ -209,6 +260,38 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 new Dictionary<string, object?> { ["external_ref"] = externalRef, ["commune_id"] = communeId });
         }
     }
+
+    /// <summary>What refused the delete, taken from the database's own answer.</summary>
+    /// <remarks>
+    /// Read off <c>PostgresException.ConstraintName</c> rather than counted with follow-up queries,
+    /// and that is not only cheaper — it is the only version that cannot be wrong. A count is a second
+    /// opinion formed after the fact and can disagree with the refusal it claims to explain; the
+    /// constraint name IS the refusal.
+    /// <para>
+    /// It also keeps the module boundary intact. <c>fault</c> and <c>lux_reading</c> belong to Faults
+    /// and Survey, which this module does not reference and must not start referencing to write an
+    /// error message. Coupling between modules stays at the level of id strings.
+    /// </para>
+    /// <para>
+    /// ⚠️ <c>table</c> can be <c>fixture</c> rather than <c>pole</c>, and that is the informative case:
+    /// nothing referenced the pole, its lamp was cascaded into, and a fault on that lamp stopped the
+    /// whole statement.
+    /// </para>
+    /// </remarks>
+    private static Dictionary<string, object?> DescribeRefusal(PostgresException failure)
+        => new()
+        {
+            ["constraint"] = failure.ConstraintName,
+            ["table"] = failure.TableName,
+        };
+
+    /// <summary>PostgreSQL <c>23503</c> — foreign key violation.</summary>
+    /// <remarks>
+    /// Matched on SQLSTATE, not on the message: the message is localised and names tables that a
+    /// migration can rename.
+    /// </remarks>
+    private static bool IsForeignKeyViolation(DbUpdateException failure)
+        => failure.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation };
 
     private async Task<TEntity> RequireAsync<TEntity>(
         System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate, string what, CancellationToken ct)

@@ -99,6 +99,30 @@ public sealed class AssetsController(
         => CreatedAsset("fixtures", await service.CreateFixtureAsync(request, ct));
 
     /// <summary>
+    /// Deletes a pole outright. <b>204</b>, or <b>409</b> when a foreign key refuses.
+    /// </summary>
+    /// <remarks>
+    /// Poles are the one asset with a DELETE, and fixtures deliberately still have none: retiring a
+    /// lamp is a real event that <c>removed_date</c> records, while a pole row typed in by mistake is
+    /// not an event at all. Marking such a row retired would write down something that never happened.
+    /// <para>
+    /// Nothing checks in code whether the pole may go — <c>fault</c> and <c>lux_reading</c> hold it
+    /// with RESTRICT, so the database answers, and the 409 carries the constraint that said no.
+    /// </para>
+    /// </remarks>
+    [HttpDelete("poles/{poleId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeletePoleAsync(string poleId, CancellationToken ct)
+    {
+        await service.DeletePoleAsync(poleId, ct);
+        return NoContent();
+    }
+
+    /// <summary>
     /// Retires a lamp by setting <c>removed_date</c>. There is no DELETE — the equipment history is
     /// the reason the table exists.
     /// </summary>
