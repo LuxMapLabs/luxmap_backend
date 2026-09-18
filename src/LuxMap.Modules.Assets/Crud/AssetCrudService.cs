@@ -182,6 +182,52 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         }
     }
 
+    /// <summary>
+    /// Sets or clears which feeder a pole hangs off. <c>null</c> clears it.
+    /// </summary>
+    /// <remarks>
+    /// A narrow PUT with one field, the shape <c>PUT /fixtures/{id}/removal</c> already established:
+    /// one endpoint, one intent, and no way to change anything else by accident.
+    /// <para>
+    /// <b><c>null</c> is a value here, not a missing one.</b> A <c>solar_all_in_one</c> pole sits on no
+    /// circuit at all, so "this pole has no feeder" is a fact worth recording rather than an absence.
+    /// Telling the two apart is the caller's side of the contract — see <c>SetPoleFeederRequest</c>.
+    /// </para>
+    /// <para>
+    /// ⚠️ <b>The feeder must be in the pole's own commune, and the write guard cannot enforce that.</b>
+    /// <c>CommuneWriteGuard</c> reads the <c>commune_id</c> OF THE ROW BEING WRITTEN; the pole's own
+    /// commune is in scope, so the write passes however foreign the feeder is. A caller holding two
+    /// communes could otherwise wire a pole in one to a circuit in the other. The check below is the
+    /// only thing standing there.
+    /// </para>
+    /// </remarks>
+    public async Task SetPoleFeederAsync(string poleId, string? feederId, CancellationToken ct)
+    {
+        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+
+        if (feederId is not null)
+        {
+            var feeder = await RequireAsync<Feeder>(candidate => candidate.FeederId == feederId, "feeder", ct);
+
+            if (!string.Equals(feeder.CommuneId, pole.CommuneId, StringComparison.Ordinal))
+            {
+                throw new LuxMapException(
+                    ErrorCodes.CommuneForbidden,
+                    HttpStatusCode.Forbidden,
+                    "That feeder belongs to a different commune than the pole.",
+                    new Dictionary<string, object?>
+                    {
+                        ["pole_commune_id"] = pole.CommuneId,
+                        ["feeder_commune_id"] = feeder.CommuneId,
+                    });
+            }
+        }
+
+        pole.FeederId = feederId;
+        pole.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync(ct);
+    }
+
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
     public async Task RetireFixtureAsync(string fixtureId, DateOnly removedDate, CancellationToken ct)
     {
