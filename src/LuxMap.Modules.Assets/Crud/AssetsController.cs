@@ -87,6 +87,7 @@ public sealed class AssetsController(
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreatePoleAsync(
         [FromBody] CreatePoleRequest request, CancellationToken ct)
         => CreatedAsset("poles", await service.CreatePoleAsync(request, ct));
@@ -96,6 +97,7 @@ public sealed class AssetsController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateFixtureAsync(
         [FromBody] CreateFixtureRequest request, CancellationToken ct)
         => CreatedAsset("fixtures", await service.CreateFixtureAsync(request, ct));
@@ -142,6 +144,7 @@ public sealed class AssetsController(
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> SetPoleFeederAsync(
         string poleId, [FromBody] SetPoleFeederRequest request, CancellationToken ct)
     {
@@ -156,6 +159,7 @@ public sealed class AssetsController(
     [HttpPut("fixtures/{fixtureId}/removal")]
     [Authorize(Policy = LuxMapPolicies.Administrator)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RetireFixtureAsync(
         string fixtureId, [FromBody] RetireFixtureRequest request, CancellationToken ct)
