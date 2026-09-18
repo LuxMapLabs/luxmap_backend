@@ -242,6 +242,62 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
         Assert.Contains("ck_pole_current_status_confidence_matches_status", error.InnerException?.Message);
     }
 
+    /// <summary>
+    /// <c>status_confidence</c> is 0..1 and finite (BE-REVIEW-02, M-6 — closes drift 24).
+    /// </summary>
+    /// <remarks>
+    /// Before this constraint a real INSERT of 42.5 went into the table, and so would NaN — which
+    /// PostgreSQL sorts above every number, so a plain range check never catches it. The three cases
+    /// below are the three ways the old column lied; the valid case at the end is the other half of
+    /// the sabotage, proving the constraint refuses the bad values and not simply every value.
+    /// </remarks>
+    [Theory]
+    [InlineData(42.5)]
+    [InlineData(-0.1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public async Task A_confidence_outside_0_to_1_or_non_finite_is_rejected_by_the_database(double confidence)
+    {
+        var poleId = await NewPoleAsync();
+
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.WriteAsSystemAsync(async db =>
+        {
+            db.Set<PoleCurrentStatus>().Add(new PoleCurrentStatus
+            {
+                PoleId = poleId,
+                CommuneId = fixture.CommuneId,
+                FixtureStatus = FixtureStatus.Dim,
+                StatusConfidence = confidence,
+            });
+            return await db.SaveChangesAsync();
+        }));
+
+        Assert.Contains("ck_pole_current_status_confidence_range", error.InnerException?.Message);
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(0.81)]
+    [InlineData(1.0)]
+    public async Task A_confidence_inside_0_to_1_is_accepted(double confidence)
+    {
+        var poleId = await NewPoleAsync();
+
+        var written = await fixture.WriteAsSystemAsync(async db =>
+        {
+            db.Set<PoleCurrentStatus>().Add(new PoleCurrentStatus
+            {
+                PoleId = poleId,
+                CommuneId = fixture.CommuneId,
+                FixtureStatus = FixtureStatus.Dim,
+                StatusConfidence = confidence,
+            });
+            return await db.SaveChangesAsync();
+        });
+
+        Assert.Equal(1, written);
+    }
+
     [Fact]
     public async Task Unknown_carrying_a_confidence_is_rejected_too()
     {

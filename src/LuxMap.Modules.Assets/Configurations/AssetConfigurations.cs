@@ -239,8 +239,24 @@ public sealed class PoleCurrentStatusConfiguration : IEntityTypeConfiguration<Po
         // The invariant the mock set exhibits on all 103 poles: confidence is absent exactly when the
         // status is `unknown`. Enforced in BOTH directions — no confidence without an observation, no
         // observation without a confidence.
-        builder.ToTable(table => table.HasCheckConstraint(
-            "ck_pole_current_status_confidence_matches_status",
-            "(status_confidence IS NULL) = (fixture_status = 'unknown')"));
+        builder.ToTable(table =>
+        {
+            table.HasCheckConstraint(
+                "ck_pole_current_status_confidence_matches_status",
+                "(status_confidence IS NULL) = (fixture_status = 'unknown')");
+
+            // 0..1 and FINITE (BE-REVIEW-02, M-6 — drift 24). The XML doc promised 0..1 for months
+            // while the column accepted 42.5, NaN and Infinity; a real INSERT proved it. NaN is the
+            // silent one: PostgreSQL sorts it ABOVE every float, so `>= 0` and `<= 1` alone would
+            // still let it in, and it is compared with `<> 'NaN'` because `x = x` is a tautology
+            // here (NaN equals itself in PostgreSQL). Same three-term shape as lux_value and
+            // fault.status_confidence. Sweep processing (BE-15/BE-17) owns the writes to this table;
+            // the constraint is in place before the first row lands.
+            table.HasCheckConstraint(
+                "ck_pole_current_status_confidence_range",
+                "status_confidence IS NULL OR (status_confidence >= 0 AND status_confidence <= 1 "
+                + "AND status_confidence <> 'NaN'::float8 AND status_confidence <> 'Infinity'::float8 "
+                + "AND status_confidence <> '-Infinity'::float8)");
+        });
     }
 }
