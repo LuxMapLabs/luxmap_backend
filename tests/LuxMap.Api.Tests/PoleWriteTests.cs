@@ -271,7 +271,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     }
 
     /// <summary>
-    /// A feeder the caller CAN see, in a commune the pole is not in, is refused.
+    /// A feeder the caller CAN see, in a commune the pole is not in, is refused with 409.
     /// </summary>
     /// <remarks>
     /// Uses the two-commune administrator on purpose: with a single-commune account the query filter
@@ -289,8 +289,10 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
         var response = await PutFeederAsync(client, poleId, $"\"{foreignFeederId}\"");
         var body = await ReadErrorAsync(response);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Equal(ErrorCodes.CommuneForbidden, body.GetProperty("code").GetString());
+        // 409, not 403 (BE-REVIEW-02, D-5): the caller may see both communes, so nothing is
+        // forbidden to them — the two rows simply may not be joined.
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(ErrorCodes.CrossCommuneReference, body.GetProperty("code").GetString());
         Assert.Null(await FeederOfAsync(poleId));
     }
 
@@ -342,8 +344,8 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
         var response = await client.PostAsJsonAsync(PoleRoute, NewPoleBody(segmentId, foreignFeederId));
         var body = await ReadErrorAsync(response);
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Equal(ErrorCodes.CommuneForbidden, body.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(ErrorCodes.CrossCommuneReference, body.GetProperty("code").GetString());
     }
 
     /// <summary>The other half of the sabotage: a feeder in the SAME commune still goes through.</summary>

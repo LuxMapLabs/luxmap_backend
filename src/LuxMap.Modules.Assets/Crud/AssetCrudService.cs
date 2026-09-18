@@ -323,9 +323,12 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
 
         if (!string.Equals(feeder.CommuneId, communeId, StringComparison.Ordinal))
         {
+            // 409 CROSS_COMMUNE_REFERENCE, not 403 (BE-REVIEW-02, D-5): both communes may be inside
+            // the caller's scope, so nothing is forbidden to them — the two rows just may not be
+            // joined. That is a consistency conflict, the mirror of ASSET_IN_USE on the way out.
             throw new LuxMapException(
-                ErrorCodes.CommuneForbidden,
-                HttpStatusCode.Forbidden,
+                ErrorCodes.CrossCommuneReference,
+                HttpStatusCode.Conflict,
                 "That feeder belongs to a different commune than the pole.",
                 new Dictionary<string, object?>
                 {

@@ -89,6 +89,19 @@ public static class ErrorCodes
     public const string AssetInUse = "ASSET_IN_USE";
 
     /// <summary>
+    /// 409 — a write would link two assets that sit in DIFFERENT communes (BE-REVIEW-02, D-5): a
+    /// pole to a feeder of another commune, for example.
+    /// </summary>
+    /// <remarks>
+    /// Not <see cref="CommuneForbidden"/>: both communes may well be inside the caller's scope, so
+    /// nothing is forbidden to them — the two rows simply may not be joined. It is a consistency
+    /// conflict on the way in, the mirror image of <see cref="AssetInUse"/> on the way out, which is
+    /// why it is a 409 and not a 403. The composite foreign key planned in
+    /// <c>docs/contract-drift.md</c> (D-10) will raise the same refusal from the database.
+    /// </remarks>
+    public const string CrossCommuneReference = "CROSS_COMMUNE_REFERENCE";
+
+    /// <summary>
     /// 400 — the body carried a field the SERVER owns (BE-42): a display id, or <c>commune_id</c>.
     /// </summary>
     /// <remarks>
