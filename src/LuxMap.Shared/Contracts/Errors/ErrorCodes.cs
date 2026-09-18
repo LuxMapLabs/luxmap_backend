@@ -69,6 +69,26 @@ public static class ErrorCodes
     public const string ExternalRefTaken = "EXTERNAL_REF_TAKEN";
 
     /// <summary>
+    /// 409 — the asset cannot be deleted because other rows still reference it (BE-12).
+    /// </summary>
+    /// <remarks>
+    /// Raised when a <c>DELETE</c> is refused by a foreign key, not by a rule in code. <c>fault</c> and
+    /// <c>lux_reading</c> point at <c>pole</c> with <c>RESTRICT</c>, so a pole carrying research data
+    /// cannot be removed and the database is what says so.
+    /// <para>
+    /// ⚠️ It also fires one level deeper. <c>fixture</c> CASCADES from <c>pole</c>, so deleting a pole
+    /// deletes its lamps — and if a <c>fault</c> references one of those lamps, that cascade hits
+    /// <c>fk_fault_fixture_fixture_id</c> and the whole statement aborts. The pole looks unreferenced
+    /// and still cannot go. <c>details</c> names what is holding it so the caller is not left guessing.
+    /// </para>
+    /// <para>
+    /// Distinct from <see cref="ExternalRefTaken"/>, which is also 409 but means a UNIQUE collision on
+    /// the way IN. This one is a reference collision on the way OUT.
+    /// </para>
+    /// </remarks>
+    public const string AssetInUse = "ASSET_IN_USE";
+
+    /// <summary>
     /// 400 — the body carried a field the SERVER owns (BE-42): a display id, or <c>commune_id</c>.
     /// </summary>
     /// <remarks>
