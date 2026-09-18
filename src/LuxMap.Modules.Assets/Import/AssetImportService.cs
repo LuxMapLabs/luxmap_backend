@@ -243,10 +243,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     private async Task<WritePlan> PlanPolesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<Pole>(readers, pole => pole.ExternalRef, cancellationToken);
-        var segments = await ReferenceIndexAsync<RoadSegment>(
-            readers, "segment_external_ref", segment => segment.ExternalRef, cancellationToken);
-        var feeders = await ReferenceIndexAsync<Feeder>(
-            readers, "feeder_external_ref", feeder => feeder.ExternalRef, cancellationToken);
+        var segments = await ReferenceIndexAsync<RoadSegment>(readers, "segment_external_ref", cancellationToken);
+        var feeders = await ReferenceIndexAsync<Feeder>(readers, "feeder_external_ref", cancellationToken);
 
         int inserted = 0, updated = 0;
 
@@ -325,8 +323,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     /// </remarks>
     private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
-        var poles = await ReferenceIndexAsync<Pole>(
-            readers, "pole_external_ref", pole => pole.ExternalRef, cancellationToken);
+        var poles = await ReferenceIndexAsync<Pole>(readers, "pole_external_ref", cancellationToken);
 
         var occupied = await OccupiedPolesAsync(
             poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray(), cancellationToken);
@@ -334,7 +331,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
 
         foreach (var reader in readers)
         {
-            var poleId = Resolve(reader, poles, "pole_external_ref", required: true)?.Id;
+            var pole = Resolve(reader, poles, "pole_external_ref", required: true);
+            var poleId = pole?.Id;
             var fixtureType = reader.RequiredEnum<FixtureType>("fixture_type");
             var powerSource = reader.RequiredEnum<PowerSource>("power_source");
             var watt = reader.RequiredInt("lamp_watt");
@@ -358,16 +356,12 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
 
             // Copied from the pole, never read from the file. A fixture is always in the commune of
             // the pole carrying it, and letting the file say otherwise would let the two drift with
-            // nothing to detect it.
-            var commune = await dbContext.Set<Pole>().AsNoTracking()
-                .Where(pole => pole.PoleId == poleId)
-                .Select(pole => pole.CommuneId)
-                .SingleAsync(cancellationToken);
-
+            // nothing to detect it. The reference index already carries the commune (BE-REVIEW-02,
+            // F-03): this used to be one extra query per row.
             dbContext.Set<Fixture>().Add(new Fixture
             {
                 PoleId = poleId!,
-                CommuneId = commune,
+                CommuneId = pole!.CommuneId,
                 FixtureType = fixtureType,
                 PowerSource = powerSource,
                 LampWatt = watt,
@@ -459,7 +453,6 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     private async Task<Dictionary<string, List<ReferencedAsset>>> ReferenceIndexAsync<TEntity>(
         List<ImportRowReader> readers,
         string column,
-        Func<TEntity, string?> externalRef,
         CancellationToken cancellationToken)
         where TEntity : class, ICommuneScoped, IExternallyReferenced
     {
@@ -473,25 +466,28 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             return [];
         }
 
+        // Three columns, not the whole row: a pole's geometry is the widest thing on the table and
+        // nothing here reads it. The primary key is reached by name because the three asset types
+        // share no base type (same reasoning as AssetCrudService.ListAsync).
+        var key = dbContext.Model.FindEntityType(typeof(TEntity))!.FindPrimaryKey()!.Properties.Single().Name;
+
         var rows = await dbContext.Set<TEntity>().AsNoTracking()
             .Where(entity => entity.ExternalRef != null && wanted.Contains(entity.ExternalRef))
+            .Select(entity => new
+            {
+                Ref = entity.ExternalRef!,
+                Id = EF.Property<string>(entity, key),
+                entity.CommuneId,
+            })
             .ToListAsync(cancellationToken);
 
         return rows
-            .GroupBy(row => externalRef(row)!, StringComparer.Ordinal)
+            .GroupBy(row => row.Ref, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
-                group => group.Select(row => new ReferencedAsset(KeyOf(row), row.CommuneId)).ToList(),
+                group => group.Select(row => new ReferencedAsset(row.Id, row.CommuneId)).ToList(),
                 StringComparer.Ordinal);
     }
-
-    private static string KeyOf<TEntity>(TEntity entity) => entity switch
-    {
-        RoadSegment segment => segment.SegmentId,
-        Feeder feeder => feeder.FeederId,
-        Pole pole => pole.PoleId,
-        _ => throw new NotSupportedException($"{typeof(TEntity).Name} is not referenced by external_ref."),
-    };
 
     private static ReferencedAsset? Resolve(
         ImportRowReader reader, Dictionary<string, List<ReferencedAsset>> index, string column, bool required)
