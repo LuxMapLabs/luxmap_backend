@@ -16,10 +16,10 @@ namespace LuxMap.Modules.Assets.Crud;
 /// Asset CRUD (BE-12a) — the write half of asset management, plus a listing that returns ids only.
 /// </summary>
 /// <remarks>
-/// ⚠️ <b>No delete.</b> Removing a pole cascades into <c>pole_current_status</c>, a table BE-12 must
-/// never touch, and <c>fault</c> and <c>lux_reading</c> both point at poles with <c>Restrict</c>, so
-/// any pole carrying research data could not be deleted anyway. Retiring equipment is what
-/// <c>fixture.removed_date</c> is for.
+/// <b>Poles are the one asset with a DELETE</b> (BE-12, drift 43); fixtures have none. A pole row typed
+/// in by mistake was never a pole that stood and was taken down, so deleting it records nothing false,
+/// and the foreign keys — <c>fault</c> and <c>lux_reading</c> hold it with <c>Restrict</c> — decide
+/// whether it may go. Retiring a lamp is a real event, which is what <c>fixture.removed_date</c> is for.
 /// </remarks>
 public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor)
 {
