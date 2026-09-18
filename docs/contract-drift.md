@@ -910,6 +910,40 @@ vẫn không xoá được.** Vì thế `details` trả về `constraint` và `t
 T2c). T2c cho ra lỗi trên bảng **`fixture`**, không phải `pole` — chứng tỏ cascade đã chạy rồi mới
 vấp RESTRICT.
 
+> ⚠️ **GIỚI HẠN ĐÃ BIẾT — cascade `pole → pole_current_status` CHƯA chạy thật.** Nó mới chỉ được xác
+> minh qua khai báo khoá ngoại (`ON DELETE CASCADE` trong `\d pole`). Bảng đang **rỗng** vì chưa có
+> gì ghi vào nó, và BE-12 bị cấm ghi. **Phải quay lại chạy khi BE-15/BE-17 có dữ liệu** — đó là lúc
+> đóng được giới hạn này, không sớm hơn.
+
+### D-10 — feeder khác xã: đã vá MỘT PHẦN
+
+Một helper dùng chung chặn ở **cả** `POST /assets/poles` và `PUT /assets/poles/{id}/feeder`. Trước
+đó chỉ `PUT` có kiểm, `POST` để hở.
+
+🔴 **Đây là kiểm ở TẦNG ỨNG DỤNG, không phải ràng buộc DB.** Đường ghi mới nào quên gọi helper —
+seeder, `psql` gõ tay, một endpoint sau này — là mở lại đúng lỗ hổng đó. Cùng loại với thứ
+`CommuneWriteGuard` sinh ra để thay thế: biến quy-ước-phải-nhớ thành ràng-buộc-không-thể-quên.
+
+**Dạng cuối là khoá ngoại ghép.** Ghi nguyên văn để không mất, cần migration ⇒ **ticket riêng**:
+
+```sql
+CREATE UNIQUE INDEX ux_feeder_id_commune ON feeder (feeder_id, commune_id);
+ALTER TABLE pole ADD CONSTRAINT fk_pole_feeder_same_commune
+  FOREIGN KEY (feeder_id, commune_id) REFERENCES feeder (feeder_id, commune_id);
+```
+
+Áp cùng cách cho `segment_id`.
+
+⚠️ **`segment_id` mang ĐÚNG lỗ hổng đó và CHƯA vá.** `CreatePoleAsync` gọi `RequireAsync<RoadSegment>`
+— chứng minh tuyến tồn tại và nhìn thấy được, không chứng minh cùng xã. Cố ý để nguyên ở ticket này.
+
+### Bỏ qua review của CODEOWNERS
+
+PR này merge **không qua phê duyệt** của `@NTNgoc204` / `@thinh2509` dù nó chạm
+`docs/openapi/luxmap-v1.json`. Quyết định của Dylan 18/09/2026, `SELF-SIGNED`. Cổng CODEOWNERS dựng
+lên chính vì file này là bề mặt WP5/WP6 code theo, nên việc bỏ qua nó **là một phần của mục drift
+này**, không phải chi tiết quy trình bên lề.
+
 ### `null` là giá trị, không phải thiếu
 
 `PUT /…/feeder` nhận `null` để ghi nhận "cột này không nằm trên tuyến điện nào" — `solar_all_in_one`
