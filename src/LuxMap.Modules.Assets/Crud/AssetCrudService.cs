@@ -106,6 +106,15 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == request.PoleId, "pole", ct);
 
+        // At most ONE lamp in service per pole (BE-REVIEW-02, D-11). A row that arrives already
+        // retired is history and may coexist with the active one. The friendly check is here; the
+        // partial unique index ux_fixture_pole_id_active is the guard that cannot be raced past —
+        // see the catch around SaveChanges below.
+        if (request.RemovedDate is null)
+        {
+            await RejectActiveFixtureAsync(pole.PoleId, ct);
+        }
+
         var fixture = new Fixture
         {
             PoleId = pole.PoleId,
@@ -125,7 +134,18 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         };
 
         dbContext.Set<Fixture>().Add(fixture);
-        await dbContext.SaveChangesAsync(ct);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (IsActiveFixtureCollision(failure))
+        {
+            // Two requests passed the check above at the same time; the index settled it.
+            dbContext.ChangeTracker.Clear();
+            throw ActiveFixtureConflict(pole.PoleId);
+        }
+
         return fixture.FixtureId;
     }
 
@@ -337,6 +357,32 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 });
         }
     }
+
+    private async Task RejectActiveFixtureAsync(string poleId, CancellationToken ct)
+    {
+        var occupied = await dbContext.Set<Fixture>().AsNoTracking()
+            .AnyAsync(fixture => fixture.PoleId == poleId && fixture.RemovedDate == null, ct);
+
+        if (occupied)
+        {
+            throw ActiveFixtureConflict(poleId);
+        }
+    }
+
+    private static LuxMapException ActiveFixtureConflict(string poleId)
+        => new(
+            ErrorCodes.PoleHasActiveFixture,
+            HttpStatusCode.Conflict,
+            "That pole already carries a lamp in service. Retire it (PUT /assets/fixtures/{id}/removal) before recording its replacement.",
+            new Dictionary<string, object?> { ["pole_id"] = poleId });
+
+    /// <summary>PostgreSQL <c>23505</c> on the one-active-lamp index.</summary>
+    private static bool IsActiveFixtureCollision(DbUpdateException failure)
+        => failure.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ux_fixture_pole_id_active",
+        };
 
     /// <summary>What refused the delete, taken from the database's own answer.</summary>
     /// <remarks>

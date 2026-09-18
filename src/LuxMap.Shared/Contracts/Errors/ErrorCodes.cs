@@ -114,6 +114,17 @@ public static class ErrorCodes
     public const string RoleForbidden = "ROLE_FORBIDDEN";
 
     /// <summary>
+    /// 409 — the pole already carries a lamp in service; retire it first (BE-REVIEW-02, D-11).
+    /// </summary>
+    /// <remarks>
+    /// Enforced by the partial unique index <c>ux_fixture_pole_id_active</c>
+    /// (<c>pole_id WHERE removed_date IS NULL</c>), so the database says no however the row arrives.
+    /// A lamp with <c>removed_date</c> already set is history, not a second active lamp, and is not
+    /// refused.
+    /// </remarks>
+    public const string PoleHasActiveFixture = "POLE_HAS_ACTIVE_FIXTURE";
+
+    /// <summary>
     /// 400 — the body carried a field the SERVER owns (BE-42): a display id, or <c>commune_id</c>.
     /// </summary>
     /// <remarks>

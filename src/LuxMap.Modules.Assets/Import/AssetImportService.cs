@@ -318,8 +318,9 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     /// <remarks>
     /// There is no natural key to upsert on. A pole carries several lamps over its life and the
     /// history is the point, so nothing in the file identifies a particular installation. Re-running
-    /// a fixtures file therefore reports one error per row rather than silently doubling the
-    /// equipment history. Replacing a lamp goes through CRUD, which can say which row it means.
+    /// a fixtures file therefore reports one error per ACTIVE row rather than silently doubling the
+    /// equipment history (D-11: one lamp in service per pole). Replacing a lamp goes through CRUD,
+    /// which can say which row it means.
     /// </remarks>
     private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
@@ -341,12 +342,16 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             var warranty = reader.Date("warranty_expiry", required: false);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
 
-            if (poleId is not null && !occupied.Add(poleId))
+            // One lamp in service per pole (BE-REVIEW-02, D-11). A row with removed_date is history
+            // and neither occupies the pole nor is refused by an active lamp already there; only an
+            // ACTIVE row can collide, whether the other one is in the database or earlier in this file.
+            if (poleId is not null && removedDate is null && !occupied.Add(poleId))
             {
                 reader.Fail(
                     "pole_external_ref",
-                    "That pole already carries a fixture. Import creates equipment records, it never "
-                    + "replaces them — use the fixtures endpoint to record a lamp change.");
+                    "That pole already carries a lamp in service. Import creates equipment records, it "
+                    + "never replaces them — retire the current lamp (PUT /assets/fixtures/{id}/removal) "
+                    + "before recording its replacement.");
             }
 
             if (!reader.IsValid)
@@ -520,8 +525,9 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             return new HashSet<string>(StringComparer.Ordinal);
         }
 
+        // Only lamps still in service occupy a pole; a retired one leaves room for its replacement.
         var occupied = await dbContext.Set<Fixture>().AsNoTracking()
-            .Where(fixture => poleIds.Contains(fixture.PoleId))
+            .Where(fixture => poleIds.Contains(fixture.PoleId) && fixture.RemovedDate == null)
             .Select(fixture => fixture.PoleId)
             .Distinct()
             .ToListAsync(cancellationToken);

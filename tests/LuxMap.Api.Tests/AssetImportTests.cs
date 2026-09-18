@@ -89,7 +89,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
         var second = await ImportAsync(client, "fixtures", "fixtures.csv", file);
         Assert.Equal(0, second.GetProperty("inserted").GetInt32());
         Assert.Equal(1, second.GetProperty("failed").GetInt32());
-        Assert.Contains("already carries a fixture", second.GetProperty("rows")[0].GetProperty("message").GetString()!);
+        Assert.Contains("already carries a lamp in service", second.GetProperty("rows")[0].GetProperty("message").GetString()!);
 
         var count = await fixture.QueryAsync(db => db.Set<Fixture>().IgnoreQueryFilters()
             .CountAsync(item => item.Pole.ExternalRef == $"{tag}-P1"));
