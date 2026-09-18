@@ -198,6 +198,12 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
             .IsUnique()
             .HasDatabaseName("ux_fixture_pole_id_active")
             .HasFilter("removed_date IS NULL");
+
+        // A lamp cannot be taken down before it was put up (BE-REVIEW-02, Q-4). The API checks it
+        // first to answer 400 with the field named; this is the backstop for every other write path.
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_fixture_removed_after_install",
+            "removed_date IS NULL OR removed_date >= install_date"));
     }
 }
 

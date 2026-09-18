@@ -114,6 +114,10 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         {
             await RejectActiveFixtureAsync(pole.PoleId, ct);
         }
+        else
+        {
+            RequireRemovedAfterInstall(request.RemovedDate.Value, request.InstallDate!.Value);
+        }
 
         var fixture = new Fixture
         {
@@ -230,9 +234,25 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     }
 
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
+    /// <remarks>
+    /// Once only, and never before the lamp was installed (BE-REVIEW-02, Q-4). A second retirement
+    /// would silently rewrite a date that is part of the equipment history; the database CHECK
+    /// <c>ck_fixture_removed_after_install</c> stands behind the ordering rule for every other writer.
+    /// </remarks>
     public async Task RetireFixtureAsync(string fixtureId, DateOnly removedDate, CancellationToken ct)
     {
         var fixture = await RequireAsync<Fixture>(candidate => candidate.FixtureId == fixtureId, "fixture", ct);
+
+        if (fixture.RemovedDate is { } already)
+        {
+            throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                HttpStatusCode.BadRequest,
+                "That lamp is already retired; its removed_date is part of the equipment history and is not rewritten.",
+                new Dictionary<string, object?> { ["removed_date"] = already.ToString("yyyy-MM-dd") });
+        }
+
+        RequireRemovedAfterInstall(removedDate, fixture.InstallDate);
 
         fixture.RemovedDate = removedDate;
         fixture.UpdatedAt = DateTime.UtcNow;
@@ -354,6 +374,22 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 {
                     ["pole_commune_id"] = communeId,
                     ["feeder_commune_id"] = feeder.CommuneId,
+                });
+        }
+    }
+
+    private static void RequireRemovedAfterInstall(DateOnly removedDate, DateOnly installDate)
+    {
+        if (removedDate < installDate)
+        {
+            throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                HttpStatusCode.BadRequest,
+                "removed_date must be on or after install_date.",
+                new Dictionary<string, object?>
+                {
+                    ["removed_date"] = removedDate.ToString("yyyy-MM-dd"),
+                    ["install_date"] = installDate.ToString("yyyy-MM-dd"),
                 });
         }
     }

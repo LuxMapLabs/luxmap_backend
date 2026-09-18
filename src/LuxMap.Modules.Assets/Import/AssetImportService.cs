@@ -345,6 +345,11 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             // One lamp in service per pole (BE-REVIEW-02, D-11). A row with removed_date is history
             // and neither occupies the pole nor is refused by an active lamp already there; only an
             // ACTIVE row can collide, whether the other one is in the database or earlier in this file.
+            if (installDate is not null && removedDate is not null && removedDate < installDate)
+            {
+                reader.Fail("removed_date", $"'{removedDate:yyyy-MM-dd}' is before install_date '{installDate:yyyy-MM-dd}'.");
+            }
+
             if (poleId is not null && removedDate is null && !occupied.Add(poleId))
             {
                 reader.Fail(
