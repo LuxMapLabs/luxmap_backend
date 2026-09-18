@@ -87,7 +87,7 @@
     "road_class": "inter_commune",
     "length_m": 1600,
     "pole_count": 46,
-    "controller_node_id": "NODE-0001",
+    "controller_node_id": "NODE-001",
     "has_active_segment_fault": false
    }
   },
@@ -160,7 +160,7 @@
     "road_class": "inter_commune",
     "length_m": 1200,
     "pole_count": 31,
-    "controller_node_id": "NODE-0002",
+    "controller_node_id": "NODE-002",
     "has_active_segment_fault": false
    }
   },
@@ -221,7 +221,7 @@
     "road_class": "inter_village",
     "length_m": 900,
     "pole_count": 26,
-    "controller_node_id": "NODE-0003",
+    "controller_node_id": "NODE-003",
     "has_active_segment_fault": true
    }
   }

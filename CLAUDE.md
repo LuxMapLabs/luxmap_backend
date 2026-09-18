@@ -384,7 +384,7 @@ request kế tiếp; URL đã ký vẫn sống tới lúc hết hạn — dù li
 rò qua header `Referer`.
 
 Khớp luôn Contract mục 2.7 (`GET /api/v1/frames/{frame_id}/thumbnail` → JPEG) và
-`mock-pole-detail.json` (`"thumbnail_url": "/api/v1/frames/FRM-88213/thumbnail"` — đường dẫn tương
+`mock-pole-detail.json` (`"thumbnail_url": "/api/v1/frames/FRM-088213/thumbnail"` — đường dẫn tương
 đối, không host, không chữ ký). FE đã dựng theo hình dạng đó.
 
 **2. Hai bucket, key phân tầng, KHÔNG nhúng `commune_id`.**
@@ -989,7 +989,7 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 
 `mock-poles.geojson`, `mock-pole-detail.json`, `mock-faults.json`, `mock-work-orders.json`, `mock-iot-nodes.geojson`.
 
-Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-0047` — pin yếu làm đèn mờ dần, không tắt phụt).
+Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-047` — pin yếu làm đèn mờ dần, không tắt phụt).
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
 

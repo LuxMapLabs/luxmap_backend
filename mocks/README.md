@@ -22,7 +22,7 @@ WP5 và WP6 code giao diện theo bộ này, BE-39 seed database từ chính b�
 - **12 IoT node**: 3 `segment_controller` · 9 `sampled_fixture`
 - **`POLE-0047`** là cột solar, có chuỗi runtime suy giảm dần qua 18 đêm —
   dùng test biểu đồ cảnh báo sớm pin. Mang `fixture_status = dim` và có
-  `NODE-0047`: pin yếu làm đèn **mờ dần**, không tắt phụt
+  `NODE-047`: pin yếu làm đèn **mờ dần**, không tắt phụt
 - Đa số cột có `iot_node = null`, đúng như thực tế kiến trúc sparse IoT
 
 Bảy cột `unknown` không phải lỗi dữ liệu. `unknown` nghĩa là sweep gần nhất
@@ -36,3 +36,18 @@ với `out`.
 - BE-39 đọc thẳng từ thư mục này, **không copy sang `src/`**. Có hai bản là
   chắc chắn sẽ lệch, và lúc demo mới phát hiện.
 - Commit vào git, không `.gitignore`. Đây là một phần của hợp đồng.
+
+## Đổi ID 18/09/2026 (BE-REVIEW-02, D-9) — WP5 và WP6 phải kéo lại
+
+Bộ mock nay khớp bảng prefix Contract §0.2 (drift 6 đóng):
+
+| Trước | Sau | Vì sao |
+|---|---|---|
+| `NODE-0001` … `NODE-0085` | `NODE-001` … `NODE-085` | `NODE` pad 3 chữ số (sàn) |
+| `SWEEP-2026-07-21-01` … `SWEEP-2026-08-19-01` | `SWP-001` … `SWP-030` (theo thứ tự thời gian) | prefix `SWP`, 3 chữ số |
+| `FRM-88213` | `FRM-088213` | `FRM` pad 6 chữ số |
+| `USR-khang` | `USR-004` | tài khoản seed `crew` (thứ tự `SeedUsers`) |
+| `supplier: "SUP-004"` | *(bỏ)* | không có prefix `SUP` trong §0.2; `supplier` không thuộc hình dạng §2.2 |
+
+Tên tuyến (`segment_name`) BE ≠ FE (drift 42) **chưa** đổi — chờ người biết địa bàn.
+
