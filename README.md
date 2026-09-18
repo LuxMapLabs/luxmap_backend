@@ -332,7 +332,8 @@ Tóm tắt mã lỗi:
 | Tình huống | HTTP | `error.code` |
 |---|---|---|
 | Thiếu / sai / hết hạn token | 401 | `UNAUTHENTICATED` |
-| Sai vai trò, hoặc `commune_id` ngoài phạm vi | 403 | `COMMUNE_FORBIDDEN` |
+| Sai vai trò (policy từ chối) | 403 | `ROLE_FORBIDDEN` |
+| `commune_id` ngoài phạm vi, hoặc claim `["*"]` lệch vai trò | 403 | `COMMUNE_FORBIDDEN` |
 | Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` (không phải 403 — 403 sẽ lộ ra là nó tồn tại) |
 
 ## Cấu trúc

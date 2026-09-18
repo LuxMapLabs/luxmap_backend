@@ -22,6 +22,10 @@ public static class AuthorizationSetup
         services.AddSingleton<ICommuneScopeAccessor, CommuneScopeAccessor>();
         services.AddSingleton<IAuthorizationHandler, CommuneScopeConsistencyHandler>();
 
+        // Records WHY a request was forbidden, so the BE-04 status-code page can tell a refused role
+        // (ROLE_FORBIDDEN) from a territorial refusal (COMMUNE_FORBIDDEN).
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, ForbiddenCodeResultHandler>();
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer();
 

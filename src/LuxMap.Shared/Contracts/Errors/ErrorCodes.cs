@@ -102,6 +102,18 @@ public static class ErrorCodes
     public const string CrossCommuneReference = "CROSS_COMMUNE_REFERENCE";
 
     /// <summary>
+    /// 403 — the caller is signed in but their ROLE is not admitted by the endpoint's policy
+    /// (BE-REVIEW-02, D-4).
+    /// </summary>
+    /// <remarks>
+    /// Split from <see cref="CommuneForbidden"/>, which Contract section 7 reserves for a
+    /// <c>commune_id</c> outside the caller's scope. Before this code existed every bare 403 was
+    /// reported as a commune problem, so an engineer refused by the Administrator policy was told they
+    /// were outside their territory.
+    /// </remarks>
+    public const string RoleForbidden = "ROLE_FORBIDDEN";
+
+    /// <summary>
     /// 400 — the body carried a field the SERVER owns (BE-42): a display id, or <c>commune_id</c>.
     /// </summary>
     /// <remarks>
