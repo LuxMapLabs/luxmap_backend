@@ -60,6 +60,7 @@ public static class SwaggerSetup
                 Format = "date",
             });
 
+            options.SchemaFilter<JsonElementFieldSchemaFilter>();
             options.DocumentFilter<ContractEnumDocumentFilter>();
             options.SupportNonNullableReferenceTypes();
         });

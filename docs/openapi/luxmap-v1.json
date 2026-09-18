@@ -2395,7 +2395,11 @@
       "SetPoleFeederRequest": {
         "type": "object",
         "properties": {
-          "feeder_id": { }
+          "feeder_id": {
+            "type": "string",
+            "description": "The feeder this pole hangs off, or null when it is on no circuit at all. The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.",
+            "nullable": true
+          }
         },
         "additionalProperties": false
       },
