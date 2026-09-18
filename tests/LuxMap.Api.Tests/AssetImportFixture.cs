@@ -48,6 +48,20 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
 
     private string bothCommunesUserId = null!;
 
+    /// <summary>
+    /// Hashes of the refresh tokens this fixture obtained for the SEEDED accounts, so teardown can
+    /// delete exactly those rows (BE-REVIEW-02, N-5 / F-06).
+    /// </summary>
+    /// <remarks>
+    /// The two accounts this fixture creates take their tokens with them (<c>refresh_token.user_id</c>
+    /// cascades), but the seeded <c>engineer</c>, <c>agency</c> and <c>crew</c> outlive every run, and
+    /// each <see cref="SeededClientAsync"/> sign-in left a row behind: 6,168 of them on the shared
+    /// development database when this was measured. Deleting by hash touches only what this
+    /// fixture issued, so a class running beside it keeps its own sessions. BE-36 makes all of this
+    /// unnecessary by giving each run a fresh database.
+    /// </remarks>
+    private readonly System.Collections.Concurrent.ConcurrentBag<string> issuedTokenHashes = [];
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
         => builder.UseEnvironment("Production").UseTestCorsOrigin();
 
@@ -129,7 +143,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 "DELETE FROM pole WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
-                "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w;",
+                "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR token_hash = ANY(@h);",
                 "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w;",
                 "DELETE FROM app_user WHERE user_id = @u OR user_id = @w;",
                 "DELETE FROM administrative_unit WHERE commune_id = @c OR commune_id = @f;",
@@ -165,6 +179,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
     {
         var client = CreateClient();
         var tokens = await client.LoginAsync(username, passwordVariable);
+        issuedTokenHashes.Add(Modules.Identity.Auth.RefreshTokenGenerator.Hash(tokens.RefreshToken));
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }
@@ -182,8 +197,11 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
 
-        foreach (var (name, value) in new[]
-                 { ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", bothCommunesUserId) })
+        foreach (var (name, value) in new (string, object)[]
+                 {
+                     ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", bothCommunesUserId),
+                     ("h", issuedTokenHashes.ToArray()),
+                 })
         {
             var parameter = command.CreateParameter();
             parameter.ParameterName = name;
