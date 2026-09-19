@@ -968,6 +968,26 @@ ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản s
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
 **sau mỗi lần** xuất `luxmap-v1.json`, rồi `npx @redocly/cli lint`. Không sửa tay cả hai.
 
+### `[AllowAnonymous]` cấp CLASS thắng `[Authorize]` cấp METHOD (19/09/2026)
+
+Thêm một endpoint **cần token** vào một controller đang mang `[AllowAnonymous]` ở cấp class thì gắn
+`[Authorize]` lên method **không cứu được**: ASP.NET Core cho opt-out ở xa hơn thắng. Compiler nói
+thẳng điều đó qua **ASP0026**, và repo này để 0 warning nên nó nhìn thấy được, nhưng warning không
+phải error.
+
+Đã suýt phát sinh thật ở `GET /auth/me`: `AuthController` mang `[AllowAnonymous]` cấp class từ BE-07,
+nên endpoint mới sẽ **mở cho người chưa đăng nhập**. Cách sửa đã áp: chuyển `[AllowAnonymous]` xuống
+**từng** method cấp token (`login`, `register`, `refresh`, `logout`), để mặc-định-đóng của BE-08 áp
+cho mọi endpoint viết sau.
+
+> 🔴 **Test theo HÀNH VI không bắt được cái này.** Với `[AllowAnonymous]` cấp class, request không
+> token vào `/auth/me` **vẫn trả 401** — vì action chạy, không thấy claim `sub`, rồi tự ném. Cùng
+> status, khác hoàn toàn lý do: endpoint đã **tới được**, và endpoint kế tiếp ai đó thêm vào
+> controller sẽ thừa hưởng opt-out mà không ai đọc lại. Thứ bắt được là **assert trên metadata của
+> route**: `endpoint.Metadata.GetMetadata<IAllowAnonymous>()` phải `null`
+> (`CurrentUserTests.It_is_not_declared_anonymous_even_though_its_four_siblings_are`). Kiểm bằng phá
+> hoại: trả `[AllowAnonymous]` về cấp class thì test hành vi **vẫn xanh**, test metadata **đỏ**.
+
 ### Vai trò
 
 **Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.

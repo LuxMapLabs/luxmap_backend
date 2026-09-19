@@ -23,7 +23,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | **Decision** | Duyệt **toàn bộ phương án đề xuất** ở mục 5 của `docs/review/BE-REVIEW-02.md` (D-1 … D-14, O-4 … O-13, Q-1 … Q-9) và cho chạy Phase 2 |
 | **Decision maker** | **Dylan** — trực tiếp, **không** `SELF-SIGNED` |
 | **Date** | 18/09/2026 |
-| **Scope** | Contract v1.4 (file `api-contract-v1.1.md`), `docs/openapi/luxmap-v1.4.json`, log này, `CLAUDE.md`, code trên nhánh `docs/BE-REVIEW-02` |
+| **Scope** | Contract v1.4 (file `api-contract-v1.1.md`), `docs/openapi/luxmap-v1.4.json` (đổi tên theo version, nay là `luxmap-v1.5.json`), log này, `CLAUDE.md`, code trên nhánh `docs/BE-REVIEW-02` |
 
 Các quyết định con, để tra nhanh (chi tiết và lý do ở BE-REVIEW-02 mục 5):
 
@@ -56,6 +56,18 @@ Các quyết định con, để tra nhanh (chi tiết và lý do ở BE-REVIEW-0
   của Contract v1.4; regex ID dùng `[0-9]{n,}`.
 - **Thịnh/Ngọc:** O-1 (tên tuyến), review PR chạm `api-contract-v1.1.md` và `luxmap-v1.json` (CODEOWNERS).
 - **BE1:** O-7 FK ghép trước BE-13; BE-36 sớm (M-1); rate limit auth (M-5); CI lint spec (M-7).
+
+### Từ v1.5: quyết định đi cùng Contract thì ghi Ở CONTRACT
+
+Changelog Contract (mục 10) nay có cột **Người quyết**. Một thay đổi mà Contract và code cùng vào một
+lần thì **không tạo ra chỗ lệch nào**, nên nó không có gì để ghi ở file này; bốn trường FW-00 mục 1
+nằm trọn trong dòng changelog cộng phần mô tả.
+
+File này giữ đúng một nghĩa: **nơi code và Contract bất đồng**. Đó cũng là lý do nó cố ý không có
+CODEOWNERS, trong khi `api-contract-v1.1.md` và `luxmap-v1.json` thì có.
+
+**Ví dụ đầu tiên đi theo lối này:** `GET /api/v1/auth/me`, Contract v1.5, Dylan, 19/09/2026. Endpoint
+mới, hiện thực và đặc tả trong cùng một PR, **không có mục drift**.
 
 ---
 

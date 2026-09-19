@@ -288,8 +288,9 @@ $env:Swagger__Enabled="true"; $env:Cors__AllowedOrigins__0="https://localhost:30
 
 ## Xác thực
 
-Bảy endpoint, đều **không cần** access token — nhóm mobile (token trong body) và nhóm web
-(`/api/v1/auth/web/*`, refresh token chỉ trong cookie `__Secure-luxmap_rt`). Đặc tả đầy đủ: Contract mục 4.
+Bảy endpoint cấp token **không cần** access token — nhóm mobile (token trong body) và nhóm web
+(`/api/v1/auth/web/*`, refresh token chỉ trong cookie `__Secure-luxmap_rt`). Endpoint thứ tám,
+`GET /auth/me`, thì **cần**. Đặc tả đầy đủ: Contract mục 4.
 
 ```bash
 POST /api/v1/auth/login      { "username": "...", "password": "..." }
@@ -299,7 +300,13 @@ POST /api/v1/auth/logout     { "refresh_token": "..." }
 POST /api/v1/auth/web/login  { "username": "...", "password": "...", "remember_me": true }
 POST /api/v1/auth/web/refresh   (không body — cookie)
 POST /api/v1/auth/web/logout    (không body — cookie)
+
+GET  /api/v1/auth/me         → { user_id, username, email, full_name, role, commune_ids }
 ```
+
+`/auth/me` đọc từ **database**, không phải từ claim: access token sống 60 phút nên xã vừa được gán
+không hiện trong claim cho tới lần đăng nhập sau, và `full_name` với `email` thì token không mang.
+FE gọi nó khi vào app và sau khi quản trị đổi quyền, thay vì tự giải mã JWT.
 
 Login và refresh trả đúng bốn trường: `access_token`, `refresh_token`, `token_type`, `expires_in`.
 `expires_in` là lifetime của **access** token tính bằng giây. Logout luôn trả `204`, kể cả khi
