@@ -103,6 +103,109 @@ public sealed class AssetsController(
         => CreatedAsset("fixtures", await service.CreateFixtureAsync(request, ct));
 
     /// <summary>
+    /// Replaces a road segment. <b>204</b>, never the updated object.
+    /// </summary>
+    /// <remarks>
+    /// A FULL replacement: every writable field is sent every time, and <c>commune_id</c> is not one
+    /// of them. See <see cref="UpdateSegmentRequest"/> for why, and for what a missing field means.
+    /// <para>
+    /// 204 with no body, like every other write in this controller. Echoing the updated segment would
+    /// publish a read shape, and that decision belongs to <b>BE-12b</b>.
+    /// </para>
+    /// </remarks>
+    [HttpPut("segments/{segmentId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateSegmentAsync(
+        string segmentId, [FromBody] UpdateSegmentRequest request, CancellationToken ct)
+    {
+        await service.UpdateSegmentAsync(segmentId, request, ct);
+        return NoContent();
+    }
+
+    /// <summary>Replaces a feeder. <b>204</b>, never the updated object.</summary>
+    /// <remarks>See <see cref="UpdateSegmentRequest"/> for the shared full-replacement rules.</remarks>
+    [HttpPut("feeders/{feederId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateFeederAsync(
+        string feederId, [FromBody] UpdateFeederRequest request, CancellationToken ct)
+    {
+        await service.UpdateFeederAsync(feederId, request, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Replaces a pole. <b>204</b>, never the updated object.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ <b>Omitting <c>feeder_id</c> CLEARS the pole's circuit</b>, because this is a full
+    /// replacement rather than a patch. The narrow <c>PUT /assets/poles/{id}/feeder</c> is the
+    /// endpoint for changing only the circuit, and it refuses a body that leaves the key out.
+    /// </remarks>
+    [HttpPut("poles/{poleId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdatePoleAsync(
+        string poleId, [FromBody] UpdatePoleRequest request, CancellationToken ct)
+    {
+        await service.UpdatePoleAsync(poleId, request, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes a road segment. <b>204</b>, or <b>409</b> when a foreign key refuses.
+    /// </summary>
+    /// <remarks>
+    /// Nothing checks in code whether the segment may go. <c>pole</c>, <c>fault</c> and
+    /// <c>fault_cluster</c> hold it with RESTRICT — two of those in another module — so the database
+    /// answers and the 409 carries the constraint that said no.
+    /// </remarks>
+    [HttpDelete("segments/{segmentId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteSegmentAsync(string segmentId, CancellationToken ct)
+    {
+        await service.DeleteSegmentAsync(segmentId, ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes a feeder. <b>204</b>, or <b>409</b> when poles are still wired to it.
+    /// </summary>
+    /// <remarks>
+    /// <c>pole.feeder_id</c> is RESTRICT and nullable, so a feeder with poles on it is refused rather
+    /// than the poles being quietly unwired. Clearing a circuit is a per-pole decision made through
+    /// <c>PUT /assets/poles/{id}/feeder</c>.
+    /// </remarks>
+    [HttpDelete("feeders/{feederId}")]
+    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteFeederAsync(string feederId, CancellationToken ct)
+    {
+        await service.DeleteFeederAsync(feederId, ct);
+        return NoContent();
+    }
+
+    /// <summary>
     /// Deletes a pole outright. <b>204</b>, or <b>409</b> when a foreign key refuses.
     /// </summary>
     /// <remarks>

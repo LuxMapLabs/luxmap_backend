@@ -154,6 +154,93 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     }
 
     /// <summary>
+    /// Full replacement of a road segment (BE-12). <c>commune_id</c> is not writable.
+    /// </summary>
+    /// <remarks>
+    /// Read through the query filter, so a segment outside the caller's scope is a 404 rather than a
+    /// 403 that would confirm the id exists — Contract section 7.
+    /// <para>
+    /// <c>length_m</c> is overwritten with what the caller sent and is never recomputed from the new
+    /// geometry. It is a DECLARED value (BE-10, rule 4): deriving it with <c>ST_Length</c> would make
+    /// the number the front end shows shift by about 73 ppm for reasons nobody could explain.
+    /// </para>
+    /// </remarks>
+    public async Task UpdateSegmentAsync(string segmentId, UpdateSegmentRequest request, CancellationToken ct)
+    {
+        var segment = await RequireAsync<RoadSegment>(candidate => candidate.SegmentId == segmentId, "road segment", ct);
+
+        await RejectDuplicateRefAsync<RoadSegment>(segment.CommuneId, request.ExternalRef, ct, segment.ExternalRef);
+
+        segment.ExternalRef = request.ExternalRef;
+        segment.SegmentName = request.SegmentName!;
+        segment.RoadClass = request.RoadClass!.Value;
+        segment.LengthM = request.LengthM!.Value;
+        segment.Geom = Read<LineString>(request.GeomWkt);
+        segment.DataSource = request.DataSource!.Value;
+        segment.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Full replacement of a feeder (BE-12). <c>commune_id</c> is not writable.</summary>
+    /// <remarks>
+    /// ⚠️ <b>Changing a feeder's commune is not possible here, and that is what keeps the poles on it
+    /// consistent.</b> <c>RequireFeederInCommuneAsync</c> checks the match when a POLE is written; it
+    /// never runs when the FEEDER moves. Were the commune writable, a feeder could be walked out from
+    /// under poles that are already wired to it and every one of those pairs would quietly become
+    /// cross-commune, with no write left to catch it.
+    /// </remarks>
+    public async Task UpdateFeederAsync(string feederId, UpdateFeederRequest request, CancellationToken ct)
+    {
+        var feeder = await RequireAsync<Feeder>(candidate => candidate.FeederId == feederId, "feeder", ct);
+
+        await RejectDuplicateRefAsync<Feeder>(feeder.CommuneId, request.ExternalRef, ct, feeder.ExternalRef);
+
+        feeder.ExternalRef = request.ExternalRef;
+        feeder.FeederName = request.FeederName!;
+        feeder.Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt);
+        feeder.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Full replacement of a pole (BE-12). <c>commune_id</c> is not writable.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ <b>This can clear <c>feeder_id</c>, and silently, because that is what a full replacement
+    /// means.</b> A caller that sends a partial body loses the pole's circuit. <c>PUT
+    /// /assets/poles/{id}/feeder</c> is the endpoint for touching only the circuit, and it tells an
+    /// absent key from an explicit <c>null</c>.
+    /// <para>
+    /// The feeder check is <see cref="RequireFeederInCommuneAsync"/> — the SAME call the create path
+    /// and the narrow feeder endpoint make. Three write paths reaching one function is deliberate:
+    /// the check lived on only one of them once before, and the other had the hole open.
+    /// </para>
+    /// </remarks>
+    public async Task UpdatePoleAsync(string poleId, UpdatePoleRequest request, CancellationToken ct)
+    {
+        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+
+        await RejectDuplicateRefAsync<Pole>(pole.CommuneId, request.ExternalRef, ct, pole.ExternalRef);
+
+        // Through the query filter: a segment the caller cannot see is not there, so this is a 404.
+        await RequireAsync<RoadSegment>(segment => segment.SegmentId == request.SegmentId, "road segment", ct);
+
+        await RequireFeederInCommuneAsync(request.FeederId, pole.CommuneId, ct);
+
+        pole.ExternalRef = request.ExternalRef;
+        pole.SegmentId = request.SegmentId!;
+        pole.FeederId = request.FeederId;
+        pole.Geom = Read<Point>(request.GeomWkt);
+        pole.NearSensitivePoi = request.NearSensitivePoi;
+        pole.DataSource = request.DataSource!.Value;
+        pole.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
     /// Deletes a pole. The foreign keys decide whether it may go.
     /// </summary>
     /// <remarks>
@@ -173,15 +260,72 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     /// half-deleted, but the pole itself looks unreferenced. That is why the refusal explains itself.
     /// </para>
     /// </remarks>
-    public async Task DeletePoleAsync(string poleId, CancellationToken ct)
-    {
-        // Tracked, and through the query filter: a pole outside the caller's scope is simply not
-        // there, which is the 404 Contract section 7 asks for rather than a 403 that would confirm the
-        // id exists. Tracking also puts the deletion in front of CommuneWriteGuard, which checks
-        // EntityState.Deleted against OriginalValues.
-        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+    public Task DeletePoleAsync(string poleId, CancellationToken ct)
+        => DeleteAsync<Pole>(
+            candidate => candidate.PoleId == poleId,
+            "pole",
+            "That pole still has records pointing at it, so it cannot be deleted.",
+            ct);
 
-        dbContext.Set<Pole>().Remove(pole);
+    /// <summary>
+    /// Deletes a road segment. The foreign keys decide whether it may go (BE-12).
+    /// </summary>
+    /// <remarks>
+    /// Three tables hold a segment with RESTRICT and they are in TWO modules: <c>pole.segment_id</c>
+    /// here, <c>fault.segment_id</c> and <c>fault_cluster.segment_id</c> in Faults. So a segment that
+    /// looks empty of poles can still be refused, and the constraint name in <c>details</c> is the
+    /// only thing that says which one spoke.
+    /// <para>
+    /// No soft delete, for the reason the pole delete gives: a segment typed in by mistake was never
+    /// a road that existed and was decommissioned, and a retirement flag would record something that
+    /// did not happen while adding a filter every later query has to remember.
+    /// </para>
+    /// </remarks>
+    public Task DeleteSegmentAsync(string segmentId, CancellationToken ct)
+        => DeleteAsync<RoadSegment>(
+            candidate => candidate.SegmentId == segmentId,
+            "road segment",
+            "That road segment still has poles, faults or fault clusters pointing at it, so it cannot be deleted.",
+            ct);
+
+    /// <summary>
+    /// Deletes a feeder. The foreign keys decide whether it may go (BE-12).
+    /// </summary>
+    /// <remarks>
+    /// Only <c>pole.feeder_id</c> points here, and it is RESTRICT and NULLABLE — so a feeder that
+    /// still has poles is refused rather than quietly unwiring them. Clearing the circuit is a
+    /// decision somebody makes per pole through <c>PUT /assets/poles/{id}/feeder</c>, not a side
+    /// effect of deleting the cabinet.
+    /// </remarks>
+    public Task DeleteFeederAsync(string feederId, CancellationToken ct)
+        => DeleteAsync<Feeder>(
+            candidate => candidate.FeederId == feederId,
+            "feeder",
+            "That feeder still has poles wired to it, so it cannot be deleted.",
+            ct);
+
+    /// <summary>Loads the row, removes it, and turns the database's refusal into a 409.</summary>
+    /// <remarks>
+    /// <b>Tracked, and through the query filter.</b> A row outside the caller's scope is simply not
+    /// there, which is the 404 Contract section 7 asks for rather than a 403 that would confirm the id
+    /// exists. Tracking also puts the deletion in front of <c>CommuneWriteGuard</c>, which checks
+    /// <c>EntityState.Deleted</c> against <c>OriginalValues</c>.
+    /// <para>
+    /// ⚠️ <b>This is why <c>ExecuteDelete</c> is banned.</b> It would issue the DELETE straight to SQL,
+    /// past the ChangeTracker the guard walks — the same hole on the write side that the query filter
+    /// left on the read side. See <c>BannedSymbols.txt</c>.
+    /// </para>
+    /// </remarks>
+    private async Task DeleteAsync<TEntity>(
+        System.Linq.Expressions.Expression<Func<TEntity, bool>> predicate,
+        string what,
+        string refusal,
+        CancellationToken ct)
+        where TEntity : class
+    {
+        var entity = await RequireAsync(predicate, what, ct);
+
+        dbContext.Set<TEntity>().Remove(entity);
 
         try
         {
@@ -198,7 +342,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
             throw new LuxMapException(
                 ErrorCodes.AssetInUse,
                 HttpStatusCode.Conflict,
-                "That pole still has records pointing at it, so it cannot be deleted.",
+                refusal,
                 DescribeRefusal((PostgresException)failure.InnerException!));
         }
     }
@@ -307,10 +451,15 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 new Dictionary<string, object?> { ["commune_id"] = communeId });
     }
 
-    private async Task RejectDuplicateRefAsync<TEntity>(string communeId, string? externalRef, CancellationToken ct)
+    /// <param name="currentRef">
+    /// What the row being updated already holds, so keeping the code unchanged does not collide with
+    /// the row's own entry. <c>null</c> on the create path, where there is no row yet.
+    /// </param>
+    private async Task RejectDuplicateRefAsync<TEntity>(
+        string communeId, string? externalRef, CancellationToken ct, string? currentRef = null)
         where TEntity : class, ICommuneScoped, IExternallyReferenced
     {
-        if (externalRef is null)
+        if (externalRef is null || string.Equals(externalRef, currentRef, StringComparison.Ordinal))
         {
             return;
         }
