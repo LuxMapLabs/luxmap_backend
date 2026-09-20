@@ -206,6 +206,26 @@ thông báo, không lặng lẽ đặt mật khẩu mặc định.
 
 Phải `dotnet ef database update` trước; lệnh seed từ chối chạy khi còn migration chưa apply.
 
+### Nạp bộ mock FO-26
+
+Sau khi seed tài khoản ở trên, nạp 3 tuyến + 103 cột + 103 bóng + 28 sự cố của `mocks/`:
+
+```bash
+python3 scripts/seed_mock_set.py --apply
+```
+
+Bỏ `--apply` thì nó chỉ in SQL ra màn hình, không đụng database. Chạy lại bao nhiêu lần cũng được:
+nó xoá rồi ghi lại trong **một** transaction, và **từ chối chạy nếu `lux_reading` có dữ liệu** vì đó
+là ground truth RQ1.
+
+ID giữ đúng của mock (`POLE-0047` là `POLE-0047`), nên demo khớp với những gì FE đã dựng. Không nạp
+được qua endpoint import: EF Core không giữ thứ tự dòng khi để database sinh khoá, đo thật thì 102
+trên 103 cột rơi vào ID khác. Vì vậy script ghi ID tường minh rồi đẩy sequence qua vùng đã dùng.
+
+⚠️ **Đây là bản tạm, không phải BE-39.** Ba chỗ bộ mock chưa nạp được: `feeder_id` (mock không có,
+Open item O-6, đang chặn BE-13 và CV-15), `pole_current_status` (quyền ghi thuộc BE-15/BE-17), và
+IoT node / phiếu công việc / lịch sử sweep (bảng chưa tồn tại).
+
 ## Quy ước lỗi và phân trang
 
 Mọi lỗi — kể cả validation và route không khớp — trả về đúng một hình dạng:

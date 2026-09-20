@@ -958,6 +958,13 @@ thầm vào — hãy validate ở API trước cho ra 400.
 lên `HttpContext.Items`, trang status-code đọc lại); `COMMUNE_FORBIDDEN` chỉ cho địa bàn và cho claim
 `["*"]` lệch vai trò. Đừng ném `COMMUNE_FORBIDDEN` cho việc không phải địa bàn.
 
+**7b. Nạp bộ mock: dùng `scripts/seed_mock_set.py`, KHÔNG dùng endpoint import.**
+Endpoint import nạp đúng dữ liệu nhưng **không giữ được ID của mock**: EF Core không bảo toàn thứ tự
+`Add` khi database sinh khoá. Đo thật ngày 20/09 trên bảng rỗng với sequence đã đặt lại về 1: **102
+trên 103 cột** rơi vào ID khác, `POLE-0047` hoá thành cột `POLE-0062` của mock, `SEG-001` mang tên
+tuyến C. FE hardcode `POLE-0047` nên như vậy là hỏng demo. Script ghi ID tường minh rồi `setval`
+sequence qua vùng đã dùng, đúng quyết định D-6.
+
 **7. DB dev dùng chung bị test đẩy sequence.** `pole_id_seq` ở 396 625 với 0 cột (đo 18/09/2026):
 cột thật đầu tiên trên DB này là `POLE-396626`. Hệ quả cho **BE-39**: seed bộ mock phải INSERT ID tường
 minh (`POLE-0001…`) rồi `setval` sequence lên trên giá trị lớn nhất — ngoại lệ hệ thống đã chốt (D-6),
