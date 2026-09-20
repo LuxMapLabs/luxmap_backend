@@ -26,7 +26,7 @@ namespace LuxMap.Api.Tests;
 /// the constraint was tightened.
 /// </para>
 /// </remarks>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class LuxValueFinitenessTests(AssetSchemaFixture fixture) : IAsyncLifetime
 {
     private readonly List<string> createdPoleIds = [];

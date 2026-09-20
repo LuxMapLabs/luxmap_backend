@@ -27,7 +27,7 @@ namespace LuxMap.Api.Tests;
 /// no substitute accessor — the object under test is the one that runs.
 /// </para>
 /// </remarks>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class CommuneWriteScopeTests(AssetSchemaFixture fixture) : IAsyncLifetime
 {
     private const int Srid = 4326;

@@ -33,7 +33,7 @@ namespace LuxMap.Api.Tests;
 /// So this proves the import can rebuild the asset layer of FO-26, and it documents exactly what the
 /// mock set still owes before BE-39 can seed it for real.
 /// </remarks>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class AssetImportMockSetTests(AssetImportFixture fixture, ITestOutputHelper output)
 {
     [Fact]

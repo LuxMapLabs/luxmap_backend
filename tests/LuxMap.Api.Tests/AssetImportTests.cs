@@ -11,7 +11,7 @@ namespace LuxMap.Api.Tests;
 /// BE-12a — bulk import: validation before writing, upsert, insert-only fixtures, and the batch
 /// transaction.
 /// </summary>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class AssetImportTests(AssetImportFixture fixture)
 {
     private static readonly string SegmentHeader =

@@ -215,6 +215,3 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
         }
     }
 }
-
-[CollectionDefinition(nameof(AssetSchemaCollection))]
-public sealed class AssetSchemaCollection : ICollectionFixture<AssetSchemaFixture>;

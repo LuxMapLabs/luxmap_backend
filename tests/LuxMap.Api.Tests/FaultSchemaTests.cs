@@ -23,7 +23,7 @@ namespace LuxMap.Api.Tests;
 /// application-layer rule can be bypassed by CSV import, sync push or a seeder, and all three write
 /// to this table.
 /// </remarks>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class FaultSchemaTests(AssetSchemaFixture fixture) : IAsyncLifetime
 {
     private readonly List<string> faultIds = [];

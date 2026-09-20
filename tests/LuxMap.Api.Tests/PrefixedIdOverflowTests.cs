@@ -39,7 +39,7 @@ namespace LuxMap.Api.Tests;
 /// every run, alone or in a suite. Pick the range from <see cref="FreeFourDigitDecadeAsync"/>.
 /// </para>
 /// </summary>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
 {
     [Fact]

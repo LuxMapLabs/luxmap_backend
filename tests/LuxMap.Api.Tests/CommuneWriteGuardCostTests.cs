@@ -46,7 +46,7 @@ namespace LuxMap.Api.Tests;
 /// two cancel out. Verified, not assumed — the naive command matched zero tests.
 /// </para>
 /// </remarks>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class CommuneWriteGuardCostTests(AssetImportFixture fixture, ITestOutputHelper output)
 {
     private const int TrackedEntities = 1000;

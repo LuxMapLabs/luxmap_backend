@@ -15,7 +15,7 @@ namespace LuxMap.Api.Tests;
 /// BE-REVIEW-02, Q-4 — a lamp is retired once, and never before it was installed. The API answers
 /// 400 naming the field; <c>ck_fixture_removed_after_install</c> answers for every other writer.
 /// </summary>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class FixtureRetirementTests(AssetImportFixture fixture)
 {
     private const string FixtureRoute = "/api/v1/assets/fixtures";

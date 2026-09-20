@@ -25,7 +25,7 @@ namespace LuxMap.Api.Tests;
 /// approach as <c>CommuneWriteScopeTests</c>. Writing with an empty scope is a REFUSAL since the
 /// BE-08 hotfix, so anything that builds fixture data says so through the explicit backdoor.
 /// </remarks>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
 {
     private const int Srid = 4326;
