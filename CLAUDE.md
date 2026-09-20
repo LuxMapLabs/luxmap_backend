@@ -565,15 +565,30 @@ Contract mục 2.1 đã đặc tả `GET /poles`: `bbox` bắt buộc, trả `Fe
 chỗ đó. Hai bề mặt, hai việc khác nhau — đừng gộp.
 
 ```
-GET/POST  /api/v1/assets/{segments|feeders|poles}      POST /api/v1/assets/fixtures
-PUT       /api/v1/assets/fixtures/{id}/removal
-POST      /api/v1/assets/import/{segments|feeders|poles|fixtures}
+GET/POST      /api/v1/assets/{segments|feeders|poles}    POST /api/v1/assets/fixtures
+PUT/DELETE    /api/v1/assets/{segments|feeders|poles}/{id}
+PUT           /api/v1/assets/poles/{id}/feeder           PUT  /api/v1/assets/fixtures/{id}/removal
+POST          /api/v1/assets/import/{segments|feeders|poles|fixtures}
 ```
 
-**Chỉ pole có DELETE** (`DELETE /assets/poles/{id}`, BE-12 — drift 43, xác nhận 18/09/2026); fixture
-**không**. Khoá ngoại quyết định: `fault` / `lux_reading` trỏ vào pole bằng `Restrict` nên cột nào có
-dữ liệu nghiên cứu cũng không xoá được (409 `ASSET_IN_USE`, kể cả khi ràng buộc vấp ở bóng của cột).
-Ngừng dùng thiết bị là việc của `fixture.removed_date`.
+**Fixture KHÔNG có DELETE, và cũng không có PUT thay thế** — ngừng dùng thiết bị là việc của
+`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. Ba loại còn lại xoá
+được và **khoá ngoại quyết định**, không kiểm trong code: `fault` / `lux_reading` giữ pole,
+`pole` / `fault` / `fault_cluster` giữ segment, `pole.feeder_id` giữ feeder — tất cả `Restrict`, vi
+phạm là 409 `ASSET_IN_USE` kèm tên constraint trong `details` (kể cả khi ràng buộc vấp ở bóng của
+cột). Drift 43 (18/09/2026) mở đường cho pole; **drift 44 (20/09/2026)** cho năm endpoint còn lại.
+
+> ⚠️ **`PUT` ở đây là THAY THẾ TOÀN PHẦN, không phải patch — và nó cắn.** Body thiếu `feeder_id` sẽ
+> **XOÁ mạch điện của cột**, âm thầm. Ai chỉ muốn đổi mạch thì dùng `PUT /assets/poles/{id}/feeder`,
+> endpoint đó phân biệt được "không gửi" với "gửi null" (`SetPoleFeederRequest`). Đã ghim bằng
+> `Replacing_a_pole_without_a_feeder_id_clears_its_circuit` — test đó **ghi lại một quyết định**,
+> đừng "sửa" cho field dính lại.
+>
+> **`commune_id` KHÔNG nằm trong ba request update.** Chuyển tài sản sang xã khác không phải sửa mà
+> là chuyển giao: đổi luôn ai nhìn thấy dòng đó, và phải kiểm scope ở **cả hai** phía. Riêng với
+> `feeder` thì còn nặng hơn — `RequireFeederInCommuneAsync` chỉ chạy khi ghi **POLE**, không bao giờ
+> chạy khi feeder đổi xã, nên cho sửa sẽ kéo tủ điện ra khỏi các cột đang đấu vào nó và **mọi cặp đó
+> lặng lẽ thành liên-xã mà không còn lượt ghi nào bắt được**.
 
 **2. `external_ref` — khoá tự nhiên DUY NHẤT của lược đồ, trên BA bảng.**
 
