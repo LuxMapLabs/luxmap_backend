@@ -10,7 +10,7 @@ Không có consumer nào khác. Không có API công khai cho người dân.
 
 Ba tài liệu, thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.4** (18/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.3, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.4.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.5** (19/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
 2. **`docs/tasks-backend.csv`** — task list v2.1, phạm vi và lịch.
 3. File này — quy ước làm việc và những chỗ dễ sai. Không phải đặc tả.
 
@@ -1031,7 +1031,7 @@ minh (`POLE-0001…`) rồi `setval` sequence lên trên giá trị lớn nhất
 ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản seed nó đăng nhập (N-5);
 `AuthTestFactory` chưa — BE-36 (Testcontainers) là bản sửa gốc.
 
-**8. Spec hợp nhất `docs/openapi/luxmap-v1.4.json` là file SINH.** Sinh bằng
+**8. Spec hợp nhất `docs/openapi/luxmap-v1.5.json` là file SINH.** Sinh bằng
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
 **sau mỗi lần** xuất `luxmap-v1.json`, rồi `npx @redocly/cli lint`. Không sửa tay cả hai.
 

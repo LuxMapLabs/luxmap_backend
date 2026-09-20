@@ -28,7 +28,6 @@ sẽ lệch trong vòng một tuần (`AGENTS.md` đã lệch `CLAUDE.md` 102 d�
 - `dev` là branch làm việc; `main` chỉ có commit init.
 - Các trường status/completion trong `docs/tasks-backend.csv` là **trường chết** — đọc `tracking.html`.
 - Open item O-6: `pole.feeder_id` chưa có dữ liệu — đang chặn BE-13 và CV-15.
-- ⚠️ **D-item đang treo (20/09/2026):** `CLAUDE.md` dòng 13 & 974 và `README.md` dòng 5 & 294 vẫn ghi
-  Contract **v1.4** / `docs/openapi/luxmap-v1.4.json`, trong khi `docs/contract-drift.md` ghi bản hợp
-  nhất đã là **v1.5** và file thật là `luxmap-v1.5.json`. Lệnh lint trong README vì thế **chạy sẽ
-  chết**. Agent không tự sửa — Mỹ chốt rồi cập nhật cả hai file trong một commit.
+- Contract hợp nhất là **v1.5**, file máy đọc là `docs/openapi/luxmap-v1.5.json`. `CLAUDE.md` và
+  `README.md` đã được đồng bộ (20/09/2026) — chỗ nào còn ghi `luxmap-v1.4.json` là **lịch sử**
+  (`tracking.html`, `docs/review/`, `docs/contract-drift.md`), đừng "sửa cho nhất quán".
