@@ -179,6 +179,39 @@ public sealed class AuthService(
     private static bool IsUniqueViolation(DbUpdateException exception)
         => exception.InnerException is PostgresException { SqlState: "23505" };
 
+    /// <summary>
+    /// The signed-in user as the database has them RIGHT NOW, or <c>null</c> when the id names nobody.
+    /// </summary>
+    /// <remarks>
+    /// Serves <c>GET /api/v1/auth/me</c>. It reads the row rather than the token's claims on purpose:
+    /// the claims were fixed when the access token was issued and stay that way for 60 minutes, so an
+    /// account that has just been given a commune would keep reporting the old scope. It also returns
+    /// <c>full_name</c> and <c>email</c>, which the token never carried.
+    /// <para>
+    /// <c>null</c> means the subject in a still-valid token no longer exists — the controller answers
+    /// 401 for that, because the credential has stopped identifying anyone.
+    /// </para>
+    /// </remarks>
+    public async Task<CurrentUserResponse?> FindCurrentUserAsync(
+        string userId, CancellationToken ct = default)
+    {
+        var user = await dbContext.Set<AppUser>().AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.UserId == userId, ct);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        return new CurrentUserResponse(
+            user.UserId,
+            user.Username,
+            user.Email,
+            user.FullName,
+            ContractEnum.ToDbValue(user.Role),
+            await CommuneIdsForAsync(user, ct));
+    }
+
     /// <param name="group">The endpoint group the token arrived at. A token issued by the other group
     /// is treated exactly like an unknown one: 401, nothing revoked, no reuse detection.</param>
     public async Task<AuthResult> RefreshAsync(
@@ -414,10 +447,16 @@ public sealed class AuthService(
         return (entity, raw);
     }
 
-    private async Task<AuthTokens> BuildTokensAsync(
-        AppUser user, RefreshToken refresh, string rawRefreshToken, CancellationToken ct)
-    {
-        var communeIds = user.HasSystemWideScope
+    /// <summary>
+    /// The communes an account may reach: <c>["*"]</c> for an administrator, otherwise its assignments.
+    /// </summary>
+    /// <remarks>
+    /// ONE implementation, shared by the token issuer and by <see cref="FindCurrentUserAsync"/>. Two
+    /// copies would let <c>GET /auth/me</c> and the <c>commune_ids</c> claim disagree about the same
+    /// account, and the front end has no way to tell which one is lying.
+    /// </remarks>
+    private async Task<string[]> CommuneIdsForAsync(AppUser user, CancellationToken ct)
+        => user.HasSystemWideScope
             ? [AuthClaims.AllCommunes]
             : await dbContext.Set<AppUserCommune>()
                 .Where(assignment => assignment.UserId == user.UserId)
@@ -425,7 +464,10 @@ public sealed class AuthService(
                 .Select(assignment => assignment.CommuneId)
                 .ToArrayAsync(ct);
 
-        var access = accessTokenIssuer.Issue(user, communeIds);
+    private async Task<AuthTokens> BuildTokensAsync(
+        AppUser user, RefreshToken refresh, string rawRefreshToken, CancellationToken ct)
+    {
+        var access = accessTokenIssuer.Issue(user, await CommuneIdsForAsync(user, ct));
         return new AuthTokens(
             access.Token, rawRefreshToken, access.ExpiresInSeconds, refresh.ExpiresAt, refresh.SessionKind);
     }

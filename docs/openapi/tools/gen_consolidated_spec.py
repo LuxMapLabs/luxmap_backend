@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
-"""Builds docs/openapi/luxmap-v1.4.json — the CONSOLIDATED spec that matches api-contract-v1.1.md 1-1.
+"""Builds docs/openapi/luxmap-v1.5.json — the CONSOLIDATED spec that matches api-contract-v1.1.md 1-1.
 
 Run from the repository root after regenerating luxmap-v1.json from code (README):
 
     python3 docs/openapi/tools/gen_consolidated_spec.py
-    npx @redocly/cli lint docs/openapi/luxmap-v1.4.json
+    npx @redocly/cli lint docs/openapi/luxmap-v1.5.json
 
 Source of truth for IMPLEMENTED operations is docs/openapi/luxmap-v1.json, which is exported from
 the code and never edited by hand (decision E). This script only ADDS: the endpoints the Contract
 specifies but the code does not serve yet (x-luxmap-status = not_implemented), summaries and
 operationIds, tag descriptions, the prefixed-id patterns of Contract section 1.2, and the schemas
 those endpoints need. Introduced at BE-REVIEW-02 (18/09/2026); the Contract section numbers below
-are those of v1.4.
+are those of v1.5. GET /auth/me added 19/09/2026 (Contract v1.5).
 """
 import json, copy, sys, re
 from collections import OrderedDict
 
 SRC = "docs/openapi/luxmap-v1.json"
-DST = "docs/openapi/luxmap-v1.4.json"
+DST = "docs/openapi/luxmap-v1.5.json"
 
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.4"
+d["info"]["version"] = "1.5"
 d["info"]["title"] = "LuxMap API"
 d["info"]["description"] = (
-    "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.4, 18/09/2026). "
+    "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.5, 19/09/2026). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
-    "code, 21 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
+    "code, 22 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
     "base path /api/v1."
 )
@@ -88,6 +88,7 @@ SUMMARY = {
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
     ("put", "/api/v1/assets/fixtures/{fixtureId}/removal"): "Ngừng dùng bóng bằng removed_date; không có DELETE",
+    ("get", "/api/v1/auth/me"): "Người đang đăng nhập, đọc từ DB nên role và commune_ids luôn tươi",
     ("post", "/api/v1/auth/login"): "Đăng nhập mobile; trả đúng bốn trường",
     ("post", "/api/v1/auth/register"): "Đăng ký mở; tạo danh tính, không tạo quyền",
     ("post", "/api/v1/auth/refresh"): "Xoay vòng refresh token (mobile)",
@@ -100,6 +101,7 @@ SUMMARY = {
     ("post", "/api/v1/auth/web/logout"): "Thu hồi token trong cookie, luôn xoá cookie, luôn 204",
 }
 SECTION = {
+    "/api/v1/auth/me": "§4.7",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",
     "/api/v1/auth": "§4.1",
@@ -117,10 +119,11 @@ for path, item in d["paths"].items():
             if path.startswith(prefix):
                 op["x-luxmap-contract"] = sec
                 break
-        is_auth = path.startswith("/api/v1/auth")
-        if is_auth and "security" not in op:
+        # The auth group is anonymous EXCEPT /auth/me, which requires the bearer token (§4.7).
+        is_anonymous = path.startswith("/api/v1/auth") and path != "/api/v1/auth/me"
+        if is_anonymous and "security" not in op:
             op["security"] = []          # AllowAnonymous
-        if not is_auth:
+        if not is_anonymous:
             op["responses"].setdefault("401", err("UNAUTHENTICATED — thiếu / sai / hết hạn access token"))
 
 # ── shared new schemas ─────────────────────────────────────────────────────────

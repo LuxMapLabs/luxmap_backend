@@ -1,3 +1,4 @@
+using System.Net;
 using Asp.Versioning;
 using LuxMap.Modules.Identity.Entities;
 using Microsoft.AspNetCore.Http;
@@ -16,12 +17,17 @@ namespace LuxMap.Modules.Identity.Auth;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/auth")]
-// BE-08 makes authentication mandatory application-wide. These three endpoints are the way in to
-// obtain a token, so they must stay open — and that has to be declared explicitly.
-[AllowAnonymous]
+// BE-08 makes authentication mandatory application-wide, and the way in to obtain a token must stay
+// open — but that is declared PER ENDPOINT, not on the class.
+//
+// ⚠️ It used to sit on the class, and moving it was not tidying up. [AllowAnonymous] declared farther
+// away BEATS an [Authorize] on a method, so the first endpoint here that needed a token (`me`) would
+// have shipped reachable without one. The compiler says so (ASP0026) and it is right: an opt-out that
+// covers endpoints written later is an opt-out nobody re-reads.
 public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
@@ -53,6 +59,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     /// </para>
     /// </remarks>
     [HttpPost("register")]
+    [AllowAnonymous]
     [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
@@ -84,6 +91,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [AllowAnonymous]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
@@ -96,8 +104,50 @@ public sealed class AuthController(AuthService authService) : ControllerBase
         return Respond(result);
     }
 
+    /// <summary>
+    /// The signed-in user, read from the database (Contract section 4.7).
+    /// </summary>
+    /// <remarks>
+    /// The ONE endpoint of this controller that needs an access token. The other four opt OUT with
+    /// <see cref="AllowAnonymousAttribute"/> individually; this one is covered by the application-wide
+    /// fallback policy, and says so with an explicit <see cref="AuthorizeAttribute"/>.
+    /// <para>
+    /// It serves BOTH endpoint groups: mobile and web receive the same access token in the response
+    /// body and send it the same way, so there is no <c>/auth/web/me</c> — only the REFRESH token
+    /// differs between the groups, and this endpoint never touches it.
+    /// </para>
+    /// <para>
+    /// Answers from the row, not from the claims: see <see cref="AuthService.FindCurrentUserAsync"/>.
+    /// A locked account is NOT refused here; its access token keeps working on every endpoint until it
+    /// expires, and answering 403 on this one alone would be a rule that exists nowhere else.
+    /// </para>
+    /// </remarks>
+    [HttpGet("me")]
+    [Authorize]
+    [ProducesResponseType<CurrentUserResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<CurrentUserResponse>> MeAsync(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(AuthClaims.Subject)?.Value;
+
+        var me = userId is null
+            ? null
+            : await authService.FindCurrentUserAsync(userId, cancellationToken);
+
+        // Both branches are 401 and share one message. A token with no subject and a token naming a
+        // deleted account are the same thing to the caller: this credential identifies nobody. A 404
+        // would be the wrong shape anyway — the resource is "me", and it is the token that is stale.
+        return me is not null
+            ? Ok(me)
+            : throw new LuxMapException(
+                ErrorCodes.Unauthenticated,
+                HttpStatusCode.Unauthorized,
+                "This access token no longer identifies an account. Sign in again.");
+    }
+
     /// <summary>Idempotent: an already-revoked or unknown token still returns 204.</summary>
     [HttpPost("logout")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> LogoutAsync(

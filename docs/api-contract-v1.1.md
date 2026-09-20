@@ -1,14 +1,15 @@
-# LuxMap — API Contract v1.4 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.5 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
 `api-contract-v1.1.md`** để mọi liên kết cũ vẫn đúng (quyết định D-1, Dylan, 18/09/2026).
 **Ngày chốt v1.0:** 23/08/2026 · **v1.1:** 24/08/2026 · **v1.2:** 11/09/2026 (mục 4 Auth) ·
-**v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02).
+**v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02) ·
+**v1.5:** 19/09/2026 (`GET /auth/me`).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.4.json` — khớp 1-1 với tài liệu này (36 operation: 21
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (37 operation: 22
 `implemented`, 15 `not_implemented`), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -253,8 +254,9 @@ cố; `resolved` = đã sửa; `verified` = đã nghiệm thu.
 
 ## 4. Xác thực — `/api/v1/auth` — `implemented`
 
-Hai nhóm, client chọn bằng đường dẫn. Cả 7 endpoint không cần access token. Access token sống 60
-phút, luôn ở body, không bao giờ trong cookie.
+Hai nhóm, client chọn bằng đường dẫn. **7 endpoint cấp token không cần access token**; endpoint thứ
+tám, `GET /auth/me` (mục 4.7), thì **cần**. Access token sống 60 phút, luôn ở body, không bao giờ
+trong cookie.
 
 ### 4.1 Nhóm mobile
 
@@ -338,6 +340,44 @@ Hằng số của API, không đổi theo môi trường. Giá trị là chuỗi
 FE và API **cùng site** (cùng `https`, cùng eTLD+1; domain trong Public Suffix List thì mỗi subdomain
 là một site). Gọi `/auth/web/*` **từ browser** với `credentials: 'include'`; không gọi từ server của
 FE (không có `Origin` → 403, cookie không tới browser).
+
+### 4.7 `GET /api/v1/auth/me` — người đang đăng nhập — `implemented` (v1.5)
+
+**Cần access token.** Phục vụ **cả hai nhóm**: mobile và web nhận cùng một access token và gửi cùng
+một cách, chỉ refresh token là khác nhau, nên **không có** `/auth/web/me`.
+
+`200`:
+
+```json
+{ "user_id": "USR-003", "username": "engineer", "email": "engineer@luxmap.local",
+  "full_name": "Kỹ sư bảo trì", "role": "maintenance_engineer", "commune_ids": ["COM-001"] }
+```
+
+Đúng sáu trường, bằng `register` (mục 4.1) bỏ `message`.
+
+| Trường | Ghi chú |
+|---|---|
+| `role` | Giá trị `user_role` mục 3.1 |
+| `commune_ids` | Mảng, **có thể rỗng** với tài khoản chưa được gán xã. Quản trị: `["*"]` |
+
+🔴 **Đọc từ DATABASE, không phải từ claim trong token.** Đây là lý do endpoint tồn tại thay vì để FE
+tự giải mã JWT:
+
+- Access token sống **60 phút**, nên xã vừa được quản trị gán **không** xuất hiện trong claim cho tới
+  lần đăng nhập sau. `/auth/me` trả giá trị đúng ngay lập tức.
+- `full_name` và `email` **không có trong token**, mà tên hiển thị là thứ FE cần đầu tiên.
+
+Không bao giờ phát `password_hash`, `is_locked`, `has_system_wide_scope`.
+
+| Mã | HTTP | Khi nào |
+|---|---|---|
+| `UNAUTHENTICATED` | 401 | Thiếu / sai / hết hạn token, **hoặc** token còn hạn nhưng tài khoản đã bị xoá |
+
+Tài khoản bị **khoá** không bị từ chối ở đây: access token của nó vẫn chạy trên mọi endpoint khác cho
+tới khi hết hạn, và trả 403 riêng ở endpoint này là một luật không tồn tại ở đâu khác.
+
+> ⚠️ **FE không nên tự giải mã JWT để lấy `role` hay `commune_ids`.** Làm vậy được, vì payload chỉ là
+> base64, nhưng giá trị sẽ cũ tới 60 phút. Dùng `/auth/me` khi vào app và sau khi quản trị đổi quyền.
 
 ---
 
@@ -550,10 +590,11 @@ highlight `SEG-003`.
 
 ## 10. Changelog
 
-| Phiên bản | Ngày | Thay đổi |
-|---|---|---|
-| v1.4 | 18/09/2026 | Hợp nhất ba nguồn. Gộp và đóng drift 2, 3, 4, 6, 7, 8, 10, 12, 14, 15, 17–21, 27–31, 33–39, 43 và quyết định A–E; mã lỗi mới `ROLE_FORBIDDEN` (D-4), `CROSS_COMMUNE_REFERENCE` (D-5), `POLE_HAS_ACTIVE_FIXTURE` (D-11); một bóng đang dùng/cột (D-11) và `removed_date >= install_date` (Q-4); `data_source` tám entity + mặc định loại `calibration_rig` (D-13); `user_role` + EXACT-ROLE + bảng ghi (D-14); fault MỞ (O-7 cũ); `commune_id` trong `POST /faults` (O-10 cũ); `from`/`to` không `Z` = UTC (D-12); `status_confidence` hữu hạn 0..1; mock đổi ID (D-9); §4 số liệu mock cập nhật. Đánh số mục lại, bảng ánh xạ ở đầu file |
-| v1.3 | 15/09/2026 | **BREAKING** `GET /poles/{id}/lux-readings` → `GET /lux-readings/poles/{id}` |
-| v1.2 | 11/09/2026 | Nhóm Auth (mobile + web cookie) |
-| v1.1 | 24/08/2026 | `manual` → `field_report`; `data_source`; quy ước ID; hình dạng item `GET /faults`; `POST /faults`; lux; phân quyền địa bàn |
-| v1.0 | 23/08/2026 | Bản đầu |
+| Phiên bản | Ngày | Người quyết | Thay đổi |
+|---|---|---|---|
+| v1.5 | 19/09/2026 | **Dylan** | Thêm mục 4.7 `GET /api/v1/auth/me`. Không đổi hình dạng nào đã publish: 7 endpoint auth cũ giữ nguyên từng byte. Lý do: login chỉ trả token, và access token không mang `full_name`/`email` còn `commune_ids` thì đứng yên 60 phút |
+| v1.4 | 18/09/2026 | **Dylan** (BE-REVIEW-02) | Hợp nhất ba nguồn. Gộp và đóng drift 2, 3, 4, 6, 7, 8, 10, 12, 14, 15, 17–21, 27–31, 33–39, 43 và quyết định A–E; mã lỗi mới `ROLE_FORBIDDEN` (D-4), `CROSS_COMMUNE_REFERENCE` (D-5), `POLE_HAS_ACTIVE_FIXTURE` (D-11); một bóng đang dùng/cột (D-11) và `removed_date >= install_date` (Q-4); `data_source` tám entity + mặc định loại `calibration_rig` (D-13); `user_role` + EXACT-ROLE + bảng ghi (D-14); fault MỞ (O-7 cũ); `commune_id` trong `POST /faults` (O-10 cũ); `from`/`to` không `Z` = UTC (D-12); `status_confidence` hữu hạn 0..1; mock đổi ID (D-9); §4 số liệu mock cập nhật. Đánh số mục lại, bảng ánh xạ ở đầu file |
+| v1.3 | 15/09/2026 | Dylan | **BREAKING** `GET /poles/{id}/lux-readings` → `GET /lux-readings/poles/{id}` |
+| v1.2 | 11/09/2026 | Dylan | Nhóm Auth (mobile + web cookie) |
+| v1.1 | 24/08/2026 | cả nhóm, FW-00 | `manual` → `field_report`; `data_source`; quy ước ID; hình dạng item `GET /faults`; `POST /faults`; lux; phân quyền địa bàn |
+| v1.0 | 23/08/2026 | cả nhóm, FW-00 | Bản đầu |
