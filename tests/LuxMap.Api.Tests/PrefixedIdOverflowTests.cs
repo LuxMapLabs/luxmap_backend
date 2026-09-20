@@ -30,6 +30,14 @@ namespace LuxMap.Api.Tests;
 /// These tests drive the REAL column default, not a hand-written expression: they move the sequence
 /// to the edge and insert. <see cref="AssetSchemaFixture"/> restores <c>pole_id_seq</c> afterwards.
 /// </para>
+/// <para>
+/// ⚠️ <b>The probe ids are chosen against the live table, never hardcoded.</b> The fixture's block of
+/// <see cref="AssetSchemaFixture.SyntheticPoleCount"/> poles does NOT start at 1 — it starts wherever
+/// <c>pole_id_seq</c> happens to stand, which on a shared development database is whatever the last
+/// seed left behind. Once the FO-26 mock set was loaded the sequence stood at 854, the block landed
+/// on 855..3354, and the literal 3000 this test used to claim was already taken: a hard 23505 on
+/// every run, alone or in a suite. Pick the range from <see cref="FreeFourDigitDecadeAsync"/>.
+/// </para>
 /// </summary>
 [Collection(nameof(AssetSchemaCollection))]
 public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
@@ -37,7 +45,10 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
     [Fact]
     public async Task Ids_past_the_padding_width_grow_instead_of_truncating()
     {
-        // 9999 is the last value that still fits the padding width; the next three cross it.
+        // 9999 is the last value that still fits the padding width; the next three cross it. This
+        // pair is FIXED by the width — unlike the decade below it cannot be moved to a free range, so
+        // the precondition is stated rather than worked around.
+        await RequireFreeAsync(9999, 10000, 10001, 10002);
         await SetPoleSequenceAsync(9998);
 
         var ids = new List<string>
@@ -55,34 +66,34 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
     public async Task The_ten_thousandth_pole_does_not_collide_with_the_one_thousandth()
     {
         // Any five-digit value used to truncate to its first four digits, so 30000 collided with
-        // 3000 exactly as 10000 collided with 1000. The 30000 range keeps this clear of the 10000
-        // range the test above occupies.
-        Assert.True(
-            AssetSchemaFixture.SyntheticPoleCount < 3000,
-            "This test claims the 3000 and 30000 ids for itself; raising the synthetic seed past "
-            + "3000 would overlap it. Move the range rather than deleting the assertion.");
+        // 3000 exactly as 10000 collided with 1000. Both rows are created here, so the test does not
+        // lean on which ids anything else happened to take.
+        var lower = await FreeFourDigitDecadeAsync();
+        var higher = lower * 10;
 
-        // Both rows are created here, so the test does not lean on which ids the fixture's bulk seed
-        // happened to take.
-        await SetPoleSequenceAsync(2999);
+        await SetPoleSequenceAsync(lower - 1);
         var lowerId = await InsertPoleAsync();
 
-        // Under the old default this insert produced 'POLE-3000' and died on the primary key. The
-        // assertion is a formality — the insert above is the real check.
-        await SetPoleSequenceAsync(29999);
+        // Under the old default this insert produced the lower id again and died on the primary key.
+        // The assertions are a formality — the insert above is the real check.
+        await SetPoleSequenceAsync(higher - 1);
         var higherId = await InsertPoleAsync();
 
-        Assert.Equal("POLE-3000", lowerId);
-        Assert.Equal("POLE-30000", higherId);
+        Assert.Equal(PrefixedIds.Pole.Format(lower), lowerId);
+        Assert.Equal(PrefixedIds.Pole.Format(higher), higherId);
         Assert.NotEqual(lowerId, higherId);
+
+        // Exactly what lpad(…, 4) used to return for the higher value: its first four digits. Stating
+        // the relationship keeps the pair meaningful now that the numbers are not literals.
+        Assert.Equal(lowerId, higherId[..^1]);
     }
 
     [Fact]
     public async Task Padding_below_the_width_is_unchanged()
     {
         // Checked against rows the DEFAULT actually produced, rather than by inserting at a low
-        // sequence value: the fixture's bulk seed already occupies 1..2500, so those IDs are taken.
-        // The Theory below covers the expression itself across every width.
+        // sequence value: the fixture's bulk seed already holds a block of 2500 consecutive numbers,
+        // so those ids are taken. The Theory below covers the expression itself across every width.
         var padded = await fixture.QueryAsync(db => db.Set<Pole>()
             .IgnoreQueryFilters()
             .Where(pole => pole.CommuneId == fixture.CommuneId)
@@ -171,6 +182,66 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
             }
 
             return (string)(await command.ExecuteScalarAsync())!;
+        });
+
+    /// <summary>
+    /// The lowest four-digit multiple of 1000 whose id AND whose ten-fold id are both free.
+    /// </summary>
+    /// <remarks>
+    /// Width 4 means <c>lpad</c> truncated a five-digit value to its first four digits, so the pair
+    /// under test is always <c>(d, d × 10)</c> with <c>d</c> of four digits. Which <c>d</c> does not
+    /// matter, and choosing it here rather than writing 3000 is the whole point: the fixture's block
+    /// of synthetic poles sits wherever the sequence stood when the run began, so no literal is safe.
+    /// <para>
+    /// 1000 is left out on purpose: its ten-fold is 10000, the padding-width boundary that
+    /// <see cref="Ids_past_the_padding_width_grow_instead_of_truncating"/> claims. xUnit does not
+    /// promise an order for the methods of a class, so the two must not be able to want the same id.
+    /// </para>
+    /// </remarks>
+    private async Task<long> FreeFourDigitDecadeAsync()
+    {
+        foreach (var decade in new long[] { 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000 })
+        {
+            if ((await TakenAsync(decade, decade * 10)).Count == 0)
+            {
+                return decade;
+            }
+        }
+
+        Assert.Fail(
+            "Every four-digit decade and its ten-fold is taken, so this test has nowhere to write. "
+            + "The pole table is far fuller than any test run should leave it — clear it rather than "
+            + "widening the search.");
+        return 0;
+    }
+
+    /// <summary>Asserts that no row holds any of <paramref name="numbers"/>, naming the ones that do.</summary>
+    /// <remarks>
+    /// Without this the range being occupied surfaces as a raw <c>23505</c> from deep inside
+    /// <c>SaveChanges</c>, which says nothing about why — that is exactly how the 3000 collision hid.
+    /// </remarks>
+    private async Task RequireFreeAsync(params long[] numbers)
+    {
+        var taken = await TakenAsync(numbers);
+
+        Assert.True(
+            taken.Count == 0,
+            $"These ids must be free for this test to write them, but rows already hold "
+            + $"{string.Join(", ", taken.Order(StringComparer.Ordinal))}. The pole table is carrying "
+            + "leftovers from an earlier run, or pole_id_seq has been moved far past its seeded value.");
+    }
+
+    /// <summary>The ids among <paramref name="numbers"/> that a row already holds.</summary>
+    private Task<List<string>> TakenAsync(params long[] numbers)
+        => fixture.QueryAsync(db =>
+        {
+            var ids = numbers.Select(PrefixedIds.Pole.Format).ToList();
+
+            return db.Set<Pole>()
+                .IgnoreQueryFilters()
+                .Where(pole => ids.Contains(pole.PoleId))
+                .Select(pole => pole.PoleId)
+                .ToListAsync();
         });
 
     private Task SetPoleSequenceAsync(long value)
