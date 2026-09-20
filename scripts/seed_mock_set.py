@@ -30,7 +30,15 @@ WHAT IT DOES NOT SEED, and why:
   work_order_id      Present on 11 mock faults; `fault` has no such column until BE-21. Decision C
                      says the API emits null for it meanwhile.
 
-It is idempotent: everything it owns is deleted and rewritten inside one transaction.
+Re-running it is safe for the mock set itself: one transaction, and `--apply` uses ON_ERROR_STOP
+so a failure rolls the whole thing back.
+
+⚠️ But the DELETEs are UNQUALIFIED. `fault`, `fault_cluster`, `fixture`, `pole` and `road_segment`
+are emptied outright, not filtered to the rows this script wrote — so anything else on that database
+(assets imported by hand, faults created while testing) goes too. Only `lux_reading` is protected,
+by the RAISE guard at the top of `statements()`, because it is the RQ1 ground truth. Point this at a
+development database you are willing to lose, never at anything shared that holds work. Scoping
+the deletes to the seeded `external_ref` values belongs to the real BE-39 seeder that replaces it.
 """
 import argparse
 import json
