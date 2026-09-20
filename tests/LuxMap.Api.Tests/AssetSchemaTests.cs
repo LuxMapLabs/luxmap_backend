@@ -12,7 +12,7 @@ namespace LuxMap.Api.Tests;
 /// The point of the task is that geometry survives the round trip and that <c>bbox</c> queries ride
 /// the GIST index, and neither can be verified without the real database.
 /// </summary>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class AssetSchemaTests(AssetSchemaFixture fixture)
 {
     private const int Srid = 4326;

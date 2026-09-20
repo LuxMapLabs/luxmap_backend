@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Log của Serilog (BE-05)
 logs/
+
+# Con trỏ phiên làm việc của agent (.ai) — đổi mỗi phiên, không commit
+.ai/tasks/current.md

@@ -19,7 +19,7 @@ namespace LuxMap.Api.Tests;
 /// failing test rather than as a quietly different number.
 /// </para>
 /// </remarks>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class SpatialDistanceTests(AssetSchemaFixture fixture)
 {
     /// <summary>POLE-0001 in <c>mocks/mock-poles.geojson</c>.</summary>

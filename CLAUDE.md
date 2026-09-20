@@ -10,7 +10,7 @@ Không có consumer nào khác. Không có API công khai cho người dân.
 
 Ba tài liệu, thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.4** (18/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.3, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.4.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.5** (19/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
 2. **`docs/tasks-backend.csv`** — task list v2.1, phạm vi và lịch.
 3. File này — quy ước làm việc và những chỗ dễ sai. Không phải đặc tả.
 
@@ -48,6 +48,31 @@ xảy ra**; im lặng quá 3 ngày làm việc là **approve với thay đổi k
 **ESCALATE với thay đổi có chạm** — không bao giờ là approve; và một quyết định `SELF-SIGNED` chạm bề
 mặt API **chưa ổn định** cho tới khi FW kế tiếp xác nhận, nên ticket xây lên trên nó **phải ghi rõ nền
 là tạm**.
+
+---
+
+## Giao thức `.ai/` — làm việc nhiều agent
+
+Repo này có thể được nhiều agent cùng phục vụ (Claude Code, Codex). Vùng bàn giao giữa chúng là
+`.ai/`, và **`AGENTS.md` là symlink tới chính file này** — Codex đọc `AGENTS.md` theo quy ước, nên
+một file duy nhất phục vụ cả hai, và symlink luôn phân giải theo branch đang đứng. Đừng tạo lại
+`AGENTS.md` thành file thường: bản `AGENTS.md` cũ (untracked, 17/09/2026) là bản chép đông cứng của
+`CLAUDE.md` trên `dev`, nên trên nhánh này nó thiếu trọn 74 dòng, vẫn ghi Contract v1.1, và không có
+tám ràng buộc BE-REVIEW-02 lẫn luật `[AllowAnonymous]` cấp CLASS.
+
+Trước khi bắt đầu một ticket, đọc theo thứ tự:
+
+1. `.ai/context/sources.md` — tra nhanh file nào trả lời câu hỏi gì
+2. `.ai/tasks/<ticket>.md` — phạm vi, tiêu chí xong, và mục **KHÔNG ĐƯỢC làm**
+3. `.ai/context/commands.md` — lệnh build/test/migrate (bản đầy đủ: `README.md`)
+
+Ghi kết quả vào `.ai/results/<ticket>.md`, review vào `.ai/reviews/<ticket>-by-<agent>.md`. Quy ước
+đầy đủ, vòng đời ticket và quy tắc hai pha: `.ai/README.md`.
+
+⚠️ `.ai/` **đứng cuối** thứ tự ưu tiên — sau Contract, sau `tasks-backend.csv`, sau file này. Và nó
+**không nhận** bốn loại phát hiện ở bảng trên: deviation vẫn về `contract-drift.md`, ràng buộc kỹ
+thuật vẫn về đây, tiến độ vẫn về `tracking.html`. Một deviation ghi trong `.ai/results/` là deviation
+**không bao giờ tới tay WP5/WP6**.
 
 ---
 
@@ -832,6 +857,41 @@ của mọi endpoint để sửa một vấn đề chỉ nằm ở ba literal.
 > không** so với `fixture_status`, không nói gì về giá trị. XML doc ghi *"0..1"* nhưng **không có
 > ràng buộc nào thực thi**. Quyền ghi bảng đó thuộc **BE-15/BE-17** nên bản sửa thuộc về đó.
 
+### Quy ước: MỌI test ghi tài sản nằm trong `AssetDatabaseCollection`, và KHÔNG test nào ghim ID bằng literal
+
+Hai quy tắc, một nguyên nhân: **`pole_id_seq` là tài nguyên TOÀN CỤC dùng chung**, còn DB phát triển
+thì dùng chung giữa mọi lượt chạy.
+
+**1. Một collection duy nhất cho 16 class ghi tài sản.** xUnit chạy song song các class **khác
+collection**, tuần tự các class **cùng collection**. `PrefixedIdOverflowTests` phải `setval` ghim
+sequence tới ngưỡng độ rộng đệm rồi chèn — việc đó **không chịu được người ghi thứ hai**: lượt lùi
+sequence trao cho hàng xóm một ID đã có, còn `nextval` của hàng xóm cướp mất ID vừa ghim. Bên thua
+chết vì `pk_pole`, thông điệp không hề nhắc tới race.
+
+Đo thật, 5 lượt mỗi bên, cùng máy cùng DB: tách hai collection → **4,1–4,3 s, 4/5 lượt đỏ**; gộp một
+collection → **5,2–5,4 s, 5/5 xanh**. **Một giây đổi lấy bộ test không còn đỏ ngẫu nhiên.** Đừng tách
+ra lại vì lý do tốc độ.
+
+**2. Không literal ID nào trong test — chọn dải từ bảng LIVE.**
+
+> 🔴 `AssetSchemaFixture` chèn 2500 cột bắt đầu từ **chỗ `pole_id_seq` đang đứng**, KHÔNG phải từ 1.
+
+`PrefixedIdOverflowTests` từng giành literal `3000` / `30000`, canh bằng
+`Assert.True(SyntheticPoleCount < 3000)` — câu đó **mã hoá một tiền đề sai**. Sau khi BE-39 seed bộ
+mock FO-26, sequence đứng ở **854**, khối 2500 cột rơi vào **855..3354**, trùm lên 3000. Hậu quả
+không dừng ở một test: lượt `setval(2999)` **làm nhiễm độc sequence** cho khoảng 355 lượt chèn kế
+tiếp, nên một lượt chạy đỏ 36 test, lượt sau đỏ 76 — trông y hệt flaky, thực ra tất định.
+
+Đường đúng: hỏi bảng xem số nào còn trống rồi mới ghim (`FreeFourDigitDecadeAsync`), và nêu tiền đề
+thành assert có thông điệp (`RequireFreeAsync`) thay vì để nó lộ ra dưới dạng `23505` trần từ trong
+`SaveChanges`.
+
+⚠️ Ngưỡng **9999 → 10000** là ngoại lệ: nó do chính độ rộng đệm quy định nên **không dời đi đâu
+được**. Vì vậy thập niên `1000` bị loại khỏi danh sách ứng viên — bội mười của nó đúng là 10000.
+
+**BE-36 (Testcontainers, W17–W18) xoá bỏ toàn bộ lớp lỗi này** — mỗi lượt chạy một DB sạch, sequence
+bắt đầu từ 0, không còn dải nào bị chiếm trước. Tới lúc đó có thể xét tách lại collection.
+
 ### Năm quy tắc chốt ở BE-18 — sự cố
 
 **1. Ghi vết đặt TRÊN bảng `fault`, không có `FaultHistory`.**
@@ -958,13 +1018,20 @@ thầm vào — hãy validate ở API trước cho ra 400.
 lên `HttpContext.Items`, trang status-code đọc lại); `COMMUNE_FORBIDDEN` chỉ cho địa bàn và cho claim
 `["*"]` lệch vai trò. Đừng ném `COMMUNE_FORBIDDEN` cho việc không phải địa bàn.
 
+**7b. Nạp bộ mock: dùng `scripts/seed_mock_set.py`, KHÔNG dùng endpoint import.**
+Endpoint import nạp đúng dữ liệu nhưng **không giữ được ID của mock**: EF Core không bảo toàn thứ tự
+`Add` khi database sinh khoá. Đo thật ngày 20/09 trên bảng rỗng với sequence đã đặt lại về 1: **102
+trên 103 cột** rơi vào ID khác, `POLE-0047` hoá thành cột `POLE-0062` của mock, `SEG-001` mang tên
+tuyến C. FE hardcode `POLE-0047` nên như vậy là hỏng demo. Script ghi ID tường minh rồi `setval`
+sequence qua vùng đã dùng, đúng quyết định D-6.
+
 **7. DB dev dùng chung bị test đẩy sequence.** `pole_id_seq` ở 396 625 với 0 cột (đo 18/09/2026):
 cột thật đầu tiên trên DB này là `POLE-396626`. Hệ quả cho **BE-39**: seed bộ mock phải INSERT ID tường
 minh (`POLE-0001…`) rồi `setval` sequence lên trên giá trị lớn nhất — ngoại lệ hệ thống đã chốt (D-6),
 ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản seed nó đăng nhập (N-5);
 `AuthTestFactory` chưa — BE-36 (Testcontainers) là bản sửa gốc.
 
-**8. Spec hợp nhất `docs/openapi/luxmap-v1.4.json` là file SINH.** Sinh bằng
+**8. Spec hợp nhất `docs/openapi/luxmap-v1.5.json` là file SINH.** Sinh bằng
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
 **sau mỗi lần** xuất `luxmap-v1.json`, rồi `npx @redocly/cli lint`. Không sửa tay cả hai.
 

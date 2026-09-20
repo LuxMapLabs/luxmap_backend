@@ -18,7 +18,7 @@ namespace LuxMap.Api.Tests;
 /// to point at the cause.
 /// </para>
 /// </summary>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class CommuneReferenceTests(AssetSchemaFixture fixture)
 {
     [Fact]

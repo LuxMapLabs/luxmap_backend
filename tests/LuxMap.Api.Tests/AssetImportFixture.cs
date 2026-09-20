@@ -212,6 +212,3 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
         await command.ExecuteNonQueryAsync();
     }
 }
-
-[CollectionDefinition(nameof(AssetImportCollection))]
-public sealed class AssetImportCollection : ICollectionFixture<AssetImportFixture>;

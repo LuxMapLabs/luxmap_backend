@@ -12,7 +12,7 @@ namespace LuxMap.Api.Tests;
 /// <see cref="AssetSchemaFixture.SyntheticPoleCount"/> rows, not asserted from the schema. Reading the
 /// index out of <c>pg_indexes</c> would only prove it exists; it would not prove the planner picks it.
 /// </remarks>
-[Collection(nameof(AssetSchemaCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public class SpatialIndexTests(AssetSchemaFixture fixture)
 {
     /// <summary>

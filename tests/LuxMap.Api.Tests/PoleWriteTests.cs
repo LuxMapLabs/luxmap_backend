@@ -29,7 +29,7 @@ namespace LuxMap.Api.Tests;
 /// behind here would make the FIXTURE's teardown fail on the very RESTRICT these tests exercise.
 /// </para>
 /// </remarks>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
 {
     private const string PoleRoute = "/api/v1/assets/poles";

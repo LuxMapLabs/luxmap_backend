@@ -22,7 +22,7 @@ namespace LuxMap.Api.Tests;
 /// authority — a mistake that looks like tightening security and is actually a denial of service to
 /// two of the four roles. These tests pin the asymmetry so nobody "tidies it up" later.
 /// </remarks>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class AssetPermissionTests(AssetImportFixture fixture)
 {
     [Fact]

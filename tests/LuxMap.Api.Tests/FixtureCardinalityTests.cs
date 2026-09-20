@@ -20,7 +20,7 @@ namespace LuxMap.Api.Tests;
 /// first, then install) goes through. A check that refused every second lamp would pass half of each
 /// test and nobody would notice until the first real lamp change.
 /// </remarks>
-[Collection(nameof(AssetImportCollection))]
+[Collection(nameof(AssetDatabaseCollection))]
 public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
 {
     private const string FixtureRoute = "/api/v1/assets/fixtures";
