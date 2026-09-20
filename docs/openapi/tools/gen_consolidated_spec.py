@@ -24,10 +24,15 @@ d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 # ── info / servers ──────────────────────────────────────────────────────────────
 d["info"]["version"] = "1.5"
 d["info"]["title"] = "LuxMap API"
+# ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
+# lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
+HTTP_METHODS = ("get", "post", "put", "patch", "delete")
+n_from_code = sum(1 for item in d["paths"].values() for m in item if m in HTTP_METHODS)
+
 d["info"]["description"] = (
     "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.5, 19/09/2026). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
-    "code, 22 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
+    f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
     "base path /api/v1."
 )
@@ -85,6 +90,11 @@ SUMMARY = {
     ("get", "/api/v1/assets/poles"): "Danh sách ID cột (chỗ giữ chỗ BE-12b)",
     ("post", "/api/v1/assets/poles"): "Tạo cột; 201 + Location, không body",
     ("post", "/api/v1/assets/fixtures"): "Ghi một lần lắp bóng; commune_id chép từ cột",
+    ("put", "/api/v1/assets/segments/{segmentId}"): "Thay thế TOÀN PHẦN một tuyến; commune_id không sửa được",
+    ("delete", "/api/v1/assets/segments/{segmentId}"): "Xoá tuyến; khoá ngoại quyết định (409 ASSET_IN_USE)",
+    ("put", "/api/v1/assets/feeders/{feederId}"): "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được",
+    ("delete", "/api/v1/assets/feeders/{feederId}"): "Xoá mạch điện; còn cột đang đấu vào thì 409 ASSET_IN_USE",
+    ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
     ("put", "/api/v1/assets/fixtures/{fixtureId}/removal"): "Ngừng dùng bóng bằng removed_date; không có DELETE",
@@ -110,7 +120,7 @@ SECTION = {
 
 for path, item in d["paths"].items():
     for method, op in item.items():
-        if method not in ("get", "post", "put", "patch", "delete"):
+        if method not in HTTP_METHODS:
             continue
         op["summary"] = SUMMARY[(method, path)]
         op["operationId"] = opid(method, path)
