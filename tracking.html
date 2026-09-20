@@ -93,6 +93,12 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>20/09/2026</td>
+        <td><code>BE-39</code> Hết đỏ ngẫu nhiên ở bộ test tài sản — <strong>hai lỗi khác nhau trên cùng một <code>pole_id_seq</code> dùng chung</strong>. (1) <code>PrefixedIdOverflowTests</code> giành literal <code>3000</code>/<code>30000</code>, nhưng khối 2500 cột của <code>AssetSchemaFixture</code> bắt đầu từ chỗ sequence đang đứng chứ không từ 1: sau khi seed bộ mock, sequence ở <strong>854</strong> nên khối rơi vào <strong>855..3354</strong>, trùm lên 3000. Lượt <code>setval(2999)</code> còn <strong>nhiễm độc sequence cho ~355 lượt chèn kế tiếp</strong> — một lượt đỏ 1 test, lượt sau 36, lượt sau 76, trông như flaky nhưng <strong>tất định</strong>, tái hiện cả khi chạy một mình. Nay chọn dải từ bảng live và nêu tiền đề thành assert có thông điệp. (2) Gộp <code>AssetSchemaCollection</code> + <code>AssetImportCollection</code> thành <code>AssetDatabaseCollection</code>: 16 class không còn chạy song song trên cùng sequence. Đo A/B 5 lượt mỗi bên — <strong>tách: 4,1–4,3 s, 4/5 đỏ; gộp: 5,2–5,4 s, 5/5 xanh</strong>. Toàn giải pháp <strong>488/488 xanh</strong>, DB dev không trôi (<code>pole_id_seq</code> đứng yên qua 3 lượt)</td>
+        <td><code>tests/LuxMap.Api.Tests/AssetDatabaseCollection.cs</code>, <code>PrefixedIdOverflowTests.cs</code>, 16 file test, <code>CLAUDE.md</code></td>
+        <td><code>fix(test): pick the id-overflow probe range from the live pole table</code> + <code>test: merge the asset collections so pole_id_seq has one writer at a time</code></td>
+      </tr>
+      <tr>
+        <td>20/09/2026</td>
         <td><code>BE-39</code> (một phần) Nạp bộ mock FO-26 vào DB dev: 3 tuyến, 103 cột, 103 bóng, 28 sự cố, 1 cụm. Đối chiếu từng trường với mock: <strong>0/103 cột lệch</strong>. ID ghi tường minh theo D-6 — nạp qua endpoint import làm 102/103 cột rơi vào ID khác vì EF không giữ thứ tự khi DB sinh khoá</td>
         <td><code>scripts/seed_mock_set.py</code>, <code>README.md</code>, <code>CLAUDE.md</code></td>
         <td><code>feat(BE-39): seed the FO-26 mock set with the mock's own display ids</code></td>
