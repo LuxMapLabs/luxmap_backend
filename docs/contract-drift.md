@@ -108,9 +108,18 @@ Bốn quyết định đi kèm, đều là **nội bộ backend** nhưng chạm 
    nullable — nên xoá tủ điện **không** âm thầm gỡ mạch của cột). Vi phạm → `409 ASSET_IN_USE` kèm
    tên constraint trong `details`.
 
-**Đề xuất.** Ghi vào Contract mục 2.11 ở lần tăng version kế tiếp, cùng lúc với **BE-12b** (hình dạng
-response khi đọc) — hai thứ này thuộc cùng một màn hình của WP5, tách ra duyệt hai lần là bắt Thịnh/Ngọc
-đọc cùng một ngữ cảnh hai lần.
+**Đề xuất.** Ghi vào Contract mục 5.3.1 ở lần tăng version kế tiếp (**v1.6**), cùng lúc với
+**BE-12b** (hình dạng response khi đọc) — hai thứ này thuộc cùng một màn hình của WP5, tách ra duyệt
+hai lần là bắt Thịnh/Ngọc đọc cùng một ngữ cảnh hai lần.
+
+📄 **Đề xuất BE-12b đã soạn sẵn để duyệt chung: [`docs/review/BE-12b-read-shape.md`](review/BE-12b-read-shape.md).**
+Ba câu hỏi cần chữ ký, cả ba đều là *"mục 5.1 cấm emit `data_source` / `external_ref` / `feeder_id` —
+lệnh cấm đó có áp cho endpoint kiểm kê không"*.
+
+> 🔴 **Điểm 3 ở trên (`data_source` sửa được) BUỘC phải quyết cùng Q2 của tài liệu đó.** Nếu Q2 trả
+> lời **không emit** thì phải **bỏ `data_source` khỏi cả ba request `PUT`**: một trường ghi được mà
+> không đọc lại được là thiết kế không ai bảo vệ được, và với trường provenance của Nhánh C thì nó là
+> đúng điều kiện để trộn nhầm nguồn dữ liệu mà không ai thấy. Đừng duyệt lệch hai câu này.
 
 **Ảnh hưởng.** WP5 chưa code màn quản trị tài sản nên chưa ai bị chặn. Nếu quyết khác ở điểm 1 (đổi
 sang `PATCH`) thì phải sửa trước khi WP5 bắt đầu — sau đó là breaking change.
