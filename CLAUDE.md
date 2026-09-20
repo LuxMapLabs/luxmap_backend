@@ -51,6 +51,31 @@ là tạm**.
 
 ---
 
+## Giao thức `.ai/` — làm việc nhiều agent
+
+Repo này có thể được nhiều agent cùng phục vụ (Claude Code, Codex). Vùng bàn giao giữa chúng là
+`.ai/`, và **`AGENTS.md` là symlink tới chính file này** — Codex đọc `AGENTS.md` theo quy ước, nên
+một file duy nhất phục vụ cả hai, và symlink luôn phân giải theo branch đang đứng. Đừng tạo lại
+`AGENTS.md` thành file thường: bản `AGENTS.md` cũ (untracked, 17/09/2026) là bản chép đông cứng của
+`CLAUDE.md` trên `dev`, nên trên nhánh này nó thiếu trọn 74 dòng, vẫn ghi Contract v1.1, và không có
+tám ràng buộc BE-REVIEW-02 lẫn luật `[AllowAnonymous]` cấp CLASS.
+
+Trước khi bắt đầu một ticket, đọc theo thứ tự:
+
+1. `.ai/context/sources.md` — tra nhanh file nào trả lời câu hỏi gì
+2. `.ai/tasks/<ticket>.md` — phạm vi, tiêu chí xong, và mục **KHÔNG ĐƯỢC làm**
+3. `.ai/context/commands.md` — lệnh build/test/migrate (bản đầy đủ: `README.md`)
+
+Ghi kết quả vào `.ai/results/<ticket>.md`, review vào `.ai/reviews/<ticket>-by-<agent>.md`. Quy ước
+đầy đủ, vòng đời ticket và quy tắc hai pha: `.ai/README.md`.
+
+⚠️ `.ai/` **đứng cuối** thứ tự ưu tiên — sau Contract, sau `tasks-backend.csv`, sau file này. Và nó
+**không nhận** bốn loại phát hiện ở bảng trên: deviation vẫn về `contract-drift.md`, ràng buộc kỹ
+thuật vẫn về đây, tiến độ vẫn về `tracking.html`. Một deviation ghi trong `.ai/results/` là deviation
+**không bao giờ tới tay WP5/WP6**.
+
+---
+
 ## Phạm vi đã chốt — Nhánh C
 
 Chốt 24/08/2026 (FO-01). **Không có thử nghiệm hiện trường.** Ba nguồn dữ liệu:
