@@ -1003,12 +1003,12 @@ không còn bảo vệ test dữ liệu — nó sẽ chỉ khẳng định một
 
 ### Tám ràng buộc chốt ở BE-REVIEW-02 (18/09/2026)
 
-**1. Mạch điện của cột phải cùng xã với cột — ở MỌI đường ghi, cho tới khi có FK ghép.**
-`RequireFeederInCommuneAsync` (POST/PUT) và kiểm theo dòng trong `PlanPolesAsync` (import) là ba nơi
-hiện có; đường ghi mới (seeder BE-39, sync BE-43) **phải gọi cùng kiểm**. Vi phạm → 409
-`CROSS_COMMUNE_REFERENCE`, không phải 403. **Tuyến thì KHÔNG kiểm**: `road_class = inter_commune` là
-đường chạy giữa các xã, cột ở xã khác với chủ tuyến là hợp lệ. Dạng cuối là FK ghép
-`(feeder_id, commune_id)` — ticket riêng trước BE-13 (Contract O-7).
+**1. Mạch điện của cột phải cùng xã với cột. ✅ Nay là RÀNG BUỘC DB — xem mục O-7 bên dưới.**
+`RequireFeederInCommuneAsync` (POST/PUT) và kiểm theo dòng trong `PlanPolesAsync` (import) vẫn là thứ
+**trả lời**: 409 `CROSS_COMMUNE_REFERENCE`, không phải 403. Đường ghi mới (seeder BE-39, sync BE-43)
+**vẫn nên gọi** — không phải để an toàn mà để có thông điệp tử tế; quên thì FK chặn, nhưng chặn bằng
+500. **Tuyến thì KHÔNG kiểm**: `road_class = inter_commune` là đường chạy giữa các xã, cột ở xã khác
+với chủ tuyến là hợp lệ.
 
 **2. `DateTime` trên query string KHÔNG đi qua `UtcDateTimeConverter`.** Converter đó chỉ áp cho JSON.
 Query binder trả `Kind=Unspecified` khi thiếu `Z`, và `.ToUniversalTime()` trên nó dịch theo múi giờ
@@ -1049,6 +1049,48 @@ ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản s
 **8. Spec hợp nhất `docs/openapi/luxmap-v1.5.json` là file SINH.** Sinh bằng
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
 **sau mỗi lần** xuất `luxmap-v1.json`, rồi `npx @redocly/cli lint`. Không sửa tay cả hai.
+
+### Ba bẫy chốt ở O-7 — FK ghép `(feeder_id, commune_id)` (21/09/2026)
+
+`pole` trỏ tới `feeder` bằng **cả hai** cột, nên "mạch điện của cột nằm trong xã của cột" là **luật
+của lược đồ**, không còn là một lượt gọi hàm phải nhớ. Migration `FeederCommuneCompositeFk`. FK đơn
+cột `fk_pole_feeder_feeder_id` **bị thay thế**, không phải thêm chồng — hai FK chồng nhau sẽ làm
+`details.constraint` của `409 ASSET_IN_USE` thành không đoán được.
+
+**1. 🔴 `MATCH SIMPLE` là thứ giữ cho cột-không-có-mạch hợp lệ. ĐỪNG "siết" sang `MATCH FULL`.**
+
+Mặc định của Postgres là `MATCH SIMPLE`: hàng nào có **bất kỳ** cột FK nào null thì **bỏ qua hẳn**
+lượt kiểm. Đó chính xác là hành vi mà cột `solar_all_in_one` dựa vào — `feeder_id` null,
+`commune_id` không null, và hàng vẫn vào. `MATCH FULL` đòi các cột phải null **cùng nhau**; vì
+`commune_id` không bao giờ null, nó sẽ từ chối **mọi** cột không có mạch trong bảng, tức đa số.
+
+Đây là loại sửa trông *đúng hơn* lúc review. Canh bằng
+`A_pole_with_no_feeder_is_still_legal_even_though_its_commune_is_not_null`.
+
+**2. 🔴 `ak_feeder_feeder_id_commune_id` TRÔNG thừa và KHÔNG thừa.**
+
+`feeder_id` đã là khoá chính, nên unique trên `(feeder_id, commune_id)` tự nó chẳng thêm gì — và đó
+đúng là lý do sẽ có người xoá nó đi như rác. Nó là **đích** của FK ghép: Postgres chỉ cho khoá ngoại
+trỏ vào cột có ràng buộc unique. Xoá nó là kéo theo cả FK ghép.
+
+**3. `segment_id` KHÔNG có khoá tương tự, và đó là cố ý.** `road_class = inter_commune` nghĩa là
+đường chạy **giữa** các xã (BE-REVIEW-02 ràng buộc 1). Thêm "cho đối xứng" sẽ làm tuyến liên xã hợp
+lệ trở thành không ghi được. Canh bằng `A_pole_may_still_sit_on_a_segment_owned_by_another_commune`.
+
+**Hai lớp, và cần cả hai — đừng bỏ lớp app vì "DB lo rồi".** `RequireFeederInCommuneAsync` vẫn chạy
+trước và vẫn là thứ trả lời, vì FK một mình nổ ra `DbUpdateException` trần → middleware BE-04 trả
+**500**. Cùng hình dạng `CommuneFilter.Narrow` chồng lên `CommuneWriteGuard`: thông điệp đọc được ở
+trước, thứ không thể quên ở sau.
+
+⚠️ **FK bắt được một ca mà tầng app CHƯA BAO GIỜ phủ:** đổi `commune_id` của **chính cột** trong khi
+nó đang đấu vào một tủ điện. Lượt kiểm đọc xã của cột làm vế cố định nên không có gì kích hoạt. Hôm
+nay không request nào hỏi được điều đó, nhưng đó là tính chất của controller tuần này chứ không phải
+của dữ liệu.
+
+⚠️ **Index đổi hình:** `ix_pole_feeder_id` → `ix_pole_feeder_id_commune_id`. Vẫn dẫn đầu bằng
+`feeder_id` nên phục vụ được mọi truy vấn lọc theo feeder, và vì query filter BE-08 luôn nhét
+`commune_id` vào `WHERE`, index ghép còn phủ tốt hơn. **`ix_pole_commune_id` KHÔNG bị drop** — đã soi
+riêng lúc đọc migration, vì đây đúng là cái bẫy đã cắn ở BE-12a (xem quy ước partial index).
 
 ### `[AllowAnonymous]` cấp CLASS thắng `[Authorize]` cấp METHOD (19/09/2026)
 
@@ -1187,7 +1229,7 @@ FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** 
 
 ## Thứ tự hiện tại
 
-W1 (xong): nền tảng **BE-01 → BE-00 → BE-02..BE-07**. W2–W3 (đang): GIS tài sản — BE-09/10/11/12a/12 xong, BE-42 và BE-18 đẩy sớm, BE-REVIEW-02 xong 18/09/2026. **Kế tiếp: BE-13** (trước đó: ticket FK ghép — Contract O-7).
+W1 (xong): nền tảng **BE-01 → BE-00 → BE-02..BE-07**. W2–W3 (đang): GIS tài sản — BE-09/10/11/12a/12 xong, BE-42 và BE-18 đẩy sớm, BE-REVIEW-02 xong 18/09/2026. O-7 (FK ghép) xong 21/09/2026. **Kế tiếp: BE-13** — cần **O-6** (file `feeder_id` cho bộ mock).
 
 Sau đó: GIS tài sản (W2–W4) → khảo sát (W5–W7) → sự cố (W7–W9) → quy trình (W9–W12) → dashboard (W13–W15) → quản trị (W15–W17) → hoàn thiện (W17–W21).
 

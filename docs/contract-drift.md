@@ -55,7 +55,8 @@ Các quyết định con, để tra nhanh (chi tiết và lý do ở BE-REVIEW-0
 - **WP5/WP6:** kéo lại `mocks/` (D-9); đọc mục 1.4 (mã lỗi mới) và mục 2 (`ROLE_FORBIDDEN`, `user_role`)
   của Contract v1.4; regex ID dùng `[0-9]{n,}`.
 - **Thịnh/Ngọc:** O-1 (tên tuyến), review PR chạm `api-contract-v1.1.md` và `luxmap-v1.json` (CODEOWNERS).
-- **BE1:** O-7 FK ghép trước BE-13; BE-36 sớm (M-1); rate limit auth (M-5); CI lint spec (M-7).
+- **BE1:** ~~O-7 FK ghép trước BE-13~~ — **xong 21/09/2026**, xem drift 45; BE-36 sớm (M-1);
+  rate limit auth (M-5); CI lint spec (M-7).
 
 ### Từ v1.5: quyết định đi cùng Contract thì ghi Ở CONTRACT
 
@@ -76,6 +77,7 @@ mới, hiện thực và đặc tả trong cùng một PR, **không có mục dr
 | # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Trạng thái |
 |---|---|---|---|---|
 | 44 | Năm endpoint sửa/xoá tài sản không có trong Contract | Trung bình | WP5 (màn quản trị tài sản) | **Chờ duyệt** — nêu ở FW kế tiếp |
+| 45 | Contract mục 9 còn ghi O-7 là việc đang mở; FK ghép đã có trong lược đồ | Thấp | Không ai — thuần nội bộ backend | **Chờ đóng ở v1.6** |
 
 ### 44 — `PUT` và `DELETE` cho tuyến đường, tủ điện, cột đèn (20/09/2026)
 
@@ -123,6 +125,45 @@ lệnh cấm đó có áp cho endpoint kiểm kê không"*.
 
 **Ảnh hưởng.** WP5 chưa code màn quản trị tài sản nên chưa ai bị chặn. Nếu quyết khác ở điểm 1 (đổi
 sang `PATCH`) thì phải sửa trước khi WP5 bắt đầu — sau đó là breaking change.
+
+### 45 — O-7 đã xong: FK ghép `(feeder_id, commune_id)` (21/09/2026)
+
+**Contract đang ghi gì.** Mục 9 liệt kê **O-7** là Open item của BE1, hạn *"trước BE-13"*, kèm câu
+*"tới lúc đó mọi đường ghi phải gọi kiểm cùng xã"*. Câu đó **nay đã sai**.
+
+**Code đang làm gì.** `pole` mang khoá ngoại ghép tới `feeder` trên **cả hai** cột:
+
+```
+fk_pole_feeder_feeder_id_commune_id
+    FOREIGN KEY (feeder_id, commune_id) REFERENCES feeder (feeder_id, commune_id) ON DELETE RESTRICT
+```
+
+Migration `FeederCommuneCompositeFk`. FK đơn cột `fk_pole_feeder_feeder_id` bị **thay thế**, không
+phải thêm chồng — nên `details.constraint` của `409 ASSET_IN_USE` vẫn xác định một giá trị.
+
+Bốn điểm đáng nêu:
+
+1. **Bề mặt API KHÔNG đổi.** `RequireFeederInCommuneAsync` vẫn chạy trước và vẫn là thứ **trả lời**:
+   409 `CROSS_COMMUNE_REFERENCE` nêu đúng hai xã. FK chỉ là lớp chặn phía dưới — nếu nó là thứ nổ thì
+   người dùng nhận `DbUpdateException` trần và **500**, nên hai lớp đều cần, không thay nhau. Cùng
+   hình dạng `CommuneFilter.Narrow` chồng lên `CommuneWriteGuard`.
+2. **Khoá ngoại bắt được một ca mà tầng app CHƯA BAO GIỜ phủ:** đổi `commune_id` của **chính cột**
+   trong khi nó đang đấu vào một tủ điện. `RequireFeederInCommuneAsync` đọc xã của cột làm vế cố
+   định nên không có gì kích hoạt. Hôm nay không request nào hỏi được điều đó — `commune_id` vắng mặt
+   ở cả ba body update — nhưng đó là tính chất của controller tuần này, không phải của dữ liệu.
+3. **Cột không có mạch vẫn hợp lệ**, nhờ `MATCH SIMPLE` (mặc định của Postgres): một hàng có bất kỳ
+   cột FK nào null thì bỏ qua lượt kiểm. `MATCH FULL` sẽ từ chối **mọi** cột không có feeder.
+4. **`segment_id` KHÔNG có khoá tương tự, và đó là cố ý** — `road_class = inter_commune` nghĩa là
+   đường chạy giữa các xã (BE-REVIEW-02 ràng buộc 1).
+
+**Đề xuất.** Ở **v1.6**, xoá dòng O-7 khỏi mục 9 và đổi câu *"mọi đường ghi phải gọi kiểm cùng xã"*
+thành ghi chú rằng lược đồ đã thực thi. Gộp chung lần duyệt với drift 44 và BE-12b — không đáng một
+lượt duyệt riêng.
+
+**Ảnh hưởng.** Không ai. Không endpoint nào đổi, không mã lỗi nào đổi, không trường nào đổi. Mục drift
+này tồn tại **chỉ vì Contract đang nói một việc đã xong là chưa xong** — và một Open item quá hạn mà
+thật ra đã đóng sẽ ngốn thời gian FW-00 y như một cái còn mở thật.
+
 
 > Ghi theo khuôn: Contract đang ghi gì · Code đang làm gì · Đề xuất · Ảnh hưởng. Chạm bề mặt API thì
 > theo nguyên tắc 3 (ESCALATE khi im lặng), không tự coi là approve.

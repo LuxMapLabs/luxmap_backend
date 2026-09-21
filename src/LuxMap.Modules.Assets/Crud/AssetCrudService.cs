@@ -495,10 +495,18 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     /// both is what stops the two paths from disagreeing again.
     /// </para>
     /// <para>
-    /// 🔴 This is an APPLICATION check, not a constraint. A new write path that forgets to call it —
-    /// a seeder, psql by hand — reopens the hole. The form that cannot be forgotten is a composite
-    /// foreign key on <c>(feeder_id, commune_id)</c>, which needs a migration and is its own ticket;
-    /// see <c>docs/contract-drift.md</c> item 43. <c>segment_id</c> carries the same hole, unpatched.
+    /// <b>O-7 put a composite foreign key on <c>(feeder_id, commune_id)</c> underneath this, so a
+    /// write path that forgets to call it no longer reopens the hole</b> — see
+    /// <c>PoleConfiguration</c>. This check is still the one that ANSWERS: it names both communes in
+    /// a 409 <c>CROSS_COMMUNE_REFERENCE</c>, where the constraint alone would surface as a bare
+    /// <c>DbUpdateException</c> and a 500. Same two-layer shape as <c>CommuneFilter.Narrow</c> over
+    /// <c>CommuneWriteGuard</c>: the readable refusal in front, the one that cannot be forgotten
+    /// behind.
+    /// </para>
+    /// <para>
+    /// <c>segment_id</c> gets NO such key, and that is not an omission: <c>road_class =
+    /// inter_commune</c> means the road runs BETWEEN communes, so a pole in a different commune from
+    /// its segment's owner is correct data (BE-REVIEW-02, constraint 1).
     /// </para>
     /// </remarks>
     private async Task RequireFeederInCommuneAsync(string? feederId, string communeId, CancellationToken ct)
