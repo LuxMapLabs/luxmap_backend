@@ -479,9 +479,13 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
 
         var total = await query.CountAsync(ct);
         var items = await query
-            // Never OrderBy the display id — the width is a MINIMUM, so POLE-10000 sorts before
-            // POLE-9999 as text (Contract section 0.3). Same rule as ListAsync.
+            // created_at is the published order (Contract section 0.3), but it TIES for a whole
+            // batch: PostgreSQL now() is transaction-start time, so all 103 mock poles share one
+            // value and the tiebreaker is what actually orders them. Length first, then text — the
+            // id width is a MINIMUM, so plain text sorts POLE-10000 between POLE-1000 and
+            // POLE-9999. Sorting shorter ids first restores numeric order for one prefix.
             .OrderBy(pole => pole.CreatedAt)
+            .ThenBy(pole => pole.PoleId.Length)
             .ThenBy(pole => pole.PoleId)
             .Skip(page.Skip)
             .Take(page.PageSize)
@@ -519,12 +523,23 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
             query = query.Where(entity => communes.Contains(entity.CommuneId));
         }
 
+        // The id's LENGTH, as an expression over the same parameter, so the tiebreaker below can
+        // put shorter ids first without this method having to know which property it was handed.
+        var idLength = System.Linq.Expressions.Expression.Lambda<Func<TEntity, int>>(
+            System.Linq.Expressions.Expression.Property(id.Body, nameof(string.Length)),
+            id.Parameters);
+
         var total = await query.CountAsync(ct);
         var items = await query
-            // NEVER OrderBy the display id: the width is a MINIMUM, so POLE-10000 sorts before
-            // POLE-9999 as text. created_at is the stable order (Contract section 0.3). Reached by
-            // name because the three asset types share the column but no common base type.
+            // created_at is the stable published order (Contract section 0.3), reached by name
+            // because the three asset types share the column but no common base type.
+            //
+            // ⚠️ It TIES for a whole batch — PostgreSQL now() is transaction-start time, so every
+            // row of one import shares a value and the tiebreaker is what really orders them. The
+            // display id alone will not do: its width is a MINIMUM, so as text POLE-10000 sorts
+            // between POLE-1000 and POLE-9999. Length first restores numeric order for one prefix.
             .OrderBy(entity => EF.Property<DateTime>(entity, "CreatedAt"))
+            .ThenBy(idLength)
             .ThenBy(id)
             .Skip(page.Skip)
             .Take(page.PageSize)
