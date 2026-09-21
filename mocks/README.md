@@ -37,6 +37,56 @@ với `out`.
   chắc chắn sẽ lệch, và lúc demo mới phát hiện.
 - Commit vào git, không `.gitignore`. Đây là một phần của hợp đồng.
 
+## O-6 — mạch điện cho bộ mock (chờ FO điền)
+
+Hai file rỗng đã dựng sẵn khuôn, **chưa có dữ liệu nào**. Người điền cần biết mạch điện thật
+của địa bàn — Contract mục 9 giao O-6 cho **Dylan + FO**.
+
+| File | Ai điền | Nội dung |
+|---|---|---|
+| `mock-feeders.csv` | FO | Danh sách tủ điện. **Chưa có dòng nào** |
+| `mock-pole-feeders.csv` | FO | Cột nào đấu vào tủ nào. 103 dòng đã điền sẵn phần tra cứu |
+
+> ⚠️ **O-6 như Contract đang ghi là THIẾU MỘT NỬA.** Mục 9 chỉ nhắc
+> `mock-pole-feeders.csv`, nhưng bộ mock **không có một tủ điện nào** — không có `mock-feeders.*`,
+> và bảng `feeder` trên DB dev đang rỗng. Không gán cột vào tủ chưa tồn tại được, nên
+> `mock-feeders.csv` phải điền **trước**.
+
+### Điền thế nào
+
+**Chỉ sửa cột cuối cùng, `feeder_external_ref`.** Năm cột đầu là bản chép từ
+`mock-poles.geojson` để tra cứu cho dễ — sửa chúng không có tác dụng gì, vì chương trình nạp
+khớp theo `pole_external_ref` và **bỏ qua** phần còn lại. Sinh lại được bất cứ lúc nào từ chính
+`mock-poles.geojson`.
+
+**Chỉ 58 trên 103 dòng cần điền.** 45 dòng còn lại là `solar_all_in_one` — chúng **không đấu vào
+mạch nào cả**, nên để trống là câu trả lời đúng chứ không phải dữ liệu thiếu. Cột
+`power_source` có sẵn trong file để nhìn ra ngay.
+
+| Tuyến | Cần điền (`grid`) | Để trống (`solar`) |
+|---|---|---|
+| `SEG-001` | 46 | 0 |
+| `SEG-002` | **0** | 31 |
+| `SEG-003` | 12 | 14 |
+| | **58** | **45** |
+
+> `SEG-002` **toàn bộ chạy bằng solar**. Nghĩa là tuyến đó sẽ không bao giờ sinh ra cụm lỗi theo
+> mạch điện — CV-15 gom cụm dọc mạch, nên với `SEG-002` nó không có gì để gom. Đây là tính chất
+> của bộ mock, không phải lỗi; nêu ra để lúc đọc kết quả không ai đi tìm nguyên nhân.
+
+Giá trị trong `feeder_external_ref` phải khớp một `external_ref` có trong `mock-feeders.csv`.
+Không phải `FDR-001` — mã đó do DB sinh lúc INSERT, người soạn file không biết trước. Cùng quy ước
+`*_external_ref` mà bốn template ở `docs/templates/` đang dùng.
+
+### Sau khi điền
+
+Việc nạp thuộc **BE-39**, qua `scripts/seed_mock_set.py`, **không** qua endpoint import — endpoint
+import không giữ được ID của mock (BE-REVIEW-02 ràng buộc 7b). Script hiện ghi cứng
+`feeder_id = NULL` cho cả 103 cột; sửa chỗ đó là việc của ticket nạp, không phải của người điền file.
+
+**Xong O-6 chưa gỡ chặn hết CV-15** — CV-15 còn phụ thuộc **BE-13**, mà BE-13 đang chờ duyệt hình
+dạng endpoint (`docs/review/BE-13-topology-shape.md`).
+
 ## Đổi ID 18/09/2026 (BE-REVIEW-02, D-9) — WP5 và WP6 phải kéo lại
 
 Bộ mock nay khớp bảng prefix Contract §0.2 (drift 6 đóng):

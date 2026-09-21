@@ -114,6 +114,17 @@ Gắn trên `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReadi
 - **ID là chuỗi có prefix:** `POLE-0001`, `FAULT-0001`, `SEG-001`, `COM-001`. Không phải `int`, không phải `Guid`. Bảng prefix đầy đủ và cách sinh ở **mục 0.1–0.4**.
 - **⚠️ ID là TỐI THIỂU N chữ số, không phải ĐÚNG N.** Contract mục 0.3: vượt ngưỡng thì ID dài ra — cột thứ 10000 là `POLE-10000`, **không phải** `POLE-1000`. Hai hệ quả:
   - **Không bao giờ `ORDER BY pole_id`.** So chuỗi thì `POLE-10000 < POLE-9999`. Sắp theo `created_at` hoặc theo sequence. Lọc theo khoảng trên text cũng sai từ cột thứ 10000.
+    - ⚠️ **`created_at` MỘT MÌNH KHÔNG ĐỦ, và chỗ hở nằm ở tiebreaker.** `now()` của Postgres là
+      thời điểm **bắt đầu transaction**, nên **cả mẻ nạp dùng chung đúng một giá trị** — đo thật:
+      cả 103 cột mock có cùng một `created_at`. Vậy `created_at` không sắp xếp gì bên trong một mẻ,
+      và **tiebreaker mới là thứ quyết định thứ tự thật**. Để `ThenBy(pole_id)` trần là mở lại đúng
+      cái bug dòng trên vừa cấm.
+    - **Khuôn đúng: `ORDER BY created_at, length(id), id`.** Sắp theo độ dài trước thì ID ngắn đứng
+      trước, khôi phục thứ tự số trong cùng một prefix. Áp ở `ListAsync` (BE-12a) và
+      `TopologyPageAsync` (BE-13); listing mới **phải** theo khuôn này.
+    - 🔴 **Test so TẬP không bắt được lỗi này.** `Assert.Equal` trên hai collection đã sắp vẫn xanh
+      khi thứ tự sai. Phải assert **có thứ tự**, trên ID nằm hai bên ngưỡng độ rộng, và **ghi trong
+      cùng một transaction** để chúng trùng `created_at`. Canh bằng `PrefixedIdOrderingTests`.
   - Regex/validator phía FE và mobile phải là `^POLE-[0-9]{4,}$`, **không phải** `[0-9]{4}` — và `[0-9]`, không `\d` (`\d` khớp chữ số Unicode).
 - **Cách sinh ID — mô tả chuẩn, mọi chỗ khác trỏ về đây.** ID sinh ở tầng DB qua `DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`. Tên sequence theo khuôn `<thing>_id_seq` — `pole_id_seq`, `fixture_id_seq`, `segment_id_seq`… (bảng đầy đủ ở `PrefixedId.cs`).
   - **Không dùng `LPAD(nextval(...)::text, 4, '0')`.** `LPAD` của Postgres **cắt bớt** khi giá trị dài hơn độ rộng: `nextval` = 12345 với width 4 cho ra `'2345'`. Kết quả là ID trùng, sai **câm** — không ràng buộc nào bắt được. Đã lật ở commit `8ea9930`.

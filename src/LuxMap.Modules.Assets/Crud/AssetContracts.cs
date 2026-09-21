@@ -232,3 +232,54 @@ public sealed record UpdatePoleRequest
     [Required]
     public DataSource? DataSource { get; init; }
 }
+
+/// <summary>
+/// BE-13 — one pole as the topology endpoints report it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// ⚠️ <b>PROVISIONAL SHAPE — the Contract specifies no topology endpoint at all.</b> Proposed in
+/// <c>docs/review/BE-13-topology-shape.md</c>, registered as drift 46, and not stable until the next
+/// FW confirms it. Anything built on top of this must say its foundation is temporary.
+/// </para>
+/// <para>
+/// <b>This is NOT the BE-12b read shape and must not drift into it.</b> The consumer here is CV-15
+/// and CV-05 — clustering engines, not a screen — so it carries what clustering needs and nothing
+/// else. No <c>fixture_status</c>, no <c>open_fault_count</c>, no <c>install_date</c>. Two endpoints
+/// answering the same question with two values is how drift starts, and nothing detects the day they
+/// disagree.
+/// </para>
+/// <para>
+/// <c>{lat, lng}</c> rather than GeoJSON, following the precedent <c>GET /faults</c> set in Contract
+/// section 2.4: a paginated list for an engine is not a map layer. EPSG:4326 like every other
+/// endpoint — 3405 exists only inside the SQL tree (BE-10, rule 3).
+/// </para>
+/// <para>
+/// <c>FeederId</c> is repeated in every item although the route already names it, so that
+/// <c>/segments/{id}/poles</c> and <c>/feeders/{id}/poles</c> share one item type and a result set
+/// merged from several calls still describes itself.
+/// </para>
+/// </remarks>
+public sealed record TopologyPole
+{
+    public required string PoleId { get; init; }
+
+    public required string SegmentId { get; init; }
+
+    /// <summary>Null for a pole on no circuit — a fact, not a missing value.</summary>
+    public string? FeederId { get; init; }
+
+    /// <summary>
+    /// ⚠️ Present ONLY on the unassigned listing, null elsewhere.
+    /// </summary>
+    /// <remarks>
+    /// It is the one field that separates "this pole is solar, so it has no circuit" from "nobody has
+    /// assigned this pole yet". Both are <c>feeder_id = NULL</c> in the database and look identical
+    /// without it, and CV-05 has to tell them apart to know what is left to do.
+    /// </remarks>
+    public PowerSource? PowerSource { get; init; }
+
+    public required double Lat { get; init; }
+
+    public required double Lng { get; init; }
+}

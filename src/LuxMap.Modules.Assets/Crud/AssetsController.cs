@@ -255,6 +255,86 @@ public sealed class AssetsController(
         return NoContent();
     }
 
+    // ── BE-13 topology ────────────────────────────────────────────────────────────────────────
+    //
+    // ⚠️ PROVISIONAL — the Contract specifies no topology endpoint at all. Proposed in
+    // docs/review/BE-13-topology-shape.md, registered as drift 46, NOT stable until the next FW
+    // confirms it. Anything built on top of these routes must say its foundation is temporary.
+    //
+    // NO role policy, exactly like the other GETs: SetFallbackPolicy already requires a login, and a
+    // policy is one EXACT role, so putting MaintenanceEngineer here would lock out the administrator
+    // and the managing authority (BE-12a, rule 4).
+
+    /// <summary>
+    /// Every pole hanging off one circuit — the query BE-13 exists for, and CV-15's input.
+    /// </summary>
+    /// <remarks>
+    /// A feeder outside the caller's commune answers <b>404</b>, not 403: the query filter makes the
+    /// row not exist for them, and Contract section 7 asks for absence rather than a refusal that
+    /// would confirm the id is real somewhere else.
+    /// </remarks>
+    [HttpGet("feeders/{feederId}/poles")]
+    [ProducesResponseType<PagedResult<TopologyPole>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PagedResult<TopologyPole>>> ListPolesOnFeederAsync(
+        string feederId, PageQuery page, CancellationToken ct)
+        => Ok(await service.ListPolesOnFeederAsync(feederId, page.ToPageRequest(), ct));
+
+    /// <summary>Every pole on one road segment — CV-05's input.</summary>
+    /// <remarks>
+    /// ⚠️ The result may include poles belonging to a DIFFERENT commune than the segment's owner, and
+    /// that is correct: <c>road_class = inter_commune</c> means the road runs between communes
+    /// (BE-REVIEW-02, constraint 1). Only the electrical circuit has to match its pole's commune.
+    /// </remarks>
+    [HttpGet("segments/{segmentId}/poles")]
+    [ProducesResponseType<PagedResult<TopologyPole>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PagedResult<TopologyPole>>> ListPolesOnSegmentAsync(
+        string segmentId, PageQuery page, CancellationToken ct)
+        => Ok(await service.ListPolesOnSegmentAsync(segmentId, page.ToPageRequest(), ct));
+
+    /// <summary>
+    /// Poles on no circuit: what CV-05 still has to place, plus every solar pole.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 🔴 <b>The weakest part of the proposal, and it is flagged rather than hidden.</b> This path
+    /// reads badly — these are not the poles OF any feeder. The alternatives were worse:
+    /// <c>/assets/poles?feeder_id=none</c> bolts BE-13 onto the list endpoint whose shape is BE-12b's
+    /// open question, and <c>/assets/poles/unassigned</c> takes a name out of the space BE-12b holds.
+    /// Section 4 of the proposal asks the reviewer to choose; this route is the placeholder until
+    /// they do.
+    /// </para>
+    /// <para>
+    /// The only listing that carries <c>power_source</c>, because it is the only one where "solar, so
+    /// no circuit" has to be told apart from "not assigned yet" — identical in the database otherwise.
+    /// </para>
+    /// </remarks>
+    [HttpGet("feeders/poles")]
+    [ProducesResponseType<PagedResult<TopologyPole>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<TopologyPole>>> ListPolesWithoutFeederAsync(
+        [FromQuery] bool unassigned,
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        PageQuery page,
+        CancellationToken ct)
+    {
+        // Required and must be true. The route has no other meaning today, and refusing the bare path
+        // keeps the door open for the reviewer to replace it without silently changing what an
+        // existing caller gets back.
+        if (!unassigned)
+        {
+            throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                System.Net.HttpStatusCode.BadRequest,
+                "This listing only answers unassigned=true.",
+                new Dictionary<string, object?> { ["unassigned"] = "must be true" });
+        }
+
+        return Ok(await service.ListPolesWithoutFeederAsync(Narrow(communeId), page.ToPageRequest(), ct));
+    }
+
     /// <summary>
     /// Retires a lamp by setting <c>removed_date</c>. There is no DELETE — the equipment history is
     /// the reason the table exists.
