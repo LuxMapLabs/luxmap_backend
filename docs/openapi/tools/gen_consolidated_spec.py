@@ -97,6 +97,9 @@ SUMMARY = {
     ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
+    # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
+    ("get", "/api/v1/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
+    ("get", "/api/v1/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString",
     # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
     ("get", "/api/v1/assets/segments/{segmentId}/poles"): "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
@@ -535,28 +538,20 @@ def ni(method, path, tag, summary, section, ticket, responses, parameters=None, 
 
 ENUM_CSV = lambda ref: {"type": "string", "description": f"CSV của {ref}"}
 
-ni("get", "/api/v1/poles", "Poles", "Cột đèn trên bản đồ theo bbox (FeatureCollection)", "§5.1", "BE-14",
-   [("200", {"description": "FeatureCollection", "content": json_content("PoleFeatureCollection")}),
-    ("400", err("VALIDATION_FAILED — thiếu bbox")),
-    ("403", err("COMMUNE_FORBIDDEN — commune_id ngoài phạm vi (§7)")),
-    ("413", err("BBOX_TOO_LARGE — quá 2000 cột; FE hiển thị 'Phóng to để xem chi tiết'"))],
-   parameters=[BBOX,
-               p("status", ENUM_CSV("fixture_status"), desc="CSV enum, ví dụ dim,out"),
-               p("power_source", {"$ref": "#/components/schemas/PowerSource"}),
-               p("segment_id", {"$ref": "#/components/schemas/SegmentId"}),
-               p("commune_id", {"$ref": "#/components/schemas/CommuneId"}, desc="Thu hẹp trong phạm vi được phép; ngoài phạm vi → 403"),
-               p("has_open_fault", {"type": "boolean"}),
-               p("data_source", {"$ref": "#/components/schemas/DataSource"}, desc="Mặc định LOẠI calibration_rig; truyền tường minh để thấy bộ hiệu chuẩn (Contract §1.6)")])
+# ⚠️ /api/v1/poles and /api/v1/segments USED TO BE DECLARED HERE as not_implemented. BE-14 serves
+# them, so the hand-written versions are gone and the ones EXPORTED FROM THE CODE stand. Leaving
+# them would have been worse than untidy: ni() writes the same path key, so the stub OVERWROTE the
+# real operation — the consolidated spec kept calling a shipped endpoint unimplemented, and the
+# response schemas the exporter had just emitted became orphans. Redocly caught exactly that as two
+# no-unused-components warnings.
+#
+# The lesson for the next ticket that implements a stub: DELETE ITS ni() CALL in the same commit, and
+# read the operation counter in the output line.
+
 ni("get", "/api/v1/poles/{pole_id}", "Poles", "Chi tiết cột + lịch sử, đủ trong MỘT request", "§5.1", "BE-20",
    [("200", {"description": "Chi tiết cột", "content": json_content("PoleDetail")}),
     ("404", err("Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)"))],
    parameters=[p("pole_id", {"$ref": "#/components/schemas/PoleId"}, True, where="path")])
-ni("get", "/api/v1/segments", "Segments", "Đoạn đường theo bbox (FeatureCollection của LineString)", "§5.2", "BE-14",
-   [("200", {"description": "FeatureCollection", "content": json_content("SegmentFeatureCollection")}),
-    ("400", err("VALIDATION_FAILED — thiếu bbox")),
-    ("403", err("COMMUNE_FORBIDDEN"))],
-   parameters=[BBOX, p("commune_id", {"$ref": "#/components/schemas/CommuneId"}),
-               p("data_source", {"$ref": "#/components/schemas/DataSource"}, desc="Mặc định LOẠI calibration_rig (Contract §1.6)")])
 ni("get", "/api/v1/faults", "Faults", "Danh sách sự cố — phân trang JSON, KHÔNG phải GeoJSON", "§5.4", "BE-40",
    [("200", {"description": "Trang sự cố; sắp mặc định -priority_score", "content": json_content("FaultPagedResult")}),
     ("403", err("COMMUNE_FORBIDDEN"))],

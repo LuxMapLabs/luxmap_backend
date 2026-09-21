@@ -79,6 +79,7 @@ mới, hiện thực và đặc tả trong cùng một PR, **không có mục dr
 | 44 | Năm endpoint sửa/xoá tài sản không có trong Contract | Trung bình | WP5 (màn quản trị tài sản) | **Chờ duyệt** — nêu ở FW kế tiếp |
 | 45 | Contract mục 9 còn ghi O-7 là việc đang mở; FK ghép đã có trong lược đồ | Thấp | Không ai — thuần nội bộ backend | **Chờ đóng ở v1.6** |
 | 46 | Không có endpoint topology nào trong Contract; BE-13 đã hiện thực trên nền TẠM | Cao | WP4 (CV-05, CV-15) | **Đã hiện thực, CHỜ DUYỆT** — đề xuất ở `review/BE-13-topology-shape.md` |
+| 47 | `GET /poles` và `GET /segments` trả đúng HÌNH DẠNG mục 5.1–5.2 nhưng ba trường chưa có nguồn | Cao | WP5, WP6 (bản đồ trông sẽ trống) | **Mở** — gỡ dần theo BE-15/17 và bảng IoT |
 
 ### 44 — `PUT` và `DELETE` cho tuyến đường, tủ điện, cột đèn (20/09/2026)
 
@@ -223,6 +224,43 @@ chưa ai bị chặn), mục này **có người đang đợi thật**, hạn W4
 > gán cột vào tủ điện chưa tồn tại được — cần `mock-feeders.csv` trước. Khuôn cho cả hai đã dựng sẵn
 > ở `mocks/`, chỉ **58 trên 103 dòng** cần điền (45 cột solar để trống là đúng). Đề nghị sửa câu chữ
 > của O-6 ở v1.6.
+
+
+### 47 — BE-14 trả đủ hình dạng, nhưng ba trường chưa có nguồn dữ liệu (22/09/2026)
+
+**Contract đang ghi gì.** Mục 5.1 liệt kê 15 `properties` cho `GET /poles`, mục 5.2 liệt kê 7 cho
+`GET /segments`. Không mục nào nói trường nào có thể rỗng vì bảng chưa tồn tại.
+
+**Code đang làm gì.** Cả hai endpoint đã hiện thực **đúng đặc tả** — đủ 15 và 7 khoá, `FeatureCollection`,
+`[lng, lat]`, không `feature.id`, `bbox` bắt buộc, quá 2000 cột → 413. Nhưng ba trường **chưa có
+nguồn**:
+
+| Trường | Trả về hôm nay | Vì sao | Ai gỡ |
+|---|---|---|---|
+| `fixture_status` | `unknown` với **mọi** cột | `pole_current_status` rỗng | **BE-15/BE-17** |
+| `status_confidence` | `null` với mọi cột | như trên (mục 5.1: null ⟺ `unknown`) | **BE-15/BE-17** |
+| `last_seen_at`, `last_sweep_id` | `null` | như trên | **BE-15/BE-17** |
+| `has_iot_node` | `false` với mọi cột | **không có bảng `iot_node`** | ticket IoT |
+| `controller_node_id` | `null` với mọi tuyến | như trên | ticket IoT |
+
+> 🔴 **`unknown` ở đây KHÔNG phải giá trị tạm.** Mục 3.1 định nghĩa `unknown` là *"sweep gần nhất
+> không phủ được cột đó"* — đúng trạng thái của một cột chưa ai phân loại. Nên hình dạng đúng **và**
+> giá trị đúng; chỉ là dữ liệu chưa về. **Không được gộp vào `out`** ở bất kỳ thống kê nào.
+
+**Khoá vẫn được emit, không bỏ khỏi JSON** — tiền lệ `nearest_luminance` của BE-42: WP5/WP6 bind
+hình dạng cuối ngay bây giờ, và ngày bảng IoT ra đời không response nào đổi hình.
+
+**Ảnh hưởng — đây là phần WP5 cần biết trước khi mở bản đồ.** Bộ mock `mock-poles.geojson` mang
+70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`, nhưng API sẽ trả **103 `unknown`** cho tới khi
+BE-15/BE-17 ghi `pole_current_status`. Bản đồ chạy đúng, chỉ là một màu. Nếu WP5 demo theo bộ mock mà
+đọc từ API thì con số sẽ không khớp — **đó là dữ liệu chưa có, không phải endpoint sai**.
+
+**`GET /iot-nodes` KHÔNG nằm trong PR này.** Mô tả BE-14 ở `tasks-backend.csv` có nó, nhưng bảng
+`iot_node` chưa tồn tại và mục 5.6 đánh dấu cả nhóm IoT là `[NOT IMPLEMENTED]`. Tạo bảng đó không
+phải việc của BE-14; đây là **thu hẹp phạm vi do lược đồ, không phải lựa chọn**.
+
+**Không có gì cần duyệt.** Hình dạng đã nằm trong Contract và code khớp. Mục này tồn tại để không ai
+đọc một bản đồ toàn `unknown` rồi kết luận BE-14 hỏng.
 
 
 > Ghi theo khuôn: Contract đang ghi gì · Code đang làm gì · Đề xuất · Ảnh hưởng. Chạm bề mặt API thì

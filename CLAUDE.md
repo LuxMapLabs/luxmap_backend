@@ -1070,6 +1070,57 @@ ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản s
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
 **sau mỗi lần** xuất `luxmap-v1.json`, rồi `npx @redocly/cli lint`. Không sửa tay cả hai.
 
+### Bốn bẫy chốt ở BE-14 — bản đồ bbox (22/09/2026)
+
+**1. 🔴 `Enum.TryParse` KHÔNG đọc được giá trị enum trên query string.**
+
+Giá trị trên dây là snake_case thường (`calibration_rig`, `field_report`, `node_offline`), còn tên
+thành viên .NET là `CalibrationRig`. `Enum.TryParse(ignoreCase: true)` **không biết dấu gạch dưới**,
+nên nó **nhận giá trị một từ** (`normal`, `dim`, `out`) và **từ chối mọi giá trị nhiều từ**.
+
+Đây là dạng lỗi ẩn kỹ nhất trong ticket này: bộ lọc thường dùng chạy tốt, chỉ vài giá trị trả 400, và
+không ai nghĩ tới việc bộ phân tích enum mới là thủ phạm. Đã gặp thật ở `data_source=calibration_rig`.
+
+Khuôn đúng: so với **tên trên dây**, sinh bằng `JsonNamingPolicy.SnakeCaseLower.ConvertName` — đúng
+policy đang serialize chúng ra, nên giá trị client đọc được chính là giá trị nó gửi lại được. Xem
+`MapController.WireName`.
+
+**2. 🔴 Test THỨ TỰ không thay được test KẾ HOẠCH, và ngược lại.**
+
+`ST_Intersects(geom, envelope)` trên cột 4326 thô là dạng **duy nhất** đi được `ix_pole_geom`. Bọc bất
+kỳ hàm nào quanh cột — `ST_Transform`, `ST_Buffer` — thì **hàng trả về vẫn đúng y hệt**, chỉ mất index.
+Kiểm bằng phá hoại: thêm `.Buffer(0)` làm plan rơi về `ix_pole_commune_id`, **không một assert dữ liệu
+nào đỏ**.
+
+Vì vậy `MapQueryPlanTests` chạy `EXPLAIN` trên **SQL mà EF thật sự sinh** (`ToQueryString()`), không
+phải SQL viết tay. `SpatialIndexTests` của BE-09 vẫn EXPLAIN một câu viết tay kèm chú thích *"what
+BE-14 will issue"* — đó là **dự đoán**, và giờ đã có bản đối chứng.
+
+**3. 🔴 Teardown của fixture PHẢI xoá mọi bảng `Restrict` trỏ vào `pole`.**
+
+`fault.pole_id` và `lux_reading.pole_id` đều `Restrict`. `AssetImportFixture` xoá
+`fixture → pole → feeder → road_segment` nhưng **thiếu cả hai** — nên một test tạo fault làm lượt xoá
+pole gãy, **cả teardown gãy theo**, và cột ở lại mang ID mà sequence sẽ phát lại. Lượt chạy sau chết
+vì `pk_pole`, trông như flaky.
+
+Đo được: 217 cột + 20 fault mồ côi tích lại qua vài lượt. Mọi test có ghi fault đều đang rò cột theo
+đường này mà không ai thấy.
+
+**4. 🔴 Lùi sequence dùng chung thì PHẢI trả nó về chỗ cũ.**
+
+`PrefixedIdOverflowTests` cố ý `setval` lùi để chạm ngưỡng độ rộng, rồi **để nguyên**. Các lượt chèn
+sau trong cùng run leo dần từ chỗ thấp đó và đụng bất cứ hàng nào đang nằm trên đường —
+đúng "nhiễm độc ~355 lượt chèn" đã ghi ở mục bộ test tài sản.
+
+Chọn dải trống **không đủ**: `FreeFourDigitDecadeAsync` kiểm thập niên nó ghi vào, **không kiểm cả
+đoạn phía trên** mà sequence sẽ đi qua. Nay mỗi lượt lùi nằm trong `try/finally` trả sequence về giá
+trị đọc được trước đó. Sau khi bịt, bộ test **xanh 3 lượt liên tiếp ngay cả khi 217 cột mồ côi vẫn
+còn** — tức đây mới là nguyên nhân, không phải rác dữ liệu.
+
+⚠️ **Đừng thêm `setval` vào fixture để "sàn" sequence theo ID lớn nhất.** Tôi đã thử: nó đẩy khối
+2500 cột của `AssetSchemaFixture` vào đúng dải `9999/10000` mà `PrefixedIdOverflowTests` giữ, và ngưỡng
+đó **không dời đi đâu được**. Trả sequence về chỗ cũ là đường đúng.
+
 ### Ba bẫy chốt ở O-7 — FK ghép `(feeder_id, commune_id)` (21/09/2026)
 
 `pole` trỏ tới `feeder` bằng **cả hai** cột, nên "mạch điện của cột nằm trong xã của cột" là **luật
