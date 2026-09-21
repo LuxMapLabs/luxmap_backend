@@ -288,7 +288,7 @@ dotnet build src/LuxMap.Api && Swagger__Enabled=true Cors__AllowedOrigins__0=htt
 Lệnh này dựng host thật nên cần `.env` (hoặc `POSTGRES_PASSWORD`) như mọi lần chạy khác; không
 cần database đang chạy vì chỉ đọc cấu hình chứ không kết nối.
 
-Sau đó sinh lại bản hợp nhất khớp Contract (22 operation từ code + 15 endpoint chưa có code) và lint:
+Sau đó sinh lại bản hợp nhất khớp Contract (27 operation từ code + 15 endpoint chưa có code) và lint:
 
 ```bash
 python3 docs/openapi/tools/gen_consolidated_spec.py && npx @redocly/cli lint docs/openapi/luxmap-v1.5.json

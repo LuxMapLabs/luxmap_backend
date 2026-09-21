@@ -75,7 +75,54 @@ mới, hiện thực và đặc tả trong cùng một PR, **không có mục dr
 
 | # | Chỗ lệch | Mức | Ai bị ảnh hưởng | Trạng thái |
 |---|---|---|---|---|
-| — | *(chưa có)* | | | |
+| 44 | Năm endpoint sửa/xoá tài sản không có trong Contract | Trung bình | WP5 (màn quản trị tài sản) | **Chờ duyệt** — nêu ở FW kế tiếp |
+
+### 44 — `PUT` và `DELETE` cho tuyến đường, tủ điện, cột đèn (20/09/2026)
+
+**Contract đang ghi gì.** Mục 2.1–2.3 chỉ đặc tả phần ĐỌC cho bản đồ. Nhóm `/assets/…` vốn đã nằm
+ngoài Contract (BE-12a), và drift 43 mới chỉ xác nhận `DELETE /assets/poles/{id}` cùng
+`PUT /assets/poles/{id}/feeder`. Sửa tài sản và xoá tuyến/tủ điện **chưa có ở đâu cả**.
+
+**Code đang làm gì.** BE-12 thêm năm endpoint, tất cả `[Authorize(Administrator)]`, tất cả trả `204`
+không body:
+
+```
+PUT    /api/v1/assets/segments/{id}      PUT    /api/v1/assets/feeders/{id}
+PUT    /api/v1/assets/poles/{id}
+DELETE /api/v1/assets/segments/{id}      DELETE /api/v1/assets/feeders/{id}
+```
+
+Bốn quyết định đi kèm, đều là **nội bộ backend** nhưng chạm bề mặt API nên phải nêu:
+
+1. **`PUT` là THAY THẾ TOÀN PHẦN, không phải patch.** Thiếu field nghĩa là field đó rỗng — nên body
+   không có `feeder_id` sẽ **xoá mạch điện của cột**. Ai chỉ muốn đổi mạch thì dùng
+   `PUT /assets/poles/{id}/feeder`, endpoint đó phân biệt được "không gửi" với "gửi null".
+2. **`commune_id` KHÔNG sửa được.** Chuyển tài sản sang xã khác không phải sửa, mà là chuyển giao —
+   đổi luôn ai nhìn thấy dòng đó, và phải kiểm scope ở **cả hai** phía. Sai xã thì xoá rồi tạo lại.
+3. **`data_source` SỬA ĐƯỢC.** Đây là chỗ đánh đổi: nó là trường provenance của Nhánh C, ghi đè nó là
+   ghi đè nguồn gốc dữ liệu. Giữ cho sửa vì một lần import sai không còn đường nào khác sau khi có
+   `fault` trỏ vào, và endpoint là Quản trị-only. **Nếu FW thấy rủi ro lớn hơn tiện lợi thì bỏ field
+   này khỏi cả ba request là đủ** — không ảnh hưởng gì khác.
+4. **Xoá tuyến/tủ điện do KHOÁ NGOẠI quyết định**, không kiểm trong code: `pole`, `fault`,
+   `fault_cluster` giữ tuyến bằng `Restrict`; `pole.feeder_id` giữ tủ điện bằng `Restrict` (và
+   nullable — nên xoá tủ điện **không** âm thầm gỡ mạch của cột). Vi phạm → `409 ASSET_IN_USE` kèm
+   tên constraint trong `details`.
+
+**Đề xuất.** Ghi vào Contract mục 5.3.1 ở lần tăng version kế tiếp (**v1.6**), cùng lúc với
+**BE-12b** (hình dạng response khi đọc) — hai thứ này thuộc cùng một màn hình của WP5, tách ra duyệt
+hai lần là bắt Thịnh/Ngọc đọc cùng một ngữ cảnh hai lần.
+
+📄 **Đề xuất BE-12b đã soạn sẵn để duyệt chung: [`docs/review/BE-12b-read-shape.md`](review/BE-12b-read-shape.md).**
+Ba câu hỏi cần chữ ký, cả ba đều là *"mục 5.1 cấm emit `data_source` / `external_ref` / `feeder_id` —
+lệnh cấm đó có áp cho endpoint kiểm kê không"*.
+
+> 🔴 **Điểm 3 ở trên (`data_source` sửa được) BUỘC phải quyết cùng Q2 của tài liệu đó.** Nếu Q2 trả
+> lời **không emit** thì phải **bỏ `data_source` khỏi cả ba request `PUT`**: một trường ghi được mà
+> không đọc lại được là thiết kế không ai bảo vệ được, và với trường provenance của Nhánh C thì nó là
+> đúng điều kiện để trộn nhầm nguồn dữ liệu mà không ai thấy. Đừng duyệt lệch hai câu này.
+
+**Ảnh hưởng.** WP5 chưa code màn quản trị tài sản nên chưa ai bị chặn. Nếu quyết khác ở điểm 1 (đổi
+sang `PATCH`) thì phải sửa trước khi WP5 bắt đầu — sau đó là breaking change.
 
 > Ghi theo khuôn: Contract đang ghi gì · Code đang làm gì · Đề xuất · Ảnh hưởng. Chạm bề mặt API thì
 > theo nguyên tắc 3 (ESCALATE khi im lặng), không tự coi là approve.
