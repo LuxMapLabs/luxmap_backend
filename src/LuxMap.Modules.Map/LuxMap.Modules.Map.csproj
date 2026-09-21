@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <!-- The map view is a READ MODEL that spans modules: a pole comes from Assets, the count of its
+         open faults from Faults. Assets must not learn about Faults to serve it — Faults already
+         depends on Assets, so that edge would close a cycle — and this module exists so the
+         composition has somewhere to live that points only downhill.
+
+         BE-20 (pole detail) adds Survey for luminance history, and /iot-nodes adds Telemetry. Those
+         references belong HERE when they arrive, not on Assets. -->
+    <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

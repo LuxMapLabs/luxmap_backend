@@ -2,6 +2,7 @@ using LuxMap.Modules.Admin;
 using LuxMap.Modules.Assets;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Identity;
+using LuxMap.Modules.Map;
 using LuxMap.Modules.Survey;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
@@ -37,6 +38,7 @@ ILuxMapModule[] modules =
 [
     new IdentityModule(),
     new AssetsModule(),
+    new MapModule(),
     new SurveyModule(),
     new FaultsModule(),
     new WorkOrdersModule(),
