@@ -78,6 +78,7 @@ mới, hiện thực và đặc tả trong cùng một PR, **không có mục dr
 |---|---|---|---|---|
 | 44 | Năm endpoint sửa/xoá tài sản không có trong Contract | Trung bình | WP5 (màn quản trị tài sản) | **Chờ duyệt** — nêu ở FW kế tiếp |
 | 45 | Contract mục 9 còn ghi O-7 là việc đang mở; FK ghép đã có trong lược đồ | Thấp | Không ai — thuần nội bộ backend | **Chờ đóng ở v1.6** |
+| 46 | Không có endpoint topology nào trong Contract; BE-13 cần một cái | Cao | WP4 (CV-05, CV-15) | **Chờ duyệt** — đề xuất ở `review/BE-13-topology-shape.md` |
 
 ### 44 — `PUT` và `DELETE` cho tuyến đường, tủ điện, cột đèn (20/09/2026)
 
@@ -163,6 +164,50 @@ lượt duyệt riêng.
 **Ảnh hưởng.** Không ai. Không endpoint nào đổi, không mã lỗi nào đổi, không trường nào đổi. Mục drift
 này tồn tại **chỉ vì Contract đang nói một việc đã xong là chưa xong** — và một Open item quá hạn mà
 thật ra đã đóng sẽ ngốn thời gian FW-00 y như một cái còn mở thật.
+
+
+### 46 — BE-13 cần endpoint topology, Contract không có cái nào (21/09/2026)
+
+**Contract đang ghi gì.** Không gì cả. Đã tra toàn văn: không có endpoint nào nhóm cột theo mạch
+điện hay theo tuyến. Mục 5.3 phủ CRUD `/assets/…`; mục 2.1 phủ `GET /poles` theo `bbox`, là endpoint
+**bản đồ** của BE-14.
+
+**Code đang làm gì.** Cũng không gì cả — **chưa hiện thực dòng nào**, cố ý. Tiêu chí nghiệm thu của
+BE-13 (`tasks-backend.csv` dòng 16) là *"Truy vấn được 'tất cả cột trên feeder X' phục vụ
+clustering"*, mà truy vấn đó không có chỗ nào để gọi.
+
+**Phần GÁN của BE-13 thì đã xong** từ BE-12a/BE-12: `PUT /assets/poles/{id}/feeder` gán mạch,
+`PUT /assets/poles/{id}` gán tuyến, import gán theo lô. Phần thiếu đúng là phần **đọc**.
+
+**Đề xuất.** Ba endpoint, chi tiết và lý lẽ ở
+📄 [`docs/review/BE-13-topology-shape.md`](review/BE-13-topology-shape.md):
+
+```
+GET /api/v1/assets/feeders/{feederId}/poles
+GET /api/v1/assets/segments/{segmentId}/poles
+GET /api/v1/assets/feeders/poles?unassigned=true
+```
+
+Phân trang JSON kèm `{lat, lng}` — **không** GeoJSON, theo đúng tiền lệ `GET /faults` ở mục 2.4.
+Vào Contract mục 5.4 ở **v1.6**.
+
+> 🔴 **Phải duyệt CÙNG LÚC với BE-12b Q3.** Câu đó hỏi `GET /assets/poles/{id}` có emit `feeder_id`
+> không. Nếu trả lời **không emit**, thì một hệ thống mà `feeder_id` không đọc được ở đâu cả nhưng
+> endpoint topology lại **nhóm theo nó** là mâu thuẫn — người dùng thấy kết quả gom nhóm mà không tra
+> được cột nào thuộc nhóm nào. Tài liệu BE-12b đã nêu BE-13 như lý do cho Q3 khi BE-13 còn là giả
+> định; nay nó có thật.
+
+**Ảnh hưởng.** **WP4 bị chặn** — CV-05 và CV-15 đều đợi. Khác với drift 44 và 45 (WP5 chưa code nên
+chưa ai bị chặn), mục này **có người đang đợi thật**, hạn W4.
+
+> ⚠️ **Duyệt xong vẫn chưa chạy được — O-6 chặn phần dữ liệu.** Bộ mock **không có một tủ điện nào**
+> và cả 103 cột đều `feeder_id = NULL`. BE-13 giao *khả năng truy vấn*; O-6 giao *dữ liệu để truy
+> vấn*. Gộp hai thứ sẽ dẫn tới W4 báo BE-13 xong rồi W5 CV-15 phát hiện không có gì để gom.
+>
+> **Và O-6 như mục 9 đang ghi là thiếu một nửa:** nó chỉ nhắc `mock-pole-feeders.csv`, nhưng không
+> gán cột vào tủ điện chưa tồn tại được — cần `mock-feeders.csv` trước. Khuôn cho cả hai đã dựng sẵn
+> ở `mocks/`, chỉ **58 trên 103 dòng** cần điền (45 cột solar để trống là đúng). Đề nghị sửa câu chữ
+> của O-6 ở v1.6.
 
 
 > Ghi theo khuôn: Contract đang ghi gì · Code đang làm gì · Đề xuất · Ảnh hưởng. Chạm bề mặt API thì
