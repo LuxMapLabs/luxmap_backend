@@ -115,7 +115,7 @@ mang `location{lat,lng}`. BE-13 cùng loại — danh sách phân trang cho mộ
 **EPSG:4326**, như mọi endpoint. Khoảng cách tính ở tầng DB bằng `SpatialFunctions.DistanceMeters`
 (3405) và **không bao giờ đi ra API** — xem bốn quy tắc BE-10.
 
-**Bốn trường, không hơn.** Cố ý **không** mang `fixture_status`, `open_fault_count`,
+**Năm trường, không hơn.** Cố ý **không** mang `fixture_status`, `open_fault_count`,
 `status_confidence` hay bất cứ thứ gì của mục 5.1: hai endpoint trả lời cùng một câu hỏi bằng hai
 giá trị là cách drift bắt đầu, và không có gì phát hiện ngày chúng lệch nhau. Cùng nguyên tắc
 BE-12b tự đặt ra cho chính nó.
@@ -181,7 +181,7 @@ Nghĩa là dù ba endpoint này được duyệt và hiện thực xong hôm nay
 | Truy vấn | Trả về |
 |---|---|
 | `GET /assets/feeders/{id}/poles` | **404** — không có feeder nào tồn tại |
-| `GET /assets/segments/{id}/poles` | 103 cột, tất cả `feeder_id: null` |
+| `GET /assets/segments/{id}/poles` | Đúng số cột của tuyến đó (46 / 31 / 26), tất cả `feeder_id: null` |
 | `GET /assets/feeders/poles?unassigned=true` | **cả 103 cột** |
 
 **CV-15 vẫn bị chặn sau khi BE-13 xong.** BE-13 giao *khả năng truy vấn*; O-6 giao *dữ liệu để truy
