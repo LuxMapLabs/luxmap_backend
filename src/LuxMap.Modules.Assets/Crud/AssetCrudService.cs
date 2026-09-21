@@ -3,6 +3,7 @@ using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Import;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
@@ -401,6 +402,107 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         fixture.RemovedDate = removedDate;
         fixture.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync(ct);
+    }
+
+    // ── BE-13 topology ────────────────────────────────────────────────────────────────────────
+    //
+    // ⚠️ PROVISIONAL — the Contract specifies no topology endpoint. Proposed in
+    // docs/review/BE-13-topology-shape.md, registered as drift 46, not stable until the next FW.
+
+    /// <summary>Every pole hanging off one circuit. The query CV-15 clusters along.</summary>
+    /// <remarks>
+    /// The feeder is READ FIRST, and that is not a redundant round trip. It is what makes a feeder
+    /// outside the caller's commune answer <b>404</b> rather than an empty page: the query filter
+    /// makes the row not exist for them, and Contract section 7 wants absence, not 403. Returning an
+    /// empty list instead would turn the endpoint into a probe for whether a given feeder id exists
+    /// in some other commune — the same reasoning decision A settled for <c>GET /faults?pole_id=</c>.
+    /// </remarks>
+    public async Task<PagedResult<TopologyPole>> ListPolesOnFeederAsync(
+        string feederId, PageRequest page, CancellationToken ct)
+    {
+        await RequireAsync<Feeder>(feeder => feeder.FeederId == feederId, "feeder", ct);
+
+        return await TopologyPageAsync(pole => pole.FeederId == feederId, page, withPowerSource: false, ct);
+    }
+
+    /// <summary>Every pole on one road segment.</summary>
+    /// <remarks>
+    /// ⚠️ These poles need NOT all be in the segment's own commune. <c>road_class =
+    /// inter_commune</c> means the road runs between communes, so a pole belonging to a neighbour is
+    /// correct data (BE-REVIEW-02, constraint 1). The caller still only sees what their own scope
+    /// permits, because the query filter applies to <c>pole</c> independently of the segment.
+    /// </remarks>
+    public async Task<PagedResult<TopologyPole>> ListPolesOnSegmentAsync(
+        string segmentId, PageRequest page, CancellationToken ct)
+    {
+        await RequireAsync<RoadSegment>(segment => segment.SegmentId == segmentId, "road segment", ct);
+
+        return await TopologyPageAsync(pole => pole.SegmentId == segmentId, page, withPowerSource: false, ct);
+    }
+
+    /// <summary>Poles on no circuit — what CV-05 still has to place, plus every solar pole.</summary>
+    /// <remarks>
+    /// This listing is the ONE that carries <c>power_source</c>, because it is the only one where the
+    /// caller has to separate "solar, so it has no circuit" from "nobody has assigned it yet". Both
+    /// are <c>feeder_id = NULL</c> and indistinguishable without it.
+    /// </remarks>
+    public Task<PagedResult<TopologyPole>> ListPolesWithoutFeederAsync(
+        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
+    {
+        var scoped = communes is null
+            ? (System.Linq.Expressions.Expression<Func<Pole, bool>>)(pole => pole.FeederId == null)
+            : pole => pole.FeederId == null && communes.Contains(pole.CommuneId);
+
+        return TopologyPageAsync(scoped, page, withPowerSource: true, ct);
+    }
+
+    /// <summary>The one query body the three topology listings share.</summary>
+    /// <remarks>
+    /// <para>
+    /// <c>power_source</c> comes from the pole's ACTIVE lamp — the one with no <c>removed_date</c> —
+    /// and BE-REVIEW-02 constraint 3 made that unique per pole (<c>ux_fixture_pole_id_active</c>), so
+    /// there is exactly one to read and no aggregation rule to invent. A pole with no lamp at all
+    /// reports null rather than a guess.
+    /// </para>
+    /// <para>
+    /// Projected in ONE query rather than loading poles and then their lamps: the N+1 that
+    /// BE-REVIEW-02 finding F-03 already had to remove once.
+    /// </para>
+    /// </remarks>
+    private async Task<PagedResult<TopologyPole>> TopologyPageAsync(
+        System.Linq.Expressions.Expression<Func<Pole, bool>> predicate,
+        PageRequest page,
+        bool withPowerSource,
+        CancellationToken ct)
+    {
+        var query = dbContext.Set<Pole>().AsNoTracking().Where(predicate);
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            // Never OrderBy the display id — the width is a MINIMUM, so POLE-10000 sorts before
+            // POLE-9999 as text (Contract section 0.3). Same rule as ListAsync.
+            .OrderBy(pole => pole.CreatedAt)
+            .ThenBy(pole => pole.PoleId)
+            .Skip(page.Skip)
+            .Take(page.PageSize)
+            .Select(pole => new TopologyPole
+            {
+                PoleId = pole.PoleId,
+                SegmentId = pole.SegmentId,
+                FeederId = pole.FeederId,
+                PowerSource = withPowerSource
+                    ? pole.Fixtures
+                        .Where(lamp => lamp.RemovedDate == null)
+                        .Select(lamp => (PowerSource?)lamp.PowerSource)
+                        .FirstOrDefault()
+                    : null,
+                // EPSG:4326 straight off the column. 3405 never leaves the SQL tree (BE-10, rule 3).
+                Lat = pole.Geom.Y,
+                Lng = pole.Geom.X,
+            })
+            .ToListAsync(ct);
+
+        return PagedResult<TopologyPole>.From(page, total, items);
     }
 
     private async Task<PagedResult<string>> ListAsync<TEntity>(
