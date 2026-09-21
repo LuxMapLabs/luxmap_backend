@@ -10,6 +10,17 @@ namespace LuxMap.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // AddForeignKey below VALIDATES EVERY EXISTING ROW. On a database that already holds a
+            // pole wired to a feeder in another commune, this migration aborts with a bare 23503 that
+            // names no row. Run this first to see the offenders — it returns nothing on a clean
+            // database, and the dev database was verified empty of feeders before this was applied:
+            //
+            //   SELECT p.pole_id, p.commune_id AS pole_commune, f.feeder_id, f.commune_id AS feeder_commune
+            //   FROM pole p JOIN feeder f ON f.feeder_id = p.feeder_id
+            //   WHERE f.commune_id <> p.commune_id;
+            //
+            // Each row it returns has to be repaired by hand: the pole moves, or the circuit does.
+            // There is no correct automatic answer, which is why this is a query and not a fix-up.
             migrationBuilder.DropForeignKey(
                 name: "fk_pole_feeder_feeder_id",
                 table: "pole");

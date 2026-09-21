@@ -259,6 +259,55 @@ public sealed class FeederCommuneConstraintTests(AssetImportFixture fixture)
         Assert.Equal([nameof(Feeder.FeederId), nameof(Feeder.CommuneId)], alternateKeyColumns);
     }
 
+    /// <summary>
+    /// 🔴 A SIDE EFFECT of the alternate key: EF Core now refuses to modify a tracked feeder's
+    /// commune itself, and it refuses BEFORE <c>CommuneWriteGuard</c> ever runs.
+    /// </summary>
+    /// <remarks>
+    /// <c>HasAlternateKey</c> makes <c>Feeder.CommuneId</c> a KEY property, and EF Core forbids
+    /// modifying a key on a tracked entity. The refusal comes out of <c>DetectChanges</c> as a plain
+    /// <c>InvalidOperationException</c> — which the BE-04 middleware answers as <b>500</b>, not as the
+    /// 403 <c>COMMUNE_FORBIDDEN</c> the guard would have produced before O-7.
+    /// <para>
+    /// <b>The data is not at risk and never was.</b> Both layers REFUSE; what changed is which one
+    /// refuses and how legibly. Recorded because CLAUDE.md section 1c advertises the guard as covering
+    /// every <c>ICommuneScoped</c> entity, and that sentence is now inaccurate for this one path —
+    /// the path BE-39's seeder and BE-43's sync will be written on.
+    /// </para>
+    /// <para>
+    /// Deliberately NOT worked around. Moving a feeder between communes is already forbidden by
+    /// BE-12a (<c>commune_id</c> is absent from every update request, and for a feeder it would drag
+    /// every pole wired to it across a commune boundary with no write left to catch it), so EF is now
+    /// enforcing a rule the team had already made. Translating the exception would mean catching
+    /// <c>InvalidOperationException</c> around <c>SaveChanges</c> and matching on a localised message
+    /// — a broad catch on a very common exception type, to improve the error of an operation that
+    /// must never succeed.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Changing_a_tracked_feeders_own_commune_is_refused_by_EF_before_the_guard_sees_it()
+    {
+        var feederId = await NewFeederAsync(fixture.CommuneId);
+
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+        var feeder = await db.Set<Feeder>().IgnoreQueryFilters().SingleAsync(f => f.FeederId == feederId);
+
+        feeder.CommuneId = fixture.ForeignCommuneId;
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync());
+
+        // Asserted on the key property rather than the full sentence: the message is EF's and a
+        // version bump may reword it, but it will still have to name the property it refused.
+        Assert.Contains(nameof(Feeder.CommuneId), thrown.Message, StringComparison.Ordinal);
+
+        // Whatever the exception type, the row did not move.
+        var stored = await fixture.QueryAsync(inner => inner.Set<Feeder>().IgnoreQueryFilters()
+            .Where(f => f.FeederId == feederId).Select(f => f.CommuneId).SingleAsync());
+
+        Assert.Equal(fixture.CommuneId, stored);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────────────────────
     //
     // Everything is written through the backdoor on purpose: these tests are about what survives
