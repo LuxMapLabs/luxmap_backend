@@ -140,6 +140,20 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
             foreach (var sql in new[]
             {
                 "DELETE FROM fixture WHERE commune_id = @c OR commune_id = @f;",
+
+                // 🔴 BEFORE the poles, and it was MISSING until BE-14 traced a broken suite to it.
+                // fault.pole_id holds a pole with RESTRICT, so one fault left behind makes the pole
+                // DELETE below fail — and with it the whole teardown, so the commune's poles survive
+                // the run. They then sit in the table holding ids that pole_id_seq will hand out
+                // again on a later run, and the next suite dies on pk_pole looking like flake.
+                // Every test that writes a fault was quietly leaking poles this way.
+                "DELETE FROM fault WHERE commune_id = @c OR commune_id = @f;",
+
+                // Same RESTRICT edge, same trap. Currently no test here leaves one behind, but a net
+                // with a known hole in it is not much of a net — and the hole is invisible until a
+                // later suite dies on pk_pole for reasons that point nowhere near the cause.
+                "DELETE FROM lux_reading WHERE commune_id = @c OR commune_id = @f;",
+
                 "DELETE FROM pole WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
