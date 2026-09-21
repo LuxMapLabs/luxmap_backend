@@ -82,7 +82,7 @@ Lý do là **khoá ngoại**, không phải sở thích:
 | Bước | Vì sao phải trước | Ràng buộc thật |
 |---|---|---|
 | 1. `segments` | `pole.segment_id` **NOT NULL** — không có tuyến thì không tạo được cột | `fk_pole_road_segment_segment_id` |
-| 2. `feeders` | `pole.feeder_id` **nullable**, nhưng nếu điền thì tuyến điện phải tồn tại | `fk_pole_feeder_feeder_id` |
+| 2. `feeders` | `pole.feeder_id` **nullable**, nhưng nếu điền thì tủ điện phải tồn tại **và cùng xã với cột** | `fk_pole_feeder_feeder_id_commune_id` |
 | 3. `poles` | `fixture.pole_id` **NOT NULL** | `fk_fixture_pole_pole_id` |
 | 4. `fixtures` | — | — |
 

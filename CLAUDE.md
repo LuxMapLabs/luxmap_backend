@@ -277,7 +277,16 @@ Vì sao lọt lâu: tiêu chí nghiệm thu của BE-08 trong `tasks-backend.csv
 | Lớp | Ở đâu | Cho cái gì |
 |---|---|---|
 | `CommuneFilter.Narrow` | Entry point của controller, gọi tường minh | 403 với thông điệp tử tế, nêu đúng `commune_id` bị từ chối. Người dùng hiểu vì sao. |
-| `CommuneWriteGuard` ở `SaveChanges` | `LuxMapDbContext`, tự động | **Backstop không thể quên.** Phủ mọi entity `ICommuneScoped`, kể cả của BE-15/BE-18/BE-21 trước khi chúng được viết. |
+| `CommuneWriteGuard` ở `SaveChanges` | `LuxMapDbContext`, tự động | **Backstop không thể quên.** Phủ mọi entity `ICommuneScoped`, kể cả của BE-15/BE-18/BE-21 trước khi chúng được viết — **trừ một ca, xem ngay dưới**. |
+
+> ⚠️ **Một ngoại lệ đã biết, phát sinh từ O-7: sửa `commune_id` của chính `Feeder` đã được track.**
+> `HasAlternateKey` biến `Feeder.CommuneId` thành **key property**, mà EF Core cấm sửa key trên entity
+> đang track — nó ném `InvalidOperationException` ngay trong `DetectChanges`, **trước khi guard chạy**,
+> nên ra **500** chứ không phải 403 `COMMUNE_FORBIDDEN`.
+>
+> **Dữ liệu không hề gặp rủi ro** — cả hai lớp đều TỪ CHỐI, chỉ khác lớp nào từ chối và từ chối có dễ
+> đọc không. Ghi lại vì câu "phủ mọi entity" ở trên là câu mà ticket sau sẽ dựa vào. Ghim bằng
+> `Changing_a_tracked_feeders_own_commune_is_refused_by_EF_before_the_guard_sees_it`.
 
 Cùng nguyên lý `ValidateCommuneReferences()`: biến quy ước-phải-nhớ thành ràng buộc-không-thể-quên.
 Không dùng `ActionFilter` — attribute phải gắn, mà cái bị quên chính là cái rò.
@@ -1086,6 +1095,16 @@ trước, thứ không thể quên ở sau.
 nó đang đấu vào một tủ điện. Lượt kiểm đọc xã của cột làm vế cố định nên không có gì kích hoạt. Hôm
 nay không request nào hỏi được điều đó, nhưng đó là tính chất của controller tuần này chứ không phải
 của dữ liệu.
+
+⚠️ **Tác dụng phụ của alternate key: KHÔNG sửa được `commune_id` của `Feeder` đang track nữa.**
+`Feeder.CommuneId` nay là **key property**, và EF Core cấm sửa key trên entity đang track: ném
+`InvalidOperationException` từ `DetectChanges`, **trước** `CommuneWriteGuard`, nên ra **500** thay vì
+403 `COMMUNE_FORBIDDEN`. **Dữ liệu không gặp rủi ro** — cả hai lớp đều từ chối. Cố ý **không** vá:
+chuyển feeder sang xã khác vốn đã bị BE-12a cấm (nó kéo tủ điện ra khỏi các cột đang đấu vào, và không
+còn lượt ghi nào bắt được), nên EF đang thực thi một luật nhóm đã chốt. Dịch lại lỗi thì phải bắt
+`InvalidOperationException` quanh `SaveChanges` và khớp theo thông điệp có thể đổi khi nâng phiên bản
+— bắt quá rộng một kiểu lỗi quá phổ biến, để làm đẹp thông điệp cho một thao tác không bao giờ được
+phép thành công. Xem thêm ngoại lệ ghi ở mục 1c.
 
 ⚠️ **Index đổi hình:** `ix_pole_feeder_id` → `ix_pole_feeder_id_commune_id`. Vẫn dẫn đầu bằng
 `feeder_id` nên phục vụ được mọi truy vấn lọc theo feeder, và vì query filter BE-08 luôn nhét
