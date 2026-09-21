@@ -78,7 +78,7 @@ mới, hiện thực và đặc tả trong cùng một PR, **không có mục dr
 |---|---|---|---|---|
 | 44 | Năm endpoint sửa/xoá tài sản không có trong Contract | Trung bình | WP5 (màn quản trị tài sản) | **Chờ duyệt** — nêu ở FW kế tiếp |
 | 45 | Contract mục 9 còn ghi O-7 là việc đang mở; FK ghép đã có trong lược đồ | Thấp | Không ai — thuần nội bộ backend | **Chờ đóng ở v1.6** |
-| 46 | Không có endpoint topology nào trong Contract; BE-13 cần một cái | Cao | WP4 (CV-05, CV-15) | **Chờ duyệt** — đề xuất ở `review/BE-13-topology-shape.md` |
+| 46 | Không có endpoint topology nào trong Contract; BE-13 đã hiện thực trên nền TẠM | Cao | WP4 (CV-05, CV-15) | **Đã hiện thực, CHỜ DUYỆT** — đề xuất ở `review/BE-13-topology-shape.md` |
 
 ### 44 — `PUT` và `DELETE` cho tuyến đường, tủ điện, cột đèn (20/09/2026)
 
@@ -172,21 +172,36 @@ thật ra đã đóng sẽ ngốn thời gian FW-00 y như một cái còn mở 
 điện hay theo tuyến. Mục 5.3 phủ CRUD `/assets/…`; mục 2.1 phủ `GET /poles` theo `bbox`, là endpoint
 **bản đồ** của BE-14.
 
-**Code đang làm gì.** Cũng không gì cả — **chưa hiện thực dòng nào**, cố ý. Tiêu chí nghiệm thu của
-BE-13 (`tasks-backend.csv` dòng 16) là *"Truy vấn được 'tất cả cột trên feeder X' phục vụ
-clustering"*, mà truy vấn đó không có chỗ nào để gọi.
-
-**Phần GÁN của BE-13 thì đã xong** từ BE-12a/BE-12: `PUT /assets/poles/{id}/feeder` gán mạch,
-`PUT /assets/poles/{id}` gán tuyến, import gán theo lô. Phần thiếu đúng là phần **đọc**.
-
-**Đề xuất.** Ba endpoint, chi tiết và lý lẽ ở
-📄 [`docs/review/BE-13-topology-shape.md`](review/BE-13-topology-shape.md):
+**Code đang làm gì.** Đã hiện thực ba endpoint (21/09), **trên nền chưa được duyệt**:
 
 ```
 GET /api/v1/assets/feeders/{feederId}/poles
 GET /api/v1/assets/segments/{segmentId}/poles
 GET /api/v1/assets/feeders/poles?unassigned=true
 ```
+
+> 🔴 **NỀN LÀ TẠM.** Theo nguyên tắc 3 của FW-00: quyết định chạm bề mặt API **chưa ổn định cho tới
+> khi FW kế tiếp xác nhận**, và ticket xây lên trên nó **phải ghi rõ nền là tạm**. Mục này là chỗ ghi
+> đó. **CV-05 và CV-15 phải biết** trước khi bind theo hình dạng này.
+
+**Vì sao hiện thực trước khi duyệt.** Cùng lối BE-12a đã đi: nhóm `/assets/…` cũng ra đời ngoài
+Contract rồi đăng ký drift sau. Điều kiện để lối đó chấp nhận được là **bề mặt MỚI, chưa ai code
+theo** — đúng trường hợp này: người dùng là CV-05/CV-15, engine nội bộ của WP4, chưa dựng gì lên
+trên. Khác hẳn BE-12b, thứ đang đổi hình dạng một phong bì **đã publish**.
+
+Hạn BE-13 là W4 (28/09–04/10) và hai ticket WP4 chặn sau nó, trong khi chờ duyệt ở nhóm này có
+thành tích không tốt: BE-12b treo từ 17/09, drift 29/30/34 đi qua bằng **hết hạn im lặng** chứ không
+phải có người đọc.
+
+**Cái gì phải làm lại nếu bị lật:** route + DTO. Truy vấn ở service và toàn bộ test phạm vi địa bàn
+**không đổi** dù hình dạng nào được chốt — đó là phần đắt, và nó không nằm trong vùng rủi ro.
+
+**Phần GÁN của BE-13 thì đã xong** từ BE-12a/BE-12: `PUT /assets/poles/{id}/feeder` gán mạch,
+`PUT /assets/poles/{id}` gán tuyến, import gán theo lô. Phần thiếu đúng là phần **đọc**.
+
+**Đề xuất.** Chi tiết và lý lẽ ở
+📄 [`docs/review/BE-13-topology-shape.md`](review/BE-13-topology-shape.md) — tài liệu **giữ nguyên**
+và vẫn đi duyệt; code không thay chữ ký.
 
 Phân trang JSON kèm `{lat, lng}` — **không** GeoJSON, theo đúng tiền lệ `GET /faults` ở mục 2.4.
 Vào Contract mục 5.4 ở **v1.6**.

@@ -80,7 +80,7 @@ def opid(method, path):
     name = "".join(re.sub(r"[{}]", "", p).title().replace("-", "").replace("_", "") for p in parts)
     return f"{method.lower()}{name}"
 
-# Summaries for the 21 implemented operations (from the controllers' XML docs / behaviour)
+# Summaries for the implemented operations (from the controllers' XML docs / behaviour)
 SUMMARY = {
     ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
     ("get", "/api/v1/assets/segments"): "Danh sách ID tuyến (chỗ giữ chỗ BE-12b)",
@@ -97,6 +97,10 @@ SUMMARY = {
     ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
+    # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
+    ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
+    ("get", "/api/v1/assets/segments/{segmentId}/poles"): "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
+    ("get", "/api/v1/assets/feeders/poles"): "[TẠM — drift 46] Cột CHƯA có mạch; bắt buộc unassigned=true; chỉ listing này trả power_source",
     ("put", "/api/v1/assets/fixtures/{fixtureId}/removal"): "Ngừng dùng bóng bằng removed_date; không có DELETE",
     ("get", "/api/v1/auth/me"): "Người đang đăng nhập, đọc từ DB nên role và commune_ids luôn tươi",
     ("post", "/api/v1/auth/login"): "Đăng nhập mobile; trả đúng bốn trường",
