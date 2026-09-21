@@ -108,6 +108,14 @@ public sealed class FeederConfiguration : IEntityTypeConfiguration<Feeder>
         // Still indexed although the column is nullable: PostgreSQL simply leaves NULL rows out.
         builder.HasIndex(feeder => feeder.Geom).HasMethod(GeometryColumns.GistMethod);
 
+        // 🔴 REDUNDANT-LOOKING AND LOAD-BEARING. feeder_id is already the primary key, so uniqueness
+        // over (feeder_id, commune_id) adds nothing on its own — and that is exactly why someone will
+        // eventually delete it as dead weight. It is the TARGET of pole's composite foreign key
+        // (O-7): PostgreSQL will only point a foreign key at columns carrying a unique constraint.
+        // Dropping this drops the only thing making "a pole's circuit lives in the pole's commune" a
+        // database rule instead of a habit. See PoleConfiguration.
+        builder.HasAlternateKey(feeder => new { feeder.FeederId, feeder.CommuneId });
+
         builder.HasCommuneReference(feeder => feeder.CommuneId);
     }
 }
@@ -142,9 +150,29 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
             // Deleting a segment that still carries poles would orphan the assets.
             .OnDelete(DeleteBehavior.Restrict);
 
+        // O-7 — the same-commune rule, as a CONSTRAINT rather than a call someone has to remember.
+        //
+        // The foreign key carries commune_id as well as feeder_id, so a pole can only hang off a
+        // feeder whose commune matches its own. RequireFeederInCommuneAsync still runs first and
+        // still owns the friendly 409 CROSS_COMMUNE_REFERENCE naming both communes; this is the
+        // backstop underneath it, the same two-layer shape as CommuneFilter.Narrow over
+        // CommuneWriteGuard. It covers the write paths that do not exist yet — BE-39's seeder,
+        // BE-43's sync — and psql by hand, none of which will call the service method.
+        //
+        // ⚠️ MATCH SIMPLE is what makes a pole with no circuit legal, and it is the DEFAULT — do not
+        // "tighten" it to MATCH FULL. Under MATCH SIMPLE a row with feeder_id NULL skips the check
+        // entirely even though commune_id is non-null, which is the behaviour a solar_all_in_one pole
+        // depends on. MATCH FULL would demand both columns be null together and reject every
+        // feeder-less pole in the table. Pinned by
+        // A_pole_with_no_feeder_is_still_legal_even_though_its_commune_is_not_null.
+        //
+        // Note segment_id deliberately gets NO such key: road_class = inter_commune means the road
+        // runs BETWEEN communes, so a pole in a different commune from its segment's owner is
+        // correct data, not a leak (BE-REVIEW-02, constraint 1).
         builder.HasOne(pole => pole.Feeder)
             .WithMany(feeder => feeder.Poles)
-            .HasForeignKey(pole => pole.FeederId)
+            .HasForeignKey(pole => new { pole.FeederId, pole.CommuneId })
+            .HasPrincipalKey(feeder => new { feeder.FeederId, feeder.CommuneId })
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasCommuneReference(pole => pole.CommuneId);
