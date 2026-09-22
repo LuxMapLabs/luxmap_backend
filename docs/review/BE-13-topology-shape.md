@@ -23,7 +23,7 @@ feeder X' phục vụ clustering"*. Tài liệu này đề xuất hình dạng c
 |---|---|---|---|
 | **Q1** | Endpoint riêng, hay thêm filter vào `GET /assets/poles`? | **Endpoint riêng** | Xem §2 — CV-15 phải gọi thêm N lần để lấy toạ độ |
 | **Q2** | Response có kèm **toạ độ** không? | **CÓ** | CV-15 không gom cụm được bằng một request; đụng anti-pattern *"đừng bắt gọi nhiều lần"* |
-| **Q3** | Cột `solar` (không mạch) truy vấn thế nào? | **`?unassigned=true`** trên endpoint feeder | Không có cách liệt kê cột ngoài mạch; CV-05 mất đầu vào |
+| **Q3** | Cột chưa gán mạch truy vấn thế nào? | **`?unassigned=true`** trên endpoint feeder | Không có cách liệt kê cột chờ gán; CV-05 mất đầu vào |
 
 ### 0.1 Một câu dùng chung với BE-12b
 
@@ -130,16 +130,18 @@ tự mô tả được.
 
 **Đề xuất:** `GET /api/v1/assets/feeders/poles?unassigned=true`
 
-**Vì sao cần.** **45 trên 103 cột của bộ mock là `solar_all_in_one`** — chúng không đấu vào mạch
-nào, và `feeder_id = NULL` là **câu trả lời đúng**, không phải dữ liệu thiếu. Không có endpoint nào
-liệt kê được chúng thì:
+**Vì sao cần.** Không có endpoint nào liệt kê được cột chưa gán mạch thì **CV-05 không biết còn
+việc gì để làm** — nó phải quét toàn bộ cột rồi tự lọc, hoặc đoán.
 
-- **CV-05** không biết cột nào còn chờ gán;
-- không ai phân biệt được *"cột này solar nên không có mạch"* với *"cột này chưa ai gán"* — hai thứ
-  trông giống hệt nhau trong DB, và chỉ khác nhau ở `power_source`.
-
-Vì vậy item của endpoint này (và **chỉ** endpoint này) mang thêm **`power_source`**: nó là thứ duy
-nhất phân biệt được hai ca trên.
+> ⚠️ **Phần này đã ĐỔI sau Contract v1.6 (22/09/2026).** Bản đầu của tài liệu lập luận rằng listing
+> này cần thêm `power_source`, vì **45 trên 103 cột là `solar_all_in_one`** và phải tách *"solar nên
+> không có mạch"* khỏi *"chưa ai gán"* — hai thứ cùng là `feeder_id = NULL` trong DB.
+>
+> Đèn solar ra khỏi phạm vi đồ án, nên **vế đầu không còn tồn tại**: mọi cột `feeder_id = NULL` nay
+> đơn giản là chưa gán. Trường `power_source` **đã bỏ khỏi listing** cùng với hai test canh nó —
+> để lại một trường chỉ trả đúng một giá trị là nợ, không phải tính năng.
+>
+> Đây cũng là lý do **O-6 nặng hơn trước**: từ 58/103 dòng cần điền thành **103/103**.
 
 > ⚠️ **Đây là chỗ đề xuất này yếu nhất, và tôi nêu ra thay vì giấu đi.** Đường dẫn
 > `/assets/feeders/poles` đọc không xuôi — nó không phải cột *của* feeder nào cả. Hai lựa chọn khác
@@ -190,7 +192,7 @@ không có gì để gom.
 
 **Đã dựng sẵn khuôn để gỡ:** `mocks/mock-feeders.csv` và `mocks/mock-pole-feeders.csv` (103 dòng,
 phần tra cứu điền sẵn, cột `feeder_external_ref` để trống), hướng dẫn ở `mocks/README.md`.
-**Chỉ 58 dòng cần điền** — 45 dòng solar để trống là đúng.
+**Cả 103 dòng đều cần điền** kể từ Contract v1.6 — trước đó chỉ 58, vì 45 cột solar không đấu mạch.
 
 > ⚠️ **O-6 như Contract mục 9 đang ghi là thiếu một nửa:** nó chỉ nhắc `mock-pole-feeders.csv`,
 > nhưng không gán cột vào tủ điện chưa tồn tại được. Cần `mock-feeders.csv` **trước**. Đề nghị sửa
@@ -204,8 +206,7 @@ phần tra cứu điền sẵn, cột `feeder_external_ref` để trống), hư�
 2. Item type mới — **không** dùng lại DTO của BE-12b, xem §2.
 3. Contract mục 5.4 + `luxmap-v1.json` xuất lại + `gen_consolidated_spec.py` chạy lại +
    `npx @redocly/cli lint` (BE-REVIEW-02 ràng buộc 8).
-4. Test: phạm vi địa bàn (404 chứ không 403), phân trang, cột solar không lọt vào kết quả của
-   feeder, và **cột ở xã khác trên cùng tuyến vẫn ra** — `inter_commune` là hợp lệ.
+4. Test: phạm vi địa bàn (404 chứ không 403), phân trang, và **cột ở xã khác trên cùng tuyến vẫn ra** — `inter_commune` là hợp lệ.
 5. Đóng mục drift đăng ký cho ticket này.
 
 **Chỉ số 3 chạm bề mặt đã publish.** Các mục còn lại nằm trong backend.

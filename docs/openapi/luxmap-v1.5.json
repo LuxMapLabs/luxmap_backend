@@ -4437,8 +4437,7 @@
       },
       "FixtureType": {
         "enum": [
-          "led_road_lamp",
-          "solar_all_in_one"
+          "led_road_lamp"
         ],
         "type": "string"
       },
@@ -4698,8 +4697,7 @@
       },
       "PowerSource": {
         "enum": [
-          "grid",
-          "solar"
+          "grid"
         ],
         "type": "string"
       },
@@ -4873,9 +4871,6 @@
           "feeder_id": {
             "type": "string",
             "nullable": true
-          },
-          "power_source": {
-            "$ref": "#/components/schemas/PowerSource"
           },
           "lat": {
             "type": "number",

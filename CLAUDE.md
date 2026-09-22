@@ -151,8 +151,8 @@ Gắn trên `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReadi
 
 ```
 fixture_status : normal | dim | out | unknown
-power_source   : grid | solar
-fixture_type   : led_road_lamp | solar_all_in_one
+power_source   : grid                            # v1.6 — solar đã bỏ
+fixture_type   : led_road_lamp                   # v1.6 — solar_all_in_one đã bỏ
 fault_type     : lamp_out | lamp_dim | segment_outage | node_offline | runtime_decline
 fault_status   : detected | confirmed | rejected | in_progress | resolved | verified
 severity       : low | medium | high | critical
@@ -165,6 +165,20 @@ road_class     : inter_commune | inter_village
 ```
 
 **Không thêm giá trị, không đổi tên, không dùng int.** FE đã hardcode.
+
+> 🔴 **`power_source` và `fixture_type` THU HẸP còn một giá trị — Contract v1.6, 22/09/2026.** Đèn
+> năng lượng mặt trời ra khỏi phạm vi đồ án. Giá trị bị **xoá khỏi enum**, không để lại không dùng:
+> một giá trị không gì sinh ra được là giá trị ticket sau tưởng mình được phép ghi, và CHECK ở DB
+> sẽ cho qua. Migration `DropSolarFixtures` **đổi 45 hàng RỒI mới siết CHECK** — đảo thứ tự là
+> migration gãy trên chính dữ liệu nó sắp bảo vệ, và `Down()` khôi phục được ràng buộc nhưng
+> **không khôi phục được dữ liệu** (đổi solar→grid là mất thông tin).
+>
+> ⚠️ **Phần PIN không đi theo.** IoT vẫn đo runtime, `runtime_decline` vẫn là `fault_type` hợp lệ —
+> giờ sáng của đèn lưới cũng suy giảm được. `POLE-0047` giữ chuỗi 18 đêm, chỉ đổi sang `grid`.
+>
+> Hệ quả đã áp: BE-13 **bỏ `power_source`** khỏi listing cột-chưa-gán (trường đó chỉ sinh ra để tách
+> *"solar nên không mạch"* khỏi *"chưa ai gán"*, mà vế đầu nay không tồn tại); O-6 từ **58/103 dòng
+> cần điền thành 103/103**, vì mọi cột nay đều chạy điện lưới.
 
 Ràng buộc nghiệp vụ đi kèm:
 
@@ -1080,8 +1094,12 @@ cột `fk_pole_feeder_feeder_id` **bị thay thế**, không phải thêm chồn
 **1. 🔴 `MATCH SIMPLE` là thứ giữ cho cột-không-có-mạch hợp lệ. ĐỪNG "siết" sang `MATCH FULL`.**
 
 Mặc định của Postgres là `MATCH SIMPLE`: hàng nào có **bất kỳ** cột FK nào null thì **bỏ qua hẳn**
-lượt kiểm. Đó chính xác là hành vi mà cột `solar_all_in_one` dựa vào — `feeder_id` null,
-`commune_id` không null, và hàng vẫn vào. `MATCH FULL` đòi các cột phải null **cùng nhau**; vì
+lượt kiểm — `feeder_id` null, `commune_id` không null, hàng vẫn vào.
+
+⚠️ **Lý do ban đầu của quy tắc này đã đổi, quy tắc thì không.** Trước v1.6 nó tồn tại vì cột
+`solar_all_in_one` không đấu vào mạch nào; đèn solar nay hết, nên **mọi cột rồi sẽ có feeder**.
+Nhưng `feeder_id` vẫn nullable và vẫn phải nullable: cột mới tạo chưa gán mạch, và `PUT` thay thế
+toàn phần vẫn xoá mạch được. `MATCH FULL` vẫn sẽ từ chối đúng những hàng đó. `MATCH FULL` đòi các cột phải null **cùng nhau**; vì
 `commune_id` không bao giờ null, nó sẽ từ chối **mọi** cột không có mạch trong bảng, tức đa số.
 
 Đây là loại sửa trông *đúng hơn* lúc review. Canh bằng

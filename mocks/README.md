@@ -20,9 +20,13 @@ WP5 và WP6 code giao diện theo bộ này, BE-39 seed database từ chính b�
 - **`SEG-003`** có một cụm lỗi cả đoạn — dùng test luồng highlight toàn tuyến
   (`has_active_segment_fault = true`)
 - **12 IoT node**: 3 `segment_controller` · 9 `sampled_fixture`
-- **`POLE-0047`** là cột solar, có chuỗi runtime suy giảm dần qua 18 đêm —
-  dùng test biểu đồ cảnh báo sớm pin. Mang `fixture_status = dim` và có
-  `NODE-047`: pin yếu làm đèn **mờ dần**, không tắt phụt
+- **`POLE-0047`** có chuỗi runtime suy giảm dần qua 18 đêm — dùng test biểu đồ
+  cảnh báo sớm. Mang `fixture_status = dim` và có `NODE-047`: đèn **mờ dần**,
+  không tắt phụt.
+  ⚠️ **Trước 22/09/2026 đây là cột solar và câu chuyện là pin yếu.** Đèn solar
+  đã ra khỏi phạm vi đồ án, nên cột này nay là `grid` / `led_road_lamp`. Chuỗi
+  runtime và `runtime_decline` **giữ nguyên** — giờ sáng của đèn lưới cũng suy
+  giảm được, và đó vẫn là kịch bản IoT phát hiện sớm
 - Đa số cột có `iot_node = null`, đúng như thực tế kiến trúc sparse IoT
 
 Bảy cột `unknown` không phải lỗi dữ liệu. `unknown` nghĩa là sweep gần nhất
@@ -54,25 +58,27 @@ của địa bàn — Contract mục 9 giao O-6 cho **Dylan + FO**.
 
 ### Điền thế nào
 
-**Chỉ sửa cột cuối cùng, `feeder_external_ref`.** Năm cột đầu là bản chép từ
+**Chỉ sửa cột cuối cùng, `feeder_external_ref`.** Bốn cột đầu là bản chép từ
 `mock-poles.geojson` để tra cứu cho dễ — sửa chúng không có tác dụng gì, vì chương trình nạp
 khớp theo `pole_external_ref` và **bỏ qua** phần còn lại. Sinh lại được bất cứ lúc nào từ chính
 `mock-poles.geojson`.
 
-**Chỉ 58 trên 103 dòng cần điền.** 45 dòng còn lại là `solar_all_in_one` — chúng **không đấu vào
-mạch nào cả**, nên để trống là câu trả lời đúng chứ không phải dữ liệu thiếu. Cột
-`power_source` có sẵn trong file để nhìn ra ngay.
+**Cả 103 dòng đều cần điền.**
 
-| Tuyến | Cần điền (`grid`) | Để trống (`solar`) |
-|---|---|---|
-| `SEG-001` | 46 | 0 |
-| `SEG-002` | **0** | 31 |
-| `SEG-003` | 12 | 14 |
-| | **58** | **45** |
+> ⚠️ **Con số này ĐÃ ĐỔI ngày 22/09/2026.** Trước đó chỉ 58 dòng cần điền: 45 cột là
+> `solar_all_in_one` và cột solar không đấu vào mạch nào. Đèn solar nay đã ra khỏi phạm vi đồ án,
+> nên **mọi cột đều chạy điện lưới và đều phải có tủ điện**. Cột `power_source` đã bỏ khỏi file —
+> nó chỉ còn một giá trị nên không phân biệt được gì nữa.
+>
+> Kéo theo: **`SEG-002` nay cũng cần tủ điện.** Ghi chú cũ nói tuyến đó toàn solar nên không bao giờ
+> sinh cụm lỗi theo mạch — điều đó **không còn đúng**.
 
-> `SEG-002` **toàn bộ chạy bằng solar**. Nghĩa là tuyến đó sẽ không bao giờ sinh ra cụm lỗi theo
-> mạch điện — CV-15 gom cụm dọc mạch, nên với `SEG-002` nó không có gì để gom. Đây là tính chất
-> của bộ mock, không phải lỗi; nêu ra để lúc đọc kết quả không ai đi tìm nguyên nhân.
+| Tuyến | Số cột cần gán |
+|---|---|
+| `SEG-001` | 46 |
+| `SEG-002` | 31 |
+| `SEG-003` | 26 |
+| | **103** |
 
 Giá trị trong `feeder_external_ref` phải khớp một `external_ref` có trong `mock-feeders.csv`.
 Không phải `FDR-001` — mã đó do DB sinh lúc INSERT, người soạn file không biết trước. Cùng quy ước
