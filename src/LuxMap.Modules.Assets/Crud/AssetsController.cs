@@ -34,33 +34,73 @@ public sealed class AssetsController(
     AssetCrudService service,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
-    /// <summary>
-    /// Ids only, paged. The full asset shape is <b>BE-12b</b>.
-    /// </summary>
-    /// <remarks>
-    /// A deliberate placeholder, not a design. BE-12a owns requests and permissions; what a read
-    /// returns is still under review, and shipping a guess would publish a shape the front end starts
-    /// depending on. Ids are enough to confirm what an import wrote, and <c>PagedResult</c> is already
-    /// the published envelope from Contract section 0.
-    /// </remarks>
+    // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
+    //
+    // These returned PagedResult<string> — ids only — from BE-12a until 22/09/2026, a placeholder
+    // held open while three questions were decided: does the section 5.1 ban on emitting
+    // external_ref, data_source and feeder_id bind the INVENTORY surface too? It does not, and
+    // docs/review/BE-12b-read-shape.md carries why for each.
+    //
+    // No role policy on any of them, like every other GET: SetFallbackPolicy already demands a
+    // login, and a policy is one EXACT role, so naming one would lock out three of the four rather
+    // than set a floor (BE-12a, rule 4).
+
+    /// <summary>Road segments in the caller's communes, paged.</summary>
     [HttpGet("segments")]
-    [ProducesResponseType<PagedResult<string>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<PagedResult<SegmentListItem>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<PagedResult<string>>> ListSegmentsAsync(
+    public async Task<ActionResult<PagedResult<SegmentListItem>>> ListSegmentsAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
         => Ok(await service.ListSegmentsAsync(Narrow(communeId), page.ToPageRequest(), ct));
 
+    /// <summary>One road segment, with its geometry as WKT.</summary>
+    [HttpGet("segments/{segmentId}")]
+    [ProducesResponseType<SegmentDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SegmentDetail>> SegmentAsync(string segmentId, CancellationToken ct)
+        => Ok(await service.SegmentAsync(segmentId, ct));
+
+    /// <summary>Feeders in the caller's communes, paged.</summary>
     [HttpGet("feeders")]
-    [ProducesResponseType<PagedResult<string>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<PagedResult<string>>> ListFeedersAsync(
+    [ProducesResponseType<PagedResult<FeederListItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<FeederListItem>>> ListFeedersAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
         => Ok(await service.ListFeedersAsync(Narrow(communeId), page.ToPageRequest(), ct));
 
+    /// <summary>One feeder. <c>geom_wkt</c> is null for the usual case of no surveyed cable route.</summary>
+    [HttpGet("feeders/{feederId}")]
+    [ProducesResponseType<FeederDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<FeederDetail>> FeederAsync(string feederId, CancellationToken ct)
+        => Ok(await service.FeederAsync(feederId, ct));
+
+    /// <summary>
+    /// Poles in the caller's communes, paged — the inventory list, NOT the map.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ Not to be confused with <c>GET /api/v1/poles</c> (BE-14), which is the map layer: bbox
+    /// required, GeoJSON, operational status. This one is a stocktake, and it carries the fields a
+    /// person reconciling a spreadsheet needs — including <c>external_ref</c>, which the map is
+    /// forbidden to emit.
+    /// </remarks>
     [HttpGet("poles")]
-    [ProducesResponseType<PagedResult<string>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<PagedResult<string>>> ListPolesAsync(
+    [ProducesResponseType<PagedResult<PoleListItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<PoleListItem>>> ListPolesAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
         => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), ct));
+
+    /// <summary>One pole, with its geometry as WKT and its segment's name resolved.</summary>
+    /// <remarks>
+    /// Outside the caller's commune this is <b>404</b>, not 403 — Contract section 7 wants absence
+    /// rather than a refusal that confirms the id exists somewhere else.
+    /// </remarks>
+    [HttpGet("poles/{poleId}")]
+    [ProducesResponseType<PoleDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PoleDetail>> PoleAsync(string poleId, CancellationToken ct)
+        => Ok(await service.PoleAsync(poleId, ct));
 
     [HttpPost("segments")]
     [Authorize(Policy = LuxMapPolicies.Administrator)]

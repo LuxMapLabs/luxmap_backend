@@ -280,3 +280,197 @@ public sealed record TopologyPole
 
     public required double Lng { get; init; }
 }
+
+// ── BE-12b — the READ shape for asset inventory ───────────────────────────────────────────────
+//
+// Contract section 5.3, decided 22/09/2026 after review with an independent agent against the WP5
+// repository. Replaces the PagedResult<string> placeholder that stood here since BE-12a.
+
+/// <summary>
+/// The lamp currently in service on a pole. <c>null</c> when the pole carries none.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Exactly ONE, never a list: <c>ux_fixture_pole_id_active</c> makes the lamp with no
+/// <c>removed_date</c> unique per pole (BE-REVIEW-02, constraint 3), so there is nothing to
+/// aggregate and no rule to invent.
+/// </para>
+/// <para>
+/// <b>Nested here, flat in Contract section 5.1 — and that is deliberate, not drift.</b> The map
+/// endpoint flattens these onto <c>properties</c> because MapLibre cannot read a nested object in a
+/// data expression. An inventory table has no such constraint, and nesting says "a pole may have no
+/// lamp" once instead of making five sibling fields separately nullable.
+/// </para>
+/// <para>
+/// Carries its OWN <c>data_source</c>. A lamp's provenance can differ from its pole's — the pole may
+/// come from public imagery while the lamp record was typed in from an inventory sheet.
+/// </para>
+/// </remarks>
+public sealed record ActiveFixture
+{
+    public required string FixtureId { get; init; }
+
+    public required FixtureType FixtureType { get; init; }
+
+    public required PowerSource PowerSource { get; init; }
+
+    public required int LampWatt { get; init; }
+
+    public required DateOnly InstallDate { get; init; }
+
+    public DateOnly? WarrantyExpiry { get; init; }
+
+    public required DataSource DataSource { get; init; }
+}
+
+/// <summary>Where an asset is, as a paginated list reports it.</summary>
+/// <remarks>
+/// <c>{lat, lng}</c> rather than GeoJSON: this is a paginated list, not a map layer, and Contract
+/// section 5.4 already published this exact shape for <c>GET /faults</c>. Reusing it beats inventing
+/// a second one. EPSG:4326 like everything that leaves the API.
+/// </remarks>
+public sealed record AssetLocation
+{
+    public required double Lat { get; init; }
+
+    public required double Lng { get; init; }
+}
+
+/// <summary>
+/// One pole in the inventory list.
+/// </summary>
+/// <remarks>
+/// <para>
+/// 🔴 <b>Shares nothing with Contract section 5.1 beyond identity.</b> No <c>fixture_status</c>, no
+/// <c>status_confidence</c>, no <c>open_fault_count</c>, no <c>last_seen_at</c>. Those belong to the
+/// OPERATIONAL view and asking two endpoints the same question is how they start disagreeing, with
+/// nothing to notice the day they do.
+/// </para>
+/// <para>
+/// <c>external_ref</c>, <c>data_source</c> and <c>feeder_id</c> ARE emitted here although section
+/// 5.1 forbids them on the map. That prohibition was written for the map; the three questions in
+/// <c>docs/review/BE-12b-read-shape.md</c> asked whether it binds the inventory surface too, and the
+/// answer was no — <c>external_ref</c> is the code the operator types during import and the only way
+/// to match a row on screen to a row in their spreadsheet; <c>data_source</c> is what keeps
+/// calibration data distinguishable from real; and <c>feeder_id</c> must be readable because
+/// <c>PUT</c> is a full replacement and an editor has to know the value it is preserving.
+/// </para>
+/// </remarks>
+public sealed record PoleListItem
+{
+    public required string PoleId { get; init; }
+
+    public string? ExternalRef { get; init; }
+
+    public required string SegmentId { get; init; }
+
+    /// <summary><c>null</c> when the pole is not wired to a circuit yet.</summary>
+    public string? FeederId { get; init; }
+
+    public required string CommuneId { get; init; }
+
+    public required DataSource DataSource { get; init; }
+
+    public required bool NearSensitivePoi { get; init; }
+
+    public required AssetLocation Location { get; init; }
+
+    /// <summary>
+    /// Carried in the LIST, not only the detail, because the inventory table shows lamp type and
+    /// wattage per row — a boolean would force one request per pole to fill a visible column.
+    /// </summary>
+    public ActiveFixture? ActiveFixture { get; init; }
+
+    public required DateTime UpdatedAt { get; init; }
+}
+
+/// <summary>One pole read on its own — the list row plus what only a detail view needs.</summary>
+public sealed record PoleDetail
+{
+    public required PoleListItem Pole { get; init; }
+
+    /// <summary>Resolved for display. The list omits it: one join per row for a label.</summary>
+    public required string SegmentName { get; init; }
+
+    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first — what a <c>PUT</c> body wants back.</summary>
+    public required string GeomWkt { get; init; }
+
+    public required DateTime CreatedAt { get; init; }
+}
+
+/// <summary>One road segment in the inventory list.</summary>
+public sealed record SegmentListItem
+{
+    public required string SegmentId { get; init; }
+
+    public string? ExternalRef { get; init; }
+
+    public required string SegmentName { get; init; }
+
+    public required RoadClass RoadClass { get; init; }
+
+    /// <summary>The DECLARED length, never <c>ST_Length</c> of the geometry (BE-10, rule 4).</summary>
+    public required double LengthM { get; init; }
+
+    public required string CommuneId { get; init; }
+
+    public required DataSource DataSource { get; init; }
+
+    /// <summary>⚠️ Counted within the CALLER'S commune scope, like every other read.</summary>
+    public required int PoleCount { get; init; }
+
+    public required DateTime UpdatedAt { get; init; }
+}
+
+/// <summary>One road segment read on its own.</summary>
+public sealed record SegmentDetail
+{
+    public required SegmentListItem Segment { get; init; }
+
+    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326.</summary>
+    public required string GeomWkt { get; init; }
+
+    public required DateTime CreatedAt { get; init; }
+}
+
+/// <summary>One feeder in the inventory list.</summary>
+/// <remarks>
+/// 🔴 <b>No <c>data_source</c>, and that is not an oversight.</b> Contract section 1.6 puts the field
+/// on eight entities and <c>Feeder</c> is not one of them. Inventing provenance for an entity that
+/// has none would make the API answer a question the database cannot.
+/// </remarks>
+public sealed record FeederListItem
+{
+    public required string FeederId { get; init; }
+
+    public string? ExternalRef { get; init; }
+
+    public required string FeederName { get; init; }
+
+    public required string CommuneId { get; init; }
+
+    /// <summary>
+    /// Whether a cable route was recorded, rather than the route itself.
+    /// </summary>
+    /// <remarks>
+    /// Branch C surveyed no cable routes, so this is <c>false</c> for almost every feeder. Shipping a
+    /// WKT column that is nearly always null in every list row costs bandwidth for nothing; the
+    /// detail endpoint carries the geometry for the one feeder a caller actually opened.
+    /// </remarks>
+    public required bool HasGeometry { get; init; }
+
+    public required int PoleCount { get; init; }
+
+    public required DateTime UpdatedAt { get; init; }
+}
+
+/// <summary>One feeder read on its own.</summary>
+public sealed record FeederDetail
+{
+    public required FeederListItem Feeder { get; init; }
+
+    /// <summary>WKT <c>LINESTRING</c>, or <c>null</c> — most feeders have no surveyed route.</summary>
+    public string? GeomWkt { get; init; }
+
+    public required DateTime CreatedAt { get; init; }
+}

@@ -9,6 +9,7 @@ using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
 using Npgsql;
 
 namespace LuxMap.Modules.Assets.Crud;
@@ -24,14 +25,109 @@ namespace LuxMap.Modules.Assets.Crud;
 /// </remarks>
 public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor)
 {
-    public Task<PagedResult<string>> ListSegmentsAsync(IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync<RoadSegment>(communes, page, segment => segment.SegmentId, ct);
+    // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
+    //
+    // These replace the PagedResult<string> placeholder BE-12a shipped. The three questions the
+    // placeholder was waiting on — emit external_ref? data_source? feeder_id? — were answered YES
+    // on 22/09/2026; docs/review/BE-12b-read-shape.md carries the reasoning.
 
-    public Task<PagedResult<string>> ListFeedersAsync(IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync<Feeder>(communes, page, feeder => feeder.FeederId, ct);
+    public Task<PagedResult<SegmentListItem>> ListSegmentsAsync(
+        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
+        => ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, ct);
 
-    public Task<PagedResult<string>> ListPolesAsync(IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync<Pole>(communes, page, pole => pole.PoleId, ct);
+    public Task<PagedResult<FeederListItem>> ListFeedersAsync(
+        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
+        => ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, ct);
+
+    public Task<PagedResult<PoleListItem>> ListPolesAsync(
+        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
+        => ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, ct);
+
+    /// <summary>One pole, read for the inventory screen.</summary>
+    /// <remarks>
+    /// <para>
+    /// Outside the caller's commune this is <b>404</b>, not 403: the query filter makes the row not
+    /// exist for them, and Contract section 7 asks for absence rather than a refusal that would
+    /// confirm the id is real somewhere else.
+    /// </para>
+    /// <para>
+    /// TWO queries for one asset, deliberately. The list projection is reused as-is so the detail
+    /// view cannot drift from the row a client just clicked; inlining it into a wider projection
+    /// would mean writing those fields twice, and two copies of a shape is how they start
+    /// disagreeing. A second round trip for a single row a human opened is the cheaper half of that
+    /// trade.
+    /// </para>
+    /// </remarks>
+    public async Task<PoleDetail> PoleAsync(string poleId, CancellationToken ct)
+    {
+        var poles = dbContext.Set<Pole>().AsNoTracking().Where(pole => pole.PoleId == poleId);
+
+        var item = await poles.Select(PoleRow).FirstOrDefaultAsync(ct) ?? throw NotFound("pole");
+
+        var extra = await poles
+            .Select(pole => new
+            {
+                pole.Geom,
+                pole.CreatedAt,
+                SegmentName = dbContext.Set<RoadSegment>()
+                    .Where(segment => segment.SegmentId == pole.SegmentId)
+                    .Select(segment => segment.SegmentName)
+                    .FirstOrDefault(),
+            })
+            .FirstAsync(ct);
+
+        return new PoleDetail
+        {
+            Pole = item,
+
+            // A pole always has a segment — NOT NULL with a real foreign key — so a missing name
+            // would mean the segment sits in another commune and the filter hid it. That happens on
+            // an inter_commune road and is legitimate, so the id still identifies it; the label is
+            // simply not this caller's to see.
+            SegmentName = extra.SegmentName ?? string.Empty,
+            GeomWkt = Wkt(extra.Geom),
+            CreatedAt = extra.CreatedAt,
+        };
+    }
+
+    /// <summary>One road segment, read for the inventory screen.</summary>
+    public async Task<SegmentDetail> SegmentAsync(string segmentId, CancellationToken ct)
+    {
+        var segments = dbContext.Set<RoadSegment>().AsNoTracking()
+            .Where(segment => segment.SegmentId == segmentId);
+
+        var item = await segments.Select(SegmentRow).FirstOrDefaultAsync(ct)
+            ?? throw NotFound("road segment");
+
+        var extra = await segments
+            .Select(segment => new { segment.Geom, segment.CreatedAt })
+            .FirstAsync(ct);
+
+        return new SegmentDetail { Segment = item, GeomWkt = Wkt(extra.Geom), CreatedAt = extra.CreatedAt };
+    }
+
+    /// <summary>One feeder, read for the inventory screen.</summary>
+    public async Task<FeederDetail> FeederAsync(string feederId, CancellationToken ct)
+    {
+        var feeders = dbContext.Set<Feeder>().AsNoTracking()
+            .Where(feeder => feeder.FeederId == feederId);
+
+        var item = await feeders.Select(FeederRow).FirstOrDefaultAsync(ct) ?? throw NotFound("feeder");
+
+        var extra = await feeders
+            .Select(feeder => new { feeder.Geom, feeder.CreatedAt })
+            .FirstAsync(ct);
+
+        return new FeederDetail
+        {
+            Feeder = item,
+
+            // Null, not an empty string. Branch C surveyed no cable routes, so "no route recorded"
+            // is the normal case and must stay distinguishable from a route that happens to be empty.
+            GeomWkt = extra.Geom is null ? null : Wkt(extra.Geom),
+            CreatedAt = extra.CreatedAt,
+        };
+    }
 
     public async Task<string> CreateSegmentAsync(CreateSegmentRequest request, CancellationToken ct)
     {
@@ -497,10 +593,19 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         return PagedResult<TopologyPole>.From(page, total, items);
     }
 
-    private async Task<PagedResult<string>> ListAsync<TEntity>(
+    /// <summary>
+    /// The one paginated list body all three asset types share.
+    /// </summary>
+    /// <remarks>
+    /// Generic over the PROJECTION as well as the entity since BE-12b, so that the ordering rule
+    /// below stays written down exactly once. It is a rule with a sharp edge and three call sites;
+    /// three copies of it would be three chances to get it wrong.
+    /// </remarks>
+    private async Task<PagedResult<TItem>> ListAsync<TEntity, TItem>(
         IReadOnlyList<string>? communes,
         PageRequest page,
         System.Linq.Expressions.Expression<Func<TEntity, string>> id,
+        System.Linq.Expressions.Expression<Func<TEntity, TItem>> projection,
         CancellationToken ct)
         where TEntity : class, ICommuneScoped
     {
@@ -531,11 +636,92 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
             .ThenBy(id)
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(id)
+            .Select(projection)
             .ToListAsync(ct);
 
-        return PagedResult<string>.From(page, total, items);
+        return PagedResult<TItem>.From(page, total, items);
     }
+
+    // ── BE-12b projections ────────────────────────────────────────────────────────────────────
+    //
+    // Held as expressions rather than methods so EF translates them into SQL, and shared between the
+    // list and the detail read so one asset cannot describe itself two ways.
+
+    /// <remarks>
+    /// The active lamp is a correlated sub-query, not an Include: one row per pole either way, and
+    /// a join would multiply the pole across its retired lamps before being collapsed again.
+    /// </remarks>
+    private static readonly System.Linq.Expressions.Expression<Func<Pole, PoleListItem>> PoleRow =
+        pole => new PoleListItem
+        {
+            PoleId = pole.PoleId,
+            ExternalRef = pole.ExternalRef,
+            SegmentId = pole.SegmentId,
+            FeederId = pole.FeederId,
+            CommuneId = pole.CommuneId,
+            DataSource = pole.DataSource,
+            NearSensitivePoi = pole.NearSensitivePoi,
+            Location = new AssetLocation { Lat = pole.Geom.Y, Lng = pole.Geom.X },
+            ActiveFixture = pole.Fixtures
+                .Where(lamp => lamp.RemovedDate == null)
+                .Select(lamp => new ActiveFixture
+                {
+                    FixtureId = lamp.FixtureId,
+                    FixtureType = lamp.FixtureType,
+                    PowerSource = lamp.PowerSource,
+                    LampWatt = lamp.LampWatt,
+                    InstallDate = lamp.InstallDate,
+                    WarrantyExpiry = lamp.WarrantyExpiry,
+                    DataSource = lamp.DataSource,
+                })
+                .FirstOrDefault(),
+            UpdatedAt = pole.UpdatedAt,
+        };
+
+    private System.Linq.Expressions.Expression<Func<RoadSegment, SegmentListItem>> SegmentRow =>
+        segment => new SegmentListItem
+        {
+            SegmentId = segment.SegmentId,
+            ExternalRef = segment.ExternalRef,
+            SegmentName = segment.SegmentName,
+            RoadClass = segment.RoadClass,
+            LengthM = segment.LengthM,
+            CommuneId = segment.CommuneId,
+            DataSource = segment.DataSource,
+
+            // ⚠️ Counted through the query filter, so it is the number of poles THIS CALLER can see.
+            // On an inter_commune road that is not the whole road, and it must not be: reporting a
+            // count the caller cannot then list would be a way to probe another commune's data.
+            PoleCount = dbContext.Set<Pole>().Count(pole => pole.SegmentId == segment.SegmentId),
+            UpdatedAt = segment.UpdatedAt,
+        };
+
+    private System.Linq.Expressions.Expression<Func<Feeder, FeederListItem>> FeederRow =>
+        feeder => new FeederListItem
+        {
+            FeederId = feeder.FeederId,
+            ExternalRef = feeder.ExternalRef,
+            FeederName = feeder.FeederName,
+            CommuneId = feeder.CommuneId,
+            HasGeometry = feeder.Geom != null,
+            PoleCount = dbContext.Set<Pole>().Count(pole => pole.FeederId == feeder.FeederId),
+            UpdatedAt = feeder.UpdatedAt,
+        };
+
+    /// <summary>Geometry as WKT for a detail read.</summary>
+    /// <remarks>
+    /// EPSG:4326, straight off the column. <c>WKTWriter</c> emits no SRID and none is wanted: every
+    /// coordinate this API returns is 4326 (Contract section 1.5), and 3405 never leaves the SQL
+    /// tree (BE-10, rule 3). The string is the shape a <c>PUT</c> body takes back, so an editor can
+    /// round-trip a geometry it did not mean to change.
+    /// </remarks>
+    private static string Wkt(Geometry geometry) => new WKTWriter().Write(geometry);
+
+    private static LuxMapException NotFound(string what)
+        => new(
+            ErrorCodes.AssetNotFound,
+            HttpStatusCode.NotFound,
+            $"That {what} does not exist, or it is outside your permitted commune scope.");
 
     /// <summary>The commune must exist AND be inside the caller's scope, or this is a 403.</summary>
     private async Task<string> CheckedCommuneAsync(string communeId, CancellationToken ct)
