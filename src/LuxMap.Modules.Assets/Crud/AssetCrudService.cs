@@ -422,7 +422,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     {
         await RequireAsync<Feeder>(feeder => feeder.FeederId == feederId, "feeder", ct);
 
-        return await TopologyPageAsync(pole => pole.FeederId == feederId, page, withPowerSource: false, ct);
+        return await TopologyPageAsync(pole => pole.FeederId == feederId, page, ct);
     }
 
     /// <summary>Every pole on one road segment.</summary>
@@ -437,14 +437,15 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     {
         await RequireAsync<RoadSegment>(segment => segment.SegmentId == segmentId, "road segment", ct);
 
-        return await TopologyPageAsync(pole => pole.SegmentId == segmentId, page, withPowerSource: false, ct);
+        return await TopologyPageAsync(pole => pole.SegmentId == segmentId, page, ct);
     }
 
-    /// <summary>Poles on no circuit — what CV-05 still has to place, plus every solar pole.</summary>
+    /// <summary>Poles on no circuit — what CV-05 still has to place.</summary>
     /// <remarks>
-    /// This listing is the ONE that carries <c>power_source</c>, because it is the only one where the
-    /// caller has to separate "solar, so it has no circuit" from "nobody has assigned it yet". Both
-    /// are <c>feeder_id = NULL</c> and indistinguishable without it.
+    /// ⚠️ This listing used to carry <c>power_source</c> so the caller could separate "solar, so it
+    /// has no circuit" from "nobody has assigned it yet". Solar lighting left the project scope on
+    /// 22/09/2026, so there is no longer a pole that legitimately has none — every row here is work
+    /// still to do, and the field was removed rather than left returning one constant.
     /// </remarks>
     public Task<PagedResult<TopologyPole>> ListPolesWithoutFeederAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
@@ -453,26 +454,19 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
             ? (System.Linq.Expressions.Expression<Func<Pole, bool>>)(pole => pole.FeederId == null)
             : pole => pole.FeederId == null && communes.Contains(pole.CommuneId);
 
-        return TopologyPageAsync(scoped, page, withPowerSource: true, ct);
+        return TopologyPageAsync(scoped, page, ct);
     }
 
     /// <summary>The one query body the three topology listings share.</summary>
     /// <remarks>
     /// <para>
-    /// <c>power_source</c> comes from the pole's ACTIVE lamp — the one with no <c>removed_date</c> —
-    /// and BE-REVIEW-02 constraint 3 made that unique per pole (<c>ux_fixture_pole_id_active</c>), so
-    /// there is exactly one to read and no aggregation rule to invent. A pole with no lamp at all
-    /// reports null rather than a guess.
-    /// </para>
-    /// <para>
-    /// Projected in ONE query rather than loading poles and then their lamps: the N+1 that
-    /// BE-REVIEW-02 finding F-03 already had to remove once.
+    /// Projected in ONE query rather than loading poles and then reading anything per row: the N+1
+    /// that BE-REVIEW-02 finding F-03 already had to remove once.
     /// </para>
     /// </remarks>
     private async Task<PagedResult<TopologyPole>> TopologyPageAsync(
         System.Linq.Expressions.Expression<Func<Pole, bool>> predicate,
         PageRequest page,
-        bool withPowerSource,
         CancellationToken ct)
     {
         var query = dbContext.Set<Pole>().AsNoTracking().Where(predicate);
@@ -494,12 +488,6 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 PoleId = pole.PoleId,
                 SegmentId = pole.SegmentId,
                 FeederId = pole.FeederId,
-                PowerSource = withPowerSource
-                    ? pole.Fixtures
-                        .Where(lamp => lamp.RemovedDate == null)
-                        .Select(lamp => (PowerSource?)lamp.PowerSource)
-                        .FirstOrDefault()
-                    : null,
                 // EPSG:4326 straight off the column. 3405 never leaves the SQL tree (BE-10, rule 3).
                 Lat = pole.Geom.Y,
                 Lng = pole.Geom.X,

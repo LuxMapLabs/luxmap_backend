@@ -127,50 +127,14 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
         Assert.Contains(across, ids);
     }
 
-    /// <summary>
-    /// The unassigned listing carries <c>power_source</c>, and it comes from the ACTIVE lamp.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// This is the field that separates "solar, so it has no circuit" from "nobody has assigned it
-    /// yet". Both are <c>feeder_id = NULL</c> in the database and identical without it, and CV-05 has
-    /// to tell them apart to know what work is left.
-    /// </para>
-    /// <para>
-    /// Reading it from the ACTIVE lamp is not arbitrary: BE-REVIEW-02 constraint 3 made that lamp
-    /// unique per pole, so there is exactly one to read and no aggregation rule to invent. The
-    /// retired lamp planted here has the OPPOSITE power source, so a version that read any lamp
-    /// would return grid and this test would fail.
-    /// </para>
-    /// </remarks>
-    [Fact]
-    public async Task Power_source_is_read_from_the_lamp_in_service_not_a_retired_one()
-    {
-        var client = await fixture.AdminClientAsync();
-        var segmentId = await NewSegmentAsync(fixture.CommuneId);
-        var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
-
-        await AddFixtureAsync(poleId, PowerSource.Grid, retired: true);
-        await AddFixtureAsync(poleId, PowerSource.Solar, retired: false);
-
-        var item = await FindPoleAsync(client, Unassigned, poleId);
-
-        Assert.Equal("solar", item.GetProperty("power_source").GetString());
-        Assert.Equal(JsonValueKind.Null, item.GetProperty("feeder_id").ValueKind);
-    }
-
-    /// <summary>A pole with no lamp at all reports null rather than a guess.</summary>
-    [Fact]
-    public async Task A_pole_with_no_lamp_reports_no_power_source()
-    {
-        var client = await fixture.AdminClientAsync();
-        var segmentId = await NewSegmentAsync(fixture.CommuneId);
-        var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
-
-        var item = await FindPoleAsync(client, Unassigned, poleId);
-
-        Assert.Equal(JsonValueKind.Null, item.GetProperty("power_source").ValueKind);
-    }
+    // ⚠️ Two tests stood here until 22/09/2026 — one pinning that power_source came from the lamp
+    // IN SERVICE, one that a pole with no lamp reported null. Both went with the field itself when
+    // solar lighting left the project scope: power_source existed on this listing only to separate
+    // "solar, so no circuit" from "not assigned yet", and that distinction no longer exists.
+    //
+    // The RULE they protected is still protected. BE-14's map endpoint still flattens the active
+    // lamp, and Installation_fields_come_from_the_lamp_in_service covers it there with the same
+    // retired-lamp trap. Coverage moved; it did not disappear.
 
     /// <summary>A pole that HAS a circuit is absent from the unassigned listing.</summary>
     [Fact]
@@ -304,7 +268,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
         var item = (await ReadPageAsync(client, $"{Feeders}/{feederId}/poles")).GetProperty("items")[0];
         var keys = item.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
 
-        string[] expected = ["pole_id", "segment_id", "feeder_id", "power_source", "lat", "lng"];
+        string[] expected = ["pole_id", "segment_id", "feeder_id", "lat", "lng"];
 
         Assert.Equal(
             [.. expected.Order(StringComparer.Ordinal)],
@@ -414,31 +378,6 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
                 db.Set<Pole>().Add(pole);
                 await db.SaveChangesAsync();
                 return pole.PoleId;
-            }
-        });
-
-    private Task AddFixtureAsync(string poleId, PowerSource power, bool retired)
-        => fixture.QueryAsync(async db =>
-        {
-            using (db.EnterUnscopedSystemWriteBackdoor())
-            {
-                var pole = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.PoleId == poleId);
-
-                db.Set<Fixture>().Add(new Fixture
-                {
-                    PoleId = poleId,
-                    CommuneId = pole.CommuneId,
-                    FixtureType = power == PowerSource.Solar
-                        ? FixtureType.SolarAllInOne
-                        : FixtureType.LedRoadLamp,
-                    PowerSource = power,
-                    LampWatt = 80,
-                    InstallDate = new DateOnly(2026, 1, 1),
-                    RemovedDate = retired ? new DateOnly(2026, 6, 1) : null,
-                    DataSource = DataSource.PublicImagery,
-                });
-
-                return await db.SaveChangesAsync();
             }
         });
 }

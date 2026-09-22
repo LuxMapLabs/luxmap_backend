@@ -1,13 +1,18 @@
-# LuxMap — API Contract v1.5 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.6 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
 `api-contract-v1.1.md`** để mọi liên kết cũ vẫn đúng (quyết định D-1, Dylan, 18/09/2026).
 **Ngày chốt v1.0:** 23/08/2026 · **v1.1:** 24/08/2026 · **v1.2:** 11/09/2026 (mục 4 Auth) ·
 **v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02) ·
-**v1.5:** 19/09/2026 (`GET /auth/me`).
+**v1.5:** 19/09/2026 (`GET /auth/me`) · **v1.6:** 22/09/2026 (bỏ đèn solar khỏi enum).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
+
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
+`luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
+tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
 **Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (37 operation: 22
 `implemented`, 15 `not_implemented`), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
@@ -198,8 +203,8 @@ JWT mang claim `commune_ids` (mảng). Quản trị mang `["*"]`.
 
 ```
 fixture_status : normal | dim | out | unknown
-power_source   : grid | solar
-fixture_type   : led_road_lamp | solar_all_in_one
+power_source   : grid
+fixture_type   : led_road_lamp
 fault_type     : lamp_out | lamp_dim | segment_outage | node_offline | runtime_decline
 fault_status   : detected | confirmed | rejected | in_progress | resolved | verified
 severity       : low | medium | high | critical
@@ -212,6 +217,13 @@ road_class     : inter_commune | inter_village
 user_role      : management_agency | maintenance_engineer | field_crew | administrator
 ```
 
+- 🔴 **`power_source` và `fixture_type` còn MỘT giá trị kể từ v1.6 (22/09/2026).** Đèn năng lượng
+  mặt trời ra khỏi phạm vi đồ án, nên `solar` và `solar_all_in_one` bị **xoá khỏi enum**, không phải
+  để lại không dùng: một giá trị enum mà không gì sinh ra được là giá trị mà ticket sau sẽ tưởng
+  mình được phép ghi. CHECK ở DB đã siết theo (migration `DropSolarFixtures`), và bộ mock FO-26 đổi
+  45 cột solar sang `grid`.
+  **Phần PIN thì không đi theo:** IoT vẫn đo runtime và `runtime_decline` **vẫn là `fault_type` hợp
+  lệ** — giờ sáng của đèn lưới cũng suy giảm được. Chỉ cái ĐÈN solar là hết.
 - `unknown` ≠ lỗi (sweep gần nhất không phủ được cột). Ký hiệu riêng, **không gộp vào `out`**.
 - `dim` là giá trị cốt lõi của đề tài → màu phải phân biệt rõ ở cả zoom xa.
 - `runtime_decline` chỉ từ IoT; `lamp_dim`/`lamp_out` chỉ từ CV; một cột có thể mang cả hai.
@@ -568,10 +580,9 @@ Vector tile khi vượt ~5000 cột; realtime khi sweep xong (giai đoạn 1 pol
 ## 8. Bộ mock FO-26 và việc FE làm được ngay
 
 `mocks/`: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), cụm lỗi cả đoạn trên `SEG-003`,
-**12 IoT node**, `POLE-0047` (solar, `dim`, `NODE-047`, runtime suy giảm 18 đêm). Mock đã khớp bảng
+**12 IoT node**, `POLE-0047` (`dim`, `NODE-047`, runtime suy giảm 18 đêm — v1.6 đổi cột này sang `grid`, chuỗi runtime giữ nguyên). Mock đã khớp bảng
 prefix mục 1.2 từ 18/09/2026 (`NODE-047`, `SWP-001..030`, `FRM-088213`, `USR-004`; bỏ `supplier`) —
-**WP5/WP6 phải kéo lại**. Việc FE làm được ngay: map shell MapLibre + 4 file mock; symbology 4 màu +
-grid/solar + icon `has_iot_node`/`near_sensitive_poi`; cluster ở zoom xa; panel chi tiết với 2 biểu đồ
+**WP5/WP6 phải kéo lại**. Việc FE làm được ngay: map shell MapLibre + 4 file mock; symbology 4 màu + icon `has_iot_node`/`near_sensitive_poi`; cluster ở zoom xa; panel chi tiết với 2 biểu đồ
 (`baseline_ratio` + ngưỡng, `runtime_hours`); state map vào URL; bảng lỗi theo `priority_score`;
 highlight `SEG-003`.
 
@@ -592,6 +603,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.6 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BREAKING, thu hẹp enum.** `power_source` còn `grid`; `fixture_type` còn `led_road_lamp`. Đèn solar ra khỏi phạm vi đồ án. Xoá giá trị thay vì để lại không dùng — giá trị enum không ai sinh ra được là giá trị ticket sau tưởng mình được ghi. Kèm migration `DropSolarFixtures` (đổi 45 hàng RỒI mới siết CHECK — ngược lại là migration gãy), bộ mock FO-26 đổi 45 cột, và bỏ `power_source` khỏi listing cột-chưa-gán của BE-13 (trường đó chỉ sinh ra để tách "solar nên không mạch" khỏi "chưa ai gán"). **`runtime_decline` GIỮ NGUYÊN** — chỉ đèn solar bị bỏ, phần runtime/IoT thì không. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.5 | 19/09/2026 | **Dylan** | Thêm mục 4.7 `GET /api/v1/auth/me`. Không đổi hình dạng nào đã publish: 7 endpoint auth cũ giữ nguyên từng byte. Lý do: login chỉ trả token, và access token không mang `full_name`/`email` còn `commune_ids` thì đứng yên 60 phút |
 | v1.4 | 18/09/2026 | **Dylan** (BE-REVIEW-02) | Hợp nhất ba nguồn. Gộp và đóng drift 2, 3, 4, 6, 7, 8, 10, 12, 14, 15, 17–21, 27–31, 33–39, 43 và quyết định A–E; mã lỗi mới `ROLE_FORBIDDEN` (D-4), `CROSS_COMMUNE_REFERENCE` (D-5), `POLE_HAS_ACTIVE_FIXTURE` (D-11); một bóng đang dùng/cột (D-11) và `removed_date >= install_date` (Q-4); `data_source` tám entity + mặc định loại `calibration_rig` (D-13); `user_role` + EXACT-ROLE + bảng ghi (D-14); fault MỞ (O-7 cũ); `commune_id` trong `POST /faults` (O-10 cũ); `from`/`to` không `Z` = UTC (D-12); `status_confidence` hữu hạn 0..1; mock đổi ID (D-9); §4 số liệu mock cập nhật. Đánh số mục lại, bảng ánh xạ ở đầu file |
 | v1.3 | 15/09/2026 | Dylan | **BREAKING** `GET /poles/{id}/lux-readings` → `GET /lux-readings/poles/{id}` |

@@ -220,7 +220,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 |---|---|---|---|
 | `external_ref` | **Có** | text | Mã cột của đơn vị quản lý. `fixtures.csv` trỏ về bằng `pole_external_ref`. Trùng trong cùng xã → **UPDATE** |
 | `segment_external_ref` | **Có** | text | Khớp `external_ref` trong `segments.csv`. Không khớp → lỗi theo dòng |
-| `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. **Để trống với cột solar** — cột `solar_all_in_one` không nối lưới nào |
+| `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. Để trống = cột chưa gán mạch. ⚠️ Trước Contract v1.6 ô này để trống với cột solar; đèn solar nay đã hết nên **mọi cột đều nên có tủ điện** |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | **Có** | Point | `geometry(Point,4326)`, NOT NULL |
 | `near_sensitive_poi` | Không | bool | `true` / `false`. Mặc định `false`. Gần trường học, chợ, cầu, ngã ba |
@@ -231,8 +231,8 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
 | `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã có bóng → lỗi theo dòng** (insert-only) |
-| `fixture_type` | **Có** | enum | `led_road_lamp` · `solar_all_in_one` — `ck_fixture_fixture_type` |
-| `power_source` | **Có** | enum | `grid` · `solar` — `ck_fixture_power_source` |
+| `fixture_type` | **Có** | enum | `led_road_lamp` — **giá trị duy nhất** từ Contract v1.6 (`ck_fixture_fixture_type`) |
+| `power_source` | **Có** | enum | `grid` — **giá trị duy nhất** từ Contract v1.6 — `ck_fixture_power_source` |
 | `lamp_watt` | **Có** | integer | |
 | `install_date` | **Có** | date | `YYYY-MM-DD` |
 | `removed_date` | Không | date | Để trống nghĩa là bóng **đang lắp**. Thay bóng thì điền vào dòng cũ và thêm một dòng mới |

@@ -156,8 +156,8 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
             {
                 PoleId = poleId,
                 CommuneId = fixture.CommuneId,
-                FixtureType = FixtureType.SolarAllInOne,
-                PowerSource = PowerSource.Solar,
+                FixtureType = FixtureType.LedRoadLamp,
+                PowerSource = PowerSource.Grid,
                 LampWatt = 60,
                 InstallDate = new DateOnly(2023, 1, 4),
                 WarrantyExpiry = new DateOnly(2028, 1, 4),

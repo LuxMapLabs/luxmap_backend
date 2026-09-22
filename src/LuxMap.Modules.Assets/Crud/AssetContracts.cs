@@ -259,6 +259,13 @@ public sealed record UpdatePoleRequest
 /// <c>/segments/{id}/poles</c> and <c>/feeders/{id}/poles</c> share one item type and a result set
 /// merged from several calls still describes itself.
 /// </para>
+/// <para>
+/// ⚠️ <b>It used to carry <c>power_source</c>, and that field was REMOVED on 22/09/2026.</b> Its only
+/// job was to separate "this pole is solar, so it has no circuit" from "nobody has assigned this pole
+/// yet" — both being <c>feeder_id = NULL</c>. Solar lighting left the project scope, so there is no
+/// longer a pole that legitimately has no circuit, and the distinction it existed to draw no longer
+/// exists. Every unassigned pole is now simply unassigned.
+/// </para>
 /// </remarks>
 public sealed record TopologyPole
 {
@@ -268,16 +275,6 @@ public sealed record TopologyPole
 
     /// <summary>Null for a pole on no circuit — a fact, not a missing value.</summary>
     public string? FeederId { get; init; }
-
-    /// <summary>
-    /// ⚠️ Present ONLY on the unassigned listing, null elsewhere.
-    /// </summary>
-    /// <remarks>
-    /// It is the one field that separates "this pole is solar, so it has no circuit" from "nobody has
-    /// assigned this pole yet". Both are <c>feeder_id = NULL</c> in the database and look identical
-    /// without it, and CV-05 has to tell them apart to know what is left to do.
-    /// </remarks>
-    public PowerSource? PowerSource { get; init; }
 
     public required double Lat { get; init; }
 

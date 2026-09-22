@@ -8,8 +8,8 @@
   "lng": 106.492025
  },
  "fixture": {
-  "fixture_type": "solar_all_in_one",
-  "power_source": "solar",
+  "fixture_type": "led_road_lamp",
+  "power_source": "grid",
   "lamp_watt": 60,
   "install_date": "2023-01-04",
   "warranty_expiry": "2028-01-04"

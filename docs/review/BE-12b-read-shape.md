@@ -147,7 +147,7 @@ sau khi WP5 bắt đầu thì không còn đổi miễn phí được nữa.
   "geom_wkt": "POINT(106.502058 10.972447)",
   "segment_name": "Đường liên thôn 3",
   "active_fixture": {
-    "fixture_id": "FIX-0047", "fixture_type": "solar_all_in_one", "power_source": "solar",
+    "fixture_id": "FIX-0047", "fixture_type": "led_road_lamp", "power_source": "grid",
     "lamp_watt": 60, "install_date": "2024-03-18", "warranty_expiry": "2027-03-18"
   },
   "created_at": "...", "updated_at": "..." }

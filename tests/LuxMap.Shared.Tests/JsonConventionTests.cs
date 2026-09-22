@@ -26,7 +26,7 @@ public class JsonConventionTests
         "SEG-003",
         FixtureStatus.Dim,
         0.82,
-        PowerSource.Solar,
+        PowerSource.Grid,
         new DateOnly(2023, 1, 4),
         new DateTime(2026, 8, 20, 4, 0, 0, DateTimeKind.Utc),
         2,
