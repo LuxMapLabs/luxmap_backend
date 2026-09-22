@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.5, 19/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 30 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.5, 19/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 32 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
     "version": "1.5"
   },
   "paths": {
@@ -2679,6 +2679,270 @@
         "x-luxmap-contract": "§5.7"
       }
     },
+    "/api/v1/poles": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "power_source",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PowerSource"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "has_open_fault",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolePropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolePropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolePropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
+        "operationId": "getPoles",
+        "x-luxmap-status": "implemented"
+      }
+    },
+    "/api/v1/segments": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Bản đồ tuyến theo bbox; FeatureCollection của LineString",
+        "operationId": "getSegments",
+        "x-luxmap-status": "implemented"
+      }
+    },
     "/api/v1/auth/web/login": {
       "post": {
         "tags": [
@@ -2935,135 +3199,6 @@
         "x-luxmap-contract": "§4.2"
       }
     },
-    "/api/v1/poles": {
-      "get": {
-        "tags": [
-          "Poles"
-        ],
-        "summary": "[NOT IMPLEMENTED] Cột đèn trên bản đồ theo bbox (FeatureCollection)",
-        "description": "Contract §5.1. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
-        "operationId": "getPoles",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§5.1",
-        "x-luxmap-ticket": "BE-14",
-        "parameters": [
-          {
-            "name": "bbox",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?$"
-            },
-            "description": "minLng,minLat,maxLng,maxLat — EPSG:4326. BẮT BUỘC, không có endpoint lấy tất cả."
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "CSV của fixture_status"
-            },
-            "description": "CSV enum, ví dụ dim,out"
-          },
-          {
-            "name": "power_source",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/PowerSource"
-            }
-          },
-          {
-            "name": "segment_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/SegmentId"
-            }
-          },
-          {
-            "name": "commune_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/CommuneId"
-            },
-            "description": "Thu hẹp trong phạm vi được phép; ngoài phạm vi → 403"
-          },
-          {
-            "name": "has_open_fault",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "data_source",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/DataSource"
-            },
-            "description": "Mặc định LOẠI calibration_rig; truyền tường minh để thấy bộ hiệu chuẩn (Contract §1.6)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "FeatureCollection",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PoleFeatureCollection"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_FAILED — thiếu bbox",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "COMMUNE_FORBIDDEN — commune_id ngoài phạm vi (§7)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "BBOX_TOO_LARGE — quá 2000 cột; FE hiển thị 'Phóng to để xem chi tiết'",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/poles/{pole_id}": {
       "get": {
         "tags": [
@@ -3098,90 +3233,6 @@
           },
           "404": {
             "description": "Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/segments": {
-      "get": {
-        "tags": [
-          "Segments"
-        ],
-        "summary": "[NOT IMPLEMENTED] Đoạn đường theo bbox (FeatureCollection của LineString)",
-        "description": "Contract §5.2. Chưa có code — ticket BE-14. Giữ trong Contract, không xoá.",
-        "operationId": "getSegments",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§5.2",
-        "x-luxmap-ticket": "BE-14",
-        "parameters": [
-          {
-            "name": "bbox",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?$"
-            },
-            "description": "minLng,minLat,maxLng,maxLat — EPSG:4326. BẮT BUỘC, không có endpoint lấy tất cả."
-          },
-          {
-            "name": "commune_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/CommuneId"
-            }
-          },
-          {
-            "name": "data_source",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/DataSource"
-            },
-            "description": "Mặc định LOẠI calibration_rig (Contract §1.6)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "FeatureCollection",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SegmentFeatureCollection"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_FAILED — thiếu bbox",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "COMMUNE_FORBIDDEN",
             "content": {
               "application/json": {
                 "schema": {
@@ -4432,8 +4483,7 @@
           "out",
           "unknown"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — fixture_status. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "FixtureType": {
         "enum": [
@@ -4441,6 +4491,20 @@
           "solar_all_in_one"
         ],
         "type": "string"
+      },
+      "Geometry": {
+        "required": [
+          "coordinates",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "coordinates": {}
+        },
+        "additionalProperties": false
       },
       "ImportResult": {
         "type": "object",
@@ -4696,6 +4760,130 @@
         },
         "additionalProperties": false
       },
+      "PoleProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Contract §5.1 — 15 thuộc tính phẳng. Không có data_source / external_ref / feeder_id (không emit).",
+        "required": [
+          "pole_id",
+          "segment_id",
+          "fixture_status",
+          "power_source",
+          "fixture_type",
+          "lamp_watt",
+          "install_date",
+          "commune_id",
+          "open_fault_count",
+          "has_iot_node",
+          "near_sensitive_poi"
+        ],
+        "properties": {
+          "pole_id": {
+            "$ref": "#/components/schemas/PoleId"
+          },
+          "segment_id": {
+            "$ref": "#/components/schemas/SegmentId"
+          },
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "maximum": 1,
+            "nullable": true,
+            "description": "null khi và chỉ khi fixture_status = unknown (CHECK ck_pole_current_status_confidence_matches_status)"
+          },
+          "power_source": {
+            "$ref": "#/components/schemas/PowerSource"
+          },
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "install_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "commune_id": {
+            "$ref": "#/components/schemas/CommuneId"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_sweep_id": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^SWP-[0-9]{3,}$"
+          },
+          "open_fault_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "description": "Đếm theo tập fault MỞ = detected|confirmed|in_progress (Contract §3.2)"
+          },
+          "has_iot_node": {
+            "type": "boolean"
+          },
+          "near_sensitive_poi": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PolePropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/PoleProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolePropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "PowerSource": {
         "enum": [
           "grid",
@@ -4800,6 +4988,92 @@
           "inter_village"
         ],
         "type": "string"
+      },
+      "SegmentProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Contract §5.2 — 7 thuộc tính. commune_id / data_source / external_ref KHÔNG emit.",
+        "required": [
+          "segment_id",
+          "segment_name",
+          "road_class",
+          "length_m",
+          "pole_count",
+          "has_active_segment_fault"
+        ],
+        "properties": {
+          "segment_id": {
+            "$ref": "#/components/schemas/SegmentId"
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "road_class": {
+            "$ref": "#/components/schemas/RoadClass"
+          },
+          "length_m": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Giá trị KHAI BÁO, không dẫn xuất từ ST_Length"
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "controller_node_id": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^NODE-[0-9]{3,}$"
+          },
+          "has_active_segment_fault": {
+            "type": "boolean",
+            "description": "true → FE highlight cả tuyến (đầu ra CV-15)"
+          }
+        }
+      },
+      "SegmentPropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/SegmentProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SegmentPropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentPropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "SetPoleFeederRequest": {
         "type": "object",
@@ -5184,87 +5458,6 @@
           }
         }
       },
-      "PoleProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Contract §5.1 — 15 thuộc tính phẳng. Không có data_source / external_ref / feeder_id (không emit).",
-        "required": [
-          "pole_id",
-          "segment_id",
-          "fixture_status",
-          "power_source",
-          "fixture_type",
-          "lamp_watt",
-          "install_date",
-          "commune_id",
-          "open_fault_count",
-          "has_iot_node",
-          "near_sensitive_poi"
-        ],
-        "properties": {
-          "pole_id": {
-            "$ref": "#/components/schemas/PoleId"
-          },
-          "segment_id": {
-            "$ref": "#/components/schemas/SegmentId"
-          },
-          "fixture_status": {
-            "$ref": "#/components/schemas/FixtureStatus"
-          },
-          "status_confidence": {
-            "type": "number",
-            "format": "double",
-            "minimum": 0,
-            "maximum": 1,
-            "nullable": true,
-            "description": "null khi và chỉ khi fixture_status = unknown (CHECK ck_pole_current_status_confidence_matches_status)"
-          },
-          "power_source": {
-            "$ref": "#/components/schemas/PowerSource"
-          },
-          "fixture_type": {
-            "$ref": "#/components/schemas/FixtureType"
-          },
-          "lamp_watt": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "install_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "warranty_expiry": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          },
-          "commune_id": {
-            "$ref": "#/components/schemas/CommuneId"
-          },
-          "last_seen_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "last_sweep_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^SWP-[0-9]{3,}$"
-          },
-          "open_fault_count": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0,
-            "description": "Đếm theo tập fault MỞ = detected|confirmed|in_progress (Contract §3.2)"
-          },
-          "has_iot_node": {
-            "type": "boolean"
-          },
-          "near_sensitive_poi": {
-            "type": "boolean"
-          }
-        }
-      },
       "PoleFeature": {
         "type": "object",
         "required": [
@@ -5308,49 +5501,6 @@
             "items": {
               "$ref": "#/components/schemas/PoleFeature"
             }
-          }
-        }
-      },
-      "SegmentProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Contract §5.2 — 7 thuộc tính. commune_id / data_source / external_ref KHÔNG emit.",
-        "required": [
-          "segment_id",
-          "segment_name",
-          "road_class",
-          "length_m",
-          "pole_count",
-          "has_active_segment_fault"
-        ],
-        "properties": {
-          "segment_id": {
-            "$ref": "#/components/schemas/SegmentId"
-          },
-          "segment_name": {
-            "type": "string"
-          },
-          "road_class": {
-            "$ref": "#/components/schemas/RoadClass"
-          },
-          "length_m": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Giá trị KHAI BÁO, không dẫn xuất từ ST_Length"
-          },
-          "pole_count": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "controller_node_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^NODE-[0-9]{3,}$"
-          },
-          "has_active_segment_fault": {
-            "type": "boolean",
-            "description": "true → FE highlight cả tuyến (đầu ra CV-15)"
           }
         }
       },

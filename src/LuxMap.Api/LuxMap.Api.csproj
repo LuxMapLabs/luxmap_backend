@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Map\LuxMap.Modules.Map.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.WorkOrders\LuxMap.Modules.WorkOrders.csproj" />

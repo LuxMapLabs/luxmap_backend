@@ -49,17 +49,25 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
         // pair is FIXED by the width — unlike the decade below it cannot be moved to a free range, so
         // the precondition is stated rather than worked around.
         await RequireFreeAsync(9999, 10000, 10001, 10002);
+        var restore = await PoleSequenceAsync();
         await SetPoleSequenceAsync(9998);
 
-        var ids = new List<string>
+        try
         {
-            await InsertPoleAsync(),
-            await InsertPoleAsync(),
-            await InsertPoleAsync(),
-            await InsertPoleAsync(),
-        };
+            var ids = new List<string>
+            {
+                await InsertPoleAsync(),
+                await InsertPoleAsync(),
+                await InsertPoleAsync(),
+                await InsertPoleAsync(),
+            };
 
-        Assert.Equal(["POLE-9999", "POLE-10000", "POLE-10001", "POLE-10002"], ids);
+            Assert.Equal(["POLE-9999", "POLE-10000", "POLE-10001", "POLE-10002"], ids);
+        }
+        finally
+        {
+            await SetPoleSequenceAsync(restore);
+        }
     }
 
     [Fact]
@@ -71,21 +79,31 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
         var lower = await FreeFourDigitDecadeAsync();
         var higher = lower * 10;
 
-        await SetPoleSequenceAsync(lower - 1);
-        var lowerId = await InsertPoleAsync();
+        var restore = await PoleSequenceAsync();
 
-        // Under the old default this insert produced the lower id again and died on the primary key.
-        // The assertions are a formality — the insert above is the real check.
-        await SetPoleSequenceAsync(higher - 1);
-        var higherId = await InsertPoleAsync();
+        try
+        {
+            await SetPoleSequenceAsync(lower - 1);
+            var lowerId = await InsertPoleAsync();
 
-        Assert.Equal(PrefixedIds.Pole.Format(lower), lowerId);
-        Assert.Equal(PrefixedIds.Pole.Format(higher), higherId);
-        Assert.NotEqual(lowerId, higherId);
+            // Under the old default this insert produced the lower id again and died on the primary
+            // key. The assertions are a formality — the insert above is the real check.
+            await SetPoleSequenceAsync(higher - 1);
+            var higherId = await InsertPoleAsync();
 
-        // Exactly what lpad(…, 4) used to return for the higher value: its first four digits. Stating
-        // the relationship keeps the pair meaningful now that the numbers are not literals.
-        Assert.Equal(lowerId, higherId[..^1]);
+            Assert.Equal(PrefixedIds.Pole.Format(lower), lowerId);
+            Assert.Equal(PrefixedIds.Pole.Format(higher), higherId);
+            Assert.NotEqual(lowerId, higherId);
+
+            // Exactly what lpad(…, 4) used to return for the higher value: its first four digits.
+            // Stating the relationship keeps the pair meaningful now that the numbers are not
+            // literals.
+            Assert.Equal(lowerId, higherId[..^1]);
+        }
+        finally
+        {
+            await SetPoleSequenceAsync(restore);
+        }
     }
 
     [Fact]
@@ -242,6 +260,28 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
                 .Where(pole => ids.Contains(pole.PoleId))
                 .Select(pole => pole.PoleId)
                 .ToListAsync();
+        });
+
+    /// <summary>
+    /// Where <c>pole_id_seq</c> stands right now, so a rewind can be undone.
+    /// </summary>
+    /// <remarks>
+    /// 🔴 <b>Rewinding a SHARED sequence and leaving it there poisons every later insert in the
+    /// run.</b> These two tests move it backwards on purpose, and without putting it back the next
+    /// few hundred inserts climb through numbers that other rows may already hold — the failure
+    /// CLAUDE.md records as one run red at 36 tests and the next at 76, deterministic but looking
+    /// like flake. Picking a free range is not enough on its own: <c>FreeFourDigitDecadeAsync</c>
+    /// checks the decade it writes into, not the whole stretch above it that the sequence then walks
+    /// through.
+    /// </remarks>
+    private Task<long> PoleSequenceAsync()
+        => fixture.QueryAsync(async db =>
+        {
+            var connection = db.Database.GetDbConnection();
+            await db.Database.OpenConnectionAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT last_value FROM pole_id_seq;";
+            return (long)(await command.ExecuteScalarAsync())!;
         });
 
     private Task SetPoleSequenceAsync(long value)

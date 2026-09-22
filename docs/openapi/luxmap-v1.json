@@ -2347,6 +2347,244 @@
         }
       }
     },
+    "/api/v1/poles": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "power_source",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PowerSource"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "has_open_fault",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolePropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolePropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolePropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/segments": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/web/login": {
       "post": {
         "tags": [
@@ -2927,8 +3165,7 @@
           "out",
           "unknown"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — fixture_status. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "FixtureType": {
         "enum": [
@@ -2936,6 +3173,20 @@
           "solar_all_in_one"
         ],
         "type": "string"
+      },
+      "Geometry": {
+        "required": [
+          "coordinates",
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "coordinates": { }
+        },
+        "additionalProperties": false
       },
       "ImportResult": {
         "type": "object",
@@ -3191,6 +3442,124 @@
         },
         "additionalProperties": false
       },
+      "PoleProperties": {
+        "required": [
+          "commune_id",
+          "fixture_status",
+          "has_iot_node",
+          "near_sensitive_poi",
+          "open_fault_count",
+          "pole_id",
+          "segment_id"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "power_source": {
+            "$ref": "#/components/schemas/PowerSource"
+          },
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "install_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_sweep_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "open_fault_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "has_iot_node": {
+            "type": "boolean"
+          },
+          "near_sensitive_poi": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolePropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/PoleProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PolePropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PolePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "PowerSource": {
         "enum": [
           "grid",
@@ -3295,6 +3664,87 @@
           "inter_village"
         ],
         "type": "string"
+      },
+      "SegmentProperties": {
+        "required": [
+          "has_active_segment_fault",
+          "length_m",
+          "pole_count",
+          "road_class",
+          "segment_id",
+          "segment_name"
+        ],
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "string"
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "road_class": {
+            "$ref": "#/components/schemas/RoadClass"
+          },
+          "length_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "controller_node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "has_active_segment_fault": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SegmentPropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/SegmentProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SegmentPropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentPropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "SetPoleFeederRequest": {
         "type": "object",
@@ -3589,6 +4039,9 @@
     },
     {
       "name": "LuxReadings"
+    },
+    {
+      "name": "Map"
     },
     {
       "name": "WebAuth"
