@@ -16,18 +16,29 @@ public enum FixtureStatus
     Unknown,
 }
 
-/// <summary>power_source : grid | solar</summary>
+/// <summary>power_source : grid</summary>
+/// <remarks>
+/// ⚠️ <b>One value, on purpose.</b> Solar lighting left the project scope on 22/09/2026, so
+/// <c>solar</c> was removed rather than left declared-and-unused: an enum value nothing can produce
+/// is a value a later ticket will assume it may write, and the CHECK constraint would have let it.
+/// The enum stays as an enum rather than collapsing to a constant because the Contract publishes
+/// <c>power_source</c> as a field and the wire shape must not change.
+/// <para>
+/// The BATTERY side of the project did NOT go with it: IoT still measures runtime and
+/// <c>runtime_decline</c> is still a valid <see cref="FaultType"/> — a grid lamp's burn hours can
+/// decline too. Only the solar LAMP is gone.
+/// </para>
+/// </remarks>
 public enum PowerSource
 {
     Grid,
-    Solar,
 }
 
-/// <summary>fixture_type : led_road_lamp | solar_all_in_one</summary>
+/// <summary>fixture_type : led_road_lamp</summary>
+/// <remarks>See <see cref="PowerSource"/> — <c>solar_all_in_one</c> left with the same decision.</remarks>
 public enum FixtureType
 {
     LedRoadLamp,
-    SolarAllInOne,
 }
 
 /// <summary>fault_type : lamp_out | lamp_dim | segment_outage | node_offline | runtime_decline</summary>

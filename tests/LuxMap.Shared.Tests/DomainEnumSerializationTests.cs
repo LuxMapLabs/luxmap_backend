@@ -22,15 +22,19 @@ public class DomainEnumSerializationTests
     public void FixtureStatus_matches_contract(FixtureStatus value, string expected)
         => Assert.Equal(expected, Wire(value));
 
+    /// <remarks>
+    /// One case each since 22/09/2026 — solar lighting left the project scope and <c>solar</c> /
+    /// <c>solar_all_in_one</c> were removed from the enums rather than left declared and unused.
+    /// The Theory stays a Theory: the value that matters is the WIRE spelling, and that is the thing
+    /// FE and WP6 hardcode.
+    /// </remarks>
     [Theory]
     [InlineData(PowerSource.Grid, "grid")]
-    [InlineData(PowerSource.Solar, "solar")]
     public void PowerSource_matches_contract(PowerSource value, string expected)
         => Assert.Equal(expected, Wire(value));
 
     [Theory]
     [InlineData(FixtureType.LedRoadLamp, "led_road_lamp")]
-    [InlineData(FixtureType.SolarAllInOne, "solar_all_in_one")]
     public void FixtureType_matches_contract(FixtureType value, string expected)
         => Assert.Equal(expected, Wire(value));
 
@@ -120,7 +124,10 @@ public class DomainEnumSerializationTests
         // Backstop: adding a new enum value without pinning its wire string turns this test red.
         (Type Type, int Expected)[] enums =
         [
-            (typeof(FixtureStatus), 4), (typeof(PowerSource), 2), (typeof(FixtureType), 2),
+            // PowerSource and FixtureType dropped to ONE member on 22/09/2026 — solar lighting left
+            // the project scope. The count is written here deliberately: this test exists so that
+            // changing an enum cannot happen without someone coming to this line and saying so.
+            (typeof(FixtureStatus), 4), (typeof(PowerSource), 1), (typeof(FixtureType), 1),
             (typeof(FaultType), 5), (typeof(FaultStatus), 6), (typeof(Severity), 4),
             (typeof(SourceChannel), 3), (typeof(DataSource), 4), (typeof(WorkOrderStatus), 6),
             (typeof(NodeRole), 2), (typeof(NodeStatus), 3), (typeof(RoadClass), 2),
