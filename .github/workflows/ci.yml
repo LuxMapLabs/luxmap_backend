@@ -1,0 +1,168 @@
+name: CI
+
+# Require this job on dev WITH "Require branches to be up to date before merging", or a
+# merge queue. YAML alone cannot invalidate yesterday's green check after another PR merges.
+on:
+  pull_request:
+    branches: [dev]
+  # A queue tests the candidate INCLUDING earlier queued PRs; omitting this trigger leaves
+  # required checks pending on the queue's SHA. Enable the queue in repository settings.
+  merge_group:
+    types: [checks_requested]
+    branches: [dev]
+
+# PR code executes here, including fork code. It needs neither repository secrets nor write access.
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel only an obsolete run of THIS PR/ref, never another PR's required check.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Merge result / build, tests, OpenAPI
+    # Compose has fixed container/volume names. A fresh hosted VM per job is load-bearing:
+    # self-hosted runners or a shared external DB would race sequence resets and teardown.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+      # Swagger CLI constructs the Production host. Without these settings export can fail
+      # before writing anything, leaving an old spec that looks deceptively unchanged.
+      Swagger__Enabled: 'true'
+      Cors__AllowedOrigins__0: https://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # github.sha is the PR's synthetic MERGE commit, or the merge-group candidate.
+          # NEVER substitute pull_request.head.sha: #46's Solar test + #47's enum removal
+          # compiled on their branches separately and broke only when combined on dev.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Create ephemeral configuration
+        # AuthTestExtensions.SeedPassword walks upward to a REAL .env and reads it directly.
+        # Merely exporting SEED_* variables breaks the current suite before its first login.
+        # Generate credentials rather than borrowing a developer's DB or repository secrets.
+        run: |
+          umask 077
+          python3 - <<'PY'
+          from pathlib import Path
+          import secrets
+
+          # EVERY key docker-compose.yml interpolates, plus the ones the app fails fast on.
+          # A missing port here does not fall back to a default: compose renders an empty port
+          # mapping and the service never starts, which surfaces far from the cause.
+          values = {
+              'POSTGRES_DB': 'luxmap_dev',
+              'POSTGRES_USER': 'luxmap',
+              'POSTGRES_PORT': '5433',
+              'REDIS_PORT': '6380',
+              'MINIO_ACCESS_KEY': 'luxmap',
+              'MINIO_PORT': '9000',
+              'MINIO_CONSOLE_PORT': '9001',
+              'MINIO_ENDPOINT': 'http://localhost:9000',
+          }
+          for key in ('POSTGRES_PASSWORD', 'MINIO_SECRET_KEY', 'JWT_SIGNING_KEY',
+                      'SEED_ADMIN_PASSWORD', 'SEED_AGENCY_PASSWORD',
+                      'SEED_ENGINEER_PASSWORD', 'SEED_CREW_PASSWORD'):
+              values[key] = secrets.token_hex(32)
+          Path('.env').write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
+          PY
+
+      - name: Restore
+        run: |
+          dotnet restore LuxMap.slnx -warnaserror
+          dotnet tool restore
+
+      - name: Build every project, including tests
+        id: build
+        # Building only LuxMap.Api misses a test still referring to a removed enum value.
+        # -warnaserror covers MSBuild warnings as well as compiler/analyzer warnings.
+        run: dotnet build LuxMap.slnx --no-restore -warnaserror
+
+      - name: Re-export and regenerate OpenAPI
+        id: spec
+        run: |
+          dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
+          python3 docs/openapi/tools/gen_consolidated_spec.py
+
+      - name: Reject stale committed specs
+        if: ${{ !cancelled() && steps.spec.outcome == 'success' }}
+        # Drift 40: code can change an endpoint/schema while a perfectly valid JSON spec stays
+        # stale. Lint alone cannot detect that. Export FROM THE BUILT MERGE RESULT, regenerate
+        # the consolidated file, then compare BOTH against that commit, without hand-editing.
+        # When the contract version changes, update this filename and the generator together.
+        run: git diff --exit-code -- docs/openapi/luxmap-v1.json docs/openapi/luxmap-v1.5.json
+
+      - name: Lint consolidated OpenAPI
+        if: ${{ !cancelled() && steps.spec.outcome == 'success' }}
+        # The consolidated spec supplies operationIds and contract-only endpoints; linting only
+        # the raw exporter output would miss that surface. Pin rules to avoid surprise CI changes.
+        run: npx --yes @redocly/cli@2.0.0 lint docs/openapi/luxmap-v1.5.json
+
+      - name: Start isolated service containers
+        id: services
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        # Reuse Compose so CI cannot silently drift from its PostGIS/init SQL or MinIO images:
+        # imresamu/postgis:17-3.5 supplies real ST_* functions and GIST; plain postgres does not.
+        # MinIO and mc MUST remain quay.io images with Compose's MANIFEST LIST digests.
+        # Docker Hub minio/* returns 404; a platform digest breaks the other architecture.
+        # Explicit services exclude the one-shot mc job from --wait's long-running health check.
+        run: |
+          docker compose up -d --wait --wait-timeout 180 postgres redis minio
+          docker compose run --rm minio-mc
+
+      - name: Migrate and seed the fresh database
+        id: database
+        if: ${{ !cancelled() && steps.services.outcome == 'success' }}
+        # Fixtures assume migrated tables, study_site, seeded users and the FO-26 baseline;
+        # they do NOT bootstrap an empty service DB. Match EF's version in Persistence.csproj.
+        # The mock loader deletes whole tables: ONLY use this on this job's disposable DB.
+        # Never redirect it to a shared dev database, even to troubleshoot a failed CI run.
+        run: |
+          dotnet tool install dotnet-ef --tool-path "$RUNNER_TEMP/ef" --version 10.0.11
+          "$RUNNER_TEMP/ef/dotnet-ef" database update --no-build -p src/LuxMap.Persistence -s src/LuxMap.Api
+          dotnet run --no-build --no-launch-profile --project src/LuxMap.Api -- --seed
+          python3 scripts/seed_mock_set.py --apply
+
+      - name: Run full regression suite
+        if: ${{ !cancelled() && steps.database.outcome == 'success' }}
+        # One invocation, no shards/matrix against this DB: fixtures reset global sequences.
+        # Keep the existing xUnit AssetDatabaseCollection serialization intact.
+        # Runsettings excludes Category=Benchmark. A CLI --filter is ANDed with that filter,
+        # not a replacement; do not add one or switch to luxmap.benchmark.runsettings here.
+        run: dotnet test LuxMap.slnx --no-build --no-restore --settings luxmap.runsettings --logger trx --results-directory .github/test-results -m:1
+
+      - name: Preserve test failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: .github/test-results/*.trx
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop service containers
+        if: ${{ always() && steps.services.outcome != 'skipped' }}
+        # The hosted VM discards volumes after the job; no shared volume cleanup is needed.
+        run: docker compose down
