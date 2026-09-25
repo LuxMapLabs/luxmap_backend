@@ -21,7 +21,7 @@ namespace LuxMap.Modules.Assets.Import;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/assets/import")]
-[Authorize(Policy = LuxMapPolicies.SystemAdmin)]
+[Authorize(Policy = LuxMapPolicies.ManageAssets)]
 public sealed class AssetImportController(AssetImportService service) : ControllerBase
 {
     /// <summary>

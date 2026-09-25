@@ -1,10 +1,12 @@
 using System.Net;
 using Asp.Versioning;
 using LuxMap.Modules.Identity.Auth;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,10 +16,11 @@ namespace LuxMap.Modules.Survey.LuxReadings;
 /// Contract section 2.9 — lux readings (BE-42).
 /// </summary>
 /// <remarks>
-/// No role policy is attached. The four policies from BE-08 are still unused in production code
-/// because nobody has decided which roles may write which assets; guessing one here would set a
-/// precedent by accident. Territorial scope IS enforced — through the pole lookup and the
-/// <c>SaveChanges</c> guard.
+/// Recording is <see cref="LuxMapPolicies.RecordLuxReading"/> — the Field Engineer, who takes the
+/// reading on site; reading back is <see cref="LuxMapPolicies.ReadLuxReadings"/>, all four roles.
+/// Before Contract v1.7 the POST carried no policy at all, which let every signed-in role write,
+/// including the read-only Superior. Territorial scope is enforced separately — through the pole
+/// lookup and the <c>SaveChanges</c> guard.
 /// </remarks>
 [ApiController]
 [ApiVersion("1.0")]
@@ -29,6 +32,7 @@ public sealed class LuxReadingsController(LuxReadingService service) : Controlle
     /// record — Contract section 5.8: retrying is normal offline behaviour, not an error.
     /// </summary>
     [HttpPost("lux-readings")]
+    [Authorize(Policy = LuxMapPolicies.RecordLuxReading)]
     [ProducesResponseType<LuxReadingResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<LuxReadingResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -50,6 +54,7 @@ public sealed class LuxReadingsController(LuxReadingService service) : Controlle
     /// <summary>One pole's series, oldest first. Paged — see <see cref="LuxReadingService.ForPoleAsync"/>.</summary>
     // Contract section 2.9 as of v1.3. Was /poles/{pole_id}/lux-readings through v1.2.
     [HttpGet("lux-readings/poles/{poleId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadLuxReadings)]
     [ProducesResponseType<PagedResult<LuxReadingResponse>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PagedResult<LuxReadingResponse>>> ForPoleAsync(
@@ -63,6 +68,7 @@ public sealed class LuxReadingsController(LuxReadingService service) : Controlle
     /// always <c>null</c> — the source table arrives with BE-15/BE-17.
     /// </summary>
     [HttpGet("lux-readings")]
+    [Authorize(Policy = LuxMapPolicies.ReadLuxReadings)]
     [ProducesResponseType<PagedResult<LuxReadingWithLuminanceResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResult<LuxReadingWithLuminanceResponse>>> SearchAsync(
         [FromQuery(Name = "pole_id")] string? poleId,

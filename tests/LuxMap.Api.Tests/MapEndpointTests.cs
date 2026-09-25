@@ -39,7 +39,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_comes_back_as_a_flat_geojson_feature_with_lng_before_lat()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -72,7 +72,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_properties_are_exactly_the_fifteen_the_contract_lists()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -110,7 +110,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_with_no_status_row_reads_as_unknown_with_no_confidence()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -124,7 +124,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task Installation_fields_come_from_the_lamp_in_service()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -147,7 +147,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task Open_fault_count_ignores_faults_that_are_no_longer_open()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -178,7 +178,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task An_area_holding_more_than_two_thousand_poles_is_refused_with_the_count()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
         try
@@ -214,7 +214,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
         const double lng = 108.5;
         const double lat = 12.5;
 
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
         try
@@ -241,7 +241,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     public async Task A_bbox_that_cannot_be_trusted_is_refused_rather_than_answered_emptily(
         string query, string expected)
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.GetAsync(Poles + query);
         var error = await ReadErrorAsync(response);
@@ -263,7 +263,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_nan_bound_is_refused_and_would_otherwise_have_returned_an_empty_map()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         Assert.Equal(
             HttpStatusCode.BadRequest,
@@ -274,7 +274,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task Poles_outside_the_callers_commune_are_not_in_the_collection()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var mine = await NewPoleAsync(fixture.CommuneId, segmentId);
         var theirs = await NewPoleAsync(fixture.ForeignCommuneId, segmentId);
@@ -289,7 +289,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task Asking_for_a_commune_outside_the_scope_is_403_naming_that_commune()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.GetAsync($"{Poles}{Box}&commune_id={fixture.ForeignCommuneId}");
         var body = await response.Content.ReadAsStringAsync();
@@ -310,7 +310,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_calibration_rig_is_hidden_by_default_and_shown_when_asked_for_by_name()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var rig = await NewPoleAsync(fixture.CommuneId, segmentId, DataSource.CalibrationRig);
 
@@ -322,7 +322,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task An_unknown_status_value_is_refused_and_the_allowed_values_are_listed()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.GetAsync($"{Poles}{Box}&status=broken");
         var error = await ReadErrorAsync(response);
@@ -347,7 +347,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task Filtering_for_unknown_finds_the_poles_that_have_no_status_row()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -360,7 +360,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_segment_comes_back_as_a_linestring_with_the_seven_contract_properties()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -393,7 +393,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     [Fact]
     public async Task Only_a_segment_level_outage_highlights_the_whole_road()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var withLampFault = await NewSegmentAsync(fixture.CommuneId);
         var withOutage = await NewSegmentAsync(fixture.CommuneId);
 

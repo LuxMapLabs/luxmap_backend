@@ -18,9 +18,10 @@ namespace LuxMap.Api.Authorization;
 /// <c>ApiPipelineSetup.HandleBareStatusCodeAsync</c>. The default handler still writes the response;
 /// nothing about the pipeline order changes.
 /// <para>
-/// A role policy is one <see cref="ClaimsAuthorizationRequirement"/> (<c>RequireClaim(role, …)</c>).
-/// The other requirement on every policy, <see cref="CommuneScopeConsistencyRequirement"/>, fails
-/// only when a token carries <c>["*"]</c> without the Administrator role — that is an issuing-side
+/// A capability policy carries one <see cref="ClaimsAuthorizationRequirement"/>
+/// (<c>RequireClaim(role, …)</c> over the roles of <c>LuxMapPolicies.Matrix</c>). The other
+/// requirement on every policy, <see cref="CommuneScopeConsistencyRequirement"/>, fails only when a
+/// token carries <c>["*"]</c> without the system_admin role — that is an issuing-side
 /// bug about territory, so it keeps <c>COMMUNE_FORBIDDEN</c>.
 /// </para>
 /// </remarks>

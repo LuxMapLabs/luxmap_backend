@@ -36,7 +36,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_circuit_reports_the_poles_wired_to_it_and_nobody_elses()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var mine = await NewFeederAsync(fixture.CommuneId);
         var theirs = await NewFeederAsync(fixture.CommuneId);
@@ -66,7 +66,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task Each_pole_carries_its_own_coordinates_in_4326()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         await NewPoleAsync(fixture.CommuneId, segmentId, feederId, lng: 106.4912, lat: 10.9734);
@@ -89,7 +89,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_circuit_in_another_commune_is_not_found_rather_than_forbidden()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var foreign = await NewFeederAsync(fixture.ForeignCommuneId);
 
         var response = await client.GetAsync($"{Feeders}/{foreign}/poles");
@@ -140,7 +140,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_already_on_a_circuit_is_not_listed_as_unassigned()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId);
@@ -162,7 +162,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_unassigned_listing_refuses_to_answer_without_the_flag()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.GetAsync($"{Feeders}/poles");
 
@@ -173,24 +173,24 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     }
 
     /// <summary>
-    /// A maintenance engineer MAY read the topology — no GET here carries a role policy.
+    /// A manager MAY read the topology — every GET here is <c>ReadNetwork</c>, which names all four roles.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A policy is one EXACT role rather than a rank, so adding one would lock out two of the four
-    /// roles while looking like a security improvement (BE-12a, rule 4).
+    /// A policy admits exactly the roles it names rather than a rank, so a GET naming fewer roles
+    /// would lock the others out while looking like a security improvement (Contract v1.7 section 2).
     /// </para>
     /// <para>
     /// ⚠️ Asserted differently on the two route shapes, and the difference is worth knowing. The
-    /// collection route answers <b>200</b> for anyone logged in, like the BE-12a listings. The
-    /// <c>{id}</c> routes read the parent first, so this engineer — scoped to neither test commune —
+    /// collection route answers <b>200</b> for any role in <c>ReadNetwork</c>, like the BE-12a listings. The
+    /// <c>{id}</c> routes read the parent first, so this manager — scoped to neither test commune —
     /// gets <b>404</b>, and 404 is itself the proof: a role policy refuses at the endpoint, before
     /// the action runs, and would have produced 403 <c>ROLE_FORBIDDEN</c> instead (BE-REVIEW-02,
     /// constraint 6). Reaching the not-found means the request got past authorization.
     /// </para>
     /// </remarks>
     [Fact]
-    public async Task A_maintenance_engineer_may_read_the_topology()
+    public async Task A_manager_may_read_the_topology()
     {
         var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
@@ -222,7 +222,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_listing_pages_without_repeating_or_dropping_a_pole()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
@@ -260,7 +260,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_item_carries_only_the_topology_fields_and_none_of_the_inventory_ones()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         await NewPoleAsync(fixture.CommuneId, segmentId, feederId);

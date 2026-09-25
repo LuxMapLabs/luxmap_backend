@@ -39,7 +39,7 @@ public sealed class AssetImportMockSetTests(AssetImportFixture fixture, ITestOut
     [Fact]
     public async Task The_whole_FO26_asset_layer_loads_through_the_import_endpoint()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = $"FO26{Guid.NewGuid():N}"[..12].ToUpperInvariant();
 
         var segments = await AssetImportTests.ImportAsync(

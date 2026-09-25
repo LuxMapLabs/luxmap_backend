@@ -34,7 +34,7 @@ public static class AuthorizationSetup
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<JwtOptions>(ConfigureJwtBearer);
 
-        services.AddAuthorizationBuilder()
+        var authorization = services.AddAuthorizationBuilder()
             // Fail CLOSED: the whole application requires authentication by default; opening an
             // endpoint requires an explicit [AllowAnonymous].
             .SetDefaultPolicy(new AuthorizationPolicyBuilder()
@@ -44,20 +44,26 @@ public static class AuthorizationSetup
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .AddRequirements(new CommuneScopeConsistencyRequirement())
-                .Build())
-            .AddPolicy(LuxMapPolicies.Superior, RolePolicy(UserRole.Superior))
-            .AddPolicy(LuxMapPolicies.Manager, RolePolicy(UserRole.Manager))
-            .AddPolicy(LuxMapPolicies.FieldEngineer, RolePolicy(UserRole.FieldEngineer))
-            .AddPolicy(LuxMapPolicies.SystemAdmin, RolePolicy(UserRole.SystemAdmin));
+                .Build());
+
+        // One policy per capability, straight from the matrix — no policy exists that is not in it.
+        foreach (var (policy, roles) in LuxMapPolicies.Matrix)
+        {
+            authorization.AddPolicy(policy, CapabilityPolicy(roles));
+        }
 
         return services;
     }
 
-    private static Action<AuthorizationPolicyBuilder> RolePolicy(UserRole role)
+    /// <summary>
+    /// Admits exactly the listed roles. <c>RequireClaim</c> with several values is an OR over those
+    /// values and nothing else — there is no ordering between roles, so no "and above".
+    /// </summary>
+    private static Action<AuthorizationPolicyBuilder> CapabilityPolicy(IReadOnlyList<UserRole> roles)
         => builder => builder
             .RequireAuthenticatedUser()
             .AddRequirements(new CommuneScopeConsistencyRequirement())
-            .RequireClaim(AuthClaims.Role, ContractEnum.ToDbValue(role));
+            .RequireClaim(AuthClaims.Role, roles.Select(ContractEnum.ToDbValue));
 
     private static void ConfigureJwtBearer(JwtBearerOptions options, JwtOptions jwt)
     {

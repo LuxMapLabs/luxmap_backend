@@ -70,12 +70,16 @@ public sealed class ScopeTestController(
         scope_commune_ids = scopeAccessor.Scope.CommuneIds,
     });
 
-    [HttpGet("engineer-only")]
-    [Authorize(Policy = LuxMapPolicies.Manager)]
-    public IActionResult EngineerOnly() => Ok(new { ok = true });
+    /// <summary>
+    /// Stand-ins for the two capabilities that have no production endpoint yet, so their matrix rows
+    /// can be exercised over HTTP before the tickets that build them (D-R7, BE-33).
+    /// </summary>
+    [HttpGet("manager-only")]
+    [Authorize(Policy = LuxMapPolicies.ControlLighting)]
+    public IActionResult ManagerOnly() => Ok(new { ok = true });
 
     [HttpGet("admin-only")]
-    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
+    [Authorize(Policy = LuxMapPolicies.ManageUsers)]
     public IActionResult AdminOnly() => Ok(new { ok = true });
 
     [HttpGet("open")]

@@ -1,8 +1,5 @@
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
 namespace LuxMap.Api.Tests;
@@ -114,43 +111,7 @@ public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper 
         Assert.Null(me.Metadata.GetMetadata<IAllowAnonymous>());
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────────────────────
+    private RouteEndpoint[] ProductionEndpoints() => Tests.ProductionEndpoints.Of(factory.Services);
 
-    /// <summary>
-    /// Endpoints of the APPLICATION, with the ones this test assembly injects filtered out.
-    /// </summary>
-    /// <remarks>
-    /// <c>ScopeTestController</c> and <c>TestEndpointsController</c> both carry
-    /// <c>[AllowAnonymous]</c> on purpose and are loaded into the host through an ApplicationPart, so
-    /// counting them would make this test assert something about the test harness rather than about
-    /// the shipped API. The filter is on the controller's ASSEMBLY, not on a name pattern.
-    /// </remarks>
-    private RouteEndpoint[] ProductionEndpoints()
-    {
-        var thisAssembly = typeof(AnonymousEndpointTests).Assembly;
-
-        var all = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
-            .OfType<RouteEndpoint>()
-            .Where(endpoint => endpoint.Metadata.GetMetadata<ControllerActionDescriptor>() is not null)
-            .ToArray();
-
-        var production = all
-            .Where(endpoint => endpoint.Metadata.GetMetadata<ControllerActionDescriptor>()!
-                .ControllerTypeInfo.Assembly != thisAssembly)
-            .ToArray();
-
-        // The filter must actually be removing something, or its correctness is never exercised.
-        Assert.NotEqual(all.Length, production.Length);
-
-        return production;
-    }
-
-    /// <summary>Renders an endpoint as <c>POST /api/v1/auth/login</c>, with the version token resolved.</summary>
-    private static string Describe(RouteEndpoint endpoint)
-    {
-        var methods = endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [];
-        var route = Regex.Replace(endpoint.RoutePattern.RawText!, @"\{version:apiVersion\}", "1");
-
-        return $"{string.Join('/', methods.Order(StringComparer.Ordinal))} /{route}";
-    }
+    private static string Describe(RouteEndpoint endpoint) => Tests.ProductionEndpoints.Describe(endpoint);
 }

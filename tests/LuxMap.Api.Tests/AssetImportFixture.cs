@@ -14,24 +14,23 @@ namespace LuxMap.Api.Tests;
 /// A real host and database for the BE-12a import and CRUD tests.
 /// </summary>
 /// <remarks>
-/// It creates TWO communes and an administrator scoped to only the first. That combination is the
-/// point: <c>CommuneScopeConsistencyHandler</c> rejects a wildcard claim on a non-administrator, but
-/// the reverse — an administrator scoped to named communes — is a supported configuration, and it is
-/// the only way to exercise territorial rules against a role that is allowed to write at all. The
-/// seeded <c>admin</c> account is system-wide, so the write guard never applies to it.
+/// It creates TWO communes and a manager scoped to only the first. Since Contract v1.7 the Manager is
+/// the one role that may write assets (<c>LuxMapPolicies.ManageAssets</c>), and a commune-scoped one
+/// is what exercises the territorial rules on those writes. The seeded <c>admin</c> account is
+/// system-wide and may no longer write assets at all (D-R12).
 /// </remarks>
 public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    /// <summary>The commune the test administrator may write to.</summary>
+    /// <summary>The commune the test manager may write to.</summary>
     public string CommuneId { get; private set; } = null!;
 
-    /// <summary>A commune that EXISTS but is outside the test administrator's scope.</summary>
+    /// <summary>A commune that EXISTS but is outside the test manager's scope.</summary>
     public string ForeignCommuneId { get; private set; } = null!;
 
-    public string AdminUsername { get; private set; } = null!;
+    public string ManagerUsername { get; private set; } = null!;
 
     /// <summary>
-    /// An administrator whose scope covers BOTH communes.
+    /// A manager whose scope covers BOTH communes.
     /// </summary>
     /// <remarks>
     /// Exists for exactly one question: when the query filter admits rows from two communes at once,
@@ -41,8 +40,11 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
     /// </remarks>
     public string BothCommunesUsername { get; private set; } = null!;
 
-    /// <summary>From <c>.env</c>, exactly as BE-06 reads it. Never a literal in the test source.</summary>
-    public string AdminPassword { get; } = AuthTestExtensions.SeedPassword("SEED_ADMIN_PASSWORD");
+    /// <summary>
+    /// The password of the two accounts this fixture creates — borrowed from <c>.env</c>, exactly as
+    /// BE-06 reads it, so it is never a literal in the test source.
+    /// </summary>
+    public string AccountPassword { get; } = AuthTestExtensions.SeedPassword("SEED_ADMIN_PASSWORD");
 
     private string userId = null!;
 
@@ -82,22 +84,22 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
             CommuneId = mine.CommuneId;
             ForeignCommuneId = theirs.CommuneId;
 
-            AdminUsername = $"be12a-{Guid.NewGuid():N}"[..20];
+            ManagerUsername = $"be12a-{Guid.NewGuid():N}"[..20];
             var user = new AppUser
             {
-                Username = AdminUsername,
-                Email = $"{AdminUsername}@luxmap.local",
-                FullName = "BE-12a commune-scoped administrator",
-                Role = UserRole.SystemAdmin,
+                Username = ManagerUsername,
+                Email = $"{ManagerUsername}@luxmap.local",
+                FullName = "BE-12a commune-scoped manager",
+                Role = UserRole.Manager,
 
-                // The whole reason this account exists: administrator rights WITHOUT system-wide
-                // scope, so the territorial rules still bite.
+                // The whole reason this account exists: the right to write assets inside ONE
+                // commune, so the territorial rules bite.
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
                 PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
             };
 
-            user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, AdminPassword);
+            user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, AccountPassword);
             db.Set<AppUser>().Add(user);
             await db.SaveChangesAsync();
 
@@ -110,14 +112,14 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
             {
                 Username = BothCommunesUsername,
                 Email = $"{BothCommunesUsername}@luxmap.local",
-                FullName = "BE-12a administrator over two communes",
-                Role = UserRole.SystemAdmin,
+                FullName = "BE-12a manager over two communes",
+                Role = UserRole.Manager,
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
                 PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
             };
 
-            wide.PasswordHash = new PasswordHasher<AppUser>().HashPassword(wide, AdminPassword);
+            wide.PasswordHash = new PasswordHasher<AppUser>().HashPassword(wide, AccountPassword);
             db.Set<AppUser>().Add(wide);
             await db.SaveChangesAsync();
 
@@ -170,20 +172,20 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
         await base.DisposeAsync();
     }
 
-    /// <summary>An <see cref="HttpClient"/> already carrying the commune-scoped administrator's token.</summary>
-    public async Task<HttpClient> AdminClientAsync()
+    /// <summary>An <see cref="HttpClient"/> already carrying the commune-scoped manager's token.</summary>
+    public async Task<HttpClient> ManagerClientAsync()
     {
         var client = CreateClient();
-        var tokens = await (await client.PostLoginAsync(AdminUsername, AdminPassword)).ReadTokensAsync();
+        var tokens = await (await client.PostLoginAsync(ManagerUsername, AccountPassword)).ReadTokensAsync();
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }
 
-    /// <summary>An <see cref="HttpClient"/> for the administrator scoped to BOTH communes.</summary>
+    /// <summary>An <see cref="HttpClient"/> for the manager scoped to BOTH communes.</summary>
     public async Task<HttpClient> BothCommunesClientAsync()
     {
         var client = CreateClient();
-        var tokens = await (await client.PostLoginAsync(BothCommunesUsername, AdminPassword)).ReadTokensAsync();
+        var tokens = await (await client.PostLoginAsync(BothCommunesUsername, AccountPassword)).ReadTokensAsync();
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }

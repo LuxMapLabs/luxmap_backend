@@ -148,7 +148,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
     public async Task Wrong_role_returns_403_in_contract_error_shape()
     {
         var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
-        var response = await client.GetAsync("/api/v1/_scope/engineer-only");
+        var response = await client.GetAsync("/api/v1/_scope/manager-only");
 
         output.WriteLine($"  field_engineer calling a manager-only endpoint → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -162,7 +162,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
     public async Task Correct_role_passes_the_policy()
     {
         var client = await AuthenticatedAsync("engineer", "SEED_ENGINEER_PASSWORD");
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/_scope/engineer-only")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/v1/_scope/manager-only")).StatusCode);
     }
 
     [Fact]
