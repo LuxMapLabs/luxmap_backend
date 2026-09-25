@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
@@ -451,13 +452,18 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     /// Bulk-inserts poles on one segment with raw SQL — 2000 round trips through EF would dominate
     /// the run.
     /// </summary>
+    /// <remarks>
+    /// ⚠️ Formatted with the INVARIANT culture. On a machine whose culture writes a decimal comma
+    /// (en_VN, vi_VN), plain interpolation turns 108.5 into <c>108,5</c> and ST_MakePoint receives four
+    /// arguments instead of two — PostgreSQL then refuses the row as having a Z dimension.
+    /// </remarks>
     private Task PlantPolesAsync(string segmentId, int count, double? lng = null, double? lat = null)
-        => ExecuteAsync($"""
+        => ExecuteAsync(string.Create(CultureInfo.InvariantCulture, $"""
             INSERT INTO pole (pole_id, segment_id, commune_id, geom, near_sensitive_poi, data_source)
             SELECT 'POLE-' || ({PlantedIdBase} + i)::text, '{segmentId}', '{fixture.CommuneId}',
                    ST_SetSRID(ST_MakePoint({lng ?? Lng}, {lat ?? Lat}), 4326), false, 'public_imagery'
             FROM generate_series(1, {count}) AS i;
-            """);
+            """));
 
     /// <summary>
     /// Removes every planted pole. Runs in a <c>finally</c>, and deliberately clears the WHOLE
