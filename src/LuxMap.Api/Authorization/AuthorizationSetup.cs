@@ -49,6 +49,16 @@ public static class AuthorizationSetup
         // One policy per capability, straight from the matrix — no policy exists that is not in it.
         foreach (var (policy, roles) in LuxMapPolicies.Matrix)
         {
+            // 🔴 An EMPTY list does not mean "nobody". RequireClaim with no allowed values only asks
+            // that a role claim EXISTS, so it admits every signed-in role — found by removing the only
+            // role of ManageAssets and watching the superior create a segment. Refuse to start instead.
+            if (roles.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Capability '{policy}' names no role. An empty RequireClaim admits EVERY role; "
+                    + "remove the capability instead of emptying it.");
+            }
+
             authorization.AddPolicy(policy, CapabilityPolicy(roles));
         }
 
