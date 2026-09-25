@@ -127,13 +127,13 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
-        await NewFixtureAsync(poleId, PowerSource.Grid, watt: 100, retired: true);
-        await NewFixtureAsync(poleId, PowerSource.Solar, watt: 40, retired: false);
+        // Since Contract v1.6 every lamp is grid / led_road_lamp, so the wattage is what tells the two
+        // apart: a value taken from the retired lamp would read 100.
+        await NewFixtureAsync(poleId, watt: 100, retired: true);
+        await NewFixtureAsync(poleId, watt: 40, retired: false);
 
         var properties = Find(await GetAsync(client, Poles + Box), poleId).GetProperty("properties");
 
-        Assert.Equal("solar", properties.GetProperty("power_source").GetString());
-        Assert.Equal("solar_all_in_one", properties.GetProperty("fixture_type").GetString());
         Assert.Equal(40, properties.GetProperty("lamp_watt").GetInt32());
     }
 
@@ -520,7 +520,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
             }
         });
 
-    private Task NewFixtureAsync(string poleId, PowerSource power, int watt, bool retired)
+    private Task NewFixtureAsync(string poleId, int watt, bool retired)
         => fixture.QueryAsync(async db =>
         {
             using (db.EnterUnscopedSystemWriteBackdoor())
@@ -531,8 +531,8 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
                 {
                     PoleId = poleId,
                     CommuneId = pole.CommuneId,
-                    FixtureType = power == PowerSource.Solar ? FixtureType.SolarAllInOne : FixtureType.LedRoadLamp,
-                    PowerSource = power,
+                    FixtureType = FixtureType.LedRoadLamp,
+                    PowerSource = PowerSource.Grid,
                     LampWatt = watt,
                     InstallDate = new DateOnly(2026, 1, 1),
                     RemovedDate = retired ? new DateOnly(2026, 6, 1) : null,
