@@ -39,7 +39,7 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
             me.EnumerateObject().Select(property => property.Name));
 
         Assert.Equal("engineer", me.GetProperty("username").GetString());
-        Assert.Equal("maintenance_engineer", me.GetProperty("role").GetString());
+        Assert.Equal("manager", me.GetProperty("role").GetString());
 
         // Compared against the ROW, not against a literal. The seeded display names are exactly the
         // kind of value that differs between a fresh seed and a long-lived development database — the

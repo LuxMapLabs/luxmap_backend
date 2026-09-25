@@ -50,7 +50,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
             Claims = new Dictionary<string, object>
             {
                 ["sub"] = "USR-003",
-                ["role"] = "maintenance_engineer",
+                ["role"] = "manager",
                 ["commune_ids"] = new[] { "COM-001" },
             },
         };
@@ -80,7 +80,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
 
         // With MapInboundClaims still on, "sub" would be null here.
         Assert.Equal("USR-003", root.GetProperty("sub").GetString());
-        Assert.Equal("maintenance_engineer", root.GetProperty("role").GetString());
+        Assert.Equal("manager", root.GetProperty("role").GetString());
         Assert.NotEmpty(root.GetProperty("commune_ids").EnumerateArray());
     }
 
@@ -150,7 +150,7 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
         var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
         var response = await client.GetAsync("/api/v1/_scope/engineer-only");
 
-        output.WriteLine($"  field_crew calling an engineer-only endpoint → HTTP {(int)response.StatusCode}");
+        output.WriteLine($"  field_engineer calling a manager-only endpoint → HTTP {(int)response.StatusCode}");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
         // ROLE_FORBIDDEN since BE-REVIEW-02 (D-4): the crew member is inside their territory, it is

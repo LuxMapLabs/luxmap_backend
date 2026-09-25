@@ -45,10 +45,10 @@ public static class AuthorizationSetup
                 .RequireAuthenticatedUser()
                 .AddRequirements(new CommuneScopeConsistencyRequirement())
                 .Build())
-            .AddPolicy(LuxMapPolicies.ManagementAgency, RolePolicy(UserRole.ManagementAgency))
-            .AddPolicy(LuxMapPolicies.MaintenanceEngineer, RolePolicy(UserRole.MaintenanceEngineer))
-            .AddPolicy(LuxMapPolicies.FieldCrew, RolePolicy(UserRole.FieldCrew))
-            .AddPolicy(LuxMapPolicies.Administrator, RolePolicy(UserRole.Administrator));
+            .AddPolicy(LuxMapPolicies.Superior, RolePolicy(UserRole.Superior))
+            .AddPolicy(LuxMapPolicies.Manager, RolePolicy(UserRole.Manager))
+            .AddPolicy(LuxMapPolicies.FieldEngineer, RolePolicy(UserRole.FieldEngineer))
+            .AddPolicy(LuxMapPolicies.SystemAdmin, RolePolicy(UserRole.SystemAdmin));
 
         return services;
     }

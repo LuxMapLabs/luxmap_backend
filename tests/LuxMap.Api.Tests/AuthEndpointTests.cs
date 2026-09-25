@@ -31,7 +31,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         output.WriteLine(JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
 
         Assert.Equal("USR-003", payload.GetProperty("sub").GetString());
-        Assert.Equal("maintenance_engineer", payload.GetProperty("role").GetString());
+        Assert.Equal("manager", payload.GetProperty("role").GetString());
         Assert.Equal(JsonValueKind.String, payload.GetProperty("role").ValueKind);
 
         var communes = payload.GetProperty("commune_ids");

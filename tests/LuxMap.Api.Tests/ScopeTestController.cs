@@ -71,11 +71,11 @@ public sealed class ScopeTestController(
     });
 
     [HttpGet("engineer-only")]
-    [Authorize(Policy = LuxMapPolicies.MaintenanceEngineer)]
+    [Authorize(Policy = LuxMapPolicies.Manager)]
     public IActionResult EngineerOnly() => Ok(new { ok = true });
 
     [HttpGet("admin-only")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     public IActionResult AdminOnly() => Ok(new { ok = true });
 
     [HttpGet("open")]

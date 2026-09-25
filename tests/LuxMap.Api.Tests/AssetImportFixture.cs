@@ -88,7 +88,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 Username = AdminUsername,
                 Email = $"{AdminUsername}@luxmap.local",
                 FullName = "BE-12a commune-scoped administrator",
-                Role = UserRole.Administrator,
+                Role = UserRole.SystemAdmin,
 
                 // The whole reason this account exists: administrator rights WITHOUT system-wide
                 // scope, so the territorial rules still bite.
@@ -111,7 +111,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 Username = BothCommunesUsername,
                 Email = $"{BothCommunesUsername}@luxmap.local",
                 FullName = "BE-12a administrator over two communes",
-                Role = UserRole.Administrator,
+                Role = UserRole.SystemAdmin,
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
                 PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,

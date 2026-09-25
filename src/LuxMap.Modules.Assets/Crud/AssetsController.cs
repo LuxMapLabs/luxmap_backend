@@ -20,7 +20,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// <c>FeatureCollection</c>, 413 past 2000 poles. That is BE-14's, and an inventory list answering
 /// the same path would take it. These are two different surfaces for two different jobs.
 /// <para>
-/// <b>Permissions.</b> Writing is <see cref="LuxMapPolicies.Administrator"/> — the first production
+/// <b>Permissions.</b> Writing is <see cref="LuxMapPolicies.SystemAdmin"/> — the first production
 /// use of the four BE-08 policies. Reads carry NO policy: <c>SetFallbackPolicy</c> already demands
 /// authentication, and naming a role here would EXCLUDE the other three rather than set a floor.
 /// Contract section 7 covers territory only and says nothing about who may write, so the split is
@@ -63,7 +63,7 @@ public sealed class AssetsController(
         => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), ct));
 
     [HttpPost("segments")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -73,7 +73,7 @@ public sealed class AssetsController(
         => CreatedAsset("segments", await service.CreateSegmentAsync(request, ct));
 
     [HttpPost("feeders")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -82,7 +82,7 @@ public sealed class AssetsController(
         => CreatedAsset("feeders", await service.CreateFeederAsync(request, ct));
 
     [HttpPost("poles")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -93,7 +93,7 @@ public sealed class AssetsController(
         => CreatedAsset("poles", await service.CreatePoleAsync(request, ct));
 
     [HttpPost("fixtures")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -114,7 +114,7 @@ public sealed class AssetsController(
     /// </para>
     /// </remarks>
     [HttpPut("segments/{segmentId}")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -130,7 +130,7 @@ public sealed class AssetsController(
     /// <summary>Replaces a feeder. <b>204</b>, never the updated object.</summary>
     /// <remarks>See <see cref="UpdateSegmentRequest"/> for the shared full-replacement rules.</remarks>
     [HttpPut("feeders/{feederId}")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -152,7 +152,7 @@ public sealed class AssetsController(
     /// endpoint for changing only the circuit, and it refuses a body that leaves the key out.
     /// </remarks>
     [HttpPut("poles/{poleId}")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -174,7 +174,7 @@ public sealed class AssetsController(
     /// answers and the 409 carries the constraint that said no.
     /// </remarks>
     [HttpDelete("segments/{segmentId}")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -194,7 +194,7 @@ public sealed class AssetsController(
     /// <c>PUT /assets/poles/{id}/feeder</c>.
     /// </remarks>
     [HttpDelete("feeders/{feederId}")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -218,7 +218,7 @@ public sealed class AssetsController(
     /// </para>
     /// </remarks>
     [HttpDelete("poles/{poleId}")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -242,7 +242,7 @@ public sealed class AssetsController(
     /// </para>
     /// </remarks>
     [HttpPut("poles/{poleId}/feeder")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -340,7 +340,7 @@ public sealed class AssetsController(
     /// the reason the table exists.
     /// </summary>
     [HttpPut("fixtures/{fixtureId}/removal")]
-    [Authorize(Policy = LuxMapPolicies.Administrator)]
+    [Authorize(Policy = LuxMapPolicies.SystemAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]

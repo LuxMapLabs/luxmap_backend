@@ -102,7 +102,7 @@ public sealed class IdentitySeeder(
                 Email = template.Email,
                 FullName = template.FullName,
                 Role = template.Role,
-                HasSystemWideScope = template.Role == UserRole.Administrator,
+                HasSystemWideScope = template.Role == UserRole.SystemAdmin,
                 PasswordHash = string.Empty,
                 PasswordAlgorithm = PasswordAlgorithm,
             };
@@ -136,9 +136,9 @@ public static class SeedUsers
     /// <summary>One account per role. The order is fixed so USR-001..USR-004 stay stable.</summary>
     public static IReadOnlyList<SeedUser> All { get; } =
     [
-        new("admin", "admin@luxmap.local", "System Administrator", UserRole.Administrator),
-        new("agency", "agency@luxmap.local", "Managing Authority Officer", UserRole.ManagementAgency),
-        new("engineer", "engineer@luxmap.local", "Maintenance Engineer", UserRole.MaintenanceEngineer),
-        new("crew", "crew@luxmap.local", "Survey and Repair Crew", UserRole.FieldCrew),
+        new("admin", "admin@luxmap.local", "System Administrator", UserRole.SystemAdmin),
+        new("agency", "agency@luxmap.local", "Managing Authority Officer", UserRole.Superior),
+        new("engineer", "engineer@luxmap.local", "Maintenance Engineer", UserRole.Manager),
+        new("crew", "crew@luxmap.local", "Survey and Repair Crew", UserRole.FieldEngineer),
     ];
 }

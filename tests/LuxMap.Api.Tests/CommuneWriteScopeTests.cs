@@ -101,7 +101,7 @@ public class CommuneWriteScopeTests(AssetSchemaFixture fixture) : IAsyncLifetime
         var claims = new List<Claim>
         {
             new(AuthClaims.Subject, "USR-001"),
-            new(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.MaintenanceEngineer)),
+            new(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.Manager)),
         };
 
         claims.AddRange(communeIds.Select(id => new Claim(AuthClaims.CommuneIds, id)));
@@ -119,7 +119,7 @@ public class CommuneWriteScopeTests(AssetSchemaFixture fixture) : IAsyncLifetime
             User = new ClaimsPrincipal(new ClaimsIdentity(
                 [
                     new Claim(AuthClaims.Subject, "USR-000"),
-                    new Claim(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.Administrator)),
+                    new Claim(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.SystemAdmin)),
                     new Claim(AuthClaims.CommuneIds, AuthClaims.AllCommunes),
                 ],
                 authenticationType: "Test")),

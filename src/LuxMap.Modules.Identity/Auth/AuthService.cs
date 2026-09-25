@@ -173,7 +173,7 @@ public sealed class AuthService(
     /// crew member can only FILE faults, which an engineer still has to approve. An engineer could
     /// reject genuine faults and hide real outages; a managing authority sees across communes.
     /// </summary>
-    public const UserRole LowestRole = UserRole.FieldCrew;
+    public const UserRole LowestRole = UserRole.FieldEngineer;
 
     /// <summary>PostgreSQL SQLSTATE 23505 — unique_violation.</summary>
     private static bool IsUniqueViolation(DbUpdateException exception)
