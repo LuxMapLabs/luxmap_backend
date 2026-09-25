@@ -107,6 +107,30 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
         }
     }
 
+    /// <summary>
+    /// The four values retired by Contract v1.7 are admitted by no registered policy.
+    /// </summary>
+    /// <remarks>
+    /// A token minted before the migration still carries one of them for up to 60 minutes. The only
+    /// thing that keeps such a token from passing is that no policy lists the old value — and a
+    /// "compatibility" entry is exactly the kind of addition that looks harmless in review.
+    /// </remarks>
+    [Fact]
+    public async Task No_registered_policy_admits_a_retired_role_value()
+    {
+        string[] retired = ["management_agency", "maintenance_engineer", "field_crew", "administrator"];
+        var provider = factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
+
+        foreach (var name in LuxMapPolicies.Matrix.Keys)
+        {
+            var policy = await provider.GetPolicyAsync(name);
+            var admitted = policy!.Requirements.OfType<ClaimsAuthorizationRequirement>()
+                .SelectMany(requirement => requirement.AllowedValues ?? []);
+
+            Assert.Empty(admitted.Intersect(retired, StringComparer.Ordinal));
+        }
+    }
+
     private static IEnumerable<string> PoliciesOf(RouteEndpoint endpoint)
         => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
             .Select(data => data.Policy)
