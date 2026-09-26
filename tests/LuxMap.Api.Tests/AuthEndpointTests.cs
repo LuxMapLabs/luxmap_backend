@@ -2,8 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Identity.Seeding;
 using LuxMap.Persistence;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Xunit.Abstractions;
 
@@ -99,14 +102,23 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         Assert.Empty(details.EnumerateObject());
     }
 
+    /// <remarks>
+    /// ⚠️ Locks a THROWAWAY account, never a seeded one. It used to lock <c>crew</c> for a few
+    /// milliseconds, and xUnit runs other collections in parallel against the same database: any test
+    /// signing in as <c>crew</c> in that window got 403 <c>ACCOUNT_LOCKED</c> and failed for no reason
+    /// it could name (measured: 1 run in 3 once the role-matrix tests added six crew sign-ins).
+    /// </remarks>
     [Fact]
     public async Task Locked_account_is_blocked_on_both_login_and_refresh()
     {
-        var tokens = await Client.LoginAsync("crew", "SEED_CREW_PASSWORD");
-        await SetLockedAsync("crew", locked: true);
+        var password = AuthTestExtensions.SeedPassword("SEED_CREW_PASSWORD");
+        var username = await CreateThrowawayAccountAsync(password);
         try
         {
-            var login = await Client.PostLoginAsync("crew", AuthTestExtensions.SeedPassword("SEED_CREW_PASSWORD"));
+            var tokens = await (await Client.PostLoginAsync(username, password)).ReadTokensAsync();
+            await SetLockedAsync(username, locked: true);
+
+            var login = await Client.PostLoginAsync(username, password);
             var refresh = await Client.PostRefreshAsync(tokens.RefreshToken);
 
             output.WriteLine($"  login while locked   : HTTP {(int)login.StatusCode}");
@@ -121,7 +133,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         }
         finally
         {
-            await SetLockedAsync("crew", locked: false);
+            await DeleteAccountAsync(username);
         }
     }
 
@@ -201,6 +213,35 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
         var root = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
         Assert.Equal(["error"], root.EnumerateObject().Select(p => p.Name));
     }
+
+    /// <summary>A field engineer with no communes, existing only for the duration of one test.</summary>
+    private Task<string> CreateThrowawayAccountAsync(string password)
+        => factory.QueryAsync(async db =>
+        {
+            var username = $"lock-{Guid.NewGuid():N}"[..20];
+            var user = new AppUser
+            {
+                Username = username,
+                Email = $"{username}@luxmap.local",
+                FullName = "Locked-account probe",
+                Role = UserRole.FieldEngineer,
+                PasswordHash = string.Empty,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+            };
+            user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, password);
+            db.Set<AppUser>().Add(user);
+            await db.SaveChangesAsync();
+            return username;
+        });
+
+    /// <summary>Its refresh tokens go with it (<c>refresh_token.user_id</c> cascades).</summary>
+    private Task DeleteAccountAsync(string username)
+        => factory.QueryAsync(async db =>
+        {
+            #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
+            return await db.Set<AppUser>().Where(u => u.Username == username).ExecuteDeleteAsync();
+            #pragma warning restore RS0030
+        });
 
     private Task SetLockedAsync(string username, bool locked)
         => factory.QueryAsync(async db =>
