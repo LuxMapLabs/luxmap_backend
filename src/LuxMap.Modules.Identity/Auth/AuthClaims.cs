@@ -9,7 +9,7 @@ public static class AuthClaims
     /// <summary>User id, e.g. <c>USR-001</c>.</summary>
     public const string Subject = "sub";
 
-    /// <summary>A SINGLE string carrying the BE-06 value (<c>administrator</c>, <c>field_crew</c>, ...).</summary>
+    /// <summary>A SINGLE string carrying the Contract section 3.1 value (<c>system_admin</c>, <c>field_engineer</c>, ...).</summary>
     public const string Role = "role";
 
     /// <summary>

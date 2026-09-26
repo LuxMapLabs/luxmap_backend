@@ -284,7 +284,10 @@ lỗi ở phía phát token hàng giờ.
 Hệ quả: request chưa đăng nhập tới route **không tồn tại** cũng nhận 401 chứ không phải 404 — có
 chủ ý, người lạ không dò được route nào có thật.
 
-**Policy theo vai trò.** `LuxMapPolicies.MaintenanceEngineer` v.v.
+**Policy theo capability.** Mỗi policy (`LuxMapPolicies.ReadNetwork`, `ManageAssets`, …) là một
+capability liệt kê đúng các vai trò được vào, lấy từ `LuxMapPolicies.Matrix` — nguồn duy nhất, không
+thứ bậc (Contract v1.7 §2). Capability rỗng làm host từ chối khởi động, vì `RequireClaim` không giá trị
+nhận mọi vai trò.
 
 ### `Authorization/CommuneScopeAccessor.cs`
 Rút phạm vi địa bàn từ `ClaimsPrincipal`.

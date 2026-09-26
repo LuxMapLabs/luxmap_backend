@@ -144,14 +144,14 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
     [Fact]
     public async Task Wildcard_claim_on_a_non_administrator_is_rejected()
     {
-        // Simulate a BUG on the issuing side: turn on the system-wide flag for a field_crew account.
+        // Simulate a BUG on the issuing side: turn on the system-wide flag for a field_engineer account.
         await factory.SetSystemWideAsync("crew", true);
         try
         {
             var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
             var response = await client.GetAsync("/api/v1/_scope/probes");
 
-            output.WriteLine($"  field_crew carrying [\"*\"] → HTTP {(int)response.StatusCode}");
+            output.WriteLine($"  field_engineer carrying [\"*\"] → HTTP {(int)response.StatusCode}");
             Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
             var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync())

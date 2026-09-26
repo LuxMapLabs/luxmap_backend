@@ -4,12 +4,15 @@ using System.Security.Claims;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Identity.Auth;
+using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Identity.Seeding;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
@@ -30,26 +33,71 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
 {
     private const int Srid = 4326;
 
-    /// <summary>The seeded administrator. Its claim is <c>["*"]</c>, so it can write any commune.</summary>
-    private const string AdminUser = "admin";
-
-    private const string AdminUserId = "USR-001";
+    /// <summary>
+    /// The password of the field engineer this class creates — borrowed from <c>.env</c> so it is
+    /// never a literal in the test source.
+    /// </summary>
+    private static readonly string FieldEngineerPassword = AuthTestExtensions.SeedPassword("SEED_CREW_PASSWORD");
 
     /// <summary>
-    /// The seeded engineer, scoped to <c>COM-001</c> only.
+    /// A field engineer scoped to the fixture's commune — created per class, because recording a
+    /// reading is <c>RecordLuxReading</c>, the Field Engineer ONLY (Contract v1.7 section 2).
+    /// </summary>
+    /// <remarks>
+    /// Until v1.7 these tests wrote as the seeded system-wide administrator, which the POST accepted
+    /// because it carried no policy at all. The seeded <c>crew</c> account IS a field engineer but is
+    /// scoped to the seed commune, while the fixture creates a fresh one per run — so a field engineer
+    /// inside the fixture's commune has to be made here.
+    /// </remarks>
+    private string fieldEngineerUsername = null!;
+
+    private string fieldEngineerUserId = null!;
+
+    /// <summary>
+    /// The seeded field engineer, scoped to the seed commune only.
     /// </summary>
     /// <remarks>
     /// Used for the out-of-scope test: the fixture creates a FRESH commune per run, so every fixture
-    /// pole is outside this account's claim without any extra setup.
+    /// pole is outside this account's claim without any extra setup. It must be a field engineer:
+    /// any other role would be refused by the policy with 403 before the scope was ever consulted.
     /// </remarks>
-    private const string EngineerUser = "engineer";
+    private const string OutOfScopeFieldEngineer = "crew";
 
     private readonly List<string> createdLuxIds = [];
     private readonly List<string> createdPoleIds = [];
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public async Task InitializeAsync()
+    {
+        fieldEngineerUsername = $"be42-{Guid.NewGuid():N}"[..20];
+
+        fieldEngineerUserId = await fixture.WriteAsSystemAsync(async db =>
+        {
+            var user = new AppUser
+            {
+                Username = fieldEngineerUsername,
+                Email = $"{fieldEngineerUsername}@luxmap.local",
+                FullName = "BE-42 field engineer",
+                Role = UserRole.FieldEngineer,
+                HasSystemWideScope = false,
+                PasswordHash = string.Empty,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+            };
+
+            user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, FieldEngineerPassword);
+            db.Set<AppUser>().Add(user);
+            await db.SaveChangesAsync();
+
+            db.Set<AppUserCommune>().Add(new AppUserCommune { UserId = user.UserId, CommuneId = fixture.CommuneId });
+            await db.SaveChangesAsync();
+            return user.UserId;
+        });
+    }
 
     /// <summary>Removes every row this class created — the fixture only cleans its own commune.</summary>
+    /// <remarks>
+    /// The readings go first: <c>lux_reading.measured_by</c> holds the account with RESTRICT. The
+    /// account's refresh tokens and commune assignment cascade with it.
+    /// </remarks>
     public async Task DisposeAsync()
         => await fixture.WriteAsSystemAsync(async db =>
         {
@@ -57,27 +105,38 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
             await db.Set<LuxReading>().IgnoreQueryFilters()
                 .Where(reading => createdLuxIds.Contains(reading.LuxId)).ExecuteDeleteAsync();
 
+            await db.Set<AppUser>()
+                .Where(user => user.UserId == fieldEngineerUserId).ExecuteDeleteAsync();
+
             return await db.Set<Pole>().IgnoreQueryFilters()
                 .Where(pole => createdPoleIds.Contains(pole.PoleId)).ExecuteDeleteAsync();
             #pragma warning restore RS0030
         });
 
     /// <summary>
-    /// A client carrying a REAL access token.
+    /// A client carrying a REAL access token for the field engineer inside the fixture's commune.
     /// </summary>
     /// <remarks>
     /// The scope has to come from a signed JWT: an HTTP request runs its own authentication, so
     /// setting an ambient ClaimsPrincipal in the test process would leave the request unauthenticated.
     /// </remarks>
-    private async Task<HttpClient> ClientAsync(string username)
+    private async Task<HttpClient> FieldEngineerClientAsync()
+    {
+        var client = fixture.CreateClient();
+        var tokens = await (await client.PostLoginAsync(fieldEngineerUsername, FieldEngineerPassword)).ReadTokensAsync();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+
+        return client;
+    }
+
+    /// <summary>A client for one of the seeded accounts.</summary>
+    private async Task<HttpClient> SeededClientAsync(string username, string passwordVariable)
     {
         var client = fixture.CreateClient();
         // LoginAsync takes the ENVIRONMENT VARIABLE NAME, not the password — seed passwords are read
         // from .env and never appear in test source.
-        var tokens = await client.LoginAsync(
-            username,
-            username == AdminUser ? "SEED_ADMIN_PASSWORD" : "SEED_ENGINEER_PASSWORD");
-
+        var tokens = await client.LoginAsync(username, passwordVariable);
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokens.AccessToken);
 
@@ -143,7 +202,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task A_reading_is_created_and_the_database_assigns_the_lux_id()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (status, body) = await PostAsync(client, Body(poleId));
@@ -163,7 +222,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Sending_lux_id_is_rejected_rather_than_silently_ignored()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (status, body) = await PostAsync(client, Body(poleId, luxId: "LUX-9999"));
@@ -177,7 +236,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     {
         // Silence would be worse than a refusal here: the caller would believe it chose the commune
         // that owns the record, and it did not.
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (status, body) = await PostAsync(client, Body(poleId, communeId: fixture.CommuneId));
@@ -191,7 +250,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task An_unknown_pole_is_404()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
 
         var (status, body) = await PostAsync(client, Body("POLE-999999"));
 
@@ -206,12 +265,12 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         // would confirm the resource exists. The query filter delivers that for free — the pole is
         // simply not found.
         //
-        // The seeded engineer is scoped to COM-001 while the fixture creates a fresh commune per
-        // run, so any fixture pole is out of scope for them without further setup. The pole is REAL:
+        // The seeded field engineer is scoped to the seed commune while the fixture creates a fresh
+        // commune per run, so any fixture pole is out of scope for them without further setup. The pole is REAL:
         // an invented id would be stopped by the foreign key before the scope check ran, and the
         // test would pass while proving the wrong thing.
         var poleId = await NewPoleAsync();
-        using var client = await ClientAsync(EngineerUser);
+        using var client = await SeededClientAsync(OutOfScopeFieldEngineer, "SEED_CREW_PASSWORD");
 
         var (status, body) = await PostAsync(client, Body(poleId));
 
@@ -224,7 +283,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task The_stored_commune_is_the_poles_commune()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (_, body) = await PostAsync(client, Body(poleId));
@@ -243,7 +302,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task A_repeated_client_op_id_returns_200_with_the_first_record_and_creates_nothing()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
         var opId = Guid.NewGuid().ToString();
 
@@ -280,7 +339,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         // No upper bound, deliberately. This is ground truth for RQ1: FO-14 measures once in the
         // field, so refusing a real reading loses it for good, while an implausible one stays
         // visible and can be excluded during analysis. 99999 is logged as a warning and stored.
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (status, body) = await PostAsync(client, Body(poleId, luxValue: luxValue));
@@ -298,7 +357,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Measured_by_comes_from_the_token_is_stored_and_is_never_echoed_back()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (_, body) = await PostAsync(client, Body(poleId));
@@ -314,7 +373,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
             .IgnoreQueryFilters()
             .SingleAsync(reading => reading.LuxId == luxId));
 
-        Assert.Equal(AdminUserId, stored.MeasuredBy);
+        Assert.Equal(fieldEngineerUserId, stored.MeasuredBy);
     }
 
     // ── (x) data_source ──────────────────────────────────────────────────────
@@ -325,7 +384,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         // Two layers guard this: the enum converter refuses to bind, and ck_lux_reading_data_source
         // would refuse the row. The binder is the one that answers here, so the caller gets a 400
         // rather than a 500 wrapping a constraint violation.
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (status, _) = await PostAsync(client, Body(poleId, dataSource: "not_a_real_source"));
@@ -340,7 +399,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     {
         // CV-12 binds against the final shape today. A missing key and a null value are different
         // things to a client, and the Contract publishes the key.
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (_, created) = await PostAsync(client, Body(poleId));
@@ -369,7 +428,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task A_from_or_to_bound_without_a_Z_suffix_is_read_as_UTC_not_as_server_local_time()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var body = (Dictionary<string, object?>)Body(poleId);
@@ -393,7 +452,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task The_per_pole_endpoint_omits_nearest_luminance_and_sorts_oldest_first()
     {
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         foreach (var day in new[] { 3, 1, 2 })
@@ -424,7 +483,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         // RESTRICT, not cascade. A lux reading is the ground truth for RQ1; removing a pole must not
         // quietly remove research data. It also keeps this out of the cascade blind spot recorded in
         // CLAUDE.md 1c, where the SaveChanges guard cannot see deletions the database performs.
-        using var client = await ClientAsync(AdminUser);
+        using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 
         var (_, created) = await PostAsync(client, Body(poleId));

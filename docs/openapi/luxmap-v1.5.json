@@ -2,8 +2,8 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.5, 19/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 35 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
-    "version": "1.5"
+    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.7, 25/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 35 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "version": "1.7"
   },
   "paths": {
     "/api/v1/assets/import/{kind}": {
@@ -133,6 +133,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Nạp MỘT loại file kiểm kê (segments|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
         "operationId": "postAssetsImportKind",
         "x-luxmap-status": "implemented",
@@ -215,6 +219,13 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
         "operationId": "getAssetsSegments",
         "x-luxmap-status": "implemented",
@@ -318,6 +329,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Tạo tuyến đường; 201 + Location, không body",
         "operationId": "postAssetsSegments",
         "x-luxmap-status": "implemented",
@@ -389,8 +404,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
         "operationId": "getAssetsSegmentsSegmentid",
         "x-luxmap-status": "implemented",
@@ -524,6 +556,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Thay thế TOÀN PHẦN một tuyến; commune_id không sửa được",
         "operationId": "putAssetsSegmentsSegmentid",
         "x-luxmap-status": "implemented",
@@ -618,6 +654,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Xoá tuyến; khoá ngoại quyết định (409 ASSET_IN_USE)",
         "operationId": "deleteAssetsSegmentsSegmentid",
         "x-luxmap-status": "implemented",
@@ -700,6 +740,13 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Danh sách mạch điện — has_geometry + pole_count; KHÔNG có data_source (§1.6)",
         "operationId": "getAssetsFeeders",
         "x-luxmap-status": "implemented",
@@ -783,6 +830,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Tạo mạch điện; 201 + Location, không body",
         "operationId": "postAssetsFeeders",
         "x-luxmap-status": "implemented",
@@ -854,8 +905,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
         "operationId": "getAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
@@ -989,6 +1057,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được",
         "operationId": "putAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
@@ -1083,6 +1155,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Xoá mạch điện; còn cột đang đấu vào thì 409 ASSET_IN_USE",
         "operationId": "deleteAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
@@ -1165,6 +1241,13 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
         "operationId": "getAssetsPoles",
         "x-luxmap-status": "implemented",
@@ -1288,6 +1371,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Tạo cột; 201 + Location, không body",
         "operationId": "postAssetsPoles",
         "x-luxmap-status": "implemented",
@@ -1359,8 +1446,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Một cột + geom_wkt + segment_name + created_at; ngoài phạm vi xã → 404",
         "operationId": "getAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -1494,6 +1598,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
         "operationId": "putAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -1588,6 +1696,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
         "operationId": "deleteAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -1691,8 +1803,22 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Ghi một lần lắp bóng; commune_id chép từ cột",
         "operationId": "postAssetsFixtures",
         "x-luxmap-status": "implemented",
@@ -1828,6 +1954,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
         "operationId": "putAssetsPolesPoleidFeeder",
         "x-luxmap-status": "implemented",
@@ -1906,8 +2036,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
         "operationId": "getAssetsFeedersFeederidPoles",
         "x-luxmap-status": "implemented",
@@ -1986,8 +2133,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
         "operationId": "getAssetsSegmentsSegmentidPoles",
         "x-luxmap-status": "implemented",
@@ -2097,6 +2261,13 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "[TẠM — drift 46] Cột CHƯA có mạch; bắt buộc unassigned=true; chỉ listing này trả power_source",
         "operationId": "getAssetsFeedersPoles",
         "x-luxmap-status": "implemented",
@@ -2190,8 +2361,22 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "summary": "Ngừng dùng bóng bằng removed_date; không có DELETE",
         "operationId": "putAssetsFixturesFixtureidRemoval",
         "x-luxmap-status": "implemented",
@@ -2397,6 +2582,7 @@
             }
           }
         },
+        "deprecated": true,
         "summary": "Đăng ký mở; tạo danh tính, không tạo quyền",
         "operationId": "postAuthRegister",
         "x-luxmap-status": "implemented",
@@ -2762,6 +2948,10 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:record_lux_reading",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
         "summary": "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",
         "operationId": "postLuxReadings",
         "x-luxmap-status": "implemented",
@@ -2844,8 +3034,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_lux_readings",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
         "operationId": "getLuxReadings",
         "x-luxmap-status": "implemented",
@@ -2924,8 +3131,25 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
+        "x-luxmap-capability": "cap:read_lux_readings",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
         "operationId": "getLuxReadingsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -3083,6 +3307,13 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
         "operationId": "getPoles",
         "x-luxmap-status": "implemented"
@@ -3191,6 +3422,13 @@
             }
           }
         },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
         "summary": "Bản đồ tuyến theo bbox; FeatureCollection của LineString",
         "operationId": "getSegments",
         "x-luxmap-status": "implemented"
@@ -3669,7 +3907,7 @@
         "tags": [
           "Faults"
         ],
-        "summary": "[NOT IMPLEMENTED] Tổ khảo sát báo sự cố tại hiện trường",
+        "summary": "[NOT IMPLEMENTED] Kỹ sư hiện trường báo sự cố tại chỗ",
         "description": "Contract §5.4. Chưa có code — ticket BE-41. Giữ trong Contract, không xoá.",
         "operationId": "postFaults",
         "x-luxmap-status": "not_implemented",
@@ -7124,7 +7362,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -7152,7 +7390,7 @@
     },
     {
       "name": "Assets",
-      "description": "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản trị."
+      "description": "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản lý (cap:manage_assets); đọc = cap:read_network."
     },
     {
       "name": "AssetImport",
@@ -7160,7 +7398,7 @@
     },
     {
       "name": "LuxReadings",
-      "description": "Số đo lux — Contract §5.7. Ground truth RQ1."
+      "description": "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."
     },
     {
       "name": "Poles",

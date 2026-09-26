@@ -80,7 +80,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Deleting_a_pole_nothing_references_succeeds_and_takes_its_fixture_with_it()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, fixtureId) = await NewPoleWithFixtureAsync();
 
         var response = await client.DeleteAsync($"{PoleRoute}/{poleId}");
@@ -97,7 +97,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task A_pole_with_a_lux_reading_cannot_be_deleted_because_that_is_research_data()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, _) = await NewPoleWithFixtureAsync();
         await AddLuxReadingAsync(poleId);
 
@@ -112,7 +112,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task A_pole_with_a_fault_against_it_cannot_be_deleted()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, _) = await NewPoleWithFixtureAsync();
         await AddFaultAsync(poleId: poleId, fixtureId: null);
 
@@ -135,7 +135,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task A_pole_whose_fixture_has_a_fault_cannot_be_deleted_and_nothing_is_half_removed()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, fixtureId) = await NewPoleWithFixtureAsync();
         await AddFaultAsync(poleId: null, fixtureId: fixtureId);
 
@@ -160,7 +160,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Deleting_a_pole_that_does_not_exist_is_404()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.DeleteAsync($"{PoleRoute}/POLE-000000");
         var body = await ReadErrorAsync(response);
@@ -181,7 +181,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     public async Task Deleting_a_pole_in_another_commune_is_404_not_403_so_the_id_is_not_confirmed()
     {
         var foreignPoleId = await NewForeignPoleAsync();
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.DeleteAsync($"{PoleRoute}/{foreignPoleId}");
         var body = await ReadErrorAsync(response);
@@ -192,9 +192,9 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_maintenance_engineer_may_not_delete_a_pole()
+    public async Task A_system_admin_may_not_delete_a_pole()
     {
-        var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
+        var client = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
         var (poleId, _) = await NewPoleWithFixtureAsync();
 
         var response = await client.DeleteAsync($"{PoleRoute}/{poleId}");
@@ -208,7 +208,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Assigning_a_feeder_in_the_same_commune_succeeds_and_the_row_changes()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, _) = await NewPoleWithFixtureAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
@@ -221,7 +221,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Assigning_null_clears_the_feeder_because_a_solar_pole_is_on_no_circuit()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, _) = await NewPoleWithFixtureAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
@@ -241,7 +241,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task An_empty_body_is_rejected_rather_than_read_as_a_request_to_clear_the_feeder()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, _) = await NewPoleWithFixtureAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
         await PutFeederAsync(client, poleId, $"\"{feederId}\"");
@@ -260,7 +260,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     [Fact]
     public async Task Assigning_a_feeder_that_does_not_exist_is_404()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var (poleId, _) = await NewPoleWithFixtureAsync();
 
         var response = await PutFeederAsync(client, poleId, "\"FDR-000\"");
@@ -300,7 +300,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     public async Task Setting_the_feeder_of_a_pole_in_another_commune_is_404()
     {
         var foreignPoleId = await NewForeignPoleAsync();
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
         var response = await PutFeederAsync(client, foreignPoleId, $"\"{feederId}\"");
@@ -309,7 +309,7 @@ public sealed class PoleWriteTests(AssetImportFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_field_crew_member_may_not_set_a_feeder()
+    public async Task A_field_engineer_may_not_set_a_feeder()
     {
         var client = await fixture.SeededClientAsync("crew", "SEED_CREW_PASSWORD");
         var (poleId, _) = await NewPoleWithFixtureAsync();

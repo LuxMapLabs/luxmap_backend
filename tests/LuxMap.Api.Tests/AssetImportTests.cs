@@ -26,7 +26,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_reference_that_matches_nothing_is_caught_in_validation_and_nothing_is_written()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
 
         var result = await ImportAsync(client, "poles", "poles.csv",
@@ -48,7 +48,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task Loading_the_same_file_twice_updates_instead_of_creating_a_second_copy()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
 
         var file = SegmentHeader
@@ -77,7 +77,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_second_fixtures_file_is_refused_per_row_rather_than_doubling_the_equipment_history()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
         await SeedPoleAsync(client, tag);
 
@@ -100,7 +100,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task Two_rows_in_ONE_file_claiming_the_same_pole_are_caught_before_the_write()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
         await SeedPoleAsync(client, tag);
 
@@ -118,7 +118,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_row_naming_a_commune_outside_the_scope_fails_that_row_and_leaves_the_rest_written()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
 
         var result = await ImportAsync(client, "segments", "segments.csv",
@@ -146,7 +146,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task More_than_a_hundred_errors_are_truncated_but_the_total_is_still_reported_in_full()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
 
         // 150 rows, each missing road_class AND data_source — so 300 errors from 150 rows, which also
@@ -169,7 +169,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_file_whose_header_is_missing_a_column_reports_it_once_against_line_one()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var result = await ImportAsync(client, "segments", "segments.csv",
             "external_ref,segment_name\nA,Ten");
@@ -183,7 +183,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task An_unsupported_file_extension_is_refused_with_415_before_anything_is_parsed()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         using var content = new MultipartFormDataContent();
         var bytes = new ByteArrayContent(Encoding.UTF8.GetBytes("irrelevant"));
@@ -198,7 +198,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task An_unknown_import_kind_is_a_400_naming_the_four_that_exist()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         using var content = new MultipartFormDataContent();
         content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("a,b\n1,2")), "file", "x.csv");
@@ -213,7 +213,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_semicolon_file_with_a_utf8_BOM_and_CRLF_still_imports()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = Tag();
 
         // Everything Excel does wrong at once, which is the realistic case rather than the tidy one.
@@ -267,7 +267,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
             }
         });
 
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var result = await ImportAsync(client, "segments", "segments.csv",
             SegmentHeader
             + $"\n{shared},Tuyen cua xa minh,inter_commune,1600,"

@@ -126,7 +126,7 @@ public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper outpu
         output.WriteLine($"  201 body: {body.GetRawText()}");
 
         Assert.Equal(name, body.GetProperty("username").GetString());
-        Assert.Equal("field_crew", body.GetProperty("role").GetString());
+        Assert.Equal("field_engineer", body.GetProperty("role").GetString());
         Assert.Empty(body.GetProperty("commune_ids").EnumerateArray());
 
         // No token is handed out — POST /auth/login stays the single token-issuing path.
@@ -135,7 +135,7 @@ public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper outpu
 
         var stored = await LoadAsync(name);
         Assert.NotNull(stored);
-        Assert.Equal("field_crew", UserRoleOf(stored));
+        Assert.Equal("field_engineer", UserRoleOf(stored));
         Assert.False(stored.IsLocked);
         Assert.False(stored.HasSystemWideScope);
         Assert.DoesNotContain(StrongPassword, stored.PasswordHash, StringComparison.Ordinal);
@@ -158,7 +158,7 @@ public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper outpu
         output.WriteLine("── decoded payload of the newly registered account ──");
         output.WriteLine(JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
 
-        Assert.Equal("field_crew", payload.GetProperty("role").GetString());
+        Assert.Equal("field_engineer", payload.GetProperty("role").GetString());
         Assert.Equal(JsonValueKind.Array, payload.GetProperty("commune_ids").ValueKind);
         Assert.Empty(payload.GetProperty("commune_ids").EnumerateArray());
     }
@@ -196,14 +196,14 @@ public class RegistrationTests(ScopeTestFixture factory, ITestOutputHelper outpu
             email = $"{name}@luxmap.local",
             full_name = "Would-be admin",
             password = StrongPassword,
-            role = "administrator",
+            role = "system_admin",
         });
 
         response.EnsureSuccessStatusCode();
         var stored = await LoadAsync(name);
 
         output.WriteLine($"  body said role=administrator → stored role is {UserRoleOf(stored!)}");
-        Assert.Equal("field_crew", UserRoleOf(stored!));
+        Assert.Equal("field_engineer", UserRoleOf(stored!));
         Assert.False(stored!.HasSystemWideScope);
     }
 

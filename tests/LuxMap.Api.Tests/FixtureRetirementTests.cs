@@ -23,7 +23,7 @@ public sealed class FixtureRetirementTests(AssetImportFixture fixture)
     [Fact]
     public async Task Retiring_a_lamp_before_its_install_date_is_400_and_the_row_is_untouched()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var lampId = await NewLampAsync(installDate: new DateOnly(2024, 6, 1));
 
         var response = await client.PutAsJsonAsync($"{FixtureRoute}/{lampId}/removal", new { removed_date = "2024-05-31" });
@@ -38,7 +38,7 @@ public sealed class FixtureRetirementTests(AssetImportFixture fixture)
     [Fact]
     public async Task Retiring_a_lamp_on_its_install_date_or_later_succeeds_and_a_second_retirement_is_400()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var lampId = await NewLampAsync(installDate: new DateOnly(2024, 6, 1));
 
         // Same day is allowed: a lamp can be installed and found dead within the shift.
@@ -59,7 +59,7 @@ public sealed class FixtureRetirementTests(AssetImportFixture fixture)
     [Fact]
     public async Task Creating_a_historical_lamp_with_removed_date_before_install_date_is_400()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
         var response = await client.PostAsJsonAsync(FixtureRoute, new
@@ -80,7 +80,7 @@ public sealed class FixtureRetirementTests(AssetImportFixture fixture)
     [Fact]
     public async Task Import_reports_a_removed_date_before_install_date_as_a_row_error()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = $"T{Guid.NewGuid():N}"[..9].ToUpperInvariant();
         await NewPoleAsync(externalRef: $"{tag}-P1");
 

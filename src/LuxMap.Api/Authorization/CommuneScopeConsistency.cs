@@ -30,7 +30,7 @@ public sealed class CommuneScopeConsistencyHandler(ILogger<CommuneScopeConsisten
             return Task.CompletedTask;
         }
 
-        if (CommuneScopeAccessor.HasWildcardClaim(principal) && !CommuneScopeAccessor.IsAdministrator(principal))
+        if (CommuneScopeAccessor.HasWildcardClaim(principal) && !CommuneScopeAccessor.IsSystemAdmin(principal))
         {
             // Error rather than Warning: this signals a BUG on the token-issuing side, not an attack.
             logger.LogError(
