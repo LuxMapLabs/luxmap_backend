@@ -1,21 +1,23 @@
-# LuxMap — API Contract v1.6 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.7 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
 `api-contract-v1.1.md`** để mọi liên kết cũ vẫn đúng (quyết định D-1, Dylan, 18/09/2026).
 **Ngày chốt v1.0:** 23/08/2026 · **v1.1:** 24/08/2026 · **v1.2:** 11/09/2026 (mục 4 Auth) ·
 **v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02) ·
-**v1.5:** 19/09/2026 (`GET /auth/me`) · **v1.6:** 22/09/2026 (bỏ đèn solar khỏi enum).
+**v1.5:** 19/09/2026 (`GET /auth/me`) · **v1.6:** 22/09/2026 (bỏ đèn solar khỏi enum) ·
+**v1.7:** 25/09/2026 (vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 và v1.7, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (37 operation: 22
-`implemented`, 15 `not_implemented`), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (45 operation: 32
+`implemented`, 13 `not_implemented` — đếm lại ở v1.7; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+`x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
 **Ký hiệu**
@@ -121,13 +123,13 @@ client **không** parse.
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token thiếu/sai/hết hạn/thu hồi/dùng lại/sai nhóm — một mã |
 | `ACCOUNT_LOCKED` | 403 | Đúng mật khẩu, tài khoản khoá (cả login lẫn refresh) |
 | `COMMUNE_FORBIDDEN` | 403 | `commune_id` ngoài phạm vi claim (mục 2), hoặc claim `["*"]` lệch vai trò |
-| `ROLE_FORBIDDEN` | 403 | Đã đăng nhập nhưng **vai trò** không được policy của endpoint cho phép (v1.4, D-4) |
+| `ROLE_FORBIDDEN` | 403 | Đã đăng nhập nhưng **vai trò** không nằm trong danh sách của capability mà endpoint yêu cầu (mục 2; v1.4, D-4) |
 | `ORIGIN_NOT_ALLOWED` | 403 | `Origin` thiếu / lạ / `null` — chỉ nhóm `/auth/web/*` |
 | `POLE_NOT_FOUND` | 404 | `pole_id` không tồn tại **hoặc ngoài phạm vi** — cùng một câu trả lời |
 | `ASSET_NOT_FOUND` | 404 | Tài sản (`/assets/…`) không tồn tại **hoặc ngoài phạm vi** |
 | `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
 | `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
-| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username/email |
+| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username/email (`POST /auth/register` — **DEPRECATED**, mục 4.1) |
 | `EXTERNAL_REF_TAKEN` | 409 | `(commune_id, external_ref)` đã có |
 | `ASSET_IN_USE` | 409 | `DELETE` bị khoá ngoại từ chối; `details.constraint`, `details.table` |
 | `CROSS_COMMUNE_REFERENCE` | 409 | Gắn cột vào mạch điện **khác xã** với cột (v1.4, D-5) |
@@ -154,21 +156,42 @@ client **không** parse.
 ra `properties`), `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReading` (emit).
 `Feeder` không có. **Mọi endpoint thống kê phải lọc và nhóm được theo trường này**, và **không bao giờ
 trả một con số gộp ba nguồn**. `GET /poles` và `GET /segments` **mặc định loại `calibration_rig`**;
-muốn thấy bộ hiệu chuẩn thì truyền `data_source=calibration_rig` tường minh (v1.4, D-13). Giá trị
-`field` giữ cho tương lai; Nhánh C không sinh bản ghi nào mang nó.
+muốn thấy bộ hiệu chuẩn thì truyền `data_source=calibration_rig` tường minh (v1.4, D-13).
+
+Nguồn của từng giá trị (v1.7, D-R10 — phạm vi theo Phiếu đăng ký v1.2):
+
+| Giá trị | Dữ liệu |
+|---|---|
+| `field` | Thu **ngoài thực địa ở xã đối tác**: video đêm của đèn thật, số đo sáng **tương đối** bằng điện thoại, kiểm tra trạng thái đèn bằng mắt ban đêm |
+| `public_imagery` | Ảnh đêm công khai — nguồn khởi động AI trong lúc chờ quay thực địa |
+| `calibration_rig` | Controlled Reference Capture Set trên **mô hình testbed tự dựng** (đèn LED, mức sáng biết trước) |
+| `simulated` | Telemetry mô phỏng |
+
+🔴 Dữ liệu từ testbed (ảnh **và** telemetry) **không bao giờ** mang `field` — gộp nó vào `field` là
+trộn thí nghiệm có kiểm soát với hiện trường. Telemetry thật từ thiết bị IoT trên testbed mang giá trị
+nào (`calibration_rig` hay giá trị mới) còn mở: `[OPEN → O-9]`.
 
 ---
 
 ## 2. Phân quyền — theo địa bàn và theo vai trò
 
-JWT mang claim `commune_ids` (mảng). Quản trị mang `["*"]`.
+Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3.2.c (v1.7, D-R6). JWT mang claim
+`commune_ids` (mảng). Quản trị hệ thống mang `["*"]`.
 
-| Vai trò | Giá trị enum `user_role` | Phạm vi địa bàn |
-|---|---|---|
-| Cơ quan quản lý | `management_agency` | Có thể gồm nhiều xã |
-| Kỹ sư bảo trì | `maintenance_engineer` | Đúng các xã trong claim |
-| Tổ khảo sát / sửa chữa | `field_crew` | Đúng các xã trong claim |
-| Quản trị | `administrator` | Toàn hệ thống, `*` |
+| Vai trò | Giá trị enum `user_role` | Thay cho (≤ v1.6) | Phạm vi địa bàn |
+|---|---|---|---|
+| Cấp giám sát (Superior) | `superior` | `management_agency` | Một **tập xã** qua gán xã (có thể nhiều xã). **Chỉ đọc** |
+| Quản lý (Manager) | `manager` | `maintenance_engineer` | Đúng các xã trong claim |
+| Kỹ sư hiện trường (Field Engineer) | `field_engineer` | `field_crew` | Đúng các xã trong claim |
+| Quản trị hệ thống (System Admin) | `system_admin` | `administrator` | Toàn hệ thống, `*` |
+
+- **Không có role Tổ khảo sát riêng** — khảo sát đêm, kiểm tra và sửa chữa đều là Kỹ sư hiện trường.
+- **Công dân (Citizen) không có tài khoản và không có role.** Công dân báo sự cố qua **mã QR trên cột**;
+  báo cáo đó vào một hàng chờ riêng, Quản lý duyệt rồi mới thành `fault` — **không** thêm giá trị mới
+  vào `source_channel` (v1.7, D-R1). Chưa có endpoint.
+- **Không có tự đăng ký.** Tài khoản do **Quản trị hệ thống** tạo, gán vai trò và gán xã (v1.7, D-R11).
+  `POST /auth/register` còn chạy nhưng **DEPRECATED**, gỡ ở BE-33a (mục 4.1).
+- Cấp giám sát không có cấp "huyện" riêng: phạm vi của họ là danh sách xã được gán (v1.7, D-R3).
 
 **Quy tắc địa bàn**
 
@@ -176,24 +199,37 @@ JWT mang claim `commune_ids` (mảng). Quản trị mang `["*"]`.
   `COMMUNE_FORBIDDEN`** (kể cả khi chỉ một trong nhiều giá trị sai). Truy cập trực tiếp tài nguyên
   ngoài phạm vi → **404**, không 403 (403 sẽ lộ rằng nó tồn tại). `GET /sync/bundle` chỉ đóng gói
   dữ liệu trong phạm vi claim.
-- Tài khoản mới đăng ký có `commune_ids: []`, đăng nhập được nhưng **không thấy gì** cho tới khi Quản trị
-  gán địa bàn (BE-33).
+- Tài khoản chưa được gán xã có `commune_ids: []`, đăng nhập được nhưng **không thấy gì**.
 
-**Quy tắc vai trò (v1.4, D-14 — EXACT-ROLE)**
+**Quy tắc vai trò (v1.7, D-R5 — thay D-14 của v1.4)**
 
-- Policy là **một vai trò chính xác, không phải một bậc**: `role:maintenance_engineer` chỉ nhận đúng
-  kỹ sư, không nhận Quản trị. Vì thế **endpoint ĐỌC không gắn policy vai trò** — mọi vai trò đã đăng
-  nhập đều đọc được trong phạm vi địa bàn của mình.
-- Bảng GHI:
+- Mỗi endpoint nghiệp vụ yêu cầu **một capability**; mỗi capability liệt kê **tường minh danh sách vai
+  trò chính xác** được vào. **Không có thứ bậc**: không có "từ Quản lý trở lên" — vai trò được vào vì
+  được **nêu tên**, vai trò không được nêu tên thì bị từ chối. (v1.4 D-14 ghi "*một* vai trò chính xác";
+  v1.7 nới thành *danh sách*, vì phiếu có vai trò chỉ-đọc và có việc chia giữa Quản lý và Kỹ sư hiện
+  trường — một-vai-trò chỉ diễn đạt được điều đó bằng cách để endpoint trần, tức mở cho cả bốn.)
+- **Không endpoint nghiệp vụ nào chỉ dựa vào "đã đăng nhập"**. Ngoại lệ duy nhất: `GET /auth/me`
+  (nói về chính người gọi, không về mạng lưới).
+- Ma trận hiện hành:
 
-| Nhóm endpoint | Được GHI | Ghi chú |
+| Capability | Vai trò được vào | Endpoint |
 |---|---|---|
-| `/assets/*` (POST/PUT/DELETE/import) | **Quản trị** | Đã hiện thực (BE-12a/BE-12) |
-| `/lux-readings` (POST) | Mọi vai trò đã đăng nhập, trong phạm vi địa bàn | Đã hiện thực (BE-42) |
-| `/auth/*` | Không cần token | |
-| Sweep/frame (BE-15/17), fault (BE-19/41), work order (BE-21/24) | **Chốt trước khi hiện thực từng ticket**, theo cùng nguyên tắc EXACT-ROLE | `[OPEN → O-2]` |
+| `ReadNetwork` | superior, manager, field_engineer, system_admin | mọi `GET /assets/*`, `GET /poles`, `GET /segments` |
+| `ReadLuxReadings` | superior, manager, field_engineer, system_admin | `GET /lux-readings`, `GET /lux-readings/poles/{id}` |
+| `ManageAssets` | **manager** | mọi `POST`/`PUT`/`DELETE` `/assets/*` và `POST /assets/import/{kind}` |
+| `RecordLuxReading` | **field_engineer** | `POST /lux-readings` |
+| `ControlLighting` | **manager** | chưa có endpoint — điều khiển ON/OFF/AUTO thiết bị được hỗ trợ (testbed demo), mục 5.6 |
+| `ManageUsers` | **system_admin** | chưa có endpoint — tạo account, gán vai trò và xã (BE-33) |
 
+- `/auth/*` cấp token không cần token.
+- Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
+  vụ nào; nạp dữ liệu đầu kỳ dùng seeder, không qua API (v1.7, D-R12).
+- Capability cho sweep/session review, fault, work order… được thêm **cùng ticket** của chúng, theo
+  đúng luật này: `[OPEN → O-2]`.
 - Sai vai trò → **403 `ROLE_FORBIDDEN`**. Đây là mã khác `COMMUNE_FORBIDDEN`.
+- ⚠️ Access token phát trước khi đổi vai trò (≤ v1.6) còn mang giá trị cũ tới **60 phút**; không
+  capability nào nhận giá trị cũ, nên token đó bị 403 cho tới lần refresh kế tiếp (refresh đọc vai trò
+  từ DB).
 
 ---
 
@@ -214,7 +250,7 @@ wo_status      : open | assigned | in_progress | done | verified | cancelled
 node_role      : segment_controller | sampled_fixture
 node_status    : online | offline | never_reported
 road_class     : inter_commune | inter_village
-user_role      : management_agency | maintenance_engineer | field_crew | administrator
+user_role      : superior | manager | field_engineer | system_admin
 ```
 
 - 🔴 **`power_source` và `fixture_type` còn MỘT giá trị kể từ v1.6 (22/09/2026).** Đèn năng lượng
@@ -259,8 +295,16 @@ cố; `resolved` = đã sửa; `verified` = đã nghiệm thu.
   và chỉ khi `fixture_status = unknown` (ràng buộc DB).
 - Bộ hiệu chuẩn FO-07 được đăng ký như `RoadSegment`/`Pole`/`Fixture` thật với
   `data_source = calibration_rig` — pipeline chạy đúng một đường.
-- `LuxReading` (người đo, giá trị tuyệt đối) **không phải** `luminance_history` (CV, tỉ lệ so với baseline
-  của chính cột). Chúng chỉ gặp nhau ở `nearest_luminance` (mục 5.7).
+- `LuxReading` (người đo bằng điện thoại, số đọc **tương đối**) **không phải** `luminance_history` (CV,
+  tỉ lệ so với baseline của chính cột). Chúng chỉ gặp nhau ở `nearest_luminance` (mục 5.7).
+- **Lưu trữ (v1.7, D-R16).** Ảnh, telemetry và hồ sơ sự cố được giữ **tối thiểu hết thời hạn bảo hành**
+  của tài sản. Hết bảo hành **không** kích hoạt xoá hay archive gì. Tài sản hết bảo hành vẫn quản lý
+  bình thường, chỉ mang **cảnh báo "hết bảo hành"** — tính từ `warranty_expiry` của bóng đang dùng so
+  với hôm nay, **không lưu thành cột trạng thái** — hiện ở bản đồ, danh sách tài sản, và fault / work
+  order của tài sản đó, để Quản lý biết lần sửa này phải tự chi trả. Chưa hiện thực (BE-31, BE-35).
+- **Audit trail bắt buộc (v1.7, D-R13).** Mọi phát hiện tự động và mọi quyết định của người (fault,
+  lệnh điều khiển, review survey session) ghi vào một bảng audit **append-only dùng chung**. Thiết kế ở
+  BE-19; tới lúc đó `fault` chỉ giữ quyết định mới nhất trên chính dòng.
 
 ---
 
@@ -284,11 +328,15 @@ hồi ngay; client **phải lưu token mới**.
 **`POST /api/v1/auth/logout`** — body `{ "refresh_token" }` → **`204`** với mọi giá trị; thiếu trường
 → `400 VALIDATION_FAILED`.
 
-**`POST /api/v1/auth/register`** — body `{ "username", "email", "full_name", "password" }` → `201`:
+**`POST /api/v1/auth/register`** — 🔴 **DEPRECATED (v1.7, D-R11) — sẽ gỡ ở BE-33a.** Mô hình chính
+thức: **Quản trị hệ thống tạo account**, gán vai trò và gán xã; không có tự đăng ký. Endpoint còn chạy
+cho tới khi BE-33a thêm `POST /api/v1/admin/users` (capability `ManageUsers`), để không lúc nào hệ thống
+mất cách tạo tài khoản. **WP6: bỏ màn đăng ký.** Hành vi hiện tại, giữ nguyên tới lúc gỡ:
+body `{ "username", "email", "full_name", "password" }` → `201`:
 
 ```json
 { "user_id": "USR-005", "username": "...", "email": "...", "full_name": "...",
-  "role": "field_crew", "commune_ids": [],
+  "role": "field_engineer", "commune_ids": [],
   "message": "Account created. An administrator must assign communes before any data becomes visible." }
 ```
 
@@ -343,8 +391,8 @@ Hằng số của API, không đổi theo môi trường. Giá trị là chuỗi
 | Claim | Kiểu | Ví dụ |
 |---|---|---|
 | `sub` | chuỗi | `USR-001` |
-| `role` | chuỗi đơn (mục 3.1 `user_role`) | `maintenance_engineer` |
-| `commune_ids` | luôn là mảng | `["COM-001"]` · Quản trị `["*"]` |
+| `role` | chuỗi đơn (mục 3.1 `user_role`) | `manager` |
+| `commune_ids` | luôn là mảng | `["COM-001"]` · Quản trị hệ thống `["*"]` |
 | `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
 
 ### 4.6 Ràng buộc triển khai web
@@ -362,7 +410,7 @@ một cách, chỉ refresh token là khác nhau, nên **không có** `/auth/web/
 
 ```json
 { "user_id": "USR-003", "username": "engineer", "email": "engineer@luxmap.local",
-  "full_name": "Kỹ sư bảo trì", "role": "maintenance_engineer", "commune_ids": ["COM-001"] }
+  "full_name": "Quản lý", "role": "manager", "commune_ids": ["COM-001"] }
 ```
 
 Đúng sáu trường, bằng `register` (mục 4.1) bỏ `message`.
@@ -370,7 +418,7 @@ một cách, chỉ refresh token là khác nhau, nên **không có** `/auth/web/
 | Trường | Ghi chú |
 |---|---|
 | `role` | Giá trị `user_role` mục 3.1 |
-| `commune_ids` | Mảng, **có thể rỗng** với tài khoản chưa được gán xã. Quản trị: `["*"]` |
+| `commune_ids` | Mảng, **có thể rỗng** với tài khoản chưa được gán xã. Quản trị hệ thống: `["*"]` |
 
 🔴 **Đọc từ DATABASE, không phải từ claim trong token.** Đây là lý do endpoint tồn tại thay vì để FE
 tự giải mã JWT:
@@ -435,7 +483,8 @@ road_class, length_m, pole_count, controller_node_id, has_active_segment_fault`.
 
 ### 5.3 Quản lý kiểm kê tài sản — `/api/v1/assets/…` — `implemented`
 
-Tách khỏi `/poles` (endpoint bản đồ, mục 5.1). Ghi = **Quản trị**; đọc = mọi vai trò đã đăng nhập.
+Tách khỏi `/poles` (endpoint bản đồ, mục 5.1). Ghi = **Quản lý** (`ManageAssets`); đọc = `ReadNetwork`
+(cả bốn vai trò). Quản trị hệ thống ghi được tới v1.6, **từ v1.7 thì không** (mục 2).
 
 | Endpoint | Body / Query | Trả về |
 |---|---|---|
@@ -478,7 +527,7 @@ thuộc nó.
 **`PATCH /api/v1/faults/{fault_id}`** — `[NOT IMPLEMENTED]` (BE-19). Body
 `{ fault_status, override_fault_type?, note? }`; sai luồng (mục 3.2) → `409` để FE disable nút trước.
 
-**`POST /api/v1/faults`** — `[NOT IMPLEMENTED]` (BE-41). Tổ khảo sát báo tại chỗ (FM-19). Body:
+**`POST /api/v1/faults`** — `[NOT IMPLEMENTED]` (BE-41). Kỹ sư hiện trường báo tại chỗ (FM-19). Body:
 
 | Trường | Bắt buộc | Ghi chú |
 |---|---|---|
@@ -505,7 +554,8 @@ DUPLICATE_OP`**; `404 POLE_NOT_FOUND`; `400 LOCATION_REQUIRED` / `FAULT_TYPE_NOT
 - **`PATCH /api/v1/work-orders/{work_order_id}`** — đổi `wo_status`, gán người; luồng: `[OPEN → O-3]`.
 - **`POST /api/v1/work-orders/{work_order_id}/evidence`** — `multipart/form-data`: `file` (JPEG theo
   magic bytes), `kind=before|after`, `captured_at`, `lat`, `lng`; sai định dạng → `415
-  UNSUPPORTED_IMAGE_FORMAT`.
+  UNSUPPORTED_IMAGE_FORMAT`. Video bằng chứng: **planned** (v1.7, D-R14) — tới lúc có ticket video,
+  endpoint này vẫn chỉ nhận JPEG.
 
 ### 5.6 IoT, sweep, ảnh — `[NOT IMPLEMENTED]`
 
@@ -516,16 +566,26 @@ DUPLICATE_OP`**; `404 POLE_NOT_FOUND`; `400 LOCATION_REQUIRED` / `FAULT_TYPE_NOT
   processing_status, data_source` (BE-17). Enum `processing_status`: `[OPEN → O-4]`.
 - **`GET /api/v1/frames/{frame_id}/thumbnail`** — JPEG, **proxy qua API, không presigned** (phạm vi
   địa bàn áp cho ảnh như cho hàng); kích thước 320 px cạnh dài / q80 là **tạm**: `[OPEN → O-4]` (BE-15).
+- **Video khảo sát đêm — planned** (v1.7, D-R14). Phiếu v1.2 cho Kỹ sư hiện trường quay video liên tục;
+  hiện chỉ frame JPEG được nhận. Hướng đề xuất: upload thẳng MinIO bằng presigned URL, sync khi có mạng;
+  tách frame ở server hay trên máy chốt ở ticket video (cùng WP6).
+- **Điều khiển đèn ON / OFF / AUTO — chưa đặc tả** (v1.7, D-R7). Chỉ trên **thiết bị chiếu sáng được hỗ
+  trợ (testbed demo)**: mô hình đèn LED tự dựng, **không** lưới chiếu sáng của xã. Chỉ thiết bị có
+  `supports_remote_control = true` nhận lệnh — thiết bị ngoài thực địa luôn `false`. Capability
+  `ControlLighting` = Quản lý; mọi lệnh ghi audit. Cột và endpoint thuộc ticket device registry.
 
 ### 5.7 Số đo lux — `implemented`
 
-Ground truth cho RQ1; CV-12 đối chiếu với phân loại của hệ thống.
+Một trong các nguồn ground truth cho RQ1; CV-12 đối chiếu với phân loại của hệ thống. ⚠️ **Số đọc TƯƠNG
+ĐỐI** (v1.7, D-R15): `lux_value` là số đọc cảm biến ánh sáng của **điện thoại**, theo quy trình cố định —
+cùng máy, cùng app, cùng tư thế đo. Chỉ dùng để so giữa các cột và giữa các đêm; **không** phải giá trị
+lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chuẩn chiếu sáng.
 
 **`POST /api/v1/lux-readings`**
 
 ```json
 { "client_op_id": "uuid", "pole_id": "POLE-0047", "measured_at": "2026-10-02T19:42:00Z",
-  "lux_value": 12.4, "meter_model": "UNI-T UT383", "data_source": "calibration_rig", "note": "..." }
+  "lux_value": 12.4, "meter_model": "Pixel 7a", "data_source": "field", "note": "..." }
 ```
 
 | Trường | Bắt buộc | Ghi chú |
@@ -533,9 +593,10 @@ Ground truth cho RQ1; CV-12 đối chiếu với phân loại của hệ thống
 | `client_op_id` | Có | UUID, khử trùng lặp |
 | `pole_id` | Có | Bộ hiệu chuẩn cũng là cột thật |
 | `measured_at` | Có | ISO 8601 UTC `Z` |
-| `lux_value` | Có | Số thực, không âm, **hữu hạn** (NaN/Infinity → `400`); không có trần — trên 200 lux chỉ log cảnh báo, vẫn lưu |
-| `data_source` | Có | Nhánh C hầu hết là `calibration_rig` |
-| `meter_model`, `note` | Không | |
+| `lux_value` | Có | Số đọc tương đối, số thực, không âm, **hữu hạn** (NaN/Infinity → `400`); không có trần. Trên 200 server chỉ log cảnh báo và vẫn lưu — đó là **kiểm tra hợp lệ dữ liệu thô**, không mang nghĩa trắc quang |
+| `data_source` | Có | Đo ngoài thực địa → `field`; đo trên testbed → `calibration_rig` (mục 1.6) |
+| `meter_model` | Không | **Model điện thoại** dùng để đo |
+| `note` | Không | |
 | `lux_id`, `commune_id` | **Cấm** | Server sở hữu → `400 SERVER_OWNED_FIELD`; `commune_id` tra từ cột |
 
 `measured_by` = user trong JWT, lưu FK, **không emit**. `201` kèm `lux_id`; trùng `client_op_id` →
@@ -575,7 +636,8 @@ qua API. Nợ có chủ: BE-15/BE-17.
 
 ## 7. Chưa chốt (chưa chặn FE)
 
-Vector tile khi vượt ~5000 cột; realtime khi sweep xong (giai đoạn 1 polling); lưu ảnh dài hạn.
+Vector tile khi vượt ~5000 cột; realtime khi sweep xong (giai đoạn 1 polling). (Lưu ảnh dài hạn đã
+chốt ở v1.7 — mục 3.3.)
 
 ## 8. Bộ mock FO-26 và việc FE làm được ngay
 
@@ -591,18 +653,20 @@ highlight `SEG-003`.
 | O | Nội dung | Owner | Hạn |
 |---|---|---|---|
 | **O-1** | Tên tuyến `segment_name` BE ≠ FE (`SEG-001..003`) — cần người biết địa bàn | Thịnh/Ngọc | FW kế tiếp |
-| **O-2** | Vai trò được GHI cho sweep/frame (BE-15/17), fault (BE-19/41), work order (BE-21/24) — theo EXACT-ROLE | Dylan + WP5/WP6 | trước BE-15 |
+| **O-2** | Capability cho sweep/frame + review session (BE-15/17), fault (BE-19/41), work order + lịch làm việc (BE-21/24) — theo luật danh sách vai trò của mục 2 (v1.7) | Dylan + WP5/WP6 | cùng ticket, trước khi hiện thực |
 | **O-3** | Máy trạng thái `wo_status` (BE-22) | Dylan | trước BE-21 |
 | **O-4** | Enum `processing_status` của sweep; kích thước thumbnail (320/q80 tạm) | Dylan + WP5 | FW kế tiếp, trước W6 |
 | **O-5** | Hình dạng `sync/bundle` / `sync/push` (đề xuất ở 5.8) | Dylan + WP6 | FW kế tiếp, trước W14 |
 | **O-6** | `feeder_id` cho 103 cột mock: file gán riêng `mocks/mock-pole-feeders.csv` (D-7) — cần người biết mạch điện; chặn RQ2/CV-15 | Dylan + FO | trước BE-13 |
 | **O-7** | FK ghép `(feeder_id, commune_id)` (D-10) — ticket riêng trước BE-13; tới lúc đó mọi đường ghi phải gọi kiểm cùng xã | BE1 | trước BE-13 |
 | **O-8** | Thư viện Redocly `license` cho spec; server staging/prod trong `servers` | Dylan | khi có |
+| **O-9** | `data_source` của telemetry **thật** từ thiết bị IoT trên testbed: `calibration_rig` hay giá trị mới — không được là `field` (v1.7, D-R10) | Dylan | trước IoT ingest |
 
 ## 10. Changelog
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.7 | 25/09/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BREAKING, đổi giá trị claim `role`.** Vai trò theo Phiếu đăng ký FA26SE222 v1.2: `management_agency`→`superior`, `maintenance_engineer`→`manager`, `field_crew`→`field_engineer`, `administrator`→`system_admin` (song ánh; migration `RenameUserRolesToRegistrationV12`, `Down()` không mất dữ liệu). D-14 "một vai trò chính xác" → **danh sách vai trò chính xác cho mỗi capability**, vẫn cấm thứ bậc; ma trận ở mục 2. **Hai đổi hành vi:** ghi `/assets/*` + import chuyển từ Quản trị sang **Quản lý**; `POST /lux-readings` chỉ **Kỹ sư hiện trường** (trước: mọi vai trò). `POST /auth/register` **DEPRECATED**, gỡ ở BE-33a. Citizen không có account (QR, chưa có endpoint). Kèm: nguồn `data_source` theo phạm vi mới (mục 1.6, O-9); lux là số đọc tương đối (5.7); lưu trữ + cảnh báo hết bảo hành (3.3); audit trail bắt buộc (3.3); video và điều khiển ON/OFF/AUTO là planned (5.5, 5.6). Quyết định D-R1…D-R18 ở `docs/contract-drift.md`. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.6 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BREAKING, thu hẹp enum.** `power_source` còn `grid`; `fixture_type` còn `led_road_lamp`. Đèn solar ra khỏi phạm vi đồ án. Xoá giá trị thay vì để lại không dùng — giá trị enum không ai sinh ra được là giá trị ticket sau tưởng mình được ghi. Kèm migration `DropSolarFixtures` (đổi 45 hàng RỒI mới siết CHECK — ngược lại là migration gãy), bộ mock FO-26 đổi 45 cột, và bỏ `power_source` khỏi listing cột-chưa-gán của BE-13 (trường đó chỉ sinh ra để tách "solar nên không mạch" khỏi "chưa ai gán"). **`runtime_decline` GIỮ NGUYÊN** — chỉ đèn solar bị bỏ, phần runtime/IoT thì không. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.5 | 19/09/2026 | **Dylan** | Thêm mục 4.7 `GET /api/v1/auth/me`. Không đổi hình dạng nào đã publish: 7 endpoint auth cũ giữ nguyên từng byte. Lý do: login chỉ trả token, và access token không mang `full_name`/`email` còn `commune_ids` thì đứng yên 60 phút |
 | v1.4 | 18/09/2026 | **Dylan** (BE-REVIEW-02) | Hợp nhất ba nguồn. Gộp và đóng drift 2, 3, 4, 6, 7, 8, 10, 12, 14, 15, 17–21, 27–31, 33–39, 43 và quyết định A–E; mã lỗi mới `ROLE_FORBIDDEN` (D-4), `CROSS_COMMUNE_REFERENCE` (D-5), `POLE_HAS_ACTIVE_FIXTURE` (D-11); một bóng đang dùng/cột (D-11) và `removed_date >= install_date` (Q-4); `data_source` tám entity + mặc định loại `calibration_rig` (D-13); `user_role` + EXACT-ROLE + bảng ghi (D-14); fault MỞ (O-7 cũ); `commune_id` trong `POST /faults` (O-10 cũ); `from`/`to` không `Z` = UTC (D-12); `status_confidence` hữu hạn 0..1; mock đổi ID (D-9); §4 số liệu mock cập nhật. Đánh số mục lại, bảng ánh xạ ở đầu file |

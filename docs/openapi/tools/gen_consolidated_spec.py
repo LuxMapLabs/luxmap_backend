@@ -11,7 +11,8 @@ the code and never edited by hand (decision E). This script only ADDS: the endpo
 specifies but the code does not serve yet (x-luxmap-status = not_implemented), summaries and
 operationIds, tag descriptions, the prefixed-id patterns of Contract section 1.2, and the schemas
 those endpoints need. Introduced at BE-REVIEW-02 (18/09/2026); the Contract section numbers below
-are those of v1.5. GET /auth/me added 19/09/2026 (Contract v1.5).
+are those of v1.5. GET /auth/me added 19/09/2026 (Contract v1.5). Roles and the capability matrix of
+Contract v1.7 (25/09/2026) come from the code as x-luxmap-capability / x-luxmap-roles.
 """
 import json, copy, sys, re
 from collections import OrderedDict
@@ -22,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.5"
+d["info"]["version"] = "1.7"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -30,7 +31,7 @@ HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 n_from_code = sum(1 for item in d["paths"].values() for m in item if m in HTTP_METHODS)
 
 d["info"]["description"] = (
-    "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.5, 19/09/2026). "
+    "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.7, 25/09/2026). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -51,9 +52,9 @@ d["components"]["schemas"]["ApiError"]["properties"]["details"]["description"] =
 TAGS = OrderedDict([
     ("Auth", "Nhóm mobile — Contract §4.1. Refresh token trong body."),
     ("WebAuth", "Nhóm web — Contract §4.2. Refresh token chỉ trong cookie HttpOnly __Secure-luxmap_rt."),
-    ("Assets", "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản trị."),
+    ("Assets", "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản lý (cap:manage_assets); đọc = cap:read_network."),
     ("AssetImport", "Nhập tài sản CSV/GeoJSON theo từng loại file — Contract §5.3."),
-    ("LuxReadings", "Số đo lux — Contract §5.7. Ground truth RQ1."),
+    ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
     ("Poles", "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."),
     ("Segments", "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."),
     ("Faults", "Sự cố — Contract §5.4. CHƯA HIỆN THỰC (BE-40, BE-19, BE-41)."),
@@ -142,6 +143,11 @@ for path, item in d["paths"].items():
             op["security"] = []          # AllowAnonymous
         if not is_anonymous:
             op["responses"].setdefault("401", err("UNAUTHENTICATED — thiếu / sai / hết hạn access token"))
+        # Contract v1.7 §2: every business operation requires ONE capability, published by the code.
+        if "x-luxmap-capability" in op:
+            op["responses"].setdefault("403", err(
+                "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; "
+                "COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim"))
 
 # ── shared new schemas ─────────────────────────────────────────────────────────
 def pid(prefix, digits):
@@ -571,7 +577,7 @@ ni("patch", "/api/v1/faults/{fault_id}", "Faults", "Kỹ sư xác nhận / bác 
     ("409", err("Chuyển trạng thái sai luồng: detected→confirmed|rejected; confirmed→in_progress→resolved→verified"))],
    parameters=[p("fault_id", {"$ref": "#/components/schemas/FaultId"}, True, where="path")],
    body={"$ref": "#/components/schemas/PatchFaultRequest"})
-ni("post", "/api/v1/faults", "Faults", "Tổ khảo sát báo sự cố tại hiện trường", "§5.4", "BE-41",
+ni("post", "/api/v1/faults", "Faults", "Kỹ sư hiện trường báo sự cố tại chỗ", "§5.4", "BE-41",
    [("201", {"description": "Fault đầy đủ kèm client_op_id", "content": json_content("CreatedFaultResponse")}),
     ("200", {"description": "DUPLICATE_OP — client_op_id đã xử lý, trả fault đã tạo (KHÔNG phải lỗi)", "content": json_content("CreatedFaultResponse")}),
     ("400", err("LOCATION_REQUIRED | FAULT_TYPE_NOT_REPORTABLE | VALIDATION_FAILED")),
