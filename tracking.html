@@ -96,6 +96,12 @@
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
+        <td>26/09/2026</td>
+        <td><code>REG-v1.2</code> Bổ sung phiếu đăng ký đã loại bỏ thông tin định danh; ghi quy tắc SQL độc lập culture và tài khoản test riêng. Chốt giữ nguyên tên đã sửa tay trên dev, chưa chạy <code>--seed</code>. PR vào <code>dev</code> phải nêu breaking FE/Mobile và đủ 3 ô CSV (BE-07 tên task, BE-41 tiêu chí nghiệm thu, BE-08 notes).</td>
+        <td><code>docs/registration/FA26SE222_v1.2.md</code>, <code>CLAUDE.md</code>, <code>tracking.html</code></td>
+        <td><code>docs: add sanitized registration reference and test guardrails</code></td>
+      </tr>
+      <tr>
         <td>25/09/2026</td>
         <td><code>REG-v1.2</code> Vai trò + phân quyền + docs theo Phiếu đăng ký v1.2. <strong>C1</strong> đổi enum song ánh, migration DROP CHECK → 4 UPDATE → ADD CHECK, <code>Down()</code> không mất dữ liệu; DB dev: 18 tài khoản đổi đúng mapping (14 cặn test → <code>system_admin</code>). <strong>C2</strong> ma trận capability 6 dòng, mọi endpoint nghiệp vụ gắn capability (architecture test), ghi tài sản → Quản lý, lux → Kỹ sư hiện trường. <strong>C3</strong> 4 tài khoản demo đổi tên hiển thị tại chỗ. <strong>C4</strong> 24 ca HTTP vai trò × capability (kỳ vọng literal), kiểm DB không còn giá trị cũ, sabotage A/A2/B1/B2 đều đỏ đúng chỗ. <strong>C5</strong> Contract v1.7 + spec có <code>x-luxmap-capability</code> / <code>x-luxmap-roles</code>, <code>register</code> <code>deprecated: true</code>. <strong>C6</strong> docs theo bảng kiểm kê đã duyệt. Kèm 3 bản sửa có sẵn trên <code>dev</code>: <code>MapEndpointTests</code> không compile (solar), SQL phụ thuộc culture <code>en_VN</code>, race khoá tài khoản <code>crew</code>; và <code>fix(auth)</code> capability rỗng</td>
         <td>migration <code>20260925164118_RenameUserRolesToRegistrationV12</code>, <code>LuxMapPolicies.cs</code>, <code>AuthorizationSetup.cs</code>, 4 controller, <code>CapabilityOperationFilter.cs</code>, <code>IdentitySeeder.cs</code>, 3 test mới, <code>api-contract-v1.1.md</code>, <code>contract-drift.md</code>, <code>CLAUDE.md</code>, <code>.ai/results/registration-v1.2-phase2.md</code></td>

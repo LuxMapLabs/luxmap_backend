@@ -994,6 +994,21 @@ thành assert có thông điệp (`RequireFreeAsync`) thay vì để nó lộ ra
 **BE-36 (Testcontainers, W17–W18) xoá bỏ toàn bộ lớp lỗi này** — mỗi lượt chạy một DB sạch, sequence
 bắt đầu từ 0, không còn dải nào bị chiếm trước. Tới lúc đó có thể xét tách lại collection.
 
+### Hai bẫy test chốt ở REG-v1.2 — culture và tài khoản seed
+
+**SQL có số thực phải độc lập culture.** Ưu tiên truyền giá trị bằng SQL parameters. Khi test cần
+sinh chuỗi SQL literal, dùng `string.Create(CultureInfo.InvariantCulture, $"…")` như
+`MapEndpointTests.PlantPolesAsync`. Culture `en_VN` từng biến `108.5` thành `108,5`, khiến
+`ST_MakePoint` nhận thêm đối số và PostGIS báo `22023: Geometry has Z dimension`. Đổi locale của
+máy chỉ che lỗi; kiểm tra phải chạy được với locale dấu phẩy.
+
+**Test đổi trạng thái tài khoản phải tự tạo tài khoản riêng và dọn trong `finally`.** Các tài khoản
+seed được nhiều collection dùng để đăng nhập. Khoá, đổi role, password hoặc scope của chúng sẽ
+ảnh hưởng test khác dù có khôi phục ở teardown. `AuthEndpointTests` từng khoá `crew` trong vài ms,
+khiến `RoleCapabilityMatrixTests` ngẫu nhiên nhận 403 ngay ở login. Dùng mẫu
+`CreateThrowawayAccountAsync` / `DeleteAccountAsync` trong `AuthEndpointTests`; chỉ sửa tài khoản
+thuộc test đó, giữ tài khoản seed dùng chung ổn định.
+
 ### Năm quy tắc chốt ở BE-18 — sự cố
 
 **1. Ghi vết đặt TRÊN bảng `fault`, không có `FaultHistory`.**
