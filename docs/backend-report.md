@@ -1,5 +1,10 @@
 # LuxMap Backend — Báo cáo hiện trạng để review
 
+> 🗄️ **Tài liệu lịch sử — giữ nguyên, không sửa theo hiện trạng (D-R18, 25/09/2026).** Viết trước
+> Contract v1.7: tên vai trò (`management_agency` / `maintenance_engineer` / `field_crew` /
+> `administrator`, "Quản trị" ghi tài sản), "Nhánh C", solar và tự đăng ký ở đây là **trạng thái lúc
+> đó**. Hiện hành: Contract v1.7 §2 và `docs/contract-drift.md` mục *Registration v1.2*.
+
 **Repo:** `LuxMapLabs/luxmap_backend` · **WP2** · nhánh tích hợp `dev`
 **Phạm vi báo cáo:** BE-00 → BE-08 (nền tảng W1 + trọn nhóm Identity)
 **Ngày:** 30/08/2026 · **Quy mô:** ~6.970 dòng C# trong 92 file, 13 project (10 src + 3 test), 202 test

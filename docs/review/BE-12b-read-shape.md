@@ -1,5 +1,10 @@
 # BE-12b — hình dạng response khi ĐỌC tài sản (đề xuất, chờ duyệt)
 
+> 🗄️ **Tài liệu lịch sử — giữ nguyên, không sửa theo hiện trạng (D-R18, 25/09/2026).** Viết trước
+> Contract v1.7: tên vai trò (`management_agency` / `maintenance_engineer` / `field_crew` /
+> `administrator`, "Quản trị" ghi tài sản), "Nhánh C", solar và tự đăng ký ở đây là **trạng thái lúc
+> đó**. Hiện hành: Contract v1.7 §2 và `docs/contract-drift.md` mục *Registration v1.2*.
+
 **Trạng thái:** đề xuất. **Chưa có dòng code nào theo hình dạng này**, và `GET /api/v1/assets/…`
 vẫn trả `PagedResult<string>` như Contract mục 5.3 đang ghi.
 

@@ -1,5 +1,10 @@
 # BE-REVIEW-02 — Review toàn diện backend + đề xuất + Contract hợp nhất (DRAFT)
 
+> 🗄️ **Tài liệu lịch sử — giữ nguyên, không sửa theo hiện trạng (D-R18, 25/09/2026).** Viết trước
+> Contract v1.7: tên vai trò (`management_agency` / `maintenance_engineer` / `field_crew` /
+> `administrator`, "Quản trị" ghi tài sản), "Nhánh C", solar và tự đăng ký ở đây là **trạng thái lúc
+> đó**. Hiện hành: Contract v1.7 §2 và `docs/contract-drift.md` mục *Registration v1.2*.
+
 **Ngày:** 18/09/2026 · **Người review:** reviewer độc lập (Claude) · **Phạm vi:** `origin/dev` @ `f8bb55b`
 (working tree HEAD `0c0ead9` trên nhánh `feat/BE-12-pole-delete-and-feeder`, đã merge vào `origin/dev`
 qua PR #38 — cây mã giống hệt, chỉ thiếu merge commit).

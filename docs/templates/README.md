@@ -10,7 +10,7 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy
 > multipart/form-data, field `file`, tối đa 10 MB
 > ```
 >
-> Chỉ **Quản trị** được nạp. Trả **200** kèm kết quả `{inserted, updated, failed, total_errors,
+> Chỉ **Quản lý** được nạp (capability `ManageAssets`, Contract v1.7 §2 — tới v1.6 là Quản trị). Trả **200** kèm kết quả `{inserted, updated, failed, total_errors,
 > truncated, rows[]}` — 200 kể cả khi có dòng hỏng, vì những dòng hợp lệ đã ghi thật.
 >
 > ⚠️ **Contract v1.1 vẫn không đặc tả endpoint này.** Cả đường dẫn lẫn hình dạng kết quả đều là
@@ -209,7 +209,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | `external_ref` | **Có** | text | Mã mạch điện của đơn vị quản lý. `poles.csv` trỏ về bằng `feeder_external_ref` |
 | `feeder_name` | **Có** | text | |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
-| `geom_wkt` | Không | LineString | **Nullable** — nhánh C không khảo sát tuyến cáp, để trống thay vì bịa lộ trình |
+| `geom_wkt` | Không | LineString | **Nullable** — nhóm không khảo sát tuyến cáp, để trống thay vì bịa lộ trình |
 
 > ⚠️ **`feeder` KHÔNG có cột `data_source`.** Bốn bảng kia có, bảng này không — kiểm từ
 > `\d feeder`. Đừng thêm cột đó vào file này.
@@ -334,9 +334,6 @@ một trong hai cách:
 2. **Gán thủ công sau khi nạp** — nhanh hơn, nhưng phải ghi lại cách gán, nếu không thì kết
    quả gom cụm không tái lập được.
 
-Cột `solar_all_in_one` thì **đúng là không có feeder** (không nối lưới nào) — chỉ cột lưới
-mới thiếu. Đừng gán feeder cho cột solar để "cho đủ".
-
 ### Bốn trường bộ mock còn thiếu để nạp được
 
 Kiểm bằng test `AssetImportMockSetTests` — nó nạp trọn 3 tuyến + 103 cột + 103 bóng qua đúng
@@ -346,7 +343,7 @@ endpoint thật, sau khi bổ sung ba trường đầu:
 |---|---|---|
 | `external_ref` | cả hai file | Lấy chính `pole_id` / `segment_id` của mock — mã của mock **là** mã kiểm kê cho tới khi có mã thật |
 | `commune_id` | `mock-segments.geojson` không có; `mock-poles.geojson` ghi `COM-001` | Ghi đè bằng xã của test |
-| `data_source` | cả hai file | Đặt `public_imagery` — đúng bản chất dữ liệu ảnh đêm công khai của nhánh C |
+| `data_source` | cả hai file | Đặt `public_imagery` — bộ mock dựng từ ảnh đêm công khai, không phải dữ liệu thực địa (`field`) |
 | `feeder_id` | cả hai file | **KHÔNG bổ sung.** Test khẳng định cả 103 cột có `feeder_id` NULL, để khoảng trống này không bị che đi |
 
 **BE-39 phải xử lý bốn trường này trước khi seed**, nếu không bộ mock nạp lên sẽ không dựng lại

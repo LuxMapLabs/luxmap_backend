@@ -1,5 +1,10 @@
 # BE-13 — hình dạng endpoint topology (đề xuất, chờ duyệt)
 
+> 🗄️ **Tài liệu lịch sử — giữ nguyên, không sửa theo hiện trạng (D-R18, 25/09/2026).** Viết trước
+> Contract v1.7: tên vai trò (`management_agency` / `maintenance_engineer` / `field_crew` /
+> `administrator`, "Quản trị" ghi tài sản), "Nhánh C", solar và tự đăng ký ở đây là **trạng thái lúc
+> đó**. Hiện hành: Contract v1.7 §2 và `docs/contract-drift.md` mục *Registration v1.2*.
+
 **Trạng thái:** đề xuất. **Chưa có dòng code nào.** Contract không có endpoint topology nào, và
 `GET /api/v1/assets/poles` vẫn chỉ nhận `commune_id` + phân trang, vẫn trả `PagedResult<string>`.
 

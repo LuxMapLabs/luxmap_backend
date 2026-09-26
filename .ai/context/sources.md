@@ -28,6 +28,6 @@ sẽ lệch trong vòng một tuần (`AGENTS.md` đã lệch `CLAUDE.md` 102 d�
 - `dev` là branch làm việc; `main` chỉ có commit init.
 - Các trường status/completion trong `docs/tasks-backend.csv` là **trường chết** — đọc `tracking.html`.
 - Open item O-6: `pole.feeder_id` chưa có dữ liệu — đang chặn BE-13 và CV-15.
-- Contract hợp nhất là **v1.5**, file máy đọc là `docs/openapi/luxmap-v1.5.json`. `CLAUDE.md` và
-  `README.md` đã được đồng bộ (20/09/2026) — chỗ nào còn ghi `luxmap-v1.4.json` là **lịch sử**
+- Contract hợp nhất là **v1.7** (25/09/2026), file máy đọc **vẫn** là `docs/openapi/luxmap-v1.5.json`
+  (tên file giữ từ v1.5, cố ý). `CLAUDE.md` và `README.md` đã được đồng bộ (25/09/2026) — chỗ nào còn ghi `luxmap-v1.4.json` là **lịch sử**
   (`tracking.html`, `docs/review/`, `docs/contract-drift.md`), đừng "sửa cho nhất quán".

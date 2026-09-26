@@ -1,16 +1,21 @@
 # LuxMap — Backend (WP2)
 
 Nền tảng GIS + IoT + Computer Vision quản lý tài sản và sự cố chiếu sáng đường nông thôn.
+Tên đề tài (Phiếu đăng ký FA26SE222 v1.2, mục 3.1): **LuxMap: A GIS, IoT and Computer Vision Platform for
+Rural Road Lighting Asset and Fault Management** — *LuxMap: Hệ thống bản đồ số GIS tích hợp IoT và thị giác
+máy tính để quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn*. Phiếu (bản markdown:
+`docs/registration/FA26SE222_v1.2.md`) là nguồn chuẩn cho actor, chức năng, NFR và deliverable.
 Capstone FA26SE222 · W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2, phụ trách: BE1 – Mỹ**.
 
 Backend phục vụ 3 consumer: **Web SPA** (WP5), **Android native** (WP6), **engine CV** (WP4).
-Không có consumer nào khác. Không có API công khai cho người dân.
+Không có consumer nào khác. **Công dân (Citizen) không có tài khoản**: họ báo sự cố qua mã QR trên cột
+(chưa có endpoint — D-R1, xem mục "Vai trò").
 
 ## Nguồn sự thật
 
 Ba tài liệu, thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.5** (19/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.7** (25/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
 2. **`docs/tasks-backend.csv`** — task list v2.1, phạm vi và lịch.
 3. File này — quy ước làm việc và những chỗ dễ sai. Không phải đặc tả.
 
@@ -76,15 +81,26 @@ thuật vẫn về đây, tiến độ vẫn về `tracking.html`. Một deviati
 
 ---
 
-## Phạm vi đã chốt — Nhánh C
+## Phạm vi — theo Phiếu đăng ký v1.2 (D-R10, 25/09/2026)
 
-Chốt 24/08/2026 (FO-01). **Không có thử nghiệm hiện trường.** Ba nguồn dữ liệu:
+Phiếu v1.2 **thay FO-01** (24/08/2026, "không có thử nghiệm hiện trường" — nay `SUPERSEDED`, ghi ở
+`docs/contract-drift.md`). Phạm vi thực tế của nhóm:
 
-| Nguồn | Dùng cho | Tính chất |
+| Ở đâu | Làm gì | `data_source` |
 |---|---|---|
-| Ảnh đêm công khai | Phần phát hiện | Không có metadata phơi sáng, nhãn cảm quan |
-| Bộ hiệu chuẩn tự dựng (FO-07) | Chuẩn hoá + phân loại | Ground truth photometric **duy nhất** |
-| Dữ liệu IoT mô phỏng (FO-25) | Runtime | Mô phỏng, neo vào tài liệu công bố |
+| **Ngoài thực địa** (xã đối tác) | Quay **video đêm** đèn đường thật; đo sáng **tương đối bằng điện thoại**; kiểm tra trạng thái đèn **bằng mắt** ban đêm (ground truth lớp `out`). **Không** lắp thiết bị, **không** thao tác lưới chiếu sáng của xã | `field` |
+| **Mô hình testbed tự dựng** (đèn LED) | Toàn bộ IoT (trạng thái nguồn, dòng điện, thời gian vận hành); demo **điều khiển cưỡng chế ON/OFF/AUTO**; **Controlled Reference Capture Set** — mức sáng biết trước (trước đây gọi là "bộ hiệu chuẩn tự dựng", FO-07) | `calibration_rig` (telemetry testbed: Contract O-9) |
+| **Khởi động AI** | Ảnh đêm công khai + controlled reference, trong lúc chờ quay thực địa (phiếu mục 4) | `public_imagery` |
+| Telemetry mô phỏng | Runtime khi chưa có thiết bị (FO-25) | `simulated` |
+
+🔴 **Dữ liệu testbed không bao giờ mang `field`.** Gộp thí nghiệm có kiểm soát vào số liệu hiện trường là
+đúng loại lỗi luật tách `data_source` sinh ra để chặn.
+
+⚠️ **Ground truth không còn một nguồn.** Trước đây bộ hiệu chuẩn là "ground truth photometric duy nhất";
+nay có video thực địa + số đo tương đối bằng điện thoại + kiểm tra bằng mắt cho lớp `out` + controlled
+reference trên testbed. Bốn quyết định từng dựa trên FO-01 **chưa sửa code**, mỗi cái là một follow-up
+"nền đã đổi, cần xét lại" trong `tracking.html`: `external_ref` là danh tính vĩnh viễn (**ưu tiên cao**),
+`administrative_unit` không geometry, `data_source = field` (nay sẽ có bản ghi), và ground truth.
 
 **Hệ quả cho backend:** nguồn dữ liệu phải giữ tách bạch từ lúc ingest tới lúc thống kê. Nếu không lưu được nguồn ngay ở `SurveySweep` và `Fault`, tới lúc báo cáo sẽ không tách ra được nữa — và CV-11, CV-18, IOT-16 đều yêu cầu báo cáo tách riêng. Gộp số liệu giữa dữ liệu có ground truth thật và dữ liệu gán nhãn cảm quan là lỗi nghiêm trọng, không phải chi tiết trình bày.
 
@@ -250,7 +266,13 @@ Contract và đã hiện thực — nhóm endpoint `/assets/…`, xem mục BE-1
 response khi đọc một tài sản) vẫn đang chờ Thịnh/Ngọc duyệt. Phần còn lại trong bảng vẫn chưa có đặc
 tả — cần thống nhất trước khi hiện thực, đừng tự sinh endpoint rồi coi như xong.
 
-Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (giai đoạn 1 dùng polling), chính sách lưu ảnh dài hạn. Phân quyền theo `commune_id` **đã chốt ở mục 7**, không còn để mở.
+Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (giai đoạn 1 dùng polling). Phân quyền theo `commune_id` **đã chốt ở mục 7**, không còn để mở.
+
+**Lưu trữ đã chốt (D-R16, Contract §3.3):** ảnh, telemetry, fault giữ **tối thiểu qua hết bảo hành** của
+tài sản; hết bảo hành **không** xoá / archive gì — chỉ gắn **cảnh báo "hết bảo hành"**, tính từ
+`fixture.warranty_expiry` của bóng đang dùng so với hôm nay, **không lưu thành cột trạng thái** (hiện ở bản
+đồ, danh sách tài sản, fault / work order). ⚠️ Ngày bảo hành nằm trên **`fixture`**, không trên `pole`, và
+**nullable** — "không biết hạn bảo hành" phải hiện khác "còn bảo hành". Hiện thực: BE-31 / BE-35.
 
 ---
 
@@ -491,6 +513,11 @@ header vẫn qua. Lớp phòng thủ thứ hai: ImageSharp chạy trên một `C
 JpegConfigurationModule**, không phải `Configuration.Default` — PNG dựng sẵn để tấn công không chỉ bị
 từ chối bởi chính sách, mà **không có code path nào phân tích được nó**.
 
+⚠️ **Video là PLANNED, không phải được phép (D-R14).** Phiếu v1.2 cho Kỹ sư hiện trường quay video (khảo
+sát và thiết bị), nhưng cho tới ticket video quy tắc này **giữ nguyên: chỉ JPEG**. Hướng đề xuất cho
+ticket đó là upload thẳng MinIO bằng presigned URL — **ngược quy tắc 1** ở trên, nên ticket video phải tự
+trả lời chuyện phân quyền theo địa bàn cho byte video, không được coi là đã giải.
+
 **6. Thumbnail sinh ĐỒNG BỘ, 320px cạnh dài, JPEG q80 — con số TẠM.**
 
 Contract chỉ nói "ảnh JPEG", **không quy định kích thước**. 320/q80 là tôi chọn — **phải chốt với FE ở
@@ -552,13 +579,19 @@ cạnh PostGIS. Đừng để nợ này chỉ nằm trong báo cáo một phiên
 
 | | `LuxReading` (BE-42) | `luminance_history` (BE-15/BE-17 + CV) |
 |---|---|---|
-| Ai sinh | **Người** cầm máy đo | **CV** xử lý ảnh sweep |
+| Ai sinh | **Người** đo bằng **điện thoại** | **CV** xử lý ảnh sweep |
 | Thời gian | `measured_at` | `observed_at` |
-| Giá trị | `lux_value` — **tuyệt đối, đơn vị lux** | `baseline_ratio` — **tỉ lệ, không đơn vị** |
-| Truy vết | `meter_model` | `sweep_id` |
+| Giá trị | `lux_value` — **số đọc TƯƠNG ĐỐI** của cảm biến ánh sáng điện thoại | `baseline_ratio` — **tỉ lệ, không đơn vị** |
+| Truy vết | `meter_model` — **model điện thoại** | `sweep_id` |
 | ID hiển thị | `LUX-0001` | **không có** |
 
-Contract mục 2.9 gọi lux là **ground truth cho RQ1**: CV-12 dùng nó để **chấm** phân loại của CV.
+⚠️ **`lux_value` là TƯƠNG ĐỐI (D-R15, Contract §5.7).** Đo theo quy trình cố định — cùng máy, cùng app,
+cùng tư thế — nên sai số hệ thống của cảm biến là chung cho mọi lần đo và triệt tiêu khi so tương đối.
+Chỉ dùng để so giữa các cột và giữa các đêm; **không bao giờ** là lux tuyệt đối, **không** dùng để đánh
+giá đạt/không đạt chuẩn chiếu sáng. Ngưỡng cảnh báo 200 là kiểm tra hợp lệ dữ liệu thô, không mang nghĩa
+trắc quang. Tên cột **giữ nguyên**.
+
+Contract §5.7 gọi lux là **một trong các nguồn ground truth cho RQ1**: CV-12 dùng nó để **chấm** phân loại của CV.
 Ghi lux vào chuỗi luminance là để CV tự chấm chính mình, và làm lệch luôn biểu đồ của BE-20.
 Chúng gặp nhau **đúng một chỗ**: trường `nearest_luminance` của `GET /lux-readings`, ghép theo
 **THỜI GIAN** ±48 giờ (không phải không gian).
@@ -585,10 +618,10 @@ Lux là sự kiện đã xảy ra và là ground truth RQ1 — xoá pole không 
 Cũng để **không tạo bảng cascade thứ ba**: guard `SaveChanges` không thấy cascade do DB thực hiện
 (xem mục 1c). `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
 
-**Không gắn policy vai trò.** (Đúng tại thời điểm BE-42; **BE-12a đã gắn** — xem mục BE-12a.)
-Bốn policy của BE-08 khi đó chưa dùng ở dòng sản xuất nào vì chưa ai quyết
-vai trò nào được ghi gì. Đoán một cái ở đây là vô tình tạo tiền lệ. Phạm vi địa bàn **vẫn được canh**
-— qua lượt đọc pole và qua guard.
+**Phân quyền (Contract v1.7):** `POST` = `RecordLuxReading` (**chỉ Kỹ sư hiện trường**), `GET` =
+`ReadLuxReadings` (cả bốn vai trò). Tới v1.6 `POST` **không gắn policy nào**, nên mọi vai trò đã đăng nhập
+đều ghi được — kể cả Cấp giám sát chỉ-đọc. Phạm vi địa bàn **vẫn được canh riêng** — qua lượt đọc pole
+và qua guard.
 
 ### Sáu quy tắc chốt ở BE-12a — nhập và sửa tài sản
 
@@ -651,8 +684,8 @@ ghi. Lỗi ở bước ghi **rollback cả mẻ, trả 500**, không đổ lỗi
 > `SaveChanges`. Đó **đúng là** một lỗi mức-dòng lọt xuống bước ghi, và nó nổi lên dưới dạng
 > `DbUpdateException` thô → 500, **không phải** kết quả validate có số dòng.
 >
-> **Chưa sửa ở BE-12a** — một transaction, thua thì không ghi gì, dữ liệu không hỏng, và hai quản trị
-> viên nạp cùng file trong cùng một giây chưa đáng thiết kế riêng. Ghi lại vì **BE-12b kế thừa đúng
+> **Chưa sửa ở BE-12a** — một transaction, thua thì không ghi gì, dữ liệu không hỏng, và hai người
+> quản lý nạp cùng file trong cùng một giây chưa đáng thiết kế riêng. Ghi lại vì **BE-12b kế thừa đúng
 > đường ghi này**, và vì bản sửa đúng là **upsert thật (`ON CONFLICT DO UPDATE`)**, không phải thêm
 > một lượt kiểm nữa — thêm kiểm chỉ thu hẹp cửa sổ chứ không đóng được.
 
@@ -671,18 +704,38 @@ Kết quả: `{inserted, updated, failed, total_errors, truncated, rows[]}`.
 phân giải tham chiếu tới hàng chưa có ID. Thứ tự tự thực thi: nạp cột trước tuyến thì **mọi** dòng
 báo `segment_external_ref` không khớp gì cả.
 
-**4. Phân quyền — policy là MỘT vai trò chính xác, KHÔNG phải một bậc.**
+**4. Phân quyền — capability, mỗi capability là một DANH SÁCH vai trò chính xác, KHÔNG phải một bậc.**
+
+> Từ Contract v1.7 (D-R5, 25/09/2026). Tới v1.6 mỗi policy là **một** vai trò và GET để trần; ghi
+> tài sản là của Quản trị. Nay:
 
 | | |
 |---|---|
-| POST / PUT / import | `[Authorize(Policy = LuxMapPolicies.Administrator)]` |
-| GET | **KHÔNG gắn policy nào** |
+| POST / PUT / DELETE / import | `[Authorize(Policy = LuxMapPolicies.ManageAssets)]` — **chỉ Quản lý** |
+| GET | `[Authorize(Policy = LuxMapPolicies.ReadNetwork)]` — cả bốn vai trò |
 
-`SetFallbackPolicy` đã bắt buộc đăng nhập rồi. Gắn `MaintenanceEngineer` lên GET **chặn luôn Quản
-trị và Cơ quan quản lý** — policy là `RequireClaim(role, "maintenance_engineer")`, đúng một giá trị.
-Trông như siết bảo mật, thực chất là chặn hai vai trò khỏi dữ liệu của chính họ. Đã canh bằng test.
+Ma trận ở **`LuxMapPolicies.Matrix`**, nguồn DUY NHẤT; `AuthorizationSetup` đăng ký policy bằng vòng lặp
+trên nó, `RequireClaim(role, <danh sách>)` — OR giữa các giá trị, **không** thứ bậc. Vai trò được vào vì
+được **nêu tên**. Quản trị hệ thống **không** ghi tài sản nữa (D-R12): nó đọc qua `*`, nhưng `*` làm
+guard `SaveChanges` cho nó qua hết — nên **chỉ policy** đứng giữa nó và bảng tài sản.
 
-Đây là **lần đầu bốn policy của BE-08 được dùng ở dòng sản xuất**. `LuxMapPolicies` vì thế chuyển từ
+**Không endpoint nghiệp vụ nào được dựa vào fallback** (fallback = "đã đăng nhập" = cả bốn vai trò, tức
+mở cho Cấp giám sát chỉ-đọc trên cả endpoint ghi). Ngoại lệ có tên: `GET /auth/me`.
+`CapabilityPolicyCoverageTests` đỏ khi endpoint thiếu capability, khi endpoint nêu policy ngoài ma trận,
+hoặc khi policy đăng ký nhận vai trò ma trận không nêu. Capability chưa có endpoint (`ControlLighting`,
+`ManageUsers`) khai sẵn; capability khác (survey review, work order, fault) thêm **cùng ticket** của nó.
+
+> 🔴 **Capability RỖNG là capability MỞ, không phải đóng.** `RequireClaim(role)` không kèm giá trị nào
+> chỉ đòi claim `role` **tồn tại** — tức nhận **mọi** vai trò. Phát hiện bằng sabotage: bỏ vai trò duy
+> nhất của `ManageAssets` là Cấp giám sát tạo được tuyến. `AuthorizationSetup` nay **từ chối khởi động**
+> khi một capability rỗng; muốn bỏ capability thì **xoá** nó, đừng làm rỗng.
+
+> 🔴 **Test kỳ vọng phải là LITERAL, không đọc từ ma trận.** Test suy kỳ vọng từ `Matrix` sẽ đồng ý với
+> mọi ma trận, kể cả ma trận sai. `RoleCapabilityMatrixTests` (HTTP, 4 vai trò × 6 capability) và
+> `CapabilityMatrixTests` (Shared, không cần Docker) chép bảng của Contract; đổi quyền là sửa cả hai
+> trong cùng diff.
+
+`LuxMapPolicies` nằm ở **`LuxMap.Shared`** từ BE-12a — chuyển từ
 `LuxMap.Api` sang **`LuxMap.Shared`**: host tham chiếu module chứ không ngược lại, nên controller
 trong module không thấy được hằng khai ở host.
 
@@ -693,7 +746,7 @@ trong module không thấy được hằng khai ở host.
 > module tự khai tên policy của mình, host đăng ký khớp** — đổi được sau, chỉ là đổi ở nhiều chỗ
 > hơn. Chốt ở FW-00 rồi hãy sửa; đừng để một ticket import quyết thay.
 
-Contract mục 7 **chỉ nói phạm vi địa bàn, không nói vai trò nào được ghi** — đã đăng ký drift 31.
+Ma trận vai trò nay nằm ở Contract **§2** (v1.7); drift 31 và D-14 là lịch sử.
 
 **5. `CommuneFilter.Narrow` giờ có call site thật.**
 
@@ -951,8 +1004,13 @@ số quyết định đáng ghi là hữu hạn và biết trước. Cột `repo
 vấn đề, và vẫn phải quyết "actor là gì khi engine sinh sự cố".
 
 ⚠️ **Đánh đổi: chỉ giữ quyết định MỚI NHẤT, không giữ chuỗi.** Một fault đi
-`detected → confirmed → rejected` chỉ còn trạng thái cuối. **Nếu BE-19 cần đủ chuỗi thì
-`FaultHistory` là việc của BE-19 (W8)** — chủ nợ có tên, đừng để nó rơi.
+`detected → confirmed → rejected` chỉ còn trạng thái cuối.
+
+> 🔴 **Audit trail nay là BẮT BUỘC, không còn "nếu BE-19 cần" (D-R13, 25/09/2026).** Phiếu v1.2 đòi
+> *"an audit trail of every automated finding and engineer decision"*. Hướng đã chốt: **một bảng audit
+> append-only dùng chung** cho quyết định fault (BE-18/19), lệnh điều khiển đèn (D-R7) và review survey
+> session — **không** làm `FaultHistory` riêng cho từng loại. Thiết kế chi tiết ở Phase 1 của **BE-19**.
+> Các cột trên dòng `fault` vẫn giữ (trả lời nhanh *ai quyết mới nhất*), nhưng không còn là toàn bộ vết.
 
 `reported_by` **NULL với fault do CV/IoT sinh**, và đó là câu trả lời đúng chứ không phải dữ liệu
 thiếu — `source_channel` đã nói engine nào. **Không dựng user hệ thống giả**: nó làm mọi dòng trông
@@ -965,8 +1023,9 @@ thiếu — `source_channel` đã nói engine nào. **Không dựng user hệ th
 | Có `pole_id` | Server tra từ pole. Client gửi → **400** |
 | `pole_id` NULL | Lấy từ **scope JWT**. Đúng một commune → lấy luôn. Nhiều hơn một → **400**, client phải chọn (và giá trị chọn phải trong scope) |
 
-Không suy được từ `lat`/`lng`: **`administrative_unit` không có cột geometry** — cố ý, nhánh C không
-có nguồn ranh giới thật (`AdministrativeUnit.cs`). Đã đăng ký drift: Contract mục 2.8 không có
+Không suy được từ `lat`/`lng`: **`administrative_unit` không có cột geometry** — cố ý khi đó, vì chưa có
+nguồn ranh giới thật (`AdministrativeUnit.cs`). ⚠️ Lý do này dựa trên FO-01 (nay `SUPERSEDED`) — **nền đã
+đổi, cần xét lại** (follow-up trong `tracking.html`). Đã đăng ký drift: Contract mục 2.8 không có
 `commune_id` trong body.
 
 **3. `priority_score` là cột LƯU, nullable.**
@@ -1213,10 +1272,32 @@ cho mọi endpoint viết sau.
 
 ### Vai trò
 
-**Cơ quan quản lý** · **Kỹ sư bảo trì** · **Tổ khảo sát/sửa chữa** · **Quản trị**.
-Phân quyền theo vai trò **và** theo địa bàn.
+Bốn vai trò đăng nhập theo Phiếu v1.2 mục 3.2.c (Contract v1.7 §2, D-R6):
 
-**Không có vai trò Người dân.** `Fault` do engine sinh (`cv` / `iot`) hoặc do tổ khảo sát báo tại chỗ (`field_report`). Không có luồng nào để một người "tạo sự cố" rồi hệ thống tin ngay — kỹ sư **duyệt** chứ không tạo.
+| Vai trò | `user_role` | Thay cho (≤ v1.6) | Tài khoản demo |
+|---|---|---|---|
+| **Cấp giám sát** (Superior) — bản đồ, thống kê, báo cáo; **chỉ đọc** | `superior` | `management_agency` | `agency` |
+| **Quản lý** (Manager) — tài sản, giao việc khảo sát / sửa chữa, duyệt sự cố, điều khiển đèn testbed | `manager` | `maintenance_engineer` | `engineer` |
+| **Kỹ sư hiện trường** (Field Engineer) — khảo sát đêm, kiểm tra, sửa chữa (Tổ khảo sát đã gộp vào đây) | `field_engineer` | `field_crew` | `crew` |
+| **Quản trị hệ thống** (System Admin) — tài khoản, vai trò, cấu hình, giám sát, log | `system_admin` | `administrator` | `admin` |
+
+Phân quyền theo vai trò (ma trận capability, mục BE-12a quy tắc 4) **và** theo địa bàn. Cấp giám sát
+xem nhiều xã bằng **danh sách xã được gán**, không có cấp huyện (D-R3). Username seed và biến
+`SEED_*_PASSWORD` **giữ tên cũ** — chúng là định danh, không phải nhãn (D-R6).
+
+**Không có tự đăng ký (D-R11).** Quản trị hệ thống tạo tài khoản, gán vai trò và xã. `POST /auth/register`
+còn chạy nhưng **DEPRECATED**, gỡ ở BE-33a — đừng xây gì mới lên nó.
+
+**Công dân (Citizen) không có tài khoản, không có vai trò (D-R1).** Họ báo sự cố qua **QR trên cột**; báo
+cáo vào **hàng chờ riêng**, Quản lý duyệt rồi mới thành `fault`. **Không** thêm giá trị vào
+`source_channel`, và **không** để báo cáo của dân đi thẳng vào `fault` — nguyên tắc cũ vẫn đúng: không có
+luồng nào để một người "tạo sự cố" rồi hệ thống tin ngay, **người có vai trò duyệt** chứ không tạo.
+`Fault` do engine sinh (`cv` / `iot`) hoặc do Kỹ sư hiện trường báo tại chỗ (`field_report`).
+
+**Điều khiển ON/OFF/AUTO (D-R7).** Chỉ **Quản lý** (`ControlLighting`); chỉ thiết bị
+`supports_remote_control = true` — tức thiết bị **testbed** tự dựng; thiết bị ngoài thực địa luôn
+`false`, vì nhóm không có quyền vận hành lưới chiếu sáng của xã; **mọi lệnh ghi audit**. Docs viết
+*"supported lighting devices (testbed demo)"*. Đừng viết như thể hệ thống điều khiển lưới thật.
 
 ---
 
@@ -1229,7 +1310,9 @@ Vi phạm thì hệ thống vẫn chạy, số liệu vẫn ra, nhưng kết qu�
 - **Không so sánh độ sáng giữa hai cột khác nhau.**
 - **`unknown` đếm riêng, không gộp vào `out`.**
 - **Mọi phát hiện tự động ghi kèm phiên bản model và firmware** (BE-34). Không tái lập được thì không phải kết quả.
-- **Mọi quyết định của kỹ sư ghi vết trên chính dòng `fault`** (`confirmed_by/at`, `resolved_by/at` — BE-18). Chuỗi đầy đủ (`FaultHistory`) chỉ dựng nếu BE-19 cần.
+- **Mọi phát hiện tự động và mọi quyết định của người đều vào audit trail** (D-R13): bảng audit append-only dùng chung, thiết kế ở BE-19. Cột `confirmed_by/at`, `resolved_by/at` trên dòng `fault` (BE-18) chỉ là quyết định mới nhất.
+- **Precision / recall báo RIÊNG cho `out` và `dim`** (NFR phiếu v1.2). `dim` là lớp khó và đáng giá; một con số gộp sẽ giấu nó — cùng họ lỗi với gộp `unknown` vào `out`.
+- **Báo tỉ lệ cột có mạch điện được xác nhận** (NFR *feeder topology coverage*). Cột không gán được mạch thì gom cụm chỉ theo hình học, và **độ tin cậy giảm phải được ghi lại** — không im lặng coi như có mạch.
 - **Sự cố cấp đoạn là một nguyên nhân, không phải N sự cố bóng.** CV-15 sinh `cluster_id` và `fault_type = segment_outage`.
 - **Telemetry ingest idempotent theo `(node_id, reading_time)`** (IOT-09). Store-and-forward chắc chắn gửi trùng — đó là hoạt động bình thường.
 - **Phiên đêm cắt qua nửa đêm.** Không tính runtime theo ngày lịch.
@@ -1276,23 +1359,21 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 
 `mock-poles.geojson`, `mock-pole-detail.json`, `mock-faults.json`, `mock-work-orders.json`, `mock-iot-nodes.geojson`.
 
-Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** là cột solar có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-047` — pin yếu làm đèn mờ dần, không tắt phụt).
+Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-047` — đèn mờ dần, không tắt phụt; từ Contract v1.6 là cột `grid` / `led_road_lamp`).
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
 
-> **Lập trường về `external_ref` của bộ mock — ĐÃ ĐÓNG, không phải nợ mở.**
+> 🔴 **Lập trường về `external_ref` của bộ mock — MỞ LẠI, ưu tiên cao (D-R10, 25/09/2026).**
 >
 > Bộ mock không mang mã kiểm kê nào, nên cách nạp duy nhất là lấy chính `pole_id` / `segment_id` của
 > mock làm `external_ref` (`AssetImportMockSetTests` làm đúng vậy).
 >
-> **Dưới Nhánh C, đó là danh tính ngoài VĨNH VIỄN.** Nhánh C không có thử nghiệm hiện trường (FO-01),
-> nên không có mã kiểm kê thật nào sẽ về, nên **nhu cầu di trú mã không tồn tại trong phạm vi đồ án**.
-> Di trú mã là **ngoài phạm vi**. Giữ nó thành "nợ hạn W5" chỉ đảm bảo tuần W5 có người mở lại ra bàn
-> cho một rủi ro không tồn tại.
->
-> **Nếu Nhánh C đổi** thì mới cần quyết, và lúc đó dữ kiện này quan trọng: đường "xoá sạch nạp lại"
-> **đóng từ W5**, vì `fault` và `lux_reading` trỏ vào `pole` bằng `Restrict` và FO-14 đo lux ở W5.
-> Sau mốc đó chỉ còn đường `UPDATE pole SET external_ref = …` kèm bảng ánh xạ.
+> Lập trường cũ ("danh tính ngoài VĨNH VIỄN, di trú mã ngoài phạm vi") dựa trên FO-01 — không có thử
+> nghiệm hiện trường nên không có mã kiểm kê thật nào sẽ về. **FO-01 nay `SUPERSEDED`**: phiếu v1.2 có
+> field trial với xã đối tác, nên mã kiểm kê thật **có thể** về. **Nền đã đổi, cần xét lại** — và phải xét
+> **trước khi** dữ liệu kiểm kê thật về, vì dữ kiện này vẫn nguyên: đường "xoá sạch nạp lại" **đóng từ
+> W5**, do `fault` và `lux_reading` trỏ vào `pole` bằng `Restrict` và FO-14 đo lux ở W5. Sau mốc đó chỉ
+> còn đường `UPDATE pole SET external_ref = …` kèm bảng ánh xạ.
 
 ---
 
@@ -1307,10 +1388,11 @@ FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** 
 - Đừng bắt FE gọi nhiều lần để dựng màn chi tiết cột.
 - Đừng để FE tự tính `baseline_ratio` hay `classified_as`.
 - Đừng gộp `unknown` vào `out`.
-- Đừng gộp số liệu giữa ba nguồn dữ liệu của nhánh C.
+- Đừng gộp số liệu giữa các nguồn `data_source` — và đừng gắn `field` cho dữ liệu testbed.
 - Đừng hard-code ngưỡng dim/out hay trọng số ưu tiên.
 - Đừng đề xuất node IoT cho mọi cột — sparse IoT là thiết kế, không phải điểm cần tối ưu.
-- Đừng thêm luồng người dân gửi phản ánh.
+- Đừng cho báo cáo QR của công dân đi thẳng vào `fault`, và đừng tạo tài khoản / vai trò cho công dân.
+- Đừng viết điều khiển ON/OFF/AUTO như thể nó chạm lưới chiếu sáng của xã — chỉ thiết bị testbed.
 - Đừng giả định có mạng — mobile phải chạy trọn ca offline.
 - Đừng âm thầm bỏ frame không hợp lệ.
 
