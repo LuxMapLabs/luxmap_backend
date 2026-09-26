@@ -253,7 +253,7 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 | Task | Thiếu |
 |---|---|
 | ~~BE-07~~ | ~~Endpoint đăng ký / đăng nhập / refresh~~ → **đã đặc tả ở Contract mục 4 (v1.2)** |
-| ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, còn chờ duyệt |
+| ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, đã hiện thực ở Contract §5.3.1 (SELF-SIGNED, chờ FW xác nhận) |
 | BE-15, BE-16 | Upload sweep, validate metadata phơi sáng |
 | BE-27 | Notification — **chốt tên bảng/entity cùng FE2 trước W16** |
 | BE-28→31 | Toàn bộ dashboard và thống kê |
@@ -263,7 +263,7 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 
 BE-41 và BE-42 đã được đặc tả ở bản hợp nhất (mục 2.8 và 2.9). **BE-12a** được đặc tả riêng ngoài
 Contract và đã hiện thực — nhóm endpoint `/assets/…`, xem mục BE-12a bên dưới; **BE-12b** (hình dạng
-response khi đọc một tài sản) vẫn đang chờ Thịnh/Ngọc duyệt. Phần còn lại trong bảng vẫn chưa có đặc
+response khi đọc một tài sản) đã hiện thực ở Contract §5.3.1; quyết định SELF-SIGNED còn chờ FW xác nhận. Phần còn lại trong bảng vẫn chưa có đặc
 tả — cần thống nhất trước khi hiện thực, đừng tự sinh endpoint rồi coi như xong.
 
 Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (giai đoạn 1 dùng polling). Phân quyền theo `commune_id` **đã chốt ở mục 7**, không còn để mở.

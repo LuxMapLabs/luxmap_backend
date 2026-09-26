@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.7, 25/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 32 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.7, 25/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 35 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
     "version": "1.7"
   },
   "paths": {
@@ -173,17 +173,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
+                  "$ref": "#/components/schemas/SegmentListItemPagedResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
+                  "$ref": "#/components/schemas/SegmentListItemPagedResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
+                  "$ref": "#/components/schemas/SegmentListItemPagedResult"
                 }
               }
             }
@@ -226,7 +226,7 @@
           "field_engineer",
           "system_admin"
         ],
-        "summary": "Danh sách ID tuyến (chỗ giữ chỗ BE-12b)",
+        "summary": "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
         "operationId": "getAssetsSegments",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -339,498 +339,95 @@
         "x-luxmap-contract": "§5.3"
       }
     },
-    "/api/v1/assets/feeders": {
-      "get": {
-        "tags": [
-          "Assets"
-        ],
-        "parameters": [
-          {
-            "name": "commune_id",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/PageQuery"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:read_network",
-        "x-luxmap-roles": [
-          "superior",
-          "manager",
-          "field_engineer",
-          "system_admin"
-        ],
-        "summary": "Danh sách ID mạch điện (chỗ giữ chỗ BE-12b)",
-        "operationId": "getAssetsFeeders",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
-      },
-      "post": {
-        "tags": [
-          "Assets"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFeederRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFeederRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFeederRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:manage_assets",
-        "x-luxmap-roles": [
-          "manager"
-        ],
-        "summary": "Tạo mạch điện; 201 + Location, không body",
-        "operationId": "postAssetsFeeders",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
-      }
-    },
-    "/api/v1/assets/poles": {
-      "get": {
-        "tags": [
-          "Assets"
-        ],
-        "parameters": [
-          {
-            "name": "commune_id",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/PageQuery"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StringPagedResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:read_network",
-        "x-luxmap-roles": [
-          "superior",
-          "manager",
-          "field_engineer",
-          "system_admin"
-        ],
-        "summary": "Danh sách ID cột (chỗ giữ chỗ BE-12b)",
-        "operationId": "getAssetsPoles",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
-      },
-      "post": {
-        "tags": [
-          "Assets"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePoleRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePoleRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreatePoleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:manage_assets",
-        "x-luxmap-roles": [
-          "manager"
-        ],
-        "summary": "Tạo cột; 201 + Location, không body",
-        "operationId": "postAssetsPoles",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
-      }
-    },
-    "/api/v1/assets/fixtures": {
-      "post": {
-        "tags": [
-          "Assets"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFixtureRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFixtureRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateFixtureRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Created"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:manage_assets",
-        "x-luxmap-roles": [
-          "manager"
-        ],
-        "summary": "Ghi một lần lắp bóng; commune_id chép từ cột",
-        "operationId": "postAssetsFixtures",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
-      }
-    },
     "/api/v1/assets/segments/{segmentId}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "segmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
+        "operationId": "getAssetsSegmentsSegmentid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      },
       "put": {
         "tags": [
           "Assets"
@@ -1067,7 +664,271 @@
         "x-luxmap-contract": "§5.3"
       }
     },
+    "/api/v1/assets/feeders": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederListItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederListItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederListItemPagedResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "Danh sách mạch điện — has_geometry + pole_count; KHÔNG có data_source (§1.6)",
+        "operationId": "getAssetsFeeders",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      },
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFeederRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFeederRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFeederRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "Tạo mạch điện; 201 + Location, không body",
+        "operationId": "postAssetsFeeders",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      }
+    },
     "/api/v1/assets/feeders/{feederId}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "feederId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
+        "operationId": "getAssetsFeedersFeederid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      },
       "put": {
         "tags": [
           "Assets"
@@ -1304,7 +1165,311 @@
         "x-luxmap-contract": "§5.3"
       }
     },
+    "/api/v1/assets/poles": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleListItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleListItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleListItemPagedResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
+        "operationId": "getAssetsPoles",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      },
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePoleRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePoleRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "Tạo cột; 201 + Location, không body",
+        "operationId": "postAssetsPoles",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      }
+    },
     "/api/v1/assets/poles/{poleId}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "poleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "Một cột + geom_wkt + segment_name + created_at; ngoài phạm vi xã → 404",
+        "operationId": "getAssetsPolesPoleid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      },
       "put": {
         "tags": [
           "Assets"
@@ -1537,6 +1702,125 @@
         ],
         "summary": "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
         "operationId": "deleteAssetsPolesPoleid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.3"
+      }
+    },
+    "/api/v1/assets/fixtures": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFixtureRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFixtureRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFixtureRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "Ghi một lần lắp bóng; commune_id chép từ cột",
+        "operationId": "postAssetsFixtures",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
       }
@@ -4357,6 +4641,47 @@
   },
   "components": {
     "schemas": {
+      "ActiveFixture": {
+        "required": [
+          "data_source",
+          "fixture_id",
+          "fixture_type",
+          "install_date",
+          "lamp_watt",
+          "power_source"
+        ],
+        "type": "object",
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "power_source": {
+            "$ref": "#/components/schemas/PowerSource"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "install_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          }
+        },
+        "additionalProperties": false
+      },
       "ApiError": {
         "type": "object",
         "properties": {
@@ -4379,6 +4704,24 @@
         "properties": {
           "error": {
             "$ref": "#/components/schemas/ApiError"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AssetLocation": {
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -4683,6 +5026,91 @@
         "type": "string",
         "description": "Contract v1.1 section 1 — fault_type. Frozen: do not add values, do not rename, do not use int."
       },
+      "FeederDetail": {
+        "required": [
+          "created_at",
+          "feeder"
+        ],
+        "type": "object",
+        "properties": {
+          "feeder": {
+            "$ref": "#/components/schemas/FeederListItem"
+          },
+          "geom_wkt": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FeederListItem": {
+        "required": [
+          "commune_id",
+          "feeder_id",
+          "feeder_name",
+          "has_geometry",
+          "pole_count",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "feeder_id": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeder_name": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "has_geometry": {
+            "type": "boolean"
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FeederListItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeederListItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "FixtureStatus": {
         "enum": [
           "normal",
@@ -4966,6 +5394,159 @@
         },
         "additionalProperties": false
       },
+      "PoleDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Contract §5.1 — đủ trong MỘT request. Hình dạng theo mock-pole-detail.json.",
+        "required": [
+          "pole_id",
+          "segment_id",
+          "segment_name",
+          "commune_id",
+          "location",
+          "fixture",
+          "current_status",
+          "iot_node",
+          "luminance_baseline",
+          "luminance_history",
+          "open_faults",
+          "recent_frames"
+        ],
+        "properties": {
+          "pole_id": {
+            "$ref": "#/components/schemas/PoleId"
+          },
+          "segment_id": {
+            "$ref": "#/components/schemas/SegmentId"
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "commune_id": {
+            "$ref": "#/components/schemas/CommuneId"
+          },
+          "location": {
+            "$ref": "#/components/schemas/LatLng"
+          },
+          "fixture": {
+            "$ref": "#/components/schemas/PoleDetailFixture"
+          },
+          "current_status": {
+            "$ref": "#/components/schemas/PoleCurrentStatus"
+          },
+          "iot_node": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PoleIotNode"
+              }
+            ],
+            "type": "object"
+          },
+          "luminance_baseline": {
+            "$ref": "#/components/schemas/LuminanceBaseline"
+          },
+          "luminance_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LuminancePoint"
+            }
+          },
+          "runtime_history": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/RuntimePoint"
+            },
+            "description": "Chỉ có khi cột có IoT node"
+          },
+          "open_faults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenFaultSummary"
+            }
+          },
+          "recent_frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecentFrame"
+            }
+          }
+        }
+      },
+      "PoleListItem": {
+        "required": [
+          "commune_id",
+          "data_source",
+          "location",
+          "near_sensitive_poi",
+          "pole_id",
+          "segment_id",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "near_sensitive_poi": {
+            "type": "boolean"
+          },
+          "location": {
+            "$ref": "#/components/schemas/AssetLocation"
+          },
+          "active_fixture": {
+            "$ref": "#/components/schemas/ActiveFixture"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleListItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleListItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "PoleProperties": {
         "type": "object",
         "additionalProperties": false,
@@ -5194,6 +5775,100 @@
         ],
         "type": "string"
       },
+      "SegmentDetail": {
+        "required": [
+          "created_at",
+          "geom_wkt",
+          "segment"
+        ],
+        "type": "object",
+        "properties": {
+          "segment": {
+            "$ref": "#/components/schemas/SegmentListItem"
+          },
+          "geom_wkt": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SegmentListItem": {
+        "required": [
+          "commune_id",
+          "data_source",
+          "length_m",
+          "pole_count",
+          "road_class",
+          "segment_id",
+          "segment_name",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "road_class": {
+            "$ref": "#/components/schemas/RoadClass"
+          },
+          "length_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SegmentListItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentListItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SegmentProperties": {
         "type": "object",
         "additionalProperties": false,
@@ -5309,30 +5984,6 @@
         ],
         "type": "string",
         "description": "Contract v1.1 section 1 — source_channel. Frozen: do not add values, do not rename, do not use int."
-      },
-      "StringPagedResult": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "page_size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "additionalProperties": false
       },
       "TopologyPole": {
         "required": [
@@ -5994,86 +6645,6 @@
           "heading_deg": {
             "type": "number",
             "format": "double"
-          }
-        }
-      },
-      "PoleDetail": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Contract §5.1 — đủ trong MỘT request. Hình dạng theo mock-pole-detail.json.",
-        "required": [
-          "pole_id",
-          "segment_id",
-          "segment_name",
-          "commune_id",
-          "location",
-          "fixture",
-          "current_status",
-          "iot_node",
-          "luminance_baseline",
-          "luminance_history",
-          "open_faults",
-          "recent_frames"
-        ],
-        "properties": {
-          "pole_id": {
-            "$ref": "#/components/schemas/PoleId"
-          },
-          "segment_id": {
-            "$ref": "#/components/schemas/SegmentId"
-          },
-          "segment_name": {
-            "type": "string"
-          },
-          "commune_id": {
-            "$ref": "#/components/schemas/CommuneId"
-          },
-          "location": {
-            "$ref": "#/components/schemas/LatLng"
-          },
-          "fixture": {
-            "$ref": "#/components/schemas/PoleDetailFixture"
-          },
-          "current_status": {
-            "$ref": "#/components/schemas/PoleCurrentStatus"
-          },
-          "iot_node": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PoleIotNode"
-              }
-            ],
-            "type": "object"
-          },
-          "luminance_baseline": {
-            "$ref": "#/components/schemas/LuminanceBaseline"
-          },
-          "luminance_history": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LuminancePoint"
-            }
-          },
-          "runtime_history": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "$ref": "#/components/schemas/RuntimePoint"
-            },
-            "description": "Chỉ có khi cột có IoT node"
-          },
-          "open_faults": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OpenFaultSummary"
-            }
-          },
-          "recent_frames": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RecentFrame"
-            }
           }
         }
       },

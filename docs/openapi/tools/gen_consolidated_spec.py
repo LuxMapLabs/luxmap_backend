@@ -84,11 +84,14 @@ def opid(method, path):
 # Summaries for the implemented operations (from the controllers' XML docs / behaviour)
 SUMMARY = {
     ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
-    ("get", "/api/v1/assets/segments"): "Danh sách ID tuyến (chỗ giữ chỗ BE-12b)",
+    ("get", "/api/v1/assets/segments"): "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
+    ("get", "/api/v1/assets/segments/{segmentId}"): "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
     ("post", "/api/v1/assets/segments"): "Tạo tuyến đường; 201 + Location, không body",
-    ("get", "/api/v1/assets/feeders"): "Danh sách ID mạch điện (chỗ giữ chỗ BE-12b)",
+    ("get", "/api/v1/assets/feeders"): "Danh sách mạch điện — has_geometry + pole_count; KHÔNG có data_source (§1.6)",
+    ("get", "/api/v1/assets/feeders/{feederId}"): "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
     ("post", "/api/v1/assets/feeders"): "Tạo mạch điện; 201 + Location, không body",
-    ("get", "/api/v1/assets/poles"): "Danh sách ID cột (chỗ giữ chỗ BE-12b)",
+    ("get", "/api/v1/assets/poles"): "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
+    ("get", "/api/v1/assets/poles/{poleId}"): "Một cột + geom_wkt + segment_name + created_at; ngoài phạm vi xã → 404",
     ("post", "/api/v1/assets/poles"): "Tạo cột; 201 + Location, không body",
     ("post", "/api/v1/assets/fixtures"): "Ghi một lần lắp bóng; commune_id chép từ cột",
     ("put", "/api/v1/assets/segments/{segmentId}"): "Thay thế TOÀN PHẦN một tuyến; commune_id không sửa được",

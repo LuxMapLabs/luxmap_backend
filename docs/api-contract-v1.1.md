@@ -6,7 +6,7 @@
 **Ngày chốt v1.0:** 23/08/2026 · **v1.1:** 24/08/2026 · **v1.2:** 11/09/2026 (mục 4 Auth) ·
 **v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02) ·
 **v1.5:** 19/09/2026 (`GET /auth/me`) · **v1.6:** 22/09/2026 (bỏ đèn solar khỏi enum) ·
-**v1.7:** 25/09/2026 (vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability).
+**v1.7:** 25/09/2026 (hợp nhất BE-12b ngày 22/09 và vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability ngày 25/09).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
@@ -15,7 +15,7 @@ tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đ�
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (45 operation: 32
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (48 operation: 35
 `implemented`, 13 `not_implemented` — đếm lại ở v1.7; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
@@ -488,9 +488,12 @@ Tách khỏi `/poles` (endpoint bản đồ, mục 5.1). Ghi = **Quản lý** (`
 
 | Endpoint | Body / Query | Trả về |
 |---|---|---|
-| **`GET /api/v1/assets/segments`** | `commune_id[]`, `page`, `page_size` | `PagedResult<string>` — **chỉ ID**. Chỗ giữ chỗ tới BE-12b |
-| **`GET /api/v1/assets/feeders`** | như trên | như trên |
-| **`GET /api/v1/assets/poles`** | như trên | như trên |
+| **`GET /api/v1/assets/segments`** | `commune_id[]`, `page`, `page_size` | `PagedResult<SegmentListItem>` — xem 5.3.1 |
+| **`GET /api/v1/assets/segments/{segmentId}`** | — | `SegmentDetail`; `404 ASSET_NOT_FOUND` (kể cả khi ngoài phạm vi xã) |
+| **`GET /api/v1/assets/feeders`** | như trên | `PagedResult<FeederListItem>` |
+| **`GET /api/v1/assets/feeders/{feederId}`** | — | `FeederDetail`; `404` |
+| **`GET /api/v1/assets/poles`** | như trên | `PagedResult<PoleListItem>` |
+| **`GET /api/v1/assets/poles/{poleId}`** | — | `PoleDetail`; `404` |
 | **`POST /api/v1/assets/segments`** | `{external_ref?, segment_name, road_class, length_m, geom_wkt, commune_id, data_source}` | `201` + `Location`, không body; `400` xã không tồn tại; `403` xã ngoài phạm vi; `409 EXTERNAL_REF_TAKEN` |
 | **`POST /api/v1/assets/feeders`** | `{external_ref?, feeder_name, commune_id, geom_wkt?}` | `201` + `Location` |
 | **`POST /api/v1/assets/poles`** | `{external_ref?, segment_id, feeder_id?, commune_id, geom_wkt, near_sensitive_poi?, data_source}` | `201` + `Location`; `404 ASSET_NOT_FOUND` tuyến/mạch; `409 CROSS_COMMUNE_REFERENCE` mạch khác xã |
@@ -504,7 +507,59 @@ Nhập: kiểm **toàn bộ** file trước, ghi tập hợp lệ trong **một*
 `(commune_id, external_ref)` cho tuyến/mạch/cột; bóng **insert-only** (từ chối khi cột đang có bóng
 dùng; bóng đã ngừng dùng không chặn). Xã ngoài phạm vi, mạch khác xã, `removed_date < install_date`
 là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự tự thực thi qua `*_external_ref`. Mẫu:
-`docs/templates/`. `external_ref` **không** emit ra API.
+`docs/templates/`.
+
+#### 5.3.1 Hình dạng khi ĐỌC (v1.7, BE-12b)
+
+```jsonc
+// GET /assets/poles → items[]
+{ "pole_id": "POLE-0047", "external_ref": "TB-2024-047", "segment_id": "SEG-003",
+  "feeder_id": null, "commune_id": "COM-001", "data_source": "public_imagery",
+  "near_sensitive_poi": true, "location": { "lat": 10.972447, "lng": 106.502058 },
+  "active_fixture": { "fixture_id": "FIX-0047", "fixture_type": "led_road_lamp",
+                      "power_source": "grid", "lamp_watt": 60,
+                      "install_date": "2024-03-18", "warranty_expiry": "2027-03-18",
+                      "data_source": "public_imagery" },
+  "updated_at": "2026-09-18T04:12:07Z" }
+
+// GET /assets/segments → items[]
+{ "segment_id": "SEG-003", "external_ref": "DX-03", "segment_name": "Đường liên thôn 3",
+  "road_class": "inter_village", "length_m": 1420, "commune_id": "COM-001",
+  "data_source": "public_imagery", "pole_count": 31, "updated_at": "…" }
+
+// GET /assets/feeders → items[]
+{ "feeder_id": "FDR-001", "external_ref": "TĐ-01", "feeder_name": "Tủ điện chợ",
+  "commune_id": "COM-001", "has_geometry": false, "pole_count": 12, "updated_at": "…" }
+
+// GET /assets/{kind}/{id} → thêm
+{ "pole": { …dòng danh sách… }, "segment_name": "Đường liên thôn 3",
+  "geom_wkt": "POINT (106.502058 10.972447)", "created_at": "…" }
+```
+
+🔴 **`external_ref`, `data_source` và `feeder_id` ĐƯỢC emit ở đây, dù mục 5.1 cấm trên bản đồ.**
+Lệnh cấm đó viết cho **endpoint bản đồ**; nhóm kiểm kê là bề mặt khác, người dùng khác, và cả ba đều
+cần thiết ở đây: `external_ref` là mã đơn vị tự gõ lúc nhập và là cách duy nhất khớp dòng trên màn
+hình với dòng trong bảng tính; `data_source` ghi được từ BE-12 mà không đọc được là đúng điều kiện
+để trộn nhầm dữ liệu hiệu chuẩn; `feeder_id` phải đọc được vì `PUT` là **thay thế toàn phần** —
+người sửa không đọc được mạch hiện tại thì sẽ xoá nó khi chỉ định đổi tên.
+
+**KHÔNG lặp lại mục 5.1.** Không `fixture_status`, `status_confidence`, `open_fault_count`,
+`last_seen_at`, `last_sweep_id`, `has_iot_node`, `luminance_*`, `runtime_*`. Hai endpoint cùng trả
+một trường là hai nguồn sự thật cho một câu hỏi, và không gì phát hiện ngày chúng lệch.
+
+- **`location{lat,lng}`, không GeoJSON** — danh sách phân trang, không phải lớp bản đồ; dùng lại đúng
+  khuôn mục 5.4 đã publish cho `GET /faults`.
+- **`active_fixture` có trong CẢ danh sách**, không chỉ chi tiết: bảng kiểm kê hiện loại đèn và công
+  suất theo từng dòng, nên một cờ boolean sẽ ép gọi thêm một request mỗi cột. `null` khi cột chưa lắp
+  bóng; **đúng một bóng** nhờ `ux_fixture_pole_id_active`.
+- **`feeder` KHÔNG có `data_source`** — mục 1.6 gắn trường này lên tám thực thể và `Feeder` không
+  nằm trong đó. Bịa ra provenance cho thứ không có là để API trả lời một câu hỏi database không trả
+  lời được.
+- **`has_geometry` thay vì `geom_wkt` trong danh sách** — Nhánh C không khảo sát tuyến cáp nên đa số
+  feeder không có hình học; chi tiết mới mang WKT.
+- **`pole_count` đếm trong PHẠM VI của người gọi**, không phải tổng thật của tuyến. Đường
+  `inter_commune` mang cột của xã khác và query filter giấu chúng; trả tổng thật sẽ thành kênh đo
+  dữ liệu xã khác mà không liệt kê được — đúng thứ mục 7 sinh ra để chặn.
 
 ### 5.4 Sự cố
 
@@ -666,6 +721,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.7 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BE-12b — hình dạng ĐỌC tài sản, mục 5.3.1.** Thay `PagedResult<string>` (chỗ giữ chỗ từ BE-12a) bằng dòng kiểm kê đầy đủ, thêm `GET /assets/{kind}/{id}`. Ba câu treo từ 17/09 trả lời **CÓ** cả ba: emit `external_ref`, `data_source`, `feeder_id` ở nhóm kiểm kê — lệnh cấm ở mục 5.1 viết cho endpoint bản đồ, không ràng buộc bề mặt này. `active_fixture` có trong cả danh sách (bảng kiểm kê hiện công suất theo dòng); `feeder` không có `data_source` (mục 1.6 không gắn); `pole_count` đếm trong phạm vi người gọi. Quyết sau khi review độc lập đối chiếu repo WP5. ⚠️ **BREAKING** so với chỗ giữ chỗ, nhưng WP5 chưa đọc endpoint này — màn kiểm kê của họ đang dùng mock local. Chạm bề mặt API và ký một mình → **chưa ổn định tới FW kế tiếp** |
 | v1.7 | 25/09/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BREAKING, đổi giá trị claim `role`.** Vai trò theo Phiếu đăng ký FA26SE222 v1.2: `management_agency`→`superior`, `maintenance_engineer`→`manager`, `field_crew`→`field_engineer`, `administrator`→`system_admin` (song ánh; migration `RenameUserRolesToRegistrationV12`, `Down()` không mất dữ liệu). D-14 "một vai trò chính xác" → **danh sách vai trò chính xác cho mỗi capability**, vẫn cấm thứ bậc; ma trận ở mục 2. **Hai đổi hành vi:** ghi `/assets/*` + import chuyển từ Quản trị sang **Quản lý**; `POST /lux-readings` chỉ **Kỹ sư hiện trường** (trước: mọi vai trò). `POST /auth/register` **DEPRECATED**, gỡ ở BE-33a. Citizen không có account (QR, chưa có endpoint). Kèm: nguồn `data_source` theo phạm vi mới (mục 1.6, O-9); lux là số đọc tương đối (5.7); lưu trữ + cảnh báo hết bảo hành (3.3); audit trail bắt buộc (3.3); video và điều khiển ON/OFF/AUTO là planned (5.5, 5.6). Quyết định D-R1…D-R18 ở `docs/contract-drift.md`. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.6 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BREAKING, thu hẹp enum.** `power_source` còn `grid`; `fixture_type` còn `led_road_lamp`. Đèn solar ra khỏi phạm vi đồ án. Xoá giá trị thay vì để lại không dùng — giá trị enum không ai sinh ra được là giá trị ticket sau tưởng mình được ghi. Kèm migration `DropSolarFixtures` (đổi 45 hàng RỒI mới siết CHECK — ngược lại là migration gãy), bộ mock FO-26 đổi 45 cột, và bỏ `power_source` khỏi listing cột-chưa-gán của BE-13 (trường đó chỉ sinh ra để tách "solar nên không mạch" khỏi "chưa ai gán"). **`runtime_decline` GIỮ NGUYÊN** — chỉ đèn solar bị bỏ, phần runtime/IoT thì không. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.5 | 19/09/2026 | **Dylan** | Thêm mục 4.7 `GET /api/v1/auth/me`. Không đổi hình dạng nào đã publish: 7 endpoint auth cũ giữ nguyên từng byte. Lý do: login chỉ trả token, và access token không mang `full_name`/`email` còn `commune_ids` thì đứng yên 60 phút |

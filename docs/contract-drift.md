@@ -125,6 +125,7 @@ mới, hiện thực và đặc tả trong cùng một PR, **không có mục dr
 | 45 | Contract mục 9 còn ghi O-7 là việc đang mở; FK ghép đã có trong lược đồ | Thấp | Không ai — thuần nội bộ backend | **Chờ đóng ở v1.6** |
 | 46 | Không có endpoint topology nào trong Contract; BE-13 đã hiện thực trên nền TẠM | Cao | WP4 (CV-05, CV-15) | **Đã hiện thực, CHỜ DUYỆT** — đề xuất ở `review/BE-13-topology-shape.md` |
 | 47 | `GET /poles` và `GET /segments` trả đúng HÌNH DẠNG mục 5.1–5.2 nhưng ba trường chưa có nguồn | Cao | WP5, WP6 (bản đồ trông sẽ trống) | **Mở** — gỡ dần theo BE-15/17 và bảng IoT |
+| 34 | ~~`GET /assets/*` trả danh sách ID~~ | — | — | ✅ **ĐÓNG 22/09/2026** — BE-12b hiện thực, Contract v1.7 mục 5.3.1 |
 
 ### 44 — `PUT` và `DELETE` cho tuyến đường, tủ điện, cột đèn (20/09/2026)
 
@@ -306,6 +307,31 @@ phải việc của BE-14; đây là **thu hẹp phạm vi do lược đồ, kh�
 
 **Không có gì cần duyệt.** Hình dạng đã nằm trong Contract và code khớp. Mục này tồn tại để không ai
 đọc một bản đồ toàn `unknown` rồi kết luận BE-14 hỏng.
+
+
+### 34 — ĐÓNG: `GET /assets/*` nay trả hình dạng kiểm kê đầy đủ (22/09/2026)
+
+Mục drift này mở từ BE-12a với hạn dùng rõ ràng: *"xoá khi BE-12b xong"*. BE-12b xong.
+
+`GET /api/v1/assets/{segments|feeders|poles}` trả `PagedResult<T>` với dòng kiểm kê đầy đủ, và ba
+endpoint `GET /assets/{kind}/{id}` được thêm. Đặc tả ở **Contract mục 5.3.1 (v1.7)**, nên từ đây
+Contract và code không còn lệch — không còn gì để ghi ở file này.
+
+**Ba câu treo từ 17/09 trả lời CÓ cả ba.** Quyết ngày 22/09 sau một lượt review độc lập đối chiếu
+**repo WP5 thật** (`luxmap-web`), không phải suy đoán. Điều quyết định là phát hiện rằng màn quản trị
+tài sản của WP5 **đọc từ mock local**, chỉ modal import gọi API — nên đổi hình dạng vẫn còn miễn phí,
+và `AssetPoleItem` của họ cho thấy bảng hiện **công suất và loại đèn theo từng dòng**, thứ khiến
+`has_active_fixture` kiểu boolean trở thành N+1.
+
+⚠️ **`SELF-SIGNED`** — ký một mình, không qua Thịnh/Ngọc. Chạm bề mặt API nên **chưa ổn định cho tới
+khi FW kế tiếp xác nhận**; ticket xây lên trên nó phải ghi rõ nền là tạm.
+
+> 🔴 **Việc lớn hơn tìm thấy trong cùng lượt review, và nó KHÔNG ở repo này.**
+> `luxmap-web/src/pages/assets/components/ImportAssetModal.tsx` bắt mọi exception rồi dựng
+> `inserted: <số dòng>, failed: 0, total_errors: 0` và gọi `onImportSuccess`. Backend 500, 401 hay
+> mất mạng đều hiện ra như một lượt nạp hoàn hảo, và `|| 10` khiến file rỗng cũng báo "đã nạp 10".
+> **Nhìn giao diện không phân biệt được FE↔BE đã thông hay đã hỏng.** Cần WP5 sửa; tiêu chí nghiệm
+> thu nên là *import → đọc lại từ server → sửa → tải lại trang*.
 
 
 > Ghi theo khuôn: Contract đang ghi gì · Code đang làm gì · Đề xuất · Ảnh hưởng. Chạm bề mặt API thì

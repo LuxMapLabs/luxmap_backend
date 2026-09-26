@@ -121,6 +121,13 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     }
 
     /// <summary>Installation fields come from the lamp IN SERVICE, never a retired one.</summary>
+    /// <remarks>
+    /// ⚠️ <b>The two lamps are told apart by WATTAGE now, not by power source.</b> This test used to
+    /// plant a retired grid lamp beside an active solar one, which made the assertion self-evident.
+    /// Contract v1.6 left <c>power_source</c> and <c>fixture_type</c> with one value each, so they
+    /// can no longer discriminate anything — <c>lamp_watt</c> is what carries the test now, and 100
+    /// against 40 is as decisive as grid against solar was.
+    /// </remarks>
     [Fact]
     public async Task Installation_fields_come_from_the_lamp_in_service()
     {
@@ -136,6 +143,8 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
         var properties = Find(await GetAsync(client, Poles + Box), poleId).GetProperty("properties");
 
         Assert.Equal(40, properties.GetProperty("lamp_watt").GetInt32());
+        Assert.Equal("grid", properties.GetProperty("power_source").GetString());
+        Assert.Equal("led_road_lamp", properties.GetProperty("fixture_type").GetString());
     }
 
     /// <summary><c>open_fault_count</c> counts the OPEN set and nothing else.</summary>

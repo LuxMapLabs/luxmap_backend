@@ -33,36 +33,77 @@ public sealed class AssetsController(
     AssetCrudService service,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
-    /// <summary>
-    /// Ids only, paged. The full asset shape is <b>BE-12b</b>.
-    /// </summary>
-    /// <remarks>
-    /// A deliberate placeholder, not a design. BE-12a owns requests and permissions; what a read
-    /// returns is still under review, and shipping a guess would publish a shape the front end starts
-    /// depending on. Ids are enough to confirm what an import wrote, and <c>PagedResult</c> is already
-    /// the published envelope from Contract section 0.
-    /// </remarks>
+    // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
+    //
+    // These returned PagedResult<string> — ids only — from BE-12a until 22/09/2026, a placeholder
+    // held open while three questions were decided: does the section 5.1 ban on emitting
+    // external_ref, data_source and feeder_id bind the INVENTORY surface too? It does not, and
+    // docs/review/BE-12b-read-shape.md carries why for each.
+    //
+    // Every inventory read names ReadNetwork, which admits all four roles (Contract v1.7 section 2).
+
+    /// <summary>Road segments in the caller's communes, paged.</summary>
     [HttpGet("segments")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<PagedResult<string>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<PagedResult<SegmentListItem>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
-    public async Task<ActionResult<PagedResult<string>>> ListSegmentsAsync(
+    public async Task<ActionResult<PagedResult<SegmentListItem>>> ListSegmentsAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
         => Ok(await service.ListSegmentsAsync(Narrow(communeId), page.ToPageRequest(), ct));
 
+    /// <summary>One road segment, with its geometry as WKT.</summary>
+    [HttpGet("segments/{segmentId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<SegmentDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SegmentDetail>> SegmentAsync(string segmentId, CancellationToken ct)
+        => Ok(await service.SegmentAsync(segmentId, ct));
+
+    /// <summary>Feeders in the caller's communes, paged.</summary>
     [HttpGet("feeders")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<PagedResult<string>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<PagedResult<string>>> ListFeedersAsync(
+    [ProducesResponseType<PagedResult<FeederListItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<FeederListItem>>> ListFeedersAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
         => Ok(await service.ListFeedersAsync(Narrow(communeId), page.ToPageRequest(), ct));
 
+    /// <summary>One feeder. <c>geom_wkt</c> is null for the usual case of no surveyed cable route.</summary>
+    [HttpGet("feeders/{feederId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<FeederDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<FeederDetail>> FeederAsync(string feederId, CancellationToken ct)
+        => Ok(await service.FeederAsync(feederId, ct));
+
+    /// <summary>
+    /// Poles in the caller's communes, paged — the inventory list, NOT the map.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ Not to be confused with <c>GET /api/v1/poles</c> (BE-14), which is the map layer: bbox
+    /// required, GeoJSON, operational status. This one is a stocktake, and it carries the fields a
+    /// person reconciling a spreadsheet needs — including <c>external_ref</c>, which the map is
+    /// forbidden to emit.
+    /// </remarks>
     [HttpGet("poles")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<PagedResult<string>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<PagedResult<string>>> ListPolesAsync(
+    [ProducesResponseType<PagedResult<PoleListItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<PoleListItem>>> ListPolesAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
         => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), ct));
+
+    /// <summary>One pole, with its geometry as WKT and its segment's name resolved.</summary>
+    /// <remarks>
+    /// Outside the caller's commune this is <b>404</b>, not 403 — Contract section 7 wants absence
+    /// rather than a refusal that confirms the id exists somewhere else.
+    /// </remarks>
+    [HttpGet("poles/{poleId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<PoleDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PoleDetail>> PoleAsync(string poleId, CancellationToken ct)
+        => Ok(await service.PoleAsync(poleId, ct));
 
     [HttpPost("segments")]
     [Authorize(Policy = LuxMapPolicies.ManageAssets)]
@@ -263,9 +304,7 @@ public sealed class AssetsController(
     // docs/review/BE-13-topology-shape.md, registered as drift 46, NOT stable until the next FW
     // confirms it. Anything built on top of these routes must say its foundation is temporary.
     //
-    // NO role policy, exactly like the other GETs: SetFallbackPolicy already requires a login, and a
-    // policy is one EXACT role, so putting MaintenanceEngineer here would lock out the administrator
-    // and the managing authority (BE-12a, rule 4).
+    // Topology reads use ReadNetwork, with the same four-role access as inventory reads.
 
     /// <summary>
     /// Every pole hanging off one circuit — the query BE-13 exists for, and CV-15's input.

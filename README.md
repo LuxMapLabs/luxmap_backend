@@ -40,6 +40,21 @@ dotnet run --project src/LuxMap.Api
 
 `/` không có route — 401 khi chưa đăng nhập, 404 khi đã đăng nhập (mặc định đóng). Endpoint đang chạy: `/api/v1/auth/*`, `/api/v1/assets/*`, `/api/v1/lux-readings*` — xem Contract.
 
+## CI cho PR vào `dev`
+
+[Workflow CI](.github/workflows/ci.yml) build **merge commit** của PR với `dev` bằng .NET 10,
+coi warning là lỗi, xuất lại cả hai spec và so với bản commit, lint bằng Redocly rồi chạy toàn bộ
+regression test (không benchmark). Mỗi job dùng service containers từ Compose trên VM riêng;
+CI tạo `.env` tạm, migrate, seed tài khoản rồi nạp FO-26 trước khi test. Chỉ dựng container rỗng
+hoặc chỉ truyền biến môi trường **không đủ**: fixture không tự bootstrap DB, còn
+`AuthTestExtensions.SeedPassword` đọc trực tiếp file `.env`. Không dùng DB dev chung cho CI.
+
+**Cần cấu hình trên GitHub:** đặt `Merge result / build, tests, OpenAPI` làm required check của
+`dev` và bật **Require branches to be up to date before merging**, hoặc dùng merge queue
+(workflow đã nhận `merge_group`). Nếu thiếu ràng buộc này, check xanh cũ vẫn có thể được dùng sau
+khi PR khác đổi `dev`, tái diễn lỗi #46/#47. Khi check spec đỏ, chạy lại các lệnh ở mục
+[Xuất OpenAPI spec ra file](#xuất-openapi-spec-ra-file) rồi commit cả hai file sinh; không sửa tay.
+
 ## Chạy môi trường dev
 
 Cần Docker Desktop đang chạy.
