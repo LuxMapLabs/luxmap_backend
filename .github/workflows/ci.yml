@@ -123,14 +123,16 @@ jobs:
       - name: Start isolated service containers
         id: services
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        # Reuse Compose so CI cannot silently drift from its PostGIS/init SQL or MinIO images:
+        # Reuse Compose so CI cannot silently drift from its PostGIS/init SQL:
         # imresamu/postgis:17-3.5 supplies real ST_* functions and GIST; plain postgres does not.
-        # MinIO and mc MUST remain quay.io images with Compose's MANIFEST LIST digests.
-        # Docker Hub minio/* returns 404; a platform digest breaks the other architecture.
-        # Explicit services exclude the one-shot mc job from --wait's long-running health check.
-        run: |
-          docker compose up -d --wait --wait-timeout 180 postgres redis minio
-          docker compose run --rm minio-mc
+        # PostGIS ONLY. The suite needs nothing else, verified 26/09/2026: 606/606 green with
+        # MinIO and Redis stopped. Storage tests use InMemoryObjectStore, the S3 client is built
+        # lazily (no call at startup), and no code references Redis.
+        # MinIO is NOT started because it can no longer be pulled anonymously: Docker Hub
+        # minio/* returns 404 (BE-11) and quay.io/minio/* now answers 401 "Requires
+        # authentication" (26/09/2026). The first S3 integration test (BE-36) must pick a new
+        # image source first; do not re-add minio here until one is chosen.
+        run: docker compose up -d --wait --wait-timeout 180 postgres
 
       - name: Migrate and seed the fresh database
         id: database
