@@ -8,6 +8,9 @@ thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 > 🗄️ **Mục đăng ký TRƯỚC 25/09/2026 là lịch sử (D-R18)** — chúng dùng tên vai trò cũ và nói "Quản trị"
 > ghi tài sản, "Nhánh C". Không sửa lại; vai trò hiện hành ở mục *Registration v1.2* bên dưới và
 > Contract v1.7 §2.
+>
+> 📄 **Nguồn phiếu hiện hành: v1.4 (27/09/2026)** — mục *Registration v1.4* bên dưới. Vai trò không đổi so
+> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23, D-R25…D-R28 **còn chờ quyết**.
 
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
 archive: (1) ghi ngay, bốn trường Decision / Decision maker / Date / Scope; (2) policy là một vai trò
@@ -102,6 +105,52 @@ Ma trận §2 dùng con số 13.
 - **WP6:** đổi giá trị `role`; **bỏ màn đăng ký** (`/auth/register` deprecated); `POST /lux-readings` chỉ
   Kỹ sư hiện trường.
 - **Thịnh/Ngọc:** xác nhận hoặc lật D-R5, D-R6, D-R10, D-R11, D-R12 ở FW kế tiếp.
+
+### Registration v1.4 — CV chỉ ON/OFF, độ sáng đo bằng BH1750 trên xe (27/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Nguồn chuẩn cho scope / actor / FR / NFR / deliverable chuyển sang **Phiếu FA26SE222 v1.4** (`docs/registration/FA26SE222_v1.4.md`); `FA26SE222_v1.2.md` thành lịch sử. **Chỉ tầng tài liệu** — D-R20 … D-R28 bên dưới: D-R21, D-R24 **chốt hướng (SELF-SIGNED)**, còn lại **đề xuất, CHƯA CHỐT**; chưa đổi Contract, chưa đổi code |
+| **Decision maker** | Nguồn phiếu: nhóm (nội dung phiếu). Các D-item: **chưa có người ký** — mục chạm bề mặt API **không** được im lặng thành approve (FW-00 mục 3) → **ESCALATE** ở FW kế tiếp |
+| **Date** | 27/09/2026 |
+| **Scope** | Tài liệu: `docs/registration/FA26SE222_v1.4.md` (mới), banner ở `FA26SE222_v1.2.md`, mục này, `CLAUDE.md` (con trỏ nguồn + cảnh báo nền đã đổi ở BE-42 / phạm vi), `tracking.html` (bảng follow-up). **Không** đụng `api-contract-v1.1.md`, `docs/openapi/*`, migration, `src/`. Khảo sát tác động: `.ai/results/registration-v1.4-phase1.md` |
+
+**v1.3 bị bỏ qua có chủ đích.** Phiếu v1.3 (đã nộp) chuyển CV sang chấm **mặt đường theo đoạn**
+(Insufficient / Adequate / Excessive). Repo chưa từng áp dụng v1.3; v1.4 quay lại **từng bóng**, nên đi
+thẳng v1.2 → v1.4. Enum Contract mục 1 **không phải lật** — đó là lý do chính hướng v1.4 rẻ cho backend.
+
+**Điều thay đổi về bản chất (v1.2 → v1.4):**
+
+| | v1.2 | v1.4 |
+|---|---|---|
+| CV quyết gì | Phát hiện bóng **và chấm** normal / dim / out từ độ sáng ảnh đã chuẩn hoá phơi sáng + khoảng cách | **Chỉ ON/OFF**, và xác nhận đỉnh lux là của chính bóng đó (không phải đèn pha, biển hiệu) |
+| Tín hiệu Dim | Độ sáng ảnh so baseline cột | **Đỉnh lux BH1750 lúc xe ngang cột** so baseline cột |
+| Đo sáng | Người đứng dưới cột, cảm biến **điện thoại**, từng lần (`LuxReading`, D-R15) | Module **BH1750FVI + vi điều khiển** gắn nóc xe, hướng lên, **lấy mẫu liên tục suốt sweep**, đồng bộ đồng hồ với điện thoại đầu phiên |
+| Vai trò của lux | **Ground truth** chấm CV (CV-12, RQ1) | **Đầu vào** của phân loại Dim |
+| Ground truth `dim` | Lux điện thoại + Controlled Reference Capture Set | **Kiểm tra thực địa** (field verification) — phương pháp chưa định |
+| Controlled Reference Capture Set | Deliverable | **Không còn** trong deliverable |
+
+| Mã | Đề xuất | Chạm API | Trạng thái |
+|---|---|---|---|
+| **D-R19** | Phiếu v1.4 thay v1.2 làm nguồn chuẩn. Vai trò, ma trận capability, Citizen/QR, điều khiển testbed, audit trail (D-R1…D-R18) **giữ nguyên** — v1.4 không đổi actor | Không | ✅ Tầng tài liệu, 27/09 |
+| **D-R20** | `fixture_status` **giữ** `normal \| dim \| out \| unknown`. Quy tắc: CV `OFF` → `out`; CV `ON` + `baseline_ratio` < `dim_threshold_ratio` → `dim`; còn lại `normal`; không có quan sát → `unknown`. `lamp_out` / `lamp_dim` vẫn `source_channel = cv` (kênh = sweep khảo sát) — **cần xác nhận**, vì `lamp_dim` nay do CV **và** cảm biến cùng quyết | Có (ngữ nghĩa, không đổi hình dạng) | Chờ quyết |
+| **D-R21** | **Mô hình dữ liệu một phiên khảo sát — hướng (B), chốt 27/09.** App quay riêng (WP6) sinh **bốn file thô, không ai nhập tay**: (1) **video**; (2) **log lux** — module ESP32 + BH1750 gửi **từng mẫu** qua **BLE notify** (`seq`, `module_ms`, `lux`), app gắn `phone_elapsed_ns` lúc nhận; (3) **GPS track** theo thời gian (không phải một toạ độ cho cả file); (4) **cấu hình quay** thực tế. **Cả ba luồng video / GPS / lux dùng CHUNG một đồng hồ** `SystemClock.elapsedRealtimeNanos()` — Camera2 gắn `SENSOR_TIMESTAMP` cùng hệ thời gian khi `SENSOR_INFO_TIMESTAMP_SOURCE = REALTIME` (**phải kiểm trên máy quay thật**); quy đổi UTC **một lần** mỗi phiên, nên **không cần mốc flash**. Jitter BLE ~10–50 ms (≈0,4 m ở 30 km/h) — server khớp tuyến tính `(module_ms, phone_elapsed_ns)` trên cả phiên để khử. **Điện thoại không xử lý gì**: server lưu nguyên byte bốn file, parse log lux thành bảng mẫu theo sweep (không gắn cột), tìm đỉnh, ghép cột bằng GPS track + vị trí cột GIS, lấy ON/OFF của CV, rồi ghi **một dòng cho mỗi cột mỗi sweep** (`peak_at, peak_lux, cv_state, baseline_ratio, classified_as, association_confidence`) vào chuỗi luminance. Khoảng `seq` bị hổng trùng lúc ngang cột → `unknown`, không đoán. `LuxReading` (BE-42) **giữ** cho số đo **thủ công** lúc kiểm tra thực địa — ứng viên ground truth của D-R23. Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15 mới, §5.7 diễn đạt lại | **Chốt hướng, SELF-SIGNED** — nền tạm tới FW kế tiếp; **đặc tả BE-15 chưa viết** |
+| **D-R22** | `luminance_history` / `luminance_baseline` **giữ hình dạng** (`baseline_ratio`, `classified_as`, `dim_threshold_ratio` 0.80) nhưng **nguồn đổi**: đỉnh lux theo cột, không phải độ sáng ảnh. `out_threshold_ratio` (0.15) **mất vai trò phân loại** vì Out nay do CV quyết — giữ làm kiểm tra nhất quán (CV nói ON mà lux gần 0), hay bỏ? Tên `luminance_*` giữ dù đại lượng là độ rọi (đổi tên = BREAKING không mua được gì) | **Có** — §5.2 detail, BE-33 | Chờ quyết |
+| **D-R23** | **Lux không còn là ground truth của `dim`** — nó là đầu vào. Quy tắc BE-42 số 1 trong `CLAUDE.md` (*"ghi lux vào chuỗi luminance là để CV tự chấm chính mình"*) **đảo nghĩa**: ở v1.4 chuỗi luminance **chính là** lux. Cần chốt ground truth mới cho `dim` (kiểm tra thực địa bằng gì, ai làm, trên tập con nào) và cho độ lặp lại của phép đo (nhiều lượt qua cùng cột). `out` vẫn = kiểm tra bằng mắt ban đêm | Không (nghiên cứu) — nhưng đổi tiêu chí CV-12 | Chờ quyết, **ưu tiên cao** |
+| **D-R24** | **Cấu hình quay CỐ ĐỊNH, kiểm ở cấp PHIÊN thay cho kiểm từng JPEG (BE-16).** Camera2 (hoặc CameraX + Camera2Interop): tắt AE, cố định ISO + shutter; lấy nét cố định vô cực; WB cố định; độ phân giải + fps cố định; **tắt EIS / HDR / night mode** (crop, bóp méo, ghép frame). App ghi cấu hình **thực tế** vào file cấu hình phiên; server so với **một profile đã chốt** và **từ chối** phiên lệch, kèm lý do — cùng tinh thần "không nhận, không suy đoán" của BE-16. Con số ISO / shutter chốt sau buổi quay thử. Metadata phiên thêm: làn, chiều đi, tần số lấy mẫu module, phiên bản firmware module (BE-34). Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15/16 chưa đặc tả | **Chốt hướng, SELF-SIGNED**; chờ profile từ buổi quay thử |
+| **D-R25** | Controlled Reference Capture Set **rời deliverable**. Giá trị `calibration_rig` **giữ trong enum** (xoá giá trị enum là BREAKING, và testbed IoT D-R10 vẫn cần một nhãn không-phải-`field` — Contract O-9). Không seed / không dựng thêm dữ liệu cho nó tới khi có quyết định | Không | Chờ quyết |
+| **D-R26** | Trạng thái **đoạn** suy ra từ cột (phiếu 3.2.b: các cột Out/Dim liền nhau). **Tương thích** với CV-15 (`segment_outage`, `has_active_segment_fault`) — không thêm trường | Không | Ghi nhận |
+| **D-R27** | Mốc thời gian: `LuxReading` bị đẩy sớm cho **FO-14 đo lux điện thoại W5**. Với BH1750, FO-14 đổi thành đo bằng module trên xe → việc BE thực sự cần sớm là **ingest mẫu theo sweep (D-R21)**, không phải thêm trường cho `POST /lux-readings`. `tasks-backend.csv` giữ nguyên tới khi D-R21 chốt | Không | Chờ quyết cùng D-R21 |
+| **D-R28** | **Video là dữ liệu CHÍNH → ticket video (D-R14) thành việc chặn đường.** Dữ kiện (27/09): **mỗi video dưới 1 phút** → 1080p30 ở bitrate điện thoại (~12–20 Mbps) cỡ **~100–150 MB/clip**; một sweep gồm **nhiều clip**. Cỡ này **giữ được BE-11 quy tắc 1** (mọi byte qua API, không presigned) nếu endpoint video **stream thẳng** sang MinIO (S3 multipart), **không** buffer vào RAM, **không** qua `IFormFile` 10 MB; nâng giới hạn body **riêng cho endpoint này** (ví dụ 300 MB). Upload lại cả clip khi lỗi là chấp nhận được; resumable chưa cần. **Đề xuất: (A) proxy qua API** — không phải giải lại phân quyền địa bàn. (B) presigned PUT chỉ xét lại nếu clip dài ra. Hệ quả mô hình: log lux + GPS track là **một luồng liên tục cho cả sweep** (chung đồng hồ), video là **nhiều clip** có `start_elapsed_ns` riêng; cột bị đi ngang **giữa hai clip** → `unknown`, không đoán. Còn chốt: cắt frame ở server hay engine CV, giữ video gốc bao lâu (D-R16) | **Có** — endpoint upload mới | **Đề xuất (A), chờ quyết — chặn BE-15** |
+
+**Việc còn nợ người khác sau mục này:**
+
+- **WP4 (AI):** mô hình đổi đích — phát hiện + phân lớp ON/OFF; CV-12 không còn "chấm CV bằng lux" (D-R23).
+- **WP6 (mobile):** **app quay riêng** (D-R21, D-R24): Camera2 khoá cấu hình, GPS track, nhận BLE từng mẫu, mọi luồng dùng
+  chung `elapsedRealtimeNanos`; kiểm `SENSOR_INFO_TIMESTAMP_SOURCE` trên máy quay thật. Upload chờ D-R28.
+- **IoT (Member 2):** firmware module BH1750 (phiếu 3.2.g) — gói BLE `seq, module_ms, lux`, notify từng mẫu; chốt tần số lấy mẫu với BE.
+- **Người ký:** D-R21, D-R24 đã SELF-SIGNED (Dylan, 27/09) → xác nhận ở FW kế tiếp; D-R20, D-R22, D-R28 chạm bề mặt API →
+  ESCALATE; D-R23 cần cả WP4.
 
 ### Từ v1.5: quyết định đi cùng Contract thì ghi Ở CONTRACT
 
