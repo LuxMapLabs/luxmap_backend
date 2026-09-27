@@ -1,10 +1,21 @@
 # LuxMap — Backend (WP2)
 
 Nền tảng GIS + IoT + Computer Vision quản lý tài sản và sự cố chiếu sáng đường nông thôn.
-Tên đề tài (Phiếu đăng ký FA26SE222 v1.2, mục 3.1): **LuxMap: A GIS, IoT and Computer Vision Platform for
+Tên đề tài (Phiếu đăng ký FA26SE222 v1.4, mục 3.1 — không đổi từ v1.2): **LuxMap: A GIS, IoT and Computer Vision Platform for
 Rural Road Lighting Asset and Fault Management** — *LuxMap: Hệ thống bản đồ số GIS tích hợp IoT và thị giác
 máy tính để quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn*. Phiếu (bản markdown:
-`docs/registration/FA26SE222_v1.2.md`) là nguồn chuẩn cho actor, chức năng, NFR và deliverable.
+`docs/registration/FA26SE222_v1.4.md`, từ 27/09/2026; bản v1.2 là lịch sử) là nguồn chuẩn cho actor, chức
+năng, NFR và deliverable.
+
+> 🔴 **Phiếu v1.4 (27/09/2026) đổi kênh đo độ sáng — nền của BE-42 và của phân loại `dim` đã đổi, CHƯA
+> CHỐT.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750FVI gắn nóc xe**, lấy mẫu liên tục suốt sweep;
+> **Dim = CV nói ON + đỉnh lux lúc ngang cột dưới ngưỡng baseline của chính cột đó**. Enum mục 1 **không
+> đổi**. Các đề xuất D-R20…D-R28 ở `docs/contract-drift.md` (mục *Registration v1.4*) **chưa có chữ ký** và
+> đa số chạm API → mọi chỗ bên dưới nói "đo sáng bằng điện thoại", "lux là ground truth chấm CV" là **nền
+> cũ**: đừng xây ticket mới lên đó. **D-R21 / D-R24 đã chốt hướng (SELF-SIGNED 27/09, nền tạm)**: mỗi
+> phiên = video + log lux BLE + GPS track + cấu hình quay, **chung đồng hồ `elapsedRealtimeNanos`**,
+> server xử lý toàn bộ; upload video (clip <1 phút, ~100–150 MB) là **D-R28 — đề xuất proxy qua API, chờ quyết**. Khảo sát:
+> `.ai/results/registration-v1.4-phase1.md`.
 Capstone FA26SE222 · W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2, phụ trách: BE1 – Mỹ**.
 
 Backend phục vụ 3 consumer: **Web SPA** (WP5), **Android native** (WP6), **engine CV** (WP4).
@@ -83,6 +94,11 @@ thuật vẫn về đây, tiến độ vẫn về `tracking.html`. Một deviati
 
 ## Phạm vi — theo Phiếu đăng ký v1.2 (D-R10, 25/09/2026)
 
+> ⚠️ **v1.4 (27/09):** dòng "Ngoài thực địa" bên dưới còn ghi *đo sáng tương đối bằng điện thoại* — v1.4 đo
+> bằng **module BH1750 trên xe khảo sát** (vẫn **không** lắp gì lên cột hay lưới của xã). Controlled
+> Reference Capture Set **rời deliverable** ở v1.4; giá trị `calibration_rig` **giữ** trong enum (D-R25).
+> Luật tách `data_source` giữ nguyên. Bảng giữ nguyên tới khi D-R21/D-R25 chốt.
+
 Phiếu v1.2 **thay FO-01** (24/08/2026, "không có thử nghiệm hiện trường" — nay `SUPERSEDED`, ghi ở
 `docs/contract-drift.md`). Phạm vi thực tế của nhóm:
 
@@ -98,7 +114,8 @@ Phiếu v1.2 **thay FO-01** (24/08/2026, "không có thử nghiệm hiện trư�
 
 ⚠️ **Ground truth không còn một nguồn.** Trước đây bộ hiệu chuẩn là "ground truth photometric duy nhất";
 nay có video thực địa + số đo tương đối bằng điện thoại + kiểm tra bằng mắt cho lớp `out` + controlled
-reference trên testbed. Bốn quyết định từng dựa trên FO-01 **chưa sửa code**, mỗi cái là một follow-up
+reference trên testbed. ⚠️ **Ở v1.4 lux BH1750 là ĐẦU VÀO của phân loại `dim`, không còn là ground truth
+của nó** — ground truth `dim` mới chưa chốt (**D-R23, ưu tiên cao**). Bốn quyết định từng dựa trên FO-01 **chưa sửa code**, mỗi cái là một follow-up
 "nền đã đổi, cần xét lại" trong `tracking.html`: `external_ref` là danh tính vĩnh viễn (**ưu tiên cao**),
 `administrative_unit` không geometry, `data_source = field` (nay sẽ có bản ghi), và ground truth.
 
@@ -199,7 +216,7 @@ road_class     : inter_commune | inter_village
 Ràng buộc nghiệp vụ đi kèm:
 
 - **`unknown` không phải lỗi** — nghĩa là sweep gần nhất không phủ được cột đó. Có ký hiệu riêng ở FE, **không gộp vào `out`** ở bất kỳ thống kê nào (BE-28).
-- `runtime_decline` **chỉ** đến từ IoT. `lamp_dim` và `lamp_out` **chỉ** đến từ CV. Một cột có thể mang **cả hai cùng lúc** — mô hình dữ liệu phải cho phép.
+- `runtime_decline` **chỉ** đến từ IoT. `lamp_dim` và `lamp_out` **chỉ** đến từ CV (v1.4: `lamp_dim` do CV **và** cảm biến BH1750 cùng quyết — `source_channel` giữ `cv`? **D-R20, chờ quyết**). Một cột có thể mang **cả hai cùng lúc** — mô hình dữ liệu phải cho phép.
 - Luồng `fault_status` hợp lệ: `detected → confirmed | rejected`, rồi `confirmed → in_progress → resolved → verified`. Chuyển sai luồng → **409** để FE disable nút trước, không để user bấm rồi mới lỗi (BE-19).
 
 ---
@@ -574,6 +591,13 @@ gì canh nó từ đó trở đi**. Chủ nợ là **BE-36** (Testcontainers, W1
 cạnh PostGIS. Đừng để nợ này chỉ nằm trong báo cáo một phiên làm việc.
 
 ### Bốn quy tắc chốt ở BE-42 — số đo lux
+
+> 🔴 **Nền đã đổi ở Phiếu v1.4 (27/09/2026) — bốn quy tắc dưới đây mô tả code HIỆN CÓ, chưa phải hướng
+> đi.** Quy tắc 1 dựa trên tiền đề *lux là ground truth chấm CV*; ở v1.4 đỉnh lux theo cột **chính là**
+> tín hiệu `dim`, nên chuỗi luminance sẽ lấy từ lux (D-R22, D-R23). `lux_value` "cảm biến điện thoại"
+> (D-R15) thành module BH1750 trên xe, lấy mẫu theo sweep — D-R21 **chốt hướng (B)** (SELF-SIGNED): chuỗi mẫu thô theo sweep + đỉnh theo cột vào chuỗi luminance; `LuxReading` giữ cho đo **thủ công**. Đặc tả BE-15 chưa viết; upload video (D-R28) còn chặn.
+> Quy tắc 2 (`commune_id` server tra) và 4 (`Restrict`) **giữ nguyên** dù chọn hướng nào. XML doc của
+> `LuxReading.cs` còn ghi *"ABSOLUTE `lux_value`"* — lệch cả D-R15, sửa ở Phase 2.
 
 **1. `LuxReading` KHÔNG phải `luminance_history`. Lẫn hai cái là hỏng nghiên cứu.**
 
@@ -1287,7 +1311,7 @@ cho mọi endpoint viết sau.
 
 ### Vai trò
 
-Bốn vai trò đăng nhập theo Phiếu v1.2 mục 3.2.c (Contract v1.7 §2, D-R6):
+Bốn vai trò đăng nhập theo Phiếu v1.2 mục 3.2.c — **không đổi ở v1.4** (Contract v1.7 §2, D-R6):
 
 | Vai trò | `user_role` | Thay cho (≤ v1.6) | Tài khoản demo |
 |---|---|---|---|
@@ -1326,7 +1350,7 @@ Vi phạm thì hệ thống vẫn chạy, số liệu vẫn ra, nhưng kết qu�
 - **`unknown` đếm riêng, không gộp vào `out`.**
 - **Mọi phát hiện tự động ghi kèm phiên bản model và firmware** (BE-34). Không tái lập được thì không phải kết quả.
 - **Mọi phát hiện tự động và mọi quyết định của người đều vào audit trail** (D-R13): bảng audit append-only dùng chung, thiết kế ở BE-19. Cột `confirmed_by/at`, `resolved_by/at` trên dòng `fault` (BE-18) chỉ là quyết định mới nhất.
-- **Precision / recall báo RIÊNG cho `out` và `dim`** (NFR phiếu v1.2). `dim` là lớp khó và đáng giá; một con số gộp sẽ giấu nó — cùng họ lỗi với gộp `unknown` vào `out`.
+- **Precision / recall báo RIÊNG cho `out` và `dim`** (NFR phiếu v1.2; v1.4 tách thành P/R/F1 cho **ON/OFF** của CV cộng đối chiếu Normal / Dim / Out với **field verification** — vẫn báo riêng từng lớp). `dim` là lớp khó và đáng giá; một con số gộp sẽ giấu nó — cùng họ lỗi với gộp `unknown` vào `out`.
 - **Báo tỉ lệ cột có mạch điện được xác nhận** (NFR *feeder topology coverage*). Cột không gán được mạch thì gom cụm chỉ theo hình học, và **độ tin cậy giảm phải được ghi lại** — không im lặng coi như có mạch.
 - **Sự cố cấp đoạn là một nguyên nhân, không phải N sự cố bóng.** CV-15 sinh `cluster_id` và `fault_type = segment_outage`.
 - **Telemetry ingest idempotent theo `(node_id, reading_time)`** (IOT-09). Store-and-forward chắc chắn gửi trùng — đó là hoạt động bình thường.
@@ -1361,7 +1385,7 @@ Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL 
 |---|---|---|
 | BE-05 OpenAPI spec | FM-04 sinh DTO Kotlin | W1 |
 | BE-07 auth | FM-05 | W1 |
-| **BE-42 `LuxReading`** | FM-14, FO-14 (đo lux W5), CV-12 | **W4 — đã đẩy sớm, đừng trễ** |
+| **BE-42 `LuxReading`** | FM-14, FO-14 (đo lux W5), CV-12 | **W4 — đã đẩy sớm, đừng trễ** · ⚠️ v1.4: FO-14 đổi sang BH1750 trên xe, việc thật sự cần sớm là ingest mẫu theo sweep (D-R21, D-R27) |
 | BE-13 topology | CV-05 pole association, CV-15 clustering | W4 |
 | BE-14 bbox | FW-08, FM-15 | W4 |
 | BE-19, BE-20 | FW-12, FW-13, FM-17 | W8–W9 |
