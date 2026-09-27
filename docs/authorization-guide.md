@@ -1,7 +1,7 @@
 # Phân quyền và phạm vi địa bàn — hướng dẫn cho người viết endpoint
 
 Đọc file này trước khi thêm bất kỳ endpoint nào từ BE-09 trở đi.
-Đặc tả gốc: [`api-contract-v1.1.md`](api-contract-v1.1.md) mục 7.
+Đặc tả gốc: [`api-contract-v1.1.md`](api-contract-v1.1.md) **§2** (v1.7 — vai trò, ma trận capability, phạm vi địa bàn).
 
 ---
 
@@ -90,14 +90,39 @@ var frames = dbContext.Set<SurveyFrame>()
 
 ⚠️ Đây là chỗ dễ rò nhất trong toàn hệ thống. Review kỹ mọi truy vấn loại này.
 
-### Giới hạn theo vai trò
+### Giới hạn theo vai trò — BẮT BUỘC một capability trên mọi endpoint nghiệp vụ
 
 ```csharp
-[Authorize(Policy = LuxMapPolicies.MaintenanceEngineer)]
+[HttpGet("poles")]
+[Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+
+[HttpPost("poles")]
+[Authorize(Policy = LuxMapPolicies.ManageAssets)]
 ```
 
-Bốn policy: `ManagementAgency`, `MaintenanceEngineer`, `FieldCrew`, `Administrator`.
-Dùng hằng số, đừng gõ chuỗi.
+Từ Contract v1.7, mỗi policy là một **capability** liệt kê **tường minh** các vai trò được vào —
+**không thứ bậc**. Ma trận ở `LuxMapPolicies.Matrix` (nguồn duy nhất, `AuthorizationSetup` đăng ký
+từ đó):
+
+| Capability | Vai trò |
+|---|---|
+| `ReadNetwork` | superior, manager, field_engineer, system_admin |
+| `ReadLuxReadings` | superior, manager, field_engineer, system_admin |
+| `ManageAssets` | manager |
+| `RecordLuxReading` | field_engineer |
+| `ControlLighting` | manager (chưa có endpoint) |
+| `ManageUsers` | system_admin (chưa có endpoint) |
+
+Viết endpoint mới:
+
+1. **Đừng để endpoint trần.** Fallback chỉ đòi "đã đăng nhập", tức cho **cả bốn** vai trò — kể cả Cấp
+   giám sát chỉ-đọc trên một endpoint ghi. `CapabilityPolicyCoverageTests` đỏ nếu bạn quên.
+2. Capability có sẵn khớp thì dùng lại. Chưa có thì **thêm vào `Matrix`** cùng ticket, cập nhật bảng
+   Contract §2, **và** hai bảng literal trong `RoleCapabilityMatrixTests` / `CapabilityMatrixTests`
+   — cùng một diff.
+3. **Không bao giờ để một capability rỗng.** `RequireClaim(role)` không có giá trị nào **nhận mọi vai
+   trò**; host từ chối khởi động nếu gặp.
+4. Dùng hằng số, đừng gõ chuỗi.
 
 ---
 
@@ -129,11 +154,11 @@ vẫn đúng từng request.
 
 ## Kiểm tra chéo `["*"]` với vai trò
 
-Claim `commune_ids` mang `"*"` mà vai trò không phải Quản trị → **403 + log Error**.
+Claim `commune_ids` mang `"*"` mà vai trò không phải `system_admin` → **403 + log Error**.
 
 Đây **không phải** chống client giả mạo — claim nằm trong JWT đã ký. Đây là lớp chặn **lỗi ở phía
 phát token**: BE-06 không có ràng buộc DB nào buộc `has_system_wide_scope` đi cùng
-`role = 'administrator'`, nên một câu `UPDATE` tay hoặc một bug ở BE-33 là đủ để BE-07 phát `["*"]`
+`role = 'system_admin'`, nên một câu `UPDATE` tay hoặc một bug ở BE-33 là đủ để BE-07 phát `["*"]`
 cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bug, không phải dấu hiệu bị tấn công.
 
 ---
@@ -143,7 +168,7 @@ cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bu
 | Tình huống | HTTP | `error.code` |
 |---|---|---|
 | Thiếu / sai / hết hạn token, sai `iss`, sai `aud` | 401 | `UNAUTHENTICATED` |
-| Sai vai trò | 403 | `ROLE_FORBIDDEN` (BE-REVIEW-02 D-4; trước đó là `COMMUNE_FORBIDDEN`) |
+| Vai trò không nằm trong capability | 403 | `ROLE_FORBIDDEN` (BE-REVIEW-02 D-4; trước đó là `COMMUNE_FORBIDDEN`) |
 | `commune_id` ngoài phạm vi | 403 | `COMMUNE_FORBIDDEN` |
 | `["*"]` lệch vai trò | 403 | `COMMUNE_FORBIDDEN` |
 | Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` |
@@ -152,12 +177,16 @@ cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bu
 
 ---
 
-## Tài khoản mới đăng ký: quản trị phải làm gì
+## Tạo tài khoản
 
-`POST /api/v1/auth/register` mở cho mọi người. Tài khoản mới nhận `field_crew` và **không có xã
-nào**, nên **đăng nhập được nhưng không thấy bản ghi nào**. Đó là thiết kế, không phải lỗi.
+**Mô hình chính thức (Contract v1.7, D-R11): chỉ Quản trị hệ thống tạo tài khoản**, gán vai trò và gán
+xã. Không có tự đăng ký. API cho việc này là `POST /api/v1/admin/users` (capability `ManageUsers`) ở
+**BE-33a** — chưa có.
 
-**Chưa có UI cho tới BE-33.** Trong lúc chờ, quản trị gán bằng SQL:
+**Giai đoạn chuyển tiếp, tới BE-33a.** `POST /api/v1/auth/register` còn chạy nhưng **DEPRECATED** — chỉ
+dùng như công cụ tạo tài khoản của Quản trị hệ thống, không phải màn tự đăng ký cho người dùng (WP6 bỏ
+màn đó). Tài khoản vừa tạo nhận `field_engineer` và **không có xã nào**, nên **đăng nhập được nhưng
+không thấy bản ghi nào**. Quản trị hệ thống gán vai trò và xã bằng SQL:
 
 ```bash
 docker compose exec postgres psql -U luxmap -d luxmap_dev
@@ -180,10 +209,13 @@ INSERT INTO app_user_commune (user_id, commune_id) VALUES ('USR-005', 'COM-001')
 Đổi vai trò nếu cần:
 
 ```sql
-UPDATE app_user SET role = 'maintenance_engineer' WHERE user_id = 'USR-005';
+UPDATE app_user SET role = 'manager' WHERE user_id = 'USR-005';
+-- superior | manager | field_engineer | system_admin (CHECK ck_app_user_role từ chối giá trị khác)
 ```
 
-⚠️ **Đừng bật `has_system_wide_scope` cho tài khoản không phải Quản trị.** Không có ràng buộc DB nào
+Cấp giám sát xem nhiều xã thì **gán nhiều dòng `app_user_commune`** — không có cấp huyện (D-R3).
+
+⚠️ **Đừng bật `has_system_wide_scope` cho tài khoản không phải `system_admin`.** Không có ràng buộc DB nào
 chặn, nhưng BE-08 sẽ từ chối mọi request của tài khoản đó và ghi log mức Error.
 
 📌 Người dùng phải **đăng nhập lại** để thấy thay đổi: access token mang claim cũ tới 60 phút.

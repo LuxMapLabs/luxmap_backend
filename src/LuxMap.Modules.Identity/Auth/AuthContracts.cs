@@ -106,7 +106,7 @@ public sealed class RegisterRequest
 /// WP5 and WP6 to bind against.
 /// </para>
 /// </remarks>
-/// <param name="Role">A Contract section 3.1 <c>user_role</c> string, e.g. <c>maintenance_engineer</c>.</param>
+/// <param name="Role">A Contract section 3.1 <c>user_role</c> string, e.g. <c>manager</c>.</param>
 /// <param name="CommuneIds">The communes the account may reach, or <c>["*"]</c> for an administrator. May be empty.</param>
 public sealed record CurrentUserResponse(
     string UserId,

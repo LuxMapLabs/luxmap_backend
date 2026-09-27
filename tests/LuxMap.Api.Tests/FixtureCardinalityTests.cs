@@ -30,7 +30,7 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_second_active_lamp_on_the_same_pole_is_409_and_the_first_stays_the_only_one()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
         var first = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
@@ -48,7 +48,7 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
     [Fact]
     public async Task Retiring_the_lamp_first_lets_its_replacement_through()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
         var first = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
@@ -68,7 +68,7 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_historical_row_that_arrives_already_retired_may_coexist_with_the_active_lamp()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId))).StatusCode);
@@ -85,7 +85,7 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
     [Fact]
     public async Task Import_accepts_a_lamp_for_a_pole_whose_previous_lamp_was_retired_and_refuses_one_that_is_still_lit()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = $"T{Guid.NewGuid():N}"[..9].ToUpperInvariant();
         var poleId = await NewPoleAsync(externalRef: $"{tag}-P1");
 

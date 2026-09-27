@@ -5,17 +5,16 @@ using LuxMap.Shared.Serialization;
 namespace LuxMap.Shared.Tests;
 
 /// <summary>
-/// ⚠️ These four values are NOT in Contract v1.1 — BE-06 chose them. They travel in the JWT claim, so
-/// web and mobile will hardcode them; pinned here so nobody changes them quietly before the Contract
-/// is updated at FW-00.
+/// The four values of Contract v1.7 section 3.1 <c>user_role</c>. They travel in the JWT claim, so web
+/// and mobile hardcode them; pinned here so nobody changes them without a Contract version.
 /// </summary>
 public class UserRoleTests
 {
     [Theory]
-    [InlineData(UserRole.ManagementAgency, "management_agency")]
-    [InlineData(UserRole.MaintenanceEngineer, "maintenance_engineer")]
-    [InlineData(UserRole.FieldCrew, "field_crew")]
-    [InlineData(UserRole.Administrator, "administrator")]
+    [InlineData(UserRole.Superior, "superior")]
+    [InlineData(UserRole.Manager, "manager")]
+    [InlineData(UserRole.FieldEngineer, "field_engineer")]
+    [InlineData(UserRole.SystemAdmin, "system_admin")]
     public void Role_serializes_to_the_agreed_string(UserRole role, string expected)
         => Assert.Equal(expected, JsonSerializer.Serialize(role, LuxMapJsonOptions.Default).Trim('"'));
 

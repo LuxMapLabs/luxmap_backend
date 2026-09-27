@@ -13,39 +13,49 @@ using NetTopologySuite.Geometries;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// BE-12a — who may write assets, and who may read them. The FIRST production use of the four BE-08
-/// role policies.
+/// Who may write assets, and who may read them — <c>ManageAssets</c> and <c>ReadNetwork</c> of the
+/// capability matrix (Contract v1.7 section 2).
 /// </summary>
 /// <remarks>
-/// The read cases matter as much as the write ones. A policy is one EXACT role claim, not a rank, so
-/// putting <c>MaintenanceEngineer</c> on a GET would lock out administrators and the managing
-/// authority — a mistake that looks like tightening security and is actually a denial of service to
-/// two of the four roles. These tests pin the asymmetry so nobody "tidies it up" later.
+/// Writing is the Manager ONLY. The System Admin wrote assets until Contract v1.7 and now may not
+/// (D-R12): registration form v1.2 gives "manage lighting poles and assets" to the Manager and nothing
+/// of the kind to the System Admin. The read cases matter as much as the write ones: a policy admits
+/// exactly the roles it names, so a GET that named only the Manager would lock the other three out of
+/// their own data. These tests pin both halves.
 /// </remarks>
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class AssetPermissionTests(AssetImportFixture fixture)
 {
-    [Fact]
-    public async Task A_maintenance_engineer_may_NOT_create_an_asset()
+    /// <remarks>
+    /// The System Admin is the case that matters most: it is system-wide, so the write guard would
+    /// let it through — only the policy stands between it and the asset tables.
+    /// </remarks>
+    [Theory]
+    [InlineData("admin", "SEED_ADMIN_PASSWORD")]
+    [InlineData("agency", "SEED_AGENCY_PASSWORD")]
+    [InlineData("crew", "SEED_CREW_PASSWORD")]
+    public async Task Only_a_manager_may_create_an_asset(string username, string passwordVariable)
     {
-        var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
+        var client = await fixture.SeededClientAsync(username, passwordVariable);
 
         var response = await client.PostAsJsonAsync("/api/v1/assets/segments", NewSegment());
         var body = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
 
-        // ROLE_FORBIDDEN, not COMMUNE_FORBIDDEN (BE-REVIEW-02, D-4): the engineer is inside their
-        // territory; it is the ROLE the policy refused. Before D-4 every bare 403 was reported as a
-        // commune problem and the front end would have said "outside your area".
+        // ROLE_FORBIDDEN, not COMMUNE_FORBIDDEN (BE-REVIEW-02, D-4): it is the ROLE the policy
+        // refused. Before D-4 every bare 403 was reported as a commune problem and the front end
+        // would have said "outside your area".
         Assert.Contains(ErrorCodes.RoleForbidden, body);
         Assert.DoesNotContain(ErrorCodes.CommuneForbidden, body);
     }
 
-    [Fact]
-    public async Task A_maintenance_engineer_may_NOT_import()
+    [Theory]
+    [InlineData("admin", "SEED_ADMIN_PASSWORD")]
+    [InlineData("agency", "SEED_AGENCY_PASSWORD")]
+    public async Task A_system_admin_or_a_superior_may_NOT_import(string username, string passwordVariable)
     {
-        var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
+        var client = await fixture.SeededClientAsync(username, passwordVariable);
 
         using var content = new MultipartFormDataContent();
         content.Add(new ByteArrayContent(Encoding.UTF8.GetBytes("a,b\n1,2")), "file", "segments.csv");
@@ -56,7 +66,7 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task A_maintenance_engineer_MAY_read()
+    public async Task A_manager_MAY_read()
     {
         var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
 
@@ -66,7 +76,7 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task The_managing_authority_MAY_read_which_proves_reads_carry_no_role_policy()
+    public async Task A_superior_MAY_read_because_ReadNetwork_names_every_role()
     {
         var client = await fixture.SeededClientAsync("agency", "SEED_AGENCY_PASSWORD");
 
@@ -76,7 +86,7 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task A_field_crew_member_may_read_but_not_write()
+    public async Task A_field_engineer_may_read_but_not_write()
     {
         var client = await fixture.SeededClientAsync("crew", "SEED_CREW_PASSWORD");
 
@@ -87,9 +97,9 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task An_administrator_creates_an_asset_and_gets_201_with_a_Location_header_and_no_body()
+    public async Task A_manager_creates_an_asset_and_gets_201_with_a_Location_header_and_no_body()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.PostAsJsonAsync("/api/v1/assets/segments", NewSegment());
 
@@ -104,7 +114,7 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
     [Fact]
     public async Task An_administrator_imports_and_gets_200_with_the_import_result()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var tag = $"P{Guid.NewGuid():N}"[..9].ToUpperInvariant();
 
         var result = await AssetImportTests.ImportAsync(client, "segments", "segments.csv",
@@ -129,7 +139,7 @@ public sealed class AssetPermissionTests(AssetImportFixture fixture)
     [Fact]
     public async Task Creating_an_asset_for_a_commune_outside_the_scope_is_403_naming_that_commune()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.PostAsJsonAsync(
             "/api/v1/assets/segments", NewSegment(fixture.ForeignCommuneId));

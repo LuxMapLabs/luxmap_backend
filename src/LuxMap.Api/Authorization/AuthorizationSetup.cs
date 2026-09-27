@@ -34,7 +34,7 @@ public static class AuthorizationSetup
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<JwtOptions>(ConfigureJwtBearer);
 
-        services.AddAuthorizationBuilder()
+        var authorization = services.AddAuthorizationBuilder()
             // Fail CLOSED: the whole application requires authentication by default; opening an
             // endpoint requires an explicit [AllowAnonymous].
             .SetDefaultPolicy(new AuthorizationPolicyBuilder()
@@ -44,20 +44,36 @@ public static class AuthorizationSetup
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .AddRequirements(new CommuneScopeConsistencyRequirement())
-                .Build())
-            .AddPolicy(LuxMapPolicies.ManagementAgency, RolePolicy(UserRole.ManagementAgency))
-            .AddPolicy(LuxMapPolicies.MaintenanceEngineer, RolePolicy(UserRole.MaintenanceEngineer))
-            .AddPolicy(LuxMapPolicies.FieldCrew, RolePolicy(UserRole.FieldCrew))
-            .AddPolicy(LuxMapPolicies.Administrator, RolePolicy(UserRole.Administrator));
+                .Build());
+
+        // One policy per capability, straight from the matrix — no policy exists that is not in it.
+        foreach (var (policy, roles) in LuxMapPolicies.Matrix)
+        {
+            // 🔴 An EMPTY list does not mean "nobody". RequireClaim with no allowed values only asks
+            // that a role claim EXISTS, so it admits every signed-in role — found by removing the only
+            // role of ManageAssets and watching the superior create a segment. Refuse to start instead.
+            if (roles.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Capability '{policy}' names no role. An empty RequireClaim admits EVERY role; "
+                    + "remove the capability instead of emptying it.");
+            }
+
+            authorization.AddPolicy(policy, CapabilityPolicy(roles));
+        }
 
         return services;
     }
 
-    private static Action<AuthorizationPolicyBuilder> RolePolicy(UserRole role)
+    /// <summary>
+    /// Admits exactly the listed roles. <c>RequireClaim</c> with several values is an OR over those
+    /// values and nothing else — there is no ordering between roles, so no "and above".
+    /// </summary>
+    private static Action<AuthorizationPolicyBuilder> CapabilityPolicy(IReadOnlyList<UserRole> roles)
         => builder => builder
             .RequireAuthenticatedUser()
             .AddRequirements(new CommuneScopeConsistencyRequirement())
-            .RequireClaim(AuthClaims.Role, ContractEnum.ToDbValue(role));
+            .RequireClaim(AuthClaims.Role, roles.Select(ContractEnum.ToDbValue));
 
     private static void ConfigureJwtBearer(JwtBearerOptions options, JwtOptions jwt)
     {

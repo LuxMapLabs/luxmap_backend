@@ -1,4 +1,6 @@
 using System.Text.Json;
+using LuxMap.Persistence.Conventions;
+using LuxMap.Shared.Authorization;
 
 namespace LuxMap.Api.Tests;
 
@@ -28,6 +30,49 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
 
     private JsonElement Schema(string name)
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
+
+    /// <summary>
+    /// Every business operation publishes the capability it requires and the roles it admits
+    /// (Contract v1.7 section 2), exactly as <see cref="LuxMapPolicies.Matrix"/> has them.
+    /// </summary>
+    /// <remarks>
+    /// Web and mobile hide buttons from these two fields. A spec that drifted from the pipeline would
+    /// show a button the API then refuses, or hide one it would allow.
+    /// </remarks>
+    [Fact]
+    public void Every_business_operation_publishes_its_capability_and_roles()
+    {
+        var checkedOps = 0;
+
+        foreach (var path in Spec.GetProperty("paths").EnumerateObject())
+        {
+            // /auth issues tokens; /_ are the probe controllers this test assembly injects.
+            if (path.Name.StartsWith("/api/v1/auth", StringComparison.Ordinal)
+                || path.Name.StartsWith("/api/v1/_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (var operation in path.Value.EnumerateObject())
+            {
+                var where = $"{operation.Name.ToUpperInvariant()} {path.Name}";
+                Assert.True(operation.Value.TryGetProperty("x-luxmap-capability", out var capability), $"{where}: no x-luxmap-capability");
+
+                var roles = operation.Value.GetProperty("x-luxmap-roles").EnumerateArray().Select(role => role.GetString()).ToArray();
+                var expected = LuxMapPolicies.Matrix[capability.GetString()!].Select(ContractEnum.ToDbValue).ToArray();
+                Assert.Equal(expected, roles);
+                checkedOps++;
+            }
+        }
+
+        Assert.True(checkedOps >= 24, $"only {checkedOps} business operations found");
+    }
+
+    /// <summary><c>POST /auth/register</c> is DEPRECATED in Contract v1.7 (D-R11), and the spec says so.</summary>
+    [Fact]
+    public void Self_registration_is_published_as_deprecated()
+        => Assert.True(Spec.GetProperty("paths").GetProperty("/api/v1/auth/register").GetProperty("post")
+            .GetProperty("deprecated").GetBoolean());
 
     [Theory]
     [InlineData("FixtureStatus", new[] { "normal", "dim", "out", "unknown" })]

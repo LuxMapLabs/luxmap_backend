@@ -41,7 +41,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Replacing_a_segment_overwrites_every_writable_field()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
         var response = await client.PutAsJsonAsync($"{Segments}/{segmentId}", new
@@ -77,7 +77,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_declared_length_survives_a_geometry_that_disagrees_with_it()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
         var response = await client.PutAsJsonAsync($"{Segments}/{segmentId}", new
@@ -105,7 +105,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_segment_may_keep_the_inventory_code_it_already_holds()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId, externalRef: "INV-KEEP-1");
 
         var response = await client.PutAsJsonAsync($"{Segments}/{segmentId}", new
@@ -125,7 +125,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_segment_may_not_take_an_inventory_code_another_segment_in_the_commune_holds()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         await NewSegmentAsync(fixture.CommuneId, externalRef: "INV-TAKEN-1");
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
@@ -151,7 +151,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Replacing_a_segment_in_another_commune_is_404_rather_than_403()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var foreign = await NewSegmentAsync(fixture.ForeignCommuneId);
 
         var response = await client.PutAsJsonAsync($"{Segments}/{foreign}", new
@@ -172,7 +172,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Deleting_a_segment_nothing_references_succeeds()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
         var response = await client.DeleteAsync($"{Segments}/{segmentId}");
@@ -184,7 +184,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_segment_that_still_carries_a_pole_cannot_be_deleted()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
 
@@ -202,7 +202,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Deleting_a_segment_that_does_not_exist_is_404()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var response = await client.DeleteAsync($"{Segments}/SEG-000000");
 
@@ -215,7 +215,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Replacing_a_feeder_overwrites_its_name_and_cable_route()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
         var response = await client.PutAsJsonAsync($"{Feeders}/{feederId}", new
@@ -243,7 +243,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Replacing_a_feeder_without_a_geometry_clears_the_cable_route()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId, withGeometry: true);
 
         var response = await client.PutAsJsonAsync($"{Feeders}/{feederId}", new
@@ -266,7 +266,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_feeder_with_poles_wired_to_it_cannot_be_deleted_and_they_stay_wired()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId);
@@ -283,7 +283,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Deleting_a_feeder_nothing_is_wired_to_succeeds()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
         var response = await client.DeleteAsync($"{Feeders}/{feederId}");
@@ -306,7 +306,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task Replacing_a_pole_without_a_feeder_id_clears_its_circuit()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId);
@@ -397,7 +397,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_may_not_be_moved_onto_a_segment_the_caller_cannot_see()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
         var invisible = await NewSegmentAsync(fixture.ForeignCommuneId);
@@ -416,12 +416,14 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     // ── Permissions ───────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// All five new endpoints are administrator-only, and refuse with <c>ROLE_FORBIDDEN</c>.
+    /// All five endpoints are manager-only (<c>ManageAssets</c>), and refuse with <c>ROLE_FORBIDDEN</c>.
     /// </summary>
     /// <remarks>
     /// Asserting the CODE, not just the 403: before BE-REVIEW-02 D-4 every bare 403 came back as
-    /// <c>COMMUNE_FORBIDDEN</c> and the front end would tell an engineer they were outside their area
-    /// when the real answer is that their role may not write assets.
+    /// <c>COMMUNE_FORBIDDEN</c> and the front end would tell the caller they were outside their area
+    /// when the real answer is that their role may not write assets. The System Admin is the account
+    /// to try: it wrote assets until Contract v1.7, and its '*' scope means the write guard would not
+    /// stop it — only the policy does.
     /// </remarks>
     [Theory]
     [InlineData("PUT", Segments)]
@@ -429,9 +431,9 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     [InlineData("PUT", Poles)]
     [InlineData("DELETE", Segments)]
     [InlineData("DELETE", Feeders)]
-    public async Task A_maintenance_engineer_may_not_replace_or_delete_an_asset(string method, string route)
+    public async Task A_system_admin_may_not_replace_or_delete_an_asset(string method, string route)
     {
-        var client = await fixture.SeededClientAsync("engineer", "SEED_ENGINEER_PASSWORD");
+        var client = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
 
         using var request = new HttpRequestMessage(new HttpMethod(method), $"{route}/SEG-000000");
 

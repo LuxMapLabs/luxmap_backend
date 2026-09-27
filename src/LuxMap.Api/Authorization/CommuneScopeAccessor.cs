@@ -48,13 +48,13 @@ public sealed class CommuneScopeAccessor(IHttpContextAccessor httpContextAccesso
         // Defence in depth: '*' only means anything when the role really is Administrator. The
         // mismatch case is already rejected by CommuneScopeConsistencyHandler; failing closed a
         // second time here covers anyone using the accessor outside the authorization pipeline.
-        return IsAdministrator(principal) ? CommuneScope.SystemWide : CommuneScope.Empty;
+        return IsSystemAdmin(principal) ? CommuneScope.SystemWide : CommuneScope.Empty;
     }
 
-    public static bool IsAdministrator(ClaimsPrincipal principal)
+    public static bool IsSystemAdmin(ClaimsPrincipal principal)
         => string.Equals(
             principal.FindFirst(AuthClaims.Role)?.Value,
-            ContractEnum.ToDbValue(UserRole.Administrator),
+            ContractEnum.ToDbValue(UserRole.SystemAdmin),
             StringComparison.Ordinal);
 
     public static bool HasWildcardClaim(ClaimsPrincipal principal)

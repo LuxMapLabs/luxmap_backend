@@ -36,7 +36,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_row_carries_the_inventory_fields_and_none_of_the_operational_ones()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, externalRef: Ref());
 
@@ -72,7 +72,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_inventory_code_is_readable_on_all_three_resources()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         string poleRef = Ref(), segmentRef = Ref(), feederRef = Ref();
 
         var segmentId = await NewSegmentAsync(fixture.CommuneId, segmentRef);
@@ -101,7 +101,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task Provenance_is_readable_where_it_exists_and_absent_where_it_does_not()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, source: DataSource.CalibrationRig);
@@ -124,7 +124,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_circuit_a_full_replacement_would_overwrite_is_readable()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var feederId = await NewFeederAsync(fixture.CommuneId);
         var wired = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: feederId);
@@ -150,7 +150,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_lamp_in_service_travels_with_the_row_and_a_retired_one_does_not()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -170,7 +170,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_with_no_lamp_reports_a_null_active_fixture_rather_than_an_empty_object()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -187,7 +187,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_pole_row_carries_a_plain_location_and_not_a_geojson_geometry()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -205,7 +205,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_segment_row_carries_its_declared_length_and_a_pole_count()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         await NewPoleAsync(fixture.CommuneId, segmentId);
         await NewPoleAsync(fixture.CommuneId, segmentId);
@@ -229,7 +229,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_segments_pole_count_stops_at_the_edge_of_the_callers_scope()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         await NewPoleAsync(fixture.CommuneId, segmentId);
         await NewPoleAsync(fixture.ForeignCommuneId, segmentId);
@@ -243,7 +243,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_feeder_row_reports_whether_a_cable_route_was_surveyed()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var without = await NewFeederAsync(fixture.CommuneId);
         var with = await NewFeederAsync(fixture.CommuneId, withGeometry: true);
 
@@ -258,7 +258,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task Reading_one_pole_adds_its_geometry_its_segment_name_and_when_it_was_created()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -281,7 +281,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_geometry_a_detail_read_returns_is_accepted_straight_back_by_a_replacement()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId);
 
@@ -300,7 +300,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task A_feeder_with_no_surveyed_route_reports_a_null_geometry_not_an_empty_string()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var feederId = await NewFeederAsync(fixture.CommuneId);
 
         var body = await GetAsync(client, $"{Feeders}/{feederId}");
@@ -314,7 +314,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [InlineData("feeders")]
     public async Task An_asset_in_another_commune_is_not_found_rather_than_forbidden(string resource)
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var id = resource switch
         {
@@ -349,7 +349,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
     [Fact]
     public async Task The_literal_unassigned_route_still_wins_over_the_feeder_detail_route()
     {
-        var client = await fixture.AdminClientAsync();
+        var client = await fixture.ManagerClientAsync();
 
         var unassigned = await client.GetAsync($"{Feeders}/poles?unassigned=true");
         Assert.Equal(HttpStatusCode.OK, unassigned.StatusCode);

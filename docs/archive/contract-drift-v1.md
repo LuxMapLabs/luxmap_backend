@@ -1,5 +1,10 @@
 # Chỗ lệch giữa code và Contract — nội dung mang vào FW-00
 
+> 🗄️ **Tài liệu lịch sử — giữ nguyên, không sửa theo hiện trạng (D-R18, 25/09/2026).** Viết trước
+> Contract v1.7: tên vai trò (`management_agency` / `maintenance_engineer` / `field_crew` /
+> `administrator`, "Quản trị" ghi tài sản), "Nhánh C", solar và tự đăng ký ở đây là **trạng thái lúc
+> đó**. Hiện hành: Contract v1.7 §2 và `docs/contract-drift.md` mục *Registration v1.2*.
+
 **Mục đích:** danh sách những chỗ code hiện tại và `api-contract-v1.1.md` / `tasks-backend.csv`
 không khớp nhau, để cả nhóm quyết trong buổi review FW-00.
 

@@ -2,7 +2,7 @@
 
 Modular monolith ASP.NET Core phục vụ Web SPA (WP5), Android native (WP6) và engine CV (WP4).
 
-Nguồn sự thật: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) (Contract **v1.5**, bản hợp nhất) → [`docs/tasks-backend.csv`](docs/tasks-backend.csv) → [`CLAUDE.md`](CLAUDE.md). Chỗ lệch mới ghi vào [`docs/contract-drift.md`](docs/contract-drift.md); log cũ ở `docs/archive/`.
+Nguồn sự thật: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) (Contract **v1.7**, bản hợp nhất) → [`docs/tasks-backend.csv`](docs/tasks-backend.csv) → [`CLAUDE.md`](CLAUDE.md). Chỗ lệch mới ghi vào [`docs/contract-drift.md`](docs/contract-drift.md); log cũ ở `docs/archive/`.
 
 📖 **Mới vào dự án?** Đọc [`docs/code-walkthrough.md`](docs/code-walkthrough.md) — hướng dẫn đọc
 code theo thứ tự, giải thích từng cơ chế và vì sao nó tồn tại.
@@ -215,8 +215,19 @@ dotnet run --project src/LuxMap.Api -- --seed
 Chạy lại bao nhiêu lần cũng được, không tạo trùng — mỗi bản ghi nhận diện bằng khoá tự nhiên
 (tên xã, username) chứ không phải ID, nên ID vẫn do sequence sinh đúng quy ước.
 
-Seed tạo một xã và bốn tài khoản, mỗi vai trò một tài khoản: `admin`, `agency`, `engineer`,
-`crew`. Mật khẩu đọc từ `.env` (`SEED_*_PASSWORD`) — **thiếu biến nào thì seed dừng hẳn** kèm
+Seed tạo một xã và bốn tài khoản demo, mỗi vai trò một tài khoản (Contract v1.7 §2):
+
+| Username | Vai trò | Tên hiển thị | Biến mật khẩu |
+|---|---|---|---|
+| `admin` | `system_admin` (`*`) | Quản trị hệ thống | `SEED_ADMIN_PASSWORD` |
+| `agency` | `superior` | Cấp giám sát | `SEED_AGENCY_PASSWORD` |
+| `engineer` | `manager` | Quản lý | `SEED_ENGINEER_PASSWORD` |
+| `crew` | `field_engineer` | Kỹ sư hiện trường | `SEED_CREW_PASSWORD` |
+
+Username và tên biến **có trước v1.7 và được giữ** — test, `.env` của mọi người và bộ mock
+(`assigned_to: USR-004`) đều trỏ vào chúng. Chạy seed lại trên DB cũ sẽ cập nhật tên hiển thị; vai trò
+thì migration `RenameUserRolesToRegistrationV12` đổi. Không có tài khoản công dân — công dân báo sự cố qua
+QR, không đăng nhập. Mật khẩu đọc từ `.env` (`SEED_*_PASSWORD`) — **thiếu biến nào thì seed dừng hẳn** kèm
 thông báo, không lặng lẽ đặt mật khẩu mặc định.
 
 Phải `dotnet ef database update` trước; lệnh seed từ chối chạy khi còn migration chưa apply.
@@ -327,9 +338,13 @@ Bảy endpoint cấp token **không cần** access token — nhóm mobile (token
 (`/api/v1/auth/web/*`, refresh token chỉ trong cookie `__Secure-luxmap_rt`). Endpoint thứ tám,
 `GET /auth/me`, thì **cần**. Đặc tả đầy đủ: Contract mục 4.
 
+🔴 **`POST /auth/register` DEPRECATED (Contract v1.7, D-R11), gỡ ở BE-33a.** Không có tự đăng ký: Quản
+trị hệ thống tạo tài khoản, gán vai trò và gán xã. Tới khi BE-33a có `POST /api/v1/admin/users`, làm
+theo [`docs/authorization-guide.md`](docs/authorization-guide.md) mục "Tạo tài khoản".
+
 ```bash
 POST /api/v1/auth/login      { "username": "...", "password": "..." }
-POST /api/v1/auth/register   { "username": "...", "email": "...", "full_name": "...", "password": "..." }
+POST /api/v1/auth/register   { "username": "...", "email": "...", "full_name": "...", "password": "..." }   # DEPRECATED
 POST /api/v1/auth/refresh    { "refresh_token": "..." }
 POST /api/v1/auth/logout     { "refresh_token": "..." }
 POST /api/v1/auth/web/login  { "username": "...", "password": "...", "remember_me": true }
@@ -352,8 +367,8 @@ Claim trong access token — **BE-08 so chuỗi chính xác, đừng đổi**:
 | Claim | Kiểu | Ví dụ |
 |---|---|---|
 | `sub` | chuỗi | `USR-001` |
-| `role` | **chuỗi**, không phải mảng | `maintenance_engineer` |
-| `commune_ids` | **luôn là mảng** | `["COM-001"]` · Quản trị: `["*"]` |
+| `role` | **chuỗi**, không phải mảng — `superior` / `manager` / `field_engineer` / `system_admin` | `manager` |
+| `commune_ids` | **luôn là mảng** | `["COM-001"]` · Quản trị hệ thống: `["*"]` |
 | `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
 
 Vòng đời: access **60 phút**; refresh trượt **30 ngày** mỗi lần xoay vòng, nhưng không bao giờ
@@ -377,6 +392,11 @@ openssl rand -base64 48
 `[AllowAnonymous]`. Truy vấn tự bị giới hạn trong các xã thuộc claim của người gọi; quên gắn scope
 cho entity mới thì **app không khởi động được**.
 
+**Mọi endpoint nghiệp vụ gắn một capability** của `LuxMapPolicies.Matrix` — mỗi capability liệt kê
+đúng các vai trò được vào, không thứ bậc (Contract v1.7 §2). Endpoint quên gắn thì
+`CapabilityPolicyCoverageTests` đỏ. Spec công bố capability và vai trò của từng operation ở
+`x-luxmap-capability` / `x-luxmap-roles`.
+
 👉 **Trước khi viết endpoint mới, đọc [`docs/authorization-guide.md`](docs/authorization-guide.md).**
 Nó nói rõ bạn phải làm gì, và những chỗ dễ lách.
 
@@ -385,7 +405,7 @@ Tóm tắt mã lỗi:
 | Tình huống | HTTP | `error.code` |
 |---|---|---|
 | Thiếu / sai / hết hạn token | 401 | `UNAUTHENTICATED` |
-| Sai vai trò (policy từ chối) | 403 | `ROLE_FORBIDDEN` |
+| Vai trò không nằm trong capability của endpoint | 403 | `ROLE_FORBIDDEN` |
 | `commune_id` ngoài phạm vi, hoặc claim `["*"]` lệch vai trò | 403 | `COMMUNE_FORBIDDEN` |
 | Tài nguyên ngoài phạm vi | 404 | `NOT_FOUND` (không phải 403 — 403 sẽ lộ ra là nó tồn tại) |
 

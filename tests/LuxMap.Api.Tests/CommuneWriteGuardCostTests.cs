@@ -282,7 +282,7 @@ public sealed class CommuneWriteGuardCostTests(AssetImportFixture fixture, ITest
         List<Claim> claims =
         [
             new(AuthClaims.Subject, "USR-COST"),
-            new(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.Administrator)),
+            new(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.SystemAdmin)),
             new(AuthClaims.CommuneIds, communeId),
         ];
 

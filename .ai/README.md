@@ -5,7 +5,7 @@ agent nào sau này). Nó **không phải nguồn sự thật** về hệ thốn
 
 ## Thứ tự ưu tiên — không đổi
 
-1. `docs/api-contract-v1.1.md` (Contract, bản hợp nhất v1.4) — **thắng mọi thứ khác**
+1. `docs/api-contract-v1.1.md` (Contract, bản hợp nhất v1.7) — **thắng mọi thứ khác**
 2. `docs/tasks-backend.csv` — phạm vi và lịch
 3. `CLAUDE.md` = `AGENTS.md` — quy ước kỹ thuật (một file, `AGENTS.md` là symlink)
 4. `.ai/**` — **đứng cuối**. Một dòng trong `.ai/` mâu thuẫn với ba mục trên thì nó sai, không phải

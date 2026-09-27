@@ -15,10 +15,10 @@ public sealed class SeedCredentials
 
     public static string EnvironmentVariableFor(UserRole role) => role switch
     {
-        UserRole.Administrator => "SEED_ADMIN_PASSWORD",
-        UserRole.ManagementAgency => "SEED_AGENCY_PASSWORD",
-        UserRole.MaintenanceEngineer => "SEED_ENGINEER_PASSWORD",
-        UserRole.FieldCrew => "SEED_CREW_PASSWORD",
+        UserRole.SystemAdmin => "SEED_ADMIN_PASSWORD",
+        UserRole.Superior => "SEED_AGENCY_PASSWORD",
+        UserRole.Manager => "SEED_ENGINEER_PASSWORD",
+        UserRole.FieldEngineer => "SEED_CREW_PASSWORD",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, "No seed password variable for this role."),
     };
 

@@ -5,6 +5,10 @@
 Contract v1.4 (xem changelog mục 10 của [`api-contract-v1.1.md`](api-contract-v1.1.md)) hoặc chuyển
 thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 
+> 🗄️ **Mục đăng ký TRƯỚC 25/09/2026 là lịch sử (D-R18)** — chúng dùng tên vai trò cũ và nói "Quản trị"
+> ghi tài sản, "Nhánh C". Không sửa lại; vai trò hiện hành ở mục *Registration v1.2* bên dưới và
+> Contract v1.7 §2.
+
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
 archive: (1) ghi ngay, bốn trường Decision / Decision maker / Date / Scope; (2) policy là một vai trò
 chính xác; (3) im lặng > 3 ngày làm việc = APPROVE nếu không chạm API, ESCALATE nếu chạm, fallback
@@ -57,6 +61,47 @@ Các quyết định con, để tra nhanh (chi tiết và lý do ở BE-REVIEW-0
 - **Thịnh/Ngọc:** O-1 (tên tuyến), review PR chạm `api-contract-v1.1.md` và `luxmap-v1.json` (CODEOWNERS).
 - **BE1:** ~~O-7 FK ghép trước BE-13~~ — **xong 21/09/2026**, xem drift 45; BE-36 sớm (M-1);
   rate limit auth (M-5); CI lint spec (M-7).
+
+### Registration v1.2 — vai trò, phân quyền, phạm vi (25/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Đồng bộ backend với **Phiếu đăng ký FA26SE222 v1.2** (`docs/registration/FA26SE222_v1.2.md`): D-R1 … D-R18 theo bảng dưới. Contract lên **v1.7** |
+| **Decision maker** | **Mỹ (Dylan)** · `SELF-SIGNED` — mọi mục chạm bề mặt API phải được xác nhận lại ở FW kế tiếp (FW-00 mục 3), tới lúc đó **nền là tạm** |
+| **Date** | 25/09/2026 |
+| **Scope** | `api-contract-v1.1.md` (v1.7: §1.4, §1.6, §2, §3.1, §3.3, §4.1, §4.5, §4.7, §5.3–§5.7, §7, §9, §10); `docs/openapi/luxmap-v1.json` + `luxmap-v1.5.json`; migration `RenameUserRolesToRegistrationV12`; `LuxMapPolicies`, `AuthorizationSetup`, 4 controller; seeder; `CLAUDE.md`, `README.md`, `tracking.html`; nhánh `chore/registration-v1.2-roles-docs`. Khảo sát: `.ai/results/registration-v1.2-phase1.md`, thực thi: `…-phase2.md` |
+
+| Mã | Chốt | Chạm API |
+|---|---|---|
+| **D-R1** | **Citizen không có account, không có role**; `user_role` vẫn 4 giá trị. Báo sự cố qua QR trên cột → **hàng chờ riêng**, Quản lý duyệt rồi mới thành `fault`; **không** thêm giá trị vào `source_channel`. Chưa có endpoint; `AnonymousEndpointTests` giữ 7 endpoint. Quyết định 20/09/2026 *"bỏ actor guest"* (chỉ ghi trong comment `AnonymousEndpointTests`) **bị thay thế một phần**: không có guest đọc dữ liệu, nhưng có Citizen báo sự cố ẩn danh | Không (chưa có endpoint) |
+| **D-R2** | Giữ `text` + CHECK sinh từ `HasContractEnum`. Migration: `DROP CONSTRAINT` → 4 `UPDATE` → `ADD CONSTRAINT`; `Down()` đối xứng, không mất dữ liệu | — |
+| **D-R3** | Phạm vi Superior = **tập xã** qua `app_user_commune`. Không schema huyện, không đổi guard/filter, không cấp `*` | — |
+| **D-R4** | Vai trò cố định, ma trận quyền trong code. Quản trị hệ thống chỉ **gán** vai trò và xã (API: BE-33) | — |
+| **D-R5** | **Sửa D-14** (v1.4): "một vai trò chính xác cho mỗi policy" → **"danh sách vai trò chính xác cho mỗi capability"**, vẫn cấm thứ bậc. Lý do: phiếu có vai trò chỉ-đọc (Superior) và việc chia giữa Quản lý / Kỹ sư hiện trường; một-vai-trò chỉ diễn đạt được bằng endpoint trần — đúng cái đã để `POST /lux-readings` mở cho cả Superior. Ma trận ở `LuxMapPolicies.Matrix` (nguồn duy nhất), Contract §2. Không endpoint nghiệp vụ nào dựa vào fallback (ngoại lệ tên riêng: `GET /auth/me`), canh bằng `CapabilityPolicyCoverageTests` | **Có** |
+| **D-R6** | Song ánh `management_agency→superior`, `maintenance_engineer→manager`, `field_crew→field_engineer`, `administrator→system_admin`. 14 tài khoản `administrator` cặn test trên DB dev map máy móc → `system_admin` (migration không biết username; dọn ở BE-36). Tài khoản seed đổi `role` + `full_name` tại chỗ; **giữ** username `admin/agency/engineer/crew`, `USR-001..004`, biến `SEED_*_PASSWORD`. Tên hiển thị: Cấp giám sát / Quản lý / Kỹ sư hiện trường / Quản trị hệ thống | **Có — BREAKING** (giá trị claim `role`) |
+| **D-R7** | Điều khiển ON/OFF/AUTO: chỉ **Quản lý**; chỉ thiết bị `supports_remote_control = true` (testbed LED tự dựng) — thiết bị ngoài thực địa luôn `false`; mọi lệnh ghi audit; docs viết *"supported lighting devices (testbed demo)"*. PR này chỉ khai capability `ControlLighting`. Chốt trước khảo sát (Mỹ, 25/09/2026) | Không (chưa có endpoint) |
+| **D-R8, D-R9** | Mapping Member 1–5 → tên, và timeline 09/2026–03/2027 so với kế hoạch 13 tuần: **Mỹ xử lý riêng, KHÔNG thuộc PR này** — `CLAUDE.md`, `tracking.html`, `tasks-backend.csv` giữ nguyên mốc W0–W21 | — |
+| **D-R10** | **Phiếu v1.2 thay FO-01 (24/08/2026) — FO-01 `SUPERSEDED`.** Ngoài thực địa (xã đối tác): quay video đêm đèn thật, đo sáng tương đối bằng điện thoại, kiểm tra bằng mắt ban đêm (ground truth lớp out); **không** lắp thiết bị, **không** thao tác lưới xã. Testbed tự dựng: toàn bộ IoT, demo ON/OFF/AUTO, Controlled Reference Capture Set. AI khởi động bằng ảnh công khai + controlled reference. Nhãn "Nhánh C" bỏ khỏi văn hiện hành; **luật tách `data_source` giữ nguyên**. Dữ liệu thực địa mang `field`; dữ liệu testbed **không bao giờ** mang `field`. Bốn quyết định dựa trên Nhánh C thành follow-up "nền đã đổi, cần xét lại" (xem `tracking.html`) — `external_ref` **ưu tiên cao** | **Có** (§1.6 câu về `field`; O-9 mới) |
+| **D-R11** | Mô hình cuối: **chỉ Quản trị hệ thống tạo account**, không tự đăng ký. PR này: `LowestRole → field_engineer`, `POST /auth/register` **DEPRECATED** (Contract §4.1, README, `deprecated: true` trong spec) — **breaking đã báo trước**. **BE-33a** (ngay sau): `POST /api/v1/admin/users` (`ManageUsers`), gỡ `/auth/register` + `RegistrationTests`, `AnonymousEndpointTests` 7→6, báo WP6 bỏ màn đăng ký; Phase 1 của nó mở 3 D-item: mật khẩu tạm + đổi ở lần đầu, bắt buộc ≥1 xã cho 3 vai trò có phạm vi, khoá/mở khoá qua `is_locked` | **Có — breaking báo trước** |
+| **D-R12** | (1) Ghi tài sản + import → **Quản lý**; (2) Quản trị hệ thống vẫn **đọc** qua `*`; (3) Quản trị hệ thống **không ghi** nghiệp vụ — nạp đầu kỳ qua seeder / `EnterUnscopedSystemWriteBackdoor` như BE-39 | **Có** (13 endpoint ghi đổi người được ghi) |
+| **D-R13** | Audit trail **bắt buộc**, không còn "nếu BE-19 cần": một bảng audit **append-only dùng chung** cho quyết định fault, lệnh điều khiển, review survey session — không `FaultHistory` riêng từng loại. Thiết kế ở Phase 1 của BE-19. PR này không tạo bảng | Không (chưa có bảng) |
+| **D-R14** | Video (khảo sát + bằng chứng): ngoài phạm vi, **planned**. BE-11 chỉ nhận JPEG tới khi có ticket video. Hướng đề xuất (chốt cùng Thịnh/mobile): upload thẳng MinIO bằng presigned URL, sync khi có mạng; tách frame ở server hay máy chốt ở ticket đó. ⚠️ Presigned **ngược** BE-11 quy tắc 1 — ticket video phải giải quyết chuyện phân quyền đó, không mặc nhiên | Không (planned) |
+| **D-R15** | `lux_value` = số đọc cảm biến ánh sáng **điện thoại**, quy trình cố định (cùng máy, app, tư thế); **tương đối**, chỉ so giữa cột và giữa đêm; không tuyên bố lux tuyệt đối, không đánh giá đạt chuẩn. `meter_model` = model điện thoại. Ngưỡng 200 giữ nhưng ghi lại là kiểm tra hợp lệ dữ liệu thô. Giữ tên cột | Diễn đạt (§5.7), không đổi hình dạng |
+| **D-R16** | Đóng mục mở "lưu ảnh dài hạn": ảnh, telemetry, fault giữ **tối thiểu qua hết bảo hành**; hết bảo hành **không** xoá / archive. Tài sản hết bảo hành chỉ mang **cảnh báo**, tính từ ngày hết hạn so với hôm nay, **không lưu cột trạng thái**; hiện trên bản đồ, danh sách tài sản, fault / work order. Hiện thực: BE-31 / BE-35. Schema hiện có: `fixture.install_date` (NOT NULL), `fixture.warranty_expiry` (NULL được), `fixture.removed_date` — **trên `fixture`, không trên `pole`** | Có (§7, §3.3; chưa có trường) |
+| **D-R17** | Contract **v1.7**, BREAKING. Giữ tên file spec `luxmap-v1.5.json`; spec sinh lại từ code, không sửa tay. Người ký: Mỹ, `SELF-SIGNED` (CODEOWNERS đã bỏ từ 14/09) | — |
+| **D-R18** | Tài liệu lịch sử giữ nguyên + banner (`backend-report.md`, `docs/review/*`, `docs/archive/*`, log này, mục đã xong trong tracking). Khối v1.6 trong `CLAUDE.md` giữ. Chỉ xoá chỗ sót viết ở thì hiện tại (`docs/templates/README.md` hai dòng solar, `CLAUDE.md` `POLE-0047` là cột solar). Không đụng bản sao untracked `.ai/context/tracking.html` | — |
+
+⚠️ **Đính chính khảo sát:** Phase 1 ghi "15 chỗ gắn `Administrator`". Đếm lại lúc hiện thực: **13 attribute**
+(12 trong `AssetsController` + 1 cấp class `AssetImportController`); dòng thứ 14 của grep là XML doc.
+Ma trận §2 dùng con số 13.
+
+**Việc còn nợ người khác sau quyết định này:**
+
+- **WP5:** đổi giá trị `role` (bốn giá trị mới); màn quản lý tài sản nay là của **Quản lý**, Quản trị hệ
+  thống bị `403 ROLE_FORBIDDEN`; đọc `x-luxmap-roles` trong spec để ẩn nút.
+- **WP6:** đổi giá trị `role`; **bỏ màn đăng ký** (`/auth/register` deprecated); `POST /lux-readings` chỉ
+  Kỹ sư hiện trường.
+- **Thịnh/Ngọc:** xác nhận hoặc lật D-R5, D-R6, D-R10, D-R11, D-R12 ở FW kế tiếp.
 
 ### Từ v1.5: quyết định đi cùng Contract thì ghi Ở CONTRACT
 

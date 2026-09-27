@@ -122,7 +122,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/segments": {
@@ -190,7 +194,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       },
       "post": {
         "tags": [
@@ -279,7 +290,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/segments/{segmentId}": {
@@ -338,7 +353,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       },
       "put": {
         "tags": [
@@ -457,7 +479,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       },
       "delete": {
         "tags": [
@@ -537,7 +563,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/feeders": {
@@ -605,7 +635,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       },
       "post": {
         "tags": [
@@ -674,7 +711,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/feeders/{feederId}": {
@@ -733,7 +774,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       },
       "put": {
         "tags": [
@@ -852,7 +900,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       },
       "delete": {
         "tags": [
@@ -932,7 +984,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/poles": {
@@ -1000,7 +1056,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       },
       "post": {
         "tags": [
@@ -1109,7 +1172,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/poles/{poleId}": {
@@ -1168,7 +1235,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       },
       "put": {
         "tags": [
@@ -1287,7 +1361,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       },
       "delete": {
         "tags": [
@@ -1367,7 +1445,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/fixtures": {
@@ -1458,7 +1540,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/poles/{poleId}/feeder": {
@@ -1579,7 +1665,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/assets/feeders/{feederId}/poles": {
@@ -1645,7 +1735,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/assets/segments/{segmentId}/poles": {
@@ -1711,7 +1808,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/assets/feeders/poles": {
@@ -1806,7 +1910,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/assets/fixtures/{fixtureId}/removal": {
@@ -1887,7 +1998,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ]
       }
     },
     "/api/v1/auth/login": {
@@ -2083,7 +2198,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/v1/auth/refresh": {
@@ -2419,7 +2535,11 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:record_lux_reading",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ]
       },
       "get": {
         "tags": [
@@ -2489,7 +2609,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_lux_readings",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/lux-readings/poles/{poleId}": {
@@ -2555,7 +2682,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_lux_readings",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/poles": {
@@ -2698,7 +2832,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/segments": {
@@ -2793,7 +2934,14 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
       }
     },
     "/api/v1/auth/web/login": {
@@ -4529,7 +4677,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },

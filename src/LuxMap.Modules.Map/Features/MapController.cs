@@ -5,6 +5,7 @@ using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.GeoJson;
 using LuxMap.Shared.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -53,6 +54,7 @@ public sealed class MapController(
     /// </para>
     /// </remarks>
     [HttpGet("poles")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<FeatureCollection<PoleProperties>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -85,6 +87,7 @@ public sealed class MapController(
     /// lamps, so the cap that protects the pole layer would only ever add a failure mode to this one.
     /// </remarks>
     [HttpGet("segments")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<FeatureCollection<SegmentProperties>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]

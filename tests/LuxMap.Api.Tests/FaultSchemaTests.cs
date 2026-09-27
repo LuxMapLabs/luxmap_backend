@@ -54,7 +54,7 @@ public class FaultSchemaTests(AssetSchemaFixture fixture) : IAsyncLifetime
         var claims = new List<Claim>
         {
             new(AuthClaims.Subject, "USR-001"),
-            new(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.MaintenanceEngineer)),
+            new(AuthClaims.Role, ContractEnum.ToDbValue(UserRole.Manager)),
         };
         claims.AddRange(communeIds.Select(id => new Claim(AuthClaims.CommuneIds, id)));
 

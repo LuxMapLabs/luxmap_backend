@@ -87,12 +87,27 @@ public sealed class IdentitySeeder(
 
         foreach (var template in SeedUsers.All)
         {
-            var exists = await dbContext.Set<AppUser>()
-                .AnyAsync(user => user.Username == template.Username, cancellationToken);
+            var existing = await dbContext.Set<AppUser>()
+                .FirstOrDefaultAsync(user => user.Username == template.Username, cancellationToken);
 
-            if (exists)
+            if (existing is not null)
             {
-                logger.LogInformation("Account {Username} already exists, skipping.", template.Username);
+                // The display name follows the template, so a database seeded before Contract v1.7
+                // picks up the new role names on the next run. The role itself was renamed in place
+                // by migration RenameUserRolesToRegistrationV12; the password is never touched.
+                if (existing.FullName != template.FullName)
+                {
+                    logger.LogInformation(
+                        "Account {Username} exists; display name {Old} -> {New}.",
+                        template.Username, existing.FullName, template.FullName);
+                    existing.FullName = template.FullName;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    logger.LogInformation("Account {Username} already exists, skipping.", template.Username);
+                }
+
                 continue;
             }
 
@@ -102,7 +117,7 @@ public sealed class IdentitySeeder(
                 Email = template.Email,
                 FullName = template.FullName,
                 Role = template.Role,
-                HasSystemWideScope = template.Role == UserRole.Administrator,
+                HasSystemWideScope = template.Role == UserRole.SystemAdmin,
                 PasswordHash = string.Empty,
                 PasswordAlgorithm = PasswordAlgorithm,
             };
@@ -133,12 +148,18 @@ public sealed record SeedUser(string Username, string Email, string FullName, Us
 
 public static class SeedUsers
 {
-    /// <summary>One account per role. The order is fixed so USR-001..USR-004 stay stable.</summary>
+    /// <summary>One demo account per role. The order is fixed so USR-001..USR-004 stay stable.</summary>
+    /// <remarks>
+    /// The usernames predate Contract v1.7 and are KEPT (D-R6): tests, <c>.env</c> variables
+    /// (<c>SEED_*_PASSWORD</c>) and the mock set (<c>assigned_to: USR-004</c>) all refer to them, and a
+    /// username is an identifier, not a label. The display name is what carries the role.
+    /// There is no Citizen account — the Citizen reports through a QR code and never signs in (D-R1).
+    /// </remarks>
     public static IReadOnlyList<SeedUser> All { get; } =
     [
-        new("admin", "admin@luxmap.local", "System Administrator", UserRole.Administrator),
-        new("agency", "agency@luxmap.local", "Managing Authority Officer", UserRole.ManagementAgency),
-        new("engineer", "engineer@luxmap.local", "Maintenance Engineer", UserRole.MaintenanceEngineer),
-        new("crew", "crew@luxmap.local", "Survey and Repair Crew", UserRole.FieldCrew),
+        new("admin", "admin@luxmap.local", "Quản trị hệ thống", UserRole.SystemAdmin),
+        new("agency", "agency@luxmap.local", "Cấp giám sát", UserRole.Superior),
+        new("engineer", "engineer@luxmap.local", "Quản lý", UserRole.Manager),
+        new("crew", "crew@luxmap.local", "Kỹ sư hiện trường", UserRole.FieldEngineer),
     ];
 }

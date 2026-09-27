@@ -1,4 +1,6 @@
 using LuxMap.Modules.Identity.Auth.Web;
+using LuxMap.Persistence.Conventions;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts;
 using Microsoft.OpenApi;
 
@@ -33,6 +35,7 @@ public static class SwaggerSetup
             AddBearerSecurity(options);
             AddRefreshTokenCookieSecurity(options);
             options.OperationFilter<RefreshTokenCookieOperationFilter>();
+            options.OperationFilter<CapabilityOperationFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than
             // trusting Swashbuckle to infer correctly: getting this wrong makes FM-04 generate
@@ -81,13 +84,33 @@ public static class SwaggerSetup
             Scheme = "bearer",
             BearerFormat = "JWT",
             In = ParameterLocation.Header,
-            Description = "Paste the JWT here WITHOUT the 'Bearer ' prefix.",
+            Description = BearerDescription(),
         });
 
         options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
         {
             [new OpenApiSecuritySchemeReference(schemeId, document)] = [],
         });
+    }
+
+    /// <summary>
+    /// The access token's authorization claims and the capability matrix, rendered from
+    /// <see cref="LuxMapPolicies.Matrix"/> so the spec and the pipeline cannot disagree.
+    /// </summary>
+    private static string BearerDescription()
+    {
+        var matrix = string.Join("; ", LuxMapPolicies.Matrix.Select(entry =>
+            $"{entry.Key} = {string.Join(", ", entry.Value.Select(ContractEnum.ToDbValue))}"));
+
+        return "Paste the JWT here WITHOUT the 'Bearer ' prefix. "
+            + "Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) "
+            + "and commune_ids (always an array; [\"*\"] for system_admin only). "
+            + "Every business operation requires one capability, named in x-luxmap-capability, admitting exactly "
+            + "the roles in x-luxmap-roles — no ranking between roles. "
+            + $"Matrix: {matrix}. "
+            + "401 UNAUTHENTICATED: token missing, invalid or expired. "
+            + "403 ROLE_FORBIDDEN: the role is not in the capability's list. "
+            + "403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.";
     }
 
     /// <summary>
