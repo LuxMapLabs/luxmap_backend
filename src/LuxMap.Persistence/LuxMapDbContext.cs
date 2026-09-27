@@ -1,4 +1,5 @@
 using System.Reflection;
+using LuxMap.Persistence.Audit;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -73,6 +74,7 @@ public class LuxMapDbContext(
     /// </remarks>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        AuditWriteGuard.Enforce(ChangeTracker, systemWriteDepth > 0);
         EnforceCommuneWriteScope();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
@@ -81,6 +83,7 @@ public class LuxMapDbContext(
     public override Task<int> SaveChangesAsync(
         bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        AuditWriteGuard.Enforce(ChangeTracker, systemWriteDepth > 0);
         EnforceCommuneWriteScope();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }

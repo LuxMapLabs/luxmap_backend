@@ -1468,3 +1468,26 @@ Ba task mới v2.0 dễ bị quên vì không có trong kế hoạch cũ: **BE-4
 ### CI: cấu hình host chỉ đặt ở bước cần dựng host
 
 `Cors__AllowedOrigins__0` dùng cho export OpenAPI và migrate/seed phải ở `env` của từng step. Đặt ở cấp job làm `CorsTests.Startup_stops_on_a_missing_or_malformed_allowlist(null)` khởi động thành công vì allowlist từ môi trường, dù test đang kiểm cấu hình thiếu. Giữ môi trường regression test độc lập với cấu hình của CLI (PR #52, 27/09/2026).
+
+
+### BE-23a — audit chung, append-only và giới hạn thật (27/09/2026)
+
+`LuxMap.Persistence/Audit/` chứa `AuditEvent`, `IAuditTrail` và `IAudited`.
+`Record` chỉ stage event vào **cùng DbContext scoped**; service chụp actor, vai trò, thời điểm,
+before/after rồi gọi đúng một `SaveChanges` cùng thay đổi nghiệp vụ. Không save riêng audit.
+Guard ở cả sync/async từ chối sửa/xoá audit (kể cả backdoor); khi có thay đổi `IAudited`,
+bắt buộc đúng một audit mới. Backdoor chỉ bỏ yêu cầu có event cho seed/fixture.
+Guard đếm event, không chứng minh nội dung event khớp thao tác: service và test nghiệp vụ phải kiểm điều đó.
+BE-23 sẽ gắn marker cho WorkOrder/WorkOrderFault; Fault đợi BE-19.
+
+Trigger DB chặn UPDATE/DELETE/TRUNCATE với SQLSTATE `55000`.
+**Append-only chặn lỗi ứng dụng, KHÔNG chặn người có quyền SQL.**
+`luxmap.audit_purge` là custom GUC, không phải quyền bảo mật; user có SQL có thể đặt nó,
+và tài khoản `luxmap` local hiện là superuser. Không mô tả cơ chế này như chống giả mạo tuyệt đối.
+Chỉ teardown test được `SET LOCAL luxmap.audit_purge = 'on'` trong transaction riêng,
+rồi DELETE với WHERE theo dữ liệu của test. Không đặt ở mức session/connection pool.
+`AuditGuardTests.Production_source_never_enables_the_test_purge_switch` quét `src/` (trừ migration)
+để chặn đường bật GUC trong ứng dụng; giữ test này cùng `BannedBulkWriteApiTests`.
+FK actor và commune đều RESTRICT: muốn dọn tài khoản/xã test phải dọn audit của test trước.
+Rollback migration xoá bảng audit và mất dữ liệu audit; vòng apply/rollback/reapply chỉ chạy
+trên DB test, khi bảng audit trống.

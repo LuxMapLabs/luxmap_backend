@@ -224,6 +224,7 @@ public class BannedBulkWriteApiTests
         Assert.Contains("Fixture", scoped);
         Assert.Contains("Fault", scoped);
         Assert.Contains("LuxReading", scoped);
+        Assert.Contains("AuditEvent", scoped);
 
         Assert.DoesNotContain("RefreshToken", scoped);
         Assert.DoesNotContain("AppUser", scoped);

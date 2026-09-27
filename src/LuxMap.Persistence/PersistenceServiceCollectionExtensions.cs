@@ -1,4 +1,5 @@
 using System.Reflection;
+using LuxMap.Persistence.Audit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ public static class PersistenceServiceCollectionExtensions
         services.AddSingleton(_ => BuildDataSource(connectionString));
         services.AddDbContext<LuxMapDbContext>((provider, options) =>
             Configure(options, provider.GetRequiredService<NpgsqlDataSource>()));
+        services.AddScoped<IAuditTrail, AuditTrail>();
 
         return services;
     }
