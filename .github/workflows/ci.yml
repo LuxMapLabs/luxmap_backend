@@ -33,10 +33,6 @@ jobs:
     env:
       DOTNET_NOLOGO: 'true'
       DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
-      # Swagger CLI constructs the Production host. Without these settings export can fail
-      # before writing anything, leaving an old spec that looks deceptively unchanged.
-      Swagger__Enabled: 'true'
-      Cors__AllowedOrigins__0: https://localhost:3000
 
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +98,11 @@ jobs:
 
       - name: Re-export and regenerate OpenAPI
         id: spec
+        # Only host-building tools need these values. Job-level CORS configuration contaminates
+        # the regression test that deliberately starts with no allowlist.
+        env:
+          Swagger__Enabled: 'true'
+          Cors__AllowedOrigins__0: https://localhost:3000
         run: |
           dotnet swagger tofile --output docs/openapi/luxmap-v1.json src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll v1
           python3 docs/openapi/tools/gen_consolidated_spec.py
@@ -136,6 +137,8 @@ jobs:
 
       - name: Migrate and seed the fresh database
         id: database
+        env:
+          Cors__AllowedOrigins__0: https://localhost:3000
         if: ${{ !cancelled() && steps.services.outcome == 'success' }}
         # Fixtures assume migrated tables, study_site, seeded users and the FO-26 baseline;
         # they do NOT bootstrap an empty service DB. Match EF's version in Persistence.csproj.

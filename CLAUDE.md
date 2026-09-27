@@ -1464,3 +1464,7 @@ Sau đó: GIS tài sản (W2–W4) → khảo sát (W5–W7) → sự cố (W7�
 > **6 chứ không phải 16 — cách phân biệt, để không ai sửa ngược.** 6 là số cột **tồn tại tại thời điểm migration** đó: `segment_id`, `pole_id`, `fixture_id`, `feeder_id`, `user_id`, `commune_id`. `PrefixedIds` khai **16 SPEC**, nhưng 10 spec còn lại thuộc entity chưa được tạo (`Fault`, `SurveyFrame`, `LuxReading`…). Số cột thật sẽ tăng dần khi các entity đó ra đời; con số 16 chỉ đúng cho *bảng prefix*, không đúng cho *migration này*.
 
 Ba task mới v2.0 dễ bị quên vì không có trong kế hoạch cũ: **BE-40**, **BE-41**, **BE-43**. Cả ba đang chặn WP6.
+
+### CI: cấu hình host chỉ đặt ở bước cần dựng host
+
+`Cors__AllowedOrigins__0` dùng cho export OpenAPI và migrate/seed phải ở `env` của từng step. Đặt ở cấp job làm `CorsTests.Startup_stops_on_a_missing_or_malformed_allowlist(null)` khởi động thành công vì allowlist từ môi trường, dù test đang kiểm cấu hình thiếu. Giữ môi trường regression test độc lập với cấu hình của CLI (PR #52, 27/09/2026).
