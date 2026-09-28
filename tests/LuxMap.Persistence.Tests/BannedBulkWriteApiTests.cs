@@ -252,6 +252,7 @@ public class BannedBulkWriteApiTests
         [
             typeof(Modules.Assets.Entities.Pole).Assembly,
             typeof(Modules.Faults.Entities.Fault).Assembly,
+            typeof(Modules.WorkOrders.Entities.WorkOrder).Assembly,
             typeof(Modules.Survey.Entities.LuxReading).Assembly,
             typeof(Modules.Identity.Entities.AppUser).Assembly,
             typeof(AdministrativeUnit).Assembly,

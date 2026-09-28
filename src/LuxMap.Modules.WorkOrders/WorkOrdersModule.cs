@@ -6,7 +6,7 @@ namespace LuxMap.Modules.WorkOrders;
 
 /// <summary>
 /// WorkOrders module — WorkOrder, ExternalUnit, RepairEvidence (BE-21..BE-24).
-/// Empty shell as of BE-01: no entities, no endpoints yet.
+/// Inspection and repair assignments (BE-23); evidence remains BE-24.
 /// </summary>
 public sealed class WorkOrdersModule : ILuxMapModule
 {
@@ -14,5 +14,6 @@ public sealed class WorkOrdersModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddScoped<WorkOrderService>();
     }
 }

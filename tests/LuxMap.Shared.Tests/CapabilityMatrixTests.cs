@@ -23,6 +23,9 @@ public class CapabilityMatrixTests
         ["cap:record_lux_reading"] = ["field_engineer"],
         ["cap:control_lighting"] = ["manager"],
         ["cap:manage_users"] = ["system_admin"],
+        ["cap:read_work_orders"] = ["field_engineer", "manager", "superior", "system_admin"],
+        ["cap:manage_work_orders"] = ["manager"],
+        ["cap:execute_work_orders"] = ["field_engineer"],
     };
 
     [Fact]

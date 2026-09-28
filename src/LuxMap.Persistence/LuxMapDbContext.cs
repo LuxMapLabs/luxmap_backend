@@ -22,7 +22,8 @@ namespace LuxMap.Persistence;
 public class LuxMapDbContext(
     DbContextOptions<LuxMapDbContext> options,
     ModuleAssemblyCatalog catalog,
-    ICommuneScopeAccessor scopeAccessor)
+    ICommuneScopeAccessor scopeAccessor,
+    ICurrentActorAccessor? actorAccessor = null)
     : DbContext(options)
 {
     /// <summary>
@@ -30,6 +31,9 @@ public class LuxMapDbContext(
     /// capturing an outside accessor — see the note on <c>CommuneScopeBuilderExtensions.ApplyFilter</c>.
     /// </summary>
     public CommuneScope CurrentCommuneScope => scopeAccessor.Scope;
+
+    public string? CurrentAssigneeRestriction => actorAccessor?.Role == LuxMap.Shared.Contracts.Enums.UserRole.FieldEngineer
+        ? actorAccessor.UserId ?? string.Empty : null;
 
     /// <summary>
     /// Identifies the set of loaded modules. The model depends on it, so the model cache key must

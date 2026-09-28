@@ -64,6 +64,7 @@ public static class SwaggerSetup
             });
 
             options.SchemaFilter<JsonElementFieldSchemaFilter>();
+            options.SchemaFilter<WorkOrderSchemaFilter>();
             options.DocumentFilter<ContractEnumDocumentFilter>();
             options.SupportNonNullableReferenceTypes();
         });

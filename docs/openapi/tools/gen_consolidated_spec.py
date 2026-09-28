@@ -31,7 +31,7 @@ HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 n_from_code = sum(1 for item in d["paths"].values() for m in item if m in HTTP_METHODS)
 
 d["info"]["description"] = (
-    "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.7, 25/09/2026). "
+    "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, nền tạm tới FW). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -58,7 +58,7 @@ TAGS = OrderedDict([
     ("Poles", "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."),
     ("Segments", "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."),
     ("Faults", "Sự cố — Contract §5.4. CHƯA HIỆN THỰC (BE-40, BE-19, BE-41)."),
-    ("WorkOrders", "Phiếu công việc — Contract §5.5. CHƯA HIỆN THỰC (BE-21..BE-24)."),
+    ("WorkOrders", "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."),
     ("IotSweeps", "IoT node, sweep, thumbnail — Contract §5.6. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."),
     ("Sync", "Đồng bộ offline — Contract §5.8. CHƯA HIỆN THỰC (BE-43)."),
 ])
@@ -121,7 +121,24 @@ SUMMARY = {
     ("post", "/api/v1/auth/web/refresh"): "Xoay vòng refresh token từ cookie; không body",
     ("post", "/api/v1/auth/web/logout"): "Thu hồi token trong cookie, luôn xoá cookie, luôn 204",
 }
+# BE-23 provisional operations, exported from controllers (WO-1…WO-11).
+for method, suffix, summary in [
+    ("get", "", "Danh sách việc trong phạm vi xã và người được giao"),
+    ("get", "/{id}", "Chi tiết việc và các hành động được phép"),
+    ("get", "/assignees", "Kỹ sư hiện trường đủ điều kiện trong xã"),
+    ("post", "", "Tạo inspection/repair; task_kind bắt buộc"),
+    ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
+    ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
+    ("post", "/{id}/start", "Người được giao bắt đầu việc"),
+    ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra"),
+    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault"),
+    ("post", "/{id}/return", "Quản lý trả việc để làm tiếp"),
+    ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),
+]:
+    SUMMARY[(method, "/api/v1/work-orders" + suffix)] = "[TẠM — WO-1…WO-11] " + summary
+
 SECTION = {
+    "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/auth/me": "§4.7",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",
@@ -393,42 +410,8 @@ S["CreatedFaultResponse"] = {"allOf": [{"$ref": "#/components/schemas/FaultItem"
                                          "properties": {"client_op_id": {"type": "string", "format": "uuid"}}}],
                              "description": "§5.4: item kèm client_op_id đã gửi lên."}
 
-S["WorkOrderItem"] = {"type": "object", "additionalProperties": False,
-    "description": "Contract §5.5 — hình dạng theo mock-work-orders.json.",
-    "required": ["work_order_id", "title", "fault_ids", "wo_status", "created_at"],
-    "properties": OrderedDict([
-        ("work_order_id", {"$ref": "#/components/schemas/WorkOrderId"}),
-        ("title", {"type": "string"}),
-        ("segment_id", {"type": "string", "nullable": True, "pattern": "^SEG-[0-9]{3,}$"}),
-        ("cluster_id", {"type": "string", "nullable": True, "pattern": "^CLS-[0-9]{3,}$"}),
-        ("fault_ids", {"type": "array", "items": {"$ref": "#/components/schemas/FaultId"}}),
-        ("wo_status", {"$ref": "#/components/schemas/WorkOrderStatus"}),
-        ("assigned_to", {"type": "string", "nullable": True, "pattern": "^USR-[0-9]{3,}$"}),
-        ("priority_score", {"type": "number", "format": "double", "nullable": True}),
-        ("created_at", {"type": "string", "format": "date-time"}),
-        ("due_date", {"type": "string", "format": "date", "nullable": True}),
-    ])}
-S["WorkOrderPagedResult"] = {"type": "object", "additionalProperties": False,
-    "required": ["page", "page_size", "total", "items"],
-    "properties": OrderedDict([
-        ("page", {"type": "integer", "format": "int32"}),
-        ("page_size", {"type": "integer", "format": "int32", "maximum": 200}),
-        ("total", {"type": "integer", "format": "int32"}),
-        ("items", {"type": "array", "items": {"$ref": "#/components/schemas/WorkOrderItem"}}),
-    ])}
-S["CreateWorkOrderRequest"] = {"type": "object", "additionalProperties": False, "required": ["title", "fault_ids"],
-    "properties": OrderedDict([
-        ("title", {"type": "string"}),
-        ("fault_ids", {"type": "array", "minItems": 1, "items": {"$ref": "#/components/schemas/FaultId"}}),
-        ("assigned_to", {"type": "string", "nullable": True}),
-        ("due_date", {"type": "string", "format": "date", "nullable": True}),
-    ])}
-S["PatchWorkOrderRequest"] = {"type": "object", "additionalProperties": False,
-    "description": "§5.5: đổi wo_status, gán người. Luồng wo_status: Open item O-3.",
-    "properties": OrderedDict([
-        ("wo_status", {"nullable": True, "allOf": [{"$ref": "#/components/schemas/WorkOrderStatus"}], "type": "string"}),
-        ("assigned_to", {"type": "string", "nullable": True}),
-    ])}
+# BE-23: work-order schemas now come from the live code. Do not replace their
+# task_kind, partial-PATCH semantics or detail shape with the old §5.5 placeholders.
 S["EvidenceUpload"] = {"type": "object", "required": ["file", "kind", "captured_at", "lat", "lng"],
     "properties": OrderedDict([
         ("file", {"type": "string", "format": "binary", "description": "JPEG, quyết bằng magic bytes FF D8 FF (BE-11)"}),
@@ -586,20 +569,7 @@ ni("post", "/api/v1/faults", "Faults", "Kỹ sư hiện trường báo sự cố
     ("400", err("LOCATION_REQUIRED | FAULT_TYPE_NOT_REPORTABLE | VALIDATION_FAILED")),
     ("404", err("POLE_NOT_FOUND"))],
    body={"$ref": "#/components/schemas/CreateFaultRequest"})
-ni("get", "/api/v1/work-orders", "WorkOrders", "Danh sách phiếu công việc (phân trang)", "§5.5", "BE-21",
-   [("200", {"description": "Trang phiếu", "content": json_content("WorkOrderPagedResult")})],
-   parameters=[p("wo_status", ENUM_CSV("wo_status")), p("assigned_to", {"type": "string"}),
-               p("segment_id", {"$ref": "#/components/schemas/SegmentId"})] + PAGE)
-ni("post", "/api/v1/work-orders", "WorkOrders", "Tạo phiếu công việc từ các sự cố", "§5.5", "BE-21",
-   [("201", {"description": "Phiếu đã tạo", "content": json_content("WorkOrderItem")}),
-    ("400", err("VALIDATION_FAILED"))],
-   body={"$ref": "#/components/schemas/CreateWorkOrderRequest"})
-ni("patch", "/api/v1/work-orders/{work_order_id}", "WorkOrders", "Đổi wo_status, gán người", "§5.5", "BE-22/BE-23",
-   [("200", {"description": "Phiếu sau khi đổi", "content": json_content("WorkOrderItem")}),
-    ("404", err("Không tồn tại hoặc ngoài phạm vi")),
-    ("409", err("Chuyển trạng thái sai luồng (luồng wo_status: Open item O-3)"))],
-   parameters=[p("work_order_id", {"$ref": "#/components/schemas/WorkOrderId"}, True, where="path")],
-   body={"$ref": "#/components/schemas/PatchWorkOrderRequest"})
+# BE-23 implements list/create/detail/assignment/actions. Evidence remains BE-24.
 ni("post", "/api/v1/work-orders/{work_order_id}/evidence", "WorkOrders", "Ảnh before/after cho phiếu (multipart)", "§5.5", "BE-24",
    [("201", {"description": "Đã lưu; hình dạng response chưa đặc tả"}),
     ("404", err("Không tồn tại hoặc ngoài phạm vi")),

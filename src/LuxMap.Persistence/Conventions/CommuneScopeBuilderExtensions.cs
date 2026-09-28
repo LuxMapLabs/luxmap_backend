@@ -46,6 +46,13 @@ public static class CommuneScopeBuilderExtensions
     /// </summary>
     internal static void ApplyCommuneScope(this ModelBuilder modelBuilder, LuxMapDbContext context)
     {
+        if (modelBuilder.Model.GetEntityTypes().Any(entity =>
+            entity.ClrType.IsAssignableTo(typeof(IAssigneeScoped))
+            && !entity.ClrType.IsAssignableTo(typeof(ICommuneScoped))))
+        {
+            throw new InvalidOperationException("IAssigneeScoped requires ICommuneScoped.");
+        }
+
         var scoped = modelBuilder.Model
             .GetEntityTypes()
             .Where(entity => entity.ClrType.IsAssignableTo(typeof(ICommuneScoped)))
@@ -91,8 +98,19 @@ public static class CommuneScopeBuilderExtensions
     private static void ApplyFilter<TEntity>(ModelBuilder modelBuilder, LuxMapDbContext context)
         where TEntity : class, ICommuneScoped
     {
-        modelBuilder.Entity<TEntity>().HasQueryFilter(candidate =>
-            context.CurrentCommuneScope.IsSystemWide
-            || context.CurrentCommuneScope.CommuneIds.Contains(candidate.CommuneId));
+        if (typeof(IAssigneeScoped).IsAssignableFrom(typeof(TEntity)))
+        {
+            modelBuilder.Entity<TEntity>().HasQueryFilter(candidate =>
+                (context.CurrentCommuneScope.IsSystemWide
+                 || context.CurrentCommuneScope.CommuneIds.Contains(candidate.CommuneId))
+                && (context.CurrentAssigneeRestriction == null
+                    || EF.Property<string?>(candidate, nameof(IAssigneeScoped.AssignedTo)) == context.CurrentAssigneeRestriction));
+        }
+        else
+        {
+            modelBuilder.Entity<TEntity>().HasQueryFilter(candidate =>
+                context.CurrentCommuneScope.IsSystemWide
+                || context.CurrentCommuneScope.CommuneIds.Contains(candidate.CommuneId));
+        }
     }
 }

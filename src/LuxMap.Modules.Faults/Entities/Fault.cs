@@ -13,16 +13,9 @@ namespace LuxMap.Modules.Faults.Entities;
 /// person still goes through the same review as one the engine found. Nobody creates an
 /// already-confirmed fault.
 /// <para>
-/// <b>The audit trail lives on this row</b>, not in a separate history table. Contract section 2.5
-/// lets an engineer change exactly three things — <c>fault_status</c>, <c>override_fault_type</c>,
-/// <c>note</c> — so the decisions worth recording are few and known. Columns for who confirmed and
-/// who resolved answer that directly. A general change-log table would be heavier than the problem
-/// and would still need a decision about what an "actor" is when the engine files the fault.
-/// </para>
-/// <para>
-/// ⚠️ That trades away one thing: this records the LATEST decision, not the sequence of them. A
-/// fault that went <c>detected → confirmed → rejected</c> keeps only the last state. If BE-19 needs
-/// the full sequence, <c>FaultHistory</c> is its to build — recorded in CLAUDE.md with BE-19 named.
+/// These columns record the latest decision only. D-R13 requires the full sequence in the
+/// shared append-only audit_event table (BE-23a), not a separate FaultHistory table.
+/// Work order propagation is audited in its single work order event; BE-19 owns direct decisions.
 /// </para>
 /// </remarks>
 public class Fault : ICommuneScoped
@@ -158,4 +151,6 @@ public class Fault : ICommuneScoped
     public string? DetectionModelVersion { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public uint Version { get; set; }
 }

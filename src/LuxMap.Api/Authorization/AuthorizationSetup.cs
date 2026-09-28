@@ -20,6 +20,7 @@ public static class AuthorizationSetup
 
         // Singleton — mandatory. See the note on CommuneScopeAccessor.
         services.AddSingleton<ICommuneScopeAccessor, CommuneScopeAccessor>();
+        services.AddSingleton<ICurrentActorAccessor, CurrentActorAccessor>();
         services.AddSingleton<IAuthorizationHandler, CommuneScopeConsistencyHandler>();
 
         // Records WHY a request was forbidden, so the BE-04 status-code page can tell a refused role

@@ -55,6 +55,9 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
     {
         builder.ToTable("fault");
         builder.HasKey(fault => fault.FaultId);
+        builder.HasAlternateKey(fault => new { fault.FaultId, fault.CommuneId });
+        builder.Property(fault => fault.Version).IsRowVersion();
+        builder.HasIndex(fault => fault.CommuneId);
 
         builder.Property(fault => fault.FaultId).HasPrefixedId(PrefixedIds.Fault);
 

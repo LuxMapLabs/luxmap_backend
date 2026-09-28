@@ -49,6 +49,10 @@ public static class LuxMapPolicies
     /// <summary>Create accounts and assign roles and communes. No endpoint yet (BE-33).</summary>
     public const string ManageUsers = "cap:manage_users";
 
+    public const string ReadWorkOrders = "cap:read_work_orders";
+    public const string ManageWorkOrders = "cap:manage_work_orders";
+    public const string ExecuteWorkOrders = "cap:execute_work_orders";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -59,5 +63,8 @@ public static class LuxMapPolicies
             [RecordLuxReading] = [UserRole.FieldEngineer],
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],
+            [ReadWorkOrders] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
+            [ManageWorkOrders] = [UserRole.Manager],
+            [ExecuteWorkOrders] = [UserRole.FieldEngineer],
         };
 }
