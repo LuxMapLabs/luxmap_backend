@@ -2,6 +2,8 @@ using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Map.Bbox;
+using LuxMap.Modules.Telemetry;
+using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -34,7 +36,7 @@ namespace LuxMap.Modules.Map.Features;
 /// survives — never the other way round.
 /// </para>
 /// </remarks>
-public sealed class MapQueryService(LuxMapDbContext dbContext)
+public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, TimeProvider clock)
 {
     /// <summary>Past this many poles the client is told to zoom in rather than served (section 5.1).</summary>
     public const int MaxPoles = 2000;
@@ -185,6 +187,20 @@ public sealed class MapQueryService(LuxMapDbContext dbContext)
                     .Any(fault => fault.SegmentId == segment.SegmentId
                         && fault.FaultType == FaultType.SegmentOutage
                         && OpenFaultStatuses.Contains(fault.FaultStatus)),
+
+                // I-7b: derived on read through segment → pole → feeder → feeder_control → device.
+                // The commune filter applies to every set here, so a device of another commune
+                // never appears even on an inter_commune road.
+                ControllerNodeIds = dbContext.Set<IotNode>()
+                    .Where(node => dbContext.Set<FeederControl>().Any(control =>
+                        control.NodeId == node.NodeId
+                        && dbContext.Set<Pole>().Any(pole =>
+                            pole.SegmentId == segment.SegmentId && pole.FeederId == control.FeederId)))
+                    .OrderBy(node => node.CreatedAt)
+                    .ThenBy(node => node.NodeId.Length)
+                    .ThenBy(node => node.NodeId)
+                    .Select(node => node.NodeId)
+                    .ToList(),
             })
             .ToListAsync(ct);
 
@@ -201,8 +217,86 @@ public sealed class MapQueryService(LuxMapDbContext dbContext)
                     RoadClass = row.RoadClass,
                     LengthM = row.LengthM,
                     PoleCount = row.PoleCount,
-                    ControllerNodeId = null,
+                    ControllerNodeIds = row.ControllerNodeIds,
                     HasActiveSegmentFault = row.HasActiveSegmentFault,
+                },
+            })],
+        };
+    }
+
+    /// <summary>
+    /// IoT devices inside a bounding box (BE-14b), as a <c>FeatureCollection</c> of points.
+    /// </summary>
+    /// <remarks>
+    /// No size limit, like segments: a commune has a handful of cabinets. Features come in id order
+    /// (<c>created_at, length(id), id</c> — never the bare id, see CLAUDE.md section 0).
+    /// </remarks>
+    public async Task<FeatureCollection<IotNodeProperties>> IotNodesAsync(
+        IotNodeMapQuery query, CancellationToken ct)
+    {
+        var envelope = Envelope(query.Bbox);
+
+        // ⚠️ Intersects(envelope) on the raw 4326 column — the form that reaches ix_iot_node_geom.
+        var nodes = dbContext.Set<IotNode>().AsNoTracking()
+            .Where(node => node.Geom.Intersects(envelope));
+
+        nodes = WithDataSource(nodes, query.DataSource, node => node.DataSource);
+
+        if (query.CommuneIds is { Count: > 0 } communes)
+        {
+            nodes = nodes.Where(node => communes.Contains(node.CommuneId));
+        }
+
+        var rows = await nodes
+            .OrderBy(node => node.CreatedAt)
+            .ThenBy(node => node.NodeId.Length)
+            .ThenBy(node => node.NodeId)
+            .Select(node => new
+            {
+                node.NodeId,
+                node.NodeRole,
+                node.Geom,
+                node.SupportsRemoteControl,
+                node.LastReportAt,
+
+                FeederIds = dbContext.Set<FeederControl>()
+                    .Where(control => control.NodeId == node.NodeId)
+                    .OrderBy(control => control.RelayNo)
+                    .Select(control => control.FeederId)
+                    .ToList(),
+
+                SegmentIds = dbContext.Set<RoadSegment>()
+                    .Where(segment => dbContext.Set<Pole>().Any(pole =>
+                        pole.SegmentId == segment.SegmentId
+                        && dbContext.Set<FeederControl>().Any(control =>
+                            control.NodeId == node.NodeId && control.FeederId == pole.FeederId)))
+                    .OrderBy(segment => segment.CreatedAt)
+                    .ThenBy(segment => segment.SegmentId.Length)
+                    .ThenBy(segment => segment.SegmentId)
+                    .Select(segment => segment.SegmentId)
+                    .ToList(),
+            })
+            .ToListAsync(ct);
+
+        // One clock reading for the whole response, so two devices with the same last report can
+        // never straddle the threshold within one answer.
+        var now = clock.GetUtcNow().UtcDateTime;
+
+        return new FeatureCollection<IotNodeProperties>
+        {
+            Features = [.. rows.Select(row => new Feature<IotNodeProperties>
+            {
+                Geometry = GeoJsonGeometry.Point(row.Geom.X, row.Geom.Y),
+                Properties = new IotNodeProperties
+                {
+                    NodeId = row.NodeId,
+                    NodeRole = row.NodeRole,
+                    NodeStatus = iot.StatusAt(row.LastReportAt, now),
+                    PoleId = null,
+                    SegmentIds = row.SegmentIds,
+                    FeederIds = row.FeederIds,
+                    SupportsRemoteControl = row.SupportsRemoteControl,
+                    LastReportAt = row.LastReportAt,
                 },
             })],
         };

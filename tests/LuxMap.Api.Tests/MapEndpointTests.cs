@@ -383,11 +383,16 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
         string[] expected =
         [
             "segment_id", "segment_name", "road_class", "length_m", "pole_count",
-            "controller_node_id", "has_active_segment_fault",
+            "controller_node_ids", "has_active_segment_fault",
         ];
 
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], [.. keys.Order(StringComparer.Ordinal)]);
         Assert.Equal(1, feature.GetProperty("properties").GetProperty("pole_count").GetInt32());
+
+        // I-7b: a list, and EMPTY — not null — when no device switches the segment.
+        var controllers = feature.GetProperty("properties").GetProperty("controller_node_ids");
+        Assert.Equal(JsonValueKind.Array, controllers.ValueKind);
+        Assert.Equal(0, controllers.GetArrayLength());
     }
 
     /// <summary>

@@ -100,6 +100,9 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
             }
 
             await ExecuteAsync(db, "DELETE FROM pole WHERE commune_id = @commune;", ("commune", CommuneId));
+            // BE-14b: feeder_control holds feeder and iot_node with RESTRICT, so it goes first.
+            await ExecuteAsync(db, "DELETE FROM feeder_control WHERE commune_id = @commune;", ("commune", CommuneId));
+            await ExecuteAsync(db, "DELETE FROM iot_node WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM feeder WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM road_segment WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM administrative_unit WHERE commune_id = @commune;", ("commune", CommuneId));

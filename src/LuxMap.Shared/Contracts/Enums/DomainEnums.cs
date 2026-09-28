@@ -106,11 +106,16 @@ public enum WorkOrderStatus
     Cancelled,
 }
 
-/// <summary>node_role : segment_controller | sampled_fixture</summary>
+/// <summary>node_role : segment_controller</summary>
+/// <remarks>
+/// <c>sampled_fixture</c> REMOVED (drift "BE-14 / IoT", I-1, 28/09/2026): the project installs no
+/// device on individual poles, only one per main cabinet. The remaining name is kept although the
+/// device switches feeders rather than a segment (I-7), so the front end does not change. Same
+/// reasoning as <see cref="PowerSource"/> in v1.6: a value nothing produces is removed, not left.
+/// </remarks>
 public enum NodeRole
 {
     SegmentController,
-    SampledFixture,
 }
 
 /// <summary>node_status : online | offline | never_reported</summary>

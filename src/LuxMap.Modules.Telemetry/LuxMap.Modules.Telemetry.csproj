@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <!-- feeder_control points at feeder (I-12). Assets never references Telemetry, so no cycle. -->
+    <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

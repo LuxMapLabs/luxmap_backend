@@ -2944,6 +2944,108 @@
         ]
       }
     },
+    "/api/v1/iot-nodes": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotNodePropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotNodePropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotNodePropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ]
+      }
+    },
     "/api/v1/auth/web/login": {
       "post": {
         "tags": [
@@ -4503,6 +4605,97 @@
         ],
         "type": "string"
       },
+      "IotNodeProperties": {
+        "required": [
+          "feeder_ids",
+          "node_id",
+          "node_role",
+          "node_status",
+          "segment_ids",
+          "supports_remote_control"
+        ],
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_role": {
+            "$ref": "#/components/schemas/NodeRole"
+          },
+          "node_status": {
+            "$ref": "#/components/schemas/NodeStatus"
+          },
+          "pole_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "feeder_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supports_remote_control": {
+            "type": "boolean"
+          },
+          "last_report_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotNodePropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/IotNodeProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotNodePropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IotNodePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "LoginRequest": {
         "required": [
           "password",
@@ -4678,11 +4871,9 @@
       },
       "NodeRole": {
         "enum": [
-          "segment_controller",
-          "sampled_fixture"
+          "segment_controller"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — node_role. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "NodeStatus": {
         "enum": [
@@ -4690,8 +4881,7 @@
           "offline",
           "never_reported"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — node_status. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "PageQuery": {
         "type": "object",
@@ -5159,6 +5349,7 @@
       },
       "SegmentProperties": {
         "required": [
+          "controller_node_ids",
           "has_active_segment_fault",
           "length_m",
           "pole_count",
@@ -5185,9 +5376,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "controller_node_id": {
-            "type": "string",
-            "nullable": true
+          "controller_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "has_active_segment_fault": {
             "type": "boolean"

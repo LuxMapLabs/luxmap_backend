@@ -19,14 +19,20 @@ not. Sequences are pushed past the seeded range at the end so later inserts cann
 
 WHAT IT DOES NOT SEED, and why:
 
-  feeder_id          The mock set carries no circuit at all, so all 103 poles land with feeder_id
-                     NULL. Open item O-6. This blocks BE-13 and CV-15, which cluster along the
-                     ELECTRICAL circuit — inventing values here would hide that.
+  feeder_id          The mock set carries no real circuit (open item O-6). Since BE-14b the script
+                     creates ONE TEMPORARY DEMO feeder per segment (FDR-001..003, external_ref
+                     DEMO-SEG-00n) and hangs every pole on its segment's feeder, so the cabinet
+                     devices have lamps to reach (decision I-11, 28/09/2026). This is NOT circuit
+                     data: CV-15 must not treat it as topology, and O-6 replaces it.
   pole_current_status  Its writes belong to BE-15/BE-17 (CLAUDE.md). The mock does carry
                      fixture_status, status_confidence, last_seen_at and last_sweep_id, so this is a
                      deliberate omission rather than a missing feature.
-  iot_node, survey_sweep, survey_frame, luminance_history
+  survey_sweep, survey_frame, luminance_history
                      Those tables do not exist yet.
+  iot_node           Seeded from mock-iot-nodes.geojson — the three cabinet devices, each switching
+                     its segment's demo feeder on relay 1. data_source = simulated (demo rows, not
+                     testbed hardware), supports_remote_control = false. The testbed's own device
+                     (two feeders, odd/even lamps) is seeded later, once the rig has coordinates.
   Work orders are linked through work_order_fault (BE-23), with kinds in the companion CSV.
   Their audit history starts empty; existing work order audit prevents re-seeding.
 
@@ -77,6 +83,16 @@ def statements() -> list[str]:
     poles = load("mock-poles.geojson")["features"]
     segments = load("mock-segments.geojson")["features"]
     faults = load("mock-faults.json")["items"]
+    nodes = load("mock-iot-nodes.geojson")["features"]
+
+    # One temporary demo feeder per segment, in segment-id order: FDR-001 for SEG-001, and so on.
+    segment_ids = sorted(f["properties"]["segment_id"] for f in segments)
+    demo_feeder = {sid: f"FDR-{i:03d}" for i, sid in enumerate(segment_ids, start=1)}
+    for node in nodes:
+        p = node["properties"]
+        wanted = [demo_feeder[sid] for sid in p["segment_ids"]]
+        if p["node_role"] != "segment_controller" or p["feeder_ids"] != wanted:
+            raise SystemExit(f"{p['node_id']} does not match the demo wiring {wanted}.")
 
     orders = load("mock-work-orders.json")["items"]
     with (MOCKS / "mock-work-order-kinds.csv").open(encoding="utf-8", newline="") as file:
@@ -108,8 +124,10 @@ DO $$ BEGIN
 END $$;""".strip())
 
     # Foreign-key order: fault before the rows it points at, fixture before pole.
+    # feeder_control holds both feeder and iot_node; feeder is freed only once no pole points at it.
     sql.append("DELETE FROM work_order_fault; DELETE FROM work_order; DELETE FROM fault; DELETE FROM fault_cluster; "
-               "DELETE FROM fixture; DELETE FROM pole; DELETE FROM road_segment;")
+               "DELETE FROM feeder_control; DELETE FROM iot_node; "
+               "DELETE FROM fixture; DELETE FROM pole; DELETE FROM feeder; DELETE FROM road_segment;")
 
     for feature in segments:
         p = feature["properties"]
@@ -122,12 +140,18 @@ END $$;""".strip())
             # settled position, since Branch C runs no field survey and none is ever coming.
             f"{quote(p['segment_id'])});")
 
+    for sid in segment_ids:
+        sql.append(
+            "INSERT INTO feeder (feeder_id, feeder_name, commune_id, geom, external_ref) VALUES ("
+            f"{quote(demo_feeder[sid])}, {quote(f'Mạch tạm {sid} (demo, chờ O-6)')}, {COMMUNE}, NULL, "
+            f"{quote(f'DEMO-{sid}')});")
+
     for feature in poles:
         p = feature["properties"]
         sql.append(
             "INSERT INTO pole (pole_id, segment_id, feeder_id, commune_id, geom, "
             "near_sensitive_poi, data_source, external_ref) VALUES ("
-            f"{quote(p['pole_id'])}, {quote(p['segment_id'])}, NULL, {COMMUNE}, "
+            f"{quote(p['pole_id'])}, {quote(p['segment_id'])}, {quote(demo_feeder[p['segment_id']])}, {COMMUNE}, "
             f"{geometry(feature['geometry'])}, {str(p['near_sensitive_poi']).lower()}, "
             f"{DATA_SOURCE}, {quote(p['pole_id'])});")
 
@@ -184,6 +208,18 @@ END $$;""".strip())
             # account — it would appear in every listing of who reports faults.
             f"{quote(f['reported_by'])}, NULL, NULL, NULL, NULL, NULL);")
 
+    for node in nodes:
+        p = node["properties"]
+        sql.append(
+            "INSERT INTO iot_node (node_id, commune_id, node_role, geom, supports_remote_control, "
+            "data_source, last_report_at) VALUES ("
+            f"{quote(p['node_id'])}, {COMMUNE}, {quote(p['node_role'])}, {geometry(node['geometry'])}, "
+            f"{str(p['supports_remote_control']).lower()}, 'simulated', {quote(p['last_report_at'])});")
+        for relay, feeder_id in enumerate(p["feeder_ids"], start=1):
+            sql.append(
+                "INSERT INTO feeder_control (feeder_id, node_id, commune_id, relay_no) VALUES ("
+                f"{quote(feeder_id)}, {quote(p['node_id'])}, {COMMUNE}, {relay});")
+
     for wo in orders:
         assigned = "(SELECT user_id FROM app_user WHERE username = 'crew')" if wo["assigned_to"] else "NULL"
         created = quote(wo["created_at"])
@@ -202,6 +238,8 @@ END $$;""".strip())
     # numeric tail back out of the ids keeps this correct however many rows the mock grows to.
     for sequence, column, table, prefix in [
         ("work_order_id_seq", "work_order_id", "work_order", 4),
+        ("feeder_id_seq", "feeder_id", "feeder", 5),
+        ("node_id_seq", "node_id", "iot_node", 6),
         ("segment_id_seq", "segment_id", "road_segment", 5),
         ("pole_id_seq", "pole_id", "pole", 6),
         ("fixture_id_seq", "fixture_id", "fixture", 5),

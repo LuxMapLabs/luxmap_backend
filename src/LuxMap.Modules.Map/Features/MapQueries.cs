@@ -26,6 +26,17 @@ public sealed record PoleMapQuery
     public IReadOnlyList<DataSource>? DataSource { get; init; }
 }
 
+/// <summary>What <c>GET /iot-nodes</c> was asked for.</summary>
+public sealed record IotNodeMapQuery
+{
+    public required BoundingBox Bbox { get; init; }
+
+    public IReadOnlyList<string>? CommuneIds { get; init; }
+
+    /// <summary><c>null</c> means the default of section 1.6: everything EXCEPT <c>calibration_rig</c>.</summary>
+    public IReadOnlyList<DataSource>? DataSource { get; init; }
+}
+
 /// <summary>What <c>GET /segments</c> was asked for.</summary>
 public sealed record SegmentMapQuery
 {

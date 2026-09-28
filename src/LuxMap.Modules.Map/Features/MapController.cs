@@ -105,6 +105,32 @@ public sealed class MapController(
             },
             ct));
 
+    /// <summary>IoT devices inside a bounding box, as a <c>FeatureCollection</c> of points (BE-14b).</summary>
+    /// <remarks>
+    /// Shape per drift "BE-14 / IoT" rather than Contract section 5.6: no <c>battery_pct</c>,
+    /// <c>segment_ids</c> and <c>feeder_ids</c> as derived lists, <c>pole_id</c> always null.
+    /// <c>data_source</c> follows the same default as poles and segments — the testbed
+    /// (<c>calibration_rig</c>) is shown only when asked for by name.
+    /// </remarks>
+    [HttpGet("iot-nodes")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<FeatureCollection<IotNodeProperties>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<FeatureCollection<IotNodeProperties>>> IotNodesAsync(
+        [FromQuery] string? bbox,
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "data_source")] string? dataSource,
+        CancellationToken ct)
+        => Ok(await service.IotNodesAsync(
+            new IotNodeMapQuery
+            {
+                Bbox = BoundingBox.Parse(bbox),
+                CommuneIds = CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
+                DataSource = CsvEnum<DataSource>(dataSource, "data_source"),
+            },
+            ct));
+
     /// <summary>
     /// Reads a comma-separated enum list in the WIRE spelling, refusing an unknown member by name.
     /// </summary>
