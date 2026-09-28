@@ -216,7 +216,7 @@ road_class     : inter_commune | inter_village
 Ràng buộc nghiệp vụ đi kèm:
 
 - **`unknown` không phải lỗi** — nghĩa là sweep gần nhất không phủ được cột đó. Có ký hiệu riêng ở FE, **không gộp vào `out`** ở bất kỳ thống kê nào (BE-28).
-> ⚠️ **Mô hình IoT đã đổi (28/09/2026, `docs/contract-drift.md` → "BE-14 / IoT").** Chỉ có thiết bị ở **tủ điện tổng**, gắn **mạch** (`feeder_id`), trên testbed (`calibration_rig`); **không** IoT trên từng cột, **không** `battery_pct`. Contract và mock **chưa** cập nhật (I-7…I-11 còn mở) — ticket IoT đừng dựng `sampled_fixture` hay chuỗi `NODE-047` theo mock cũ.
+> ⚠️ **Mô hình IoT đã đổi (28/09/2026, `docs/contract-drift.md` → "BE-14 / IoT").** Chỉ có thiết bị ở **tủ điện tổng**, gắn **mạch** (`feeder_id`), trên testbed (`calibration_rig`); **không** IoT trên từng cột, **không** `battery_pct`. Contract và mock **chưa** cập nhật (I-7…I-11 còn mở) — ticket IoT đừng dựng `sampled_fixture` hay chuỗi `NODE-047` theo mock cũ. `controller_node_id` của `/segments` sẽ thành **`controller_node_ids[]` tính lúc đọc** (I-7b); điều khiển đi qua **rơ-le gộp vào feeder** (I-12).
 
 - `runtime_decline` **chỉ** đến từ IoT. `lamp_dim` và `lamp_out` **chỉ** đến từ CV (v1.4: `lamp_dim` do CV **và** cảm biến BH1750 cùng quyết — `source_channel` giữ `cv`? **D-R20, chờ quyết**). Một cột có thể mang **cả hai cùng lúc** — mô hình dữ liệu phải cho phép.
 - Luồng `fault_status` hợp lệ: `detected → confirmed | rejected`, rồi `confirmed → in_progress → resolved → verified`. Chuyển sai luồng → **409** để FE disable nút trước, không để user bấm rồi mới lỗi (BE-19).
