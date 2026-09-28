@@ -1,0 +1,4 @@
+work_order_id,task_kind
+WO-0001,inspection
+WO-0002,repair
+WO-0003,inspection

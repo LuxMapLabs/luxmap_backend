@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\src\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+    <ProjectReference Include="..\..\src\LuxMap.Modules.WorkOrders\LuxMap.Modules.WorkOrders.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
   </ItemGroup>
 

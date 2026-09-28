@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Bản hợp nhất khớp 1-1 với docs/api-contract-v1.1.md (Contract v1.7, 25/09/2026). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 35 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 46 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
     "version": "1.7"
   },
   "paths": {
@@ -3690,6 +3690,934 @@
         "x-luxmap-contract": "§4.2"
       }
     },
+    "/api/v1/work-orders": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "wo_status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "task_kind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assigned_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "scheduled_from",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "scheduled_to",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderItemPagedResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Danh sách việc trong phạm vi xã và người được giao",
+        "operationId": "getWorkOrders",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      },
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Tạo inspection/repair; task_kind bắt buộc",
+        "operationId": "postWorkOrders",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Chi tiết việc và các hành động được phép",
+        "operationId": "getWorkOrdersId",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      },
+      "patch": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày",
+        "operationId": "patchWorkOrdersId",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/assignees": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAssigneePagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAssigneePagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAssigneePagedResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Kỹ sư hiện trường đủ điều kiện trong xã",
+        "operationId": "getWorkOrdersAssignees",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/assignee": {
+      "put": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Giao, giao lại hoặc gỡ người được giao",
+        "operationId": "putWorkOrdersIdAssignee",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/start": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:execute_work_orders",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Người được giao bắt đầu việc",
+        "operationId": "postWorkOrdersIdStart",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/complete": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:execute_work_orders",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Người được giao nộp báo cáo và kết quả kiểm tra",
+        "operationId": "postWorkOrdersIdComplete",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/verify": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Quản lý nghiệm thu và giải phóng liên kết fault",
+        "operationId": "postWorkOrdersIdVerify",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/return": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Quản lý trả việc để làm tiếp",
+        "operationId": "postWorkOrdersIdReturn",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/cancel": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] Quản lý huỷ và giải phóng liên kết fault",
+        "operationId": "postWorkOrdersIdCancel",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
     "/api/v1/poles/{pole_id}": {
       "get": {
         "tags": [
@@ -4041,220 +4969,6 @@
           },
           "409": {
             "description": "Chuyển trạng thái sai luồng: detected→confirmed|rejected; confirmed→in_progress→resolved→verified",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/work-orders": {
-      "get": {
-        "tags": [
-          "WorkOrders"
-        ],
-        "summary": "[NOT IMPLEMENTED] Danh sách phiếu công việc (phân trang)",
-        "description": "Contract §5.5. Chưa có code — ticket BE-21. Giữ trong Contract, không xoá.",
-        "operationId": "getWorkOrders",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§5.5",
-        "x-luxmap-ticket": "BE-21",
-        "parameters": [
-          {
-            "name": "wo_status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "description": "CSV của wo_status"
-            }
-          },
-          {
-            "name": "assigned_to",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "segment_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/SegmentId"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            },
-            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (Contract §1.3)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Trang phiếu",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkOrderPagedResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "WorkOrders"
-        ],
-        "summary": "[NOT IMPLEMENTED] Tạo phiếu công việc từ các sự cố",
-        "description": "Contract §5.5. Chưa có code — ticket BE-21. Giữ trong Contract, không xoá.",
-        "operationId": "postWorkOrders",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§5.5",
-        "x-luxmap-ticket": "BE-21",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateWorkOrderRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Phiếu đã tạo",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkOrderItem"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "VALIDATION_FAILED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/work-orders/{work_order_id}": {
-      "patch": {
-        "tags": [
-          "WorkOrders"
-        ],
-        "summary": "[NOT IMPLEMENTED] Đổi wo_status, gán người",
-        "description": "Contract §5.5. Chưa có code — ticket BE-22/BE-23. Giữ trong Contract, không xoá.",
-        "operationId": "patchWorkOrdersWorkOrderId",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§5.5",
-        "x-luxmap-ticket": "BE-22/BE-23",
-        "parameters": [
-          {
-            "name": "work_order_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkOrderId"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PatchWorkOrderRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Phiếu sau khi đổi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/WorkOrderItem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Không tồn tại hoặc ngoài phạm vi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Chuyển trạng thái sai luồng (luồng wo_status: Open item O-3)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4726,6 +5440,19 @@
         },
         "additionalProperties": false
       },
+      "AssignWorkOrderRequest": {
+        "required": [
+          "assigned_to"
+        ],
+        "type": "object",
+        "properties": {
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "AuthTokenResponse": {
         "type": "object",
         "properties": {
@@ -4741,6 +5468,26 @@
           "expires_in": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompleteWorkOrderRequest": {
+        "required": [
+          "report_note"
+        ],
+        "type": "object",
+        "properties": {
+          "report_note": {
+            "minLength": 10,
+            "type": "string"
+          },
+          "fault_outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FaultOutcomeRequest"
+            },
+            "description": "Required exactly once per linked fault for inspection; forbidden for repair or segment-only inspection."
           }
         },
         "additionalProperties": false
@@ -4967,6 +5714,56 @@
         },
         "additionalProperties": false
       },
+      "CreateWorkOrderRequest": {
+        "required": [
+          "task_kind",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "WO-5 (provisional): repair requires fault_ids; inspection requires fault_ids OR segment_id. Server-owned fields are rejected."
+      },
       "CurrentUserResponse": {
         "type": "object",
         "properties": {
@@ -5003,6 +5800,18 @@
         ],
         "type": "string"
       },
+      "FaultOutcomeRequest": {
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/InspectionOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
       "FaultStatus": {
         "enum": [
           "detected",
@@ -5012,8 +5821,7 @@
           "resolved",
           "verified"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — fault_status. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "FaultType": {
         "enum": [
@@ -5023,8 +5831,7 @@
           "node_offline",
           "runtime_decline"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — fault_type. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "FeederDetail": {
         "required": [
@@ -5187,6 +5994,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "InspectionOutcome": {
+        "enum": [
+          "fault_present",
+          "fault_absent",
+          "inconclusive"
+        ],
+        "type": "string"
       },
       "LoginRequest": {
         "required": [
@@ -5389,6 +6204,29 @@
           "page_size": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PatchWorkOrderRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Absent preserves; null clears.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Absent preserves; null clears.",
+            "format": "date",
             "nullable": true
           }
         },
@@ -5768,6 +6606,16 @@
         },
         "additionalProperties": false
       },
+      "ReviewWorkOrderRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RoadClass": {
         "enum": [
           "inter_commune",
@@ -5973,8 +6821,7 @@
           "high",
           "critical"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — severity. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "SourceChannel": {
         "enum": [
@@ -5984,6 +6831,13 @@
         ],
         "type": "string",
         "description": "Contract v1.1 section 1 — source_channel. Frozen: do not add values, do not rename, do not use int."
+      },
+      "TaskKind": {
+        "enum": [
+          "inspection",
+          "repair"
+        ],
+        "type": "string"
       },
       "TopologyPole": {
         "required": [
@@ -6176,6 +7030,314 @@
         },
         "additionalProperties": false
       },
+      "WorkOrderAssignee": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "full_name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderAssigneePagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderAssignee"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderDetail": {
+        "required": [
+          "allowed_actions",
+          "commune_id",
+          "created_by",
+          "fault_ids",
+          "faults",
+          "title",
+          "work_order_id"
+        ],
+        "type": "object",
+        "properties": {
+          "work_order_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cluster_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wo_status": {
+            "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority_score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "review_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "report_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "assigned_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assignee_eligible": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "allowed_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "faults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderFaultDetail"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderFaultDetail": {
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "pole_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "$ref": "#/components/schemas/WorkOrderLocation"
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "fault_status": {
+            "$ref": "#/components/schemas/FaultStatus"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "inspection_outcome": {
+            "$ref": "#/components/schemas/InspectionOutcome"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderItem": {
+        "required": [
+          "commune_id",
+          "fault_ids",
+          "title",
+          "work_order_id"
+        ],
+        "type": "object",
+        "properties": {
+          "work_order_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cluster_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wo_status": {
+            "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority_score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderLocation": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkOrderStatus": {
         "enum": [
           "open",
@@ -6185,8 +7347,7 @@
           "verified",
           "cancelled"
         ],
-        "type": "string",
-        "description": "Contract v1.1 section 1 — work_order_status. Frozen: do not add values, do not rename, do not use int."
+        "type": "string"
       },
       "PoleId": {
         "type": "string",
@@ -6883,144 +8044,6 @@
         ],
         "description": "§5.4: item kèm client_op_id đã gửi lên."
       },
-      "WorkOrderItem": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Contract §5.5 — hình dạng theo mock-work-orders.json.",
-        "required": [
-          "work_order_id",
-          "title",
-          "fault_ids",
-          "wo_status",
-          "created_at"
-        ],
-        "properties": {
-          "work_order_id": {
-            "$ref": "#/components/schemas/WorkOrderId"
-          },
-          "title": {
-            "type": "string"
-          },
-          "segment_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^SEG-[0-9]{3,}$"
-          },
-          "cluster_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^CLS-[0-9]{3,}$"
-          },
-          "fault_ids": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FaultId"
-            }
-          },
-          "wo_status": {
-            "$ref": "#/components/schemas/WorkOrderStatus"
-          },
-          "assigned_to": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^USR-[0-9]{3,}$"
-          },
-          "priority_score": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "due_date": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          }
-        }
-      },
-      "WorkOrderPagedResult": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "page",
-          "page_size",
-          "total",
-          "items"
-        ],
-        "properties": {
-          "page": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "page_size": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 200
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/WorkOrderItem"
-            }
-          }
-        }
-      },
-      "CreateWorkOrderRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "title",
-          "fault_ids"
-        ],
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "fault_ids": {
-            "type": "array",
-            "minItems": 1,
-            "items": {
-              "$ref": "#/components/schemas/FaultId"
-            }
-          },
-          "assigned_to": {
-            "type": "string",
-            "nullable": true
-          },
-          "due_date": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          }
-        }
-      },
-      "PatchWorkOrderRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "§5.5: đổi wo_status, gán người. Luồng wo_status: Open item O-3.",
-        "properties": {
-          "wo_status": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/WorkOrderStatus"
-              }
-            ],
-            "type": "string"
-          },
-          "assigned_to": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
       "EvidenceUpload": {
         "type": "object",
         "required": [
@@ -7362,7 +8385,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -7414,7 +8437,7 @@
     },
     {
       "name": "WorkOrders",
-      "description": "Phiếu công việc — Contract §5.5. CHƯA HIỆN THỰC (BE-21..BE-24)."
+      "description": "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."
     },
     {
       "name": "IotSweeps",

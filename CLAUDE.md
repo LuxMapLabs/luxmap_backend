@@ -1491,3 +1491,26 @@ rồi DELETE với WHERE theo dữ liệu của test. Không đặt ở mức se
 FK actor và commune đều RESTRICT: muốn dọn tài khoản/xã test phải dọn audit của test trước.
 Rollback migration xoá bảng audit và mất dữ liệu audit; vòng apply/rollback/reapply chỉ chạy
 trên DB test, khi bảng audit trống.
+
+### BE-23 — xmin, tên partial index và quyền người được giao (28/09/2026)
+
+`IsRowVersion()` trên uint dùng cột hệ thống xmin. **EF vẫn sinh AddColumn xmin trên fault và
+DropColumn trong Down**, dù Npgsql xử lý đặc biệt lúc sinh SQL: đọc migration và bỏ thao tác
+cột vật lý, giữ mapping trong model/Designer/snapshot. Không tạo một cột xmin riêng.
+
+`HasIndex(..., "tên")` đặt tên model index, **chưa bảo đảm tên DB** khi convention snake_case
+chạy. Đã sinh `ix_work_order_fault_fault_id1` thay vì `ux_work_order_fault_fault_id_active`;
+phải thêm `HasDatabaseName` vì service nhận diện 23505 bằng tên constraint thật.
+
+WorkOrder gộp IAssigneeScoped vào cùng lambda commune, tham chiếu DbContext. WorkOrderFault
+chỉ scope commune; BE-24/BE-43 phải lookup WO cha trước. Sau concurrency cũng lookup lại có
+filter: reassign vừa xảy ra có thể biến WO thành 404 với người được giao cũ.
+
+Fault.CommuneId nay là alternate-key property để FK bảng nối bảo đảm cùng xã; giống Feeder,
+EF không cho đổi commune trên entity đã track. Fault không chuyển xã.
+
+**Timestamp app sinh rồi trả thẳng từ entity đang track phải cắt về micro giây trước khi lưu.**
+Dùng `UtcMicrosecondClock.UtcNow()` (Shared), giữ cùng một `now` cho entity, fault và audit.
+PostgreSQL `timestamptz` chỉ lưu µs; `DateTime.UtcNow` trên Linux có tick 100 ns nên response
+có thể khác DB dù local macOS (đồng hồ µs) xanh. PR #54 đã lộ sai lệch completed_at/resolved_at.
+Test phải cấp thời gian cố định có tick lẻ dưới µs qua TimeProvider, không chỉ thử đồng hồ thật.

@@ -401,3 +401,85 @@ Phần work order và đổi mock **chưa hiện thực**, đợi BE-23a merge t
 **Phải báo WP5/WP6:** WO-0001/WO-0003 chuyển thành inspection, có `task_kind`, giữ fault detected
 cho kiểm tra; không coi đây là repair hợp lệ. Việc thông báo chưa thực hiện; không suy ra họ đã nhận
 thay đổi chỉ từ việc ghi log này. Các drift bề mặt API còn lại đăng ký khi triển khai BE-23.
+
+## BE-23 — work orders (28/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực inspection/repair, bảng nối giữ lịch sử, capability, giới hạn người được giao, máy trạng thái và audit theo D2–D11; D3 phương án B |
+| **Decision maker** | **Mỹ chốt bổ sung 27/09/2026 + thiết kế Claude theo uỷ quyền người dùng 27/09/2026**; D-WO-P2-01 được Claude giải theo lệnh Mỹ 28/09/2026 |
+| **Date** | 28/09/2026 |
+| **Scope** | BE-23; Contract §1.4, §2, §3.1–3.3, §5.4–5.5. Không sửa Contract trong ticket này. Mọi mục chạm API là **nền tạm tới FW kế tiếp xác nhận**; im lặng là ESCALATE, không phải approve |
+
+| Mã | Deviation / quyết định áp dụng | Chạm API |
+|---|---|---|
+| WO-1 | `ReadWorkOrders` = cả bốn vai trò; `ManageWorkOrders` = manager; `ExecuteWorkOrders` = field_engineer. FE chỉ thấy WO được giao cho mình **và** trong xã; WO không thấy → 404 `WORK_ORDER_NOT_FOUND`. `assigned_to=me` hỗ trợ mọi vai trò; FE lọc người khác → trang rỗng. System Admin chỉ đọc | Có |
+| WO-2 | Máy trạng thái bên dưới đóng O-3 trên nền tạm. Chỉ repair lan truyền fault qua service FaultTransitions; mỗi thao tác một audit chung | Có |
+| WO-3 | Enum mới `task_kind: inspection \| repair`; `inspection_outcome: fault_present \| fault_absent \| inconclusive`. Task kind và thành viên fault bất biến. Inspection nhận `FaultStatusSets.Open`; repair nhận Open trừ detected | Có |
+| WO-4 | Thêm GET detail, GET assignees, PUT assignee, POST start/complete/verify/return/cancel. PATCH chỉ sửa title/due_date/scheduled_date; không đổi wo_status hoặc người được giao bằng PATCH | Có |
+| WO-5 | **BREAKING**: POST bắt buộc `task_kind`. Repair cần 1..200 fault; inspection cần fault hoặc một segment, không cả hai. Server tra commune; POST cấm work_order_id/commune_id/wo_status/cluster_id/priority_score. Item thêm task_kind/commune_id/scheduled_date/updated_at; detail thêm các trường mô tả bên dưới | Có |
+| WO-6 | Segment chụp từ fault có priority cao nhất, null cuối; hoà theo created_at/length(id)/id; bỏ fault không segment. Cluster chụp khi các cluster khác null có đúng một giá trị. Priority đọc sống = max trên toàn bộ thành viên, kể cả đã release. Mock lần lượt 98.0/74.2/66.4, API ra 92.9/96.3/72.5 | Có |
+| WO-7 | Nguồn `fault.work_order_id` cho BE-40 là bảng nối có released_at NULL, tối đa một do unique partial index. Câu “luôn null tới BE-21” hết nền; **BE-40 chưa hiện thực ở đây** | Có |
+| WO-8 | Thêm `WORK_ORDER_NOT_FOUND` (404), `FAULT_NOT_FOUND` (404), `INVALID_STATE_TRANSITION`, `FAULT_ALREADY_IN_WORK_ORDER`, `FAULT_STATUS_NOT_ELIGIBLE`, `ASSIGNEE_NOT_ELIGIBLE`, `CONCURRENT_MODIFICATION` (409). Bảng §11 của decisions gọi “sáu” nhưng §8 thực tế liệt kê **bảy** mã mới | Có |
+| WO-9 | Không đổi mock-work-orders.json. File loại riêng gán WO-0001/0003 inspection, WO-0002 repair. Seed FAULT-0003/0007/0011 thành in_progress để khớp WO-0002; assigned_at và started_at suy từ created_at. Không audit seed; có audit work_order thì seed từ chối. **Cần báo WP5/WP6, chưa gửi thông báo trong phiên này** | Có |
+| WO-10 | BE-19 phải từ chối sửa fault đang thuộc repair hoạt động bằng 409 (mã do BE-19 chốt). Fault trong inspection vẫn được review. Đây là ràng buộc cho ticket sau, không thêm endpoint fault ở BE-23 | Có, tương lai |
+| WO-11 | Thiết kế audit chung được kéo từ BE-19 lên BE-23a (đã merge PR #53); không endpoint đọc audit. WorkOrder và WorkOrderFault implement IAudited; Fault đợi BE-19 | Không |
+
+### Endpoint và hình dạng BE-23 (nền tạm)
+
+Base `/api/v1/work-orders`:
+
+| Endpoint | Capability | Request |
+|---|---|---|
+| GET base | ReadWorkOrders | wo_status CSV, task_kind, assigned_to (ID hoặc me), segment_id, commune_id lặp, scheduled_from/to (date, đóng hai đầu), page/page_size |
+| GET /{id} | ReadWorkOrders | — |
+| GET /assignees | ManageWorkOrders | commune_id bắt buộc đúng một; page (page_size cố định 50). Trả trang `{user_id, full_name}` đủ điều kiện |
+| POST base | ManageWorkOrders | task_kind, title (trim 1..200), fault_ids? hoặc segment_id?, assigned_to?, due_date?, scheduled_date?, note? → 201 detail + Location |
+| PATCH /{id} | ManageWorkOrders | title?, due_date?, scheduled_date? → 200 detail |
+| PUT /{id}/assignee | ManageWorkOrders | assigned_to bắt buộc có khoá, ID hoặc null → 200 detail |
+| POST /{id}/start | ExecuteWorkOrders | không body → 200 detail |
+| POST /{id}/complete | ExecuteWorkOrders | report_note trim ≥10; inspection có fault bắt buộc fault_outcomes[{fault_id,outcome}] phủ đúng một lần mọi thành viên; repair/inspection theo tuyến cấm khoá này |
+| POST /{id}/verify | ManageWorkOrders | {note?} |
+| POST /{id}/return hoặc /cancel | ManageWorkOrders | {note} bắt buộc không rỗng |
+
+PATCH: thiếu khoá giữ nguyên; null chỉ xoá ngày; title null và body rỗng → 400.
+No-op PATCH/assignee trả 200, không audit, không đổi updated_at. `scheduled_date <= due_date`
+khi cả hai có; scheduled_date là ngày bắt đầu ca đêm. Listing mới nhất trước:
+`created_at DESC, length(work_order_id) DESC, work_order_id DESC`; fault_ids theo chiều tăng.
+
+Detail = item + `note, review_note, report_note, created_by, assigned_at, started_at, completed_at,
+closed_at, assignee_eligible, allowed_actions[], faults[]`. Fault detail gồm `fault_id, pole_id,
+segment_id, location{lat,lng}, fault_type, fault_status, severity, inspection_outcome`.
+Không trả entity EF hoặc thông tin tài khoản nhạy cảm vào response/audit.
+
+Người được giao phải là field_engineer, không khoá, có xã WO trong **DB** app_user_commune.
+Mọi lý do từ chối dùng cùng `ASSIGNEE_NOT_ELIGIBLE`, details chỉ assigned_to (ngoài correlation_id).
+Không FK ghép tới bảng gán xã: quản trị vẫn gỡ xã được. Không tự gỡ WO khi quyền user đổi;
+detail tính assignee_eligible lúc đọc. Role/commune trong JWT vẫn tuân vòng đời token hiện hữu.
+
+### Máy trạng thái và audit
+
+| Trạng thái | Hành động hợp lệ |
+|---|---|
+| open | assign → assigned; unassign no-op; edit; cancel → cancelled |
+| assigned | reassign → assigned (cùng người no-op); unassign → open; edit; start → in_progress; cancel |
+| in_progress | reassign → assigned (cùng người no-op); unassign → open; edit; complete → done; cancel |
+| done | verify → verified; return → in_progress |
+| verified / cancelled | không hành động ghi |
+
+Manager làm assign/unassign/edit/verify/return/cancel; chỉ FE được giao làm start/complete.
+Sai capability → 403 không phụ thuộc ID có tồn tại; sau capability và validate, lookup áp cả
+commune và assignee → 404; sai trạng thái → 409. Lỗi concurrency cũng lookup lại bằng filter,
+không lộ WO nếu vừa bị đổi người giao.
+
+Repair start: confirmed → in_progress, đã in_progress giữ. Complete **chưa** resolved.
+Verify: in_progress → resolved → verified trong cùng SaveChanges; resolved_by là người được giao,
+resolved_at là completed_at. Fault không đúng trạng thái nguồn bỏ qua, ghi fault_skipped trong
+audit. Inspection chỉ ghi outcome, không sửa fault_status. Verify/cancel release mọi dòng nối;
+done còn giữ fault. Cancel repair không lùi trạng thái fault.
+
+Đúng một audit/thao tác làm thay đổi, 0 cho no-op/lỗi. Audit chụp DTO riêng, actor và vai trò,
+correlation ID, thời điểm chung với nghiệp vụ, before/after và fault_changes/fault_skipped.
+Unique index bắt hai create cùng fault; xmin bắt sửa WO/fault đồng thời; transaction rollback cả
+nghiệp vụ và audit của bên thua. Không BE-24 evidence, BE-27 notification, SLA, ExternalUnit,
+gom địa lý hay khảo sát trong phạm vi này.

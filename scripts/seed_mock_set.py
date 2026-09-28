@@ -25,22 +25,23 @@ WHAT IT DOES NOT SEED, and why:
   pole_current_status  Its writes belong to BE-15/BE-17 (CLAUDE.md). The mock does carry
                      fixture_status, status_confidence, last_seen_at and last_sweep_id, so this is a
                      deliberate omission rather than a missing feature.
-  iot_node, work_order, survey_sweep, survey_frame, luminance_history
+  iot_node, survey_sweep, survey_frame, luminance_history
                      Those tables do not exist yet.
-  work_order_id      Present on 11 mock faults; `fault` has no such column until BE-21. Decision C
-                     says the API emits null for it meanwhile.
+  Work orders are linked through work_order_fault (BE-23), with kinds in the companion CSV.
+  Their audit history starts empty; existing work order audit prevents re-seeding.
 
 Re-running it is safe for the mock set itself: one transaction, and `--apply` uses ON_ERROR_STOP
 so a failure rolls the whole thing back.
 
 ⚠️ But the DELETEs are UNQUALIFIED. `fault`, `fault_cluster`, `fixture`, `pole` and `road_segment`
 are emptied outright, not filtered to the rows this script wrote — so anything else on that database
-(assets imported by hand, faults created while testing) goes too. Only `lux_reading` is protected,
-by the RAISE guard at the top of `statements()`, because it is the RQ1 ground truth. Point this at a
+(assets imported by hand, faults created while testing) goes too. `lux_reading` and existing work-order audit are protected by RAISE guards at the top of
+`statements()`: research readings and audit history must not be erased or attached to reused IDs. Point this at a
 development database you are willing to lose, never at anything shared that holds work. Scoping
 the deletes to the seeded `external_ref` values belongs to the real BE-39 seeder that replaces it.
 """
 import argparse
+import csv
 import json
 import pathlib
 import subprocess
@@ -77,7 +78,25 @@ def statements() -> list[str]:
     segments = load("mock-segments.geojson")["features"]
     faults = load("mock-faults.json")["items"]
 
+    orders = load("mock-work-orders.json")["items"]
+    with (MOCKS / "mock-work-order-kinds.csv").open(encoding="utf-8", newline="") as file:
+        kinds = {row["work_order_id"]: row["task_kind"] for row in csv.DictReader(file)}
+    if set(kinds) != {wo["work_order_id"] for wo in orders} or not set(kinds.values()) <= {"inspection", "repair"}:
+        raise SystemExit("Work order kinds must cover exactly the mock work orders.")
+    in_progress = {fid for wo in orders if kinds[wo["work_order_id"]] == "repair"
+                   and wo["wo_status"] == "in_progress" for fid in wo["fault_ids"]}
     sql = ["BEGIN;"]
+    sql.append(f"""
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM audit_event WHERE entity_type = 'work_order') THEN
+    RAISE EXCEPTION 'Work order audit exists; re-seeding would reuse its entity IDs.';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM app_user u JOIN app_user_commune c USING (user_id)
+      WHERE u.username = 'crew' AND u.role = 'field_engineer' AND NOT u.is_locked
+      AND c.commune_id = {COMMUNE}) THEN
+    RAISE EXCEPTION 'crew is not eligible in study_site';
+  END IF;
+END $$;""".strip())
 
     # A lux reading is the ground truth for RQ1 and points at a pole with RESTRICT. If any exist this
     # script must not be the thing that decides they can go.
@@ -89,7 +108,7 @@ DO $$ BEGIN
 END $$;""".strip())
 
     # Foreign-key order: fault before the rows it points at, fixture before pole.
-    sql.append("DELETE FROM fault; DELETE FROM fault_cluster; "
+    sql.append("DELETE FROM work_order_fault; DELETE FROM work_order; DELETE FROM fault; DELETE FROM fault_cluster; "
                "DELETE FROM fixture; DELETE FROM pole; DELETE FROM road_segment;")
 
     for feature in segments:
@@ -154,7 +173,7 @@ END $$;""".strip())
             "detection_model_version) VALUES ("
             f"{quote(f['fault_id'])}, NULL, {quote(f['pole_id'])}, {quote(f['fixture_id'])}, "
             f"{quote(f['segment_id'])}, {COMMUNE}, {location['lat']}, {location['lng']}, "
-            f"{quote(f['fault_type'])}, {quote(f['fault_status'])}, {quote(f['severity'])}, "
+            f"{quote(f['fault_type'])}, {quote('in_progress' if f['fault_id'] in in_progress else f['fault_status'])}, {quote(f['severity'])}, "
             f"{quote(f['source_channel'])}, {quote(f['data_source'])}, "
             f"{f['priority_score'] if f['priority_score'] is not None else 'NULL'}, "
             f"{f['status_confidence'] if f['status_confidence'] is not None else 'NULL'}, "
@@ -165,9 +184,24 @@ END $$;""".strip())
             # account — it would appear in every listing of who reports faults.
             f"{quote(f['reported_by'])}, NULL, NULL, NULL, NULL, NULL);")
 
+    for wo in orders:
+        assigned = "(SELECT user_id FROM app_user WHERE username = 'crew')" if wo["assigned_to"] else "NULL"
+        created = quote(wo["created_at"])
+        sql.append(
+            "INSERT INTO work_order (work_order_id, commune_id, task_kind, title, wo_status, "
+            "segment_id, cluster_id, assigned_to, assigned_at, created_by, due_date, started_at, created_at, updated_at) VALUES ("
+            f"{quote(wo['work_order_id'])}, {COMMUNE}, {quote(kinds[wo['work_order_id']])}, {quote(wo['title'])}, "
+            f"{quote(wo['wo_status'])}, {quote(wo['segment_id'])}, {quote(wo['cluster_id'])}, {assigned}, "
+            f"{created if wo['assigned_to'] else 'NULL'}, (SELECT user_id FROM app_user WHERE username = 'engineer'), "
+            f"{quote(wo['due_date'])}, {created if wo['wo_status'] == 'in_progress' else 'NULL'}, {created}, {created});")
+        for fault_id in wo["fault_ids"]:
+            sql.append("INSERT INTO work_order_fault (work_order_id, fault_id, commune_id, linked_at) VALUES ("
+                       f"{quote(wo['work_order_id'])}, {quote(fault_id)}, {COMMUNE}, {created});")
+
     # Past the seeded range, or the next insert collides with a hand-written primary key. Reading the
     # numeric tail back out of the ids keeps this correct however many rows the mock grows to.
     for sequence, column, table, prefix in [
+        ("work_order_id_seq", "work_order_id", "work_order", 4),
         ("segment_id_seq", "segment_id", "road_segment", 5),
         ("pole_id_seq", "pole_id", "pole", 6),
         ("fixture_id_seq", "fixture_id", "fixture", 5),
