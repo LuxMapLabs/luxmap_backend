@@ -503,6 +503,17 @@ gom địa lý hay khảo sát trong phạm vi này.
 | **I-5** | `data_source` của thiết bị và telemetry = **`calibration_rig`** — theo D-R10 nhóm không lắp thiết bị ngoài thực địa, thiết bị chỉ có trên testbed. Đóng Contract **O-9** mà không thêm giá trị enum | Không (dùng giá trị có sẵn) |
 | **I-6** | Bảng thiết bị mang `supports_remote_control` và **chế độ hiện tại** do thiết bị báo về (`on \| off \| auto`). **Lệnh** đã gửi (ai, lúc nào, kết quả) ở bảng lệnh riêng + audit (D-R7, D-R13) — thuộc ticket điều khiển đèn, **không** thuộc BE-14 | **Có** (enum chế độ mới, trường mới trên `/iot-nodes`) |
 
+**Bổ sung cùng ngày — kênh và điều khiển theo segment (Mỹ, 28/09/2026):**
+
+| Mã | Chốt | Chạm API |
+|---|---|---|
+| **I-12** | Thiết bị có **1..n kênh** đóng/cắt (rơ-le / công tắc tơ). **Mỗi kênh cấp đúng một mạch** (`feeder`). Chế độ hiện tại `on \| off \| auto` là của **kênh**, không của cả thiết bị (sửa I-6). Quan hệ thiết bị → đèn đi **qua mạch**: kênh → `feeder` → `pole.feeder_id` → `pole.segment_id`. Không có bảng thiết bị ↔ cột song song | **Có** (hình dạng thiết bị) |
+| **I-13** | Trên **testbed**, đi dây **mỗi kênh = một segment**, để lệnh theo segment luôn chính xác. Ngoài thực địa thiết bị chỉ **đo và báo**, không nhận lệnh (D-R7) | Không |
+| **I-14** | Lệnh ghi **theo kênh**; giao diện cho chọn **theo segment**, server tra ra các kênh cấp điện cho segment đó. Mạch cấp cho **nhiều segment** → **cảnh báo** (liệt kê segment bị kéo theo) **rồi vẫn cho gửi**. Cột không thuộc kênh nào → báo "N cột không điều khiển được". Mỗi lệnh ghi audit | **Có** — thuộc ticket điều khiển đèn, không thuộc BE-14 |
+| **I-15** | Trên bản đồ: thiết bị là **một điểm riêng** tại vị trí tủ; chọn thiết bị → highlight các cột và segment nó cấp điện (suy ra, không nhập tay) | **Có** (§5.6) |
+
+⚠️ I-12…I-15 **cần O-6** (`feeder_id` của cột) có dữ liệu: hôm nay `luxmap_dev` có **0/103** cột mang `feeder_id`. Chưa có O-6 thì thiết bị không nối được với đèn nào.
+
 **Hệ quả còn phải quyết — ghi lại để không ai coi là đã xong:**
 
 | # | Câu hỏi | Vì sao phải quyết |
@@ -511,6 +522,8 @@ gom địa lý hay khảo sát trong phạm vi này.
 | I-8 | `has_iot_node` trên `GET /poles`: giữ khoá và luôn `false`, hay bỏ khoá (BREAKING) | Không còn thiết bị trên cột nên trường không bao giờ khác `false` |
 | I-9 | `runtime_decline` nay đo **theo mạch**, không theo bóng. Fault đó gắn vào đâu: `pole_id` null + `location` = toạ độ tủ điện? Cần `feeder_id` trên `fault`? | `fault` hiện không có `feeder_id`; `ck_fault_pole_or_location` đòi `pole_id` hoặc `location` |
 | I-10 | Demo `POLE-0047` / `NODE-047` (runtime suy giảm 18 đêm, FE hardcode) phải dựng lại ở mức mạch | FE đã dựng theo nó (CLAUDE.md mục bộ mock FO-26) |
+| I-7b | `controller_node_id` của `GET /segments` (§5.2) chỉ chứa **một** giá trị, trong khi một segment có thể được **nhiều** thiết bị cấp điện (I-14): giữ một giá trị (`null` khi 0 hoặc ≥ 2) hay đổi thành `controller_node_ids[]` (BREAKING) | Thực tế nhiều-nhiều giữa tủ điện và segment |
+| I-16 | Ai cung cấp "tủ nào cấp cho cột nào" ngoài thực địa (nhóm thực địa hỏi xã?) hay chỉ testbed | Nguồn dữ liệu cho O-6 |
 | I-11 | `GET /iot-nodes` làm theo hướng **(A)** tách BE-14b sau IOT-10, hay **(B)** BE1 tạo bảng sớm (cần Đạt đồng ý) | Xem `tracking.html` → Vấn đề đang mở |
 
 **Phải báo:** WP5 (bản đồ lớp IoT, `battery_pct`, `has_iot_node`, demo `POLE-0047`), WP6, và **BE2 – Đạt** (IOT-10 dựng bảng theo I-1…I-6). **Chưa báo ai.**
