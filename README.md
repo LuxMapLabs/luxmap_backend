@@ -437,3 +437,23 @@ Tóm tắt mã lỗi:
 
 Mọi thứ đi qua `LuxMapJsonOptions.Configure`. Host gọi `AddLuxMapJsonConventions()` — hàm này
 cấu hình **cả** minimal API lẫn MVC controller, vì hai đường đọc hai `JsonOptions` khác nhau.
+
+### Work orders — BE-23
+
+API `/api/v1/work-orders` đã có inspection/repair, giao người, lịch và các action
+start/complete/verify/return/cancel. Bề mặt mới là **nền tạm tới FW kế tiếp**, xem
+[drift WO-1…WO-11](docs/contract-drift.md#be-23--work-orders-28092026) và
+[hướng dẫn phân quyền](docs/authorization-guide.md). POST nay bắt buộc `task_kind`; PATCH chỉ
+sửa title/ngày, giao người dùng PUT `/assignee`. Không có evidence trong BE-23.
+
+Seed mock thêm ba WO từ `mocks/mock-work-orders.json` và `mocks/mock-work-order-kinds.csv`,
+tra xã bằng `seed_key=study_site`, user theo username. Script từ chối khi có audit work_order;
+không xoá audit để nạp lại. Seed thay toàn bộ tài sản/fault/WO trên DB đích khi guard cho qua.
+Chạy trên DB test được chỉ định:
+
+```bash
+python3 scripts/seed_mock_set.py --database luxmap_test --apply
+```
+
+WO-0001/0003 là inspection; WO-0002 repair in_progress, nên ba fault của nó cũng in_progress.
+Hình dạng file mock WO giữ nguyên; priority API tính sống từ fault, không lấy số priority WO mock.

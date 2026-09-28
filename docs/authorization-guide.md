@@ -112,6 +112,9 @@ từ đó):
 | `RecordLuxReading` | field_engineer |
 | `ControlLighting` | manager (chưa có endpoint) |
 | `ManageUsers` | system_admin (chưa có endpoint) |
+| `ReadWorkOrders` | superior, manager, field_engineer, system_admin (FE bị giới hạn theo người được giao) |
+| `ManageWorkOrders` | manager |
+| `ExecuteWorkOrders` | field_engineer |
 
 Viết endpoint mới:
 
@@ -227,3 +230,20 @@ kèm `ST_Intersects`. Giả thuyết là nó không phá GIST index vì index ch
 geometry, còn mệnh đề commune chỉ là filter phụ — **nhưng chưa được chứng minh**, vì chưa có bảng
 `pole` để đo. Nếu không đạt ngân sách 500ms/2000 cột thì cho nhánh nóng đi qua repository tường
 minh thay vì query filter.
+
+## Trường hợp 4 — chỉ người được giao (BE-23, drift WO-1; nền tạm tới FW)
+
+`WorkOrder` implement cả `ICommuneScoped` và `IAssigneeScoped`. Bộ dựng model gộp commune và
+assignee trong **một** lambda; không gọi HasQueryFilter lần hai để ghi đè commune. Entity chỉ
+implement IAssigneeScoped mà không ICommuneScoped làm model từ chối khởi động.
+
+`ICurrentActorAccessor` là singleton đọc HttpContext hiện tại. Filter tham chiếu
+`LuxMapDbContext.CurrentAssigneeRestriction`: FE có sub thì chỉ assigned_to=sub, FE thiếu sub
+thì chuỗi rỗng (không khớp); các vai trò khác không thêm hạn chế assignee. Vẫn áp commune.
+BE-24/BE-43 phải truy vấn WorkOrder qua filter trước khi truy vấn dữ liệu con; bảng nối
+WorkOrderFault chỉ tự scope theo commune, không thay thế lượt kiểm quyền trên WO cha.
+
+GET/start/complete của FE khác người được giao trả 404 WORK_ORDER_NOT_FOUND. Mọi lỗi sau
+xung đột phải đọc lại qua filter, không dùng IgnoreQueryFilters để lấy wo_status hiện tại.
+Capability vẫn chạy trước lookup: FE gọi endpoint chỉ-manager nhận 403 ROLE_FORBIDDEN độc lập
+với ID có tồn tại, không phải một đường đọc WO. Body không hợp lệ được validate trước lookup.
