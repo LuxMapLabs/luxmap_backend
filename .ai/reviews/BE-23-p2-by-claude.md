@@ -95,3 +95,24 @@ audit_event sau suite: 0
 ```
 
 **Kết luận: approved.** Các mục "Ý kiến" ở vòng 1 giữ nguyên, không chặn merge. Chưa push.
+
+## Review lại — vòng 3, CI PR #54 (28/09/2026)
+
+CI run `36374528444` đỏ ở `Repair_propagation_and_inspection_outcomes_and_release`: `completed_at` của
+response là `…46.8506205Z`, còn `resolved_at` đọc từ DB là `…46.8506200Z`. **Lỗi thật, không phải
+flaky.** `WorkOrderService` trả detail từ entity đang track với tick 100 ns (Linux), còn `timestamptz`
+chỉ lưu µs. Hai vòng review trước không bắt được vì chỉ chạy test trên macOS, nơi đồng hồ vốn ở µs.
+
+**Bản sửa:** `UtcMicrosecondClock.UtcNow()` (Shared) thay cho cả 4 chỗ `DateTime.UtcNow` trong
+service, vẫn một `now` chung cho WO, fault và audit. Test dùng `TimeProvider` cố định với tick lẻ
+1/5/9. Bẫy đã ghi vào `CLAUDE.md`.
+
+```
+build 0 warning · 160 + 36 + 18 + 465 = 679 passed (luxmap_test)
+sabotage: helper trả DateTime.UtcNow nguyên → UtcMicrosecondClockTests đỏ 3/3 trên macOS; đã khôi phục
+```
+
+**Nợ, ngoài phạm vi BE-23:** `AssetCrudService` / `AssetImportService` gán `UpdatedAt =
+DateTime.UtcNow` theo cùng khuôn. Chúng có trả thẳng giá trị đó ra response hay không thì chưa kiểm.
+
+**Kết luận vòng 3: approved.** Chờ CI chạy lại sau push.

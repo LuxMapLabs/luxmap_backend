@@ -1508,3 +1508,9 @@ filter: reassign vừa xảy ra có thể biến WO thành 404 với người đ
 
 Fault.CommuneId nay là alternate-key property để FK bảng nối bảo đảm cùng xã; giống Feeder,
 EF không cho đổi commune trên entity đã track. Fault không chuyển xã.
+
+**Timestamp app sinh rồi trả thẳng từ entity đang track phải cắt về micro giây trước khi lưu.**
+Dùng `UtcMicrosecondClock.UtcNow()` (Shared), giữ cùng một `now` cho entity, fault và audit.
+PostgreSQL `timestamptz` chỉ lưu µs; `DateTime.UtcNow` trên Linux có tick 100 ns nên response
+có thể khác DB dù local macOS (đồng hồ µs) xanh. PR #54 đã lộ sai lệch completed_at/resolved_at.
+Test phải cấp thời gian cố định có tick lẻ dưới µs qua TimeProvider, không chỉ thử đồng hồ thật.

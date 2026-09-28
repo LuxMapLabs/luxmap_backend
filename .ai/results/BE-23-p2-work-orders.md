@@ -2457,3 +2457,172 @@ Passed!  - Failed:     0, Passed:   465, Skipped:     0, Total:   465, Duration:
 ```
 
 ✅ Build 0 warning / 0 error; 676 test xanh (157 Shared + 36 Persistence + 18 Storage + 465 API), 0 failed, 0 skipped. Sabotage 4/4 đỏ, đã khôi phục. `git diff --check` exit 0. Không có thay đổi src/ so với trước vòng sửa. Dừng, chờ Claude review.
+
+## Sửa CI PR #54
+
+28/09/2026 — theo báo lỗi CI run 36374528444 của Mỹ: completed_at response có tick 100 ns (…8506205), resolved_at đọc từ PostgreSQL đã cắt µs (…8506200). DateTime trong entity đang track vẫn giữ tick chưa lưu được; converter UTC không sửa được độ chính xác của giá trị trong entity.
+
+Thêm một helper `UtcMicrosecondClock.UtcNow(TimeProvider? timeProvider = null)` cạnh UtcNormalization trong Shared/Serialization. Helper đọc UTC từ TimeProvider.System mặc định và trừ phần dư ticks modulo TicksPerMicrosecond, giữ DateTimeKind.Utc. TimeProvider cho phép test đồng hồ cố định, không cần Docker hoặc phụ thuộc độ phân giải đồng hồ hệ điều hành. Thay đúng bốn `var now` trong WorkOrderService; từng thao tác vẫn truyền chung now cho WO/fault/audit occurred_at. Không đổi converter, response schema, migration hay nới assertion completed_at/resolved_at.
+
+Test Shared dùng timestamp cố định cộng 1/5/9 tick dưới µs, assert giá trị chính xác sau cắt (không làm tròn), Kind=Utc và modulo=0. Sabotage thay thân helper bằng `return DateTime.UtcNow;`: 3/3 ca đỏ trên máy macOS, đã khôi phục nguyên byte trong finally. Build/full test dưới đây chạy sau khôi phục.
+
+Môi trường test: ConnectionStrings__LuxMap trỏ Host=localhost;Port=5433;Database=luxmap_test;Username=luxmap theo prompt; DOTNET_USE_POLLING_FILE_WATCHER=1, NUGET_HTTP_CACHE_PATH=/private/tmp/be23-nuget-cache; không đặt Cors. Không truy cập luxmap_dev, không migrate/seed trong lần sửa này.
+
+### Test Shared mới
+
+```sh
+dotnet test tests/LuxMap.Shared.Tests --filter FullyQualifiedName~UtcMicrosecondClockTests
+```
+
+```text
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  LuxMap.Shared -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Shared/bin/Debug/net10.0/LuxMap.Shared.dll
+  LuxMap.Modules.Admin -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Admin/bin/Debug/net10.0/LuxMap.Modules.Admin.dll
+  LuxMap.Modules.Telemetry -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Telemetry/bin/Debug/net10.0/LuxMap.Modules.Telemetry.dll
+  LuxMap.Persistence -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Persistence/bin/Debug/net10.0/LuxMap.Persistence.dll
+  LuxMap.Modules.Assets -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Assets/bin/Debug/net10.0/LuxMap.Modules.Assets.dll
+  LuxMap.Modules.Identity -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Identity/bin/Debug/net10.0/LuxMap.Modules.Identity.dll
+  LuxMap.Modules.Faults -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Faults/bin/Debug/net10.0/LuxMap.Modules.Faults.dll
+  LuxMap.Modules.Survey -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Survey/bin/Debug/net10.0/LuxMap.Modules.Survey.dll
+  LuxMap.Modules.WorkOrders -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.WorkOrders/bin/Debug/net10.0/LuxMap.Modules.WorkOrders.dll
+  LuxMap.Shared.Tests -> /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/bin/Debug/net10.0/LuxMap.Shared.Tests.dll
+Test run for /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/bin/Debug/net10.0/LuxMap.Shared.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:     3, Skipped:     0, Total:     3, Duration: 11 ms - LuxMap.Shared.Tests.dll (net10.0)
+```
+
+### Sabotage trả DateTime.UtcNow nguyên
+
+```sh
+dotnet test tests/LuxMap.Shared.Tests --filter FullyQualifiedName~UtcMicrosecondClockTests
+```
+
+```text
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  LuxMap.Shared -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Shared/bin/Debug/net10.0/LuxMap.Shared.dll
+  LuxMap.Modules.Telemetry -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Telemetry/bin/Debug/net10.0/LuxMap.Modules.Telemetry.dll
+  LuxMap.Modules.Admin -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Admin/bin/Debug/net10.0/LuxMap.Modules.Admin.dll
+  LuxMap.Persistence -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Persistence/bin/Debug/net10.0/LuxMap.Persistence.dll
+  LuxMap.Modules.Assets -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Assets/bin/Debug/net10.0/LuxMap.Modules.Assets.dll
+  LuxMap.Modules.Identity -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Identity/bin/Debug/net10.0/LuxMap.Modules.Identity.dll
+  LuxMap.Modules.Survey -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Survey/bin/Debug/net10.0/LuxMap.Modules.Survey.dll
+  LuxMap.Modules.Faults -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Faults/bin/Debug/net10.0/LuxMap.Modules.Faults.dll
+  LuxMap.Modules.WorkOrders -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.WorkOrders/bin/Debug/net10.0/LuxMap.Modules.WorkOrders.dll
+  LuxMap.Shared.Tests -> /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/bin/Debug/net10.0/LuxMap.Shared.Tests.dll
+Test run for /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/bin/Debug/net10.0/LuxMap.Shared.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+[xUnit.net 00:00:00.14]     LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(extraTicks: 5) [FAIL]
+[xUnit.net 00:00:00.15]     LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(extraTicks: 9) [FAIL]
+[xUnit.net 00:00:00.15]     LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(extraTicks: 1) [FAIL]
+  Failed LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(extraTicks: 5) [2 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 2026-09-28T03:40:46.8506200Z
+Actual:   2026-09-28T03:43:45.1173740Z
+  Stack Trace:
+     at LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(Int32 extraTicks) in /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/UtcMicrosecondClockTests.cs:line 18
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+  Failed LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(extraTicks: 9) [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 2026-09-28T03:40:46.8506200Z
+Actual:   2026-09-28T03:43:45.1239960Z
+  Stack Trace:
+     at LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(Int32 extraTicks) in /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/UtcMicrosecondClockTests.cs:line 18
+   at InvokeStub_UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+  Failed LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(extraTicks: 1) [< 1 ms]
+  Error Message:
+   Assert.Equal() Failure: Values differ
+Expected: 2026-09-28T03:40:46.8506200Z
+Actual:   2026-09-28T03:43:45.1241180Z
+  Stack Trace:
+     at LuxMap.Shared.Tests.UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(Int32 extraTicks) in /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/UtcMicrosecondClockTests.cs:line 18
+   at InvokeStub_UtcMicrosecondClockTests.UtcNow_truncates_submicrosecond_ticks_and_preserves_utc(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithOneArg(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+
+Failed!  - Failed:     3, Passed:     0, Skipped:     0, Total:     3, Duration: 23 ms - LuxMap.Shared.Tests.dll (net10.0)
+
+Exit code: 1
+```
+
+### Build sau khôi phục
+
+```sh
+dotnet build
+```
+
+```text
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  LuxMap.Shared -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Shared/bin/Debug/net10.0/LuxMap.Shared.dll
+  LuxMap.Modules.Admin -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Admin/bin/Debug/net10.0/LuxMap.Modules.Admin.dll
+  LuxMap.Modules.Telemetry -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Telemetry/bin/Debug/net10.0/LuxMap.Modules.Telemetry.dll
+  LuxMap.Persistence -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Persistence/bin/Debug/net10.0/LuxMap.Persistence.dll
+  LuxMap.Modules.Identity -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Identity/bin/Debug/net10.0/LuxMap.Modules.Identity.dll
+  LuxMap.Modules.Assets -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Assets/bin/Debug/net10.0/LuxMap.Modules.Assets.dll
+  LuxMap.Infrastructure.Storage -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Infrastructure.Storage/bin/Debug/net10.0/LuxMap.Infrastructure.Storage.dll
+  LuxMap.Modules.Faults -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Faults/bin/Debug/net10.0/LuxMap.Modules.Faults.dll
+  LuxMap.Modules.Survey -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Survey/bin/Debug/net10.0/LuxMap.Modules.Survey.dll
+  LuxMap.Modules.WorkOrders -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.WorkOrders/bin/Debug/net10.0/LuxMap.Modules.WorkOrders.dll
+  LuxMap.Infrastructure.Storage.Tests -> /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Infrastructure.Storage.Tests/bin/Debug/net10.0/LuxMap.Infrastructure.Storage.Tests.dll
+  LuxMap.Modules.Map -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Modules.Map/bin/Debug/net10.0/LuxMap.Modules.Map.dll
+  LuxMap.Shared.Tests -> /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/bin/Debug/net10.0/LuxMap.Shared.Tests.dll
+  LuxMap.Persistence.Tests -> /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Persistence.Tests/bin/Debug/net10.0/LuxMap.Persistence.Tests.dll
+  LuxMap.Api -> /Users/nhm809/Documents/LuxMap/luxmap_backend/src/LuxMap.Api/bin/Debug/net10.0/LuxMap.Api.dll
+  LuxMap.Api.Tests -> /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Api.Tests/bin/Debug/net10.0/LuxMap.Api.Tests.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.62
+```
+
+### Full test sau khôi phục
+
+```sh
+dotnet test --no-build
+```
+
+```text
+Test run for /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Shared.Tests/bin/Debug/net10.0/LuxMap.Shared.Tests.dll (.NETCoreApp,Version=v10.0)
+Test run for /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Api.Tests/bin/Debug/net10.0/LuxMap.Api.Tests.dll (.NETCoreApp,Version=v10.0)
+Test run for /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Persistence.Tests/bin/Debug/net10.0/LuxMap.Persistence.Tests.dll (.NETCoreApp,Version=v10.0)
+Test run for /Users/nhm809/Documents/LuxMap/luxmap_backend/tests/LuxMap.Infrastructure.Storage.Tests/bin/Debug/net10.0/LuxMap.Infrastructure.Storage.Tests.dll (.NETCoreApp,Version=v10.0)
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+A total of 1 test files matched the specified pattern.
+
+Passed!  - Failed:     0, Passed:   160, Skipped:     0, Total:   160, Duration: 73 ms - LuxMap.Shared.Tests.dll (net10.0)
+
+Passed!  - Failed:     0, Passed:    36, Skipped:     0, Total:    36, Duration: 388 ms - LuxMap.Persistence.Tests.dll (net10.0)
+
+Passed!  - Failed:     0, Passed:    18, Skipped:     0, Total:    18, Duration: 895 ms - LuxMap.Infrastructure.Storage.Tests.dll (net10.0)
+
+Passed!  - Failed:     0, Passed:   465, Skipped:     0, Total:   465, Duration: 17 s - LuxMap.Api.Tests.dll (net10.0)
+```
+
+✅ Build 0 warning / 0 error; 679 test xanh (160 Shared + 36 Persistence + 18 Storage + 465 API), 0 failed, 0 skipped. Bao gồm test Repair_propagation_and_inspection_outcomes_and_release với assertion thời gian giữ nguyên. `git diff --check` exit 0. CLAUDE.md đã ghi bẫy; AGENTS.md vẫn là symlink.
+
+### Nợ ngoài phạm vi
+
+AssetCrudService / AssetImportService cần rà timestamp app sinh rồi trả trực tiếp từ entity theo cùng quy tắc µs trong một ticket riêng. Không sửa hai service này theo yêu cầu. Chưa chạy lại CI remote PR #54; kết quả trên là local luxmap_test và sabotage xác định trên macOS.
+
+### Đề xuất commit fix riêng
+
+`fix(work-orders): truncate application timestamps to PostgreSQL microseconds`
+
+- `src/LuxMap.Shared/Serialization/UtcMicrosecondClock.cs`
+- `src/LuxMap.Modules.WorkOrders/WorkOrderService.cs`
+- `tests/LuxMap.Shared.Tests/UtcMicrosecondClockTests.cs`
+- `CLAUDE.md` (AGENTS.md symlink, không tạo file khác)
+- `.ai/results/BE-23-p2-work-orders.md`
+- `tracking.html`
+
+Không commit, không push. Dừng để Claude review và đưa fix lên PR #54.
