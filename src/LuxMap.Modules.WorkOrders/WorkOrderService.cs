@@ -156,7 +156,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             segment = road.SegmentId;
         }
         if (request.AssignedTo is not null) await RequireAssignee(request.AssignedTo, commune, ct);
-        var now = DateTime.UtcNow;
+        var now = UtcMicrosecondClock.UtcNow();
         var clusters = faults.Select(x => x.ClusterId).Where(x => x is not null).Distinct().ToArray();
         // SQL is constructed exclusively from the server's immutable prefixed-ID specification.
         var idSql = $"SELECT {PrefixedIds.WorkOrder.DefaultValueSql} AS \"Value\"";
@@ -199,7 +199,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         wo.Title = title ?? wo.Title;
         wo.DueDate = nextDue;
         wo.ScheduledDate = nextScheduled;
-        var now = DateTime.UtcNow;
+        var now = UtcMicrosecondClock.UtcNow();
         wo.UpdatedAt = now;
         Record(wo, AuditAction.DetailsChanged, before, Snapshot(wo), now);
         await Save(id, [], ct);
@@ -216,7 +216,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         if (wo.AssignedTo == assigned) return await Detail(id, ct);
         var before = Snapshot(wo);
         var action = assigned is null ? AuditAction.Unassigned : wo.AssignedTo is null ? AuditAction.Assigned : AuditAction.Reassigned;
-        var now = DateTime.UtcNow;
+        var now = UtcMicrosecondClock.UtcNow();
         wo.AssignedTo = assigned;
         wo.AssignedAt = assigned is null ? null : now;
         wo.WoStatus = assigned is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned;
@@ -252,7 +252,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             }
             else if (OptionalJson.Present(outcomes)) throw OptionalJson.Invalid("fault_outcomes");
         }
-        var now = DateTime.UtcNow;
+        var now = UtcMicrosecondClock.UtcNow();
         var changes = new List<FaultChange>();
         var skipped = new List<string>();
         if (wo.TaskKind == TaskKind.Repair && action is "start" or "verify")
