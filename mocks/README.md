@@ -19,7 +19,12 @@ WP5 và WP6 code giao diện theo bộ này, BE-39 seed database từ chính b�
 - **103 cột**: 70 `normal` · 10 `dim` · 16 `out` · 7 `unknown`
 - **`SEG-003`** có một cụm lỗi cả đoạn — dùng test luồng highlight toàn tuyến
   (`has_active_segment_fault = true`)
-- **12 IoT node**: 3 `segment_controller` · 9 `sampled_fixture`
+- **3 IoT node**, cả ba `segment_controller`, đặt ở tủ điện tổng (28/09/2026, drift "BE-14 / IoT").
+  ⚠️ **Trước 28/09 có 12 node**, gồm 9 `sampled_fixture` trên từng cột: đồ án **không** gắn IoT lên
+  cột, nên 9 node đó bị bỏ (I-1), `battery_pct` bị bỏ (I-2), `segment_id` thành `segment_ids[]`, thêm
+  `feeder_ids[]` + `supports_remote_control`. `has_iot_node` của mọi cột nay là `false` (I-8), và
+  `controller_node_id` của `mock-segments.geojson` thành `controller_node_ids[]` (I-7b). **Phải báo
+  WP5/WP6.**
 - **`POLE-0047`** có chuỗi runtime suy giảm dần qua 18 đêm — dùng test biểu đồ
   cảnh báo sớm. Mang `fixture_status = dim` và có `NODE-047`: đèn **mờ dần**,
   không tắt phụt.
@@ -27,7 +32,10 @@ WP5 và WP6 code giao diện theo bộ này, BE-39 seed database từ chính b�
   đã ra khỏi phạm vi đồ án, nên cột này nay là `grid` / `led_road_lamp`. Chuỗi
   runtime và `runtime_decline` **giữ nguyên** — giờ sáng của đèn lưới cũng suy
   giảm được, và đó vẫn là kịch bản IoT phát hiện sớm
-- Đa số cột có `iot_node = null`, đúng như thực tế kiến trúc sparse IoT
+  ⚠️ **28/09/2026: kịch bản này phải dựng lại ở mức MẠCH** (I-10) — không còn
+  `NODE-047` trên cột. `mock-pole-detail.json` còn `iot_node: NODE-047`, **chưa
+  sửa**, chờ hỏi WP5 còn dùng màn biểu đồ runtime theo cột không
+- Thiết bị IoT nằm ở tủ điện, nối tới đèn qua **mạch** (feeder), không qua cột
 
 Bảy cột `unknown` không phải lỗi dữ liệu. `unknown` nghĩa là sweep gần nhất
 không phủ được cột đó, và phải có ký hiệu riêng trên bản đồ — không gộp màu

@@ -248,9 +248,10 @@ ID giữ đúng của mock (`POLE-0047` là `POLE-0047`), nên demo khớp với
 được qua endpoint import: EF Core không giữ thứ tự dòng khi để database sinh khoá, đo thật thì 102
 trên 103 cột rơi vào ID khác. Vì vậy script ghi ID tường minh rồi đẩy sequence qua vùng đã dùng.
 
-⚠️ **Đây là bản tạm, không phải BE-39.** Ba chỗ bộ mock chưa nạp được: `feeder_id` (mock không có,
-Open item O-6, đang chặn BE-13 và CV-15), `pole_current_status` (quyền ghi thuộc BE-15/BE-17), và
-IoT node / phiếu công việc / lịch sử sweep (bảng chưa tồn tại).
+⚠️ **Đây là bản tạm, không phải BE-39.** Chưa nạp: `pole_current_status` (quyền ghi thuộc BE-15/BE-17)
+và lịch sử sweep (bảng chưa tồn tại). `feeder_id` được nạp bằng **mạch TẠM** — mỗi segment một feeder
+`FDR-001..003`, `external_ref = DEMO-SEG-00n` — để 3 thiết bị IoT mock có đèn để nối; đó **không** phải
+dữ liệu mạch thật, O-6 thay thế nó.
 
 ## Quy ước lỗi và phân trang
 
@@ -457,3 +458,18 @@ python3 scripts/seed_mock_set.py --database luxmap_test --apply
 
 WO-0001/0003 là inspection; WO-0002 repair in_progress, nên ba fault của nó cũng in_progress.
 Hình dạng file mock WO giữ nguyên; priority API tính sống từ fault, không lấy số priority WO mock.
+
+### Thiết bị IoT — BE-14b
+
+`GET /api/v1/iot-nodes?bbox=…` trả thiết bị ở **tủ điện tổng** (không có IoT trên từng cột). Mỗi thiết
+bị điều khiển 0..n feeder qua rơ-le (bảng `feeder_control`); `segment_ids`, `feeder_ids` và
+`controller_node_ids` của `/segments` đều **tính lúc đọc**. Hình dạng là nền tạm, xem
+[drift "BE-14 / IoT"](docs/contract-drift.md).
+
+`node_status` tính từ `last_report_at` so với ngưỡng im lặng, mặc định **1 giờ**. Đổi bằng
+`Iot:OfflineAfter` trong `appsettings.json` hoặc biến môi trường, rồi khởi động lại; giá trị ≤ 0 làm
+app từ chối khởi động:
+
+```bash
+Iot__OfflineAfter=00:30:00 dotnet run --project src/LuxMap.Api
+```

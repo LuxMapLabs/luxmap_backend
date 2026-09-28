@@ -192,7 +192,7 @@ severity       : low | medium | high | critical
 source_channel : cv | iot | field_report        # v1.0 ghi 'manual', đã bỏ
 data_source    : field | public_imagery | calibration_rig | simulated
 wo_status      : open | assigned | in_progress | done | verified | cancelled
-node_role      : segment_controller | sampled_fixture   # ⚠️ 28/09: sampled_fixture SẼ BỎ (I-1)
+node_role      : segment_controller                  # 28/09 — sampled_fixture đã bỏ (I-1)
 node_status    : online | offline | never_reported
 road_class     : inter_commune | inter_village
 ```
@@ -216,7 +216,7 @@ road_class     : inter_commune | inter_village
 Ràng buộc nghiệp vụ đi kèm:
 
 - **`unknown` không phải lỗi** — nghĩa là sweep gần nhất không phủ được cột đó. Có ký hiệu riêng ở FE, **không gộp vào `out`** ở bất kỳ thống kê nào (BE-28).
-> ⚠️ **Mô hình IoT đã đổi (28/09/2026, `docs/contract-drift.md` → "BE-14 / IoT").** Chỉ có thiết bị ở **tủ điện tổng**, gắn **mạch** (`feeder_id`), trên testbed (`calibration_rig`); **không** IoT trên từng cột, **không** `battery_pct`. Contract và mock **chưa** cập nhật (I-7…I-11 còn mở) — ticket IoT đừng dựng `sampled_fixture` hay chuỗi `NODE-047` theo mock cũ. `controller_node_id` của `/segments` sẽ thành **`controller_node_ids[]` tính lúc đọc** (I-7b); điều khiển đi qua **rơ-le gộp vào feeder** (I-12).
+> ⚠️ **Mô hình IoT (28/09/2026, `docs/contract-drift.md` → "BE-14 / IoT"; hiện thực BE-14b).** Thiết bị chỉ ở **tủ điện tổng**, không IoT trên từng cột, không `battery_pct`. Thiết bị nối tới đèn qua **rơ-le gộp vào feeder** (`feeder_control`, 0/1 thiết bị mỗi feeder), không có bảng thiết bị ↔ cột. `has_iot_node` luôn `false`; `controller_node_ids[]`, `segment_ids[]`, `feeder_ids[]` tính lúc đọc. Contract §5.6 **chưa** cập nhật (drift I-18) — ticket IoT theo drift, không theo Contract hay mock cũ.
 
 - `runtime_decline` **chỉ** đến từ IoT. `lamp_dim` và `lamp_out` **chỉ** đến từ CV (v1.4: `lamp_dim` do CV **và** cảm biến BH1750 cùng quyết — `source_channel` giữ `cv`? **D-R20, chờ quyết**). Một cột có thể mang **cả hai cùng lúc** — mô hình dữ liệu phải cho phép.
 - Luồng `fault_status` hợp lệ: `detected → confirmed | rejected`, rồi `confirmed → in_progress → resolved → verified`. Chuyển sai luồng → **409** để FE disable nút trước, không để user bấm rồi mới lỗi (BE-19).
@@ -252,7 +252,7 @@ has_iot_node, near_sensitive_poi
 
 ```
 segment_id, segment_name, road_class, length_m, pole_count,
-controller_node_id, has_active_segment_fault
+controller_node_ids[], has_active_segment_fault      # 28/09: danh sách tính lúc đọc (I-7b)
 ```
 
 `has_active_segment_fault = true` → FE highlight **cả tuyến**. Đây là output của spatial clustering (CV-15), khác bản chất với lỗi từng bóng.
@@ -1516,3 +1516,29 @@ Dùng `UtcMicrosecondClock.UtcNow()` (Shared), giữ cùng một `now` cho entit
 PostgreSQL `timestamptz` chỉ lưu µs; `DateTime.UtcNow` trên Linux có tick 100 ns nên response
 có thể khác DB dù local macOS (đồng hồ µs) xanh. PR #54 đã lộ sai lệch completed_at/resolved_at.
 Test phải cấp thời gian cố định có tick lẻ dưới µs qua TimeProvider, không chỉ thử đồng hồ thật.
+
+### BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
+
+**Schema và quyền ghi tách nhau như `pole_current_status`.** `feeder_control` là bảng riêng khoá theo
+`feeder_id`, KHÔNG phải cột trên `feeder`: chế độ ON/OFF/AUTO do thiết bị báo, còn `PUT
+/assets/feeders/{id}` là thay thế toàn phần và sẽ xoá mất nó. Cả hai FK của `feeder_control` mang
+`commune_id` (khuôn O-7), nên `ak_iot_node_node_id_commune_id` là đích FK — trông thừa, đừng xoá.
+
+**`iot_node.data_source` siết hơn enum.** `ck_iot_node_data_source_not_field` chỉ nhận
+`calibration_rig | simulated`: nhóm không lắp thiết bị ngoài thực địa (D-R10). Mở rộng CHECK này là
+quyết định, không phải sửa lỗi.
+
+**`node_status` không lưu.** `IotOptions.StatusAt` tính từ `last_report_at` và `Iot:OfflineAfter`
+(mặc định 1 giờ); đúng bằng ngưỡng vẫn `online`. IOT-11 phải sinh `node_offline` từ **cùng**
+`IotOptions`, không tự đặt ngưỡng thứ hai.
+
+**Teardown của fixture phải xoá `feeder_control` rồi `iot_node` TRƯỚC `feeder` và xã** — cả hai
+`Restrict` (cùng họ bẫy BE-14 số 3). `AssetSchemaFixture` và `AssetImportFixture` đã làm.
+
+🔴 **`gen_consolidated_spec.py` có schema VIẾT TAY ĐÈ lên schema xuất từ code** (`S["PoleProperties"]`,
+`S["SegmentProperties"]`…). Đổi một record `properties` trong code mà không sửa bản viết tay thì spec
+hợp nhất vẫn ra hình dạng cũ, và CI không đỏ vì spec sinh lại vẫn khớp chính nó. Khi hiện thực một
+stub `ni(...)`, xoá luôn stub **và** schema viết tay đi kèm (`S["IotNode*"]` đã xoá ở BE-14b).
+
+**Mock `indent=1`.** Sửa mock bằng script phải round-trip từng byte trước khi đổi (đọc → ghi lại → so
+bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
