@@ -522,6 +522,7 @@ gom địa lý hay khảo sát trong phạm vi này.
 | **I-9** | Fault `runtime_decline` (đo theo mạch) có `pole_id` **null**, `location` = **toạ độ tủ điện** của thiết bị. Chưa thêm `feeder_id` vào `fault` — xét lại khi có ticket cần | Có (ngữ nghĩa `runtime_decline`) |
 | **I-10** | Demo `POLE-0047` / `NODE-047` **dựng lại ở mức mạch**; phải hỏi WP5 còn dùng màn biểu đồ runtime theo cột không trước khi đổi mock | Có (mock) |
 | **I-16** | Dữ liệu "tủ nào cấp cho cột nào": **ngoài thực địa** nhóm thực địa hỏi xã; **testbed** nhóm tự khai theo sơ đồ đi dây | Không |
+| **I-7b** | `controller_node_id` của `GET /segments` (§5.2) **đổi thành `controller_node_ids[]`** (Mỹ, 28/09/2026). Danh sách **tính lúc đọc**, không lưu: segment → cột (`pole.segment_id`) → `feeder` (`pole.feeder_id`) → bảng điều khiển feeder (I-12) → thiết bị; không trùng lặp, sắp theo khuôn `created_at, length(id), id`. Rỗng `[]` khi không thiết bị nào điều khiển — **không** `null`. Dữ liệu nhập thêm hay đi dây lại có hiệu lực ở request kế tiếp. Hôm nay mọi segment ra `[]` (0/103 cột có `feeder_id`, bảng điều khiển chưa có). Cùng kiểu `pole_count` / `has_active_segment_fault` (tính lúc đọc) | **Có — BREAKING** (đổi tên + kiểu; hôm nay trường luôn `null` nên FE chưa có logic dựa vào giá trị) |
 
 ⚠️ I-12…I-15 **cần O-6** (`feeder_id` của cột) có dữ liệu: hôm nay `luxmap_dev` có **0/103** cột mang `feeder_id`. Chưa có O-6 thì thiết bị không nối được với đèn nào.
 
@@ -529,7 +530,6 @@ gom địa lý hay khảo sát trong phạm vi này.
 
 | # | Câu hỏi | Vì sao phải quyết |
 |---|---|---|
-| I-7b | `controller_node_id` của `GET /segments` (§5.2) chỉ chứa **một** giá trị, trong khi một segment có thể được **nhiều** thiết bị cấp điện (I-14): giữ một giá trị (`null` khi 0 hoặc ≥ 2) hay đổi thành `controller_node_ids[]` (BREAKING). Đề xuất: danh sách **suy ra lúc đọc** (segment → cột → feeder → thiết bị), không lưu; hôm nay trường luôn `null` nên FE chưa có logic dựa vào nó | Thực tế nhiều-nhiều giữa tủ điện và segment |
 | I-11 | **BE-14b làm ngay** (hướng B, Mỹ nghiêng về) hay đợi IOT-10. Làm ngay được, không cần phần cứng (`last_report_at` null ⇒ `never_reported` cho tới khi có telemetry). Còn cần: (1) **Đạt đồng ý** BE1 dựng bảng thiết bị + bảng điều khiển feeder, telemetry vẫn của Đạt; (2) ngưỡng im lặng mặc định; (3) sơ đồ testbed (mấy thiết bị, mấy rơ-le); (4) cho phép tạo tạm **mỗi segment một feeder** để demo bộ mock khi O-6 chưa có; (5) dùng toạ độ `mock-iot-nodes.geojson` cho 3 thiết bị mock | Xem `tracking.html` → Vấn đề đang mở |
 
 **Phải báo:** WP5 (bản đồ lớp IoT, `battery_pct`, `has_iot_node`, demo `POLE-0047`), WP6, và **BE2 – Đạt** (IOT-10 dựng bảng theo I-1…I-6, I-12; payload telemetry mang `relay_no` theo I-17; câu hỏi sở hữu bảng ở I-11). **Chưa báo ai.**
