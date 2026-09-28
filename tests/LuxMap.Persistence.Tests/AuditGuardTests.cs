@@ -77,9 +77,12 @@ public class AuditGuardTests
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "LuxMap.slnx"))) root = root.Parent;
         Assert.NotNull(root);
-        var files = Directory.GetFiles(Path.Combine(root.FullName, "src"), "*.cs", SearchOption.AllDirectories)
-            .Where(file => !file.Split(Path.DirectorySeparatorChar)
-                .Any(part => part is "bin" or "obj" or "Migrations"))
+        // Scan every file, regardless of extension, so new config/text formats cannot evade this guard.
+        var files = Directory.GetFiles(Path.Combine(root.FullName, "src"), "*", SearchOption.AllDirectories)
+            .Where(file => !file.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
+            .Where(file => Path.GetFileName(file) != "20260927161055_AddAuditEvent.cs")
+            .Concat([Path.Combine(root.FullName, "docker-compose.yml"), Path.Combine(root.FullName, ".env.example")])
+            .Concat(Directory.GetFiles(Path.Combine(root.FullName, ".github", "workflows"), "*", SearchOption.AllDirectories))
             .ToArray();
         Assert.NotEmpty(files);
         Assert.DoesNotContain(files, file => File.ReadAllText(file).Contains("luxmap.audit_purge", StringComparison.Ordinal));

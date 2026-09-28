@@ -137,6 +137,18 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
         {
             var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
 
+            // Cover both fixture communes and actors, including events written in another commune.
+            await using (var transaction = await db.Database.BeginTransactionAsync())
+            {
+                await db.Database.ExecuteSqlRawAsync("SET LOCAL luxmap.audit_purge = 'on'");
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    DELETE FROM audit_event
+                    WHERE commune_id = {CommuneId} OR commune_id = {ForeignCommuneId}
+                       OR actor_user_id = {userId} OR actor_user_id = {bothCommunesUserId}
+                    """);
+                await transaction.CommitAsync();
+            }
+
             // Raw SQL, in dependency order. Every table here has a Restrict or Cascade edge, so the
             // order is the schema's, not a preference.
             foreach (var sql in new[]
