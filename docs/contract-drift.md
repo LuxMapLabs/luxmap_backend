@@ -483,3 +483,34 @@ correlation ID, thời điểm chung với nghiệp vụ, before/after và fault
 Unique index bắt hai create cùng fault; xmin bắt sửa WO/fault đồng thời; transaction rollback cả
 nghiệp vụ và audit của bên thua. Không BE-24 evidence, BE-27 notification, SLA, ExternalUnit,
 gom địa lý hay khảo sát trong phạm vi này.
+
+
+### BE-14 / IoT — chỉ còn thiết bị đo điện ở tủ điện tổng (28/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Mô hình thiết bị IoT theo phạm vi thật của đồ án: **một loại** thiết bị cố định, gắn ở **trụ điện / tủ điện tổng**, đo dòng điện và trạng thái nguồn, nhận lệnh ON/OFF/AUTO. **Không có IoT trên từng cột đèn.** Module BH1750 trên xe **không** phải `iot_node` (thuộc phiên khảo sát, D-R21 / BE-15) |
+| **Decision maker** | **Mỹ (Dylan)** — trực tiếp trong phiên 28/09/2026, trên đề xuất của Claude |
+| **Date** | 28/09/2026 |
+| **Scope** | Contract §3.1 (`node_role`), §5.1 (`has_iot_node`), §5.2 (`controller_node_id`), §5.6 (`GET /iot-nodes`), mock `mock-iot-nodes.geojson` + chuỗi `POLE-0047`/`NODE-047`; chặn thiết kế IOT-10 / BE-14 `/iot-nodes`. **Chưa đổi Contract, mock hay code** |
+
+| Mã | Chốt | Chạm API |
+|---|---|---|
+| **I-1** | **Bỏ `sampled_fixture`** — không có thiết bị IoT gắn trên từng cột. 9 node `sampled_fixture` của mock không còn đại diện cho gì | **Có — BREAKING** (enum §3.1, mock) |
+| **I-2** | **Bỏ `battery_pct`** khỏi properties của `GET /iot-nodes` (thiết bị ở tủ điện dùng điện lưới; đèn solar đã bỏ từ v1.6) | **Có — BREAKING** (§5.6, mock) |
+| **I-3** | `node_status` **tính lúc đọc**, không lưu cột: chưa từng báo → `never_reported`; `last_report_at` quá ngưỡng im lặng → `offline`; còn lại `online`. Ngưỡng cấu hình được (BE-33), cùng ngưỡng IOT-11 dùng để sinh `node_offline` | Không (ngữ nghĩa, giữ enum) |
+| **I-4** | Thiết bị có **toạ độ riêng** (vị trí tủ điện, `Point` 4326) và gắn với **mạch điện** (`feeder_id`), không gắn với cột. Tuyến (`segment_id`, `controller_node_id` của `/segments`) **suy ra** từ các cột trên mạch | **Có** (§5.6 thêm `feeder_id`; nguồn của `segment_id` đổi) |
+| **I-5** | `data_source` của thiết bị và telemetry = **`calibration_rig`** — theo D-R10 nhóm không lắp thiết bị ngoài thực địa, thiết bị chỉ có trên testbed. Đóng Contract **O-9** mà không thêm giá trị enum | Không (dùng giá trị có sẵn) |
+| **I-6** | Bảng thiết bị mang `supports_remote_control` và **chế độ hiện tại** do thiết bị báo về (`on \| off \| auto`). **Lệnh** đã gửi (ai, lúc nào, kết quả) ở bảng lệnh riêng + audit (D-R7, D-R13) — thuộc ticket điều khiển đèn, **không** thuộc BE-14 | **Có** (enum chế độ mới, trường mới trên `/iot-nodes`) |
+
+**Hệ quả còn phải quyết — ghi lại để không ai coi là đã xong:**
+
+| # | Câu hỏi | Vì sao phải quyết |
+|---|---|---|
+| I-7 | Giá trị còn lại của `node_role`: giữ `segment_controller` (không đổi tên, như tiền lệ `power_source = grid` v1.6), đổi tên (ví dụ `feeder_controller`, BREAKING), hay bỏ hẳn trường | Với I-4 thiết bị gắn **mạch**, không gắn **tuyến** — tên cũ nói sai điều nó làm |
+| I-8 | `has_iot_node` trên `GET /poles`: giữ khoá và luôn `false`, hay bỏ khoá (BREAKING) | Không còn thiết bị trên cột nên trường không bao giờ khác `false` |
+| I-9 | `runtime_decline` nay đo **theo mạch**, không theo bóng. Fault đó gắn vào đâu: `pole_id` null + `location` = toạ độ tủ điện? Cần `feeder_id` trên `fault`? | `fault` hiện không có `feeder_id`; `ck_fault_pole_or_location` đòi `pole_id` hoặc `location` |
+| I-10 | Demo `POLE-0047` / `NODE-047` (runtime suy giảm 18 đêm, FE hardcode) phải dựng lại ở mức mạch | FE đã dựng theo nó (CLAUDE.md mục bộ mock FO-26) |
+| I-11 | `GET /iot-nodes` làm theo hướng **(A)** tách BE-14b sau IOT-10, hay **(B)** BE1 tạo bảng sớm (cần Đạt đồng ý) | Xem `tracking.html` → Vấn đề đang mở |
+
+**Phải báo:** WP5 (bản đồ lớp IoT, `battery_pct`, `has_iot_node`, demo `POLE-0047`), WP6, và **BE2 – Đạt** (IOT-10 dựng bảng theo I-1…I-6). **Chưa báo ai.**
