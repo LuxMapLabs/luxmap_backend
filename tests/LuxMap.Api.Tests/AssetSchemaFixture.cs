@@ -90,6 +90,15 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
         await using (var scope = Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+            // Audit holds the commune with RESTRICT; the purge switch must end before asset cleanup.
+            await using (var transaction = await db.Database.BeginTransactionAsync())
+            {
+                await db.Database.ExecuteSqlRawAsync("SET LOCAL luxmap.audit_purge = 'on'");
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM audit_event WHERE commune_id = {CommuneId}");
+                await transaction.CommitAsync();
+            }
+
             await ExecuteAsync(db, "DELETE FROM pole WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM feeder WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM road_segment WHERE commune_id = @commune;", ("commune", CommuneId));

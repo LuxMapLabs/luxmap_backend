@@ -385,3 +385,19 @@ khi FW kế tiếp xác nhận**; ticket xây lên trên nó phải ghi rõ nề
 
 > Ghi theo khuôn: Contract đang ghi gì · Code đang làm gì · Đề xuất · Ảnh hưởng. Chạm bề mặt API thì
 > theo nguyên tắc 3 (ESCALATE khi im lặng), không tự coi là approve.
+
+
+### BE-23 — audit trước và loại việc của mock (27/09/2026)
+
+| | |
+|---|---|
+| **Decision** | D1/D9: tách hạ tầng audit D-R13 (trước hẹn BE-19) thành BE-23a, merge trước BE-23. D10: WO-0001 và WO-0003 là `inspection`; repair chỉ nhận fault `confirmed` hoặc `in_progress`. |
+| **Decision maker** | Mỹ — chốt bổ sung trực tiếp 27/09/2026; thiết kế chi tiết trong `.ai/results/BE-23-claude-decisions.md` theo uỷ quyền |
+| **Date** | 27/09/2026 |
+| **Scope** | BE-23a chỉ thêm lưu trữ audit nội bộ, không có API đọc audit. D10 chạm ngữ nghĩa mock/API; chưa gộp vào Contract v1.7, cần xác nhận FW. |
+
+**Hiện thực:** BE-23a có bảng audit, guard EF, trigger append-only và lối dọn test đã duyệt.
+Phần work order và đổi mock **chưa hiện thực**, đợi BE-23a merge theo D9.
+**Phải báo WP5/WP6:** WO-0001/WO-0003 chuyển thành inspection, có `task_kind`, giữ fault detected
+cho kiểm tra; không coi đây là repair hợp lệ. Việc thông báo chưa thực hiện; không suy ra họ đã nhận
+thay đổi chỉ từ việc ghi log này. Các drift bề mặt API còn lại đăng ký khi triển khai BE-23.
