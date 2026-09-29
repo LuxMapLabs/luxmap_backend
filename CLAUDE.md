@@ -1580,6 +1580,14 @@ quyết định sự cố nào (cùng họ lưu ý của BE-23a).
 Chuyển mà máy trạng thái vốn cấm thì 409 dù có luật riêng của `PATCH` hay không — sabotage gỡ luật đó đã
 xanh cho tới khi thêm cặp này.
 
+### Enum lưu dạng CHỮ: không bao giờ `ORDER BY` thẳng theo cột (29/09/2026)
+
+`HasContractEnum` lưu enum thành **text** (đúng giá trị trên dây), nên `OrderBy(x => x.Severity)` sắp theo
+**bảng chữ cái**: `critical, high, low, medium` — sai mà trông như có thứ tự. Cùng họ với bẫy
+`ORDER BY pole_id` ở mục 0. Muốn sắp theo mức thì dùng **hạng tường minh** dạng `Expression` để EF sinh
+`CASE` (`FaultQueryService.SeverityRank`); một hàm C# gọi trong `OrderBy` thì EF **không dịch được**.
+Test phải trồng các giá trị theo thứ tự mà sắp chữ cái sẽ lộ sai (`Default_order_is_severity_by_rank_…`).
+
 ### BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 
 **Schema và quyền ghi tách nhau như `pole_current_status`.** `feeder_control` là bảng riêng khoá theo
