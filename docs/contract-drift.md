@@ -615,3 +615,35 @@ và trả thứ tự mặc định về như cũ. `severity` do Quản lý đặ
 
 **Phải báo / đưa ra FW kế tiếp:** Thịnh, Khang, WP6 (FM-25). **Chưa báo.**
 
+## BE-19 — `PATCH /faults/{id}`: Quản lý duyệt sự cố (29/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực `PATCH /faults/{id}` theo §5.4, với các điểm Contract không nói (R-1…R-9) |
+| **Decision maker** | **Mỹ chốt 29/09/2026** — theo đề xuất D-1…D-10 ở `.ai/results/BE-19-p1.md`, **đã chỉnh sau review độc lập của Codex CLI** (xem mục "Chốt sau review" trong file đó). Chưa qua FW → `SELF-SIGNED` |
+| **Date** | 29/09/2026 |
+| **Scope** | BE-19; Contract §2, §3.2, §5.4. Không sửa Contract. Mọi mục chạm API là **nền tạm tới FW kế tiếp** |
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **R-1** | Capability mới `ReviewFaults` (`cap:review_faults`) = **chỉ Quản lý** | Có |
+| **R-2** | `PATCH` **chỉ** làm `detected → confirmed \| rejected`. `confirmed → in_progress → resolved → verified` hợp lệ ở §3.2 nhưng do **phiếu sửa chữa** lái (WO-2) → ở đây 409 `INVALID_STATE_TRANSITION` kèm `allowed_actions` | Có (thu hẹp §5.4) |
+| **R-3** | Sự cố đang bị **phiếu sửa chữa** giữ (liên kết chưa giải phóng, **bất kể** trạng thái phiếu: open/assigned/in_progress/done) → **409 `FAULT_IN_ACTIVE_REPAIR`** (mã mới) kèm `work_order_id`. Phiếu **kiểm tra** không chặn (WO-10) | Có |
+| **R-4** | `override_fault_type`: chỉ `lamp_out ↔ lamp_dim`; lưu ở cột **`fault.override_fault_type`**, `fault.fault_type` giữ **nguyên loại kênh báo** (không phải ground truth — v1.4 `dim` = CV + lux). API trả và lọc `fault_type` = `override ?? fault_type`. Đặt về đúng loại gốc = xoá override; `null` = xoá. Loại khác hoặc sự cố không phải lamp → 400 | Có |
+| **R-5** | Body thêm **`severity?`** (P-2) — Quản lý đặt mức ưu tiên. `null` → 400 | Có |
+| **R-6** | `note` của PATCH lưu vào cột mới **`review_note`** (không ghi đè `note` của người báo); cắt khoảng trắng; rỗng/`null` = xoá; thiếu khoá = giữ | Có |
+| **R-7** | Item `GET /faults` và response PATCH thêm **`review_note`** và **`allowed_actions[]`** → **20 khoá**. `allowed_actions` ∈ `confirm, reject, reclassify, set_severity, edit_note`; **rỗng** với mọi vai trò khác Quản lý, với sự cố đóng, và với sự cố bị phiếu sửa chữa giữ. Chỉ mang tính gợi ý: race vẫn có thể ra 409 | Có |
+| **R-8** | `fault_status` bắt buộc; gửi **đúng trạng thái hiện tại** = không chuyển, vẫn áp `severity`/`override_fault_type`/`note`. Không đổi gì → 200, **không** audit, **không** đổi `updated_at`. Sửa khi sự cố đã đóng → 409. Chặn "phiếu sửa chữa" áp **trước** mọi thứ khác, kể cả no-op | Có |
+| **R-9** | Thứ tự lỗi: 403 capability → 400 body → 404 `FAULT_NOT_FOUND` (không tồn tại **hoặc** ngoài phạm vi) → 409 `FAULT_IN_ACTIVE_REPAIR` → 409 `INVALID_STATE_TRANSITION` → 409 `CONCURRENT_MODIFICATION` | Có |
+
+**Ngoài API (không chạm hình dạng):** `Fault` nay là `IAudited` — **mọi** lần ghi sự cố phải kèm đúng một
+audit trong cùng `SaveChanges` (D-R13): quyết định của Quản lý ghi `entity_type = fault`, `action =
+confirmed | rejected | details_changed`. Tạo phiếu công việc và `PATCH` sự cố **khoá hàng `fault`**
+(`FOR UPDATE`) rồi mới đọc trạng thái để kiểm — chặn race "bác bỏ trong lúc đang tạo phiếu" mà `xmin`
+không thấy (Codex phát hiện). Phiếu tạo tiếp (FR-2) vẫn **không** tự lọc sự cố đã bị bác bỏ sau khi
+kiểm tra: mặc định mang cả nhóm `fault_present`, gặp sự cố không đủ điều kiện → 409
+`FAULT_STATUS_NOT_ELIGIBLE`; Quản lý gửi `fault_ids` để chọn.
+
+**Phải báo:** WP5 (FW-12: 20 khoá, `allowed_actions`, `review_note`, 2 mã lỗi mới, `fault_type` là loại
+đã quyết). **Chưa báo.**
+
