@@ -1,3 +1,4 @@
+using LuxMap.Modules.Faults;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,5 +16,6 @@ public sealed class WorkOrdersModule : ILuxMapModule
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<WorkOrderService>();
+        services.AddScoped<IActiveWorkOrderLookup, ActiveWorkOrderLookup>();
     }
 }

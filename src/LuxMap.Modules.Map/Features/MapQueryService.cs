@@ -1,7 +1,6 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
-using LuxMap.Modules.Map.Bbox;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence;

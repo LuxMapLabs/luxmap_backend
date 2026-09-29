@@ -1,5 +1,4 @@
 using Asp.Versioning;
-using LuxMap.Modules.Map.Bbox;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -72,12 +71,12 @@ public sealed class MapController(
             new PoleMapQuery
             {
                 Bbox = BoundingBox.Parse(bbox),
-                Statuses = CsvEnum<FixtureStatus>(status, "status"),
+                Statuses = WireEnum.ParseCsv<FixtureStatus>(status, "status"),
                 PowerSource = powerSource,
                 SegmentId = segmentId,
                 CommuneIds = CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
                 HasOpenFault = hasOpenFault,
-                DataSource = CsvEnum<DataSource>(dataSource, "data_source"),
+                DataSource = WireEnum.ParseCsv<DataSource>(dataSource, "data_source"),
             },
             ct));
 
@@ -101,7 +100,7 @@ public sealed class MapController(
             {
                 Bbox = BoundingBox.Parse(bbox),
                 CommuneIds = CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
-                DataSource = CsvEnum<DataSource>(dataSource, "data_source"),
+                DataSource = WireEnum.ParseCsv<DataSource>(dataSource, "data_source"),
             },
             ct));
 
@@ -127,72 +126,7 @@ public sealed class MapController(
             {
                 Bbox = BoundingBox.Parse(bbox),
                 CommuneIds = CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
-                DataSource = CsvEnum<DataSource>(dataSource, "data_source"),
+                DataSource = WireEnum.ParseCsv<DataSource>(dataSource, "data_source"),
             },
             ct));
-
-    /// <summary>
-    /// Reads a comma-separated enum list in the WIRE spelling, refusing an unknown member by name.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Bound as a string and parsed here rather than as <c>TEnum[]</c>, because the framework's
-    /// binder answers an unparseable value with a generic 400 that does not say WHICH value it
-    /// rejected — and for an enum the front end hardcodes, that is the one thing worth saying.
-    /// </para>
-    /// <para>
-    /// 🔴 <b>Matched against the SNAKE_CASE name, not with <c>Enum.TryParse</c>.</b> The wire values
-    /// of Contract section 3.1 are lowercase snake_case — <c>calibration_rig</c>,
-    /// <c>field_report</c>, <c>node_offline</c> — and <c>Enum.TryParse</c> does not know about the
-    /// underscore, so it rejects every multi-word member while happily accepting single-word ones
-    /// like <c>normal</c>. That shape of bug hides: the common filters work and the map simply
-    /// refuses a few values.
-    /// </para>
-    /// <para>
-    /// The comparison uses the SAME policy that serialises these enums on the way out, so the values
-    /// a client reads back are exactly the values it may send.
-    /// </para>
-    /// </remarks>
-    private static IReadOnlyList<TEnum>? CsvEnum<TEnum>(string? raw, string parameter)
-        where TEnum : struct, Enum
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return null;
-        }
-
-        var parsed = new List<TEnum>();
-
-        foreach (var part in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            var match = Enum.GetValues<TEnum>()
-                .Where(candidate => WireName(candidate).Equals(part, StringComparison.OrdinalIgnoreCase))
-                .Select(candidate => (TEnum?)candidate)
-                .FirstOrDefault();
-
-            if (match is not { } value)
-            {
-                throw new LuxMapException(
-                    ErrorCodes.ValidationFailed,
-                    System.Net.HttpStatusCode.BadRequest,
-                    $"'{part}' is not a valid {parameter}.",
-                    new Dictionary<string, object?>
-                    {
-                        [parameter] = part,
-                        // The same policy that serialises them, so the list a caller is shown is the
-                        // list they can actually send back.
-                        ["allowed"] = Enum.GetValues<TEnum>().Select(WireName).ToArray(),
-                    });
-            }
-
-            parsed.Add(value);
-        }
-
-        return parsed;
-    }
-
-    /// <summary>The value as it appears on the wire — the same policy <c>LuxMapJsonOptions</c> uses.</summary>
-    private static string WireName<TEnum>(TEnum value)
-        where TEnum : struct, Enum
-        => System.Text.Json.JsonNamingPolicy.SnakeCaseLower.ConvertName(value.ToString()!);
 }

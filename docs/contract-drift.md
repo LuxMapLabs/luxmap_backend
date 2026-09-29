@@ -419,7 +419,7 @@ thay đổi chỉ từ việc ghi log này. Các drift bề mặt API còn lại
 | WO-4 | Thêm GET detail, GET assignees, PUT assignee, POST start/complete/verify/return/cancel. PATCH chỉ sửa title/due_date/scheduled_date; không đổi wo_status hoặc người được giao bằng PATCH | Có |
 | WO-5 | **BREAKING**: POST bắt buộc `task_kind`. Repair cần 1..200 fault; inspection cần fault hoặc một segment, không cả hai. Server tra commune; POST cấm work_order_id/commune_id/wo_status/cluster_id/priority_score. Item thêm task_kind/commune_id/scheduled_date/updated_at; detail thêm các trường mô tả bên dưới | Có |
 | WO-6 | Segment chụp từ fault có priority cao nhất, null cuối; hoà theo created_at/length(id)/id; bỏ fault không segment. Cluster chụp khi các cluster khác null có đúng một giá trị. Priority đọc sống = max trên toàn bộ thành viên, kể cả đã release. Mock lần lượt 98.0/74.2/66.4, API ra 92.9/96.3/72.5 | Có |
-| WO-7 | Nguồn `fault.work_order_id` cho BE-40 là bảng nối có released_at NULL, tối đa một do unique partial index. Câu “luôn null tới BE-21” hết nền; **BE-40 chưa hiện thực ở đây** | Có |
+| WO-7 | Nguồn `fault.work_order_id` cho BE-40 là bảng nối có released_at NULL, tối đa một do unique partial index. Câu “luôn null tới BE-21” hết nền; **đã hiện thực ở BE-40 (29/09/2026), xem F-3** | Có |
 | WO-8 | Thêm `WORK_ORDER_NOT_FOUND` (404), `FAULT_NOT_FOUND` (404), `INVALID_STATE_TRANSITION`, `FAULT_ALREADY_IN_WORK_ORDER`, `FAULT_STATUS_NOT_ELIGIBLE`, `ASSIGNEE_NOT_ELIGIBLE`, `CONCURRENT_MODIFICATION` (409). Bảng §11 của decisions gọi “sáu” nhưng §8 thực tế liệt kê **bảy** mã mới | Có |
 | WO-9 | Không đổi mock-work-orders.json. File loại riêng gán WO-0001/0003 inspection, WO-0002 repair. Seed FAULT-0003/0007/0011 thành in_progress để khớp WO-0002; assigned_at và started_at suy từ created_at. Không audit seed; có audit work_order thì seed từ chối. **Cần báo WP5/WP6, chưa gửi thông báo trong phiên này** | Có |
 | WO-10 | BE-19 phải từ chối sửa fault đang thuộc repair hoạt động bằng 409 (mã do BE-19 chốt). Fault trong inspection vẫn được review. Đây là ràng buộc cho ticket sau, không thêm endpoint fault ở BE-23 | Có, tương lai |
@@ -556,9 +556,34 @@ gom địa lý hay khảo sát trong phạm vi này.
 | Mã | Chốt / hiện thực | Chạm API |
 |---|---|---|
 | **I-11** | **BE-14b làm ngay, do BE1.** Mỹ quyết BE1 dựng `iot_node` + `feeder_control` (phần tương ứng của IOT-10); bảng telemetry và ingest **vẫn của Đạt** (IOT-09/10). Ngưỡng offline **1 giờ**, cấu hình `Iot:OfflineAfter` (≤ 0 → không khởi động). Bộ mock có **mạch TẠM** mỗi segment một feeder (`FDR-001..003`, `external_ref = DEMO-SEG-00n`, 103/103 cột gán) và 3 thiết bị dùng toạ độ `mock-iot-nodes.geojson`; **không** phải dữ liệu O-6. Testbed thật (1 thiết bị, 2 feeder lẻ/chẵn, ~10 đèn) seed khi có toạ độ mô hình | Có |
-| **I-18** | `GET /iot-nodes` (capability `ReadNetwork`, `bbox` bắt buộc, `FeatureCollection` điểm). `properties` **đúng 8 khoá**: `node_id, node_role, node_status, pole_id, segment_ids, feeder_ids, supports_remote_control, last_report_at`. `pole_id` **luôn null** (giữ khoá); `battery_pct` bỏ; `segment_id` → `segment_ids[]`; `feeder_ids[]` theo **thứ tự rơ-le**, `segment_ids[]` theo khuôn `created_at, length(id), id`. ⚠️ MapLibre lưu mảng trong `properties` thành chuỗi JSON — FE phải parse khi dựng popup. `data_source` **mặc định loại `calibration_rig`** như `/poles`, `/segments` (§1.6) — testbed chỉ hiện khi hỏi tên. *Điểm cuối cùng là lựa chọn của Claude để nhất quán §1.6, chưa được hỏi riêng — Mỹ xác nhận hoặc lật* | **Có — BREAKING** so với §5.6 |
+| **I-18** | `GET /iot-nodes` (capability `ReadNetwork`, `bbox` bắt buộc, `FeatureCollection` điểm). `properties` **đúng 8 khoá**: `node_id, node_role, node_status, pole_id, segment_ids, feeder_ids, supports_remote_control, last_report_at`. `pole_id` **luôn null** (giữ khoá); `battery_pct` bỏ; `segment_id` → `segment_ids[]`; `feeder_ids[]` theo **thứ tự rơ-le**, `segment_ids[]` theo khuôn `created_at, length(id), id`. ⚠️ MapLibre lưu mảng trong `properties` thành chuỗi JSON — FE phải parse khi dựng popup. `data_source` **mặc định loại `calibration_rig`** như `/poles`, `/segments` (§1.6) — testbed chỉ hiện khi hỏi tên (`data_source=calibration_rig`, hoặc `calibration_rig,simulated` để thấy cả hai). **Mỹ xác nhận giữ mặc định ẩn, 29/09/2026**; FE cần nút bật/tắt "Hiện testbed" thì chỉ thêm tham số, backend không đổi | **Có — BREAKING** so với §5.6 |
 | **I-19** | Thiết bị **mock** mang `data_source = simulated`, `supports_remote_control = false` (dữ liệu demo, không phải phần cứng). Thiết bị testbed: `calibration_rig`, `true`. DB **siết hơn enum**: `ck_iot_node_data_source_not_field` chỉ nhận `calibration_rig \| simulated` (I-5, D-R10) | Không (giá trị có sẵn) |
 
 **Mock đã đổi theo I-1, I-2, I-7b, I-8** (28/09/2026): `mock-iot-nodes.geojson` còn 3 node với hình dạng I-18; `mock-segments.geojson` `controller_node_id` → `controller_node_ids[]`; `mock-poles.geojson` 9 cột `has_iot_node` true → false. `mock-pole-detail.json` (`iot_node: NODE-047`) **chưa sửa** — chờ I-10 hỏi WP5.
 
 **Phải báo:** WP5 (lớp IoT mới + parse mảng, `battery_pct` bỏ, `has_iot_node` luôn false, `controller_node_ids[]`, demo `POLE-0047`, 4 file mock đổi), WP6 (cùng các trường qua sync bundle sau này), và **BE2 – Đạt** (BE1 đã dựng `iot_node` + `feeder_control` theo I-1…I-6, I-12; telemetry vẫn của Đạt, payload mang `relay_no` theo I-17; `last_report_at` là cột Đạt sẽ ghi). **Chưa báo ai.**
+
+## BE-40 — `GET /faults` (29/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực `GET /api/v1/faults` theo §5.4, với sáu điểm Contract không nói (F-1…F-6) |
+| **Decision maker** | **Mỹ chốt 29/09/2026** — chọn đúng các đề xuất D-1…D-9 ở `.ai/results/BE-40-p1.md`. Chưa qua FW → `SELF-SIGNED` |
+| **Date** | 29/09/2026 |
+| **Scope** | BE-40; Contract §2, §5.4. Không sửa Contract trong ticket này. Mọi mục chạm API là **nền tạm tới FW kế tiếp xác nhận**; im lặng là ESCALATE, không phải approve |
+
+| Mã | Deviation / quyết định áp dụng | Chạm API |
+|---|---|---|
+| **F-1** | Capability mới `ReadFaults` (`cap:read_faults`) = cả bốn vai trò. Tách khỏi `ReadNetwork` để siết quyền đọc sự cố về sau mà không đụng bản đồ (O-2) | Có |
+| **F-2** | Kỹ sư hiện trường thấy **mọi** fault trong xã của mình, không chỉ fault thuộc phiếu được giao — để khỏi báo trùng (BE-41). WO-1 chỉ giới hạn *phiếu* | Có |
+| **F-3** | `work_order_id` = phiếu đang giữ fault (`released_at IS NULL`, WO-7), **kể cả** khi người gọi không mở được phiếu đó (WO-1 trả 404). `null` nghĩa là thật sự chưa có phiếu. §5.4 ghi "luôn null tới BE-21" — **hết hiệu lực** | Có |
+| **F-4** | `location` = `fault.lat/lng`, thiếu thì lấy điểm của cột (cùng luật với chi tiết WO). `bbox` **tuỳ chọn** ở đây, lọc khoảng số bao hai đầu trên chính điểm đó; không cột geometry, không GIST | Có |
+| **F-5** | `data_source` mặc định **ẩn `calibration_rig`** như `/poles`, `/segments`, `/iot-nodes` (§1.6); muốn thấy testbed thì truyền tên | Có |
+| **F-6** | `sort` ∈ `priority_score`, `detected_at`, `updated_at`, mỗi cái có thể thêm `-`; `priority_score` null **luôn cuối** cả hai chiều; hoà thì `created_at, length(fault_id), fault_id` **tăng dần** bất kể chiều khoá (khớp mock). `status`, `severity`, `fault_type`, `source_channel`, `data_source` nhận CSV theo tên wire; `pole_id`/`segment_id`/`cluster_id` một giá trị; thêm `commune_id` lặp được (thu hẹp, ngoài phạm vi → 403). Giá trị sai → 400 `VALIDATION_FAILED` kèm `details.allowed` | Có |
+
+**Đối chiếu mock (luxmap_test, 29/09/2026):** 28/28 fault, thứ tự mặc định khớp, 18 khoá khớp từng
+trường, 11/11 `work_order_id` khớp. Lệch duy nhất: `fault_status` của FAULT-0003/0007/0011 là
+`in_progress` (mock ghi `confirmed`) — đã ghi ở **WO-9**, không phải lệch mới.
+
+**Phải báo:** WP5 (F-1…F-6; `work_order_id` nay có giá trị thật), WP6 (cùng item qua sync bundle sau
+này). **Chưa báo ai.**

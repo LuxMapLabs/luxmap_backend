@@ -49,6 +49,9 @@ public static class LuxMapPolicies
     /// <summary>Create accounts and assign roles and communes. No endpoint yet (BE-33).</summary>
     public const string ManageUsers = "cap:manage_users";
 
+    /// <summary>Read the fault list (BE-40). Kept apart from <see cref="ReadNetwork"/> so fault access can change without touching the map.</summary>
+    public const string ReadFaults = "cap:read_faults";
+
     public const string ReadWorkOrders = "cap:read_work_orders";
     public const string ManageWorkOrders = "cap:manage_work_orders";
     public const string ExecuteWorkOrders = "cap:execute_work_orders";
@@ -63,6 +66,7 @@ public static class LuxMapPolicies
             [RecordLuxReading] = [UserRole.FieldEngineer],
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],
+            [ReadFaults] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReadWorkOrders] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageWorkOrders] = [UserRole.Manager],
             [ExecuteWorkOrders] = [UserRole.FieldEngineer],
