@@ -1,6 +1,7 @@
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Persistence;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Paging;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace LuxMap.Modules.Faults;
 
 /// <summary>Reads for <c>GET /faults</c> (BE-40, Contract section 5.4).</summary>
-public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup workOrders)
+public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup workOrders, ICurrentActorAccessor actor)
 {
     public async Task<PagedResult<FaultItem>> ListAsync(FaultListQuery query, PageRequest page, CancellationToken ct)
     {
@@ -31,7 +32,13 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
 
         if (query.FaultTypes is { } types)
         {
-            faults = faults.Where(fault => types.Contains(fault.FaultType));
+            // The type the API reports: a Manager's reclassification wins (BE-19 D-4). Two branches,
+            // each list typed like its column — EF cannot bind one non-nullable list to the nullable
+            // override column, nor translate Contains over the coalesce.
+            var overrides = types.Select(type => (FaultType?)type).ToArray();
+            faults = faults.Where(fault => fault.OverrideFaultType != null
+                ? overrides.Contains(fault.OverrideFaultType)
+                : types.Contains(fault.FaultType));
         }
 
         if (query.SourceChannels is { } channels)
@@ -60,19 +67,7 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
             faults = faults.Where(fault => fault.ClusterId == cluster);
         }
 
-        // Location is the fault's own lat/lng, falling back to its pole's point (BE-40 D-4) — the
-        // same rule as the work order detail. The table CHECK allows a pole-bound fault without
-        // coordinates, and section 5.4 makes location non-null.
-        var rows =
-            from fault in faults
-            join pole in db.Set<Pole>() on fault.PoleId equals pole.PoleId into poles
-            from pole in poles.DefaultIfEmpty()
-            select new LocatedFault
-            {
-                Fault = fault,
-                Lat = fault.Lat ?? (pole == null ? 0 : pole.Geom.Y),
-                Lng = fault.Lng ?? (pole == null ? 0 : pole.Geom.X),
-            };
+        var rows = Locate(faults);
 
         // Plain range on the numbers, inclusive like ST_Intersects on an envelope. No spatial index:
         // fault has no geometry column (BE-40 D-5), and the other filters have already narrowed it.
@@ -89,16 +84,50 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
             .Take(page.PageSize)
             .ToListAsync(ct);
 
-        var held = await workOrders.ActiveWorkOrdersAsync(paged.Select(row => row.Fault.FaultId).ToArray(), ct);
+        var items = await ToItemsAsync(paged, ct);
 
-        var items = paged.Select(row => new FaultItem
+        return PagedResult<FaultItem>.From(page, total, items);
+    }
+
+    /// <summary>One fault as <c>GET /faults</c> would show it; NULL when absent or outside scope.</summary>
+    public async Task<FaultItem?> ItemAsync(string faultId, CancellationToken ct)
+    {
+        var rows = await Locate(db.Set<Fault>().AsNoTracking().Where(fault => fault.FaultId == faultId)).ToListAsync(ct);
+        return rows.Count == 0 ? null : (await ToItemsAsync(rows, ct))[0];
+    }
+
+    // Location is the fault's own lat/lng, falling back to its pole's point (BE-40 D-4) — the same
+    // rule as the work order detail. The table CHECK allows a pole-bound fault without coordinates,
+    // and section 5.4 makes location non-null.
+    private IQueryable<LocatedFault> Locate(IQueryable<Fault> faults)
+        =>
+            from fault in faults
+            join pole in db.Set<Pole>() on fault.PoleId equals pole.PoleId into poles
+            from pole in poles.DefaultIfEmpty()
+            select new LocatedFault
+            {
+                Fault = fault,
+                Lat = fault.Lat ?? (pole == null ? 0 : pole.Geom.Y),
+                Lng = fault.Lng ?? (pole == null ? 0 : pole.Geom.X),
+            };
+
+    private async Task<FaultItem[]> ToItemsAsync(IReadOnlyList<LocatedFault> rows, CancellationToken ct)
+    {
+        var ids = rows.Select(row => row.Fault.FaultId).ToArray();
+        var held = await workOrders.ActiveWorkOrdersAsync(ids, ct);
+        var reviewer = actor.Role == UserRole.Manager;
+        var repairs = reviewer
+            ? await workOrders.ActiveRepairsAsync(ids, ct)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+
+        return rows.Select(row => new FaultItem
         {
             FaultId = row.Fault.FaultId,
             PoleId = row.Fault.PoleId,
             FixtureId = row.Fault.FixtureId,
             SegmentId = row.Fault.SegmentId,
             Location = new FaultLocation(row.Lat, row.Lng),
-            FaultType = row.Fault.FaultType,
+            FaultType = row.Fault.EffectiveType,
             FaultStatus = row.Fault.FaultStatus,
             Severity = row.Fault.Severity,
             SourceChannel = row.Fault.SourceChannel,
@@ -111,9 +140,11 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
             WorkOrderId = held.GetValueOrDefault(row.Fault.FaultId),
             Note = row.Fault.Note,
             ReportedBy = row.Fault.ReportedBy,
+            ReviewNote = row.Fault.ReviewNote,
+            AllowedActions = reviewer
+                ? FaultReviewRules.AllowedActions(row.Fault, repairs.ContainsKey(row.Fault.FaultId))
+                : [],
         }).ToArray();
-
-        return PagedResult<FaultItem>.From(page, total, items);
     }
 
     /// <remarks>

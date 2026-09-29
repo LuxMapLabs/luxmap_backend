@@ -15,7 +15,7 @@ namespace LuxMap.Modules.Faults;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/faults")]
-public sealed class FaultsController(FaultQueryService service, LuxMapDbContext db) : ControllerBase
+public sealed class FaultsController(FaultQueryService service, FaultReviewService review, LuxMapDbContext db) : ControllerBase
 {
     /// <summary>
     /// Faults in the caller's communes as paginated JSON — NOT GeoJSON — each item with
@@ -73,6 +73,28 @@ public sealed class FaultsController(FaultQueryService service, LuxMapDbContext 
             },
             page.ToPageRequest(),
             ct);
+
+    /// <summary>A Manager reviews one fault (BE-19): confirm, reject, reclassify, set severity, write a note.</summary>
+    /// <remarks>
+    /// <para>
+    /// <c>fault_status</c> is required; sending the current status means "no transition" so severity,
+    /// reclassification or the note can change on their own. Only <c>detected → confirmed | rejected</c>
+    /// are made here — later statuses belong to repair work orders.
+    /// </para>
+    /// <para>
+    /// 404 <c>FAULT_NOT_FOUND</c> outside scope; 409 <c>FAULT_IN_ACTIVE_REPAIR</c> while a repair holds
+    /// the fault, <c>INVALID_STATE_TRANSITION</c> for any other move, <c>CONCURRENT_MODIFICATION</c> on a race.
+    /// </para>
+    /// </remarks>
+    [HttpPatch("{id}")]
+    [Authorize(Policy = LuxMapPolicies.ReviewFaults)]
+    [ProducesResponseType<FaultItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public Task<FaultItem> ReviewAsync(string id, PatchFaultRequest request, CancellationToken ct)
+        => review.ReviewAsync(id, request, ct);
 
     private static string? Single(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

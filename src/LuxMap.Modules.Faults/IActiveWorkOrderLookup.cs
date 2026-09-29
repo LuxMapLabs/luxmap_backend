@@ -25,4 +25,15 @@ public interface IActiveWorkOrderLookup
     /// <summary>fault_id → work_order_id for those of <paramref name="faultIds"/> held by a work order.</summary>
     Task<IReadOnlyDictionary<string, string>> ActiveWorkOrdersAsync(
         IReadOnlyCollection<string> faultIds, CancellationToken ct);
+
+    /// <summary>
+    /// fault_id → work_order_id for those of <paramref name="faultIds"/> held by a REPAIR work order —
+    /// any unreleased link, whatever the work order's status (open, assigned, in progress, done).
+    /// </summary>
+    /// <remarks>
+    /// Drift WO-10 / BE-19 D-3: while a repair holds a fault, the repair drives its status and a
+    /// Manager's review of it answers 409. An inspection does not block review.
+    /// </remarks>
+    Task<IReadOnlyDictionary<string, string>> ActiveRepairsAsync(
+        IReadOnlyCollection<string> faultIds, CancellationToken ct);
 }

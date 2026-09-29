@@ -23,11 +23,14 @@ public sealed class AuditEvent : ICommuneScoped
 
 // Internal storage enums, deliberately outside Shared.Contracts.Enums.
 public enum AuditActorKind { User, Cv, Iot }
-public enum AuditEntityType { WorkOrder }
+public enum AuditEntityType { WorkOrder, Fault }
 public enum AuditAction
 {
     Created, Assigned, Reassigned, Unassigned, Started, Completed, Verified,
     Returned, Cancelled, DetailsChanged,
+
+    /// <summary>A Manager's review decision on a fault (BE-19): detected → confirmed / rejected.</summary>
+    Confirmed, Rejected,
 }
 
 /// <summary>Marks business entities whose writes require one audit event per SaveChanges.</summary>

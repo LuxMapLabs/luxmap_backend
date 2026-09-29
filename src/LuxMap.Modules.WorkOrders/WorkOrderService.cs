@@ -175,8 +175,13 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     private async Task<WorkOrderDetail> Insert(NewWorkOrder order, CancellationToken ct)
     {
-        var faults = order.Faults;
-        var ids = faults.Select(x => x.FaultId).ToArray();
+        var ids = order.Faults.Select(x => x.FaultId).ToArray();
+        // Lock, then RE-READ: the statuses checked below must be the ones a concurrent fault review
+        // (BE-19) cannot change before this work order commits (FaultLocks).
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await FaultLocks.LockAsync(db, ids, ct);
+        var faults = await db.Set<Fault>().AsNoTracking().Where(x => ids.Contains(x.FaultId))
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).ToListAsync(ct);
         string commune;
         string? segment;
         if (faults.Count > 0)
@@ -222,6 +227,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         });
         Record(wo, AuditAction.Created, null, Snapshot(wo, ids), now, order.Note);
         await Save(id, ids, ct);
+        await transaction.CommitAsync(ct);
         return await Detail(id, ct);
     }
 
@@ -384,6 +390,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException)
         {
+            // A failed statement aborts an open transaction; roll it back before the lookup below.
+            if (db.Database.CurrentTransaction is { } open) await open.RollbackAsync(ct);
             db.ChangeTracker.Clear();
             // Reapply BOTH filters: reassignment during a race can make the WO invisible now.
             var current = await Find(id, ct);
@@ -392,6 +400,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         catch (DbUpdateException error) when (error.InnerException is PostgresException
             { SqlState: "23505", ConstraintName: "ux_work_order_fault_fault_id_active" })
         {
+            if (db.Database.CurrentTransaction is { } open) await open.RollbackAsync(ct);
             db.ChangeTracker.Clear();
             var link = await db.Set<WorkOrderFault>().FirstAsync(x => faultIds.Contains(x.FaultId) && x.ReleasedAt == null, ct);
             throw LinkConflict(link);

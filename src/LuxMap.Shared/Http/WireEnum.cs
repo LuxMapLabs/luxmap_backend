@@ -69,6 +69,17 @@ public static class WireEnum
         return parsed;
     }
 
+    /// <summary>Reads ONE enum value in the wire spelling, refusing an unknown one by name.</summary>
+    public static TEnum Parse<TEnum>(string raw, string parameter)
+        where TEnum : struct, Enum
+        => ParseCsv<TEnum>(raw, parameter) is [var value]
+            ? value
+            : throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                HttpStatusCode.BadRequest,
+                $"{parameter} takes exactly one value.",
+                new Dictionary<string, object?> { [parameter] = raw });
+
     /// <summary>The value as it appears on the wire — the same policy <c>LuxMapJsonOptions</c> uses.</summary>
     public static string Name<TEnum>(TEnum value)
         where TEnum : struct, Enum
