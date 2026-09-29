@@ -330,7 +330,8 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         var done = await Send("a", "POST", "/" + inspect + "/complete", new { report_note = "The fault is present", fault_outcomes = new[] { new { fault_id = inspectFault, outcome = "fault_present" } } }, 200);
         Assert.Equal("fault_present", done.GetProperty("faults")[0].GetProperty("inspection_outcome").GetString());
         await Send("manager", "POST", "/" + inspect + "/verify", new { }, 200);
-        Assert.Equal(FaultStatus.Detected, await Db(db => db.Set<Fault>().IgnoreQueryFilters().Where(x => x.FaultId == inspectFault).Select(x => x.FaultStatus).SingleAsync()));
+        // Drift FR-2a (C): verifying an inspection confirms what the engineer found present.
+        Assert.Equal(FaultStatus.Confirmed, await Db(db => db.Set<Fault>().IgnoreQueryFilters().Where(x => x.FaultId == inspectFault).Select(x => x.FaultStatus).SingleAsync()));
         await Create("inspection", [inspectFault]);
         var cancelledFault = await Fault(FaultStatus.InProgress);
         var cancelled = await Create("repair", [cancelledFault], users["a"].UserId);
@@ -420,6 +421,99 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         var error = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => Db(db => db.Database.ExecuteSqlRawAsync(sql, id)));
         Assert.Equal("23514", error.SqlState);
         Assert.Equal(constraint, error.ConstraintName);
+    }
+
+    /// <summary>Drift FR-2 + FR-2a: inspection → verified → follow-up repair, one case_id for the chain.</summary>
+    [Fact]
+    public async Task A_verified_inspection_confirms_present_faults_and_follows_up_into_a_repair_on_one_case()
+    {
+        var (present, absent, unsure) = (await Fault(), await Fault(), await Fault());
+        var inspect = await VerifiedInspectionAsync((present, "fault_present"), (absent, "fault_absent"), (unsure, "inconclusive"));
+
+        var statuses = await Db(db => db.Set<Fault>().IgnoreQueryFilters()
+            .Where(x => x.FaultId == present || x.FaultId == absent || x.FaultId == unsure)
+            .ToDictionaryAsync(x => x.FaultId, x => new { x.FaultStatus, x.ConfirmedBy }));
+        Assert.Equal(FaultStatus.Confirmed, statuses[present].FaultStatus);
+        Assert.Equal(users["manager"].UserId, statuses[present].ConfirmedBy);
+        Assert.Equal(FaultStatus.Detected, statuses[absent].FaultStatus);
+        Assert.Equal(FaultStatus.Detected, statuses[unsure].FaultStatus);
+        var verified = await Db(db => db.Set<AuditEvent>().IgnoreQueryFilters()
+            .SingleAsync(x => x.EntityId == inspect && x.Action == AuditAction.Verified));
+        Assert.Contains(present, verified.AfterState!);
+
+        var parent = await Send("manager", "GET", "/" + inspect, null, 200);
+        Assert.Contains("follow_up", parent.GetProperty("allowed_actions").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(inspect, parent.GetProperty("case_id").GetString());
+        Assert.Equal(JsonValueKind.Null, parent.GetProperty("parent_work_order_id").ValueKind);
+
+        var repair = await Send("manager", "POST", "/" + inspect + "/follow-up",
+            new { task_kind = "repair", assigned_to = users["a"].UserId, note = "Go and fix it" }, 201);
+        var repairId = repair.GetProperty("work_order_id").GetString()!;
+        Assert.Equal("repair", repair.GetProperty("task_kind").GetString());
+        Assert.Equal(inspect, repair.GetProperty("parent_work_order_id").GetString());
+        Assert.Equal(inspect, repair.GetProperty("case_id").GetString());
+        Assert.Equal(parent.GetProperty("title").GetString(), repair.GetProperty("title").GetString());
+        Assert.Equal([present], repair.GetProperty("fault_ids").EnumerateArray().Select(x => x.GetString()!).ToArray());
+
+        var chain = await Send("manager", "GET", $"?case_id={inspect}", null, 200);
+        Assert.Equal(
+            new[] { inspect, repairId }.Order(),
+            chain.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("work_order_id").GetString()!).Order());
+
+        await Send("a", "POST", "/" + repairId + "/start", new { }, 200);
+        await Send("a", "POST", "/" + repairId + "/complete", new { report_note = "Lamp head replaced" }, 200);
+        await Send("manager", "POST", "/" + repairId + "/verify", new { }, 200);
+        await Send("manager", "POST", "/" + repairId + "/follow-up", new { task_kind = "repair" }, 409, "INVALID_STATE_TRANSITION");
+    }
+
+    [Fact]
+    public async Task Follow_up_is_refused_until_there_is_a_verified_parent_with_something_to_carry()
+    {
+        var fault = await Fault();
+        var open = await Create("inspection", [fault], users["a"].UserId);
+        await Send("manager", "POST", "/" + open + "/follow-up", new { task_kind = "repair" }, 409, "INVALID_STATE_TRANSITION");
+        await Send("a", "POST", "/" + open + "/follow-up", new { task_kind = "repair" }, 403, "ROLE_FORBIDDEN");
+
+        var nothing = await VerifiedInspectionAsync((await Fault(), "fault_absent"));
+        await Send("manager", "POST", "/" + nothing + "/follow-up", new { task_kind = "repair" }, 409, "NOTHING_TO_FOLLOW_UP");
+
+        var (one, two) = (await Fault(), await Fault());
+        var parent = await VerifiedInspectionAsync((one, "fault_present"), (two, "fault_present"));
+        await Send("manager", "POST", "/" + parent + "/follow-up", new { task_kind = "inspection" }, 409, "INVALID_STATE_TRANSITION");
+        await Send("manager", "POST", "/" + parent + "/follow-up", new { task_kind = "repair", fault_ids = new[] { fault } }, 400, "VALIDATION_FAILED");
+
+        // Splitting the next step: two repairs from one inspection, each with its own share, one case.
+        var first = await Send("manager", "POST", "/" + parent + "/follow-up", new { task_kind = "repair", fault_ids = new[] { one } }, 201);
+        var second = await Send("manager", "POST", "/" + parent + "/follow-up", new { task_kind = "repair", fault_ids = new[] { two } }, 201);
+        Assert.Equal(parent, first.GetProperty("case_id").GetString());
+        Assert.Equal(parent, second.GetProperty("case_id").GetString());
+        await Send("manager", "POST", "/" + parent + "/follow-up", new { task_kind = "repair", fault_ids = new[] { one } }, 409, "FAULT_ALREADY_IN_WORK_ORDER");
+    }
+
+    [Fact]
+    public async Task The_table_refuses_a_half_linked_chain_and_a_parent_from_another_commune()
+    {
+        var root = await Plant(WorkOrderStatus.Verified);
+        var child = await Plant(WorkOrderStatus.Open);
+        var half = "UPDATE work_order SET parent_work_order_id = {0} WHERE work_order_id = {1}";
+        var incomplete = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => Db(db => db.Database.ExecuteSqlRawAsync(half, root, child)));
+        Assert.Equal("ck_work_order_chain_complete", incomplete.ConstraintName);
+
+        var foreignRoot = await Plant(WorkOrderStatus.Verified, commune: foreign);
+        var cross = "UPDATE work_order SET parent_work_order_id = {0}, root_work_order_id = {0} WHERE work_order_id = {1}";
+        var refused = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => Db(db => db.Database.ExecuteSqlRawAsync(cross, foreignRoot, child)));
+        Assert.Equal("23503", refused.SqlState);
+    }
+
+    /// <summary>Creates an inspection over the faults, runs it to verified with the given outcomes.</summary>
+    private async Task<string> VerifiedInspectionAsync(params (string Fault, string Outcome)[] outcomes)
+    {
+        var id = await Create("inspection", outcomes.Select(x => x.Fault).ToArray(), users["a"].UserId);
+        await Send("a", "POST", "/" + id + "/start", new { }, 200);
+        await Send("a", "POST", "/" + id + "/complete", new { report_note = "Inspection finished",
+            fault_outcomes = outcomes.Select(x => new { fault_id = x.Fault, outcome = x.Outcome }).ToArray() }, 200);
+        await Send("manager", "POST", "/" + id + "/verify", new { }, 200);
+        return id;
     }
 
     private Task<int> AuditCount(string id) => Db(db => db.Set<AuditEvent>().IgnoreQueryFilters().CountAsync(x => x.EntityId == id));

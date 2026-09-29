@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 47 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 48 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
     "version": "1.7"
   },
   "paths": {
@@ -3870,6 +3870,13 @@
             }
           },
           {
+            "name": "case_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -4643,6 +4650,92 @@
         ],
         "summary": "[TẠM — WO-1…WO-11] Quản lý trả việc để làm tiếp",
         "operationId": "postWorkOrdersIdReturn",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/follow-up": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "summary": "[TẠM — WO-1…WO-11] [FR-2] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu; server mang sự cố fault_present sang, chung case_id",
+        "operationId": "postWorkOrdersIdFollowUp",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
       }
@@ -5999,6 +6092,55 @@
         ],
         "type": "string"
       },
+      "FollowUpWorkOrderRequest": {
+        "required": [
+          "task_kind"
+        ],
+        "type": "object",
+        "properties": {
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "nullable": true
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "Geometry": {
         "required": [
           "coordinates",
@@ -7227,6 +7369,7 @@
       "WorkOrderDetail": {
         "required": [
           "allowed_actions",
+          "case_id",
           "commune_id",
           "created_by",
           "fault_ids",
@@ -7255,6 +7398,13 @@
           "cluster_id": {
             "type": "string",
             "nullable": true
+          },
+          "parent_work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "case_id": {
+            "type": "string"
           },
           "fault_ids": {
             "type": "array",
@@ -7396,6 +7546,7 @@
       },
       "WorkOrderItem": {
         "required": [
+          "case_id",
           "commune_id",
           "fault_ids",
           "title",
@@ -7422,6 +7573,13 @@
           "cluster_id": {
             "type": "string",
             "nullable": true
+          },
+          "parent_work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "case_id": {
+            "type": "string"
           },
           "fault_ids": {
             "type": "array",

@@ -52,7 +52,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     public async Task<PagedResult<WorkOrderItem>> List(WorkOrderStatus[]? statuses, TaskKind? kind,
         string? assigned, string? segment, string[]? communes, DateOnly? from, DateOnly? to,
-        PageRequest page, CancellationToken ct)
+        PageRequest page, CancellationToken ct, string? caseId = null)
     {
         if (from > to) throw OptionalJson.Invalid("scheduled_from");
         var scope = CommuneFilter.Narrow(db.CurrentCommuneScope, communes);
@@ -66,6 +66,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             query = query.Where(x => x.AssignedTo == user);
         }
         if (segment is not null) query = query.Where(x => x.SegmentId == segment);
+        if (caseId is not null) query = query.Where(x => x.WorkOrderId == caseId || x.RootWorkOrderId == caseId);
         if (from is not null) query = query.Where(x => x.ScheduledDate >= from);
         if (to is not null) query = query.Where(x => x.ScheduledDate <= to);
         var total = await query.CountAsync(ct);
@@ -82,6 +83,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             WorkOrderId = wo.WorkOrderId, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
             CreatedAt = wo.CreatedAt, UpdatedAt = wo.UpdatedAt, DueDate = wo.DueDate, ScheduledDate = wo.ScheduledDate,
+            ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
             FaultIds = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.FaultId).ToArray(),
             PriorityScore = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.PriorityScore).DefaultIfEmpty().Max(),
         }).ToArray();
@@ -105,13 +107,14 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             WorkOrderId = id, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
             CreatedAt = wo.CreatedAt, UpdatedAt = wo.UpdatedAt, DueDate = wo.DueDate, ScheduledDate = wo.ScheduledDate,
+            ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
             FaultIds = members.Select(x => x.Fault.FaultId).ToArray(),
             PriorityScore = members.Select(x => x.Fault.PriorityScore).DefaultIfEmpty().Max(),
             Note = wo.Note, ReviewNote = wo.ReviewNote, ReportNote = wo.ReportNote, CreatedBy = wo.CreatedBy,
             MaterialsNote = wo.MaterialsNote, MaterialsUsed = wo.MaterialsUsed,
             AssignedAt = wo.AssignedAt, StartedAt = wo.StartedAt, CompletedAt = wo.CompletedAt, ClosedAt = wo.ClosedAt,
             AssigneeEligible = wo.AssignedTo is null ? null : await EligibleUsers(wo.CommuneId).AnyAsync(x => x.UserId == wo.AssignedTo, ct),
-            AllowedActions = WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId),
+            AllowedActions = WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind),
             Faults = members.Select(x => new WorkOrderFaultDetail(x.Fault.FaultId, x.Fault.PoleId, x.Fault.SegmentId,
                 new(x.Lat, x.Lng), x.Fault.FaultType, x.Fault.FaultStatus, x.Fault.Severity, x.InspectionOutcome)).ToArray(),
         };
@@ -133,6 +136,47 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).ToListAsync(ct);
         var missing = ids.Except(faults.Select(x => x.FaultId)).ToArray();
         if (missing.Length != 0) throw Error("FAULT_NOT_FOUND", HttpStatusCode.NotFound, ("fault_ids", missing));
+        var road = faults.Count > 0 ? (RoadSegment?)null
+            : await db.Set<RoadSegment>().FirstOrDefaultAsync(x => x.SegmentId == request.SegmentId, ct)
+                ?? throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
+        return await Insert(new(kind, title, faults, road, request.AssignedTo, request.DueDate, request.ScheduledDate,
+            request.Note, Materials(request.MaterialsNote), null), ct);
+    }
+
+    /// <summary>
+    /// Creates the next step of a chain from a verified work order (drift FR-2). The server carries the
+    /// target over — the faults the inspection found present — so the Manager only picks who and when.
+    /// </summary>
+    public async Task<WorkOrderDetail> FollowUp(string id, FollowUpWorkOrderRequest request, CancellationToken ct)
+    {
+        var kind = request.TaskKind ?? throw OptionalJson.Invalid("task_kind");
+        Schedule(request.ScheduledDate, request.DueDate);
+        var parent = await Find(id, ct);
+        RequireAction(parent, "follow_up");
+        if (!WorkOrderRules.FollowUpKinds(parent.TaskKind).Contains(kind))
+            throw Error("INVALID_STATE_TRANSITION", HttpStatusCode.Conflict, ("work_order_id", id),
+                ("task_kind", parent.TaskKind), ("allowed_follow_up_kinds", WorkOrderRules.FollowUpKinds(parent.TaskKind)));
+        var present = await db.Set<WorkOrderFault>()
+            .Where(x => x.WorkOrderId == id && x.InspectionOutcome == InspectionOutcome.FaultPresent)
+            .Select(x => x.FaultId).ToListAsync(ct);
+        if (present.Count == 0) throw Error("NOTHING_TO_FOLLOW_UP", HttpStatusCode.Conflict, ("work_order_id", id));
+        var ids = request.FaultIds ?? present.ToArray();
+        if (ids.Length == 0 || ids.Distinct().Count() != ids.Length || ids.Except(present).Any())
+            throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "fault_ids"), ("carried_fault_ids", present.Order().ToArray()));
+        var faults = await db.Set<Fault>().Where(x => ids.Contains(x.FaultId))
+            .OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).ToListAsync(ct);
+        var title = request.Title is null ? parent.Title : ValidTitle(request.Title);
+        return await Insert(new(kind, title, faults, null, request.AssignedTo, request.DueDate, request.ScheduledDate,
+            request.Note, Materials(request.MaterialsNote), parent), ct);
+    }
+
+    private sealed record NewWorkOrder(TaskKind Kind, string Title, List<Fault> Faults, RoadSegment? Road,
+        string? AssignedTo, DateOnly? DueDate, DateOnly? ScheduledDate, string? Note, string? MaterialsNote, WorkOrder? Parent);
+
+    private async Task<WorkOrderDetail> Insert(NewWorkOrder order, CancellationToken ct)
+    {
+        var faults = order.Faults;
+        var ids = faults.Select(x => x.FaultId).ToArray();
         string commune;
         string? segment;
         if (faults.Count > 0)
@@ -142,21 +186,19 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             commune = faults[0].CommuneId;
             segment = faults.Where(x => x.SegmentId is not null).OrderByDescending(x => x.PriorityScore)
                 .ThenBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).FirstOrDefault()?.SegmentId;
-            var invalid = faults.Where(x => !WorkOrderRules.Eligible(kind, x.FaultStatus)).ToArray();
+            var invalid = faults.Where(x => !WorkOrderRules.Eligible(order.Kind, x.FaultStatus)).ToArray();
             if (invalid.Length > 0) throw Error("FAULT_STATUS_NOT_ELIGIBLE", HttpStatusCode.Conflict,
-                ("task_kind", kind), ("accepted_statuses", FaultStatusSets.Open.Where(x => WorkOrderRules.Eligible(kind, x)).ToArray()),
+                ("task_kind", order.Kind), ("accepted_statuses", FaultStatusSets.Open.Where(x => WorkOrderRules.Eligible(order.Kind, x)).ToArray()),
                 ("faults", invalid.Select(x => new { x.FaultId, x.FaultStatus }).ToArray()));
             var conflict = await db.Set<WorkOrderFault>().FirstOrDefaultAsync(x => ids.Contains(x.FaultId) && x.ReleasedAt == null, ct);
             if (conflict is not null) throw LinkConflict(conflict);
         }
         else
         {
-            var road = await db.Set<RoadSegment>().FirstOrDefaultAsync(x => x.SegmentId == request.SegmentId, ct)
-                ?? throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
-            commune = road.CommuneId;
-            segment = road.SegmentId;
+            commune = order.Road!.CommuneId;
+            segment = order.Road.SegmentId;
         }
-        if (request.AssignedTo is not null) await RequireAssignee(request.AssignedTo, commune, ct);
+        if (order.AssignedTo is not null) await RequireAssignee(order.AssignedTo, commune, ct);
         var now = UtcMicrosecondClock.UtcNow();
         var clusters = faults.Select(x => x.ClusterId).Where(x => x is not null).Distinct().ToArray();
         // SQL is constructed exclusively from the server's immutable prefixed-ID specification.
@@ -164,19 +206,21 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var id = await db.Database.SqlQueryRaw<string>(idSql).SingleAsync(ct);
         var wo = new WorkOrder
         {
-            WorkOrderId = id, CommuneId = commune, TaskKind = kind, Title = title, SegmentId = segment,
+            WorkOrderId = id, CommuneId = commune, TaskKind = order.Kind, Title = order.Title, SegmentId = segment,
             ClusterId = clusters.Length == 1 ? clusters[0] : null, CreatedBy = ActorId,
-            AssignedTo = request.AssignedTo, AssignedAt = request.AssignedTo is null ? null : now,
-            WoStatus = request.AssignedTo is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
-            DueDate = request.DueDate, ScheduledDate = request.ScheduledDate, Note = request.Note,
-            MaterialsNote = Materials(request.MaterialsNote), CreatedAt = now, UpdatedAt = now,
+            AssignedTo = order.AssignedTo, AssignedAt = order.AssignedTo is null ? null : now,
+            WoStatus = order.AssignedTo is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
+            DueDate = order.DueDate, ScheduledDate = order.ScheduledDate, Note = order.Note,
+            MaterialsNote = order.MaterialsNote, CreatedAt = now, UpdatedAt = now,
+            ParentWorkOrderId = order.Parent?.WorkOrderId,
+            RootWorkOrderId = order.Parent is null ? null : order.Parent.RootWorkOrderId ?? order.Parent.WorkOrderId,
         };
         db.Add(wo);
         foreach (var fault in faults) db.Add(new WorkOrderFault
         {
             WorkOrderId = id, FaultId = fault.FaultId, CommuneId = commune, LinkedAt = now,
         });
-        Record(wo, AuditAction.Created, null, Snapshot(wo, ids), now, request.Note);
+        Record(wo, AuditAction.Created, null, Snapshot(wo, ids), now, order.Note);
         await Save(id, ids, ct);
         return await Detail(id, ct);
     }
@@ -277,6 +321,19 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                 changes.Add(new(fault.FaultId, from, fault.FaultStatus));
             }
         }
+        // Drift FR-2a (C): verifying an inspection IS the Manager confirming what the engineer saw.
+        // Only fault_present moves; fault_absent and inconclusive stay for a separate decision (BE-19).
+        if (wo.TaskKind == TaskKind.Inspection && action == "verify")
+        {
+            var present = links.Where(x => x.InspectionOutcome == InspectionOutcome.FaultPresent).Select(x => x.FaultId).ToArray();
+            var faults = await db.Set<Fault>().Where(x => present.Contains(x.FaultId)).ToListAsync(ct);
+            foreach (var fault in faults)
+            {
+                if (fault.FaultStatus != FaultStatus.Detected) { skipped.Add(fault.FaultId); continue; }
+                transitions.Apply(fault, FaultStatus.Confirmed, now, ActorId);
+                changes.Add(new(fault.FaultId, FaultStatus.Detected, FaultStatus.Confirmed));
+            }
+        }
         switch (action)
         {
             case "start": wo.WoStatus = WorkOrderStatus.InProgress; wo.StartedAt = now; break;
@@ -302,7 +359,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     {
         if (!WorkOrderRules.Allows(wo.WoStatus, action)) throw Error("INVALID_STATE_TRANSITION", HttpStatusCode.Conflict,
             ("work_order_id", wo.WorkOrderId), ("wo_status", wo.WoStatus), ("action", action),
-            ("allowed_actions", WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId)));
+            ("allowed_actions", WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind)));
     }
 
     private static string ValidTitle(string? value)
@@ -350,6 +407,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         string[]? skipped = null, List<WorkOrderFault>? links = null)
         => new(wo.WorkOrderId, wo.Title, wo.TaskKind, wo.WoStatus, wo.AssignedTo, wo.AssignedAt,
             wo.DueDate, wo.ScheduledDate, wo.Note, wo.ReviewNote, wo.ReportNote, wo.MaterialsNote, wo.MaterialsUsed,
+            wo.ParentWorkOrderId, wo.RootWorkOrderId,
             wo.StartedAt, wo.CompletedAt,
             wo.ClosedAt, wo.CreatedAt, wo.UpdatedAt, wo.CreatedBy, wo.CommuneId, wo.SegmentId, wo.ClusterId,
             ids, changes, skipped, links?.Select(x => new FaultOutcomeSnapshot(x.FaultId, x.InspectionOutcome, x.ReleasedAt)).ToArray());
@@ -358,7 +416,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     private sealed record FaultOutcomeSnapshot(string FaultId, InspectionOutcome? InspectionOutcome, DateTime? ReleasedAt);
     private sealed record WorkOrderSnapshot(string WorkOrderId, string Title, TaskKind TaskKind, WorkOrderStatus WoStatus,
         string? AssignedTo, DateTime? AssignedAt, DateOnly? DueDate, DateOnly? ScheduledDate, string? Note,
-        string? ReviewNote, string? ReportNote, string? MaterialsNote, string? MaterialsUsed, DateTime? StartedAt, DateTime? CompletedAt, DateTime? ClosedAt,
+        string? ReviewNote, string? ReportNote, string? MaterialsNote, string? MaterialsUsed,
+        string? ParentWorkOrderId, string? RootWorkOrderId, DateTime? StartedAt, DateTime? CompletedAt, DateTime? ClosedAt,
         DateTime CreatedAt, DateTime UpdatedAt, string CreatedBy, string CommuneId, string? SegmentId, string? ClusterId,
         string[]? FaultIds, FaultChange[]? FaultChanges, string[]? FaultSkipped, FaultOutcomeSnapshot[]? FaultOutcomes);
 }

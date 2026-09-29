@@ -48,6 +48,21 @@ public sealed class CompleteWorkOrderRequest
     public JsonElement FaultOutcomes { get; init; }
 }
 
+/// <summary>Body of <c>POST /work-orders/{id}/follow-up</c>; the targets come from the parent (drift FR-2).</summary>
+public sealed class FollowUpWorkOrderRequest
+{
+    [Required] public TaskKind? TaskKind { get; init; }
+    /// <summary>Defaults to the parent's title.</summary>
+    [StringLength(200, MinimumLength = 1)] public string? Title { get; init; }
+    /// <summary>A subset of the parent's fault_present faults, to split the next step; defaults to all of them.</summary>
+    public string[]? FaultIds { get; init; }
+    public string? AssignedTo { get; init; }
+    public DateOnly? DueDate { get; init; }
+    public DateOnly? ScheduledDate { get; init; }
+    public string? Note { get; init; }
+    public string? MaterialsNote { get; init; }
+}
+
 public sealed class ReviewWorkOrderRequest
 {
     public string? Note { get; init; }

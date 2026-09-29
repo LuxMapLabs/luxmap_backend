@@ -25,6 +25,8 @@ public sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
             // Blank means "nothing written": the API stores it as NULL, and the table refuses the other spelling.
             table.HasCheckConstraint("ck_work_order_materials_note_not_blank", "materials_note IS NULL OR btrim(materials_note) <> ''");
             table.HasCheckConstraint("ck_work_order_materials_used_not_blank", "materials_used IS NULL OR btrim(materials_used) <> ''");
+            // A root has neither; a follow-up has both (FR-2).
+            table.HasCheckConstraint("ck_work_order_chain_complete", "(parent_work_order_id IS NULL) = (root_work_order_id IS NULL)");
         });
         builder.HasKey(x => x.WorkOrderId);
         builder.HasAlternateKey(x => new { x.WorkOrderId, x.CommuneId });
@@ -40,6 +42,11 @@ public sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
         builder.HasOne<FaultCluster>().WithMany().HasForeignKey(x => x.ClusterId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<AppUser>().WithMany().HasForeignKey(x => x.AssignedTo).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<AppUser>().WithMany().HasForeignKey(x => x.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+        // A chain never leaves its commune: both links carry commune_id, as the fault links do.
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.ParentWorkOrderId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.RootWorkOrderId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
         foreach (var property in new[] { "CommuneId", "AssignedTo", "CreatedBy", "SegmentId", "ClusterId", "WoStatus" })
         {
             builder.HasIndex(property);
