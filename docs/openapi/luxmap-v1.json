@@ -4084,6 +4084,10 @@
             "minLength": 10,
             "type": "string"
           },
+          "materials_used": {
+            "type": "string",
+            "nullable": true
+          },
           "fault_outcomes": {
             "type": "array",
             "items": {
@@ -4359,6 +4363,10 @@
             "nullable": true
           },
           "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_note": {
             "type": "string",
             "nullable": true
           }
@@ -4918,7 +4926,8 @@
             "description": "Absent preserves; null clears.",
             "format": "date",
             "nullable": true
-          }
+          },
+          "materials_note": { }
         },
         "additionalProperties": false
       },
@@ -5775,6 +5784,14 @@
             "nullable": true
           },
           "report_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_used": {
             "type": "string",
             "nullable": true
           },

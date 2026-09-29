@@ -24,6 +24,13 @@ public class WorkOrder : ICommuneScoped, IAssigneeScoped, IAudited
     public string? Note { get; set; }
     public string? ReviewNote { get; set; }
     public string? ReportNote { get; set; }
+
+    /// <summary>What the Manager plans to bring — free text, set on create and PATCH (drift FR-3).</summary>
+    public string? MaterialsNote { get; set; }
+
+    /// <summary>What the assigned engineer actually used — free text, set on complete (drift FR-3).</summary>
+    /// <remarks>A separate field from <see cref="MaterialsNote"/> so the report never overwrites the plan.</remarks>
+    public string? MaterialsUsed { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public DateTime? ClosedAt { get; set; }

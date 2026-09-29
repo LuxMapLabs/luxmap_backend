@@ -369,6 +369,59 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         Assert.NotNull(audit[^1].BeforeState);
     }
 
+    /// <summary>
+    /// Drift FR-3: the Manager's plan and the engineer's report are two fields, so completing the
+    /// work order never overwrites what the Manager wrote.
+    /// </summary>
+    [Fact]
+    public async Task Materials_plan_and_materials_used_are_kept_apart()
+    {
+        var fault = await Fault(FaultStatus.Confirmed);
+        var created = await Send("manager", "POST", "", new { task_kind = "repair", title = "Materials test",
+            fault_ids = new[] { fault }, assigned_to = users["a"].UserId, materials_note = "  2 LED 100W, 1 driver  " }, 201);
+        var id = created.GetProperty("work_order_id").GetString()!;
+        Assert.Equal("2 LED 100W, 1 driver", created.GetProperty("materials_note").GetString());
+        Assert.Equal(JsonValueKind.Null, created.GetProperty("materials_used").ValueKind);
+
+        await Send("manager", "PATCH", "/" + id, new { materials_note = "2 LED 100W, 1 driver" }, 200, auditExpected: 0);
+        var kept = await Send("manager", "PATCH", "/" + id, new { title = "Materials test renamed" }, 200);
+        Assert.Equal("2 LED 100W, 1 driver", kept.GetProperty("materials_note").GetString());
+        var changed = await Send("manager", "PATCH", "/" + id, new { materials_note = "1 LED 100W" }, 200);
+        Assert.Equal("1 LED 100W", changed.GetProperty("materials_note").GetString());
+        var cleared = await Send("manager", "PATCH", "/" + id, new { materials_note = (string?)null }, 200);
+        Assert.Equal(JsonValueKind.Null, cleared.GetProperty("materials_note").ValueKind);
+        var restored = await Send("manager", "PATCH", "/" + id, new { materials_note = "1 LED 100W" }, 200);
+        Assert.Equal("1 LED 100W", restored.GetProperty("materials_note").GetString());
+        await Send("manager", "PATCH", "/" + id, new { materials_note = 5 }, 400, "VALIDATION_FAILED");
+
+        await Send("a", "POST", "/" + id + "/start", new { }, 200);
+        var done = await Send("a", "POST", "/" + id + "/complete",
+            new { report_note = "Replaced the lamp head", materials_used = " 1 LED 100W, 2 m cable " }, 200);
+        Assert.Equal("1 LED 100W, 2 m cable", done.GetProperty("materials_used").GetString());
+        Assert.Equal("1 LED 100W", done.GetProperty("materials_note").GetString());
+
+        var completed = await Db(db => db.Set<AuditEvent>().IgnoreQueryFilters()
+            .SingleAsync(x => x.EntityId == id && x.Action == AuditAction.Completed));
+        Assert.Contains("1 LED 100W, 2 m cable", completed.AfterState!);
+
+        await Send("manager", "POST", "/" + id + "/return", new { note = "Please check the cable" }, 200);
+        var again = await Send("a", "POST", "/" + id + "/complete", new { report_note = "Cable checked, all good", materials_used = "   " }, 200);
+        Assert.Equal(JsonValueKind.Null, again.GetProperty("materials_used").ValueKind);
+        Assert.Equal("1 LED 100W", again.GetProperty("materials_note").GetString());
+    }
+
+    [Theory]
+    [InlineData("materials_note", "ck_work_order_materials_note_not_blank")]
+    [InlineData("materials_used", "ck_work_order_materials_used_not_blank")]
+    public async Task The_table_refuses_blank_materials_text(string column, string constraint)
+    {
+        var id = await Plant(WorkOrderStatus.Open);
+        var sql = $"UPDATE work_order SET {column} = '  ' WHERE work_order_id = {{0}}";
+        var error = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => Db(db => db.Database.ExecuteSqlRawAsync(sql, id)));
+        Assert.Equal("23514", error.SqlState);
+        Assert.Equal(constraint, error.ConstraintName);
+    }
+
     private Task<int> AuditCount(string id) => Db(db => db.Set<AuditEvent>().IgnoreQueryFilters().CountAsync(x => x.EntityId == id));
 
     [Fact]

@@ -14,6 +14,7 @@ public sealed class CreateWorkOrderRequest
     public DateOnly? DueDate { get; init; }
     public DateOnly? ScheduledDate { get; init; }
     public string? Note { get; init; }
+    public string? MaterialsNote { get; init; }
     public JsonElement WorkOrderId { get; init; }
     public JsonElement CommuneId { get; init; }
     public JsonElement WoStatus { get; init; }
@@ -26,6 +27,7 @@ public sealed class PatchWorkOrderRequest
     public JsonElement Title { get; init; }
     public JsonElement DueDate { get; init; }
     public JsonElement ScheduledDate { get; init; }
+    public JsonElement MaterialsNote { get; init; }
     public JsonElement CommuneId { get; init; }
     public JsonElement WoStatus { get; init; }
     public JsonElement AssignedTo { get; init; }
@@ -42,6 +44,7 @@ public sealed class AssignWorkOrderRequest
 public sealed class CompleteWorkOrderRequest
 {
     [Required] public string ReportNote { get; init; } = null!;
+    public string? MaterialsUsed { get; init; }
     public JsonElement FaultOutcomes { get; init; }
 }
 

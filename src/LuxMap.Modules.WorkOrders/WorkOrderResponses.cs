@@ -26,6 +26,8 @@ public sealed class WorkOrderDetail : WorkOrderItem
     public string? Note { get; init; }
     public string? ReviewNote { get; init; }
     public string? ReportNote { get; init; }
+    public string? MaterialsNote { get; init; }
+    public string? MaterialsUsed { get; init; }
     public required string CreatedBy { get; init; }
     public DateTime? AssignedAt { get; init; }
     public DateTime? StartedAt { get; init; }

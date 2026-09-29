@@ -108,6 +108,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             FaultIds = members.Select(x => x.Fault.FaultId).ToArray(),
             PriorityScore = members.Select(x => x.Fault.PriorityScore).DefaultIfEmpty().Max(),
             Note = wo.Note, ReviewNote = wo.ReviewNote, ReportNote = wo.ReportNote, CreatedBy = wo.CreatedBy,
+            MaterialsNote = wo.MaterialsNote, MaterialsUsed = wo.MaterialsUsed,
             AssignedAt = wo.AssignedAt, StartedAt = wo.StartedAt, CompletedAt = wo.CompletedAt, ClosedAt = wo.ClosedAt,
             AssigneeEligible = wo.AssignedTo is null ? null : await EligibleUsers(wo.CommuneId).AnyAsync(x => x.UserId == wo.AssignedTo, ct),
             AllowedActions = WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId),
@@ -168,7 +169,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             AssignedTo = request.AssignedTo, AssignedAt = request.AssignedTo is null ? null : now,
             WoStatus = request.AssignedTo is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
             DueDate = request.DueDate, ScheduledDate = request.ScheduledDate, Note = request.Note,
-            CreatedAt = now, UpdatedAt = now,
+            MaterialsNote = Materials(request.MaterialsNote), CreatedAt = now, UpdatedAt = now,
         };
         db.Add(wo);
         foreach (var fault in faults) db.Add(new WorkOrderFault
@@ -185,20 +186,24 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
         if (new[] { request.WoStatus, request.AssignedTo, request.FaultIds, request.TaskKind, request.SegmentId }.Any(OptionalJson.Present))
             throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("endpoint", "Use /assignee or a status action; targets and task_kind are immutable."));
-        if (!new[] { request.Title, request.DueDate, request.ScheduledDate }.Any(OptionalJson.Present)) throw OptionalJson.Invalid("body");
+        if (!new[] { request.Title, request.DueDate, request.ScheduledDate, request.MaterialsNote }.Any(OptionalJson.Present)) throw OptionalJson.Invalid("body");
         var title = OptionalJson.Present(request.Title) ? ValidTitle(OptionalJson.Text(request.Title, "title", false)) : null;
         var due = OptionalJson.Date(request.DueDate, "due_date");
         var scheduled = OptionalJson.Date(request.ScheduledDate, "scheduled_date");
+        var materials = Materials(OptionalJson.Text(request.MaterialsNote, "materials_note"));
         var wo = await Find(id, ct);
         RequireAction(wo, "edit");
         var before = Snapshot(wo);
         var nextDue = OptionalJson.Present(request.DueDate) ? due : wo.DueDate;
         var nextScheduled = OptionalJson.Present(request.ScheduledDate) ? scheduled : wo.ScheduledDate;
+        var nextMaterials = OptionalJson.Present(request.MaterialsNote) ? materials : wo.MaterialsNote;
         Schedule(nextScheduled, nextDue);
-        if ((title ?? wo.Title) == wo.Title && nextDue == wo.DueDate && nextScheduled == wo.ScheduledDate) return await Detail(id, ct);
+        if ((title ?? wo.Title) == wo.Title && nextDue == wo.DueDate && nextScheduled == wo.ScheduledDate
+            && nextMaterials == wo.MaterialsNote) return await Detail(id, ct);
         wo.Title = title ?? wo.Title;
         wo.DueDate = nextDue;
         wo.ScheduledDate = nextScheduled;
+        wo.MaterialsNote = nextMaterials;
         var now = UtcMicrosecondClock.UtcNow();
         wo.UpdatedAt = now;
         Record(wo, AuditAction.DetailsChanged, before, Snapshot(wo), now);
@@ -228,7 +233,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     }
 
     public async Task<WorkOrderDetail> Act(string id, string action, string? note,
-        JsonElement outcomes, CancellationToken ct)
+        JsonElement outcomes, CancellationToken ct, string? materialsUsed = null)
     {
         note = note?.Trim();
         if ((action == "complete" && (note?.Length ?? 0) < 10)
@@ -275,7 +280,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         switch (action)
         {
             case "start": wo.WoStatus = WorkOrderStatus.InProgress; wo.StartedAt = now; break;
-            case "complete": wo.WoStatus = WorkOrderStatus.Done; wo.CompletedAt = now; wo.ReportNote = note; break;
+            case "complete": wo.WoStatus = WorkOrderStatus.Done; wo.CompletedAt = now; wo.ReportNote = note;
+                wo.MaterialsUsed = Materials(materialsUsed); break;
             case "return": wo.WoStatus = WorkOrderStatus.InProgress; wo.ReviewNote = note; wo.CompletedAt = null; break;
             case "verify": wo.WoStatus = WorkOrderStatus.Verified; wo.ReviewNote = note; wo.ClosedAt = now; break;
             case "cancel": wo.WoStatus = WorkOrderStatus.Cancelled; wo.ReviewNote = note; wo.ClosedAt = now; break;
@@ -304,6 +310,9 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         value = value?.Trim();
         return value is { Length: > 0 and <= 200 } ? value : throw OptionalJson.Invalid("title");
     }
+
+    /// <summary>Free text; blank is stored as NULL, so "nothing written" has one spelling (FR-3).</summary>
+    private static string? Materials(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static void Schedule(DateOnly? scheduled, DateOnly? due)
     {
@@ -340,7 +349,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     private static WorkOrderSnapshot Snapshot(WorkOrder wo, string[]? ids = null, FaultChange[]? changes = null,
         string[]? skipped = null, List<WorkOrderFault>? links = null)
         => new(wo.WorkOrderId, wo.Title, wo.TaskKind, wo.WoStatus, wo.AssignedTo, wo.AssignedAt,
-            wo.DueDate, wo.ScheduledDate, wo.Note, wo.ReviewNote, wo.ReportNote, wo.StartedAt, wo.CompletedAt,
+            wo.DueDate, wo.ScheduledDate, wo.Note, wo.ReviewNote, wo.ReportNote, wo.MaterialsNote, wo.MaterialsUsed,
+            wo.StartedAt, wo.CompletedAt,
             wo.ClosedAt, wo.CreatedAt, wo.UpdatedAt, wo.CreatedBy, wo.CommuneId, wo.SegmentId, wo.ClusterId,
             ids, changes, skipped, links?.Select(x => new FaultOutcomeSnapshot(x.FaultId, x.InspectionOutcome, x.ReleasedAt)).ToArray());
 
@@ -348,7 +358,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     private sealed record FaultOutcomeSnapshot(string FaultId, InspectionOutcome? InspectionOutcome, DateTime? ReleasedAt);
     private sealed record WorkOrderSnapshot(string WorkOrderId, string Title, TaskKind TaskKind, WorkOrderStatus WoStatus,
         string? AssignedTo, DateTime? AssignedAt, DateOnly? DueDate, DateOnly? ScheduledDate, string? Note,
-        string? ReviewNote, string? ReportNote, DateTime? StartedAt, DateTime? CompletedAt, DateTime? ClosedAt,
+        string? ReviewNote, string? ReportNote, string? MaterialsNote, string? MaterialsUsed, DateTime? StartedAt, DateTime? CompletedAt, DateTime? ClosedAt,
         DateTime CreatedAt, DateTime UpdatedAt, string CreatedBy, string CommuneId, string? SegmentId, string? ClusterId,
         string[]? FaultIds, FaultChange[]? FaultChanges, string[]? FaultSkipped, FaultOutcomeSnapshot[]? FaultOutcomes);
 }

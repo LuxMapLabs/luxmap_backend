@@ -66,7 +66,7 @@ public sealed class WorkOrdersController(WorkOrderService service) : ControllerB
     [HttpPost("{id}/complete")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     public Task<WorkOrderDetail> Complete(string id, CompleteWorkOrderRequest request, CancellationToken ct)
-        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct);
+        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed);
 
     [HttpPost("{id}/verify")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]

@@ -22,6 +22,9 @@ public sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
             table.HasCheckConstraint("ck_work_order_completed", "wo_status NOT IN ('done','verified') OR (completed_at IS NOT NULL AND report_note IS NOT NULL)");
             table.HasCheckConstraint("ck_work_order_closed", "(wo_status IN ('verified','cancelled')) = (closed_at IS NOT NULL)");
             table.HasCheckConstraint("ck_work_order_schedule_before_due", "scheduled_date IS NULL OR due_date IS NULL OR scheduled_date <= due_date");
+            // Blank means "nothing written": the API stores it as NULL, and the table refuses the other spelling.
+            table.HasCheckConstraint("ck_work_order_materials_note_not_blank", "materials_note IS NULL OR btrim(materials_note) <> ''");
+            table.HasCheckConstraint("ck_work_order_materials_used_not_blank", "materials_used IS NULL OR btrim(materials_used) <> ''");
         });
         builder.HasKey(x => x.WorkOrderId);
         builder.HasAlternateKey(x => new { x.WorkOrderId, x.CommuneId });
