@@ -63,12 +63,12 @@ public sealed record PoleProperties
     public required int OpenFaultCount { get; init; }
 
     /// <summary>
-    /// ⚠️ Always <c>false</c> until the <c>iot_node</c> table exists.
+    /// ⚠️ ALWAYS <c>false</c> — by decision, not for lack of a table (I-8).
     /// </summary>
     /// <remarks>
-    /// The key is emitted rather than omitted, the precedent BE-42 set with <c>nearest_luminance</c>:
-    /// a consumer can bind the final shape now, and the day the table arrives no response shape
-    /// changes. <c>false</c> is also literally true of the database today — no pole has a node.
+    /// The project puts no device on individual poles (I-1): a device sits in the main cabinet and
+    /// reaches lamps through feeders. The key stays so the front end does not break; removing it
+    /// would be a breaking change for a value that can never differ.
     /// </remarks>
     public required bool HasIotNode { get; init; }
 
@@ -95,8 +95,16 @@ public sealed record SegmentProperties
 
     public required int PoleCount { get; init; }
 
-    /// <summary>⚠️ Always <c>null</c> until the <c>iot_node</c> table exists. See <see cref="PoleProperties.HasIotNode"/>.</summary>
-    public string? ControllerNodeId { get; init; }
+    /// <summary>
+    /// The devices that switch any feeder carrying a pole of this segment (I-7b), in id order.
+    /// </summary>
+    /// <remarks>
+    /// Derived on every read, never stored, so wiring changes show up on the next request. A segment
+    /// can be fed by more than one cabinet, hence a list; empty — never null — when no device
+    /// switches it. Replaces the single <c>controller_node_id</c> of Contract section 5.2 (BREAKING,
+    /// drift "BE-14 / IoT"); that key was always null, so no client logic depended on its value.
+    /// </remarks>
+    public required IReadOnlyList<string> ControllerNodeIds { get; init; }
 
     /// <summary>
     /// <c>true</c> → the front end highlights the WHOLE road, not one lamp.
@@ -107,4 +115,44 @@ public sealed record SegmentProperties
     /// ⚠️ Nothing writes those yet — CV-15 depends on BE-13 — so it is <c>false</c> everywhere today.
     /// </remarks>
     public required bool HasActiveSegmentFault { get; init; }
+}
+
+/// <summary>The flat <c>properties</c> block of one IoT device — drift "BE-14 / IoT" (I-1…I-18).</summary>
+/// <remarks>
+/// <para>
+/// Replaces the shape of Contract section 5.6: <c>battery_pct</c> is gone (I-2), <c>segment_id</c>
+/// became <see cref="SegmentIds"/>, and <see cref="FeederIds"/> and
+/// <see cref="SupportsRemoteControl"/> are new. The two lists are derived on read.
+/// </para>
+/// <para>
+/// ⚠️ MapLibre stores an array property as a JSON STRING; a client reading one in a popup must
+/// parse it. Chosen over counts plus a detail endpoint, and consistent with
+/// <see cref="SegmentProperties.ControllerNodeIds"/>.
+/// </para>
+/// </remarks>
+public sealed record IotNodeProperties
+{
+    public required string NodeId { get; init; }
+
+    public required NodeRole NodeRole { get; init; }
+
+    /// <summary>Derived from <see cref="LastReportAt"/> and <c>Iot:OfflineAfter</c> (I-3). Never stored.</summary>
+    public required NodeStatus NodeStatus { get; init; }
+
+    /// <summary>
+    /// ⚠️ ALWAYS <c>null</c>: a device sits in the cabinet, never on a pole. Kept so the front end,
+    /// which binds this key from the mock, does not break (same reasoning as I-8).
+    /// </summary>
+    public string? PoleId { get; init; }
+
+    /// <summary>Segments carrying a pole on a feeder this device switches, in id order.</summary>
+    public required IReadOnlyList<string> SegmentIds { get; init; }
+
+    /// <summary>Feeders this device switches, in relay order.</summary>
+    public required IReadOnlyList<string> FeederIds { get; init; }
+
+    /// <summary><c>true</c> only for testbed hardware (D-R7).</summary>
+    public required bool SupportsRemoteControl { get; init; }
+
+    public DateTime? LastReportAt { get; init; }
 }

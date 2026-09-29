@@ -106,7 +106,7 @@ public sealed class MapQueryPlanTests(AssetSchemaFixture fixture)
 
     private Task<string> PoleSqlAsync(PoleMapQuery query)
         => fixture.QueryAsync(db => Task.FromResult(
-            new MapQueryService(db).PoleQuery(query).ToQueryString()));
+            new MapQueryService(db, new LuxMap.Modules.Telemetry.IotOptions(), TimeProvider.System).PoleQuery(query).ToQueryString()));
 
     private async Task<string> ExplainPoleQueryAsync()
         => await fixture.ExplainAsync(Literal(await PoleSqlAsync()));

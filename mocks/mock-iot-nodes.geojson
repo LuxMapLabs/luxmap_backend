@@ -14,11 +14,16 @@
    "properties": {
     "node_id": "NODE-001",
     "node_role": "segment_controller",
-    "segment_id": "SEG-001",
-    "pole_id": null,
     "node_status": "online",
-    "last_report_at": "2026-08-20T04:00:00Z",
-    "battery_pct": 81
+    "pole_id": null,
+    "segment_ids": [
+     "SEG-001"
+    ],
+    "feeder_ids": [
+     "FDR-001"
+    ],
+    "supports_remote_control": false,
+    "last_report_at": "2026-08-20T04:00:00Z"
    }
   },
   {
@@ -33,11 +38,16 @@
    "properties": {
     "node_id": "NODE-002",
     "node_role": "segment_controller",
-    "segment_id": "SEG-002",
-    "pole_id": null,
     "node_status": "online",
-    "last_report_at": "2026-08-20T06:00:00Z",
-    "battery_pct": 87
+    "pole_id": null,
+    "segment_ids": [
+     "SEG-002"
+    ],
+    "feeder_ids": [
+     "FDR-002"
+    ],
+    "supports_remote_control": false,
+    "last_report_at": "2026-08-20T06:00:00Z"
    }
   },
   {
@@ -52,182 +62,16 @@
    "properties": {
     "node_id": "NODE-003",
     "node_role": "segment_controller",
-    "segment_id": "SEG-003",
-    "pole_id": null,
     "node_status": "offline",
-    "last_report_at": "2026-08-20T05:00:00Z",
-    "battery_pct": 84
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.50217,
-     10.969973
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-039",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-001",
-    "pole_id": "POLE-0039",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T06:00:00Z",
-    "battery_pct": 100
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.496511,
-     10.975433
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-076",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-002",
-    "pole_id": "POLE-0076",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T08:00:00Z",
-    "battery_pct": 89
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.496356,
-     10.975107
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-075",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-002",
-    "pole_id": "POLE-0075",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T08:00:00Z",
-    "battery_pct": 81
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.501097,
-     10.974081
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-085",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-003",
-    "pole_id": "POLE-0085",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T05:00:00Z",
-    "battery_pct": 59
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.4945,
-     10.971199
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-063",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-002",
-    "pole_id": "POLE-0063",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T05:00:00Z",
-    "battery_pct": 47
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.496085,
-     10.969973
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-020",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-001",
-    "pole_id": "POLE-0020",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T06:00:00Z",
-    "battery_pct": 92
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.493726,
-     10.969571
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-058",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-002",
-    "pole_id": "POLE-0058",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T04:00:00Z",
-    "battery_pct": 90
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.495428,
-     10.973153
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-069",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-002",
-    "pole_id": "POLE-0069",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T05:00:00Z",
-    "battery_pct": 69
-   }
-  },
-  {
-   "type": "Feature",
-   "geometry": {
-    "type": "Point",
-    "coordinates": [
-     106.492025,
-     10.965989
-    ]
-   },
-   "properties": {
-    "node_id": "NODE-047",
-    "node_role": "sampled_fixture",
-    "segment_id": "SEG-002",
-    "pole_id": "POLE-0047",
-    "node_status": "online",
-    "last_report_at": "2026-08-20T06:00:00Z",
-    "battery_pct": 43
+    "pole_id": null,
+    "segment_ids": [
+     "SEG-003"
+    ],
+    "feeder_ids": [
+     "FDR-003"
+    ],
+    "supports_remote_control": false,
+    "last_report_at": "2026-08-20T05:00:00Z"
    }
   }
  ]

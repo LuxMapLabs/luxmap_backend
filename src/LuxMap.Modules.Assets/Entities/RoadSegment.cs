@@ -18,8 +18,8 @@ namespace LuxMap.Modules.Assets.Entities;
 /// derived and storing them would put the same fact in two places:
 /// <list type="bullet">
 /// <item><c>pole_count</c> — <c>COUNT(pole WHERE segment_id = ...)</c>.</item>
-/// <item><c>controller_node_id</c> — the relationship is owned by <c>IotNode</c>, which carries
-/// <c>segment_id</c> and <c>node_role</c> (see <c>mock-iot-nodes.geojson</c>). IOT-10 owns it.</item>
+/// <item><c>controller_node_ids</c> — derived through the feeders the segment's poles hang off and
+/// the devices that switch them (<c>feeder_control</c>, BE-14b, I-7b).</item>
 /// <item><c>has_active_segment_fault</c> — output of the CV-15 clustering, derived from Fault (BE-18).</item>
 /// </list>
 /// BE-14 computes all three when it builds the FeatureCollection.

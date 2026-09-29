@@ -103,7 +103,9 @@ SUMMARY = {
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
     ("get", "/api/v1/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
-    ("get", "/api/v1/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString",
+    ("get", "/api/v1/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
+    # BE-14b — thiết bị ở tủ điện tổng, drift "BE-14 / IoT".
+    ("get", "/api/v1/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
     # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
     ("get", "/api/v1/assets/segments/{segmentId}/poles"): "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
@@ -236,17 +238,17 @@ S["PoleFeatureCollection"] = {"type": "object", "required": ["type", "features"]
 S["SegmentProperties"] = {
     "type": "object", "additionalProperties": False,
     "description": "Contract §5.2 — 7 thuộc tính. commune_id / data_source / external_ref KHÔNG emit.",
-    "required": ["segment_id", "segment_name", "road_class", "length_m", "pole_count", "has_active_segment_fault"],
+    "required": ["segment_id", "segment_name", "road_class", "length_m", "pole_count", "controller_node_ids", "has_active_segment_fault"],
     "properties": OrderedDict([
         ("segment_id", {"$ref": "#/components/schemas/SegmentId"}),
         ("segment_name", {"type": "string"}),
         ("road_class", {"$ref": "#/components/schemas/RoadClass"}),
         ("length_m", {"type": "integer", "format": "int32", "description": "Giá trị KHAI BÁO, không dẫn xuất từ ST_Length"}),
         ("pole_count", {"type": "integer", "format": "int32", "minimum": 0}),
-        ("controller_node_id", {"$ref": "#/components/schemas/NodeId"}),
+        ("controller_node_ids", {"type": "array", "items": {"$ref": "#/components/schemas/NodeId"},
+                                 "description": "I-7b: thiết bị điều khiển feeder của cột trên tuyến, tính lúc đọc; [] khi không có — không bao giờ null"}),
         ("has_active_segment_fault", {"type": "boolean", "description": "true → FE highlight cả tuyến (đầu ra CV-15)"}),
     ])}
-S["SegmentProperties"]["properties"]["controller_node_id"] = {"type": "string", "nullable": True, "pattern": "^NODE-[0-9]{3,}$"}
 S["SegmentFeature"] = {"type": "object", "required": ["type", "geometry", "properties"], "additionalProperties": False,
                        "properties": {"type": {"type": "string", "enum": ["Feature"]},
                                       "geometry": {"$ref": "#/components/schemas/LineStringGeometry"},
@@ -421,25 +423,6 @@ S["EvidenceUpload"] = {"type": "object", "required": ["file", "kind", "captured_
         ("lng", {"type": "number", "format": "double"}),
     ])}
 
-S["IotNodeProperties"] = {"type": "object", "additionalProperties": False,
-    "description": "Contract §5.6 — theo mock-iot-nodes.geojson.",
-    "required": ["node_id", "node_role", "node_status", "segment_id"],
-    "properties": OrderedDict([
-        ("node_id", {"type": "string", "pattern": "^NODE-[0-9]{3,}$"}),
-        ("node_role", {"$ref": "#/components/schemas/NodeRole"}),
-        ("node_status", {"$ref": "#/components/schemas/NodeStatus"}),
-        ("pole_id", {"type": "string", "nullable": True, "pattern": "^POLE-[0-9]{4,}$"}),
-        ("segment_id", {"$ref": "#/components/schemas/SegmentId"}),
-        ("battery_pct", {"type": "number", "format": "double", "nullable": True}),
-        ("last_report_at", {"type": "string", "format": "date-time", "nullable": True}),
-    ])}
-S["IotNodeFeature"] = {"type": "object", "required": ["type", "geometry", "properties"], "additionalProperties": False,
-                       "properties": {"type": {"type": "string", "enum": ["Feature"]},
-                                      "geometry": {"$ref": "#/components/schemas/PointGeometry"},
-                                      "properties": {"$ref": "#/components/schemas/IotNodeProperties"}}}
-S["IotNodeFeatureCollection"] = {"type": "object", "required": ["type", "features"], "additionalProperties": False,
-                                 "properties": {"type": {"type": "string", "enum": ["FeatureCollection"]},
-                                                "features": {"type": "array", "items": {"$ref": "#/components/schemas/IotNodeFeature"}}}}
 S["SweepItem"] = {"type": "object", "additionalProperties": False,
     "description": "Contract §5.6. processing_status chưa có enum — Open item O-4.",
     "required": ["sweep_id", "started_at", "segment_ids", "frame_count", "coverage_pct", "processing_status", "data_source"],
@@ -576,10 +559,6 @@ ni("post", "/api/v1/work-orders/{work_order_id}/evidence", "WorkOrders", "Ảnh 
     ("415", err("UNSUPPORTED_IMAGE_FORMAT — không phải JPEG theo magic bytes"))],
    parameters=[p("work_order_id", {"$ref": "#/components/schemas/WorkOrderId"}, True, where="path")],
    body={"$ref": "#/components/schemas/EvidenceUpload"}, body_ct="multipart/form-data")
-ni("get", "/api/v1/iot-nodes", "IotSweeps", "IoT node theo bbox (FeatureCollection)", "§5.6", "BE-14",
-   [("200", {"description": "FeatureCollection", "content": json_content("IotNodeFeatureCollection")}),
-    ("400", err("VALIDATION_FAILED — thiếu bbox"))],
-   parameters=[BBOX])
 ni("get", "/api/v1/sweeps", "IotSweeps", "Lịch sử các đợt quét", "§5.6", "BE-17",
    [("200", {"description": "Trang sweep", "content": json_content("SweepPagedResult")})],
    parameters=PAGE)

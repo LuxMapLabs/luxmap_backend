@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Modules.Telemetry;
 
 /// <summary>
-/// Telemetry module — IotNode, TelemetryReading, ingest idempotent on (node_id, reading_time).
-/// Empty shell as of BE-01: no entities, no endpoints yet.
+/// Telemetry module — the cabinet devices (<c>iot_node</c>) and which relay switches which feeder
+/// (<c>feeder_control</c>), BE-14b. TelemetryReading and ingest (IOT-09/10) are still to come.
 /// </summary>
 public sealed class TelemetryModule : ILuxMapModule
 {
@@ -14,5 +14,11 @@ public sealed class TelemetryModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        var options = configuration.GetSection(IotOptions.SectionName).Get<IotOptions>() ?? new IotOptions();
+
+        // A non-positive threshold STOPS startup rather than marking every device offline.
+        options.Validate();
+
+        services.AddSingleton(options);
     }
 }

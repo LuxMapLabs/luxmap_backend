@@ -92,7 +92,6 @@ public class DomainEnumSerializationTests
 
     [Theory]
     [InlineData(NodeRole.SegmentController, "segment_controller")]
-    [InlineData(NodeRole.SampledFixture, "sampled_fixture")]
     public void NodeRole_matches_contract(NodeRole value, string expected)
         => Assert.Equal(expected, Wire(value));
 
@@ -127,10 +126,11 @@ public class DomainEnumSerializationTests
             // PowerSource and FixtureType dropped to ONE member on 22/09/2026 — solar lighting left
             // the project scope. The count is written here deliberately: this test exists so that
             // changing an enum cannot happen without someone coming to this line and saying so.
+            // NodeRole dropped sampled_fixture on 28/09/2026 — no device on individual poles (I-1).
             (typeof(FixtureStatus), 4), (typeof(PowerSource), 1), (typeof(FixtureType), 1),
             (typeof(FaultType), 5), (typeof(FaultStatus), 6), (typeof(Severity), 4),
             (typeof(SourceChannel), 3), (typeof(DataSource), 4), (typeof(WorkOrderStatus), 6),
-            (typeof(NodeRole), 2), (typeof(NodeStatus), 3), (typeof(RoadClass), 2),
+            (typeof(NodeRole), 1), (typeof(NodeStatus), 3), (typeof(RoadClass), 2),
         ];
 
         foreach (var (type, expected) in enums)

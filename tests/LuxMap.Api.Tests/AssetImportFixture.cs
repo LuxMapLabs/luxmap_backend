@@ -169,6 +169,11 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 "DELETE FROM lux_reading WHERE commune_id = @c OR commune_id = @f;",
 
                 "DELETE FROM pole WHERE commune_id = @c OR commune_id = @f;",
+
+                // BE-14b: feeder_control holds both feeder and iot_node with RESTRICT, so it goes
+                // first, then the devices, then the feeders.
+                "DELETE FROM feeder_control WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM iot_node WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR token_hash = ANY(@h);",
