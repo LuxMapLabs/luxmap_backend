@@ -31,7 +31,7 @@ HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 n_from_code = sum(1 for item in d["paths"].values() for m in item if m in HTTP_METHODS)
 
 d["info"]["description"] = (
-    "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, nền tạm tới FW). "
+    "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11; BE-40: F-1…F-6 — nền tạm tới FW). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -57,7 +57,7 @@ TAGS = OrderedDict([
     ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
     ("Poles", "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."),
     ("Segments", "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."),
-    ("Faults", "Sự cố — Contract §5.4. CHƯA HIỆN THỰC (BE-40, BE-19, BE-41)."),
+    ("Faults", "Sự cố — Contract §5.4. GET đã hiện thực (BE-40, drift F-1…F-6); PATCH (BE-19) và POST (BE-41) CHƯA."),
     ("WorkOrders", "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."),
     ("IotSweeps", "IoT node, sweep, thumbnail — Contract §5.6. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."),
     ("Sync", "Đồng bộ offline — Contract §5.8. CHƯA HIỆN THỰC (BE-43)."),
@@ -106,6 +106,8 @@ SUMMARY = {
     ("get", "/api/v1/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
     # BE-14b — thiết bị ở tủ điện tổng, drift "BE-14 / IoT".
     ("get", "/api/v1/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
+    # BE-40 — §5.4; lọc CSV, sort, commune_id và mặc định ẩn calibration_rig là drift F-1…F-6.
+    ("get", "/api/v1/faults"): "Danh sách sự cố — phân trang JSON, KHÔNG GeoJSON; mặc định -priority_score, null cuối",
     # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
     ("get", "/api/v1/assets/segments/{segmentId}/poles"): "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
@@ -141,6 +143,7 @@ for method, suffix, summary in [
 
 SECTION = {
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
+    "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",
@@ -185,7 +188,6 @@ S["NodeId"] = pid("NODE", 3)
 S["SweepId"] = pid("SWP", 3)
 S["FrameId"] = pid("FRM", 6)
 S["WorkOrderId"] = pid("WO", 4)
-S["ClusterId"] = pid("CLS", 3)
 
 S["LatLng"] = {"type": "object", "required": ["lat", "lng"], "additionalProperties": False,
                "properties": {"lat": {"type": "number", "format": "double", "minimum": -90, "maximum": 90},
@@ -352,38 +354,8 @@ S["PoleDetail"] = {"type": "object", "additionalProperties": False,
         ("recent_frames", {"type": "array", "items": {"$ref": "#/components/schemas/RecentFrame"}}),
     ])}
 
-S["FaultItem"] = {"type": "object", "additionalProperties": False,
-    "description": "Contract §5.4 — một item. work_order_id LUÔN null cho tới BE-21.",
-    "required": ["fault_id", "location", "fault_type", "fault_status", "severity", "source_channel", "data_source",
-                 "detected_at", "updated_at", "work_order_id"],
-    "properties": OrderedDict([
-        ("fault_id", {"$ref": "#/components/schemas/FaultId"}),
-        ("pole_id", {"type": "string", "nullable": True, "pattern": "^POLE-[0-9]{4,}$"}),
-        ("fixture_id", {"type": "string", "nullable": True, "pattern": "^FIX-[0-9]{4,}$"}),
-        ("segment_id", {"type": "string", "nullable": True, "pattern": "^SEG-[0-9]{3,}$"}),
-        ("location", {"$ref": "#/components/schemas/LatLng"}),
-        ("fault_type", {"$ref": "#/components/schemas/FaultType"}),
-        ("fault_status", {"$ref": "#/components/schemas/FaultStatus"}),
-        ("severity", {"$ref": "#/components/schemas/Severity"}),
-        ("source_channel", {"$ref": "#/components/schemas/SourceChannel"}),
-        ("data_source", {"$ref": "#/components/schemas/DataSource"}),
-        ("priority_score", {"type": "number", "format": "double", "nullable": True, "description": "CV-16 tính; null khi chưa chấm"}),
-        ("status_confidence", {"type": "number", "format": "double", "minimum": 0, "maximum": 1, "nullable": True}),
-        ("cluster_id", {"type": "string", "nullable": True, "pattern": "^CLS-[0-9]{3,}$"}),
-        ("detected_at", {"type": "string", "format": "date-time"}),
-        ("updated_at", {"type": "string", "format": "date-time"}),
-        ("work_order_id", {"type": "string", "nullable": True, "pattern": "^WO-[0-9]{4,}$"}),
-        ("note", {"type": "string", "nullable": True}),
-        ("reported_by", {"type": "string", "nullable": True, "pattern": "^USR-[0-9]{3,}$"}),
-    ])}
-S["FaultPagedResult"] = {"type": "object", "additionalProperties": False,
-    "required": ["page", "page_size", "total", "items"],
-    "properties": OrderedDict([
-        ("page", {"type": "integer", "format": "int32"}),
-        ("page_size", {"type": "integer", "format": "int32", "maximum": 200}),
-        ("total", {"type": "integer", "format": "int32"}),
-        ("items", {"type": "array", "items": {"$ref": "#/components/schemas/FaultItem"}}),
-    ])}
+# BE-40: FaultItem and its page now come from the live code (FaultItem / FaultItemPagedResult).
+# The hand-written copies stood here and would OVERWRITE the exported schema (CLAUDE.md, BE-14b).
 S["PatchFaultRequest"] = {"type": "object", "additionalProperties": False, "required": ["fault_status"],
     "description": "Contract §5.4 (PATCH). Chuyển sai luồng → 409.",
     "properties": OrderedDict([
@@ -527,18 +499,6 @@ ni("get", "/api/v1/poles/{pole_id}", "Poles", "Chi tiết cột + lịch sử, �
    [("200", {"description": "Chi tiết cột", "content": json_content("PoleDetail")}),
     ("404", err("Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)"))],
    parameters=[p("pole_id", {"$ref": "#/components/schemas/PoleId"}, True, where="path")])
-ni("get", "/api/v1/faults", "Faults", "Danh sách sự cố — phân trang JSON, KHÔNG phải GeoJSON", "§5.4", "BE-40",
-   [("200", {"description": "Trang sự cố; sắp mặc định -priority_score", "content": json_content("FaultPagedResult")}),
-    ("403", err("COMMUNE_FORBIDDEN"))],
-   parameters=[p("bbox", {"type": "string"}, desc="Tuỳ chọn ở endpoint này"),
-               p("status", ENUM_CSV("fault_status")), p("severity", ENUM_CSV("severity")),
-               p("fault_type", ENUM_CSV("fault_type")), p("source_channel", ENUM_CSV("source_channel")),
-               p("data_source", ENUM_CSV("data_source")),
-               p("pole_id", {"$ref": "#/components/schemas/PoleId"},
-                 desc="MỘT giá trị. Cột không tồn tại và cột ngoài phạm vi trả GIỐNG NHAU: 200 + rỗng (Contract §5.4)"),
-               p("segment_id", {"$ref": "#/components/schemas/SegmentId"}),
-               p("cluster_id", {"$ref": "#/components/schemas/ClusterId"}),
-               p("sort", {"type": "string", "default": "-priority_score"})] + PAGE)
 ni("patch", "/api/v1/faults/{fault_id}", "Faults", "Kỹ sư xác nhận / bác bỏ / phân loại lại", "§5.4", "BE-19",
    [("200", {"description": "Fault sau khi đổi", "content": json_content("FaultItem")}),
     ("400", err("VALIDATION_FAILED")),

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using LuxMap.Modules.Map.Bbox;
+using LuxMap.Shared.Http;
 using LuxMap.Modules.Map.Features;
 using LuxMap.Persistence;
 using Microsoft.EntityFrameworkCore;

@@ -1073,8 +1073,14 @@ nguồn ranh giới thật (`AdministrativeUnit.cs`). ⚠️ Lý do này dựa t
 
 Contract nói **CV-16 tính** — một tiến trình ngoài API, nên giá trị phải có chỗ ghi vào. Và mục 2.4
 đặt thứ tự mặc định `-priority_score`: sắp theo biểu thức tính lúc query thì **không dùng được index
-và phân trang không ổn định**. Index là `DESC NULLS LAST` — fault CV-16 chưa chấm nằm cuối, không
-phải đầu.
+và phân trang không ổn định**. Fault CV-16 chưa chấm phải nằm **cuối**, không phải đầu.
+
+> 🔴 **`ix_fault_priority_score` trên DB là `DESC` TRẦN, không phải `DESC NULLS LAST`** (đo 29/09/2026:
+> `pg_indexes` → `btree (priority_score DESC)`). Postgres xếp NULL **lên đầu** với `DESC`, nên index
+> này không phục vụ thứ tự NULL-cuối. `IsDescending()` của EF không sinh `NULLS LAST`; câu cũ ở đây
+> và comment trong `FaultConfigurations` đã nói sai. **Truy vấn phải tự ép NULL xuống cuối**
+> (`OrderBy(x => x.PriorityScore == null)` trước) — BE-40 làm vậy, canh bằng sabotage trong
+> `FaultListTests`. Muốn index phục vụ được thì cần migration riêng (BE-32), đừng tưởng đã có.
 
 ⚠️ **Nợ:** BE-33 đổi trọng số thì phải **tính lại toàn bảng**. Job nền là **BE-26 (W12)**.
 
@@ -1196,8 +1202,9 @@ nên nó **nhận giá trị một từ** (`normal`, `dim`, `out`) và **từ ch
 không ai nghĩ tới việc bộ phân tích enum mới là thủ phạm. Đã gặp thật ở `data_source=calibration_rig`.
 
 Khuôn đúng: so với **tên trên dây**, sinh bằng `JsonNamingPolicy.SnakeCaseLower.ConvertName` — đúng
-policy đang serialize chúng ra, nên giá trị client đọc được chính là giá trị nó gửi lại được. Xem
-`MapController.WireName`.
+policy đang serialize chúng ra, nên giá trị client đọc được chính là giá trị nó gửi lại được. Dùng
+**`WireEnum.ParseCsv` / `WireEnum.Name`** ở `LuxMap.Shared/Http` (chuyển từ `MapController` ở BE-40,
+cùng `BoundingBox`, vì Faults không tham chiếu được Map). Đừng chép bản thứ ba.
 
 **2. 🔴 Test THỨ TỰ không thay được test KẾ HOẠCH, và ngược lại.**
 
@@ -1516,6 +1523,20 @@ Dùng `UtcMicrosecondClock.UtcNow()` (Shared), giữ cùng một `now` cho entit
 PostgreSQL `timestamptz` chỉ lưu µs; `DateTime.UtcNow` trên Linux có tick 100 ns nên response
 có thể khác DB dù local macOS (đồng hồ µs) xanh. PR #54 đã lộ sai lệch completed_at/resolved_at.
 Test phải cấp thời gian cố định có tick lẻ dưới µs qua TimeProvider, không chỉ thử đồng hồ thật.
+
+### BE-40 — danh sách sự cố (29/09/2026)
+
+**Faults KHÔNG tham chiếu được WorkOrders** — chiều ngược đã có (WorkOrders gọi `FaultTransitions`).
+Câu hỏi "fault nào đang nằm trong phiếu nào" đi qua port **`IActiveWorkOrderLookup`** khai ở Faults,
+WorkOrders hiện thực. **BE-19 dùng lại đúng port này** để trả 409 khi fault thuộc phiếu sửa chữa đang
+chạy (WO-10) — đừng thêm project reference, và đừng chuyển endpoint fault sang WorkOrders.
+
+Port đọc `WorkOrderFault` (chỉ scope theo xã), **không** đọc `WorkOrder` (scope theo cả người được
+giao), nên ID trả về cả với phiếu người gọi không mở được — đó là quyết định F-3, không phải rò.
+
+`location` của fault = `lat/lng` của fault, thiếu thì điểm của cột — **cùng luật** với chi tiết WO.
+CHECK `ck_fault_pole_or_location` cho phép fault có cột mà không toạ độ, nên chỉ đọc `fault.lat` là
+trả `null` ở chỗ Contract bắt buộc có giá trị.
 
 ### BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 

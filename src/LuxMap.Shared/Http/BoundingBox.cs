@@ -1,9 +1,8 @@
 using System.Globalization;
 using System.Net;
 using LuxMap.Shared.Contracts.Errors;
-using LuxMap.Shared.Http;
 
-namespace LuxMap.Modules.Map.Bbox;
+namespace LuxMap.Shared.Http;
 
 /// <summary>
 /// The <c>bbox</c> query parameter: <c>minLng,minLat,maxLng,maxLat</c> in EPSG:4326.
@@ -14,6 +13,11 @@ namespace LuxMap.Modules.Map.Bbox;
 /// 5.1, and CLAUDE.md lists an unbounded variant as an anti-pattern: the point is not tidiness, it
 /// is that a table scan over every pole in every commune cannot meet the 500 ms budget and would
 /// get slower without anyone noticing which change did it.
+/// </para>
+/// <para>
+/// <c>GET /faults</c> (BE-40) takes it as an OPTIONAL filter — Contract section 5.4 lists it among
+/// the filters of a paginated list — so that caller parses only a value that is present. It lives
+/// in Shared because the Faults module cannot reference Map (Map already references Faults).
 /// </para>
 /// <para>
 /// ⚠️ <b>Non-finite values are refused explicitly.</b> <c>double.TryParse</c> accepts "NaN" and

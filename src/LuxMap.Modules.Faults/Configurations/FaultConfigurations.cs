@@ -157,9 +157,9 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
         builder.HasIndex(fault => fault.ClusterId).HasDatabaseName("ix_fault_cluster_id");
         builder.HasIndex(fault => fault.FaultStatus).HasDatabaseName("ix_fault_fault_status");
 
-        // Serves the default ordering of Contract section 2.4 (-priority_score). DESC with NULLS
-        // LAST matches how the list is read: faults CV-16 has not scored belong at the end, not the
-        // top, and a plain DESC index would put NULLs first in PostgreSQL.
+        // Meant for the default ordering of Contract section 5.4 (-priority_score, unscored last).
+        // ⚠️ IsDescending() emits a plain DESC, which PostgreSQL sorts NULLS FIRST — so this index
+        // does NOT serve that order; GET /faults forces NULLs last in the query (CLAUDE.md, BE-18 rule 3).
         builder.HasIndex(fault => fault.PriorityScore)
             .IsDescending()
             .HasDatabaseName("ix_fault_priority_score");
