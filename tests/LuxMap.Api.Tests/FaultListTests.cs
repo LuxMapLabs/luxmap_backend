@@ -146,7 +146,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
     /// live table and sequence hold, so they cannot collide (CLAUDE.md, no literal IDs).
     /// </remarks>
     [Fact]
-    public async Task Order_is_priority_descending_with_nulls_last_and_ties_by_numeric_id()
+    public async Task Priority_order_is_descending_with_nulls_last_and_ties_by_numeric_id()
     {
         var boundary = await FreeWidthBoundaryAsync();
         var shortId = $"FAULT-{boundary - 1}";
@@ -160,10 +160,30 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
             new Plan { Priority = 90 });
         var (tiedLong, tiedShort, unscored, top) = (ids[0], ids[1], ids[2], ids[3]);
 
-        Assert.Equal([top, tiedShort, tiedLong, unscored], Ids(await GetAsync("manager", $"?commune_id={home}")));
+        Assert.Equal([top, tiedShort, tiedLong, unscored], Ids(await GetAsync("manager", $"?commune_id={home}&sort=-priority_score")));
         Assert.Equal(
             [tiedShort, tiedLong, top, unscored],
             Ids(await GetAsync("manager", $"?commune_id={home}&sort=priority_score")));
+    }
+
+    /// <summary>
+    /// Drift P-3: default order is severity, most severe first, then oldest first. Severity is stored as
+    /// text, so the four values are planted in an order where alphabetical sorting would be visibly wrong.
+    /// </summary>
+    [Fact]
+    public async Task Default_order_is_severity_by_rank_not_alphabet_then_oldest_first()
+    {
+        var earlier = DateTime.UtcNow.AddHours(-2);
+        var ids = await PlantAsync(
+            new Plan { Severity = Severity.Low },
+            new Plan { Severity = Severity.Medium },
+            new Plan { Severity = Severity.High },
+            new Plan { Severity = Severity.High, Detected = earlier },
+            new Plan { Severity = Severity.Critical });
+        var (low, medium, recentHigh, olderHigh, critical) = (ids[0], ids[1], ids[2], ids[3], ids[4]);
+
+        Assert.Equal([critical, olderHigh, recentHigh, medium, low], Ids(await GetAsync("a", "")));
+        Assert.Equal([low, medium, olderHigh, recentHigh, critical], Ids(await GetAsync("a", "?sort=severity")));
     }
 
     [Fact]
@@ -287,6 +307,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
         public double? Lat { get; init; } = 16.001;
         public double? Lng { get; init; } = 108.001;
         public double? Priority { get; init; }
+        public DateTime? Detected { get; init; }
         public FaultStatus Status { get; init; } = FaultStatus.Detected;
         public Severity Severity { get; init; } = Severity.Medium;
         public FaultType Type { get; init; } = FaultType.LampOut;
@@ -306,7 +327,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
                     CommuneId = plan.Commune ?? home, SegmentId = plan.Segment ?? segment, PoleId = plan.Pole,
                     Lat = plan.Lat, Lng = plan.Lng, PriorityScore = plan.Priority,
                     FaultStatus = plan.Status, Severity = plan.Severity, FaultType = plan.Type,
-                    SourceChannel = plan.Channel, DataSource = plan.Source, DetectedAt = DateTime.UtcNow,
+                    SourceChannel = plan.Channel, DataSource = plan.Source, DetectedAt = plan.Detected ?? DateTime.UtcNow,
                 };
                 if (plan.Id is not null)
                 {

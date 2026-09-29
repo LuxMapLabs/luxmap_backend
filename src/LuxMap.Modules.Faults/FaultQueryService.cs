@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Persistence;
@@ -160,6 +161,12 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
     {
         var ordered = (sort.Key, sort.Descending) switch
         {
+            (FaultSortKey.Severity, true) => rows
+                .OrderByDescending(SeverityRank)
+                .ThenBy(row => row.Fault.DetectedAt),
+            (FaultSortKey.Severity, false) => rows
+                .OrderBy(SeverityRank)
+                .ThenBy(row => row.Fault.DetectedAt),
             (FaultSortKey.PriorityScore, true) => rows
                 .OrderBy(row => row.Fault.PriorityScore == null)
                 .ThenByDescending(row => row.Fault.PriorityScore),
@@ -178,6 +185,17 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
             .ThenBy(row => row.Fault.FaultId.Length)
             .ThenBy(row => row.Fault.FaultId);
     }
+
+    /// <summary>
+    /// 🔴 Severity is stored as TEXT, so ordering by the column is alphabetical —
+    /// <c>critical, high, low, medium</c>. Rank it explicitly. An expression, not a method: EF turns
+    /// it into a CASE, whereas a C# method call inside OrderBy cannot be translated at all.
+    /// </summary>
+    private static readonly Expression<Func<LocatedFault, int>> SeverityRank = row =>
+        row.Fault.Severity == Severity.Critical ? 3
+        : row.Fault.Severity == Severity.High ? 2
+        : row.Fault.Severity == Severity.Medium ? 1
+        : 0;
 
     private sealed class LocatedFault
     {

@@ -23,7 +23,8 @@ public sealed class FaultsController(FaultQueryService service, FaultReviewServi
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Default order <c>-priority_score</c>, unscored faults last. <c>sort</c> also takes
+    /// Default order <c>-severity</c>, oldest first within a severity (drift P-3). <c>sort</c> also takes
+    /// <c>priority_score</c> (unscored faults last),
     /// <c>detected_at</c> and <c>updated_at</c>, each with an optional <c>-</c>.
     /// </para>
     /// <para>
