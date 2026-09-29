@@ -518,22 +518,48 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
 
     private Task<int> AuditCount(string id) => Db(db => db.Set<AuditEvent>().IgnoreQueryFilters().CountAsync(x => x.EntityId == id));
 
+    /// <remarks>
+    /// Since BE-19 creation locks the fault rows (FaultLocks), so the second request waits and then
+    /// meets the first one's link in its own pre-check — the unique index stays as the backstop.
+    /// </remarks>
     [Fact]
-    public async Task Link_race_rolls_back_losing_order_and_audit()
+    public async Task Concurrent_creates_on_one_fault_serialize_and_the_loser_leaves_nothing()
     {
         var fault = await Fault();
-        var barrier = new SaveBarrier(fault, create: true);
-        await using var raceFactory = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
-            services.AddDbContext<LuxMapDbContext>((_, options) => options.AddInterceptors(barrier))));
-        using var client = raceFactory.CreateClient();
-        client.DefaultRequestHeaders.Authorization = clients["manager"].DefaultRequestHeaders.Authorization;
-        var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => client.PostAsJsonAsync(Route,
+        var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => clients["manager"].PostAsJsonAsync(Route,
             new { task_kind = "inspection", title = "Race", fault_ids = new[] { fault } })));
         Assert.Equal(new[] { 201, 409 }, responses.Select(x => (int)x.StatusCode).Order());
         var loser = responses.Single(x => x.StatusCode == HttpStatusCode.Conflict);
         Assert.Contains("FAULT_ALREADY_IN_WORK_ORDER", await loser.Content.ReadAsStringAsync());
         Assert.Equal(1, await Db(db => db.Set<WorkOrder>().IgnoreQueryFilters().CountAsync(x => x.CommuneId == home)));
         Assert.Equal(1, await Db(db => db.Set<AuditEvent>().IgnoreQueryFilters().CountAsync(x => x.CommuneId == home)));
+    }
+
+    /// <summary>
+    /// The race Codex found (BE-19): a fault rejected while a work order is being created over it.
+    /// Holding the row lock from outside, rejecting it, then releasing must make the waiting create
+    /// re-read the fault and refuse it — not insert a link to a rejected fault.
+    /// </summary>
+    [Fact]
+    public async Task Creation_waits_for_the_fault_lock_and_rereads_the_status_it_validates()
+    {
+        var fault = await Fault();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var holder = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+        await using var transaction = await holder.Database.BeginTransactionAsync();
+        await holder.Database.ExecuteSqlRawAsync("SELECT 1 FROM fault WHERE fault_id = {0} FOR UPDATE", fault);
+
+        var create = clients["manager"].PostAsJsonAsync(Route, new { task_kind = "inspection", title = "Blocked", fault_ids = new[] { fault } });
+        await Task.Delay(500);
+        Assert.False(create.IsCompleted, "Creation should be waiting on the fault row lock.");
+
+        await holder.Database.ExecuteSqlRawAsync("UPDATE fault SET fault_status = 'rejected' WHERE fault_id = {0}", fault);
+        await transaction.CommitAsync();
+
+        var response = await create;
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains("FAULT_STATUS_NOT_ELIGIBLE", await response.Content.ReadAsStringAsync());
+        Assert.Equal(0, await Db(db => db.Set<WorkOrderFault>().IgnoreQueryFilters().CountAsync(x => x.FaultId == fault)));
     }
 
     [Fact]

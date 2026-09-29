@@ -52,6 +52,9 @@ public static class LuxMapPolicies
     /// <summary>Read the fault list (BE-40). Kept apart from <see cref="ReadNetwork"/> so fault access can change without touching the map.</summary>
     public const string ReadFaults = "cap:read_faults";
 
+    /// <summary>Review a fault: confirm, reject, reclassify, set severity, write a review note (BE-19).</summary>
+    public const string ReviewFaults = "cap:review_faults";
+
     public const string ReadWorkOrders = "cap:read_work_orders";
     public const string ManageWorkOrders = "cap:manage_work_orders";
     public const string ExecuteWorkOrders = "cap:execute_work_orders";
@@ -67,6 +70,7 @@ public static class LuxMapPolicies
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],
             [ReadFaults] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
+            [ReviewFaults] = [UserRole.Manager],
             [ReadWorkOrders] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageWorkOrders] = [UserRole.Manager],
             [ExecuteWorkOrders] = [UserRole.FieldEngineer],

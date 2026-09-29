@@ -104,8 +104,8 @@ def statements() -> list[str]:
     sql = ["BEGIN;"]
     sql.append(f"""
 DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM audit_event WHERE entity_type = 'work_order') THEN
-    RAISE EXCEPTION 'Work order audit exists; re-seeding would reuse its entity IDs.';
+  IF EXISTS (SELECT 1 FROM audit_event WHERE entity_type IN ('work_order', 'fault')) THEN
+    RAISE EXCEPTION 'Work order or fault audit exists; re-seeding would reuse its entity IDs.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM app_user u JOIN app_user_commune c USING (user_id)
       WHERE u.username = 'crew' AND u.role = 'field_engineer' AND NOT u.is_locked

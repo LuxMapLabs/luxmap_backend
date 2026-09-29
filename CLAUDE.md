@@ -1552,6 +1552,34 @@ trong cùng `verify`, cùng audit. Đây là ngoại lệ thứ hai của "chỉ
 biết: sự cố `confirmed` có thể có `confirmed_by` là người nghiệm thu một phiếu, không phải người gọi
 `PATCH /faults`.
 
+### BE-19 — duyệt sự cố, audit và khoá hàng (29/09/2026)
+
+**`Fault` là `IAudited`.** Mọi đường ghi sự cố (BE-41 báo tại chỗ, ingest CV/IoT, IOT-11) phải thêm
+**đúng một** audit trong cùng `SaveChanges` — engine ghi actor `cv`/`iot`. Seeder và fixture đi qua
+`EnterUnscopedSystemWriteBackdoor()`. ⚠️ Guard audit chạy **trước** guard xã (`LuxMapDbContext`): test
+muốn chứng minh guard xã trên sự cố phải kèm một audit hợp lệ, nếu không nó đỏ vì lý do khác
+(`FaultSchemaTests.WriteAsync`).
+
+**Khoá hàng `fault` trước khi kiểm (`FaultLocks`).** Tạo phiếu **đọc** trạng thái sự cố rồi chèn liên
+kết mà không ghi vào `fault`, nên `xmin` không thấy race với `PATCH /faults`. Cả hai phía mở transaction,
+`SELECT … FOR UPDATE` theo thứ tự `fault_id` (thứ tự khoá, **không** phải thứ tự hiển thị), rồi mới đọc
+lại. Hệ quả: hai lần tạo phiếu trên cùng sự cố nay **tuần tự**; unique index
+`ux_work_order_fault_fault_id_active` còn là lớp chặn cuối, không còn là lớp trả lời. Trong transaction,
+bắt lỗi xong phải **rollback trước** mọi truy vấn khác (`WorkOrderService.Save`).
+
+**`fault_type` là loại kênh báo, không bao giờ sửa.** Phân loại lại đi vào `override_fault_type`; API dùng
+`override ?? fault_type` cho cả trả về lẫn lọc. Lọc bằng hai nhánh, danh sách của nhánh override phải kiểu
+`FaultType?` — EF không bind được một danh sách không-null vào cột nullable, cũng không dịch được
+`Contains(override ?? type)`.
+
+⚠️ **`Down()` của `AddFaultReview` gãy khi đã có audit `entity_type = 'fault'`** — nó dựng lại CHECK cũ
+chỉ nhận `work_order`, mà bảng audit không cho xoá. Rollback migration này chỉ chạy được trên DB chưa có
+quyết định sự cố nào (cùng họ lưu ý của BE-23a).
+
+**Test chuyển trạng thái phải thử chuyển HỢP LỆ ở §3.2 nhưng cấm ở `PATCH`** (`confirmed → in_progress`).
+Chuyển mà máy trạng thái vốn cấm thì 409 dù có luật riêng của `PATCH` hay không — sabotage gỡ luật đó đã
+xanh cho tới khi thêm cặp này.
+
 ### BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 
 **Schema và quyền ghi tách nhau như `pole_current_status`.** `feeder_control` là bảng riêng khoá theo

@@ -31,7 +31,7 @@ HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 n_from_code = sum(1 for item in d["paths"].values() for m in item if m in HTTP_METHODS)
 
 d["info"]["description"] = (
-    "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6 — nền tạm tới FW). "
+    "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9 — nền tạm tới FW). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -57,7 +57,7 @@ TAGS = OrderedDict([
     ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
     ("Poles", "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."),
     ("Segments", "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."),
-    ("Faults", "Sự cố — Contract §5.4. GET đã hiện thực (BE-40, drift F-1…F-6); PATCH (BE-19) và POST (BE-41) CHƯA."),
+    ("Faults", "Sự cố — Contract §5.4. GET (BE-40, F-1…F-6) và PATCH (BE-19, R-1…R-9) đã hiện thực; POST (BE-41) CHƯA."),
     ("WorkOrders", "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."),
     ("IotSweeps", "IoT node, sweep, thumbnail — Contract §5.6. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."),
     ("Sync", "Đồng bộ offline — Contract §5.8. CHƯA HIỆN THỰC (BE-43)."),
@@ -108,6 +108,7 @@ SUMMARY = {
     ("get", "/api/v1/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
     # BE-40 — §5.4; lọc CSV, sort, commune_id và mặc định ẩn calibration_rig là drift F-1…F-6.
     ("get", "/api/v1/faults"): "Danh sách sự cố — phân trang JSON, KHÔNG GeoJSON; mặc định -priority_score, null cuối",
+    ("patch", "/api/v1/faults/{id}"): "[TẠM — BE-19] Quản lý duyệt: detected → confirmed|rejected, phân loại lại lamp_out↔lamp_dim, severity, review_note",
     # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
     ("get", "/api/v1/assets/segments/{segmentId}/poles"): "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
@@ -357,13 +358,7 @@ S["PoleDetail"] = {"type": "object", "additionalProperties": False,
 
 # BE-40: FaultItem and its page now come from the live code (FaultItem / FaultItemPagedResult).
 # The hand-written copies stood here and would OVERWRITE the exported schema (CLAUDE.md, BE-14b).
-S["PatchFaultRequest"] = {"type": "object", "additionalProperties": False, "required": ["fault_status"],
-    "description": "Contract §5.4 (PATCH). Chuyển sai luồng → 409.",
-    "properties": OrderedDict([
-        ("fault_status", {"$ref": "#/components/schemas/FaultStatus"}),
-        ("override_fault_type", {"nullable": True, "allOf": [{"$ref": "#/components/schemas/FaultType"}], "type": "string"}),
-        ("note", {"type": "string", "nullable": True}),
-    ])}
+# BE-19: PatchFaultRequest now comes from the live code; the hand-written copy would overwrite it.
 S["CreateFaultRequest"] = {"type": "object", "additionalProperties": False,
     "required": ["client_op_id", "fault_type", "note"],
     "description": "Contract §5.4 (POST). Server áp cứng source_channel=field_report, data_source=field, fault_status=detected, reported_by=JWT.",
@@ -500,13 +495,6 @@ ni("get", "/api/v1/poles/{pole_id}", "Poles", "Chi tiết cột + lịch sử, �
    [("200", {"description": "Chi tiết cột", "content": json_content("PoleDetail")}),
     ("404", err("Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)"))],
    parameters=[p("pole_id", {"$ref": "#/components/schemas/PoleId"}, True, where="path")])
-ni("patch", "/api/v1/faults/{fault_id}", "Faults", "Kỹ sư xác nhận / bác bỏ / phân loại lại", "§5.4", "BE-19",
-   [("200", {"description": "Fault sau khi đổi", "content": json_content("FaultItem")}),
-    ("400", err("VALIDATION_FAILED")),
-    ("404", err("Không tồn tại hoặc ngoài phạm vi")),
-    ("409", err("Chuyển trạng thái sai luồng: detected→confirmed|rejected; confirmed→in_progress→resolved→verified"))],
-   parameters=[p("fault_id", {"$ref": "#/components/schemas/FaultId"}, True, where="path")],
-   body={"$ref": "#/components/schemas/PatchFaultRequest"})
 ni("post", "/api/v1/faults", "Faults", "Kỹ sư hiện trường báo sự cố tại chỗ", "§5.4", "BE-41",
    [("201", {"description": "Fault đầy đủ kèm client_op_id", "content": json_content("CreatedFaultResponse")}),
     ("200", {"description": "DUPLICATE_OP — client_op_id đã xử lý, trả fault đã tạo (KHÔNG phải lỗi)", "content": json_content("CreatedFaultResponse")}),

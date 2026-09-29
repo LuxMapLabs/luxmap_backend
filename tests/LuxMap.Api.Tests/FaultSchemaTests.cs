@@ -3,6 +3,7 @@ using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Auth;
 using LuxMap.Persistence;
+using LuxMap.Persistence.Audit;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -104,7 +105,20 @@ public class FaultSchemaTests(AssetSchemaFixture fixture) : IAsyncLifetime
     {
         return asSystem
             ? fixture.WriteAsSystemAsync(async db => { db.Set<Fault>().Add(fault); return await db.SaveChangesAsync(); })
-            : fixture.QueryAsync(async db => { db.Set<Fault>().Add(fault); return await db.SaveChangesAsync(); });
+            : fixture.QueryAsync(async db =>
+            {
+                // Fault is IAudited since BE-19 and the audit guard runs BEFORE the commune guard. An
+                // in-scope audit event satisfies the first so this write still reaches the second —
+                // the guard under test — instead of failing for a reason it is not about.
+                db.Set<Fault>().Add(fault);
+                db.Set<AuditEvent>().Add(new AuditEvent
+                {
+                    OccurredAt = DateTime.UtcNow, ActorKind = AuditActorKind.Cv, CommuneId = fixture.CommuneId,
+                    EntityType = AuditEntityType.Fault, EntityId = "FAULT-TEST", Action = AuditAction.Created,
+                    AfterState = "{}", CorrelationId = Guid.NewGuid().ToString(),
+                });
+                return await db.SaveChangesAsync();
+            });
     }
 
     private void Track(Fault fault) => faultIds.Add(fault.FaultId);

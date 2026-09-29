@@ -80,6 +80,9 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
         // Five Contract section 1 enums, each stored as the exact string the API returns and pinned
         // by a generated CHECK.
         builder.HasContractEnum(fault => fault.FaultType);
+        builder.HasContractEnum(fault => fault.OverrideFaultType);
+        builder.Ignore(fault => fault.EffectiveType);
+        builder.Property(fault => fault.ReviewNote).HasColumnType("text");
         builder.HasContractEnum(fault => fault.FaultStatus);
         builder.HasContractEnum(fault => fault.Severity);
         builder.HasContractEnum(fault => fault.SourceChannel);
@@ -113,6 +116,13 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
 
             // Latitude and longitude are only ever read back, but a NaN here would put a marker
             // nowhere on the map with no error anywhere.
+            // BE-19 D-4: a Manager only moves a fault between the two lamp classes; the other three
+            // types describe a feeder, a device or a whole segment and are not the Manager's to relabel.
+            table.HasCheckConstraint(
+                "ck_fault_override_is_lamp_class",
+                "override_fault_type IS NULL OR override_fault_type IN ('lamp_out', 'lamp_dim')");
+            table.HasCheckConstraint("ck_fault_review_note_not_blank", "review_note IS NULL OR btrim(review_note) <> ''");
+
             table.HasCheckConstraint(
                 "ck_fault_location_finite",
                 $"(lat IS NULL OR ({FiniteChecks.Finite("lat")} AND lat BETWEEN -90 AND 90)) AND "
