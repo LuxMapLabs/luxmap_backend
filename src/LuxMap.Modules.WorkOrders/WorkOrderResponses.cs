@@ -11,6 +11,10 @@ public class WorkOrderItem
     public TaskKind TaskKind { get; init; }
     public string? SegmentId { get; init; }
     public string? ClusterId { get; init; }
+    /// <summary>The work order this one followed up; NULL for the first step of a chain (drift FR-2).</summary>
+    public string? ParentWorkOrderId { get; init; }
+    /// <summary>The ID of the chain's first work order — the same for every step (drift FR-2).</summary>
+    public required string CaseId { get; init; }
     public required string[] FaultIds { get; init; }
     public WorkOrderStatus WoStatus { get; init; }
     public string? AssignedTo { get; init; }
@@ -26,6 +30,8 @@ public sealed class WorkOrderDetail : WorkOrderItem
     public string? Note { get; init; }
     public string? ReviewNote { get; init; }
     public string? ReportNote { get; init; }
+    public string? MaterialsNote { get; init; }
+    public string? MaterialsUsed { get; init; }
     public required string CreatedBy { get; init; }
     public DateTime? AssignedAt { get; init; }
     public DateTime? StartedAt { get; init; }

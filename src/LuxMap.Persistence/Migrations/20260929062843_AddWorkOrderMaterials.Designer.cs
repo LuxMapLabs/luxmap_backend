@@ -3,6 +3,7 @@ using System;
 using LuxMap.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LuxMap.Persistence.Migrations
 {
     [DbContext(typeof(LuxMapDbContext))]
-    partial class LuxMapDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260929062843_AddWorkOrderMaterials")]
+    partial class AddWorkOrderMaterials
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1116,10 +1119,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
-                    b.Property<string>("ParentWorkOrderId")
-                        .HasColumnType("text")
-                        .HasColumnName("parent_work_order_id");
-
                     b.Property<string>("ReportNote")
                         .HasColumnType("text")
                         .HasColumnName("report_note");
@@ -1127,10 +1126,6 @@ namespace LuxMap.Persistence.Migrations
                     b.Property<string>("ReviewNote")
                         .HasColumnType("text")
                         .HasColumnName("review_note");
-
-                    b.Property<string>("RootWorkOrderId")
-                        .HasColumnType("text")
-                        .HasColumnName("root_work_order_id");
 
                     b.Property<DateOnly?>("ScheduledDate")
                         .HasColumnType("date")
@@ -1195,19 +1190,11 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("WoStatus")
                         .HasDatabaseName("ix_work_order_wo_status");
 
-                    b.HasIndex("ParentWorkOrderId", "CommuneId")
-                        .HasDatabaseName("ix_work_order_parent_work_order_id_commune_id");
-
-                    b.HasIndex("RootWorkOrderId", "CommuneId")
-                        .HasDatabaseName("ix_work_order_root_work_order_id_commune_id");
-
                     b.ToTable("work_order", null, t =>
                         {
                             t.HasCheckConstraint("ck_work_order_assigned_at_matches", "(assigned_to IS NULL) = (assigned_at IS NULL)");
 
                             t.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
-
-                            t.HasCheckConstraint("ck_work_order_chain_complete", "(parent_work_order_id IS NULL) = (root_work_order_id IS NULL)");
 
                             t.HasCheckConstraint("ck_work_order_closed", "(wo_status IN ('verified','cancelled')) = (closed_at IS NOT NULL)");
 
@@ -1722,20 +1709,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("SegmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_work_order_road_segment_segment_id");
-
-                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
-                        .WithMany()
-                        .HasForeignKey("ParentWorkOrderId", "CommuneId")
-                        .HasPrincipalKey("WorkOrderId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_work_order_work_order_parent_work_order_id_commune_id");
-
-                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
-                        .WithMany()
-                        .HasForeignKey("RootWorkOrderId", "CommuneId")
-                        .HasPrincipalKey("WorkOrderId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_work_order_work_order_root_work_order_id_commune_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderFault", b =>

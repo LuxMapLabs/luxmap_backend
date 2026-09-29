@@ -3519,6 +3519,13 @@
             }
           },
           {
+            "name": "case_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -4056,6 +4063,68 @@
         ]
       }
     },
+    "/api/v1/work-orders/{id}/follow-up": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowUpWorkOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ]
+      }
+    },
     "/api/v1/work-orders/{id}/cancel": {
       "post": {
         "tags": [
@@ -4248,6 +4317,10 @@
           "report_note": {
             "minLength": 10,
             "type": "string"
+          },
+          "materials_used": {
+            "type": "string",
+            "nullable": true
           },
           "fault_outcomes": {
             "type": "array",
@@ -4524,6 +4597,10 @@
             "nullable": true
           },
           "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_note": {
             "type": "string",
             "nullable": true
           }
@@ -4816,6 +4893,55 @@
           "led_road_lamp"
         ],
         "type": "string"
+      },
+      "FollowUpWorkOrderRequest": {
+        "required": [
+          "task_kind"
+        ],
+        "type": "object",
+        "properties": {
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string",
+            "nullable": true
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "Geometry": {
         "required": [
@@ -5200,7 +5326,8 @@
             "description": "Absent preserves; null clears.",
             "format": "date",
             "nullable": true
-          }
+          },
+          "materials_note": { }
         },
         "additionalProperties": false
       },
@@ -5978,6 +6105,7 @@
       "WorkOrderDetail": {
         "required": [
           "allowed_actions",
+          "case_id",
           "commune_id",
           "created_by",
           "fault_ids",
@@ -6006,6 +6134,13 @@
           "cluster_id": {
             "type": "string",
             "nullable": true
+          },
+          "parent_work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "case_id": {
+            "type": "string"
           },
           "fault_ids": {
             "type": "array",
@@ -6056,6 +6191,14 @@
             "nullable": true
           },
           "report_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "materials_used": {
             "type": "string",
             "nullable": true
           },
@@ -6139,6 +6282,7 @@
       },
       "WorkOrderItem": {
         "required": [
+          "case_id",
           "commune_id",
           "fault_ids",
           "title",
@@ -6165,6 +6309,13 @@
           "cluster_id": {
             "type": "string",
             "nullable": true
+          },
+          "parent_work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "case_id": {
+            "type": "string"
           },
           "fault_ids": {
             "type": "array",

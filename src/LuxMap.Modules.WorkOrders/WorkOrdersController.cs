@@ -25,9 +25,11 @@ public sealed class WorkOrdersController(WorkOrderService service) : ControllerB
         [FromQuery(Name = "commune_id")] string[]? communes,
         [FromQuery(Name = "scheduled_from")] DateOnly? from,
         [FromQuery(Name = "scheduled_to")] DateOnly? to,
+        [FromQuery(Name = "case_id")] string? caseId,
         PageQuery page, CancellationToken ct)
         => service.List(statuses?.Split(',').Select(x => Wire<WorkOrderStatus>(x, "wo_status")).ToArray(),
-            kind is null ? null : Wire<TaskKind>(kind, "task_kind"), assigned, segment, communes, from, to, page.ToPageRequest(), ct);
+            kind is null ? null : Wire<TaskKind>(kind, "task_kind"), assigned, segment, communes, from, to, page.ToPageRequest(), ct,
+            string.IsNullOrWhiteSpace(caseId) ? null : caseId.Trim());
 
     [HttpGet("{id}")]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
@@ -66,7 +68,7 @@ public sealed class WorkOrdersController(WorkOrderService service) : ControllerB
     [HttpPost("{id}/complete")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     public Task<WorkOrderDetail> Complete(string id, CompleteWorkOrderRequest request, CancellationToken ct)
-        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct);
+        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed);
 
     [HttpPost("{id}/verify")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
@@ -77,6 +79,15 @@ public sealed class WorkOrdersController(WorkOrderService service) : ControllerB
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
     public Task<WorkOrderDetail> Return(string id, ReviewWorkOrderRequest request, CancellationToken ct)
         => service.Act(id, "return", request.Note, default, ct);
+
+    [HttpPost("{id}/follow-up")]
+    [ProducesResponseType(typeof(WorkOrderDetail), 201)]
+    [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
+    public async Task<ActionResult<WorkOrderDetail>> FollowUp(string id, FollowUpWorkOrderRequest request, CancellationToken ct)
+    {
+        var result = await service.FollowUp(id, request, ct);
+        return Created($"/api/v1/work-orders/{result.WorkOrderId}", result);
+    }
 
     [HttpPost("{id}/cancel")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]

@@ -1538,6 +1538,20 @@ giao), nên ID trả về cả với phiếu người gọi không mở được
 CHECK `ck_fault_pole_or_location` cho phép fault có cột mà không toạ độ, nên chỉ đọc `fault.lat` là
 trả `null` ở chỗ Contract bắt buộc có giá trị.
 
+### FR-2 — chuỗi phiếu công việc (29/09/2026)
+
+**`root_work_order_id` NULL ở lịch đầu, KHÔNG trỏ vào chính nó.** API tính `case_id = root ?? work_order_id`.
+Trỏ vào chính nó thì mọi chỗ đang ghi phiếu (seed `seed_mock_set.py`, `Plant` trong test, fixture của
+BE-40) phải biết cột này, và EF phải chèn một hàng tham chiếu chính nó. Lọc chuỗi bằng
+`work_order_id = X OR root_work_order_id = X`. CHECK `ck_work_order_chain_complete` bắt cha và gốc
+null **cùng nhau**; FK ghép `(…, commune_id)` giữ cả chuỗi trong một xã. Tính nhất quán
+`root = cha.root ?? cha.id` **chỉ canh ở service** — không ràng buộc DB nào so hai hàng.
+
+**Nghiệm thu kiểm tra ĐỔI trạng thái sự cố (FR-2a).** `fault_present` + `detected` → `confirmed`, làm
+trong cùng `verify`, cùng audit. Đây là ngoại lệ thứ hai của "chỉ repair lan truyền" (WO-2). BE-19 phải
+biết: sự cố `confirmed` có thể có `confirmed_by` là người nghiệm thu một phiếu, không phải người gọi
+`PATCH /faults`.
+
 ### BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 
 **Schema và quyền ghi tách nhau như `pole_current_status`.** `feeder_control` là bảng riêng khoá theo

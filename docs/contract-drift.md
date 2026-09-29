@@ -414,7 +414,7 @@ thay đổi chỉ từ việc ghi log này. Các drift bề mặt API còn lại
 | Mã | Deviation / quyết định áp dụng | Chạm API |
 |---|---|---|
 | WO-1 | `ReadWorkOrders` = cả bốn vai trò; `ManageWorkOrders` = manager; `ExecuteWorkOrders` = field_engineer. FE chỉ thấy WO được giao cho mình **và** trong xã; WO không thấy → 404 `WORK_ORDER_NOT_FOUND`. `assigned_to=me` hỗ trợ mọi vai trò; FE lọc người khác → trang rỗng. System Admin chỉ đọc | Có |
-| WO-2 | Máy trạng thái bên dưới đóng O-3 trên nền tạm. Chỉ repair lan truyền fault qua service FaultTransitions; mỗi thao tác một audit chung | Có |
+| WO-2 | Máy trạng thái bên dưới đóng O-3 trên nền tạm. Chỉ repair lan truyền fault qua service FaultTransitions; mỗi thao tác một audit chung. **Sửa bởi FR-2a (29/09/2026):** verify inspection cũng chuyển `fault_present` `detected → confirmed` | Có |
 | WO-3 | Enum mới `task_kind: inspection \| repair`; `inspection_outcome: fault_present \| fault_absent \| inconclusive`. Task kind và thành viên fault bất biến. Inspection nhận `FaultStatusSets.Open`; repair nhận Open trừ detected | Có |
 | WO-4 | Thêm GET detail, GET assignees, PUT assignee, POST start/complete/verify/return/cancel. PATCH chỉ sửa title/due_date/scheduled_date; không đổi wo_status hoặc người được giao bằng PATCH | Có |
 | WO-5 | **BREAKING**: POST bắt buộc `task_kind`. Repair cần 1..200 fault; inspection cần fault hoặc một segment, không cả hai. Server tra commune; POST cấm work_order_id/commune_id/wo_status/cluster_id/priority_score. Item thêm task_kind/commune_id/scheduled_date/updated_at; detail thêm các trường mô tả bên dưới | Có |
@@ -484,6 +484,26 @@ Unique index bắt hai create cùng fault; xmin bắt sửa WO/fault đồng th�
 nghiệp vụ và audit của bên thua. Không BE-24 evidence, BE-27 notification, SLA, ExternalUnit,
 gom địa lý hay khảo sát trong phạm vi này.
 
+
+### Yêu cầu của FE về phiếu công việc (29/09/2026)
+
+| | |
+|---|---|
+| **Decision** | Trả lời năm đề nghị của WP5 về `WorkOrder` (survey, mã sự vụ, vật tư, gửi cấp trên, minh chứng) |
+| **Decision maker** | **Mỹ chốt 29/09/2026** cho FR-1, FR-2, FR-2a (C), FR-3, FR-5; FR-4 **chờ quyết**. Chạm API, chưa qua FW → `SELF-SIGNED` |
+| **Date** | 29/09/2026 |
+| **Scope** | BE-15, BE-23 (phiếu công việc), BE-24. Chưa đổi code, chưa migration. Mọi mục chạm API là **nền tạm tới FW kế tiếp** |
+
+| Mã | Đề nghị của FE | Quyết định | Chạm API |
+|---|---|---|---|
+| **FR-1** | Thêm `survey` vào `task_kind` | **Nhu cầu đúng** (Phiếu v1.4: Quản lý *"create and assign survey routes"*), nhưng **quyết ở Phase 1 của BE-15**, không thêm lẻ: hoàn thành khảo sát là nộp **phiên khảo sát** (D-R21), phiên được duyệt hoặc bác và khảo sát lại. Hướng nghiêng: `task_kind = survey` dùng chung lịch, giao việc, audit của phiếu, gắn với tuyến và phiên khảo sát. Thêm giá trị = đổi CHECK DB (migration) | Có |
+| **FR-2** | `case_code` / `parent_id` nối khảo sát → kiểm tra → sửa chữa | **Nhận và ĐÃ HIỆN THỰC 29/09/2026** (Mỹ chốt; đổi từ đề xuất "không làm" — Quản lý làm việc theo từng lịch nối tiếp). Item và chi tiết phiếu thêm `parent_work_order_id` (null ở lịch đầu) và `case_id` (= ID lịch đầu tiên của chuỗi, không prefix mới). `GET /work-orders?case_id=` trả cả chuỗi. **`POST /work-orders/{id}/follow-up`** (`ManageWorkOrders`) body `{task_kind, title?, fault_ids?, assigned_to?, due_date?, scheduled_date?, note?, materials_note?}` → 201 chi tiết: server mang sang các sự cố `fault_present` của lịch cha; `title` mặc định = của cha; `fault_ids` chỉ để **tách** (tập con của các sự cố mang sang, sai → 400 kèm `carried_fault_ids`); nhiều lịch con cùng cha = cây chung `case_id`. Lịch cha phải `verified` (khác → 409 `INVALID_STATE_TRANSITION`); cặp hợp lệ hiện chỉ **kiểm tra → sửa chữa** (khảo sát thêm ở BE-15), sai cặp → 409 `INVALID_STATE_TRANSITION` kèm `allowed_follow_up_kinds`; không có sự cố `fault_present` → **409 `NOTHING_TO_FOLLOW_UP`** (mã mới). `allowed_actions` của Quản lý có `follow_up` ở phiếu kiểm tra `verified`. DB: `parent_work_order_id`, `root_work_order_id` (null ở lịch đầu, API tính `case_id = root ?? chính nó`), FK ghép cùng xã, CHECK `ck_work_order_chain_complete` | Có |
+| **FR-2a** | (phát sinh từ FR-2) sự cố `fault_present` vẫn `detected` sau khi nghiệm thu kiểm tra, mà sửa chữa chỉ nhận `confirmed`/`in_progress` | **Chốt C và ĐÃ HIỆN THỰC 29/09/2026:** `verify` một phiếu **kiểm tra** chuyển các sự cố `fault_present` từ `detected` → `confirmed` (`confirmed_by` = Quản lý nghiệm thu, `confirmed_at` = lúc nghiệm thu), ghi vào `fault_changes[]` của audit phiếu; sự cố không ở `detected` → `fault_skipped[]`. `fault_absent` và `inconclusive` **không đổi** — bác bỏ vẫn qua BE-19. **Sửa WO-2** ("chỉ repair lan truyền fault"): nay inspection cũng lan truyền, đúng một chuyển này | Có (ngữ nghĩa) |
+| **FR-3** | `materials_note: string?` trên tạo phiếu và hoàn thành | **Nhận, tách HAI trường** vì là hai sự thật khác nhau: `materials_note` (Quản lý, ở `POST` và `PATCH` phiếu — cần mang gì) và `materials_used` (Kỹ sư được giao, ở `complete` — đã dùng gì). Văn bản tự do, không bảng vật tư. Một trường chung thì báo cáo của Kỹ sư ghi đè kế hoạch của Quản lý. **Đã hiện thực 29/09/2026** (migration `AddWorkOrderMaterials`): cắt khoảng trắng, chuỗi rỗng lưu `null` (CHECK `ck_work_order_materials_*_not_blank`); `PATCH` thiếu khoá giữ nguyên, `null` xoá; mỗi lần `complete` ghi lại `materials_used` (kể cả thành `null`) như `report_note`; hai trường chỉ có ở **chi tiết** phiếu, không ở item danh sách; có trong audit snapshot | Có |
+| **FR-4** | `POST /work-orders/{id}/submit-superior` | **Chờ quyết.** Đề xuất của BE1: không làm — Cấp giám sát **chỉ đọc** (Phiếu v1.4, Contract §2) và đã đọc được mọi phiếu `verified` trong xã qua `ReadWorkOrders`; báo cáo gửi lên là việc của BE-28…BE-31. Lưu ý FE: nghiệm thu chuyển sang `verified` (không phải `closed`); nhận xét của Quản lý đi qua `note` của `verify` → `review_note`; `report_note` của Kỹ sư không sửa được | Có |
+| **FR-5** | `evidence_urls: string[]` khi hoàn thành | **Không dùng URL.** Minh chứng đi qua `POST /work-orders/{id}/evidence` (Contract §5.5, multipart, JPEG theo magic bytes) — **BE-24**; byte phải qua API để canh phạm vi xã (BE-11 quy tắc 1). Video minh chứng vẫn **planned** (D-R14). Việc chốt ở Phase 1 BE-24: repair có **bắt buộc** ≥1 ảnh `after` trước `complete` không | Có |
+
+**Phải báo:** WP5 (người gửi đề nghị) — FR-1, FR-5 đã chốt; FR-2, FR-2a, FR-3 đã chốt **và hiện thực**; FR-4 chờ. Đặc biệt phải báo: nghiệm thu kiểm tra nay **đổi trạng thái sự cố** (FR-2a), và mã lỗi mới `NOTHING_TO_FOLLOW_UP`. WP6 cũng cần `materials_used` ở màn hoàn thành phiếu. **Chưa báo.**
 
 ### BE-14 / IoT — chỉ còn thiết bị đo điện ở tủ điện tổng (28/09/2026)
 
