@@ -587,3 +587,31 @@ trường, 11/11 `work_order_id` khớp. Lệch duy nhất: `fault_status` của
 
 **Phải báo:** WP5 (F-1…F-6; `work_order_id` nay có giá trị thật), WP6 (cùng item qua sync bundle sau
 này). **Chưa báo ai.**
+
+## Ưu tiên sự cố — Quản lý đặt, hoãn chấm điểm tự động (29/09/2026)
+
+| | |
+|---|---|
+| **Decision** | **Đề xuất, chờ nhóm quyết:** Quản lý tự đặt mức ưu tiên của sự cố; hoãn chấm điểm tự động (CV-16) |
+| **Decision maker** | Mỹ đồng ý hướng 29/09/2026 cho phần backend (P-2). P-1, P-3 chạm việc của WP4/WP5/WP6 → **ESCALATE ở FW kế tiếp**, không tự chốt |
+| **Date** | 29/09/2026 |
+| **Scope** | Contract §5.4 (thứ tự mặc định, `PATCH /faults`), §5.5; BE-19, BE-33; CV-16, FW-25, FM-25 |
+
+**Căn cứ.** Phiếu v1.4 chỉ nêu ưu tiên ở **phần vấn đề** (dòng 41: *"Repairs are unprioritized… no basis
+for treating an unlit school approach or bridge as more urgent"*) và ở tài liệu tham khảo (dòng 335);
+phần giải pháp, chức năng, vai trò Quản lý và NFR **không** có chấm điểm ưu tiên. "Cơ sở" để Quản lý
+phân biệt đã có trên bản đồ (trạng thái đèn, cụm cả đoạn, `near_sensitive_poi`, `road_class`). Công
+thức CV-16 hiện **chưa được viết** ở đâu; các tiêu chí đều là mức chữ nên điểm 0–100 chỉ có tối đa ~16
+giá trị khác nhau và trọng số không có đối tác xác nhận (ghi chú CV-16 v2.0).
+
+| Mã | Đề xuất | Ai bị ảnh hưởng | Chạm API |
+|---|---|---|---|
+| **P-1** | Hoãn chấm điểm tự động. `fault.priority_score` **giữ cột, nullable**, không xoá — CV-16 làm sau được mà không migration | Thịnh (CV-16), Khang (FW-25 tab trọng số), BE-33 (phần trọng số) | Không (giữ hình dạng) |
+| **P-2** | Quản lý đặt mức ưu tiên bằng **`severity`** (`low\|medium\|high\|critical`, enum có sẵn) qua `PATCH /faults` — làm ở **BE-19**, có audit | WP5, WP6 | **Có** (§5.4 body PATCH thêm `severity`) |
+| **P-3** | Thứ tự mặc định `GET /faults` và danh sách việc đổi từ `-priority_score` sang `-severity` rồi `detected_at`; `priority_score` của phiếu công việc (max của sự cố) giữ tới khi quyết | WP5 (bảng lỗi), WP6 (FM-25 "theo priority_score") | **Có** (§5.4, §5.5) — **chưa làm**, chờ nhóm |
+
+**Làm sau được không:** được. Không bước nào xoá dữ liệu hay cột; bật lại CV-16 = ghi `priority_score`
+và trả thứ tự mặc định về như cũ. `severity` do Quản lý đặt vẫn là một tiêu chí dùng được cho công thức.
+
+**Phải báo / đưa ra FW kế tiếp:** Thịnh, Khang, WP6 (FM-25). **Chưa báo.**
+
