@@ -1,4 +1,4 @@
-using LuxMap.Modules.Map.Bbox;
+using LuxMap.Shared.Http;
 using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Map.Features;
