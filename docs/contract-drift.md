@@ -679,3 +679,18 @@ phơi sáng (D-R24). Byte ảnh vẫn qua API (BE-11 quy tắc 1).
 
 **Phải báo:** WP6 (định dạng file thô, sidecar frame, upload clip), WP4 (detector theo frame, CV-05 chuyển sang backend), WP5 (màn
 duyệt phiên, coverage). **Chưa báo.**
+
+## Dữ liệu thực địa đầu tiên — đèn thật không phải LED (01/10/2026)
+
+| | |
+|---|---|
+| **Decision** | **Chỉ đăng ký, chưa quyết.** Nạp 114 cột khảo sát ảnh 28/09/2026 vào `luxmap_dev` (COM-001 Phường Long Phước, COM-002 Phường Long Bình, `data_source = field`), bóng đèn gán **giá trị tạm** vì enum không biểu diễn được đèn thật |
+| **Decision maker** | Nạp dữ liệu tạm: Mỹ chốt 01/10/2026. FX-1 chạm enum (bề mặt API) → **ESCALATE ở FW kế tiếp** |
+| **Date** | 01/10/2026 |
+| **Scope** | Contract §1 (`fixture_type`, v1.6 thu hẹp còn `led_road_lamp`), `fixture` trong `luxmap_dev`; nguồn và giá trị tạm ghi ở `img_osm/NGUON.txt` (không vào git) |
+
+| Mã | Chỗ lệch | Hệ quả | Hướng (chưa chốt) | Chạm API |
+|---|---|---|---|---|
+| **FX-1** | Ảnh thực địa cho thấy **đa số đèn ánh cam — cao áp sodium (HPS)**, một số LED. TP.HCM (trừ Thủ Đức) còn 103.374 bộ HPS năm 2024; Thủ Đức đặt mục tiêu LED toàn bộ đến **2030**. Enum `fixture_type` chỉ còn `led_road_lamp` | 114 bóng đang mang `led_road_lamp` **sai sự thật** cho phần lớn; `lamp_watt = 150` và `install_date = 2020-01-01` là **giá trị bịa để qua NOT NULL**, trông y như số thật trên mọi màn hình | (a) thêm lại giá trị cho đèn cao áp (`hps_road_lamp`?) — đảo một phần quyết định v1.6; (b) giữ enum, đánh dấu bóng "chưa xác minh" bằng cột riêng; (c) cho `lamp_watt` / `install_date` nullable khi chưa biết. Cần chốt **trước khi** FE hiển thị số liệu bóng của xã thật | **Có** (§1 enum, §5.1 `fixture_type` / `lamp_watt`) |
+
+**Phải báo / đưa ra FW kế tiếp:** WP5 (màn tài sản sẽ hiện bóng LED 150 W ngày lắp 2020-01-01 cho cả 114 cột), WP4 (CV ON/OFF trên đèn HPS ánh cam khác LED). **Chưa báo.**
