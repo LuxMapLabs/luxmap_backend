@@ -72,7 +72,9 @@ python3 scripts/copy_dev_to_supabase.py --apply   # chép trong MỘT transactio
 ```
 
 Script **từ chối** nếu: nguồn không phải `luxmap_dev`, lịch sử migration hai bên khác nhau, đích đã có dữ
-liệu, có bảng chưa nằm trong kế hoạch, hoặc thứ tự khoá ngoại sai. Kế hoạch đo ngày 01/10/2026:
+liệu, có bảng chưa nằm trong kế hoạch, hoặc thứ tự khoá ngoại sai. Trước COMMIT, script so **md5 nội dung** từng bảng
+với nguồn; lệch một ký tự là huỷ cả transaction, chưa sequence nào bị đổi. Hai phiên luôn chạy UTF8 / ISO / UTC
+bất kể shell đặt `PGCLIENTENCODING` hay `PGDATESTYLE` gì. Kế hoạch đo ngày 01/10/2026:
 
 ```text
 administrative_unit 3 / bỏ 14 · app_user 4 / bỏ 14 · app_user_commune 9 / bỏ 21
@@ -119,6 +121,10 @@ sẵn ở schema `extensions`, `search_path` của role như Supabase:
   cùng toạ độ với nguồn; chạy `--apply` lần hai → dừng, exit 2, "đích đã có 3 dòng".
 - API trỏ vào bản sao: đăng nhập `engineer`/`agency` được (hash mật khẩu giữ nguyên), bbox thực địa 114 cột,
   bbox mock 103 cột, `GET /faults` total 28.
+
+Sau review của Codex (P1): đích có trigger cố ý sửa `segment_name` → script dừng ở md5 `road_segment`, exit 2,
+đích còn 0 dòng, `pole_id_seq` vẫn `1|f`. Shell đặt `PGCLIENTENCODING=LATIN1`, `PGDATESTYLE='SQL, DMY'`: bản
+cũ chép thành `PhÆ°á»ng Long PhÆ°á»c` mà vẫn báo ✅ exit 0; bản mới chép đúng, md5 16 bảng trùng nguồn.
 
 Chưa diễn tập được: TLS `VerifyFull` qua pooler thật, quota kết nối, và việc tắt Data API — phải kiểm trên
 project thật ở bước 5.

@@ -22,6 +22,13 @@ the wrong place. A table that exists in the source but is not in the plan below 
 table must be added here on purpose, not skipped by default. The FK order of the plan is checked against
 the source catalogue before anything is read, because the target's foreign keys are not deferrable.
 
+Both sessions run with client encoding UTF8, DateStyle ISO and time zone UTC, and every COPY names its
+encoding: inherited PGCLIENTENCODING or DateStyle would otherwise turn Vietnamese names or day/month into
+something else while COPY still reports success. Before COMMIT, every table's CONTENT is compared with
+the source — an md5 over the text of each row, sorted with the "C" collation so the two servers'
+collations cannot reorder it — and any difference aborts the whole transaction. Equal counts prove
+nothing about the rows themselves.
+
 Sequences are set to the SOURCE's current value (D-5): ids already handed out — in a browser, a phone's
 offline queue, a screenshot — are never issued again for a different row.
 """
@@ -68,6 +75,10 @@ SKIPPED = {
 }
 
 
+# Fixed for BOTH sessions: an inherited setting must not change how text, dates or times are read.
+SESSION = {"PGCLIENTENCODING": "UTF8", "PGDATESTYLE": "ISO", "PGTZ": "UTC"}
+
+
 class Refused(Exception):
     pass
 
@@ -87,7 +98,7 @@ def target_env() -> dict:
     for key, var in (("sslmode", "PGSSLMODE"), ("sslrootcert", "PGSSLROOTCERT")):
         if key in query:
             env[var] = query[key]
-    return env
+    return env | SESSION
 
 
 class Db:
@@ -97,9 +108,17 @@ class Db:
     def run(self, sql: str = "", *, script: str | None = None) -> str:
         argv = [*self.argv, "-X", "-q", "-v", "ON_ERROR_STOP=1"]
         argv += ["-f", script] if script else ["-At", "-F", "\t", "-c", sql]
-        result = subprocess.run(argv, env=self.env, capture_output=True, text=True)
+        result = subprocess.run(argv, env=self.env, capture_output=True, text=True, encoding="utf-8")
         if result.returncode != 0:
             raise Refused(f"{self.name}: {result.stderr.strip()}")
+        return result.stdout
+
+    def copy_out(self, sql: str) -> bytes:
+        """COPY … TO STDOUT as raw bytes, so no locale ever decodes or re-encodes the data."""
+        result = subprocess.run([*self.argv, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-c", sql],
+                                env=self.env, capture_output=True)
+        if result.returncode != 0:
+            raise Refused(f"{self.name}: {result.stderr.decode('utf-8', 'replace').strip()}")
         return result.stdout
 
     def rows(self, sql: str) -> list[list[str]]:
@@ -107,6 +126,13 @@ class Db:
 
     def scalar(self, sql: str) -> str:
         return self.run(sql).strip()
+
+
+def digest_sql(table: str, cols: str, where: str | None) -> str:
+    """md5 over every row's text, sorted under the "C" collation so server collations cannot differ."""
+    filtered = f" WHERE {where}" if where else ""
+    return (f"SELECT md5(coalesce(string_agg(r, E'\\n' ORDER BY r COLLATE \"C\"), '')) "
+            f"FROM (SELECT ROW({cols})::text AS r FROM public.{table}{filtered}) AS rows")
 
 
 def preflight(src: Db, dst: Db) -> dict[str, list[str]]:
@@ -161,7 +187,9 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        src = Db("nguồn", ["docker", "exec", "-i", args.container, "psql", "-U", args.user, "-d", "luxmap_dev"])
+        session = [arg for key, value in SESSION.items() for arg in ("-e", f"{key}={value}")]
+        src = Db("nguồn", ["docker", "exec", "-i", *session, args.container, "psql", "-U", args.user,
+                           "-d", "luxmap_dev"])
         dst = Db("đích", ["psql"], target_env())
         columns = preflight(src, dst)
 
@@ -181,14 +209,20 @@ def main() -> int:
             return 0
 
         with tempfile.TemporaryDirectory(prefix="luxmap-copy-") as tmp:  # holds password hashes: 0700, removed after
-            lines = ["BEGIN;"]
+            lines, checks = ["BEGIN;"], []
             for table, where, order in PLAN:
                 cols = ", ".join(f'"{c}"' for c in columns[table])
                 data = Path(tmp) / f"{table}.copy"
-                # COPY output is written verbatim by psql; -At only shapes ordinary query results.
-                data.write_text(src.run(f"COPY (SELECT {cols} FROM public.{table} WHERE {where} "
-                                        f"ORDER BY {order}) TO STDOUT"), encoding="utf-8")
-                lines.append(f"\\copy public.{table} ({cols}) FROM '{data}'")
+                data.write_bytes(src.copy_out(f"COPY (SELECT {cols} FROM public.{table} WHERE {where} "
+                                              f"ORDER BY {order}) TO STDOUT WITH (ENCODING 'UTF8')"))
+                lines.append(f"\\copy public.{table} ({cols}) FROM '{data}' WITH (ENCODING 'UTF8')")
+                expected_digest = src.scalar(digest_sql(table, cols, where))
+                checks.append(f"DO $check$ BEGIN IF ({digest_sql(table, cols, None)}) IS DISTINCT FROM "
+                              f"'{expected_digest}' THEN RAISE EXCEPTION 'nội dung bảng {table} lệch nguồn'; "
+                              f"END IF; END $check$;")
+            # Content first: setval is not undone by ROLLBACK, so nothing touches a sequence until every
+            # table is proven identical to the source.
+            lines += checks
             for name, (last, called) in values.items():
                 lines.append(f"SELECT setval('public.{name}', {last}, {'true' if called == 't' else 'false'});")
             lines.append("COMMIT;")
@@ -208,8 +242,7 @@ def main() -> int:
             if got != [last, called]:
                 print(f"  ❌ sequence {name}: {got} ≠ {[last, called]}")
         print(f"  sequence: {len(values)} cái {'khớp' if not bad else 'có lệch'}")
-        poles = dst.scalar("SELECT string_agg(pole_id, ',') FROM public.pole WHERE pole_id IN ('POLE-0047', 'POLE-0104')")
-        print(f"  mốc kiểm: {poles}")
+        print(f"  nội dung: {len(PLAN)} bảng trùng md5 với nguồn (đã kiểm TRƯỚC commit)")
         return 1 if bad else 0
     except Refused as error:
         print(f"DỪNG: {error}", file=sys.stderr)

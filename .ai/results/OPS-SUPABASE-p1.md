@@ -375,3 +375,29 @@ Phát hiện khi diễn tập: phiên SQL không có `extensions` trong `search_
 runbook mục 5. `GET /poles/{id}` trả 404 vì endpoint chưa có (BE-20), không phải lỗi chép.
 
 Chưa kiểm được (cần project thật): TLS VerifyFull qua pooler, quota kết nối, Data API đã tắt.
+
+## Review script của Codex (01/10/2026) và sửa P1
+
+Codex review read-only `scripts/copy_dev_to_supabase.py` + runbook: **2 P1, 6 P2, 2 P3**. Claude kiểm lại cả hai P1
+trên DB nháp mô phỏng Supabase rồi sửa:
+
+| P1 | Kiểm chứng | Sửa |
+|---|---|---|
+| Encoding / DateStyle kế thừa từ shell làm hỏng dữ liệu âm thầm | Bản cũ, shell `PGCLIENTENCODING=LATIN1`: `COM-001 → PhÆ°á»ng Long PhÆ°á»c`, `Nguyá»n Xiá»n`, vẫn ✅ exit 0 | Cả hai phiên `PGCLIENTENCODING=UTF8`, `PGDATESTYLE=ISO`, `PGTZ=UTC`; COPY hai chiều `WITH (ENCODING 'UTF8')`; dữ liệu đi dạng bytes |
+| Chỉ đếm số dòng, kiểm sau COMMIT | Đúng như mô tả | md5 nội dung từng bảng (sắp theo collation "C") so với nguồn **trong transaction, trước setval và COMMIT**; lệch → huỷ |
+
+Bằng chứng sau sửa:
+
+```text
+(a) đích có trigger sửa segment_name -> exit=2 "nội dung bảng road_segment lệch nguồn"
+    rows after abort|0|0|0 · seq after abort|1|f
+(b) shell PGCLIENTENCODING=LATIN1 PGDATESTYLE='SQL, DMY' -> exit=0, 16 bảng ✅, 13 sequence khớp,
+    "nội dung: 16 bảng trùng md5 với nguồn"; COM-001|Phường Long Phước · Nguyễn Xiển ·
+    fault.created_at 2026-09-29 02:39:55.252127+00 = nguồn; thư mục tạm còn lại: 0
+```
+
+P2/P3 **chưa sửa**, chờ Mỹ: (3) stderr lỗi PostgreSQL có thể in `Failing row contains (...)` gồm hash mật khẩu;
+(4) script chưa ép `sslmode=verify-full`; (5) setval không rollback — giờ chỉ chạy sau khi md5 đạt, nhưng lỗi
+quyền giữa các setval vẫn để sequence nửa chừng; (6) chưa kiểm sequence nguồn có vượt max ID giữ lại;
+(7) không đối chiếu manifest đã duyệt tại lúc chạy; (8) phép thử Data API có thể đạt giả nếu key sai;
+(9) tên catalog chưa escape; (10) runbook: chạy từ root, `read -r`, bỏ ví dụ mật khẩu trong docstring.
