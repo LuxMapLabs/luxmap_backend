@@ -29,6 +29,11 @@ the source — an md5 over the text of each row, sorted with the "C" collation s
 collations cannot reorder it — and any difference aborts the whole transaction. Equal counts prove
 nothing about the rows themselves.
 
+A remote target must use sslmode=verify-full with a CA (D-3); only localhost, for rehearsals, may skip TLS.
+Inherited PG* variables are dropped so a PGHOSTADDR or PGSSLMODE left in the shell cannot redirect or
+weaken the connection. PostgreSQL errors are printed terse, without DETAIL/CONTEXT: a rejected app_user
+row would otherwise be echoed whole — password hash included — into the terminal.
+
 Sequences are set to the SOURCE's current value (D-5): ids already handed out — in a browser, a phone's
 offline queue, a screenshot — are never issued again for a different row.
 """
@@ -79,8 +84,17 @@ SKIPPED = {
 SESSION = {"PGCLIENTENCODING": "UTF8", "PGDATESTYLE": "ISO", "PGTZ": "UTC"}
 
 
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
+
+
 class Refused(Exception):
     pass
+
+
+def terse(stderr: str) -> str:
+    """Error text without DETAIL/CONTEXT/HINT lines, which can carry whole rows of data."""
+    return "\n".join(line for line in stderr.strip().splitlines()
+                     if not line.lstrip().startswith(("DETAIL:", "CONTEXT:", "HINT:")))
 
 
 def target_env() -> dict:
@@ -91,10 +105,19 @@ def target_env() -> dict:
     if parts.scheme not in ("postgresql", "postgres") or not parts.hostname:
         raise Refused("LUXMAP_TARGET_URL phải có dạng postgresql://user@host:port/db?sslmode=…")
     query = {k: v[-1] for k, v in parse_qs(parts.query).items()}
-    env = dict(os.environ, PGHOST=parts.hostname, PGPORT=str(parts.port or 5432),
+    if parts.hostname not in LOCAL_HOSTS:
+        if query.get("sslmode") != "verify-full":
+            raise Refused("đích không phải localhost phải dùng sslmode=verify-full (D-3)")
+        cert = query.get("sslrootcert")
+        if not cert or (cert != "system" and not Path(cert).is_file()):
+            raise Refused("verify-full cần sslrootcert trỏ tới file chứng chỉ CA có thật của project")
+    password = unquote(parts.password) if parts.password else os.environ.get("PGPASSWORD")
+    # Every inherited PG* variable goes: only what this URL says may shape the connection.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PG")}
+    env.update(PGHOST=parts.hostname, PGPORT=str(parts.port or 5432),
                PGDATABASE=unquote(parts.path.lstrip("/") or "postgres"), PGUSER=unquote(parts.username or ""))
-    if parts.password:
-        env["PGPASSWORD"] = unquote(parts.password)
+    if password:
+        env["PGPASSWORD"] = password
     for key, var in (("sslmode", "PGSSLMODE"), ("sslrootcert", "PGSSLROOTCERT")):
         if key in query:
             env[var] = query[key]
@@ -106,19 +129,19 @@ class Db:
         self.name, self.argv, self.env = name, argv, env
 
     def run(self, sql: str = "", *, script: str | None = None) -> str:
-        argv = [*self.argv, "-X", "-q", "-v", "ON_ERROR_STOP=1"]
+        argv = [*self.argv, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=terse"]
         argv += ["-f", script] if script else ["-At", "-F", "\t", "-c", sql]
         result = subprocess.run(argv, env=self.env, capture_output=True, text=True, encoding="utf-8")
         if result.returncode != 0:
-            raise Refused(f"{self.name}: {result.stderr.strip()}")
+            raise Refused(f"{self.name}: {terse(result.stderr)}")
         return result.stdout
 
     def copy_out(self, sql: str) -> bytes:
         """COPY … TO STDOUT as raw bytes, so no locale ever decodes or re-encodes the data."""
-        result = subprocess.run([*self.argv, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-c", sql],
-                                env=self.env, capture_output=True)
+        result = subprocess.run([*self.argv, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=terse",
+                                 "-c", sql], env=self.env, capture_output=True)
         if result.returncode != 0:
-            raise Refused(f"{self.name}: {result.stderr.decode('utf-8', 'replace').strip()}")
+            raise Refused(f"{self.name}: {terse(result.stderr.decode('utf-8', 'replace'))}")
         return result.stdout
 
     def rows(self, sql: str) -> list[list[str]]:

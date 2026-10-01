@@ -396,8 +396,19 @@ Bằng chứng sau sửa:
     fault.created_at 2026-09-29 02:39:55.252127+00 = nguồn; thư mục tạm còn lại: 0
 ```
 
-P2/P3 **chưa sửa**, chờ Mỹ: (3) stderr lỗi PostgreSQL có thể in `Failing row contains (...)` gồm hash mật khẩu;
-(4) script chưa ép `sslmode=verify-full`; (5) setval không rollback — giờ chỉ chạy sau khi md5 đạt, nhưng lỗi
+**P2-3 và P2-4 đã sửa (Mỹ chọn, 01/10/2026):**
+
+```text
+P2-4  remote không sslmode / require / verify-full thiếu CA / CA không tồn tại -> "DỪNG" trước khi kết nối
+      PGHOSTADDR=10.255.255.1 PGSSLMODE=require trong shell -> vẫn tới đúng localhost (biến PG* kế thừa bị bỏ)
+P2-3  đích có CHECK làm hỏng app_user -> bản trước: 'Failing row' 1 dòng, tiền tố hash xuất hiện 2 lần
+                                       -> bản sửa:   'Failing row' 0, tiền tố hash 0 (VERBOSITY=terse + lọc DETAIL/CONTEXT/HINT)
+```
+
+DB nháp `luxmap_copytest` và role `deploytest` đã xoá (Mỹ đồng ý).
+
+P2/P3 còn lại **chưa sửa**: (3) ~~stderr lỗi PostgreSQL có thể in `Failing row contains (...)` gồm hash mật khẩu~~ — đã sửa;
+~~(4) script chưa ép `sslmode=verify-full`~~ — đã sửa; (5) setval không rollback — giờ chỉ chạy sau khi md5 đạt, nhưng lỗi
 quyền giữa các setval vẫn để sequence nửa chừng; (6) chưa kiểm sequence nguồn có vượt max ID giữ lại;
 (7) không đối chiếu manifest đã duyệt tại lúc chạy; (8) phép thử Data API có thể đạt giả nếu key sai;
 (9) tên catalog chưa escape; (10) runbook: chạy từ root, `read -r`, bỏ ví dụ mật khẩu trong docstring.

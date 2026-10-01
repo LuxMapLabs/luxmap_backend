@@ -74,7 +74,9 @@ python3 scripts/copy_dev_to_supabase.py --apply   # chép trong MỘT transactio
 Script **từ chối** nếu: nguồn không phải `luxmap_dev`, lịch sử migration hai bên khác nhau, đích đã có dữ
 liệu, có bảng chưa nằm trong kế hoạch, hoặc thứ tự khoá ngoại sai. Trước COMMIT, script so **md5 nội dung** từng bảng
 với nguồn; lệch một ký tự là huỷ cả transaction, chưa sequence nào bị đổi. Hai phiên luôn chạy UTF8 / ISO / UTC
-bất kể shell đặt `PGCLIENTENCODING` hay `PGDATESTYLE` gì. Kế hoạch đo ngày 01/10/2026:
+bất kể shell đặt `PGCLIENTENCODING` hay `PGDATESTYLE` gì. Đích không phải localhost **bắt buộc** `sslmode=verify-full` kèm
+`sslrootcert` trỏ tới file CA có thật; mọi biến `PG*` kế thừa từ shell bị bỏ (trừ `PGPASSWORD`). Lỗi PostgreSQL
+in dạng rút gọn, không kèm `DETAIL` — dòng bị từ chối không bị in ra, nên hash mật khẩu không lọt vào terminal. Kế hoạch đo ngày 01/10/2026:
 
 ```text
 administrative_unit 3 / bỏ 14 · app_user 4 / bỏ 14 · app_user_commune 9 / bỏ 21
@@ -125,6 +127,10 @@ sẵn ở schema `extensions`, `search_path` của role như Supabase:
 Sau review của Codex (P1): đích có trigger cố ý sửa `segment_name` → script dừng ở md5 `road_segment`, exit 2,
 đích còn 0 dòng, `pole_id_seq` vẫn `1|f`. Shell đặt `PGCLIENTENCODING=LATIN1`, `PGDATESTYLE='SQL, DMY'`: bản
 cũ chép thành `PhÆ°á»ng Long PhÆ°á»c` mà vẫn báo ✅ exit 0; bản mới chép đúng, md5 16 bảng trùng nguồn.
+
+Sau sửa P2-3/P2-4: URL máy chủ thật thiếu `sslmode`, dùng `require`, hay `verify-full` mà thiếu / sai đường dẫn CA
+→ dừng trước khi kết nối. Shell có `PGHOSTADDR` lạ vẫn kết nối đúng đích. Đích gài CHECK làm hỏng dòng
+`app_user`: bản cũ in `Failing row contains` kèm hash (2 lần), bản mới chỉ in tên ràng buộc.
 
 Chưa diễn tập được: TLS `VerifyFull` qua pooler thật, quota kết nối, và việc tắt Data API — phải kiểm trên
 project thật ở bước 5.
