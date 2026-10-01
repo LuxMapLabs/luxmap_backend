@@ -253,6 +253,23 @@ và lịch sử sweep (bảng chưa tồn tại). `feeder_id` được nạp b�
 `FDR-001..003`, `external_ref = DEMO-SEG-00n` — để 3 thiết bị IoT mock có đèn để nối; đó **không** phải
 dữ liệu mạch thật, O-6 thay thế nó.
 
+### Lập danh sách cột từ ảnh khảo sát
+
+Chuyển một thư mục ảnh **sạch** (JPEG gốc, còn EXIF) thành bản nháp `poles.csv` cho endpoint import.
+Chỉ dùng thư viện chuẩn của Python, không cần cài gì:
+
+```bash
+python3 scripts/photos_to_poles.py <thư-mục-ảnh> --out <thư-mục-kết-quả> \
+    --commune-id COM-070 --segment-ref TUYEN-A --ref-prefix LP   # ba tuỳ chọn này có thể bỏ
+```
+
+Ảnh chụp liên tiếp dưới 2 giây gộp thành một cột; tọa độ và giờ đọc từ EXIF. Kết quả: `poles.csv`
+(import được sau khi điền ô bắt buộc còn trống), `observations.csv` (cột `status` để **người** điền —
+không import), `review.csv` (ca tool không tự quyết), `rejected.csv` (ảnh bị loại kèm lý do) và
+`photos/` (ảnh chép nguyên byte). `--existing <geojson>` loại các nhóm nằm sát cột đã có. Chi tiết và lý
+do các ngưỡng: docstring đầu file. ⚠️ Chép ảnh khỏi điện thoại bằng cáp / AirDrop / tải bản gốc — gửi
+qua Zalo hay Messenger làm mất EXIF.
+
 ## Quy ước lỗi và phân trang
 
 Mọi lỗi — kể cả validation và route không khớp — trả về đúng một hình dạng:
