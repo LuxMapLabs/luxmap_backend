@@ -270,7 +270,8 @@ không import), `review.csv` (ca tool không tự quyết), `rejected.csv` (ản
 `photos/` (ảnh chép nguyên byte). `--existing <geojson>` loại các nhóm nằm sát cột đã có. Xem ảnh trong `review.csv` xong, nếu hai nhóm là cùng một cột thì chạy lại
 cùng thư mục với `--merge P002=P005` (lặp lại được): tọa độ thành trung vị ảnh của cả hai lượt.
 `suggested_merges.txt` gợi ý sẵn các cặp ở hai lượt khác nhau (gần nhất trước) — vẫn phải xem ảnh, cặp
-xa thường sai. `review.csv` gắn `gps_nhay` khi hai ảnh liền nhau ngụ ý vận tốc vô lý. Chi tiết và lý
+xa thường sai. `review.csv` gắn `gps_nhay` khi hai ảnh liền nhau ngụ ý vận tốc vô lý. Ảnh không phải cột (chụp nhầm) thì
+`--drop P095` — đừng xoá file, vì xoá làm đổi tên mọi nhóm phía sau. Chi tiết và lý
 do các ngưỡng: docstring đầu file. ⚠️ Chép ảnh khỏi điện thoại bằng cáp / AirDrop / tải bản gốc — gửi
 qua Zalo hay Messenger làm mất EXIF.
 

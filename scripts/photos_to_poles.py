@@ -50,7 +50,9 @@ and five consecutive pairs in that survey carried identical coordinates.
 A PERSON DECIDES, THE TOOL RECORDS. After looking at the photos, re-run with `--merge P002=P005`
 (repeatable; `P002=P005=P009` merges three) on the same folder, so group names stay the same. The
 merged pole keeps the earliest name and its position becomes the median of EVERY photo — independent
-GPS fixes give a better estimate than deleting a row by hand. Thresholds are provisional until GPS
+GPS fixes give a better estimate than deleting a row by hand. `--drop P095` removes a group that is not
+a pole at all (a misfire); its photos are listed in rejected.csv. Deleting the file instead would shift
+every later group name and break the --merge list. Thresholds are provisional until GPS
 error is measured in the field.
 
 The GPS time-stamp is NOT used: GPS Map Camera writes local time into a field the EXIF standard
@@ -288,6 +290,19 @@ def merge_groups(groups: list[Group], specs: list[str], review_m: float) -> tupl
             for name, photos in merged.items()], reviews
 
 
+def drop_groups(groups: list[Group], names: list[str], rejected: list[tuple[str, str]]) -> list[Group]:
+    """Applies `--drop` decisions after merging, so a name must be one that survived the merges."""
+    wanted = {name.strip().upper() for name in names}
+    unknown = wanted - {group.name for group in groups}
+    if unknown:
+        raise ValueError(f"--drop: không có nhóm {', '.join(sorted(unknown))} (nhóm đã bị gộp thì dùng tên "
+                         "nhóm giữ lại)")
+    for group in groups:
+        if group.name in wanted:
+            rejected += [(p.path.name, f"người loại bằng --drop {group.name}: không phải cột") for p in group.photos]
+    return [group for group in groups if group.name not in wanted]
+
+
 def read_existing(path: Path) -> list[tuple[str, float, float]]:
     """Poles already in the system, from a GeoJSON FeatureCollection of Points with properties.pole_id."""
     poles = []
@@ -406,6 +421,8 @@ def main() -> int:
                         help="vận tốc suy ra giữa hai ảnh liền nhau vượt mức này là GPS hỏng (mặc định 60)")
     parser.add_argument("--merge", action="append", default=[], metavar="P002=P005",
                         help="gộp các nhóm người đã xác nhận là cùng một cột (lặp lại được)")
+    parser.add_argument("--drop", action="append", default=[], metavar="P095",
+                        help="loại nhóm không phải cột, ví dụ ảnh chụp nhầm (lặp lại được)")
     args = parser.parse_args()
 
     source, out = args.photos.resolve(), args.out.resolve()
@@ -418,7 +435,8 @@ def main() -> int:
 
     rejected: list[tuple[str, str]] = []
     photos = []
-    for path in sorted(p for p in source.iterdir() if p.is_file() and not p.name.startswith(".")):
+    files = sorted(p for p in source.iterdir() if p.is_file() and not p.name.startswith("."))
+    for path in files:
         try:
             photos.append(read_photo(path, args.assume_offset))
         except Rejected as reason:
@@ -430,6 +448,7 @@ def main() -> int:
     groups = name_photos(photos)
     try:
         groups, merge_reviews = merge_groups(groups, args.merge, args.review_m)
+        groups = drop_groups(groups, args.drop, rejected)
     except ValueError as error:
         parser.error(str(error))
     existing = read_existing(args.existing) if args.existing else []
@@ -464,7 +483,7 @@ def main() -> int:
     write_csv(out / "rejected.csv", ["file", "reason"], rejected)
     write_suggestions(out / "suggested_merges.txt", suggestions, groups)
 
-    print(f"{len(photos)} ảnh dùng được, {len(rejected)} ảnh bị loại -> {len(groups)} nhóm cột")
+    print(f"{len(files)} ảnh, {len(rejected)} bị loại -> {len(groups)} nhóm cột")
     print(f"poles.csv: {len(pole_rows)} dòng · review.csv: {len(reviews)} ca cần xem · "
           f"{len(suggestions)} gợi ý gộp · kết quả ở {out}")
     if not args.ref_prefix or not args.segment_ref or not args.commune_id:
