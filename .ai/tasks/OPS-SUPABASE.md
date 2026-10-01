@@ -1,9 +1,9 @@
 ---
 ticket: OPS-SUPABASE
 title: Đưa database lên Supabase (PostgreSQL + PostGIS) — khảo sát tương thích, checklist, kế hoạch chuyển dữ liệu
-status: blocked
-phase: 1
-owner: codex
+status: in_progress
+phase: 2
+owner: claude
 branch: chore/supabase-deploy
 contract_refs:
   - "mục 7 — phân quyền theo địa bàn (không được có đường đọc/ghi nào đi vòng qua API)"

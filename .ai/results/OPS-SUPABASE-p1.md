@@ -349,3 +349,29 @@ Codex không chạy được Docker trong sandbox. Claude chạy các query mụ
 **Hệ quả cho D-1/D-4:** rác test chỉ nằm ở `administrative_unit` (14 xã), `app_user` (14 tài khoản),
 `app_user_commune` (21 dòng) và `refresh_token`. Mọi bảng nghiệp vụ sạch, audit trống, không có tham
 chiếu chéo ra ngoài tập giữ — phương án A không cần lọc audit hay xử lý actor ngoài seed.
+
+## Chốt D-item (Mỹ, 01/10/2026) và Phase 2
+
+Mỹ chốt **cả D-1…D-7 theo đề xuất** trình bày trong phiên (bảng "Đã chốt" ở `docs/deploy/supabase.md`):
+A (migrate + chép dữ liệu lọc); PostGIS ở `extensions`; session pooler + VerifyFull + pool 10, role `postgres`;
+giữ 3 xã + 4 tài khoản seed; sequence = high-water nguồn, bỏ refresh token; workspace triển khai riêng;
+đóng ghi lúc chép.
+
+Phase 2 (Claude): `scripts/copy_dev_to_supabase.py` và runbook `docs/deploy/supabase.md` viết lại theo quyết
+định. Diễn tập trên DB local mô phỏng Supabase (role `deploytest` không superuser, PostGIS ở `extensions`):
+
+```text
+dotnet ef database update (Search Path=public,extensions)  -> Done; 23 migration; 18 bảng owner deploytest;
+                                                             luxmap_format_id, luxmap_audit_event_append_only owner deploytest;
+                                                             audit_event_append_only_rows / _truncate có mặt
+copy_dev_to_supabase.py              -> superuser f; migration 23 khớp; PostGIS schema extensions; kế hoạch như runbook
+copy_dev_to_supabase.py --apply      -> 16 bảng ✅, 13 sequence khớp, mốc POLE-0047,POLE-0104; exit 0
+copy_dev_to_supabase.py --apply (2)  -> exit 2 "administrative_unit ở đích đã có 3 dòng"
+API trên bản sao                     -> engineer/agency login ok; bbox thực địa 114, bbox mock 103; faults total 28
+POLE-0047 / POLE-0104 geom           -> trùng nguồn (POINT(106.492025 10.965989) / POINT(106.8484139 10.8415694))
+```
+
+Phát hiện khi diễn tập: phiên SQL không có `extensions` trong `search_path` không thấy hàm PostGIS — đã ghi vào
+runbook mục 5. `GET /poles/{id}` trả 404 vì endpoint chưa có (BE-20), không phải lỗi chép.
+
+Chưa kiểm được (cần project thật): TLS VerifyFull qua pooler, quota kết nối, Data API đã tắt.
