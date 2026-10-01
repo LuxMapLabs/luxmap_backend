@@ -40,6 +40,12 @@ pole. From the vehicle's position alone that is indistinguishable from two poles
 across a narrow road, so such pairs go to review.csv instead of being merged. All thresholds are
 provisional until GPS error is measured in the field.
 
+A PERSON DECIDES, THE TOOL RECORDS. After looking at the photos, re-run with `--merge P002=P005`
+(repeatable; `P002=P005=P009` merges three) on the same folder and thresholds, so group names stay
+the same. The merged pole keeps the earliest name and its position becomes the median of EVERY photo
+from both passes — two independent GPS fixes, a better estimate than deleting one row by hand. A merge
+of groups further apart than --review-m is still done, but flagged in review.csv as a likely typo.
+
 The GPS time-stamp is NOT used: GPS Map Camera writes local time into a field the EXIF standard
 defines as UTC, and writes altitude 0.
 """
@@ -239,6 +245,42 @@ def group_photos(photos: list[Photo], same_pole_seconds: float, max_jump_m: floa
     return [Group(f"P{n:03d}", run) for n, run in enumerate(runs, start=1)]
 
 
+def merge_groups(groups: list[Group], specs: list[str], review_m: float) -> tuple[list[Group], list[list]]:
+    """Applies `--merge A=B[=C]` decisions; returns the merged groups and review rows for far merges."""
+    by_name = {group.name: group for group in groups}
+    parent = {name: name for name in by_name}
+
+    def root(name: str) -> str:
+        while parent[name] != name:
+            name = parent[name]
+        return name
+
+    reviews = []
+    for spec in specs:
+        names = [part.strip().upper() for part in spec.split("=")]
+        unknown = [name for name in names if name not in by_name]
+        if len(names) < 2 or unknown:
+            raise ValueError(f"--merge {spec!r}: cần dạng P002=P005 với tên nhóm có thật"
+                             + (f" (không có nhóm {', '.join(unknown)})" if unknown else ""))
+        first = by_name[names[0]]
+        for name in names[1:]:
+            other = by_name[name]
+            d = distance_m(first.lat, first.lng, other.lat, other.lng)
+            if d > review_m:
+                reviews.append(["gop_xa", first.name, other.name, f"{d:.1f}", "",
+                                f"Đã gộp theo --merge nhưng hai nhóm cách nhau hơn {review_m:g} m — kiểm tra lại "
+                                "có gõ nhầm tên nhóm không."])
+            # Keep the earliest name, so the merged pole's name and external_ref do not move.
+            keep, drop = sorted((root(first.name), root(name)), key=lambda n: int(n[1:]))
+            parent[drop] = keep
+
+    merged: dict[str, list[Photo]] = {}
+    for group in groups:  # a root always precedes its members, so insertion order stays time order
+        merged.setdefault(root(group.name), []).extend(group.photos)
+    return [Group(name, sorted(photos, key=lambda p: (p.taken_utc, p.path.name)))
+            for name, photos in merged.items()], reviews
+
+
 def read_existing(path: Path) -> list[tuple[str, float, float]]:
     """Poles already in the system, from a GeoJSON FeatureCollection of Points with properties.pole_id."""
     poles = []
@@ -309,6 +351,8 @@ def main() -> int:
     parser.add_argument("--max-jump-m", type=float, default=50.0, help="mặc định 50")
     parser.add_argument("--stopped-m", type=float, default=5.0, help="mặc định 5")
     parser.add_argument("--review-m", type=float, default=20.0, help="mặc định 20")
+    parser.add_argument("--merge", action="append", default=[], metavar="P002=P005",
+                        help="gộp các nhóm người đã xác nhận là cùng một cột (lặp lại được)")
     args = parser.parse_args()
 
     source, out = args.photos.resolve(), args.out.resolve()
@@ -331,8 +375,12 @@ def main() -> int:
 
     photos = drop_duplicates(photos, rejected)
     groups = group_photos(photos, args.same_pole_seconds, args.max_jump_m)
+    try:
+        groups, merge_reviews = merge_groups(groups, args.merge, args.review_m)
+    except ValueError as error:
+        parser.error(str(error))
     existing = read_existing(args.existing) if args.existing else []
-    reviews = find_reviews(groups, existing, args.stopped_m, args.review_m)
+    reviews = merge_reviews + find_reviews(groups, existing, args.stopped_m, args.review_m)
 
     (out / "photos").mkdir(parents=True, exist_ok=True)
     used_refs: set[str] = set()

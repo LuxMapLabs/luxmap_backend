@@ -266,7 +266,8 @@ python3 scripts/photos_to_poles.py <thư-mục-ảnh> --out <thư-mục-kết-qu
 Ảnh chụp liên tiếp dưới 2 giây gộp thành một cột; tọa độ và giờ đọc từ EXIF. Kết quả: `poles.csv`
 (import được sau khi điền ô bắt buộc còn trống), `observations.csv` (cột `status` để **người** điền —
 không import), `review.csv` (ca tool không tự quyết), `rejected.csv` (ảnh bị loại kèm lý do) và
-`photos/` (ảnh chép nguyên byte). `--existing <geojson>` loại các nhóm nằm sát cột đã có. Chi tiết và lý
+`photos/` (ảnh chép nguyên byte). `--existing <geojson>` loại các nhóm nằm sát cột đã có. Xem ảnh trong `review.csv` xong, nếu hai nhóm là cùng một cột thì chạy lại
+cùng thư mục với `--merge P002=P005` (lặp lại được): tọa độ thành trung vị ảnh của cả hai lượt. Chi tiết và lý
 do các ngưỡng: docstring đầu file. ⚠️ Chép ảnh khỏi điện thoại bằng cáp / AirDrop / tải bản gốc — gửi
 qua Zalo hay Messenger làm mất EXIF.
 
