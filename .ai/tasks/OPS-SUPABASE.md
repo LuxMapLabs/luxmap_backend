@@ -1,7 +1,7 @@
 ---
 ticket: OPS-SUPABASE
 title: Đưa database lên Supabase (PostgreSQL + PostGIS) — khảo sát tương thích, checklist, kế hoạch chuyển dữ liệu
-status: ready
+status: blocked
 phase: 1
 owner: codex
 branch: chore/supabase-deploy
@@ -53,7 +53,9 @@ sequence bị đẩy rất cao). Không được mang rác lên môi trường d
 4. Lấy connection string **Session pooler** (IPv4; kết nối trực tiếp cổng 5432 mặc định chỉ IPv6).
    **Không dùng Transaction pooler** (6543): repo dùng `SELECT … FOR UPDATE` trong transaction (BE-19)
    và prepared statement.
-5. Đặt chuỗi kết nối vào `.env` local qua `ConnectionStrings__LuxMap` — **không commit**.
+5. ~~Đặt chuỗi kết nối vào `.env` local~~ — **SAI, đã sửa sau Phase 1:** `Program.cs` nạp `.env` bằng
+   DotNetEnv và nó **ghi đè** biến shell, nên chuỗi cloud trong `.env` dev sẽ kéo cả `dotnet test` lên
+   Supabase. Đặt ở một workspace triển khai riêng (D-6 trong `results/OPS-SUPABASE-p1.md`). Không commit.
 
 **Phần B — Codex, Phase 1 (ticket này):** xem mục Yêu cầu.
 
