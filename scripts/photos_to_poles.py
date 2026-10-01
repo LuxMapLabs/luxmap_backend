@@ -308,7 +308,7 @@ def drop_groups(groups: list[Group], names: list[str], rejected: list[tuple[str,
                          "nhóm giữ lại)")
     for group in groups:
         if group.name in wanted:
-            rejected += [(p.path.name, f"người loại bằng --drop {group.name}: không phải cột") for p in group.photos]
+            rejected += [(p.path.name, f"người loại bằng --drop {group.name}: không phải cột đèn") for p in group.photos]
     return [group for group in groups if group.name not in wanted]
 
 
@@ -479,7 +479,7 @@ def main() -> int:
     parser.add_argument("--no-interpolate", action="store_true",
                         help="giữ nguyên toạ độ GPS, không nội suy ảnh có GPS dùng lại / nhảy")
     parser.add_argument("--drop", action="append", default=[], metavar="P095",
-                        help="loại nhóm không phải cột, ví dụ ảnh chụp nhầm (lặp lại được)")
+                        help="loại nhóm không phải cột đèn: ảnh chụp nhầm, cột không lắp đèn (lặp lại được)")
     args = parser.parse_args()
 
     source, out = args.photos.resolve(), args.out.resolve()
