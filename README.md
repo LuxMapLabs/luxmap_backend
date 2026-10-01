@@ -277,6 +277,13 @@ xa thường sai. `review.csv` gắn `gps_nhay` khi hai ảnh liền nhau ngụ 
 do các ngưỡng: docstring đầu file. ⚠️ Chép ảnh khỏi điện thoại bằng cáp / AirDrop / tải bản gốc — gửi
 qua Zalo hay Messenger làm mất EXIF.
 
+Thư mục ảnh trải trên nhiều tuyến / nhiều xã thì gán **theo từng cột** thay cho `--segment-ref` /
+`--commune-id`: `--segments segments.csv` (tuyến gần nhất trong `--review-m`) và `--boundaries
+<geojson>` (ranh giới có `properties.commune_id`). Cột không khớp thì để trống và báo `khong_tuyen` /
+`ngoai_ranh_gioi` trong `review.csv` — không bao giờ lấy giá trị dự phòng. `--fixture-watt` +
+`--fixture-install-date` xuất thêm `fixtures.csv` với giá trị **tạm** giống nhau cho mọi cột (ảnh không
+cho biết công suất hay ngày lắp).
+
 ## Quy ước lỗi và phân trang
 
 Mọi lỗi — kể cả validation và route không khớp — trả về đúng một hình dạng:

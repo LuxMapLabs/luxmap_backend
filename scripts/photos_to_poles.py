@@ -4,6 +4,8 @@
     python3 scripts/photos_to_poles.py <photo-folder> --out <output-folder>
     python3 scripts/photos_to_poles.py img --out out --commune-id COM-070 --segment-ref TUYEN-A \\
         --ref-prefix LP --existing poles.geojson
+    python3 scripts/photos_to_poles.py img --out out --segments segments.csv --boundaries wards.geojson \\
+        --ref-prefix LP --fixture-watt 150 --fixture-install-date 2020-01-01
 
 Standard library only, so it runs on any team machine without installing anything.
 
@@ -34,6 +36,10 @@ WHAT COMES OUT, in <output-folder>:
                                       from the car)
                        da_co_cot      sits on a pole already in the system; left out of poles.csv
                        gop_xa         a --merge of groups far apart — likely a typo
+  fixtures.csv       Only with --fixture-watt and --fixture-install-date: one led_road_lamp / grid
+                     fixture per pole row, ALL with the same given values. These are placeholders a
+                     person replaces once the real inventory is known — a photo shows neither wattage
+                     nor installation date.
   suggested_merges.txt  Ready-to-paste `--merge` arguments for pairs from different passes that are
                      each other's nearest photo. A SUGGESTION: look at both photos before using it.
   rejected.csv       Every photo left out, with the reason. Nothing is dropped silently.
@@ -54,6 +60,13 @@ merged pole keeps the earliest name and its position becomes the median of EVERY
 GPS fixes give a better estimate than deleting a row by hand. `--drop P095` removes a group that is not
 a pole at all (a misfire); its photos are listed in rejected.csv. Deleting the file instead would shift
 every later group name and break the --merge list.
+
+PER-POLE SEGMENT AND COMMUNE. A folder rarely covers one road in one commune. `--segments` takes a
+segments.csv (the import template) and gives each pole the nearest segment's external_ref, if within
+--review-m; `--boundaries` takes a GeoJSON of Polygon/MultiPolygon features with properties.commune_id
+and gives each pole the commune it falls in. A pole matched by neither is left blank and listed in
+review.csv (khong_tuyen / ngoai_ranh_gioi) — never filled from a fallback, because a wrong commune_id
+silently hides the pole from the people who should see it.
 
 BAD GPS FIXES ARE INTERPOLATED (off with --no-interpolate), after the merges, because only then is it
 known which photos are different poles. A photo is re-placed when it carries the previous photo's exact
@@ -445,6 +458,60 @@ def write_csv(path: Path, header: list[str], rows: list[list]) -> None:
         writer.writerows(rows)
 
 
+def read_segments(path: Path) -> list[tuple[str, list[tuple[float, float]]]]:
+    """(external_ref, [(lat, lng), ...]) from a segments.csv whose geom_wkt is a LINESTRING."""
+    segments = []
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            wkt = (row.get("geom_wkt") or "").strip()
+            if not wkt.upper().startswith("LINESTRING(") or not row.get("external_ref"):
+                raise ValueError(f"--segments: dòng {row.get('external_ref')!r} thiếu external_ref hoặc LINESTRING")
+            pairs = [part.split() for part in wkt[wkt.index("(") + 1:wkt.rindex(")")].split(",")]
+            segments.append((row["external_ref"], [(float(lat), float(lng)) for lng, lat in pairs]))
+    return segments
+
+
+def distance_to_line_m(lat: float, lng: float, line: list[tuple[float, float]]) -> float:
+    """Metres from a point to a polyline, on a local equirectangular projection (fine at a few km)."""
+    kx = math.radians(1) * EARTH_RADIUS_M * math.cos(math.radians(lat))
+    ky = math.radians(1) * EARTH_RADIUS_M
+    pts = [((x_lng - lng) * kx, (x_lat - lat) * ky) for x_lat, x_lng in line]
+    best = math.inf
+    for (ax, ay), (bx, by) in zip(pts, pts[1:]):
+        dx, dy = bx - ax, by - ay
+        t = max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy))) if dx or dy else 0.0
+        best = min(best, math.hypot(ax + t * dx, ay + t * dy))
+    return best
+
+
+def read_boundaries(path: Path) -> list[tuple[str, list[list[list[tuple[float, float]]]]]]:
+    """(commune_id, polygons) where each polygon is [outer ring, *holes] of (lng, lat)."""
+    result = []
+    for feature in json.loads(path.read_text(encoding="utf-8")).get("features", []):
+        geometry, commune = feature.get("geometry") or {}, (feature.get("properties") or {}).get("commune_id")
+        if not commune or geometry.get("type") not in ("Polygon", "MultiPolygon"):
+            raise ValueError("--boundaries: mỗi feature phải là Polygon/MultiPolygon có properties.commune_id")
+        polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+        result.append((commune, [[[tuple(pt[:2]) for pt in ring] for ring in poly] for poly in polygons]))
+    return result
+
+
+def in_ring(lng: float, lat: float, ring: list[tuple[float, float]]) -> bool:
+    inside = False
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        if (y1 > lat) != (y2 > lat) and lng < (x2 - x1) * (lat - y1) / (y2 - y1) + x1:
+            inside = not inside
+    return inside
+
+
+def commune_at(lat: float, lng: float, boundaries) -> str:
+    for commune, polygons in boundaries:
+        for outer, *holes in polygons:
+            if in_ring(lng, lat, outer) and not any(in_ring(lng, lat, hole) for hole in holes):
+                return commune
+    return ""
+
+
 def external_ref(prefix: str | None, group: Group, used: set[str]) -> str:
     """Stable across re-runs on the same photos, so re-importing updates instead of duplicating."""
     if not prefix:
@@ -461,8 +528,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("photos", type=Path, help="thư mục ảnh sạch (không quét thư mục con)")
     parser.add_argument("--out", type=Path, required=True, help="thư mục kết quả (phải trống hoặc chưa có)")
-    parser.add_argument("--commune-id", default="", help="điền sẵn commune_id cho mọi dòng")
-    parser.add_argument("--segment-ref", default="", help="điền sẵn segment_external_ref (một thư mục = một tuyến)")
+    commune = parser.add_mutually_exclusive_group()
+    commune.add_argument("--commune-id", default="", help="điền sẵn commune_id cho mọi dòng")
+    commune.add_argument("--boundaries", type=Path,
+                         help="GeoJSON ranh giới xã (properties.commune_id): gán xã theo vị trí từng cột")
+    segment = parser.add_mutually_exclusive_group()
+    segment.add_argument("--segment-ref", default="", help="điền sẵn segment_external_ref (một thư mục = một tuyến)")
+    segment.add_argument("--segments", type=Path, help="segments.csv: gán tuyến gần nhất cho từng cột")
+    parser.add_argument("--fixture-watt", type=int, help="xuất fixtures.csv với công suất TẠM này cho mọi cột")
+    parser.add_argument("--fixture-install-date", help="ngày lắp TẠM (YYYY-MM-DD) cho fixtures.csv")
     parser.add_argument("--ref-prefix", help="sinh external_ref = <prefix>-<giờ chụp>; bỏ trống thì để người điền")
     parser.add_argument("--existing", type=Path, help="GeoJSON các cột đã có (properties.pole_id) để tránh tạo trùng")
     parser.add_argument("--assume-offset", help="múi giờ dùng khi ảnh thiếu OffsetTimeOriginal, ví dụ +07:00")
@@ -489,6 +563,20 @@ def main() -> int:
         parser.error("--out phải khác thư mục ảnh")
     if out.exists() and any(out.iterdir()):
         parser.error(f"thư mục kết quả đã có dữ liệu, chọn thư mục khác: {out}")
+    if (args.fixture_watt is None) != (args.fixture_install_date is None):
+        parser.error("--fixture-watt và --fixture-install-date phải đi cùng nhau")
+    if args.fixture_watt is not None:
+        if not args.ref_prefix:
+            parser.error("fixtures.csv trỏ về cột bằng external_ref, nên cần --ref-prefix")
+        try:
+            datetime.strptime(args.fixture_install_date, "%Y-%m-%d")
+        except ValueError:
+            parser.error("--fixture-install-date phải có dạng YYYY-MM-DD")
+    try:
+        segments = read_segments(args.segments) if args.segments else []
+        boundaries = read_boundaries(args.boundaries) if args.boundaries else []
+    except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
+        parser.error(str(error))
 
     rejected: list[tuple[str, str]] = []
     photos = []
@@ -520,14 +608,29 @@ def main() -> int:
 
     (out / "photos").mkdir(parents=True, exist_ok=True)
     used_refs: set[str] = set()
-    pole_rows, observation_rows = [], []
+    pole_rows, observation_rows, fixture_rows = [], [], []
     for group in groups:
         for photo in group.photos:
             shutil.copy2(photo.path, out / "photos" / f"{group.name}_{photo.path.name}")
+        segment_ref, commune_id = args.segment_ref, args.commune_id
+        if segments:
+            d, nearest = min((distance_to_line_m(group.lat, group.lng, line), ref) for ref, line in segments)
+            segment_ref = nearest if d <= args.review_m else ""
+            if not segment_ref:
+                reviews.append(["khong_tuyen", group.name, nearest, f"{d:.1f}", "",
+                                f"Không tuyến nào trong {args.review_m:g} m — segment_external_ref để trống."])
+        if boundaries:
+            commune_id = commune_at(group.lat, group.lng, boundaries)
+            if not commune_id:
+                reviews.append(["ngoai_ranh_gioi", group.name, "", "", "",
+                                "Cột nằm ngoài mọi ranh giới đã cho — commune_id để trống."])
         if not group.existing_pole:
-            pole_rows.append([external_ref(args.ref_prefix, group, used_refs), args.segment_ref, "",
-                              args.commune_id, f"POINT({group.lng:.7f} {group.lat:.7f})", "", "field",
-                              group.name])
+            ref = external_ref(args.ref_prefix, group, used_refs)
+            pole_rows.append([ref, segment_ref, "", commune_id, f"POINT({group.lng:.7f} {group.lat:.7f})", "",
+                              "field", group.name])
+            if args.fixture_watt is not None:
+                fixture_rows.append([ref, "led_road_lamp", "grid", args.fixture_watt, args.fixture_install_date,
+                                     "", "", "field"])
         headings = [p.heading for p in group.photos if p.heading is not None]
         first = group.photos[0]
         observation_rows.append([
@@ -544,12 +647,16 @@ def main() -> int:
                "heading_deg", "existing_pole", "position", "status", "status_note"], observation_rows)
     write_csv(out / "review.csv", ["kind", "photo_group", "other", "distance_m", "gap_s", "note"], reviews)
     write_csv(out / "rejected.csv", ["file", "reason"], rejected)
+    if args.fixture_watt is not None:
+        write_csv(out / "fixtures.csv", ["pole_external_ref", "fixture_type", "power_source", "lamp_watt",
+                                         "install_date", "removed_date", "warranty_expiry", "data_source"],
+                  fixture_rows)
     write_suggestions(out / "suggested_merges.txt", suggestions, groups)
 
     print(f"{len(files)} ảnh, {len(rejected)} bị loại -> {len(groups)} nhóm cột")
     print(f"poles.csv: {len(pole_rows)} dòng · review.csv: {len(reviews)} ca cần xem · "
           f"{len(suggestions)} gợi ý gộp · kết quả ở {out}")
-    if not args.ref_prefix or not args.segment_ref or not args.commune_id:
+    if any(not row[0] or not row[1] or not row[3] for row in pole_rows):
         print("⚠️  poles.csv còn ô bắt buộc để trống (external_ref / segment_external_ref / commune_id) "
               "— điền trước khi import.")
     return 0
