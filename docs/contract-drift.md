@@ -647,3 +647,24 @@ kiểm tra: mặc định mang cả nhóm `fault_present`, gặp sự cố khôn
 **Phải báo:** WP5 (FW-12: 20 khoá, `allowed_actions`, `review_note`, 2 mã lỗi mới, `fault_type` là loại
 đã quyết). **Chưa báo.**
 
+
+## OPS-SCHEMA — lược đồ đích theo Phiếu v1.4 (01/10/2026)
+
+| | |
+|---|---|
+| **Decision** | ERD đích và Q1–Q17 ở [`docs/database/erd.md`](database/erd.md). Codex khảo sát (`.ai/results/OPS-SCHEMA-p1.md`, 21 D-item), Claude review độc lập và chốt các mục hai bên cùng chắc; Mỹ quyết mục cả hai không chắc (FX-1) |
+| **Decision maker** | Mỹ (FX-1) + Claude theo uỷ quyền (còn lại), 01/10/2026 · `SELF-SIGNED` — mục chạm API **ESCALATE ở FW kế tiếp** |
+| **Date** | 01/10/2026 |
+| **Scope** | Chỉ lược đồ đích và tài liệu. **Chưa có migration, chưa đổi Contract.** Mỗi bảng mới vào qua Phase 1 của ticket sở hữu |
+
+Các mục chạm bề mặt API — chưa sửa Contract, phải đưa ra FW:
+
+| Mã | Thay đổi | Chạm |
+|---|---|---|
+| **S-Q12 (FX-1)** | `fixture_type`, `lamp_watt`, `install_date` **nullable khi chưa xác minh**; enum `fixture_type` thêm giá trị cho đèn cao áp sodium (tên giá trị chốt ở ticket). 114 bóng thực địa về NULL. Chọn bởi Mỹ | Contract §1 enum, §5.1 / §5.3.1 hình dạng, FE hiển thị "chưa rõ" |
+| **S-Q6** | `work_order.task_kind` thêm `survey`; tuyến của phiếu là danh sách có thứ tự (`work_order_segment`) | §5.5 (đóng FR-1 về hướng) |
+| **S-Q13** | Bỏ `ExternalUnit`/SLA khỏi domain model | §3.3 còn nhắc — sửa khi Contract lên version |
+| **S-Q10** | Tài nguyên mới `electrical_cabinet` (prefix chốt ở ticket) | Endpoint tài sản mới |
+| **S-Q7** | Phiếu khảo sát neo một xã nhưng chứa được tuyến/cột của xã khác trong phạm vi người tạo; kết quả mang xã của cột | Phân quyền đọc kết quả khảo sát (BE-15) |
+
+**Phải báo:** WP5 (FX-1 hiển thị NULL, task_kind survey, tủ điện), WP6 (survey, FX-1), WP4 (bảng khảo sát / detection / registry phiên bản). **Chưa báo.**
