@@ -23,28 +23,35 @@ WHAT COMES OUT, in <output-folder>:
                      PERSON to fill (on | off | unclear) from the photos. Never imported: the import
                      does not take lamp status, and a photo's auto exposure says nothing reliable about
                      brightness. It is the night visual check the registration counts as ground truth.
-  review.csv         Cases the tool will not decide: groups close enough to be the same pole or two
-                     facing poles, and groups that sit on a pole already in the system.
+  review.csv         Cases the tool will not decide, by `kind`:
+                       lien_nhau      consecutive photos close in time or space — one pole shot
+                                      twice, a reused GPS fix, or two poles close together
+                       gps_nhay       consecutive photos implying an impossible speed — one fix is bad
+                       gan_cung_luot  two photos of the same pass, one apart, still close together
+                       luot_khac_gan  a photo from another pass (>= 30 s apart) close by — the same pole
+                                      seen again, or a different pole (facing poles look identical
+                                      from the car)
+                       da_co_cot      sits on a pole already in the system; left out of poles.csv
+                       gop_xa         a --merge of groups far apart — likely a typo
+  suggested_merges.txt  Ready-to-paste `--merge` arguments for pairs from different passes that are
+                     each other's nearest photo. A SUGGESTION: look at both photos before using it.
   rejected.csv       Every photo left out, with the reason. Nothing is dropped silently.
   photos/            The kept photos, copied byte for byte (EXIF intact), renamed <group>_<name>.
 
-HOW PHOTOS BECOME GROUPS. Sorted by capture time (EXIF DateTimeOriginal + OffsetTimeOriginal +
-SubsecTimeOriginal). Consecutive photos less than --same-pole-seconds apart belong to the same pole:
-from a vehicle at 15-25 km/h with poles 25-40 m apart, two poles are at least ~3.6 s apart while the
-1-2 shots of one pole land within a second. GPS does not decide this — phone apps often reuse the last
-fix, so two different poles can carry the same coordinates. A group's position is the median of its
-photos.
-
-WHAT IT REFUSES TO DECIDE. A second pass over the same road produces a second group for the same
-pole. From the vehicle's position alone that is indistinguishable from two poles facing each other
-across a narrow road, so such pairs go to review.csv instead of being merged. All thresholds are
-provisional until GPS error is measured in the field.
+EVERY PHOTO STARTS AS ITS OWN POLE. Photos are sorted by capture time (EXIF DateTimeOriginal +
+OffsetTimeOriginal + SubsecTimeOriginal) and named P001, P002, ... The tool never merges on its own.
+An earlier version merged photos taken less than 2 s apart; on the first real survey (28/09/2026,
+150 photos) the same pole was shot up to 2.4 s apart while two DIFFERENT poles were shot 1.6 s and
+2.0 s apart, so it silently merged two pairs of distinct poles. Time and distance overlap; no
+threshold separates them. A wrong split is visible in review.csv, a wrong merge loses a pole without
+a trace — so the tool only splits. GPS cannot settle it either: the camera app reuses its last fix,
+and five consecutive pairs in that survey carried identical coordinates.
 
 A PERSON DECIDES, THE TOOL RECORDS. After looking at the photos, re-run with `--merge P002=P005`
-(repeatable; `P002=P005=P009` merges three) on the same folder and thresholds, so group names stay
-the same. The merged pole keeps the earliest name and its position becomes the median of EVERY photo
-from both passes — two independent GPS fixes, a better estimate than deleting one row by hand. A merge
-of groups further apart than --review-m is still done, but flagged in review.csv as a likely typo.
+(repeatable; `P002=P005=P009` merges three) on the same folder, so group names stay the same. The
+merged pole keeps the earliest name and its position becomes the median of EVERY photo — independent
+GPS fixes give a better estimate than deleting a row by hand. Thresholds are provisional until GPS
+error is measured in the field.
 
 The GPS time-stamp is NOT used: GPS Map Camera writes local time into a field the EXIF standard
 defines as UTC, and writes altitude 0.
@@ -66,6 +73,9 @@ POLES_HEADER = ["external_ref", "segment_external_ref", "feeder_external_ref", "
                 "geom_wkt", "near_sensitive_poi", "data_source"]
 JPEG_MAGIC = b"\xff\xd8\xff"
 EARTH_RADIUS_M = 6_371_008.8
+# Photos further apart in time than this come from different passes. On the 28/09/2026 survey,
+# consecutive photos within a pass were at most ~14 s apart; turnarounds took 43-330 s.
+OTHER_PASS_SECONDS = 30.0
 
 TAG_EXIF_IFD, TAG_GPS_IFD = 0x8769, 0x8825
 TAG_DATETIME_ORIGINAL, TAG_OFFSET_ORIGINAL, TAG_SUBSEC_ORIGINAL = 0x9003, 0x9011, 0x9291
@@ -231,18 +241,15 @@ def drop_duplicates(photos: list[Photo], rejected: list[tuple[str, str]]) -> lis
     return kept
 
 
-def group_photos(photos: list[Photo], same_pole_seconds: float, max_jump_m: float) -> list[Group]:
-    runs: list[list[Photo]] = []
-    for photo in sorted(photos, key=lambda p: (p.taken_utc, p.path.name)):
-        if runs:
-            last = runs[-1][-1]
-            gap = (photo.taken_utc - last.taken_utc).total_seconds()
-            # The distance guard only stops photos from two phones interleaving in time.
-            if gap < same_pole_seconds and distance_m(last.lat, last.lng, photo.lat, photo.lng) <= max_jump_m:
-                runs[-1].append(photo)
-                continue
-        runs.append([photo])
-    return [Group(f"P{n:03d}", run) for n, run in enumerate(runs, start=1)]
+def name_photos(photos: list[Photo]) -> list[Group]:
+    """Every photo starts as its own candidate pole, named in capture order. Merging is a person's call."""
+    ordered = sorted(photos, key=lambda p: (p.taken_utc, p.path.name))
+    return [Group(f"P{n:03d}", [photo]) for n, photo in enumerate(ordered, start=1)]
+
+
+def time_gap(a: Group, b: Group) -> float:
+    """Seconds between the closest photos of two groups (merged groups can span two passes)."""
+    return min(abs((y.taken_utc - x.taken_utc).total_seconds()) for x in a.photos for y in b.photos)
 
 
 def merge_groups(groups: list[Group], specs: list[str], review_m: float) -> tuple[list[Group], list[list]]:
@@ -292,30 +299,72 @@ def read_existing(path: Path) -> list[tuple[str, float, float]]:
     return poles
 
 
-def find_reviews(groups: list[Group], existing, stopped_m: float, review_m: float) -> list[list]:
+def find_reviews(groups: list[Group], existing, pair_seconds: float, pair_m: float, review_m: float,
+                 max_speed_kmh: float) -> tuple[list[list], list[tuple[str, str, float]]]:
+    """Review rows plus suggested merges: pairs from different passes that are each other's nearest."""
     reviews = []
+    for a, b in zip(groups, groups[1:]):
+        d, gap = distance_m(a.lat, a.lng, b.lat, b.lng), time_gap(a, b)
+        if gap > 0 and d / gap * 3.6 > max_speed_kmh:
+            reviews.append(["gps_nhay", a.name, b.name, f"{d:.1f}", f"{gap:.1f}",
+                            f"Hai ảnh liền nhau ngụ ý {d / gap * 3.6:.0f} km/h — toạ độ của một trong hai ảnh hỏng. "
+                            "Xem vị trí trên bản đồ, sửa tay geom_wkt nếu cần."])
+        if gap < pair_seconds or d < pair_m:
+            reviews.append(["lien_nhau", a.name, b.name, f"{d:.1f}", f"{gap:.1f}",
+                            "Hai ảnh liền nhau sát nhau về thời gian hoặc vị trí: cùng một cột chụp hai lần (thì "
+                            "--merge), GPS dùng lại toạ độ cũ, hoặc hai cột gần nhau. Xem ảnh để quyết."])
+
+    candidates = []
     for i, a in enumerate(groups):
-        for j in range(i + 1, len(groups)):
-            b = groups[j]
+        for b in groups[i + 2:]:
             d = distance_m(a.lat, a.lng, b.lat, b.lng)
-            gap = (b.photos[0].taken_utc - a.photos[-1].taken_utc).total_seconds()
-            if j == i + 1 and d < stopped_m:
-                reviews.append(["lien_nhau_rat_gan", a.name, b.name, f"{d:.1f}", f"{gap:.1f}",
-                                "Hai nhóm liền nhau gần như cùng chỗ: xe dừng chụp lại CÙNG cột, GPS dùng lại "
-                                "toạ độ cũ, hoặc hai cột ĐỐI DIỆN. Xem ảnh để quyết."])
-            elif j > i + 1 and d < review_m:
-                reviews.append(["luot_khac_gan", a.name, b.name, f"{d:.1f}", f"{gap:.1f}",
-                                "Một lượt đi khác qua gần chỗ này: cùng cột chụp hai lần, hoặc hai cột khác "
-                                "nhau. Nếu cùng cột thì xoá một dòng khỏi poles.csv."])
+            if d >= review_m:
+                continue
+            gap = time_gap(a, b)
+            if gap >= OTHER_PASS_SECONDS:
+                candidates.append((d, a, b))
+            else:
+                reviews.append(["gan_cung_luot", a.name, b.name, f"{d:.1f}", f"{gap:.1f}",
+                                "Cùng một lượt, cách nhau một ảnh mà vẫn sát nhau: cùng một cột chụp ba lần, "
+                                "GPS dùng lại toạ độ, hoặc cột rất gần nhau. Xem ảnh để quyết."])
+    nearest: dict[str, tuple[float, str]] = {}
+    for d, a, b in candidates:
+        for x, y in ((a.name, b.name), (b.name, a.name)):
+            if x not in nearest or d < nearest[x][0]:
+                nearest[x] = (d, y)
+    suggestions = []
+    for d, a, b in candidates:
+        mutual = nearest[a.name][1] == b.name and nearest[b.name][1] == a.name
+        if mutual:
+            suggestions.append((a.name, b.name, d))
+        reviews.append(["luot_khac_gan", a.name, b.name, f"{d:.1f}", f"{time_gap(a, b):.1f}",
+                        "Lượt khác đi qua cùng chỗ: cùng cột chụp lại, hoặc hai cột khác nhau "
+                        "(cột đối diện trông y hệt từ trên xe). "
+                        + ("GỢI Ý GỘP: hai ảnh gần nhau nhất của nhau, có trong suggested_merges.txt."
+                           if mutual else "")])
+
     for group in groups:
-        nearest = min(((distance_m(group.lat, group.lng, lat, lng), pole_id) for pole_id, lat, lng in existing),
-                      default=None)
-        if nearest and nearest[0] < review_m:
-            group.existing_pole = nearest[1]
-            reviews.append(["da_co_cot", group.name, nearest[1], f"{nearest[0]:.1f}", "",
+        nearest_pole = min(((distance_m(group.lat, group.lng, lat, lng), pole_id)
+                            for pole_id, lat, lng in existing), default=None)
+        if nearest_pole and nearest_pole[0] < review_m:
+            group.existing_pole = nearest_pole[1]
+            reviews.append(["da_co_cot", group.name, nearest_pole[1], f"{nearest_pole[0]:.1f}", "",
                             "Đã có cột trong hệ thống gần đây nên nhóm này KHÔNG được ghi vào poles.csv. "
                             "Nếu là cột mới thật thì thêm lại tay."])
-    return reviews
+    return reviews, suggestions
+
+
+def write_suggestions(path: Path, suggestions: list[tuple[str, str, float]], groups: list[Group]) -> None:
+    photos = {g.name: " ".join(f"{g.name}_{p.path.name}" for p in g.photos) for g in groups}
+    lines = ["# Gợi ý gộp: hai ảnh ở hai lượt khác nhau, ảnh này gần ảnh kia nhất và ngược lại.",
+             "# XEM ẢNH TRƯỚC khi dùng — hai cột đối diện nhau trông y hệt từ trên xe.",
+             "# Bỏ cặp sai khỏi dòng cuối rồi chạy lại cùng thư mục ảnh với các tham số đó.", "#"]
+    # Nearest first: on the first survey, pairs a few metres apart looked like the same pole from both
+    # directions, while an 18 m pair showed two different scenes.
+    ordered = sorted(suggestions, key=lambda item: item[2])
+    lines += [f"# {a}={b}  {d:5.1f} m   {photos[a]}  |  {photos[b]}" for a, b, d in ordered]
+    lines.append(" ".join(f"--merge {a}={b}" for a, b, _ in ordered))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def write_csv(path: Path, header: list[str], rows: list[list]) -> None:
@@ -347,10 +396,14 @@ def main() -> int:
     parser.add_argument("--ref-prefix", help="sinh external_ref = <prefix>-<giờ chụp>; bỏ trống thì để người điền")
     parser.add_argument("--existing", type=Path, help="GeoJSON các cột đã có (properties.pole_id) để tránh tạo trùng")
     parser.add_argument("--assume-offset", help="múi giờ dùng khi ảnh thiếu OffsetTimeOriginal, ví dụ +07:00")
-    parser.add_argument("--same-pole-seconds", type=float, default=2.0, help="mặc định 2.0")
-    parser.add_argument("--max-jump-m", type=float, default=50.0, help="mặc định 50")
-    parser.add_argument("--stopped-m", type=float, default=5.0, help="mặc định 5")
-    parser.add_argument("--review-m", type=float, default=20.0, help="mặc định 20")
+    parser.add_argument("--pair-seconds", type=float, default=3.0,
+                        help="ảnh liền nhau cách dưới số giây này thì đưa vào review (mặc định 3)")
+    parser.add_argument("--pair-m", type=float, default=8.0,
+                        help="ảnh liền nhau cách dưới số mét này thì đưa vào review (mặc định 8)")
+    parser.add_argument("--review-m", type=float, default=20.0,
+                        help="ảnh không liền nhau / cột đã có trong bán kính này thì đưa vào review (mặc định 20)")
+    parser.add_argument("--max-speed-kmh", type=float, default=60.0,
+                        help="vận tốc suy ra giữa hai ảnh liền nhau vượt mức này là GPS hỏng (mặc định 60)")
     parser.add_argument("--merge", action="append", default=[], metavar="P002=P005",
                         help="gộp các nhóm người đã xác nhận là cùng một cột (lặp lại được)")
     args = parser.parse_args()
@@ -374,13 +427,15 @@ def main() -> int:
             rejected.append((path.name, f"không đọc được file ({error})"))
 
     photos = drop_duplicates(photos, rejected)
-    groups = group_photos(photos, args.same_pole_seconds, args.max_jump_m)
+    groups = name_photos(photos)
     try:
         groups, merge_reviews = merge_groups(groups, args.merge, args.review_m)
     except ValueError as error:
         parser.error(str(error))
     existing = read_existing(args.existing) if args.existing else []
-    reviews = merge_reviews + find_reviews(groups, existing, args.stopped_m, args.review_m)
+    reviews, suggestions = find_reviews(groups, existing, args.pair_seconds, args.pair_m, args.review_m,
+                                        args.max_speed_kmh)
+    reviews = merge_reviews + reviews
 
     (out / "photos").mkdir(parents=True, exist_ok=True)
     used_refs: set[str] = set()
@@ -407,9 +462,11 @@ def main() -> int:
                "heading_deg", "existing_pole", "status", "status_note"], observation_rows)
     write_csv(out / "review.csv", ["kind", "photo_group", "other", "distance_m", "gap_s", "note"], reviews)
     write_csv(out / "rejected.csv", ["file", "reason"], rejected)
+    write_suggestions(out / "suggested_merges.txt", suggestions, groups)
 
     print(f"{len(photos)} ảnh dùng được, {len(rejected)} ảnh bị loại -> {len(groups)} nhóm cột")
-    print(f"poles.csv: {len(pole_rows)} dòng · review.csv: {len(reviews)} ca cần xem · kết quả ở {out}")
+    print(f"poles.csv: {len(pole_rows)} dòng · review.csv: {len(reviews)} ca cần xem · "
+          f"{len(suggestions)} gợi ý gộp · kết quả ở {out}")
     if not args.ref_prefix or not args.segment_ref or not args.commune_id:
         print("⚠️  poles.csv còn ô bắt buộc để trống (external_ref / segment_external_ref / commune_id) "
               "— điền trước khi import.")

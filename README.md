@@ -263,11 +263,14 @@ python3 scripts/photos_to_poles.py <thư-mục-ảnh> --out <thư-mục-kết-qu
     --commune-id COM-070 --segment-ref TUYEN-A --ref-prefix LP   # ba tuỳ chọn này có thể bỏ
 ```
 
-Ảnh chụp liên tiếp dưới 2 giây gộp thành một cột; tọa độ và giờ đọc từ EXIF. Kết quả: `poles.csv`
+Mỗi ảnh là một cột ứng viên — tool **không tự gộp** (khảo sát thật 28/09 cho thấy cùng cột chụp cách
+2,4 s mà hai cột khác nhau chỉ cách 1,6 s); tọa độ và giờ đọc từ EXIF. Kết quả: `poles.csv`
 (import được sau khi điền ô bắt buộc còn trống), `observations.csv` (cột `status` để **người** điền —
 không import), `review.csv` (ca tool không tự quyết), `rejected.csv` (ảnh bị loại kèm lý do) và
 `photos/` (ảnh chép nguyên byte). `--existing <geojson>` loại các nhóm nằm sát cột đã có. Xem ảnh trong `review.csv` xong, nếu hai nhóm là cùng một cột thì chạy lại
-cùng thư mục với `--merge P002=P005` (lặp lại được): tọa độ thành trung vị ảnh của cả hai lượt. Chi tiết và lý
+cùng thư mục với `--merge P002=P005` (lặp lại được): tọa độ thành trung vị ảnh của cả hai lượt.
+`suggested_merges.txt` gợi ý sẵn các cặp ở hai lượt khác nhau (gần nhất trước) — vẫn phải xem ảnh, cặp
+xa thường sai. `review.csv` gắn `gps_nhay` khi hai ảnh liền nhau ngụ ý vận tốc vô lý. Chi tiết và lý
 do các ngưỡng: docstring đầu file. ⚠️ Chép ảnh khỏi điện thoại bằng cáp / AirDrop / tải bản gốc — gửi
 qua Zalo hay Messenger làm mất EXIF.
 
