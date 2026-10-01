@@ -271,7 +271,9 @@ không import), `review.csv` (ca tool không tự quyết), `rejected.csv` (ản
 cùng thư mục với `--merge P002=P005` (lặp lại được): tọa độ thành trung vị ảnh của cả hai lượt.
 `suggested_merges.txt` gợi ý sẵn các cặp ở hai lượt khác nhau (gần nhất trước) — vẫn phải xem ảnh, cặp
 xa thường sai. `review.csv` gắn `gps_nhay` khi hai ảnh liền nhau ngụ ý vận tốc vô lý. Ảnh không phải cột (chụp nhầm) thì
-`--drop P095` — đừng xoá file, vì xoá làm đổi tên mọi nhóm phía sau. Chi tiết và lý
+`--drop P095` — đừng xoá file, vì xoá làm đổi tên mọi nhóm phía sau.
+Ảnh mang toạ độ GPS dùng lại hoặc nhảy vô lý được **nội suy** theo thời gian giữa hai ảnh tốt cùng lượt
+(cột `position` của `observations.csv` ghi rõ; tắt bằng `--no-interpolate`). Chi tiết và lý
 do các ngưỡng: docstring đầu file. ⚠️ Chép ảnh khỏi điện thoại bằng cáp / AirDrop / tải bản gốc — gửi
 qua Zalo hay Messenger làm mất EXIF.
 

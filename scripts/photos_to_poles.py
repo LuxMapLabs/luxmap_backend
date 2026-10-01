@@ -27,6 +27,7 @@ WHAT COMES OUT, in <output-folder>:
                        lien_nhau      consecutive photos close in time or space — one pole shot
                                       twice, a reused GPS fix, or two poles close together
                        gps_nhay       consecutive photos implying an impossible speed — one fix is bad
+                       noi_suy        a photo whose GPS fix was bad and was re-placed (see below)
                        gan_cung_luot  two photos of the same pass, one apart, still close together
                        luot_khac_gan  a photo from another pass (>= 30 s apart) close by — the same pole
                                       seen again, or a different pole (facing poles look identical
@@ -52,7 +53,14 @@ A PERSON DECIDES, THE TOOL RECORDS. After looking at the photos, re-run with `--
 merged pole keeps the earliest name and its position becomes the median of EVERY photo — independent
 GPS fixes give a better estimate than deleting a row by hand. `--drop P095` removes a group that is not
 a pole at all (a misfire); its photos are listed in rejected.csv. Deleting the file instead would shift
-every later group name and break the --merge list. Thresholds are provisional until GPS
+every later group name and break the --merge list.
+
+BAD GPS FIXES ARE INTERPOLATED (off with --no-interpolate), after the merges, because only then is it
+known which photos are different poles. A photo is re-placed when it carries the previous photo's exact
+coordinates although it is a different pole, or when the speed from the last good photo exceeds
+--max-speed-kmh; its position becomes a straight-line estimate in time between the nearest good photos
+of the same pass, and observations.csv `position` says which. A fix that is stuck but still creeps
+forward a few metres is NOT detected — on the 28/09 survey the bridge stretch stayed uneven. Thresholds are provisional until GPS
 error is measured in the field.
 
 The GPS time-stamp is NOT used: GPS Map Camera writes local time into a field the EXIF standard
@@ -100,6 +108,7 @@ class Photo:
     taken_utc: datetime
     taken_local: datetime
     heading: float | None
+    position: str = ""  # empty = the camera's own GPS fix; otherwise what was wrong and what was done
 
 
 @dataclass
@@ -303,6 +312,52 @@ def drop_groups(groups: list[Group], names: list[str], rejected: list[tuple[str,
     return [group for group in groups if group.name not in wanted]
 
 
+def repair_positions(groups: list[Group], max_speed_kmh: float) -> list[Group]:
+    """Re-places photos whose GPS fix is known bad by interpolating in time between good neighbours.
+
+    Bad means: the same coordinates as the previous photo although a person kept them as DIFFERENT
+    poles (the app reused its last fix), or an arrival speed from the last good photo no vehicle made.
+    Neighbours are searched only inside the same pass, so a turnaround is never bridged. The result is
+    an ESTIMATE on a straight line between two fixes, and every moved photo says so in `position`.
+    """
+    owner = {id(photo): group.name for group in groups for photo in group.photos}
+    photos = sorted((photo for group in groups for photo in group.photos), key=lambda p: (p.taken_utc, p.path.name))
+
+    last_good = None
+    for prev, photo in zip([None, *photos], photos):
+        if prev and owner[id(prev)] != owner[id(photo)] and distance_m(prev.lat, prev.lng, photo.lat, photo.lng) < 0.05:
+            photo.position = "gps_dung_lai"
+        elif last_good:
+            gap = (photo.taken_utc - last_good.taken_utc).total_seconds()
+            if gap > 0 and distance_m(last_good.lat, last_good.lng, photo.lat, photo.lng) / gap * 3.6 > max_speed_kmh:
+                photo.position = "gps_nhay"
+        if not photo.position:
+            last_good = photo
+
+    def good_neighbour(i: int, step: int) -> Photo | None:
+        j = i
+        while 0 <= j + step < len(photos):
+            if abs((photos[j + step].taken_utc - photos[j].taken_utc).total_seconds()) >= OTHER_PASS_SECONDS:
+                return None
+            j += step
+            if not photos[j].position:
+                return photos[j]
+        return None
+
+    fixes = []
+    for i, photo in enumerate(photos):
+        if photo.position:
+            fixes.append((photo, good_neighbour(i, -1), good_neighbour(i, +1)))
+    for photo, before, after in fixes:  # compute every fix from GPS before moving anything
+        if before and after:
+            f = (photo.taken_utc - before.taken_utc) / (after.taken_utc - before.taken_utc)
+            photo.lat, photo.lng = before.lat + f * (after.lat - before.lat), before.lng + f * (after.lng - before.lng)
+            photo.position += f" -> noi_suy giua {before.path.name} va {after.path.name}"
+        else:
+            photo.position += " -> KHONG noi suy duoc (thieu anh GPS tot o mot phia trong cung luot)"
+    return [Group(group.name, group.photos) for group in groups]  # recompute medians
+
+
 def read_existing(path: Path) -> list[tuple[str, float, float]]:
     """Poles already in the system, from a GeoJSON FeatureCollection of Points with properties.pole_id."""
     poles = []
@@ -421,6 +476,8 @@ def main() -> int:
                         help="vận tốc suy ra giữa hai ảnh liền nhau vượt mức này là GPS hỏng (mặc định 60)")
     parser.add_argument("--merge", action="append", default=[], metavar="P002=P005",
                         help="gộp các nhóm người đã xác nhận là cùng một cột (lặp lại được)")
+    parser.add_argument("--no-interpolate", action="store_true",
+                        help="giữ nguyên toạ độ GPS, không nội suy ảnh có GPS dùng lại / nhảy")
     parser.add_argument("--drop", action="append", default=[], metavar="P095",
                         help="loại nhóm không phải cột, ví dụ ảnh chụp nhầm (lặp lại được)")
     args = parser.parse_args()
@@ -451,10 +508,15 @@ def main() -> int:
         groups = drop_groups(groups, args.drop, rejected)
     except ValueError as error:
         parser.error(str(error))
+    if not args.no_interpolate:
+        groups = repair_positions(groups, args.max_speed_kmh)
     existing = read_existing(args.existing) if args.existing else []
     reviews, suggestions = find_reviews(groups, existing, args.pair_seconds, args.pair_m, args.review_m,
                                         args.max_speed_kmh)
-    reviews = merge_reviews + reviews
+    moved = [[ "noi_suy", group.name, photo.path.name, "", "",
+               f"Toạ độ GPS của ảnh hỏng ({photo.position}). Toạ độ là ƯỚC TÍNH trên đường thẳng giữa hai ảnh."]
+             for group in groups for photo in group.photos if photo.position]
+    reviews = merge_reviews + moved + reviews
 
     (out / "photos").mkdir(parents=True, exist_ok=True)
     used_refs: set[str] = set()
@@ -473,12 +535,13 @@ def main() -> int:
             first.taken_utc.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             first.taken_local.isoformat(timespec="milliseconds"), len(group.photos),
             ";".join(f"{group.name}_{p.path.name}" for p in group.photos),
-            f"{statistics.median(headings):.0f}" if headings else "", group.existing_pole, "", ""])
+            f"{statistics.median(headings):.0f}" if headings else "", group.existing_pole,
+            "; ".join(f"{p.path.name}: {p.position}" for p in group.photos if p.position) or "gps", "", ""])
 
     write_csv(out / "poles.csv", POLES_HEADER + ["photo_group"], pole_rows)
     write_csv(out / "observations.csv",
               ["photo_group", "lat", "lng", "taken_at_utc", "taken_at_local", "photo_count", "photos",
-               "heading_deg", "existing_pole", "status", "status_note"], observation_rows)
+               "heading_deg", "existing_pole", "position", "status", "status_note"], observation_rows)
     write_csv(out / "review.csv", ["kind", "photo_group", "other", "distance_m", "gap_s", "note"], reviews)
     write_csv(out / "rejected.csv", ["file", "reason"], rejected)
     write_suggestions(out / "suggested_merges.txt", suggestions, groups)
