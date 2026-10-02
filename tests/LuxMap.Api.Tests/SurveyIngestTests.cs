@@ -257,10 +257,12 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
             { Content = JsonContent.Create(new { title = "Renamed mid-upload" }) };
         var edited = clients["manager"].SendAsync(patch);
         var first = await Task.WhenAny(edited, Task.Delay(TimeSpan.FromSeconds(10)));
+        // Let the upload finish BEFORE any assert: a failing assert would otherwise start the teardown
+        // while the clip row is still being written, and the half-deleted fixture leaks into the next run.
         parts.SetResult();
+        await upload;
         Assert.Same(edited, first);
         await Json(await edited, 200);
-        await upload;
         Assert.Equal(1, await Db(db => db.Set<SurveyVideoClip>().CountAsync(x => x.SweepId == id)));
     }
 
