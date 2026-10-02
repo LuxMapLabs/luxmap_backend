@@ -39,6 +39,16 @@ public sealed class InMemoryObjectStore : IObjectStore
             bucket, originalKey, prepared.OriginalBytes, thumbnailKey, prepared.ThumbnailBytes);
     }
 
+    public async Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content,
+        StreamUpload upload, CancellationToken cancellationToken = default)
+    {
+        using var memory = new MemoryStream();
+        await content.CopyToAsync(memory, cancellationToken);
+        var bytes = memory.ToArray();
+        objects[(bucket, key)] = bytes;
+        return new(key, bytes.LongLength, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes)));
+    }
+
     public Task<Stream> OpenAsync(
         StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult<Stream>(new MemoryStream(objects[(bucket, key)], writable: false));

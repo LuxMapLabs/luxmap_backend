@@ -20,6 +20,10 @@ namespace LuxMap.Infrastructure.Storage;
 /// </remarks>
 public sealed class S3ObjectStore(IAmazonS3 client, ILogger<S3ObjectStore> logger) : IObjectStore
 {
+    public Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content,
+        StreamUpload upload, CancellationToken cancellationToken = default)
+        => MultipartUpload.StoreAsync(client, bucket, key, content, upload, logger, cancellationToken);
+
     public async Task<StoredImage> StoreImageAsync(
         StorageBucket bucket, string id, Stream content, CancellationToken cancellationToken = default)
     {
