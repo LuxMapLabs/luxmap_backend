@@ -699,7 +699,8 @@ Các mục chạm bề mặt API — chưa sửa Contract, phải đưa ra FW:
 | **Scope** | BE-15/16/17; Contract §2 (capability), §5.6 (`GET /sweeps`, O-4), endpoint upload video mới. **Chưa đổi Contract** — ESCALATE ở FW kế tiếp |
 
 **Phải báo:** WP6 (định dạng file thô, sidecar frame, upload clip), WP4 (detector theo frame, CV-05 chuyển sang backend), WP5 (màn
-duyệt phiên, coverage). **Chưa báo.**
+duyệt phiên, coverage). **Đã báo một phần (02/10/2026):** WP5/WP6 nhận phần P2a (xem mục dưới). **WP4 chưa báo**; sidecar frame
+và màn duyệt phiên báo cùng P2b/P2c.
 
 ### BE-15 P2a — bề mặt hiện thực để FW đối chiếu (02/10/2026)
 
@@ -710,7 +711,9 @@ Thêm `segment_ids` ở chi tiết phiếu; sáu operation ingest/read tại `/s
 `processing_status` tách khỏi `status`; `coverage_pct=null`, `frame_count=0` cho tới P2b.
 PUT clip/raw trả **200** cho lưu mới và retry; raw cap **10 MiB/file** là giới hạn vận hành tạm của P2a.
 Chưa tạo profile/registry hay kiểm codec; cấu hình và mapping frame giữ nguyên file thô để P2b kiểm.
-**Chưa cập nhật Contract/OpenAPI, chưa thông báo WP5/WP6.** Claude xuất OpenAPI sau review và kiểm PostGIS.
+OpenAPI đã xuất lại (PR #69); **văn bản Contract chưa sửa**, sửa khi lên version. **Đã báo WP5 và WP6 ngày 02/10/2026**
+(Mỹ gửi): WP5 — phiếu `survey`, `GET /sweeps`, nhãn Swagger; WP6 — luồng thu phiên, giới hạn upload, ns dạng chuỗi, nhãn Swagger,
+và xin phiên mẫu thật từ thiết bị (D-06). Chờ phản hồi ở FW kế tiếp.
 
 ## Dữ liệu thực địa đầu tiên — đèn thật không phải LED (01/10/2026)
 
@@ -738,4 +741,4 @@ Chưa tạo profile/registry hay kiểm codec; cấu hình và mapping frame gi�
 | **Ai bị ảnh hưởng** | Không client nào gọi đường cũ: đã soát 11 nhánh `luxmap-web` (02/10/2026) — web còn đọc mock; repo mobile chưa có code gọi API. Không giữ alias đường cũ |
 | **Quyết định** | Mỹ yêu cầu, **SELF-SIGNED** — chạm bề mặt API nên chưa ổn định tới FW kế tiếp. Contract text chưa sửa; sửa khi lên version |
 
-**Phải báo:** WP5 (FW-08 bản đồ), WP6 (FM-15). **Chưa báo.**
+**Phải báo:** WP5 (FW-08 bản đồ), WP6 (FM-15). **Đã báo ngày 02/10/2026** (Mỹ gửi, PR #70 đã merge). Chờ xác nhận ở FW kế tiếp.
