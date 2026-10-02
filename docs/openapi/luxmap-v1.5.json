@@ -6481,10 +6481,14 @@
           "materials_note": {
             "type": "string",
             "nullable": true
+          },
+          "commune_id": {
+            "type": "string",
+            "description": "Survey only (required): the anchor commune. Rejected for inspection and repair, whose commune comes from the faults or segment."
           }
         },
         "additionalProperties": false,
-        "description": "WO-5 (provisional): repair requires fault_ids; inspection requires fault_ids OR segment_id. Server-owned fields are rejected."
+        "description": "WO-5 (provisional): repair requires fault_ids; inspection requires fault_ids OR segment_id; survey (BE-15, provisional) requires commune_id and an ordered segment_ids. Server-owned fields are rejected."
       },
       "CurrentUserResponse": {
         "type": "object",
@@ -7226,8 +7230,7 @@
             "format": "date",
             "nullable": true
           },
-          "materials_note": {},
-          "segment_ids": {}
+          "materials_note": {}
         },
         "additionalProperties": false
       },
