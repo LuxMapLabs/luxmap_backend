@@ -6,7 +6,7 @@ namespace LuxMap.Modules.WorkOrders;
 public static class WorkOrderRules
 {
     public static bool Eligible(TaskKind kind, FaultStatus status)
-        => FaultStatusSets.IsOpen(status) && (kind == TaskKind.Inspection || status != FaultStatus.Detected);
+        => kind != TaskKind.Survey && FaultStatusSets.IsOpen(status) && (kind == TaskKind.Inspection || status != FaultStatus.Detected);
 
     public static bool Allows(WorkOrderStatus status, string action) => action switch
     {

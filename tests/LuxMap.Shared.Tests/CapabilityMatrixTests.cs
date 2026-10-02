@@ -17,6 +17,9 @@ public class CapabilityMatrixTests
 {
     private static readonly Dictionary<string, string[]> Contract = new()
     {
+        ["cap:read_surveys"] = ["field_engineer", "manager", "superior", "system_admin"],
+        ["cap:submit_surveys"] = ["field_engineer"],
+        ["cap:review_surveys"] = ["manager"],
         ["cap:read_network"] = ["field_engineer", "manager", "superior", "system_admin"],
         ["cap:read_lux_readings"] = ["field_engineer", "manager", "superior", "system_admin"],
         ["cap:manage_assets"] = ["manager"],

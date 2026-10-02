@@ -36,6 +36,7 @@ public static class SwaggerSetup
             AddRefreshTokenCookieSecurity(options);
             options.OperationFilter<RefreshTokenCookieOperationFilter>();
             options.OperationFilter<CapabilityOperationFilter>();
+            options.OperationFilter<RawRequestBodyOperationFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than
             // trusting Swashbuckle to infer correctly: getting this wrong makes FM-04 generate

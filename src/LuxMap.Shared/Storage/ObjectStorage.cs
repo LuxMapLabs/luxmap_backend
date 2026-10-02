@@ -16,6 +16,8 @@ public enum StorageBucket
 
     /// <summary>RepairEvidence images (BE-24).</summary>
     Evidence,
+    /// <summary>Survey video clips and original JSON/JSONL inputs (BE-15).</summary>
+    Video,
 }
 
 /// <summary>Which of the two objects a stored image produces.</summary>
@@ -49,6 +51,8 @@ public static class StorageKeys
 
     public const string EvidenceBucketName = "luxmap-evidence";
 
+    public const string VideoBucketName = "luxmap-video";
+
     public const string OriginalPrefix = "original";
 
     public const string ThumbnailPrefix = "thumb";
@@ -62,6 +66,7 @@ public static class StorageKeys
     {
         StorageBucket.Survey => SurveyBucketName,
         StorageBucket.Evidence => EvidenceBucketName,
+        StorageBucket.Video => VideoBucketName,
         _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket, "Unknown storage bucket."),
     };
 
@@ -99,8 +104,12 @@ public sealed record StoredImage(
     public long TotalBytes => OriginalBytes + ThumbnailBytes;
 }
 
+public sealed record StoredObject(string Key, long ByteCount, string Sha256);
+
+public sealed record StreamUpload(long ExpectedBytes, string ExpectedSha256, long MaxBytes, string ContentType, bool RequireMp4 = false);
+
 /// <summary>
-/// Object storage for the two image streams. The ONLY storage contract BE-15 and BE-24 see.
+/// Object storage for images and streamed survey inputs. The ONLY storage contract BE-15 and BE-24 see.
 /// </summary>
 /// <remarks>
 /// ⚠️ Deliberately says nothing about MinIO, S3, buckets-as-URLs or presigned links. BE-15 lands in
@@ -119,6 +128,10 @@ public sealed record StoredImage(
 /// </remarks>
 public interface IObjectStore
 {
+    /// <summary>Bounded streaming write; verifies length/hash before completing the multipart upload.</summary>
+    Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content,
+        StreamUpload upload, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Validates the image, writes the original byte-for-byte, derives and writes a thumbnail, and
     /// reports what was actually written.

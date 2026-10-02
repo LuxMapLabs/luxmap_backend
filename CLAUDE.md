@@ -1618,3 +1618,21 @@ stub `ni(...)`, xoá luôn stub **và** schema viết tay đi kèm (`S["IotNode*
 
 **Mock `indent=1`.** Sửa mock bằng script phải round-trip từng byte trước khi đổi (đọc → ghi lại → so
 bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
+
+### BE-15 P2a — khoá hàng, upload dài và EF design-time (02/10/2026)
+
+**Không khoá hàng bằng `FromSql("SELECT * … FOR UPDATE")` trên entity có row version `xmin`.**
+`SELECT *` không trả cột hệ thống `xmin`, nên EF ném `42703: column xmin does not exist` → 500 ở
+mọi lượt ghi. Khuôn đúng là `FaultLocks`: `ExecuteSql("SELECT 1 … FOR UPDATE")` rồi mới đọc bằng
+LINQ, để đọc vẫn đi qua query filter xã và người được giao.
+
+**Không giữ transaction hay khoá hàng qua một lượt stream upload.** Clip 100–300 MB qua 4G mất vài
+phút; giữ `FOR UPDATE` trên `work_order` suốt lúc đó làm mọi thao tác của Quản lý trên phiếu treo.
+Khuôn ở `SurveyIngestService.Clip`: kiểm dưới khoá → nhả → stream object (key mang hash) → khoá lại,
+kiểm lại, ghi dòng. Object mồ côi khi thua race là chấp nhận được (BE-11 quy tắc 3). Canh bằng
+`A_clip_in_flight_does_not_hold_the_work_order_lock`.
+
+**Không thêm `IDesignTimeDbContextFactory`.** EF dùng host thật để dựng model lúc design-time; một
+factory tự liệt kê assembly module sẽ âm thầm thiếu module mới, và `migrations add` sinh `DropTable`
+cho bảng của module đó. Sinh migration trong môi trường không có `.env` thì đặt
+`ConnectionStrings__LuxMap` giả cho lệnh đó, đừng đổi đường dựng model.

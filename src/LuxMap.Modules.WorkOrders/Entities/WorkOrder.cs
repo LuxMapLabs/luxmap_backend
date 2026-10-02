@@ -4,7 +4,7 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.WorkOrders.Entities;
 
-public enum TaskKind { Inspection, Repair }
+public enum TaskKind { Inspection, Repair, Survey }
 public enum InspectionOutcome { FaultPresent, FaultAbsent, Inconclusive }
 
 public class WorkOrder : ICommuneScoped, IAssigneeScoped, IAudited
@@ -60,4 +60,13 @@ public class WorkOrderFault : ICommuneScoped, IAudited
     public DateTime LinkedAt { get; set; }
     public DateTime? ReleasedAt { get; set; }
     public InspectionOutcome? InspectionOutcome { get; set; }
+}
+
+/// <summary>Ordered survey targets; access through the scoped parent work order.</summary>
+public class WorkOrderSegment : ICommuneScoped, IAudited
+{
+    public required string WorkOrderId { get; set; }
+    public int Position { get; set; }
+    public required string SegmentId { get; set; }
+    public required string CommuneId { get; set; }
 }
