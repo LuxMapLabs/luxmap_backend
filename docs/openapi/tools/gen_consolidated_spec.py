@@ -103,10 +103,10 @@ SUMMARY = {
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
-    ("get", "/api/v1/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
-    ("get", "/api/v1/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
+    ("get", "/api/v1/map/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
+    ("get", "/api/v1/map/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
     # BE-14b — thiết bị ở tủ điện tổng, drift "BE-14 / IoT".
-    ("get", "/api/v1/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
+    ("get", "/api/v1/map/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
     # BE-40 — §5.4; lọc CSV, sort, commune_id và mặc định ẩn calibration_rig là drift F-1…F-6.
     ("get", "/api/v1/faults"): "Danh sách sự cố — phân trang JSON, KHÔNG GeoJSON; mặc định -severity rồi cũ trước (P-3)",
     ("patch", "/api/v1/faults/{id}"): "[TẠM — BE-19] Quản lý duyệt: detected → confirmed|rejected, phân loại lại lamp_out↔lamp_dim, severity, review_note",
@@ -479,7 +479,7 @@ ENUM_CSV = lambda ref: {"type": "string", "description": f"CSV của {ref}"}
 # The lesson for the next ticket that implements a stub: DELETE ITS ni() CALL in the same commit, and
 # read the operation counter in the output line.
 
-ni("get", "/api/v1/poles/{pole_id}", "Poles", "Chi tiết cột + lịch sử, đủ trong MỘT request", "§5.1", "BE-20",
+ni("get", "/api/v1/map/poles/{pole_id}", "Poles", "Chi tiết cột + lịch sử, đủ trong MỘT request", "§5.1", "BE-20",
    [("200", {"description": "Chi tiết cột", "content": json_content("PoleDetail")}),
     ("404", err("Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)"))],
    parameters=[p("pole_id", {"$ref": "#/components/schemas/PoleId"}, True, where="path")])

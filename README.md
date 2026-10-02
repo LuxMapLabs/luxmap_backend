@@ -492,7 +492,7 @@ Hình dạng file mock WO giữ nguyên; priority API tính sống từ fault, k
 
 ### Thiết bị IoT — BE-14b
 
-`GET /api/v1/iot-nodes?bbox=…` trả thiết bị ở **tủ điện tổng** (không có IoT trên từng cột). Mỗi thiết
+`GET /api/v1/map/iot-nodes?bbox=…` trả thiết bị ở **tủ điện tổng** (không có IoT trên từng cột). Mỗi thiết
 bị điều khiển 0..n feeder qua rơ-le (bảng `feeder_control`); `segment_ids`, `feeder_ids` và
 `controller_node_ids` của `/segments` đều **tính lúc đọc**. Hình dạng là nền tạm, xem
 [drift "BE-14 / IoT"](docs/contract-drift.md).

@@ -11,14 +11,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace LuxMap.Modules.Map.Features;
 
 /// <summary>
-/// The map layers — <c>GET /poles</c> and <c>GET /segments</c> (BE-14, Contract sections 5.1–5.2).
+/// The map layers — <c>GET /map/poles</c>, <c>GET /map/segments</c> and <c>GET /map/iot-nodes</c>
+/// (BE-14, Contract sections 5.1–5.2; moved under <c>/map</c> by drift MAP-1).
 /// </summary>
 /// <remarks>
 /// <para>
-/// ⚠️ <b>Routed at <c>/poles</c> and <c>/segments</c>, NOT under <c>/assets</c>.</b> The inventory
-/// endpoints of BE-12a already own <c>/assets/poles</c>: paginated JSON, administrator writes. These
-/// are read-only GeoJSON layers keyed by <c>bbox</c>. Two surfaces for two consumers, and the
-/// Contract gives each its own path.
+/// ⚠️ <b>Routed under <c>/map</c>, NOT under <c>/assets</c>.</b> The inventory endpoints of BE-12a own
+/// <c>/assets/poles</c>: paginated JSON, Manager writes. These are read-only GeoJSON layers keyed by
+/// <c>bbox</c>. Two surfaces for two consumers, each with its own prefix, so neither path reads as
+/// the generic "poles" resource.
 /// </para>
 /// <para>
 /// No role policy, the same reasoning as every other GET in the system: <c>SetFallbackPolicy</c>
@@ -28,7 +29,7 @@ namespace LuxMap.Modules.Map.Features;
 /// </remarks>
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}")]
+[Route("api/v{version:apiVersion}/map")]
 public sealed class MapController(
     MapQueryService service,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase

@@ -2999,7 +2999,7 @@
         ]
       }
     },
-    "/api/v1/poles": {
+    "/api/v1/map/poles": {
       "get": {
         "tags": [
           "Map"
@@ -3149,7 +3149,7 @@
         ]
       }
     },
-    "/api/v1/segments": {
+    "/api/v1/map/segments": {
       "get": {
         "tags": [
           "Map"
@@ -3251,7 +3251,7 @@
         ]
       }
     },
-    "/api/v1/iot-nodes": {
+    "/api/v1/map/iot-nodes": {
       "get": {
         "tags": [
           "Map"

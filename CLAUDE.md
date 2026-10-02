@@ -225,21 +225,24 @@ Ràng buộc nghiệp vụ đi kèm:
 
 ## Endpoint đã đặc tả — không tự thiết kế lại
 
+> **Bốn endpoint bản đồ nằm dưới `/api/v1/map/` (drift MAP-1, 02/10/2026)**, không phải `/poles`, `/segments`,
+> `/iot-nodes` như Contract v1.7 ghi — SELF-SIGNED, chờ FW. Không client nào gọi đường cũ lúc đổi.
+
 | Endpoint | Ràng buộc |
 |---|---|
-| `GET /poles` | `bbox` **bắt buộc**, không có endpoint "lấy tất cả". Lọc: `status`, `power_source`, `segment_id`, `commune_id`, `has_open_fault`. Quá 2000 cột → **413** `BBOX_TOO_LARGE`. |
-| `GET /poles/{id}` | Trả **đủ trong 1 request**: `fixture`, `current_status`, `iot_node` (null với đa số cột), `luminance_baseline`, `luminance_history[]`, `runtime_history[]` (chỉ khi có node), `open_faults[]`, `recent_frames[]`. |
-| `GET /segments` | `bbox` bắt buộc. `FeatureCollection` của `LineString`. |
+| `GET /map/poles` | `bbox` **bắt buộc**, không có endpoint "lấy tất cả". Lọc: `status`, `power_source`, `segment_id`, `commune_id`, `has_open_fault`. Quá 2000 cột → **413** `BBOX_TOO_LARGE`. |
+| `GET /map/poles/{id}` | Trả **đủ trong 1 request**: `fixture`, `current_status`, `iot_node` (null với đa số cột), `luminance_baseline`, `luminance_history[]`, `runtime_history[]` (chỉ khi có node), `open_faults[]`, `recent_frames[]`. |
+| `GET /map/segments` | `bbox` bắt buộc. `FeatureCollection` của `LineString`. |
 | `GET /faults` | **Phân trang JSON, KHÔNG phải GeoJSON.** Mỗi item có `location{lat,lng}`. Sắp mặc định `-priority_score`. |
 | `PATCH /faults/{id}` | Body: `fault_status`, `override_fault_type?`, `note?`. |
 | `GET/POST/PATCH /work-orders` | `POST` body: `{title, fault_ids[], assigned_to?, due_date?}` |
 | `POST /work-orders/{id}/evidence` | multipart: `file`, `kind=before\|after`, `captured_at`, `lat`, `lng` |
-| `GET /iot-nodes` | `bbox`, trả `FeatureCollection` |
+| `GET /map/iot-nodes` | `bbox`, trả `FeatureCollection` |
 | `GET /sweeps` | `sweep_id, started_at, ended_at, segment_ids[], frame_count, coverage_pct, processing_status` |
 | `GET /sync/bundle` | `?segment_id=&since=` → poles + segments + open faults + work orders được giao |
 | `POST /sync/push` | Khử trùng lặp theo `client_op_id` (UUID client sinh). Xung đột: **server thắng**, trả `conflicts[]` |
 
-### `properties` của `GET /poles`
+### `properties` của `GET /map/poles`
 
 ```
 pole_id, segment_id, fixture_status, status_confidence (0..1|null),
@@ -248,7 +251,7 @@ commune_id, last_seen_at, last_sweep_id, open_fault_count,
 has_iot_node, near_sensitive_poi
 ```
 
-### `properties` của `GET /segments`
+### `properties` của `GET /map/segments`
 
 ```
 segment_id, segment_name, road_class, length_m, pole_count,

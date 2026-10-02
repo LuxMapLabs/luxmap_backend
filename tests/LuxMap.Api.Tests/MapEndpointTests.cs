@@ -27,8 +27,8 @@ namespace LuxMap.Api.Tests;
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class MapEndpointTests(AssetImportFixture fixture)
 {
-    private const string Poles = "/api/v1/poles";
-    private const string Segments = "/api/v1/segments";
+    private const string Poles = "/api/v1/map/poles";
+    private const string Segments = "/api/v1/map/segments";
 
     /// <summary>A box tight around the poles these tests plant, away from the seeded mock set.</summary>
     private const string Box = "?bbox=107.40,11.40,107.60,11.60";

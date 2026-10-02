@@ -32,7 +32,7 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
 
         builder.HasCommuneScope();
 
-        // GET /iot-nodes answers a bbox; ST_Intersects on the raw column is the only form that
+        // GET /map/iot-nodes answers a bbox; ST_Intersects on the raw column is the only form that
         // reaches this index (BE-14 trap 2).
         builder.HasIndex(node => node.Geom).HasMethod("gist");
 

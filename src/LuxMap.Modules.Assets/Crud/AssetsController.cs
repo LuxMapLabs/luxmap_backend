@@ -80,7 +80,7 @@ public sealed class AssetsController(
     /// Poles in the caller's communes, paged — the inventory list, NOT the map.
     /// </summary>
     /// <remarks>
-    /// ⚠️ Not to be confused with <c>GET /api/v1/poles</c> (BE-14), which is the map layer: bbox
+    /// ⚠️ Not to be confused with <c>GET /api/v1/map/poles</c> (BE-14), which is the map layer: bbox
     /// required, GeoJSON, operational status. This one is a stocktake, and it carries the fields a
     /// person reconciling a spreadsheet needs — including <c>external_ref</c>, which the map is
     /// forbidden to emit.

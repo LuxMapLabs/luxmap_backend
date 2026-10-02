@@ -26,7 +26,7 @@ public sealed record PoleMapQuery
     public IReadOnlyList<DataSource>? DataSource { get; init; }
 }
 
-/// <summary>What <c>GET /iot-nodes</c> was asked for.</summary>
+/// <summary>What <c>GET /map/iot-nodes</c> was asked for.</summary>
 public sealed record IotNodeMapQuery
 {
     public required BoundingBox Bbox { get; init; }

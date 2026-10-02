@@ -726,3 +726,16 @@ Chưa tạo profile/registry hay kiểm codec; cấu hình và mapping frame gi�
 | **FX-1** | Ảnh thực địa cho thấy **đa số đèn ánh cam — cao áp sodium (HPS)**, một số LED. TP.HCM (trừ Thủ Đức) còn 103.374 bộ HPS năm 2024; Thủ Đức đặt mục tiêu LED toàn bộ đến **2030**. Enum `fixture_type` chỉ còn `led_road_lamp` | 114 bóng đang mang `led_road_lamp` **sai sự thật** cho phần lớn; `lamp_watt = 150` và `install_date = 2020-01-01` là **giá trị bịa để qua NOT NULL**, trông y như số thật trên mọi màn hình | (a) thêm lại giá trị cho đèn cao áp (`hps_road_lamp`?) — đảo một phần quyết định v1.6; (b) giữ enum, đánh dấu bóng "chưa xác minh" bằng cột riêng; (c) cho `lamp_watt` / `install_date` nullable khi chưa biết. Cần chốt **trước khi** FE hiển thị số liệu bóng của xã thật | **Có** (§1 enum, §5.1 `fixture_type` / `lamp_watt`) |
 
 **Phải báo / đưa ra FW kế tiếp:** WP5 (màn tài sản sẽ hiện bóng LED 150 W ngày lắp 2020-01-01 cho cả 114 cột), WP4 (CV ON/OFF trên đèn HPS ánh cam khác LED). **Chưa báo.**
+
+## MAP-1 — endpoint bản đồ dời xuống `/api/v1/map/` (02/10/2026)
+
+| | |
+|---|---|
+| **Contract v1.7** | §5.1 `GET /poles`, `GET /poles/{pole_id}`; §5.2 `GET /segments`; §5.6 `GET /iot-nodes` |
+| **Code** | `GET /map/poles`, `GET /map/poles/{pole_id}` (BE-20, chưa hiện thực), `GET /map/segments`, `GET /map/iot-nodes` |
+| **Vì sao** | Gom bốn lớp bản đồ dưới một tiền tố, tách hẳn khỏi `/assets/poles` (kiểm kê, BE-12a); `/poles` trần dễ bị đọc như tài nguyên "cột" chung |
+| **Query, response** | Không đổi: vẫn `bbox` bắt buộc, `FeatureCollection`, 413 `BBOX_TOO_LARGE`, cùng `properties` |
+| **Ai bị ảnh hưởng** | Không client nào gọi đường cũ: đã soát 11 nhánh `luxmap-web` (02/10/2026) — web còn đọc mock; repo mobile chưa có code gọi API. Không giữ alias đường cũ |
+| **Quyết định** | Mỹ yêu cầu, **SELF-SIGNED** — chạm bề mặt API nên chưa ổn định tới FW kế tiếp. Contract text chưa sửa; sửa khi lên version |
+
+**Phải báo:** WP5 (FW-08 bản đồ), WP6 (FM-15). **Chưa báo.**
