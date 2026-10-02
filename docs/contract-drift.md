@@ -702,6 +702,11 @@ Các mục chạm bề mặt API — chưa sửa Contract, phải đưa ra FW:
 duyệt phiên, coverage). **Đã báo một phần (02/10/2026):** WP5/WP6 nhận phần P2a (xem mục dưới). **WP4 chưa báo**; sidecar frame
 và màn duyệt phiên báo cùng P2b/P2c.
 
+**Sửa D-05 (02/10/2026, Mỹ chốt, SELF-SIGNED):** đèn CV thấy **ON** mà cột **chưa có baseline** → `fixture_status = normal`,
+`luminance_history.baseline_ratio = null` (FE hiển thị "chưa đủ dữ liệu để đánh giá độ sáng"), loại khỏi precision/recall của
+`dim` và báo riêng. Thay cho "→ `unknown`": `unknown` giữ đúng nghĩa §3.1 (không được quét tới). Không thêm field, không đổi
+enum, nhưng **đổi ý nghĩa giá trị trả về** nên đưa FW. Chi tiết: `.ai/results/BE-15-p1.md` §11 "Sửa D-05".
+
 ### BE-15 P2a — bề mặt hiện thực để FW đối chiếu (02/10/2026)
 
 Nền SELF-SIGNED ở mục trên giữ nguyên; chi tiết payload tạm tại
