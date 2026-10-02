@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Shared.Contracts.Errors;
+using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,7 @@ namespace LuxMap.Modules.Identity.Auth.Web;
 [Route("api/v{version:apiVersion}/auth/web")]
 [AllowAnonymous]
 [RequireAllowedOrigin]
+[ClientSurface(ClientSurface.Web)]
 public sealed class WebAuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]

@@ -35,7 +35,8 @@ d["info"]["description"] = (
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
-    "base path /api/v1."
+    "base path /api/v1. "
+    "Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token."
 )
 d["servers"] = [
     {"url": "http://localhost:5141", "description": "Development — launchSettings.json profile 'http'"},
@@ -50,8 +51,8 @@ d["components"]["schemas"]["ApiError"]["properties"]["details"]["description"] =
 
 # ── tags ───────────────────────────────────────────────────────────────────────
 TAGS = OrderedDict([
-    ("Auth", "Nhóm mobile — Contract §4.1. Refresh token trong body."),
-    ("WebAuth", "Nhóm web — Contract §4.2. Refresh token chỉ trong cookie HttpOnly __Secure-luxmap_rt."),
+    ("Auth", "MOBILE (Android) — refresh token trong body. Riêng GET /auth/me dùng chung cho web và mobile."),
+    ("WebAuth", "WEB (trình duyệt) — refresh token chỉ trong cookie HttpOnly, kiểm Origin."),
     ("Assets", "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản lý (cap:manage_assets); đọc = cap:read_network."),
     ("AssetImport", "Nhập tài sản CSV/GeoJSON theo từng loại file — Contract §5.3."),
     ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
@@ -171,6 +172,13 @@ for path, item in d["paths"].items():
         if method not in HTTP_METHODS:
             continue
         op["summary"] = SUMMARY[(method, path)]
+        client = op.get("x-luxmap-client", "shared")
+        if client == "mobile":
+            op["summary"] = "[Mobile] " + op["summary"]
+        elif client == "web":
+            op["summary"] = "[Web] " + op["summary"]
+        elif method == "get" and path == "/api/v1/auth/me":
+            op["summary"] = "[Dùng chung] " + op["summary"]
         op["operationId"] = opid(method, path)
         op["x-luxmap-status"] = "implemented"
         for prefix, sec in SECTION.items():
@@ -455,6 +463,7 @@ def ni(method, path, tag, summary, section, ticket, responses, parameters=None, 
     op["description"] = f"Contract {section}. Chưa có code — ticket {ticket}. Giữ trong Contract, không xoá."
     op["operationId"] = opid(method, path)
     op["x-luxmap-status"] = "not_implemented"
+    op["x-luxmap-client"] = "shared"   # no client-specific endpoint is still unimplemented
     op["x-luxmap-contract"] = section
     op["x-luxmap-ticket"] = ticket
     if parameters:

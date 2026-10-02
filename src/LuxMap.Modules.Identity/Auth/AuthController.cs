@@ -27,6 +27,7 @@ namespace LuxMap.Modules.Identity.Auth;
 public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]
+    [ClientSurface(ClientSurface.Mobile)]
     [AllowAnonymous]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -65,6 +66,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     /// </para>
     /// </remarks>
     [HttpPost("register")]
+    [ClientSurface(ClientSurface.Mobile)]
     [AllowAnonymous]
     [Obsolete("DEPRECATED in Contract v1.7 (D-R11): a system admin creates accounts. Removed by BE-33a.")]
     [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
@@ -98,6 +100,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [ClientSurface(ClientSurface.Mobile)]
     [AllowAnonymous]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -154,6 +157,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
 
     /// <summary>Idempotent: an already-revoked or unknown token still returns 204.</summary>
     [HttpPost("logout")]
+    [ClientSurface(ClientSurface.Mobile)]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

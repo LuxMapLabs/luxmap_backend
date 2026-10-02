@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 56 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 56 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.7"
   },
   "paths": {
@@ -137,6 +137,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Nạp MỘT loại file kiểm kê (segments|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
         "operationId": "postAssetsImportKind",
         "x-luxmap-status": "implemented",
@@ -226,6 +227,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
         "operationId": "getAssetsSegments",
         "x-luxmap-status": "implemented",
@@ -333,6 +335,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Tạo tuyến đường; 201 + Location, không body",
         "operationId": "postAssetsSegments",
         "x-luxmap-status": "implemented",
@@ -423,6 +426,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
         "operationId": "getAssetsSegmentsSegmentid",
         "x-luxmap-status": "implemented",
@@ -560,6 +564,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Thay thế TOÀN PHẦN một tuyến; commune_id không sửa được",
         "operationId": "putAssetsSegmentsSegmentid",
         "x-luxmap-status": "implemented",
@@ -658,6 +663,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Xoá tuyến; khoá ngoại quyết định (409 ASSET_IN_USE)",
         "operationId": "deleteAssetsSegmentsSegmentid",
         "x-luxmap-status": "implemented",
@@ -747,6 +753,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Danh sách mạch điện — has_geometry + pole_count; KHÔNG có data_source (§1.6)",
         "operationId": "getAssetsFeeders",
         "x-luxmap-status": "implemented",
@@ -834,6 +841,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Tạo mạch điện; 201 + Location, không body",
         "operationId": "postAssetsFeeders",
         "x-luxmap-status": "implemented",
@@ -924,6 +932,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
         "operationId": "getAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
@@ -1061,6 +1070,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được",
         "operationId": "putAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
@@ -1159,6 +1169,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Xoá mạch điện; còn cột đang đấu vào thì 409 ASSET_IN_USE",
         "operationId": "deleteAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
@@ -1248,6 +1259,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
         "operationId": "getAssetsPoles",
         "x-luxmap-status": "implemented",
@@ -1375,6 +1387,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Tạo cột; 201 + Location, không body",
         "operationId": "postAssetsPoles",
         "x-luxmap-status": "implemented",
@@ -1465,6 +1478,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Một cột + geom_wkt + segment_name + created_at; ngoài phạm vi xã → 404",
         "operationId": "getAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -1602,6 +1616,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
         "operationId": "putAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -1700,6 +1715,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
         "operationId": "deleteAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -1819,6 +1835,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Ghi một lần lắp bóng; commune_id chép từ cột",
         "operationId": "postAssetsFixtures",
         "x-luxmap-status": "implemented",
@@ -1958,6 +1975,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
         "operationId": "putAssetsPolesPoleidFeeder",
         "x-luxmap-status": "implemented",
@@ -2055,6 +2073,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
         "operationId": "getAssetsFeedersFeederidPoles",
         "x-luxmap-status": "implemented",
@@ -2152,6 +2171,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
         "operationId": "getAssetsSegmentsSegmentidPoles",
         "x-luxmap-status": "implemented",
@@ -2268,6 +2288,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — drift 46] Cột CHƯA có mạch; bắt buộc unassigned=true; chỉ listing này trả power_source",
         "operationId": "getAssetsFeedersPoles",
         "x-luxmap-status": "implemented",
@@ -2377,6 +2398,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Ngừng dùng bóng bằng removed_date; không có DELETE",
         "operationId": "putAssetsFixturesFixtureidRemoval",
         "x-luxmap-status": "implemented",
@@ -2388,6 +2410,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "[Mobile] Đăng nhập mobile; trả đúng bốn trường",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2489,7 +2512,7 @@
             }
           }
         },
-        "summary": "Đăng nhập mobile; trả đúng bốn trường",
+        "x-luxmap-client": "mobile",
         "operationId": "postAuthLogin",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.1",
@@ -2501,6 +2524,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "[Mobile] Đăng ký mở; tạo danh tính, không tạo quyền",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2583,7 +2607,7 @@
           }
         },
         "deprecated": true,
-        "summary": "Đăng ký mở; tạo danh tính, không tạo quyền",
+        "x-luxmap-client": "mobile",
         "operationId": "postAuthRegister",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.1",
@@ -2595,6 +2619,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "[Mobile] Xoay vòng refresh token (mobile)",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2696,7 +2721,7 @@
             }
           }
         },
-        "summary": "Xoay vòng refresh token (mobile)",
+        "x-luxmap-client": "mobile",
         "operationId": "postAuthRefresh",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.1",
@@ -2708,6 +2733,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "[Dùng chung] Người đang đăng nhập, đọc từ DB nên role và commune_ids luôn tươi",
         "responses": {
           "200": {
             "description": "OK",
@@ -2750,7 +2776,7 @@
             }
           }
         },
-        "summary": "Người đang đăng nhập, đọc từ DB nên role và commune_ids luôn tươi",
+        "x-luxmap-client": "shared",
         "operationId": "getAuthMe",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.7"
@@ -2761,6 +2787,7 @@
         "tags": [
           "Auth"
         ],
+        "summary": "[Mobile] Thu hồi refresh token (mobile); luôn 204",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2805,7 +2832,7 @@
             }
           }
         },
-        "summary": "Thu hồi refresh token (mobile); luôn 204",
+        "x-luxmap-client": "mobile",
         "operationId": "postAuthLogout",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.1",
@@ -2985,6 +3012,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Danh sách sự cố — phân trang JSON, KHÔNG GeoJSON; mặc định -severity rồi cũ trước (P-3)",
         "operationId": "getFaults",
         "x-luxmap-status": "implemented",
@@ -2998,6 +3026,7 @@
         "description": "Contract §5.4. Chưa có code — ticket BE-41. Giữ trong Contract, không xoá.",
         "operationId": "postFaults",
         "x-luxmap-status": "not_implemented",
+        "x-luxmap-client": "shared",
         "x-luxmap-contract": "§5.4",
         "x-luxmap-ticket": "BE-41",
         "requestBody": {
@@ -3214,6 +3243,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-19] Quản lý duyệt: detected → confirmed|rejected, phân loại lại lamp_out↔lamp_dim, severity, review_note",
         "operationId": "patchFaultsId",
         "x-luxmap-status": "implemented",
@@ -3360,6 +3390,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",
         "operationId": "postLuxReadings",
         "x-luxmap-status": "implemented",
@@ -3461,6 +3492,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
         "operationId": "getLuxReadings",
         "x-luxmap-status": "implemented",
@@ -3558,6 +3590,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
         "operationId": "getLuxReadingsPolesPoleid",
         "x-luxmap-status": "implemented",
@@ -3722,6 +3755,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
         "operationId": "getMapPoles",
         "x-luxmap-status": "implemented"
@@ -3837,6 +3871,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
         "operationId": "getMapSegments",
         "x-luxmap-status": "implemented"
@@ -3952,6 +3987,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
         "operationId": "getMapIotNodes",
         "x-luxmap-status": "implemented"
@@ -4027,6 +4063,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-15 P2a] Tạo phiên khảo sát cho phiếu survey đang làm; idempotent theo client_op_id (201 mới, 200 lặp lại)",
         "operationId": "postSweeps",
         "x-luxmap-status": "implemented",
@@ -4122,6 +4159,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-15 P2a] Danh sách phiên; lọc work_order_id, segment_id, processing_status, data_source",
         "operationId": "getSweeps",
         "x-luxmap-status": "implemented",
@@ -4217,6 +4255,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-15 P2a] Tải một clip MP4 (stream, tối đa 300 MiB, X-Content-SHA256 bắt buộc)",
         "operationId": "putSweepsIdClipsClipno",
         "x-luxmap-status": "implemented",
@@ -4309,6 +4348,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-15 P2a] Tải file thô gps_track | lux_log (JSONL) hoặc capture_config (JSON); kiểm toàn file trước khi ghi",
         "operationId": "putSweepsIdRawKind",
         "x-luxmap-status": "implemented",
@@ -4395,6 +4435,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-15 P2a] Nộp phiên khi đủ clip + 3 file thô và manifest khớp hash; 202 vào hàng chờ xử lý",
         "operationId": "postSweepsIdSubmit",
         "x-luxmap-status": "implemented",
@@ -4465,6 +4506,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — BE-15 P2a] Chi tiết phiên kèm clip và file thô đã nhận",
         "operationId": "getSweepsId",
         "x-luxmap-status": "implemented",
@@ -4476,6 +4518,7 @@
         "tags": [
           "WebAuth"
         ],
+        "summary": "[Web] Đăng nhập web; refresh token vào cookie",
         "requestBody": {
           "content": {
             "application/json": {
@@ -4585,7 +4628,7 @@
             }
           }
         },
-        "summary": "Đăng nhập web; refresh token vào cookie",
+        "x-luxmap-client": "web",
         "operationId": "postAuthWebLogin",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.2",
@@ -4597,6 +4640,7 @@
         "tags": [
           "WebAuth"
         ],
+        "summary": "[Web] Xoay vòng refresh token từ cookie; không body",
         "responses": {
           "200": {
             "description": "OK",
@@ -4672,7 +4716,7 @@
             "RefreshTokenCookie": []
           }
         ],
-        "summary": "Xoay vòng refresh token từ cookie; không body",
+        "x-luxmap-client": "web",
         "operationId": "postAuthWebRefresh",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.2"
@@ -4683,6 +4727,7 @@
         "tags": [
           "WebAuth"
         ],
+        "summary": "[Web] Thu hồi token trong cookie, luôn xoá cookie, luôn 204",
         "responses": {
           "204": {
             "description": "No Content",
@@ -4721,7 +4766,7 @@
             "RefreshTokenCookie": []
           }
         ],
-        "summary": "Thu hồi token trong cookie, luôn xoá cookie, luôn 204",
+        "x-luxmap-client": "web",
         "operationId": "postAuthWebLogout",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.2"
@@ -4855,6 +4900,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Danh sách việc trong phạm vi xã và người được giao",
         "operationId": "getWorkOrders",
         "x-luxmap-status": "implemented",
@@ -4929,6 +4975,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)",
         "operationId": "postWorkOrders",
         "x-luxmap-status": "implemented",
@@ -4999,6 +5046,7 @@
           "field_engineer",
           "system_admin"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Chi tiết việc và các hành động được phép",
         "operationId": "getWorkOrdersId",
         "x-luxmap-status": "implemented",
@@ -5083,6 +5131,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày",
         "operationId": "patchWorkOrdersId",
         "x-luxmap-status": "implemented",
@@ -5159,6 +5208,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Kỹ sư hiện trường đủ điều kiện trong xã",
         "operationId": "getWorkOrdersAssignees",
         "x-luxmap-status": "implemented",
@@ -5245,6 +5295,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Giao, giao lại hoặc gỡ người được giao",
         "operationId": "putWorkOrdersIdAssignee",
         "x-luxmap-status": "implemented",
@@ -5312,6 +5363,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Người được giao bắt đầu việc",
         "operationId": "postWorkOrdersIdStart",
         "x-luxmap-status": "implemented",
@@ -5398,6 +5450,7 @@
         "x-luxmap-roles": [
           "field_engineer"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Người được giao nộp báo cáo và kết quả kiểm tra",
         "operationId": "postWorkOrdersIdComplete",
         "x-luxmap-status": "implemented",
@@ -5484,6 +5537,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Quản lý nghiệm thu và giải phóng liên kết fault",
         "operationId": "postWorkOrdersIdVerify",
         "x-luxmap-status": "implemented",
@@ -5570,6 +5624,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Quản lý trả việc để làm tiếp",
         "operationId": "postWorkOrdersIdReturn",
         "x-luxmap-status": "implemented",
@@ -5656,6 +5711,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] [FR-2] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu; server mang sự cố fault_present sang, chung case_id",
         "operationId": "postWorkOrdersIdFollowUp",
         "x-luxmap-status": "implemented",
@@ -5742,6 +5798,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
+        "x-luxmap-client": "shared",
         "summary": "[TẠM — WO-1…WO-11] Quản lý huỷ và giải phóng liên kết fault",
         "operationId": "postWorkOrdersIdCancel",
         "x-luxmap-status": "implemented",
@@ -5757,6 +5814,7 @@
         "description": "Contract §5.1. Chưa có code — ticket BE-20. Giữ trong Contract, không xoá.",
         "operationId": "getMapPolesPoleId",
         "x-luxmap-status": "not_implemented",
+        "x-luxmap-client": "shared",
         "x-luxmap-contract": "§5.1",
         "x-luxmap-ticket": "BE-20",
         "parameters": [
@@ -5812,6 +5870,7 @@
         "description": "Contract §5.5. Chưa có code — ticket BE-24. Giữ trong Contract, không xoá.",
         "operationId": "postWorkOrdersWorkOrderIdEvidence",
         "x-luxmap-status": "not_implemented",
+        "x-luxmap-client": "shared",
         "x-luxmap-contract": "§5.5",
         "x-luxmap-ticket": "BE-24",
         "parameters": [
@@ -5880,6 +5939,7 @@
         "description": "Contract §5.6. Chưa có code — ticket BE-15. Giữ trong Contract, không xoá.",
         "operationId": "getFramesFrameIdThumbnail",
         "x-luxmap-status": "not_implemented",
+        "x-luxmap-client": "shared",
         "x-luxmap-contract": "§5.6",
         "x-luxmap-ticket": "BE-15",
         "parameters": [
@@ -5936,6 +5996,7 @@
         "description": "Contract §5.8. Chưa có code — ticket BE-43. Giữ trong Contract, không xoá.",
         "operationId": "getSyncBundle",
         "x-luxmap-status": "not_implemented",
+        "x-luxmap-client": "shared",
         "x-luxmap-contract": "§5.8",
         "x-luxmap-ticket": "BE-43",
         "parameters": [
@@ -6001,6 +6062,7 @@
         "description": "Contract §5.8. Chưa có code — ticket BE-43. Giữ trong Contract, không xoá.",
         "operationId": "postSyncPush",
         "x-luxmap-status": "not_implemented",
+        "x-luxmap-client": "shared",
         "x-luxmap-contract": "§5.8",
         "x-luxmap-ticket": "BE-43",
         "requestBody": {
@@ -9348,11 +9410,11 @@
   "tags": [
     {
       "name": "Auth",
-      "description": "Nhóm mobile — Contract §4.1. Refresh token trong body."
+      "description": "MOBILE (Android) — refresh token trong body. Riêng GET /auth/me dùng chung cho web và mobile."
     },
     {
       "name": "WebAuth",
-      "description": "Nhóm web — Contract §4.2. Refresh token chỉ trong cookie HttpOnly __Secure-luxmap_rt."
+      "description": "WEB (trình duyệt) — refresh token chỉ trong cookie HttpOnly, kiểm Origin."
     },
     {
       "name": "Assets",
