@@ -84,6 +84,7 @@ import argparse
 import csv
 import json
 import math
+import re
 import shutil
 import statistics
 import struct
@@ -122,6 +123,7 @@ class Photo:
     taken_local: datetime
     heading: float | None
     position: str = ""  # empty = the camera's own GPS fix; otherwise what was wrong and what was done
+    has_subsec: bool = False  # EXIF carried milliseconds — the only time precise enough to call two files one press
 
 
 @dataclass
@@ -240,7 +242,7 @@ def read_photo(path: Path, assume_offset: str | None) -> Photo:
 
     direction = gps.get(GPS_IMG_DIRECTION)
     heading = direction[0] if direction and direction[0] is not None else None
-    return Photo(path, lat, lng, local.astimezone(timezone.utc), local, heading)
+    return Photo(path, lat, lng, local.astimezone(timezone.utc), local, heading, has_subsec=bool(subsec))
 
 
 def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -252,15 +254,20 @@ def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 def drop_duplicates(photos: list[Photo], rejected: list[tuple[str, str]]) -> list[Photo]:
-    """One shutter press exported twice (stamped + clean) shares time to the millisecond and position."""
+    """One shutter press exported twice (stamped + clean) shares time to the millisecond and position.
+
+    Only with milliseconds: without them two different shots in the same second, on a reused GPS fix,
+    would look identical and one pole would vanish. Those stay, and show up in review.csv as a pair.
+    """
     kept, seen = [], {}
     for photo in sorted(photos, key=lambda p: p.path.name):
         key = (photo.taken_utc, round(photo.lat, 7), round(photo.lng, 7))
-        if key in seen:
+        if photo.has_subsec and key in seen:
             rejected.append((photo.path.name, f"cùng một lần bấm với {seen[key]} — kiểm tra file nào là "
                                               "bản in chữ, giữ bản sạch"))
         else:
-            seen[key] = photo.path.name
+            if photo.has_subsec:
+                seen[key] = photo.path.name
             kept.append(photo)
     return kept
 
@@ -464,7 +471,7 @@ def read_segments(path: Path) -> list[tuple[str, list[tuple[float, float]]]]:
     with path.open(encoding="utf-8-sig", newline="") as handle:
         for row in csv.DictReader(handle):
             wkt = (row.get("geom_wkt") or "").strip()
-            if not wkt.upper().startswith("LINESTRING(") or not row.get("external_ref"):
+            if not re.match(r"(?i)^LINESTRING\s*\(", wkt) or not row.get("external_ref"):
                 raise ValueError(f"--segments: dòng {row.get('external_ref')!r} thiếu external_ref hoặc LINESTRING")
             pairs = [part.split() for part in wkt[wkt.index("(") + 1:wkt.rindex(")")].split(",")]
             segments.append((row["external_ref"], [(float(lat), float(lng)) for lng, lat in pairs]))
@@ -512,16 +519,25 @@ def commune_at(lat: float, lng: float, boundaries) -> str:
     return ""
 
 
-def external_ref(prefix: str | None, group: Group, used: set[str]) -> str:
-    """Stable across re-runs on the same photos, so re-importing updates instead of duplicating."""
+def assign_refs(prefix: str | None, groups: list[Group]) -> dict[str, str]:
+    """external_ref per group, fixed BEFORE merging, dropping or matching existing poles.
+
+    Stable across re-runs on the same photos, so re-importing updates instead of duplicating. A suffix
+    for two groups in the same second is handed out in capture order over ALL photos; allocating it after
+    filtering would let a survivor inherit the reference of a group that was removed, and a re-import
+    would then overwrite the wrong pole. A merged pole keeps the reference of its earliest group.
+    """
     if not prefix:
-        return ""
-    ref = f"{prefix}-{group.photos[0].taken_local:%Y%m%d-%H%M%S}"
-    candidate, n = ref, 2
-    while candidate in used:
-        candidate, n = f"{ref}-{n}", n + 1
-    used.add(candidate)
-    return candidate
+        return {}
+    refs, used = {}, set()
+    for group in groups:
+        ref = f"{prefix}-{group.photos[0].taken_local:%Y%m%d-%H%M%S}"
+        candidate, n = ref, 2
+        while candidate in used:
+            candidate, n = f"{ref}-{n}", n + 1
+        used.add(candidate)
+        refs[group.name] = candidate
+    return refs
 
 
 def main() -> int:
@@ -591,6 +607,7 @@ def main() -> int:
 
     photos = drop_duplicates(photos, rejected)
     groups = name_photos(photos)
+    refs = assign_refs(args.ref_prefix, groups)
     try:
         groups, merge_reviews = merge_groups(groups, args.merge, args.review_m)
         groups = drop_groups(groups, args.drop, rejected)
@@ -607,7 +624,6 @@ def main() -> int:
     reviews = merge_reviews + moved + reviews
 
     (out / "photos").mkdir(parents=True, exist_ok=True)
-    used_refs: set[str] = set()
     pole_rows, observation_rows, fixture_rows = [], [], []
     for group in groups:
         for photo in group.photos:
@@ -625,7 +641,7 @@ def main() -> int:
                 reviews.append(["ngoai_ranh_gioi", group.name, "", "", "",
                                 "Cột nằm ngoài mọi ranh giới đã cho — commune_id để trống."])
         if not group.existing_pole:
-            ref = external_ref(args.ref_prefix, group, used_refs)
+            ref = refs.get(group.name, "")
             pole_rows.append([ref, segment_ref, "", commune_id, f"POINT({group.lng:.7f} {group.lat:.7f})", "",
                               "field", group.name])
             if args.fixture_watt is not None:
