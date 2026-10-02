@@ -667,3 +667,15 @@ chỉnh phơi sáng (mẫu thực địa 28/09 tự nhảy ISO 8000), không so 
 phơi sáng (D-R24). Byte ảnh vẫn qua API (BE-11 quy tắc 1).
 
 **Phải báo / đưa ra FW kế tiếp:** WP6 (FM-18, FM-19), WP5 (màn chi tiết phiếu). **Chưa báo.**
+
+## BE-15 Phase 1 — chốt (02/10/2026)
+
+| | |
+|---|---|
+| **Decision** | D-01…D-15 ở `.ai/results/BE-15-p1.md` §11. Trong đó **D-R28 = A** (proxy streaming, cap tạm 300 MiB/clip, MP4 H.264/H.265, giữ gốc theo D-R16); `lamp_dim` giữ `source_channel = cv` (D-R20 đề xuất); capability mới `ReadSurveys` / `SubmitSurveys` / `ReviewSurveys`; enum `processing_status` (O-4) |
+| **Decision maker** | Mỹ chốt 02/10: backend chạy model, duyệt ffmpeg, backend làm ghép cột. Còn lại Claude theo uỷ quyền sau khi đối chiếu Codex · `SELF-SIGNED` |
+| **Date** | 02/10/2026 |
+| **Scope** | BE-15/16/17; Contract §2 (capability), §5.6 (`GET /sweeps`, O-4), endpoint upload video mới. **Chưa đổi Contract** — ESCALATE ở FW kế tiếp |
+
+**Phải báo:** WP6 (định dạng file thô, sidecar frame, upload clip), WP4 (detector theo frame, CV-05 chuyển sang backend), WP5 (màn
+duyệt phiên, coverage). **Chưa báo.**
