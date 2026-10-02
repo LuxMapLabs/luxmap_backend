@@ -299,8 +299,13 @@ tài sản; hết bảo hành **không** xoá / archive gì — chỉ gắn **c�
 
 `Pole` · `Fixture` · `RoadSegment` · `Feeder` · `IotNode` · `TelemetryReading` ·
 `SurveySweep` · `SurveyFrame` · `Detection` · `LuminanceBaseline` · `LuxReading` ·
-`Fault` · `FaultCluster` · `WorkOrder` · `ExternalUnit` · `RepairEvidence` ·
+`Fault` · `FaultCluster` · `WorkOrder` · `RepairEvidence` ·
 `AdministrativeUnit` · `AppUser` · `RefreshToken`
+
+> **Lược đồ đích theo Phiếu v1.4 — [`docs/database/erd.md`](docs/database/erd.md) (OPS-SCHEMA, 01/10/2026).**
+> 17 bảng hiện có giữ nguyên; 22 bảng mới vào qua migration của ticket sở hữu, theo các quyết định Q1–Q17 ở
+> đó. `ExternalUnit` đã **bỏ** (Q13 — Phiếu v1.4 chỉ giao việc cho Kỹ sư hiện trường). Ticket tạo bảng mới
+> phải đọc file đó trước; đổi một quyết định Q-x thì ghi lại, đừng lặng lẽ thiết kế khác.
 
 Điểm dễ sai:
 
