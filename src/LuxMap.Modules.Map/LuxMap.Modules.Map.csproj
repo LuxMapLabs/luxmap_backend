@@ -8,7 +8,7 @@
          depends on Assets, so that edge would close a cycle — and this module exists so the
          composition has somewhere to live that points only downhill.
 
-         BE-20 (pole detail) adds Survey for luminance history, and /iot-nodes adds Telemetry. Those
+         BE-20 (pole detail) adds Survey for luminance history, and /map/iot-nodes adds Telemetry. Those
          references belong HERE when they arrive, not on Assets. -->
     <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />

@@ -3564,7 +3564,7 @@
         "x-luxmap-contract": "§5.7"
       }
     },
-    "/api/v1/poles": {
+    "/api/v1/map/poles": {
       "get": {
         "tags": [
           "Map"
@@ -3723,11 +3723,11 @@
           "system_admin"
         ],
         "summary": "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
-        "operationId": "getPoles",
+        "operationId": "getMapPoles",
         "x-luxmap-status": "implemented"
       }
     },
-    "/api/v1/segments": {
+    "/api/v1/map/segments": {
       "get": {
         "tags": [
           "Map"
@@ -3838,11 +3838,11 @@
           "system_admin"
         ],
         "summary": "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
-        "operationId": "getSegments",
+        "operationId": "getMapSegments",
         "x-luxmap-status": "implemented"
       }
     },
-    "/api/v1/iot-nodes": {
+    "/api/v1/map/iot-nodes": {
       "get": {
         "tags": [
           "Map"
@@ -3953,7 +3953,7 @@
           "system_admin"
         ],
         "summary": "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
-        "operationId": "getIotNodes",
+        "operationId": "getMapIotNodes",
         "x-luxmap-status": "implemented"
       }
     },
@@ -5748,14 +5748,14 @@
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
       }
     },
-    "/api/v1/poles/{pole_id}": {
+    "/api/v1/map/poles/{pole_id}": {
       "get": {
         "tags": [
           "Poles"
         ],
         "summary": "[NOT IMPLEMENTED] Chi tiết cột + lịch sử, đủ trong MỘT request",
         "description": "Contract §5.1. Chưa có code — ticket BE-20. Giữ trong Contract, không xoá.",
-        "operationId": "getPolesPoleId",
+        "operationId": "getMapPolesPoleId",
         "x-luxmap-status": "not_implemented",
         "x-luxmap-contract": "§5.1",
         "x-luxmap-ticket": "BE-20",

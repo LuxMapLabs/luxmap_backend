@@ -20,8 +20,8 @@ namespace LuxMap.Api.Tests;
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class IotNodeTests(AssetImportFixture fixture)
 {
-    private const string Nodes = "/api/v1/iot-nodes";
-    private const string Segments = "/api/v1/segments";
+    private const string Nodes = "/api/v1/map/iot-nodes";
+    private const string Segments = "/api/v1/map/segments";
 
     /// <summary>A box of its own, away from the mock set and from MapEndpointTests' box.</summary>
     private const string Box = "?bbox=108.40,12.40,108.60,12.60";
@@ -149,7 +149,7 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
         await ControlAsync(feeder, node, relay: 1);
         var pole = await NewPoleAsync(await NewSegmentAsync(fixture.CommuneId), feeder);
 
-        var body = await GetAsync(client, "/api/v1/poles" + Box);
+        var body = await GetAsync(client, "/api/v1/map/poles" + Box);
 
         Assert.False(Find(body, pole, "pole_id").GetProperty("properties").GetProperty("has_iot_node").GetBoolean());
     }
