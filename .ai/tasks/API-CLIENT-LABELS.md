@@ -1,7 +1,7 @@
 ---
 ticket: API-CLIENT-LABELS
 title: Đánh dấu trong Swagger endpoint nào cho mobile, cho web, hay dùng chung
-status: ready
+status: done
 phase: 2
 owner: codex
 branch: feat/api-client-labels
