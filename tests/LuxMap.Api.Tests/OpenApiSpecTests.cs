@@ -31,6 +31,53 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     private JsonElement Schema(string name)
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
+    [Fact]
+    public void Every_operation_publishes_its_client_surface()
+    {
+        var operations = Spec.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject()).ToArray();
+
+        Assert.NotEmpty(operations);
+        foreach (var operation in operations)
+        {
+            Assert.Contains(operation.Value.GetProperty("x-luxmap-client").GetString(),
+                new[] { "mobile", "web", "shared" });
+        }
+    }
+
+    [Theory]
+    [InlineData("post", "/api/v1/auth/login", "mobile", "[Mobile] ", "Auth")]
+    [InlineData("post", "/api/v1/auth/register", "mobile", "[Mobile] ", "Auth")]
+    [InlineData("post", "/api/v1/auth/refresh", "mobile", "[Mobile] ", "Auth")]
+    [InlineData("post", "/api/v1/auth/logout", "mobile", "[Mobile] ", "Auth")]
+    [InlineData("post", "/api/v1/auth/web/login", "web", "[Web] ", "WebAuth")]
+    [InlineData("post", "/api/v1/auth/web/refresh", "web", "[Web] ", "WebAuth")]
+    [InlineData("post", "/api/v1/auth/web/logout", "web", "[Web] ", "WebAuth")]
+    [InlineData("get", "/api/v1/auth/me", "shared", "[Dùng chung] ", "Auth")]
+    public void Auth_operations_label_the_client_and_keep_the_generator_tag(
+        string method, string path, string client, string prefix, string tag)
+    {
+        var operation = Spec.GetProperty("paths").GetProperty(path).GetProperty(method);
+
+        Assert.Equal(client, operation.GetProperty("x-luxmap-client").GetString());
+        Assert.StartsWith(prefix, operation.GetProperty("summary").GetString());
+        Assert.Equal(tag, Assert.Single(operation.GetProperty("tags").EnumerateArray()).GetString());
+    }
+
+    [Fact]
+    public void Business_operations_are_shared_without_a_summary_prefix()
+    {
+        var operation = Spec.GetProperty("paths").GetProperty("/api/v1/faults").GetProperty("get");
+
+        Assert.Equal("shared", operation.GetProperty("x-luxmap-client").GetString());
+        if (operation.TryGetProperty("summary", out var summary))
+        {
+            Assert.DoesNotContain("[Mobile]", summary.GetString() ?? string.Empty);
+            Assert.DoesNotContain("[Web]", summary.GetString() ?? string.Empty);
+            Assert.DoesNotContain("[Dùng chung]", summary.GetString() ?? string.Empty);
+        }
+    }
+
     /// <summary>
     /// Every business operation publishes the capability it requires and the roles it admits
     /// (Contract v1.7 section 2), exactly as <see cref="LuxMapPolicies.Matrix"/> has them.

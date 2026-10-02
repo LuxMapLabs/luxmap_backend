@@ -29,7 +29,8 @@ public static class SwaggerSetup
                 Description =
                     "WP2 — GIS + IoT + Computer Vision platform for rural street-lighting assets. "
                     + $"Base URL {ApiRoutes.BasePath}. Conventions from API Contract v1.1: snake_case JSON, "
-                    + "lowercase string enums, ISO 8601 UTC timestamps with a Z suffix, EPSG:4326 coordinates.",
+                    + "lowercase string enums, ISO 8601 UTC timestamps with a Z suffix, EPSG:4326 coordinates. "
+                    + "Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
             });
 
             AddBearerSecurity(options);
@@ -37,6 +38,7 @@ public static class SwaggerSetup
             options.OperationFilter<RefreshTokenCookieOperationFilter>();
             options.OperationFilter<CapabilityOperationFilter>();
             options.OperationFilter<RawRequestBodyOperationFilter>();
+            options.OperationFilter<ClientSurfaceOperationFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than
             // trusting Swashbuckle to infer correctly: getting this wrong makes FM-04 generate
