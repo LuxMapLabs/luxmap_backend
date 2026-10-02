@@ -592,8 +592,8 @@ này). **Chưa báo ai.**
 
 | | |
 |---|---|
-| **Decision** | **Đề xuất, chờ nhóm quyết:** Quản lý tự đặt mức ưu tiên của sự cố; hoãn chấm điểm tự động (CV-16) |
-| **Decision maker** | Mỹ đồng ý hướng 29/09/2026 cho phần backend (P-2). P-1, P-3 chạm việc của WP4/WP5/WP6 → **ESCALATE ở FW kế tiếp**, không tự chốt |
+| **Decision** | Quản lý tự đặt mức ưu tiên của sự cố; hoãn chấm điểm tự động (CV-16). P-2, P-3 đã hiện thực; P-1 chờ nhóm |
+| **Decision maker** | Mỹ chốt 29/09/2026 cho P-2 và P-3 (`SELF-SIGNED`). P-1 và cả P-3 chạm việc của WP4/WP5/WP6 → **vẫn nêu ở FW kế tiếp** |
 | **Date** | 29/09/2026 |
 | **Scope** | Contract §5.4 (thứ tự mặc định, `PATCH /faults`), §5.5; BE-19, BE-33; CV-16, FW-25, FM-25 |
 
@@ -608,7 +608,7 @@ giá trị khác nhau và trọng số không có đối tác xác nhận (ghi c
 |---|---|---|---|
 | **P-1** | Hoãn chấm điểm tự động. `fault.priority_score` **giữ cột, nullable**, không xoá — CV-16 làm sau được mà không migration | Thịnh (CV-16), Khang (FW-25 tab trọng số), BE-33 (phần trọng số) | Không (giữ hình dạng) |
 | **P-2** | Quản lý đặt mức ưu tiên bằng **`severity`** (`low\|medium\|high\|critical`, enum có sẵn) qua `PATCH /faults` — làm ở **BE-19**, có audit | WP5, WP6 | **Có** (§5.4 body PATCH thêm `severity`) |
-| **P-3** | Thứ tự mặc định `GET /faults` và danh sách việc đổi từ `-priority_score` sang `-severity` rồi `detected_at`; `priority_score` của phiếu công việc (max của sự cố) giữ tới khi quyết | WP5 (bảng lỗi), WP6 (FM-25 "theo priority_score") | **Có** (§5.4, §5.5) — **chưa làm**, chờ nhóm |
+| **P-3** | Thứ tự mặc định `GET /faults` đổi từ `-priority_score` sang **`-severity`** (hạng `critical > high > medium > low`), cùng mức thì **sự cố cũ trước** (`detected_at` tăng), rồi `created_at, length(fault_id), fault_id`. `sort` nhận thêm `severity` / `-severity`; `-priority_score` vẫn dùng được. **Mỹ chốt 29/09/2026, ĐÃ HIỆN THỰC** — `SELF-SIGNED`, nền tạm: vẫn phải nêu ở FW vì chạm việc của Thịnh, Khang, FM-25. Danh sách **phiếu công việc** giữ nguyên (`created_at` giảm dần) — chưa đổi. ⚠️ `mock-faults.json` đang xếp theo `priority_score`, thứ tự API mặc định nay khác mock | **Có** (§5.4) |
 
 **Làm sau được không:** được. Không bước nào xoá dữ liệu hay cột; bật lại CV-16 = ghi `priority_score`
 và trả thứ tự mặc định về như cũ. `severity` do Quản lý đặt vẫn là một tiêu chí dùng được cho công thức.
@@ -648,6 +648,26 @@ kiểm tra: mặc định mang cả nhóm `fault_present`, gặp sự cố khôn
 đã quyết). **Chưa báo.**
 
 
+## Ảnh bằng chứng — hai chỗ Contract còn hở (30/09/2026)
+
+| | |
+|---|---|
+| **Decision** | **Chỉ đăng ký, chưa quyết.** Hai chỗ Contract không cho gửi ảnh ở tình huống nó tự nêu. Phát hiện khi rà các tình huống dùng ảnh trong app (thảo luận 30/09/2026) |
+| **Decision maker** | **Chưa có.** Cả hai chạm bề mặt API → **ESCALATE ở FW kế tiếp**, không tự chốt, im lặng không phải approve |
+| **Date** | 30/09/2026 |
+| **Scope** | Contract §5.4 (`POST /faults` — `photo_frame_id`), §5.5 (`POST /work-orders/{id}/evidence` — `kind`); BE-24, BE-41; FM-18, FM-19. Chưa đổi Contract, chưa đổi code |
+
+| Mã | Chỗ hở | Hệ quả | Hướng đề xuất (chưa chốt) | Chạm API |
+|---|---|---|---|---|
+| **EV-1** | Ảnh của **phiếu kiểm tra** không có `kind` đúng nghĩa. Evidence chỉ nhận `kind=before\|after`; kiểm tra không sửa gì nên không có "trước/sau", chỉ có "đã thấy thế này". `task_kind = inspection` và kết quả `fault_present \| fault_absent \| inconclusive` đã có từ BE-23 (nền tạm), Contract chưa nhắc | App phải gửi ảnh kiểm tra dưới nhãn `before` hoặc `after` — sai nghĩa, và không lọc ra được. Ảnh kiểm tra ban đêm là ứng viên **ground truth** cho lớp `out` và có thể cho `dim` (D-R23) — loại ảnh quan trọng nhất về nghiên cứu lại không có chỗ đúng | Thêm giá trị `kind = observation` (hoặc tên khác), chỉ nhận ở phiếu `inspection`; `before`/`after` chỉ nhận ở phiếu `repair`. Chốt ở Phase 1 **BE-24** | **Có** (§5.5 enum `kind`) |
+| **EV-2** | **Báo sự cố tại chỗ không upload được ảnh.** `POST /faults` có `photo_frame_id` — *"ảnh upload trước qua luồng evidence"* — nhưng luồng evidence nằm dưới `/work-orders/{id}/`, còn báo tại chỗ (FM-19) **chưa có phiếu nào**. Theo đặc tả hiện tại không có cách lấy `photo_frame_id` | FM-19 không gửi được ảnh; BE-41 sẽ vấp khi hiện thực. Tên trường còn gây nhầm: `frame` là ảnh **khảo sát** (`SurveyFrame`), không phải ảnh bằng chứng — hai luồng ảnh tách riêng từ BE-11 | Hai hướng: (a) endpoint upload ảnh **không gắn phiếu**, trả ID rồi gửi kèm `POST /faults`; (b) `POST /faults` nhận multipart kèm ảnh. Đổi tên trường cho khỏi lẫn với `SurveyFrame`. Chốt ở Phase 1 **BE-41** | **Có** (§5.4, có thể thêm endpoint) |
+
+**Chung cho cả hai:** ảnh bằng chứng là cho **người xem**, **không** vào dữ liệu chấm của CV — ảnh chụp tự
+chỉnh phơi sáng (mẫu thực địa 28/09 tự nhảy ISO 8000), không so sánh được; trạng thái đèn lấy từ video khoá
+phơi sáng (D-R24). Byte ảnh vẫn qua API (BE-11 quy tắc 1).
+
+**Phải báo / đưa ra FW kế tiếp:** WP6 (FM-18, FM-19), WP5 (màn chi tiết phiếu). **Chưa báo.**
+
 ## OPS-SCHEMA — lược đồ đích theo Phiếu v1.4 (01/10/2026)
 
 | | |
@@ -668,3 +688,15 @@ Các mục chạm bề mặt API — chưa sửa Contract, phải đưa ra FW:
 | **S-Q7** | Phiếu khảo sát neo một xã nhưng chứa được tuyến/cột của xã khác trong phạm vi người tạo; kết quả mang xã của cột | Phân quyền đọc kết quả khảo sát (BE-15) |
 
 **Phải báo:** WP5 (FX-1 hiển thị NULL, task_kind survey, tủ điện), WP6 (survey, FX-1), WP4 (bảng khảo sát / detection / registry phiên bản). **Chưa báo.**
+
+## BE-15 Phase 1 — chốt (02/10/2026)
+
+| | |
+|---|---|
+| **Decision** | D-01…D-15 ở `.ai/results/BE-15-p1.md` §11. Trong đó **D-R28 = A** (proxy streaming, cap tạm 300 MiB/clip, MP4 H.264/H.265, giữ gốc theo D-R16); `lamp_dim` giữ `source_channel = cv` (D-R20 đề xuất); capability mới `ReadSurveys` / `SubmitSurveys` / `ReviewSurveys`; enum `processing_status` (O-4) |
+| **Decision maker** | Mỹ chốt 02/10: backend chạy model, duyệt ffmpeg, backend làm ghép cột. Còn lại Claude theo uỷ quyền sau khi đối chiếu Codex · `SELF-SIGNED` |
+| **Date** | 02/10/2026 |
+| **Scope** | BE-15/16/17; Contract §2 (capability), §5.6 (`GET /sweeps`, O-4), endpoint upload video mới. **Chưa đổi Contract** — ESCALATE ở FW kế tiếp |
+
+**Phải báo:** WP6 (định dạng file thô, sidecar frame, upload clip), WP4 (detector theo frame, CV-05 chuyển sang backend), WP5 (màn
+duyệt phiên, coverage). **Chưa báo.**
