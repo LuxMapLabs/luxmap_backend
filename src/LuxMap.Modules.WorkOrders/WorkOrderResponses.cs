@@ -27,6 +27,8 @@ public class WorkOrderItem
 
 public sealed class WorkOrderDetail : WorkOrderItem
 {
+    /// <summary>SELF-SIGNED BE-15, pending FW: ordered survey targets.</summary>
+    public string[] SegmentIds { get; init; } = [];
     public string? Note { get; init; }
     public string? ReviewNote { get; init; }
     public string? ReportNote { get; init; }

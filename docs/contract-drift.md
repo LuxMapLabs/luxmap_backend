@@ -701,6 +701,17 @@ Các mục chạm bề mặt API — chưa sửa Contract, phải đưa ra FW:
 **Phải báo:** WP6 (định dạng file thô, sidecar frame, upload clip), WP4 (detector theo frame, CV-05 chuyển sang backend), WP5 (màn
 duyệt phiên, coverage). **Chưa báo.**
 
+### BE-15 P2a — bề mặt hiện thực để FW đối chiếu (02/10/2026)
+
+Nền SELF-SIGNED ở mục trên giữ nguyên; chi tiết payload tạm tại
+[`survey-ingest-p2a.md`](survey-ingest-p2a.md). Ticket P2a dùng **cột/trường `commune_id` hiện có** làm xã neo
+cho `task_kind=survey`, không thêm `anchor_commune_id`; inspection/repair vẫn cấm client gửi commune.
+Thêm `segment_ids` ở chi tiết phiếu; sáu operation ingest/read tại `/sweeps`, ba capability đã ghi ở Phase 1.
+`processing_status` tách khỏi `status`; `coverage_pct=null`, `frame_count=0` cho tới P2b.
+PUT clip/raw trả **200** cho lưu mới và retry; raw cap **10 MiB/file** là giới hạn vận hành tạm của P2a.
+Chưa tạo profile/registry hay kiểm codec; cấu hình và mapping frame giữ nguyên file thô để P2b kiểm.
+**Chưa cập nhật Contract/OpenAPI, chưa thông báo WP5/WP6.** Claude xuất OpenAPI sau review và kiểm PostGIS.
+
 ## Dữ liệu thực địa đầu tiên — đèn thật không phải LED (01/10/2026)
 
 | | |

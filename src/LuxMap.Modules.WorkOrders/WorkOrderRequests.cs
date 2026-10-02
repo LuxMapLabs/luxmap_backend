@@ -10,6 +10,8 @@ public sealed class CreateWorkOrderRequest
     [Required, StringLength(200, MinimumLength = 1)] public string Title { get; init; } = null!;
     public string[]? FaultIds { get; init; }
     public string? SegmentId { get; init; }
+    /// <summary>SELF-SIGNED BE-15: ordered survey routes; commune_id is the explicit anchor.</summary>
+    public string[]? SegmentIds { get; init; }
     public string? AssignedTo { get; init; }
     public DateOnly? DueDate { get; init; }
     public DateOnly? ScheduledDate { get; init; }
@@ -34,6 +36,7 @@ public sealed class PatchWorkOrderRequest
     public JsonElement FaultIds { get; init; }
     public JsonElement TaskKind { get; init; }
     public JsonElement SegmentId { get; init; }
+    public JsonElement SegmentIds { get; init; }
 }
 
 public sealed class AssignWorkOrderRequest

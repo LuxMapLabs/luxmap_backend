@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 50 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 56 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1.",
     "version": "1.7"
   },
   "paths": {
@@ -3957,6 +3957,484 @@
         "x-luxmap-status": "implemented"
       }
     },
+    "/api/v1/sweeps": {
+      "post": {
+        "tags": [
+          "Sweeps"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSweepRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSweepRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSweepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:submit_surveys",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "summary": "[TẠM — BE-15 P2a] Tạo phiên khảo sát cho phiếu survey đang làm; idempotent theo client_op_id (201 mới, 200 lặp lại)",
+        "operationId": "postSweeps",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      },
+      "get": {
+        "tags": [
+          "Sweeps"
+        ],
+        "parameters": [
+          {
+            "name": "work_order_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "processing_status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponsePagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponsePagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponsePagedResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "[TẠM — BE-15 P2a] Danh sách phiên; lọc work_order_id, segment_id, processing_status, data_source",
+        "operationId": "getSweeps",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/sweeps/{id}/clips/{clipNo}": {
+      "put": {
+        "tags": [
+          "Sweeps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clipNo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyClipResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyClipResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyClipResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:submit_surveys",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "summary": "[TẠM — BE-15 P2a] Tải một clip MP4 (stream, tối đa 300 MiB, X-Content-SHA256 bắt buộc)",
+        "operationId": "putSweepsIdClipsClipno",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/sweeps/{id}/raw/{kind}": {
+      "put": {
+        "tags": [
+          "Sweeps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyRawResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyRawResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyRawResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:submit_surveys",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "summary": "[TẠM — BE-15 P2a] Tải file thô gps_track | lux_log (JSONL) hoặc capture_config (JSON); kiểm toàn file trước khi ghi",
+        "operationId": "putSweepsIdRawKind",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/sweeps/{id}/submit": {
+      "post": {
+        "tags": [
+          "Sweeps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSweepRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSweepRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSweepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:submit_surveys",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "summary": "[TẠM — BE-15 P2a] Nộp phiên khi đủ clip + 3 file thô và manifest khớp hash; 202 vào hàng chờ xử lý",
+        "operationId": "postSweepsIdSubmit",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/sweeps/{id}": {
+      "get": {
+        "tags": [
+          "Sweeps"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "summary": "[TẠM — BE-15 P2a] Chi tiết phiên kèm clip và file thô đã nhận",
+        "operationId": "getSweepsId",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
     "/api/v1/auth/web/login": {
       "post": {
         "tags": [
@@ -4415,7 +4893,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
-        "summary": "[TẠM — WO-1…WO-11] Tạo inspection/repair; task_kind bắt buộc",
+        "summary": "[TẠM — WO-1…WO-11] Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)",
         "operationId": "postWorkOrders",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -5357,67 +5835,6 @@
         }
       }
     },
-    "/api/v1/sweeps": {
-      "get": {
-        "tags": [
-          "IotSweeps"
-        ],
-        "summary": "[NOT IMPLEMENTED] Lịch sử các đợt quét",
-        "description": "Contract §5.6. Chưa có code — ticket BE-17. Giữ trong Contract, không xoá.",
-        "operationId": "getSweeps",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-contract": "§5.6",
-        "x-luxmap-ticket": "BE-17",
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            },
-            "description": "Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (Contract §1.3)"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Trang sweep",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SweepPagedResult"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/frames/{frame_id}/thumbnail": {
       "get": {
         "tags": [
@@ -5714,6 +6131,19 @@
         },
         "additionalProperties": false
       },
+      "ClipManifest": {
+        "type": "object",
+        "properties": {
+          "clip_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "CompleteWorkOrderRequest": {
         "required": [
           "report_note"
@@ -5960,6 +6390,41 @@
         },
         "additionalProperties": false
       },
+      "CreateSweepRequest": {
+        "type": "object",
+        "properties": {
+          "work_order_id": {
+            "type": "string"
+          },
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "boot_session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "elapsed_anchor_ns": {
+            "type": "string"
+          },
+          "utc_anchor": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "utc_uncertainty_ms": {
+            "type": "number",
+            "format": "double"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "started_elapsed_ns": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateWorkOrderRequest": {
         "required": [
           "task_kind",
@@ -5984,6 +6449,13 @@
           },
           "segment_id": {
             "type": "string",
+            "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           },
           "assigned_to": {
@@ -6754,7 +7226,8 @@
             "format": "date",
             "nullable": true
           },
-          "materials_note": {}
+          "materials_note": {},
+          "segment_ids": {}
         },
         "additionalProperties": false
       },
@@ -7360,10 +7833,208 @@
         ],
         "type": "string"
       },
+      "SubmitSweepRequest": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ended_elapsed_ns": {
+            "type": "string"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/SweepManifest"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SurveyClipResponse": {
+        "type": "object",
+        "properties": {
+          "clip_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "byte_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content_type": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SurveyRawKind": {
+        "enum": [
+          "gps_track",
+          "lux_log",
+          "capture_config"
+        ],
+        "type": "string"
+      },
+      "SurveyRawResponse": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SurveyRawKind"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "byte_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepManifest": {
+        "type": "object",
+        "properties": {
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClipManifest"
+            }
+          },
+          "gps_hash": {
+            "type": "string"
+          },
+          "lux_hash": {
+            "type": "string"
+          },
+          "config_hash": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepProcessingStatus": {
+        "enum": [
+          "not_started",
+          "queued",
+          "processing",
+          "succeeded",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "SweepResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "work_order_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ended_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frame_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "processing_status": {
+            "$ref": "#/components/schemas/SweepProcessingStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SweepStatus"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "submitted_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyClipResponse"
+            }
+          },
+          "raw_files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyRawResponse"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepResponsePagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SweepResponse"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepStatus": {
+        "enum": [
+          "uploading",
+          "queued",
+          "processing",
+          "awaiting_review",
+          "accepted",
+          "returned",
+          "failed"
+        ],
+        "type": "string"
+      },
       "TaskKind": {
         "enum": [
           "inspection",
-          "repair"
+          "repair",
+          "survey"
         ],
         "type": "string"
       },
@@ -7673,6 +8344,12 @@
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             "format": "date",
             "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "note": {
             "type": "string",
@@ -8475,88 +9152,6 @@
           }
         }
       },
-      "SweepItem": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Contract §5.6. processing_status chưa có enum — Open item O-4.",
-        "required": [
-          "sweep_id",
-          "started_at",
-          "segment_ids",
-          "frame_count",
-          "coverage_pct",
-          "processing_status",
-          "data_source"
-        ],
-        "properties": {
-          "sweep_id": {
-            "$ref": "#/components/schemas/SweepId"
-          },
-          "started_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "ended_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "segment_ids": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SegmentId"
-            }
-          },
-          "frame_count": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "coverage_pct": {
-            "type": "number",
-            "format": "double",
-            "minimum": 0,
-            "maximum": 100
-          },
-          "processing_status": {
-            "type": "string"
-          },
-          "data_source": {
-            "$ref": "#/components/schemas/DataSource"
-          }
-        }
-      },
-      "SweepPagedResult": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "page",
-          "page_size",
-          "total",
-          "items"
-        ],
-        "properties": {
-          "page": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "page_size": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 200
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SweepItem"
-            }
-          }
-        }
-      },
       "SyncBundle": {
         "type": "object",
         "additionalProperties": false,
@@ -8694,7 +9289,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -8749,8 +9344,12 @@
       "description": "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."
     },
     {
+      "name": "Sweeps",
+      "description": "Phiên khảo sát video — BE-15 P2a đã hiện thực nhận/nộp phiên và đọc (SELF-SIGNED, nền tạm tới FW). Xử lý ở P2b, duyệt ở P2c."
+    },
+    {
       "name": "IotSweeps",
-      "description": "IoT node, sweep, thumbnail — Contract §5.6. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."
+      "description": "Thumbnail khung hình — Contract §5.6. CHƯA HIỆN THỰC (BE-15 P2b)."
     },
     {
       "name": "Sync",

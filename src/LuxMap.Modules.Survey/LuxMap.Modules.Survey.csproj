@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="../LuxMap.Modules.WorkOrders/LuxMap.Modules.WorkOrders.csproj" />
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
     <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
     <!-- A lux reading is measured AT a pole, so Survey depends on Assets for a real foreign key.

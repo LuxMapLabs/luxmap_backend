@@ -55,6 +55,10 @@ public static class LuxMapPolicies
     /// <summary>Review a fault: confirm, reject, reclassify, set severity, write a review note (BE-19).</summary>
     public const string ReviewFaults = "cap:review_faults";
 
+    public const string ReadSurveys = "cap:read_surveys";
+    public const string SubmitSurveys = "cap:submit_surveys";
+    public const string ReviewSurveys = "cap:review_surveys";
+
     public const string ReadWorkOrders = "cap:read_work_orders";
     public const string ManageWorkOrders = "cap:manage_work_orders";
     public const string ExecuteWorkOrders = "cap:execute_work_orders";
@@ -63,6 +67,9 @@ public static class LuxMapPolicies
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
         {
+            [ReadSurveys] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
+            [SubmitSurveys] = [UserRole.FieldEngineer],
+            [ReviewSurveys] = [UserRole.Manager],
             [ReadNetwork] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReadLuxReadings] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageAssets] = [UserRole.Manager],

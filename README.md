@@ -504,3 +504,11 @@ app từ chối khởi động:
 ```bash
 Iot__OfflineAfter=00:30:00 dotnet run --project src/LuxMap.Api
 ```
+
+## Nhận phiên khảo sát — BE-15 P2a
+
+API và payload tạm (SELF-SIGNED, chờ FW): [docs/survey-ingest-p2a.md](docs/survey-ingest-p2a.md).
+Sidecar `minio-mc` tạo thêm bucket `luxmap-video` cho clip và file thô; cần chạy lại sidecar khi
+triển khai cấu hình compose mới. Video proxy multipart qua API, cap **300 MiB/clip** riêng endpoint;
+raw JSON/JSONL cap **10 MiB/file**. Không thay giới hạn JPEG, không dùng presigned URL.
+P2a chỉ nhận/nộp phiên; `queued` chưa có worker cho tới P2b.

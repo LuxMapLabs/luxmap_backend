@@ -59,7 +59,8 @@ TAGS = OrderedDict([
     ("Segments", "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."),
     ("Faults", "Sự cố — Contract §5.4. GET (BE-40, F-1…F-6) và PATCH (BE-19, R-1…R-9) đã hiện thực; POST (BE-41) CHƯA."),
     ("WorkOrders", "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."),
-    ("IotSweeps", "IoT node, sweep, thumbnail — Contract §5.6. CHƯA HIỆN THỰC (BE-14, BE-17, BE-15)."),
+    ("Sweeps", "Phiên khảo sát video — BE-15 P2a đã hiện thực nhận/nộp phiên và đọc (SELF-SIGNED, nền tạm tới FW). Xử lý ở P2b, duyệt ở P2c."),
+    ("IotSweeps", "Thumbnail khung hình — Contract §5.6. CHƯA HIỆN THỰC (BE-15 P2b)."),
     ("Sync", "Đồng bộ offline — Contract §5.8. CHƯA HIỆN THỰC (BE-43)."),
 ])
 d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
@@ -131,7 +132,7 @@ for method, suffix, summary in [
     ("get", "", "Danh sách việc trong phạm vi xã và người được giao"),
     ("get", "/{id}", "Chi tiết việc và các hành động được phép"),
     ("get", "/assignees", "Kỹ sư hiện trường đủ điều kiện trong xã"),
-    ("post", "", "Tạo inspection/repair; task_kind bắt buộc"),
+    ("post", "", "Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)"),
     ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
     ("post", "/{id}/start", "Người được giao bắt đầu việc"),
@@ -143,6 +144,17 @@ for method, suffix, summary in [
 ]:
     SUMMARY[(method, "/api/v1/work-orders" + suffix)] = "[TẠM — WO-1…WO-11] " + summary
 
+# BE-15 P2a provisional operations, exported from SweepsController (SELF-SIGNED, temporary until FW).
+for method, suffix, summary in [
+    ("post", "", "Tạo phiên khảo sát cho phiếu survey đang làm; idempotent theo client_op_id (201 mới, 200 lặp lại)"),
+    ("get", "", "Danh sách phiên; lọc work_order_id, segment_id, processing_status, data_source"),
+    ("get", "/{id}", "Chi tiết phiên kèm clip và file thô đã nhận"),
+    ("put", "/{id}/clips/{clipNo}", "Tải một clip MP4 (stream, tối đa 300 MiB, X-Content-SHA256 bắt buộc)"),
+    ("put", "/{id}/raw/{kind}", "Tải file thô gps_track | lux_log (JSONL) hoặc capture_config (JSON); kiểm toàn file trước khi ghi"),
+    ("post", "/{id}/submit", "Nộp phiên khi đủ clip + 3 file thô và manifest khớp hash; 202 vào hàng chờ xử lý"),
+]:
+    SUMMARY[(method, "/api/v1/sweeps" + suffix)] = "[TẠM — BE-15 P2a] " + summary
+
 SECTION = {
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
@@ -151,6 +163,7 @@ SECTION = {
     "/api/v1/auth/web": "§4.2",
     "/api/v1/auth": "§4.1",
     "/api/v1/lux-readings": "§5.7",
+    "/api/v1/sweeps": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)",
 }
 
 for path, item in d["paths"].items():
@@ -391,28 +404,6 @@ S["EvidenceUpload"] = {"type": "object", "required": ["file", "kind", "captured_
         ("lng", {"type": "number", "format": "double"}),
     ])}
 
-S["SweepItem"] = {"type": "object", "additionalProperties": False,
-    "description": "Contract §5.6. processing_status chưa có enum — Open item O-4.",
-    "required": ["sweep_id", "started_at", "segment_ids", "frame_count", "coverage_pct", "processing_status", "data_source"],
-    "properties": OrderedDict([
-        ("sweep_id", {"$ref": "#/components/schemas/SweepId"}),
-        ("started_at", {"type": "string", "format": "date-time"}),
-        ("ended_at", {"type": "string", "format": "date-time", "nullable": True}),
-        ("segment_ids", {"type": "array", "items": {"$ref": "#/components/schemas/SegmentId"}}),
-        ("frame_count", {"type": "integer", "format": "int32", "minimum": 0}),
-        ("coverage_pct", {"type": "number", "format": "double", "minimum": 0, "maximum": 100}),
-        ("processing_status", {"type": "string"}),
-        ("data_source", {"$ref": "#/components/schemas/DataSource"}),
-    ])}
-S["SweepPagedResult"] = {"type": "object", "additionalProperties": False,
-    "required": ["page", "page_size", "total", "items"],
-    "properties": OrderedDict([
-        ("page", {"type": "integer", "format": "int32"}),
-        ("page_size", {"type": "integer", "format": "int32", "maximum": 200}),
-        ("total", {"type": "integer", "format": "int32"}),
-        ("items", {"type": "array", "items": {"$ref": "#/components/schemas/SweepItem"}}),
-    ])}
-
 S["SyncBundle"] = {"type": "object", "additionalProperties": False,
     "description": "Contract §5.8 — hình dạng đề xuất, chốt ở FW kế tiếp (Open item O-5).",
     "required": ["poles", "segments", "open_faults", "work_orders", "generated_at"],
@@ -456,9 +447,6 @@ def p(name, schema, required=False, desc=None, where="query"):
 
 BBOX = p("bbox", {"type": "string", "pattern": r"^-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?,-?\d+(\.\d+)?$"}, True,
          "minLng,minLat,maxLng,maxLat — EPSG:4326. BẮT BUỘC, không có endpoint lấy tất cả.")
-PAGE = [p("page", {"type": "integer", "format": "int32", "minimum": 1, "default": 1}),
-        p("page_size", {"type": "integer", "format": "int32", "minimum": 1, "maximum": 200, "default": 50},
-          desc="Vượt 200 bị kẹp im lặng về 200 — client đọc page_size trong response (Contract §1.3)")]
 
 def ni(method, path, tag, summary, section, ticket, responses, parameters=None, body=None, body_ct="application/json", extra=None):
     op = OrderedDict()
@@ -508,9 +496,6 @@ ni("post", "/api/v1/work-orders/{work_order_id}/evidence", "WorkOrders", "Ảnh 
     ("415", err("UNSUPPORTED_IMAGE_FORMAT — không phải JPEG theo magic bytes"))],
    parameters=[p("work_order_id", {"$ref": "#/components/schemas/WorkOrderId"}, True, where="path")],
    body={"$ref": "#/components/schemas/EvidenceUpload"}, body_ct="multipart/form-data")
-ni("get", "/api/v1/sweeps", "IotSweeps", "Lịch sử các đợt quét", "§5.6", "BE-17",
-   [("200", {"description": "Trang sweep", "content": json_content("SweepPagedResult")})],
-   parameters=PAGE)
 ni("get", "/api/v1/frames/{frame_id}/thumbnail", "IotSweeps", "Thumbnail JPEG của một khung hình — proxy qua API, không presigned", "§5.6", "BE-15",
    [("200", {"description": "JPEG (320px cạnh dài, q80 — TẠM, Open item O-4)", "content": {"image/jpeg": {"schema": {"type": "string", "format": "binary"}}}}),
     ("404", err("Không tồn tại hoặc ngoài phạm vi"))],

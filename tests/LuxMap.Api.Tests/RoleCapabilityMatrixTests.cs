@@ -42,6 +42,9 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
     /// <summary>Capability → (probe, roles admitted). The source of truth for THIS test.</summary>
     private static readonly Dictionary<string, (string Method, string Url, string[] Admitted)> Expected = new()
     {
+        ["ReadSurveys"] = ("GET", "/api/v1/sweeps", ["system_admin", "superior", "manager", "field_engineer"]),
+        ["SubmitSurveys"] = ("POST", "/api/v1/sweeps", ["field_engineer"]),
+        ["ReviewSurveys"] = ("GET", "/api/v1/_scope/review-surveys", ["manager"]),
         ["ReadNetwork"] = ("GET", "/api/v1/assets/segments", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReadLuxReadings"] = ("GET", "/api/v1/lux-readings", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ManageAssets"] = ("POST", "/api/v1/assets/segments", ["manager"]),

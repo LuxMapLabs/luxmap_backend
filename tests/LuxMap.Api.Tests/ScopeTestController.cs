@@ -85,4 +85,7 @@ public sealed class ScopeTestController(
     [HttpGet("open")]
     [AllowAnonymous]
     public IActionResult Open() => Ok(new { ok = true });
+    [HttpGet("review-surveys")]
+    [Authorize(Policy = LuxMapPolicies.ReviewSurveys)]
+    public IActionResult ReviewSurveys() => Ok();
 }

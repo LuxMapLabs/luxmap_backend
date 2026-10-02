@@ -15,6 +15,7 @@ public sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
     {
         builder.ToTable("work_order", table =>
         {
+            table.HasCheckConstraint("ck_work_order_survey_target", "task_kind <> 'survey' OR (segment_id IS NULL AND cluster_id IS NULL)");
             table.HasCheckConstraint("ck_work_order_title_not_blank", "btrim(title) <> ''");
             table.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
             table.HasCheckConstraint("ck_work_order_assigned_at_matches", "(assigned_to IS NULL) = (assigned_at IS NULL)");
@@ -72,5 +73,21 @@ public sealed class WorkOrderFaultConfiguration : IEntityTypeConfiguration<WorkO
         builder.HasIndex(x => x.FaultId, "ux_work_order_fault_fault_id_active").HasDatabaseName("ux_work_order_fault_fault_id_active").IsUnique().HasFilter("released_at IS NULL");
         builder.HasIndex(x => x.FaultId);
         builder.HasIndex(x => x.CommuneId);
+    }
+}
+
+public sealed class WorkOrderSegmentConfiguration : IEntityTypeConfiguration<WorkOrderSegment>
+{
+    public void Configure(EntityTypeBuilder<WorkOrderSegment> builder)
+    {
+        builder.ToTable("work_order_segment", t => t.HasCheckConstraint("ck_work_order_segment_position", "position >= 0"));
+        builder.HasKey(x => new { x.WorkOrderId, x.Position });
+        builder.HasIndex(x => new { x.WorkOrderId, x.SegmentId }).IsUnique();
+        builder.HasCommuneScope();
+        builder.HasCommuneReference(x => x.CommuneId);
+        builder.HasIndex(x => x.CommuneId);
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<RoadSegment>().WithMany().HasForeignKey(x => x.SegmentId).OnDelete(DeleteBehavior.Restrict);
     }
 }

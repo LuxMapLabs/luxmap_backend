@@ -19,5 +19,6 @@ public sealed class SurveyModule : ILuxMapModule
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<LuxReadingService>();
+        services.AddScoped<Ingest.SurveyIngestService>();
     }
 }

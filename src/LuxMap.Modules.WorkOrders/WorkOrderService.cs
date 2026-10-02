@@ -108,6 +108,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
             CreatedAt = wo.CreatedAt, UpdatedAt = wo.UpdatedAt, DueDate = wo.DueDate, ScheduledDate = wo.ScheduledDate,
             ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
+            SegmentIds = await db.Set<WorkOrderSegment>().Where(x => x.WorkOrderId == id).OrderBy(x => x.Position).Select(x => x.SegmentId).ToArrayAsync(ct),
             FaultIds = members.Select(x => x.Fault.FaultId).ToArray(),
             PriorityScore = members.Select(x => x.Fault.PriorityScore).DefaultIfEmpty().Max(),
             Note = wo.Note, ReviewNote = wo.ReviewNote, ReportNote = wo.ReportNote, CreatedBy = wo.CreatedBy,
@@ -122,11 +123,14 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     public async Task<WorkOrderDetail> Create(CreateWorkOrderRequest request, CancellationToken ct)
     {
-        if (new[] { request.WorkOrderId, request.CommuneId, request.WoStatus, request.ClusterId, request.PriorityScore }.Any(OptionalJson.Present))
+        if (new[] { request.WorkOrderId, request.WoStatus, request.ClusterId, request.PriorityScore }.Any(OptionalJson.Present))
             throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
         var title = ValidTitle(request.Title);
         Schedule(request.ScheduledDate, request.DueDate);
         var kind = request.TaskKind ?? throw OptionalJson.Invalid("task_kind");
+        if (kind == TaskKind.Survey) return await CreateSurvey(request, title, ct);
+        if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
+        if (request.SegmentIds is not null) throw OptionalJson.Invalid("segment_ids");
         var ids = request.FaultIds ?? [];
         if (ids.Length > 200 || ids.Distinct().Count() != ids.Length || ids.Any(string.IsNullOrWhiteSpace)
             || (ids.Length > 0 && request.SegmentId is not null)
@@ -141,6 +145,52 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                 ?? throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
         return await Insert(new(kind, title, faults, road, request.AssignedTo, request.DueDate, request.ScheduledDate,
             request.Note, Materials(request.MaterialsNote), null), ct);
+    }
+
+    // SELF-SIGNED BE-15 P2a: uses the existing commune_id as the explicit anchor.
+    private async Task<WorkOrderDetail> CreateSurvey(CreateWorkOrderRequest request, string title, CancellationToken ct)
+    {
+        var ids = request.SegmentIds ?? [];
+        var commune = OptionalJson.Text(request.CommuneId, "commune_id", false);
+        if (string.IsNullOrWhiteSpace(commune) || ids.Length is 0 or > 200 || ids.Any(string.IsNullOrWhiteSpace)
+            || ids.Distinct().Count() != ids.Length || request.SegmentId is not null || request.FaultIds is { Length: > 0 })
+            throw OptionalJson.Invalid("segment_ids / commune_id / fault_ids");
+        if (!db.CurrentCommuneScope.Allows(commune)
+            || !await db.Set<AdministrativeUnit>().AnyAsync(x => x.CommuneId == commune, ct)
+            || await db.Set<RoadSegment>().CountAsync(x => ids.Contains(x.SegmentId), ct) != ids.Length)
+            throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
+        if (request.AssignedTo is not null)
+        {
+            await RequireAssignee(request.AssignedTo, commune, ct);
+            await RequireSurveyAssignee(request.AssignedTo, ids, ct);
+        }
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // SQL expression comes only from the immutable server-side ID specification.
+        var idSql = $"SELECT {PrefixedIds.WorkOrder.DefaultValueSql} AS \"Value\"";
+        var id = await db.Database.SqlQueryRaw<string>(idSql).SingleAsync(ct);
+        var now = UtcMicrosecondClock.UtcNow();
+        var wo = new WorkOrder { WorkOrderId = id, CommuneId = commune, TaskKind = TaskKind.Survey,
+            Title = title, CreatedBy = ActorId, AssignedTo = request.AssignedTo,
+            AssignedAt = request.AssignedTo is null ? null : now,
+            WoStatus = request.AssignedTo is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
+            DueDate = request.DueDate, ScheduledDate = request.ScheduledDate, Note = request.Note,
+            MaterialsNote = Materials(request.MaterialsNote), CreatedAt = now, UpdatedAt = now };
+        db.Add(wo);
+        for (var position = 0; position < ids.Length; position++)
+            db.Add(new WorkOrderSegment { WorkOrderId = id, CommuneId = commune, Position = position, SegmentId = ids[position] });
+        Record(wo, AuditAction.Created, null, new { work_order = Snapshot(wo, []), segment_ids = ids }, now);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return await Detail(id, ct);
+    }
+
+    private async Task RequireSurveyAssignee(string assigned, string[] ids, CancellationToken ct)
+    {
+        var roads = await db.Set<RoadSegment>().Where(x => ids.Contains(x.SegmentId)).Select(x => x.CommuneId).ToArrayAsync(ct);
+        if (roads.Length != ids.Length) throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
+        // Q7: the eligible pole set is restricted to the assigning manager's scope.
+        var communes = roads.Concat(await db.Set<Pole>().Where(x => ids.Contains(x.SegmentId)).Select(x => x.CommuneId).Distinct().ToArrayAsync(ct)).Distinct();
+        foreach (var commune in communes) await RequireAssignee(assigned, commune, ct);
     }
 
     /// <summary>
@@ -234,7 +284,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     public async Task<WorkOrderDetail> Patch(string id, PatchWorkOrderRequest request, CancellationToken ct)
     {
         if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
-        if (new[] { request.WoStatus, request.AssignedTo, request.FaultIds, request.TaskKind, request.SegmentId }.Any(OptionalJson.Present))
+        if (new[] { request.WoStatus, request.AssignedTo, request.FaultIds, request.TaskKind, request.SegmentId, request.SegmentIds }.Any(OptionalJson.Present))
             throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("endpoint", "Use /assignee or a status action; targets and task_kind are immutable."));
         if (!new[] { request.Title, request.DueDate, request.ScheduledDate, request.MaterialsNote }.Any(OptionalJson.Present)) throw OptionalJson.Invalid("body");
         var title = OptionalJson.Present(request.Title) ? ValidTitle(OptionalJson.Text(request.Title, "title", false)) : null;
@@ -267,7 +317,15 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var assigned = OptionalJson.Text(request.AssignedTo, "assigned_to");
         var wo = await Find(id, ct);
         RequireAction(wo, assigned is null ? "unassign" : "assign");
-        if (assigned is not null) await RequireAssignee(assigned, wo.CommuneId, ct);
+        if (assigned is not null)
+        {
+            await RequireAssignee(assigned, wo.CommuneId, ct);
+            if (wo.TaskKind == TaskKind.Survey)
+            {
+                var segments = await db.Set<WorkOrderSegment>().Where(x => x.WorkOrderId == id).Select(x => x.SegmentId).ToArrayAsync(ct);
+                await RequireSurveyAssignee(assigned, segments, ct);
+            }
+        }
         if (wo.AssignedTo == assigned) return await Detail(id, ct);
         var before = Snapshot(wo);
         var action = assigned is null ? AuditAction.Unassigned : wo.AssignedTo is null ? AuditAction.Assigned : AuditAction.Reassigned;
