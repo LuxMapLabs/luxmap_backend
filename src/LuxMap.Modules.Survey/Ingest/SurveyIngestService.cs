@@ -38,8 +38,10 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
         // Lock first, then read through LINQ — the FaultLocks pattern. A FromSql "SELECT *" cannot be the
         // source: it omits the system column xmin that the row version maps to (42703 at runtime), and the
         // read below still goes through the commune and assignee query filters.
+        // AsNoTracking: a clip upload locks twice in one DbContext, and a tracked read would hand back the
+        // instance from the first lock with its old status — accepting a clip after the order was cancelled.
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
-        var wo = await db.Set<WorkOrder>().SingleOrDefaultAsync(x => x.WorkOrderId == id, ct)
+        var wo = await db.Set<WorkOrder>().AsNoTracking().SingleOrDefaultAsync(x => x.WorkOrderId == id, ct)
             ?? throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
         if (write && wo.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
         var ids = await db.Set<WorkOrderSegment>().Where(x => x.WorkOrderId == id).Select(x => x.SegmentId).ToArrayAsync(ct);

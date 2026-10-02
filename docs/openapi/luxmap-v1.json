@@ -3498,8 +3498,27 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "X-Content-SHA256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "video/mp4": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -3551,6 +3570,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/x-ndjson": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",

@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Http;
@@ -30,15 +31,18 @@ public sealed class SweepsController(SurveyIngestService service) : ControllerBa
     [HttpPut("{id}/clips/{clipNo:int}")]
     [Authorize(Policy = LuxMapPolicies.SubmitSurveys)]
     [RequestSizeLimit(SurveyIngestService.ClipLimit)]
-    public async Task<ActionResult<SurveyClipResponse>> Clip(string id, int clipNo, CancellationToken ct)
+    [RawRequestBody("video/mp4")]
+    public async Task<ActionResult<SurveyClipResponse>> Clip(string id, int clipNo,
+        [FromHeader(Name = "X-Content-SHA256"), Required] string sha256, CancellationToken ct)
     {
-        try { return Ok(await service.Clip(id, clipNo, Request.Body, Request.ContentLength, Request.Headers["X-Content-SHA256"].ToString(), ct)); }
+        try { return Ok(await service.Clip(id, clipNo, Request.Body, Request.ContentLength, sha256, ct)); }
         catch (BadHttpRequestException e) when (e.StatusCode == 413) { throw TooLarge(); }
     }
 
     [HttpPut("{id}/raw/{kind}")]
     [Authorize(Policy = LuxMapPolicies.SubmitSurveys)]
     [RequestSizeLimit(SurveyIngestService.RawLimit)]
+    [RawRequestBody("application/x-ndjson", "application/json")]
     public async Task<ActionResult<SurveyRawResponse>> Raw(string id, string kind, CancellationToken ct)
     {
         var parsed = kind switch { "gps_track" => SurveyRawKind.GpsTrack, "lux_log" => SurveyRawKind.LuxLog,

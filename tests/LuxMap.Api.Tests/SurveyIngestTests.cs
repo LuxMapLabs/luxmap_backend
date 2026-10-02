@@ -266,6 +266,22 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
         Assert.Equal(1, await Db(db => db.Set<SurveyVideoClip>().CountAsync(x => x.SweepId == id)));
     }
 
+    [Fact]
+    public async Task A_clip_finishing_after_its_work_order_was_cancelled_is_refused()
+    {
+        var id = await Create();
+        var parts = storage.HoldParts();
+        var upload = Clip(id, Video(), 409);
+        await storage.PartStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        // The second lock check must see THIS status, not the copy tracked by the first one.
+        var cancelled = await clients["manager"].PostAsJsonAsync($"/api/v1/work-orders/{wo}/cancel", new { note = "Cancelled mid-upload" });
+        await Json(cancelled, 200);
+        parts.SetResult();
+        var refused = await upload;
+        Assert.Equal("INVALID_STATE_TRANSITION", refused.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(0, await Db(db => db.Set<SurveyVideoClip>().CountAsync(x => x.SweepId == id)));
+    }
+
     private sealed class FakeS3() : AmazonS3Client(new AnonymousAWSCredentials(), new AmazonS3Config { ServiceURL = "http://unused.invalid" })
     {
         public int Completed { get; private set; }
