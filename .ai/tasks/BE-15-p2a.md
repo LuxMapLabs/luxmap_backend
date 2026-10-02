@@ -1,7 +1,7 @@
 ---
 ticket: BE-15
 title: Phase 2a — nhận dữ liệu phiên khảo sát (schema, upload video streaming, file thô, nộp phiên, GET /sweeps)
-status: ready
+status: done
 phase: 2
 owner: codex
 branch: feat/BE-15-survey-ingest
