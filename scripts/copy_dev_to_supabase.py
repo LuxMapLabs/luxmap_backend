@@ -40,6 +40,7 @@ offline queue, a screenshot — are never issued again for a different row.
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,49 @@ def digest_sql(table: str, cols: str, where: str | None) -> str:
             f"FROM (SELECT ROW({cols})::text AS r FROM public.{table}{filtered}) AS rows")
 
 
+def unsafe_sequences(states: dict[str, tuple[int, bool]], maxima: dict[str, int]) -> list[str]:
+    """Sequences whose NEXT value would hand out an id that a kept row already has."""
+    problems = []
+    for name, top in maxima.items():
+        last, called = states[name]
+        following = last + 1 if called else last
+        if following <= top:
+            problems.append(f"{name}: lần cấp kế tiếp {following} ≤ ID lớn nhất đang giữ {top}")
+    return problems
+
+
+def check_sequences(src: Db) -> dict[str, tuple[int, bool]]:
+    """Reads every sequence and refuses a source that would reissue a kept id (D-5 keeps its value)."""
+    owners = {}  # sequence -> (table, column), from the catalogue rather than a hand-kept list
+    for table, column, default in src.rows(
+            "SELECT c.relname, a.attname, pg_get_expr(d.adbin, d.adrelid) FROM pg_attrdef d "
+            "JOIN pg_class c ON c.oid = d.adrelid JOIN pg_attribute a ON a.attrelid = d.adrelid AND a.attnum = d.adnum "
+            "WHERE c.relnamespace = 'public'::regnamespace AND pg_get_expr(d.adbin, d.adrelid) LIKE '%nextval(%'"):
+        if found := re.search(r"nextval\('([a-z0-9_]+)'", default):
+            owners[found.group(1)] = (table, column)
+    for table, column, sequence in src.rows(
+            "SELECT table_name, column_name, pg_get_serial_sequence('public.' || table_name, column_name) "
+            "FROM information_schema.columns WHERE table_schema = 'public' AND is_identity = 'YES'"):
+        owners[sequence.removeprefix("public.")] = (table, column)
+
+    states = {}
+    for (name,) in src.rows("SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' ORDER BY 1"):
+        last, called = src.rows(f"SELECT last_value, is_called FROM public.{name}")[0]
+        states[name] = (int(last), called == "t")
+    where = {table: filt for table, filt, _ in PLAN}
+    maxima = {}
+    for name, (table, column) in owners.items():
+        if table in where and name in states:
+            maxima[name] = int(src.scalar(
+                f"SELECT coalesce(max(substring({column}::text from '[0-9]+$')::bigint), 0) "
+                f"FROM public.{table} WHERE {where[table]}"))
+    if problems := unsafe_sequences(states, maxima):
+        raise Refused("sequence ở nguồn sẽ cấp lại ID đã có — đẩy sequence nguồn lên trước khi chép: "
+                      + "; ".join(problems))
+    print(f"sequence: {len(maxima)} cái kiểm, đều cấp tiếp trên ID lớn nhất đang giữ")
+    return states
+
+
 def preflight(src: Db, dst: Db) -> dict[str, list[str]]:
     if (dbname := src.scalar("SELECT current_database()")) != "luxmap_dev":
         raise Refused(f"nguồn là {dbname!r}, không phải luxmap_dev")
@@ -225,8 +269,7 @@ def main() -> int:
             print(f"  {table:22} {kept:6} / {total - kept}")
         for table, why in SKIPPED.items():
             print(f"  {table:22} bỏ qua — {why}")
-        sequences = src.rows("SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' ORDER BY 1")
-        values = {name: src.rows(f"SELECT last_value, is_called FROM public.{name}")[0] for (name,) in sequences}
+        values = {name: [str(last), "t" if called else "f"] for name, (last, called) in check_sequences(src).items()}
         if not args.apply:
             print("\nChưa ghi gì. Thêm --apply để chép.")
             return 0

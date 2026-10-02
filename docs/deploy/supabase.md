@@ -87,9 +87,14 @@ bỏ qua: refresh_token, __ef_migrations_history, spatial_ref_sys
 
 ## 5. Nghiệm thu trước khi cả nhóm dùng
 
-- **Data API bị chặn:** `GET https://<ref>.supabase.co/rest/v1/pole?select=pole_id&limit=1`, một lần không key,
-  một lần kèm header `apikey: <anon/publishable key>`. Cả hai phải bị từ chối; **`200 []` là KHÔNG đạt**.
-  Key chỉ dùng cho phép thử này.
+- **Data API bị chặn — đạt khi đủ CẢ BA, thiếu một là "chưa kết luận", không phải "đạt":**
+  1. **Key đúng của project:** `GET https://<ref>.supabase.co/auth/v1/settings` kèm `apikey: <anon/publishable key>`
+     trả **200**. Không phải 200 thì key sai / project sai — mọi lời từ chối ở bước 2 đều vô nghĩa.
+  2. `GET https://<ref>.supabase.co/rest/v1/pole?select=pole_id&limit=1` với **cùng key** **không** trả 2xx. Ghi lại
+     status và body. **`200 []` là KHÔNG đạt** (bảng vẫn mở, chỉ là RLS lọc hết).
+  3. Ảnh chụp trang cài đặt Data API của project cho thấy **đã tắt**.
+
+  Key chỉ dùng cho phép thử này, không đưa vào app.
 - **API:** `cd ../luxmap_deploy && dotnet run --project src/LuxMap.Api`, đăng nhập `engineer` / `agency`, rồi
   `GET /api/v1/poles?bbox=106.82,10.81,106.86,10.86` → 114 cột, `bbox=106.48,10.96,106.51,10.98` → 103 cột,
   `GET /api/v1/faults` → `total` 28. (`GET /poles/{id}` chưa có — BE-20.)
