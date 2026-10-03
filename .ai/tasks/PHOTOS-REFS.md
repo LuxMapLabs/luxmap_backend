@@ -1,7 +1,7 @@
 ---
 ticket: PHOTOS-REFS
 title: Công cụ ảnh — khảo sát lại phải gắn vào mã cột cũ, không sinh cột trùng
-status: ready
+status: done
 phase: 2
 owner: codex
 branch: fix/photos-existing-refs

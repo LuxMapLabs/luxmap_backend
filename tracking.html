@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>PHOTOS-REFS — 03/10/2026: hoàn thành triển khai trên fix/photos-existing-refs</strong>
+    <p><span class="tag t-done">Đã kiểm tra offline</span> Khảo sát lại dùng external_ref cũ trong quan sát;
+    ca mơ hồ chờ duyệt; poles.csv/fixtures.csv chỉ có cột mới. Bắt buộc --existing hoặc --first-survey.
+    19 test unittest dùng JPEG/EXIF tự sinh xanh; đã thêm bước CI. Còn: review/tích hợp và CI Linux.</p>
+    <p>Files: scripts/photos_to_poles.py, scripts/tests/test_photos_to_poles.py, .github/workflows/ci.yml,
+    README.md, tracking.html, .ai/results/PHOTOS-REFS.md. Không commit/push theo yêu cầu.
+    <a href=".ai/results/PHOTOS-REFS.md">Kết quả và bằng chứng</a>.</p>
+  </div>
+  <div class="card">
     <strong>BE-15 P2b-2 — 03/10/2026: xong trên nhánh, review độc lập sạch, chưa PR</strong>
     <p><span class="tag t-next">Xong trên nhánh, chưa PR</span> <strong>Claude kiểm:</strong> Api 564, Persistence 41, Shared 290, Storage 36 xanh trên <code>luxmap_test</code>; video iPhone thật 278/278 và 568/568 frame; sửa lỗi câm <code>classified_as</code> (mọi đèn normal bị lưu unknown) + test canh toàn model; review độc lập 2 lượt: 2 P2 → sạch. Frame PTS thật/áp xoay, detector giả theo hash,
     ghép track và phân loại, schema <code>AddSurveyFrames</code>, worker heartbeat và ba mức độ phủ.
