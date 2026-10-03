@@ -30,6 +30,10 @@ public sealed class SurveySweep : ICommuneScoped, IAudited
     public DateTime? SubmittedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public Guid? ProcessingLeaseOwner { get; set; }
+    public DateTime? ProcessingLeaseExpiresAt { get; set; }
+    public int ProcessingAttempt { get; set; }
+    public double? CoveragePct { get; set; }
     public uint Version { get; set; }
 }
 

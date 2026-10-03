@@ -18,6 +18,11 @@ public sealed class SurveyModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<Processing.SurveyProcessingOptions>()
+            .Bind(configuration.GetSection("SurveyProcessing"))
+            .Validate(o => o.IsValid(), "Invalid SurveyProcessing options.").ValidateOnStart();
+        services.AddSingleton<Processing.SurveyProcessor>();
+        services.AddHostedService<Processing.SurveyProcessingWorker>();
         services.AddScoped<LuxReadingService>();
         services.AddScoped<Ingest.SurveyIngestService>();
     }
