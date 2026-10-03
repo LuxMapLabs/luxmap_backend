@@ -118,6 +118,35 @@ public sealed class SurveyProcessingTests(ITestOutputHelper output)
         Assert.Contains("ambiguous_association",ambiguous.Flags);
     }
 
+    [Fact]
+    public void Stationary_interval_uses_departure_for_the_next_crossing_in_both_directions()
+    {
+        foreach (int direction in new[] { 1, -1 })
+        {
+            var track = Enumerable.Range(0, 12).Select(t => new TrackPoint(t * 1_000_000_000L,
+                direction * (t == 0 ? 0 : t == 11 ? 20 : 10), 2, null)).ToArray();
+            var pass = SurveyAlgorithms.Associate(track, [new("P", "C", direction * 15)], [], new());
+            Assert.Equal(10_500_000_000L, Assert.Single(pass.Observations).TimeNs);
+        }
+    }
+
+    [Fact]
+    public void Corridor_drift_keeps_time_but_long_exit_or_another_route_splits_passes()
+    {
+        var o = new SurveyProcessingOptions();
+        TrackPoint[] Track(int end, bool other = false) => Enumerable.Range(0, 21)
+            .Select(t => new TrackPoint(t * 1_000_000_000L, t * 5, 2, 5,
+                OutsideCorridor: t >= 5 && t <= end, OtherRoute: other && t == 10)).ToArray();
+        var shortDrift = Assert.Single(SurveyAlgorithms.SplitPasses(Track(8), o));
+        var observation = Assert.Single(SurveyAlgorithms.Associate(shortDrift, [new("P", "C", 35)], [], o).Observations);
+        Assert.Contains("gps_degraded", observation.Flags);
+        Assert.Equal(7_000_000_000L, observation.TimeNs);
+        Assert.Equal(2, SurveyAlgorithms.SplitPasses(Track(12), o).Length);
+        Assert.Equal(2, SurveyAlgorithms.SplitPasses(Track(8, true), o).Length);
+        var ambiguous = Track(8).Select(p => p with { OutsideCorridor = false, RouteAmbiguous = p.OutsideCorridor }).ToArray();
+        Assert.Contains("route_ambiguous", Assert.Single(SurveyAlgorithms.Associate(ambiguous, [new("P", "C", 35)], [], o).Observations).Flags);
+    }
+
     public static TheoryData<int, string> Scenarios
     {
         get
@@ -164,7 +193,16 @@ public sealed class SurveyProcessingTests(ITestOutputHelper output)
         if (scenario is "paired" or "combined") Assert.All(observations.Where(x => x.PoleId is "P10" or "PAIR"), x =>
             { Assert.Null(x.Peak); Assert.Contains("paired_poles", x.Flags); Assert.Contains("peak_shared", x.Flags); });
         Assert.All(observations, x => Assert.DoesNotContain("speed_warning",x.Flags));
-        if (kmh == 30)
+        if (scenario == "stop")
+        {
+            var stopped = Assert.Single(observations, x => x.PoleId == "P10");
+            Assert.InRange(Math.Abs(stopped.TimeNs - scene.Truth["P10"]) / 1e9, 0, 1);
+            Assert.Null(stopped.Peak); // Ten seconds of sustained light is not a passing peak.
+            output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                $"STOP|{kmh}|{Math.Abs(stopped.TimeNs - scene.Truth["P10"]) / 1e9:F4}"));
+        }
+        if (kmh == 30 && scenario == "stop") Assert.InRange(pass.ExcessTimeRatio, .8, .95);
+        else if (kmh == 30)
         {
             Assert.All(observations, x => Assert.Contains("speed_excess", x.Flags));
             Assert.Equal(1, pass.ExcessTimeRatio);
@@ -189,7 +227,7 @@ public sealed class SurveyProcessingTests(ITestOutputHelper output)
 internal sealed record SyntheticDrive(TrackPoint[] Track, ClockSample[] Lux, PolePosition[] Poles,
     Dictionary<string, long> Truth, HashSet<string> Lit, (double X,double Y)[] Road)
 {
-    public static readonly string[] Cases = ["reference", "delay", "canopy", "ble_batch", "ble_drop", "off_run", "dim", "paired", "headlight", "combined"];
+    public static readonly string[] Cases = ["reference", "delay", "canopy", "ble_batch", "ble_drop", "off_run", "dim", "paired", "headlight", "combined", "stop"];
     public static SyntheticDrive Create(int kmh, string scenario)
     {
         var random = new Random(15021);
@@ -200,13 +238,22 @@ internal sealed record SyntheticDrive(TrackPoint[] Track, ClockSample[] Lux, Pol
         for (int i=1;i<=22;i++) { position += 20 + random.NextDouble()*5; poles.Add(new($"P{i}","COM-001",position)); }
         if (Has("paired")) poles.Add(new("PAIR","COM-001",poles[9].ChainageM+.6));
         var truth = poles.ToDictionary(x => x.PoleId, x => (long)Math.Round(x.ChainageM / speed * 1e9));
+        double stopAt = poles[9].ChainageM / speed;
+        if (scenario == "stop")
+        {
+            duration += 10;
+            foreach (var p in poles.Where(p => p.ChainageM > poles[9].ChainageM)) truth[p.PoleId] += 10_000_000_000L;
+        }
+        double MovingTime(double t) => scenario != "stop" || t <= stopAt ? t : t <= stopAt + 10 ? stopAt : t - 10;
         double canopyTime = truth["P14"]/1e9;
         var track = Enumerable.Range(0, (int)duration + 1).Select(i =>
         {
             double noise = (random.NextDouble()-.5)*5;
+            if (scenario == "stop" && i >= stopAt && i <= stopAt + 10) noise = 0;
             bool canopy = Has("canopy") && i >= canopyTime-3 && i <= canopyTime+4;
             return new TrackPoint(i*1_000_000_000L,
-                Math.Max(0, speed*(i-(Has("delay")?.8:0)) + noise + (canopy ? 20*Math.Sin(i):0)), canopy?25:3, speed);
+                scenario == "stop" && i >= stopAt && i <= stopAt + 10 ? poles[9].ChainageM :
+                Math.Max(0, speed*(MovingTime(i)-(Has("delay")?.8:0)) + noise + (canopy ? 20*Math.Sin(i):0)), canopy?25:3, scenario == "stop" && i >= stopAt && i <= stopAt + 10 ? 0 : speed);
         }).ToArray();
         var lit = poles.Where(p => p.PoleId != "PAIR" && !(Has("off_run") && p.PoleId is "P5" or "P6" or "P7")).Select(p=>p.PoleId).ToHashSet();
         var samples = new List<ClockSample>();
@@ -216,7 +263,8 @@ internal sealed record SyntheticDrive(TrackPoint[] Track, ClockSample[] Lux, Pol
             foreach(var p in poles.Where(p=>lit.Contains(p.PoleId)))
             {
                 double amplitude = Has("dim") && p.PoleId=="P18" ? 3.5 : 60;
-                lux += amplitude*Math.Exp(-Math.Pow((t-truth[p.PoleId]/1e9)/.25,2)/2);
+                double peakTime = scenario == "stop" && p.PoleId == "P10" ? MovingTime(t) : t;
+                lux += amplitude*Math.Exp(-Math.Pow((peakTime-truth[p.PoleId]/1e9)/.25,2)/2);
             }
             if(Has("headlight"))
             {

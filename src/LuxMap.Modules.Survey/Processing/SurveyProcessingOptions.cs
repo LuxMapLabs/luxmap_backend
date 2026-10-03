@@ -31,6 +31,8 @@ public sealed class SurveyProcessingOptions
     public double OffsetAmbiguitySeconds { get; set; } = .05;
     public double AmbiguousPoleDistanceM { get; set; } = 3;
     public double BboxPaddingDegrees { get; set; } = .001;
+    public double RouteAmbiguityM { get; set; } = 2;
+    public double RouteExitSeconds { get; set; } = 5;
     public double RouteCorridorM { get; set; } = 25;
 
     public bool IsValid() => GetType().GetProperties().Where(p => p.PropertyType == typeof(double))

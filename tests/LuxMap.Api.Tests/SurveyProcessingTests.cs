@@ -30,6 +30,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     private ModuleAssemblyCatalog catalog = null!;
     private string a = null!, b = null!, road = null!, sweep = null!;
     private string[] poles = [];
+    private string? parallelRoad;
     private string userId = null!, orderId = null!;
     private sealed class Scope(string[] communes) : ICommuneScopeAccessor
     {
@@ -98,6 +99,11 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_sweep WHERE sweep_id = {sweep}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_segment WHERE work_order_id = {orderId}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order WHERE work_order_id = {orderId}");
+        if (parallelRoad is not null)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {parallelRoad}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {parallelRoad}");
+        }
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE user_id = {userId}");
@@ -248,6 +254,87 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal(SweepProcessingStatus.Failed,(await db.Set<SurveySweep>().SingleAsync(x=>x.SweepId==sweep)).ProcessingStatus);
         Assert.Equal(3,log.Events.Count(x=>x.Level==LogLevel.Error && x.Error is InvalidOperationException
             && x.Message.Contains(sweep,StringComparison.Ordinal)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Parallel_routes_choose_only_nearest_or_reject_equal_distance(bool ambiguous)
+    {
+        await using var db = Db();
+        using (db.EnterUnscopedSystemWriteBackdoor())
+        {
+            var original = await db.Set<RoadSegment>().SingleAsync(x => x.SegmentId == road);
+            var other = new RoadSegment { CommuneId = a, SegmentName = "Parallel", RoadClass = RoadClass.InterVillage,
+                DataSource = DataSource.Simulated, LengthM = 999,
+                Geom = new LineString(original.Geom.Coordinates.Select(c => new Coordinate(c.X, c.Y + .000135)).ToArray()) { SRID = 4326 } };
+            db.Add(other); await db.SaveChangesAsync(); parallelRoad = other.SegmentId;
+            db.Add(new Pole { CommuneId = a, SegmentId = parallelRoad, DataSource = DataSource.Simulated,
+                Geom = new Point(108.00025,16.000145) { SRID = 4326 } });
+            db.Add(new WorkOrderSegment { WorkOrderId = orderId, CommuneId = a, SegmentId = parallelRoad, Position = 1 });
+            await db.SaveChangesAsync();
+        }
+        if (ambiguous)
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE survey_gps_sample SET geom = ST_Translate(geom,0,0.0000675) WHERE sweep_id = {sweep}");
+        var projected = await SurveyChainageQuery.Gps(db, sweep, [road,parallelRoad], [a,b], new(), default);
+        Assert.Equal(21, projected.Length);
+        Assert.All(projected, x => Assert.Equal(ambiguous, x.RouteAmbiguous));
+        if (!ambiguous) Assert.All(projected, x => Assert.Equal(road, x.SegmentId));
+        Assert.True(await Processor().ProcessOneAsync(sweepId: sweep));
+        var run = await db.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep);
+        var passes = await db.Set<SurveyPass>().Where(x => x.RunId == run.RunId).ToArrayAsync();
+        Assert.DoesNotContain(passes, x => x.SegmentId == parallelRoad);
+        if (ambiguous) { Assert.Empty(passes); Assert.Equal(0, run.CoveragePct); }
+        else { Assert.Single(passes); Assert.InRange(run.CoveragePct!.Value, 66, 67); }
+    }
+
+    [Theory]
+    [InlineData(.00032, 30, 40)]
+    [InlineData(.002, 210, 230)]
+    public async Task Short_lateral_drift_is_retained_and_marks_crossing_degraded(double latitudeShift, double minimum, double maximum)
+    {
+        await using var db = Db();
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE survey_gps_sample SET geom = ST_Translate(geom,0,{latitudeShift}) WHERE sweep_id = {sweep} AND sample_no BETWEEN 4 AND 7");
+        var gps = await SurveyChainageQuery.Gps(db, sweep, [road], [a,b], new(), default);
+        Assert.Equal(21, gps.Length);
+        Assert.All(gps.Where(x => x.TimeNs >= 4_000_000_000L && x.TimeNs <= 7_000_000_000L), x => Assert.InRange(x.RouteDistanceM!.Value, minimum, maximum));
+        Assert.True(await Processor().ProcessOneAsync(sweepId: sweep));
+        var run = await db.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep);
+        Assert.Single(await db.Set<SurveyPass>().Where(x => x.RunId == run.RunId).ToArrayAsync());
+        var observation = await db.Set<PoleObservation>().SingleAsync(x => x.RunId == run.RunId && x.PoleId == poles[0]);
+        Assert.Contains("gps_degraded", observation.QualityFlags, StringComparison.Ordinal);
+    }
+
+    private sealed class ChangeRouteBetweenProjections(Func<Task> change) : DbCommandInterceptor
+    {
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("ST_LineLocatePoint", StringComparison.Ordinal))
+            {
+                Assert.Equal(System.Data.IsolationLevel.RepeatableRead, command.Transaction?.IsolationLevel);
+                if (command.CommandText.Contains("JOIN pole p", StringComparison.Ordinal)) await change();
+            }
+            return result;
+        }
+    }
+
+    [Fact]
+    public async Task Projection_snapshot_survives_a_concurrent_route_edit()
+    {
+        var interceptor = new ChangeRouteBetweenProjections(async () =>
+        {
+            await using var writer = Db();
+            await writer.Database.ExecuteSqlInterpolatedAsync($"UPDATE road_segment SET geom = ST_Translate(geom,0.0004,0) WHERE segment_id = {road}");
+        });
+        await using var db = Db(interceptor: interceptor);
+        var snapshot = await SurveyChainageQuery.Snapshot(db, sweep, [road], [a,b], "simulated", new(), default);
+        Assert.InRange(snapshot.Poles[0].ChainageM / snapshot.Poles[0].LengthM, .249, .251);
+        Assert.Equal(snapshot.Gps[0].RouteGeometryJson, snapshot.Poles[0].RouteGeometryJson);
+        await using var after = Db();
+        var changed = await SurveyChainageQuery.Poles(after, [road], [a,b], "simulated", new(), default);
+        Assert.InRange(changed[0].ChainageM, 0, 1);
+        Assert.NotEqual(snapshot.Poles[0].RouteGeometryJson, changed[0].RouteGeometryJson);
     }
 
     private sealed class CaptureProjection : DbCommandInterceptor

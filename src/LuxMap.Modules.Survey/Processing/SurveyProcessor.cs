@@ -66,10 +66,9 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             var segments = await db.Set<WorkOrderSegment>().Where(x => x.WorkOrderId == sweep.WorkOrderId)
                 .OrderBy(x => x.Position).Select(x => x.SegmentId).ToArrayAsync(ct);
             await Heartbeat(db, sweep, job, o, ct);
-            var gps = await SurveyChainageQuery.Gps(db, sweep.SweepId, segments, job.Communes, o, ct);
-            await Heartbeat(db, sweep, job, o, ct);
-            var source = Json(sweep.DataSource).Trim('"');
-            var poles = await SurveyChainageQuery.Poles(db, segments, job.Communes, source, o, ct);
+            // One PostgreSQL snapshot includes the geometry used by both projections.
+            var (gps, poles) = await SurveyChainageQuery.Snapshot(db, sweep.SweepId, segments, job.Communes,
+                Json(sweep.DataSource).Trim('"'), o, ct);
             run.GisSnapshot = Json(new { segments, communes = job.Communes, poles, projected_gps = gps });
             await Heartbeat(db, sweep, job, o, ct);
             var raw = await db.Set<SurveyLuxSample>().Where(x => x.SweepId == sweep.SweepId).OrderBy(x => x.SampleNo)
@@ -78,11 +77,13 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             var fits = SurveyAlgorithms.FitClocks(raw, o);
             run.ClockFit = Json(new { epochs = fits });
             var intervals = SurveyAlgorithms.AlignLux(raw, fits, o);
-            foreach (var route in gps.GroupBy(x => x.SegmentId))
+            foreach (var route in gps.Where(x => x.SegmentId is not null && !x.RouteAmbiguous && x.RouteDistanceM <= o.RouteCorridorM).GroupBy(x => x.SegmentId!))
             {
                 await Heartbeat(db, sweep, job, o, ct);
                 var expected = poles.Where(x => x.SegmentId == route.Key).Select(x => new PolePosition(x.PoleId, x.CommuneId, x.ChainageM)).ToArray();
-                var track = route.Select(x => new TrackPoint(x.TimeNs, x.ChainageM, x.AccuracyM, x.SpeedMps)).ToArray();
+                var track = gps.Select(x => new TrackPoint(x.TimeNs, x.ChainageM, x.AccuracyM, x.SpeedMps,
+                    x.RouteDistanceM is null || x.RouteDistanceM > o.RouteCorridorM, x.RouteAmbiguous,
+                    x.SegmentId != route.Key && !x.RouteAmbiguous && x.RouteDistanceM <= o.RouteCorridorM)).ToArray();
                 foreach (var pass in SurveyAlgorithms.ProcessRoute(track, expected, intervals, o))
                     results.Add((route.Key, route.First().LengthM, pass));
             }

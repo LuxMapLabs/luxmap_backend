@@ -12,7 +12,7 @@ public sealed record ClockFit(int Epoch, long ModuleOriginMs, long PhoneOriginNs
 {
     public long Map(long moduleMs) => checked(PhoneOriginNs + (long)Math.Round((moduleMs - ModuleOriginMs) * NsPerMs + OffsetNs));
 }
-public sealed record TrackPoint(long TimeNs, double ChainageM, double AccuracyM, double? SpeedMps);
+public sealed record TrackPoint(long TimeNs, double ChainageM, double AccuracyM, double? SpeedMps, bool OutsideCorridor = false, bool RouteAmbiguous = false, bool OtherRoute = false);
 public sealed record PolePosition(string PoleId, string CommuneId, double ChainageM);
 public sealed record LuxPoint(long TimeNs, double Lux, int Interval);
 public sealed record LuxPeak(long TimeNs, double Lux, bool Saturated);
@@ -133,15 +133,18 @@ public static class SurveyAlgorithms
         return peaks.ToArray();
     }
 
+    private static bool Usable(TrackPoint p, SurveyProcessingOptions o) =>
+        p.AccuracyM <= o.MaximumAccuracyM && !p.OutsideCorridor && !p.RouteAmbiguous && !p.OtherRoute;
+
     public static TrackPoint[][] SplitPasses(IReadOnlyList<TrackPoint> track, SurveyProcessingOptions o)
     {
         var result = new List<TrackPoint[]>();
         var buffer = new List<TrackPoint>();
         int direction = 0, extreme = 0;
-        long? previousTime = null;
+        long? previousTime = null, outsideSince = null;
         void Flush()
         {
-            while (buffer.Count > 0 && buffer[^1].AccuracyM > o.MaximumAccuracyM) buffer.RemoveAt(buffer.Count - 1);
+            while (buffer.Count > 0 && !Usable(buffer[^1], o)) buffer.RemoveAt(buffer.Count - 1);
             if (buffer.Count >= 2 && Math.Abs(buffer[^1].ChainageM - buffer[0].ChainageM) >= o.TurnHysteresisM)
                 result.Add(buffer.ToArray());
             buffer.Clear(); direction = 0; extreme = 0;
@@ -150,7 +153,14 @@ public static class SurveyAlgorithms
         {
             if (previousTime is long previous && (point.TimeNs - previous > o.GpsGapSeconds * 1e9 || point.TimeNs <= previous)) Flush();
             previousTime = point.TimeNs;
-            if (point.AccuracyM > o.MaximumAccuracyM)
+            if (point.OtherRoute) { Flush(); outsideSince = null; continue; }
+            if (point.OutsideCorridor)
+            {
+                outsideSince ??= point.TimeNs;
+                if (point.TimeNs - outsideSince > o.RouteExitSeconds * 1e9) Flush();
+            }
+            else outsideSince = null;
+            if (!Usable(point, o))
             {
                 // Retain time/quality for diagnostics, never use its chainage to detect a turn.
                 if (buffer.Count > 0) buffer.Add(point);
@@ -186,12 +196,13 @@ public static class SurveyAlgorithms
     public static PassResult Associate(TrackPoint[] track, PolePosition[] poles, LuxPeak[] peaks,
         SurveyProcessingOptions o, LuxPoint[][]? intervals = null)
     {
-        var valid = track.Where(x => x.AccuracyM <= o.MaximumAccuracyM).ToArray();
+        var valid = track.Where(x => Usable(x, o)).ToArray();
         if (valid.Length < 2) throw new ProcessingFailure("GPS_INSUFFICIENT", "association");
         int direction = Math.Sign(valid[^1].ChainageM - valid[0].ChainageM);
         var monotone = new List<TrackPoint> { valid[0] };
+        // Keep both arrival and departure of a plateau: interpolation after it starts at departure.
         foreach (var point in valid.Skip(1))
-            if (direction * (point.ChainageM - monotone[^1].ChainageM) > 0) monotone.Add(point);
+            if (direction * (point.ChainageM - monotone[^1].ChainageM) >= 0) monotone.Add(point);
         var expected = poles.OrderBy(x => direction * x.ChainageM).Where(x =>
             direction * (x.ChainageM - monotone[0].ChainageM) >= 0 && direction * (monotone[^1].ChainageM - x.ChainageM) >= 0).ToArray();
         // Group nearby poles BEFORE matching: one crossing time, no claim of per-pole photometry.
@@ -237,7 +248,9 @@ public static class SurveyAlgorithms
             int right = monotone.FindIndex(x => x.TimeNs >= predicted[i]);
             int left = Math.Max(0, right - 1);
             if (right >= 0 && track.Any(x => x.TimeNs >= monotone[left].TimeNs && x.TimeNs <= monotone[right].TimeNs
-                && x.AccuracyM > o.MaximumAccuracyM)) flags.Add("gps_degraded");
+                && !Usable(x, o))) flags.Add("gps_degraded");
+            if (right >= 0 && track.Any(x => x.TimeNs >= monotone[left].TimeNs && x.TimeNs <= monotone[right].TimeNs
+                && x.RouteAmbiguous)) flags.Add("route_ambiguous");
             if (intervals is not null && !intervals.Any(x => time >= x[0].TimeNs && time <= x[^1].TimeNs)) flags.Add("lux_gap");
             double speed = Speed(valid, predicted[i], o);
             if (speed * 3.6 > o.MaximumKmh) flags.Add("speed_excess");
@@ -294,7 +307,7 @@ public static class SurveyAlgorithms
     private static long Crossing(List<TrackPoint> track, double chainage)
     {
         for (int i = 1; i < track.Count; i++)
-            if (chainage >= Math.Min(track[i - 1].ChainageM, track[i].ChainageM) && chainage <= Math.Max(track[i - 1].ChainageM, track[i].ChainageM))
+            if (track[i].ChainageM != track[i - 1].ChainageM && chainage >= Math.Min(track[i - 1].ChainageM, track[i].ChainageM) && chainage <= Math.Max(track[i - 1].ChainageM, track[i].ChainageM))
                 return track[i - 1].TimeNs + (long)((track[i].TimeNs - track[i - 1].TimeNs) *
                     ((chainage - track[i - 1].ChainageM) / (track[i].ChainageM - track[i - 1].ChainageM)));
         throw new ProcessingFailure("GPS_CROSSING_MISSING", "association");
