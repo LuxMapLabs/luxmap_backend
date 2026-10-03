@@ -8234,7 +8234,8 @@
         "properties": {
           "observation_id": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "nullable": true
           },
           "pole_id": {
             "type": "string"
@@ -8245,10 +8246,12 @@
           },
           "pass_id": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "nullable": true
           },
           "direction": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "evaluated_at": {
             "type": "string",
@@ -8308,7 +8311,8 @@
           },
           "association_confidence": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "published_as": {
             "$ref": "#/components/schemas/FixtureStatus"

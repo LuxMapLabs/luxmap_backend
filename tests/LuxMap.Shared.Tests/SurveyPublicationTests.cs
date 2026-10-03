@@ -1,11 +1,24 @@
 using LuxMap.Modules.Survey.Entities;
+using LuxMap.Modules.Survey.Processing;
 using LuxMap.Modules.Survey.Review;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Serialization;
 
 namespace LuxMap.Shared.Tests;
 
 public sealed class SurveyPublicationTests
 {
+    [Fact]
+    public void Expected_poles_read_the_snapshot_exactly_as_the_worker_writes_it()
+    {
+        // SurveyProcessor serializes PolePosition with LuxMapJsonOptions; the review reads it back by name.
+        var snapshot = System.Text.Json.JsonSerializer.Serialize(new { segments = new[] { "SEG-001" }, communes = new[] { "COM-001", "COM-002" },
+            poles = new[] { new PolePosition("POLE-0001", "COM-001", 12.5), new PolePosition("POLE-10000", "COM-002", 40) } },
+            LuxMapJsonOptions.Default);
+        Assert.Equal([new ExpectedSurveyPole("POLE-0001", "COM-001"), new ExpectedSurveyPole("POLE-10000", "COM-002")],
+            SurveyPublicationRules.ExpectedPoles(snapshot));
+    }
+
     private static PoleObservation Observation(long id, double peak, double quality = .9, string direction = "forward") => new()
     {
         ObservationId = id, PoleId = "POLE-0001", CommuneId = "COM-001", RunId = id,
@@ -143,5 +156,82 @@ public sealed class SurveyPublicationTests
         Assert.Equal(FixtureStatus.Unknown, page[0].PublishedAs); Assert.False(page[0].IsRepresentative);
         var next = Assert.Single(SurveyReviewService.Preview([off], [on, off]));
         Assert.Equal(FixtureStatus.Unknown, next.PublishedAs); Assert.True(next.IsRepresentative);
+    }
+
+    private const string PartialSnapshot = """
+        {"poles":[{"pole_id":"POLE-10000","commune_id":"COM-002"},
+                  {"pole_id":"POLE-0001","commune_id":"COM-001"},
+                  {"pole_id":"POLE-9999","commune_id":"COM-003"},
+                  {"pole_id":"POLE-9999","commune_id":"COM-003"}]}
+        """;
+    private static SurveySweep PartialSweep() => new() { SweepId = "SWP-001", WorkOrderId = "WO-001",
+        CommuneId = "COM-001", CapturedBy = "USR-001", CreateRequestHash = "unused",
+        UtcAnchor = DateTime.UnixEpoch, ElapsedAnchorNs = 1_000_000_000, EndedElapsedNs = 11_000_001_999 };
+
+    [Fact]
+    public void Publication_set_is_the_distinct_union_including_observations_outside_snapshot()
+    {
+        var first = Observation(1, 100); var other = Observation(2, 100); other.PoleId = "POLE-0002";
+        var targets = SurveyPublicationRules.PublicationSet(PartialSnapshot, [first, first, other]);
+        Assert.Equal(4, targets.Length);
+        Assert.Same(first, targets.Single(t => t.PoleId == first.PoleId).Choice!.Observation);
+        Assert.Same(other, targets.Single(t => t.PoleId == other.PoleId).Choice!.Observation);
+        Assert.Null(targets.Single(t => t.PoleId == "POLE-9999").Choice);
+        Assert.Equal(3, SurveyPublicationRules.PublicationSet(PartialSnapshot, []).Length);
+        Assert.Single(SurveyPublicationRules.PublicationSet("{}", [first]));
+    }
+
+    [Fact]
+    public void Unobserved_history_is_unknown_at_sweep_end_without_measurements_or_fault()
+    {
+        var sweep = PartialSweep(); var published = DateTime.UnixEpoch.AddDays(200);
+        var target = SurveyPublicationRules.PublicationSet(PartialSnapshot, []).First();
+        var history = SurveyPublicationRules.History(target, sweep, 5, "LOCKED-COMMUNE", published, "reviewer");
+        Assert.Equal(DateTime.UnixEpoch.AddSeconds(10).AddTicks(10), history.EvaluatedAt);
+        Assert.Equal(sweep.AtElapsed(sweep.EndedElapsedNs), history.EvaluatedAt);
+        Assert.Equal(published, history.PublishedAt); Assert.Equal("LOCKED-COMMUNE", history.CommuneId);
+        Assert.Null(history.ObservationId); Assert.Null(history.PeakLux); Assert.Null(history.CvState);
+        Assert.Null(history.BaselineId); Assert.Null(history.BaselineRatio); Assert.Null(history.StatusConfidence);
+        Assert.Equal(FixtureStatus.Unknown, history.ClassifiedAs); Assert.False(history.DimEvaluationEligible);
+        Assert.Equal(new[] { "not_observed" }, SurveyPublicationRules.Flags(history.ReasonCodes));
+        Assert.Null(SurveyPublicationRules.FaultFor(history.ClassifiedAs));
+        Assert.False(SurveyPublicationRules.IsNewer(history.EvaluatedAt, history.EvaluatedAt.AddSeconds(1)));
+        Assert.False(SurveyPublicationRules.IsNewer(history.EvaluatedAt, history.EvaluatedAt));
+        Assert.True(SurveyPublicationRules.IsNewer(history.EvaluatedAt, history.EvaluatedAt.AddSeconds(-1)));
+    }
+
+    [Fact]
+    public void Observed_history_still_uses_capture_time_and_observation_identity()
+    {
+        var observation = Observation(1, 100);
+        var target = Assert.Single(SurveyPublicationRules.PublicationSet("{}", [observation]));
+        var history = SurveyPublicationRules.History(target, PartialSweep(), 1, observation.CommuneId, DateTime.UtcNow, "reviewer");
+        Assert.Equal(observation.ObservedAt, history.EvaluatedAt); Assert.Equal(observation.ObservationId, history.ObservationId);
+        Assert.Equal(FixtureStatus.Normal, history.ClassifiedAs); Assert.Equal(100, history.PeakLux);
+    }
+
+    [Fact]
+    public void Unobserved_preview_has_no_measurements_and_missing_poles_have_numeric_stable_order()
+    {
+        var ids = SurveyPublicationRules.UnobservedPoles(PartialSnapshot, ["POLE-0001", "POLE-0002"]);
+        Assert.Equal(new[] { "POLE-9999", "POLE-10000" }, ids);
+        var item = SurveyReviewService.UnobservedPreview(ids[0], 5, PartialSweep());
+        Assert.Null(item.ObservationId); Assert.Null(item.PassId); Assert.Null(item.Direction);
+        Assert.Null(item.CvState); Assert.Null(item.CvConfidence); Assert.Null(item.PeakLux);
+        Assert.Null(item.BaselineId); Assert.Null(item.BaselineValue); Assert.Null(item.BaselineRatio);
+        Assert.Null(item.FrameId); Assert.Null(item.AssociationConfidence);
+        Assert.Equal(FixtureStatus.Unknown, item.PublishedAs); Assert.Equal(FixtureStatus.Unknown, item.ClassifiedAs);
+        Assert.Equal(new[] { "not_observed" }, item.ReasonCodes); Assert.False(item.IsRepresentative);
+        Assert.False(item.DimEvaluationEligible); Assert.Empty(item.QualityFlags);
+        Assert.Equal(PartialSweep().AtElapsed(PartialSweep().EndedElapsedNs), item.EvaluatedAt);
+    }
+
+    [Fact]
+    public void Whole_run_requires_unobserved_snapshot_and_current_communes_too()
+    {
+        var required = SurveyPublicationRules.RequiredCommunes(PartialSnapshot, ["COM-001", "COM-004"], ["COM-005"]);
+        var scope = LuxMap.Shared.Authorization.CommuneScope.ForCommunes(["COM-001", "COM-004"]);
+        Assert.Contains("COM-002", required); Assert.Contains("COM-003", required); Assert.Contains("COM-005", required);
+        Assert.False(required.All(scope.Allows));
     }
 }

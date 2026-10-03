@@ -43,6 +43,7 @@ public sealed class LuminanceHistoryConfiguration : IEntityTypeConfiguration<Lum
     {
         b.ToTable("luminance_history", t =>
         {
+            t.HasCheckConstraint("ck_luminance_history_unobserved", "observation_id IS NOT NULL OR (classified_as = 'unknown' AND peak_lux IS NULL AND cv_state IS NULL AND baseline_id IS NULL AND baseline_ratio IS NULL AND status_confidence IS NULL)");
             t.HasCheckConstraint("ck_luminance_history_finite", "(peak_lux IS NULL OR (peak_lux >= 0 AND peak_lux < 'Infinity'::float8)) AND (baseline_ratio IS NULL OR (baseline_ratio >= 0 AND baseline_ratio < 'Infinity'::float8)) AND association_confidence BETWEEN 0 AND 1 AND (status_confidence IS NULL OR status_confidence BETWEEN 0 AND 1)");
             t.HasCheckConstraint("ck_luminance_history_classification", "(classified_as = 'unknown') = (status_confidence IS NULL) AND (classified_as = 'unknown' OR cv_state IS NOT NULL) AND (cv_state IS NULL OR cv_state IN ('on','off')) AND (classified_as <> 'out' OR cv_state = 'off') AND (classified_as NOT IN ('normal','dim') OR cv_state = 'on') AND (NOT dim_evaluation_eligible OR (baseline_id IS NOT NULL AND baseline_ratio IS NOT NULL AND cv_state = 'on')) AND (classified_as <> 'dim' OR dim_evaluation_eligible) AND jsonb_typeof(reason_codes) = 'array'");
         });

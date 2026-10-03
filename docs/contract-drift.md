@@ -727,7 +727,7 @@ Bề mặt mới: `GET /sweeps/{id}/results` (`ReadSurveys`, run thành công m�
 `POST /sweeps/{id}/review` (`ReviewSurveys`, accept/return, `client_op_id`, `run_id`, `expected_version`,
 return bắt buộc note). GET sweep/list thêm `version`. Thumbnail `GET /frames/{frame_id}/thumbnail` hiện thực
 đúng JPEG proxy của Contract, kiểm cả parent/assignee/tập xã trước mở object; stub generator đã bỏ,
-**chưa xuất OpenAPI**, Claude làm sau review. Payload/mã lỗi tại [`survey-ingest-p2a.md`](survey-ingest-p2a.md).
+OpenAPI đã xuất lại sau review. Payload/mã lỗi tại [`survey-ingest-p2a.md`](survey-ingest-p2a.md).
 
 Công bố một transaction, mỗi xã một batch history/status/baseline kèm audit; mỗi fault mới một SaveChanges
 và audit `cv` riêng. Sweep cũ hoặc bằng timestamp không đè status và không tạo fault hiện tại (vẫn history).
@@ -746,7 +746,14 @@ trần High. Cấu hình `SurveyReview:LampOutSeverity` / `LampDimSeverity` (Low
 member từ ngày lắp UTC của bóng đang dùng, lookup chỉ dùng baseline cùng bóng hiện tại; không có bóng/ngày
 lắp thì không lọc thời gian. R3 adapter đọc object thiếu →503 `STORAGE_OBJECT_MISSING`. R4 results thêm
 `published_as`, `is_representative` tính trên mọi lượt của cột trong run, độc lập trang. Không có schema viết
-tay cho SurveyResultItem trong generator; JSON OpenAPI chưa xuất lại theo giới hạn lượt Codex. Nền SELF-SIGNED giữ nguyên.
+tay cho SurveyResultItem trong generator. Nền SELF-SIGNED giữ nguyên.
+
+**Review P2c vòng 3 (04/10):** phiên công bố `unknown` (`reason_codes = ["not_observed"]`) cho **mọi cột dự kiến**
+của run mà xe không đi qua — đúng nghĩa `unknown` của Contract mục 1; trước đó các cột này giữ trạng thái cũ trên bản
+đồ. **Hệ quả cho WP5/WP6:** chấp nhận một phiên phủ nửa tuyến làm nửa còn lại thành `unknown`. `GET /sweeps/{id}/results`
+liệt kê cả các cột này (đứng sau mọi quan sát); trong `SurveyResultItem`, `observation_id`, `pass_id`, `direction`,
+`association_confidence` thành **nullable**. Người duyệt phải có xã của cả cột không quan sát. Trả lại không còn bị
+chặn khi cột đã được sửa sau xử lý (`SURVEY_SCOPE_CHANGED` chỉ cho accept). OpenAPI đã xuất lại.
 
 ## Dữ liệu thực địa đầu tiên — đèn thật không phải LED (01/10/2026)
 

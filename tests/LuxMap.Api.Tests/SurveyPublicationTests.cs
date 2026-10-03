@@ -70,7 +70,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     private sealed record Capture(string Id, long Run, uint Version, string Frame, DateTime At);
-    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward")
+    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false)
     {
         await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
         var at = DateTime.UnixEpoch.AddDays(20000 + day);
@@ -79,7 +79,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
             Status = SweepStatus.AwaitingReview, ProcessingStatus = SweepProcessingStatus.Succeeded };
         db.Add(sweep); await db.SaveChangesAsync();
         var run = new SurveyProcessingRun { SweepId = sweep.SweepId, CommuneId = a, Attempt = 1, LeaseOwner = Guid.NewGuid(),
-            LeaseExpiresAt = at.AddMinutes(1), InputHash = new('b',64), SettingsSnapshot = "{}", GisSnapshot = "{}",
+            LeaseExpiresAt = at.AddMinutes(1), InputHash = new('b',64), SettingsSnapshot = "{}", GisSnapshot = System.Text.Json.JsonSerializer.Serialize(new {
+                poles = poles.Select((id, i) => new { pole_id = id, commune_id = i == 0 ? a : b }) }),
             AlgorithmVersionId = algorithm, ClockVersionId = clock, ModelVersionId = model, ExtractorVersionId = extractor,
             ResultState = "succeeded", Stage = "complete", StartedAt = at, FinishedAt = at.AddSeconds(10) };
         db.Add(run);
@@ -90,7 +91,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         var pass = new SurveyPass { Run = run, SegmentId = road, Direction = direction, FromFraction = direction == "forward" ? 0 : 1,
             ToFraction = direction == "forward" ? 1 : 0, EndElapsedNs = 10_000_000_000L, QualityFlags = "{}" };
         db.AddRange(frame, pass); await db.SaveChangesAsync();
-        for (int i = 0; i < poles.Length; i++)
+        for (int i = 0; i < (halfCovered ? 1 : poles.Length); i++)
         {
             var baseline = await new SurveyBaselineLookup(db).FindAsync(new(poles[i], direction, sweep.SweepId, at, DataSource.Simulated), default);
             var cv = i == 0 ? state : "off";
@@ -349,6 +350,106 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         var result = await check.Set<PoleObservation>().SingleAsync(o => o.RunId == next.Run && o.PoleId == poles[0]);
         Assert.Equal(FixtureStatus.Dim, result.ClassifiedAs); Assert.Equal(200, result.BaselineValue);
         Assert.True(await check.Set<LuminanceBaseline>().AnyAsync(baseline => baseline.FixtureId == first));
+    }
+
+    [Fact]
+    public async Task Half_covered_sweep_publishes_unknown_for_expected_pole_at_sweep_end()
+    {
+        await Accept(await Plant(1));
+        var capture = await Plant(2, halfCovered: true);
+        await Accept(capture);
+        await using var db = Db();
+        var history = await db.Set<LuminanceHistory>().SingleAsync(h => h.SweepId == capture.Id && h.PoleId == poles[1]);
+        Assert.Null(history.ObservationId); Assert.Null(history.PeakLux); Assert.Null(history.CvState);
+        Assert.Null(history.BaselineId); Assert.Null(history.BaselineRatio); Assert.Null(history.StatusConfidence);
+        Assert.Equal(FixtureStatus.Unknown, history.ClassifiedAs); Assert.Equal(b, history.CommuneId);
+        Assert.Equal(capture.At.AddSeconds(10), history.EvaluatedAt); Assert.Equal("[\"not_observed\"]", history.ReasonCodes.Replace(" ", ""));
+        var current = await db.Set<PoleCurrentStatus>().SingleAsync(p => p.PoleId == poles[1]);
+        Assert.Equal(FixtureStatus.Unknown, current.FixtureStatus); Assert.Null(current.LastSeenAt);
+        Assert.Equal(history.EvaluatedAt, current.LastEvaluatedAt); Assert.Equal(capture.Id, current.LastSweepId);
+        Assert.Equal(capture.Run, current.LastRunId); Assert.Null(current.StatusConfidence);
+        Assert.Single(await db.Set<Fault>().Where(f => f.PoleId == poles[1]).ToArrayAsync()); // Existing fault stays open.
+        Assert.False(await db.Set<LuminanceBaseline>().AnyAsync(baseline => baseline.PoleId == poles[1]));
+        Assert.Equal(2, await db.Set<LuminanceHistory>().CountAsync(h => h.SweepId == capture.Id));
+    }
+
+    [Fact]
+    public async Task Late_unobserved_publication_keeps_newer_current_status_but_adds_history()
+    {
+        var old = await Plant(1, halfCovered: true); var recent = await Plant(2);
+        await Accept(recent); await Accept(old);
+        await using var db = Db();
+        var current = await db.Set<PoleCurrentStatus>().SingleAsync(p => p.PoleId == poles[1]);
+        Assert.Equal(recent.Id, current.LastSweepId); Assert.Equal(FixtureStatus.Out, current.FixtureStatus);
+        Assert.Equal(FixtureStatus.Unknown, (await db.Set<LuminanceHistory>().SingleAsync(h => h.SweepId == old.Id && h.PoleId == poles[1])).ClassifiedAs);
+    }
+
+    [Fact]
+    public async Task Unobserved_pole_commune_is_required_for_review_results_and_thumbnail()
+    {
+        var capture = await Plant(1, halfCovered: true);
+        await using var db = Db([a]); var service = Service(db, [a]);
+        var error = await Assert.ThrowsAsync<LuxMapException>(() => service.Review(capture.Id,
+            new(Guid.NewGuid(), capture.Run, "accept", null, capture.Version), default));
+        Assert.Equal("COMMUNE_FORBIDDEN", error.Code);
+        error = await Assert.ThrowsAsync<LuxMapException>(() => service.Results(capture.Id, null, PageRequest.Create(1, 10), default));
+        Assert.Equal(HttpStatusCode.NotFound, error.StatusCode);
+        error = await Assert.ThrowsAsync<LuxMapException>(() => service.Thumbnail(capture.Frame, default));
+        Assert.Equal(HttpStatusCode.NotFound, error.StatusCode); Assert.Equal(0, objects.Reads);
+    }
+
+    [Fact]
+    public async Task Results_append_one_unobserved_item_and_page_across_the_boundary()
+    {
+        var capture = await Plant(1, halfCovered: true);
+        await using var db = Db(); var service = Service(db);
+        var first = await service.Results(capture.Id, null, PageRequest.Create(1, 1), default);
+        Assert.Equal(2, first.Total); Assert.NotNull(Assert.Single(first.Items).ObservationId);
+        var second = await service.Results(capture.Id, null, PageRequest.Create(2, 1), default);
+        var missing = Assert.Single(second.Items);
+        Assert.Equal(poles[1], missing.PoleId); Assert.Null(missing.ObservationId); Assert.Null(missing.PassId);
+        Assert.Equal(FixtureStatus.Unknown, missing.PublishedAs); Assert.Equal(new[] { "not_observed" }, missing.ReasonCodes);
+        Assert.Null(missing.PeakLux); Assert.Null(missing.CvConfidence); Assert.Null(missing.AssociationConfidence);
+        Assert.Equal(capture.At.AddSeconds(10), missing.EvaluatedAt);
+        var all = await service.Results(capture.Id, null, PageRequest.Create(1, 10), default);
+        Assert.Equal(new[] { poles[0], poles[1] }, all.Items.Select(x => x.PoleId));
+        Assert.Empty((await service.Results(capture.Id, null, PageRequest.Create(3, 1), default)).Items);
+    }
+
+    [Theory]
+    [InlineData(false)] [InlineData(true)]
+    public async Task Missing_or_corrected_unobserved_pole_blocks_only_accept(bool deleted)
+    {
+        var capture = await Plant(1, halfCovered: true);
+        await using (var setup = Db())
+        {
+            using var seed = setup.EnterUnscopedSystemWriteBackdoor();
+            var pole = await setup.Set<Pole>().SingleAsync(p => p.PoleId == poles[1]);
+            if (deleted) setup.Remove(pole); else pole.DataSource = DataSource.Field;
+            await setup.SaveChangesAsync();
+        }
+        var error = await Assert.ThrowsAsync<LuxMapException>(() => Accept(capture));
+        Assert.Equal("SURVEY_SCOPE_CHANGED", error.Code);
+        await using var db = Db();
+        var returned = await Service(db).Review(capture.Id, new(Guid.NewGuid(), capture.Run, "return", "Correct assets", capture.Version), default);
+        Assert.Equal(SweepStatus.Returned, returned.Status);
+        Assert.False(await db.Set<LuminanceHistory>().AnyAsync(h => h.SweepId == capture.Id));
+    }
+
+    [Fact]
+    public async Task Check_rejects_known_history_without_observation()
+    {
+        var capture = await Plant(1, halfCovered: true);
+        await using var db = Db();
+        var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO luminance_history (sweep_id, pole_id, commune_id, run_id, observation_id,
+                evaluated_at, cv_state, peak_lux, status_confidence, association_confidence,
+                classified_as, dim_evaluation_eligible, data_source, published_at, published_by, reason_codes)
+            VALUES ({capture.Id}, {poles[1]}, {b}, {capture.Run}, NULL, {capture.At}, 'on', 100, 0.9, 0,
+                'normal', false, 'simulated', {capture.At}, {user}, '[]'::jsonb)
+            """));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
+        Assert.Equal("ck_luminance_history_unobserved", error.ConstraintName);
     }
 
     public async Task DisposeAsync()

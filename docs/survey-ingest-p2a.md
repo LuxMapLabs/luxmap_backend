@@ -157,6 +157,10 @@ có attempt mới nhất, giới hạn trang 200. Mỗi item là một quan sát
 `reason_codes[]`, `quality_flags[]`, `frame_id`, `association_confidence`, `published_as`, `is_representative`.
 Hai trường cuối dùng mọi lượt của cột trong run, kể cả lượt nằm trên trang khác: `published_as` là
 kết quả sẽ công bố, `is_representative` đánh dấu observation được chọn.
+Cột **dự kiến** của run (`gis_snapshot.poles`) mà xe không đi qua cũng có một item: `observation_id`,
+`pass_id`, `direction`, các trường đo đều `null`, `evaluated_at` = lúc kết thúc phiên, `published_as = unknown`,
+`reason_codes = ["not_observed"]`. Các item này đứng **sau** mọi quan sát, theo `length(pole_id), pole_id`, và được
+tính vào `total`. Phiên dừng giữa đường sẽ hiện nhiều item như vậy — Quản lý nên trả lại thay vì chấp nhận.
 
 Quản lý (`ReviewSurveys`) gọi `POST /sweeps/{id}/review`:
 
@@ -169,9 +173,15 @@ Quản lý (`ReviewSurveys`) gọi `POST /sweeps/{id}/review`:
 Retry cùng actor/key và body chuẩn hoá trả nguyên quyết định cũ (kể cả version cũ trong body retry);
 đổi payload cùng key → 409 `IDEMPOTENCY_CONFLICT`. Run sai sweep/không thành công → 409
 `INVALID_REVIEW_RUN`; sweep đã quyết bằng key khác → 409 `SWEEP_ALREADY_REVIEWED`; version cũ →
-409 `VERSION_CONFLICT`. Kiểm quyền trước cả retry. Thiếu bất kỳ xã nào của quan sát run →
+409 `VERSION_CONFLICT`. Kiểm quyền trước cả retry. Thiếu bất kỳ xã nào của run — xã của quan sát, của
+cột dự kiến trong snapshot và xã hiện tại của các cột đó →
 403 `COMMUNE_FORBIDDEN`; parent ngoài scope/assignee → 404. Run không có kết quả ở GET → 404.
 
+Chấp nhận công bố **mọi cột dự kiến** cộng mọi cột có quan sát: cột không quan sát nhận history
+`unknown`/`not_observed` (`observation_id` null, CHECK `ck_luminance_history_unobserved` cấm số đo trên hàng đó) và
+trạng thái hiện tại `unknown` nếu mới hơn — đúng nghĩa *phiên gần nhất không phủ được cột* của Contract mục 1; không
+sinh sự cố, không dựng baseline. Kiểm tương thích cột (`SURVEY_SCOPE_CHANGED`: cột bị xoá, đổi xã hoặc đổi
+`data_source` sau khi xử lý) **chỉ** chạy khi accept; trả lại luôn được.
 Chấp nhận giữ khoá work order → sweep → toàn bộ pole theo thứ tự ID; một transaction bao gồm audit
 quyết định, các batch công bố theo xã và audit `cv` riêng cho từng fault mới. Một SaveChanges chỉ có
 một audit mới; batch xã không nhét pole của xã khác vào audit. Không tự hoàn thành phiếu công việc.
@@ -205,8 +215,8 @@ phải chốt trước khi mở xử lý thực địa (D-05/D-06, BE-33/34); kh
 `GET /frames/{frame_id}/thumbnail` dùng `ReadSurveys`, trả stream JPEG qua API. Kiểm sweep cha,
 work order/assignee, xã trong các run và GIS snapshot trước khi mở object; ngoài quyền 404.
 Object thiếu trả 503 `STORAGE_OBJECT_MISSING` từ adapter S3; lỗi quyền truy cập không đổi thành missing.
-Không presigned URL. Stub thumbnail đã bỏ khỏi generator; chưa xuất lại OpenAPI trong lượt này.
+Không presigned URL. Stub thumbnail đã bỏ khỏi generator; OpenAPI đã xuất lại (`luxmap-v1.json`, `luxmap-v1.5.json`).
 
 Migration `AddSurveyPublication` thêm ba bảng bất biến, FK Restrict và truy vết review/current/fault.
 Giữ CHECK status_confidence 0..1 có sẵn. Down từ chối nếu đã có lịch sử/baseline/quyết định duyệt;
-rollback ứng dụng nên giữ dữ liệu. Chưa apply migration hoặc chạy test PostGIS trong lượt Codex P2c.
+rollback ứng dụng nên giữ dữ liệu. Claude đã apply → rollback → apply hai vòng trên `luxmap_test` và chạy toàn bộ test PostGIS.

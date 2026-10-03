@@ -18,8 +18,49 @@ public sealed class SurveyReviewOptions
 public sealed record PublicationChoice(PoleObservation Observation, FixtureStatus Status, double? Confidence,
     double? Ratio, bool DimEligible, string[] Reasons);
 
+public sealed record ExpectedSurveyPole(string PoleId, string CommuneId);
+public sealed record PublicationTarget(string PoleId, PublicationChoice? Choice);
+
 public static class SurveyPublicationRules
 {
+    public static ExpectedSurveyPole[] ExpectedPoles(string snapshot)
+    {
+        using var json = JsonDocument.Parse(snapshot);
+        return json.RootElement.TryGetProperty("poles", out var poles)
+            ? poles.EnumerateArray().Select(p => new ExpectedSurveyPole(
+                p.GetProperty("pole_id").GetString()!, p.GetProperty("commune_id").GetString()!)).ToArray() : [];
+    }
+
+    public static string[] UnobservedPoles(string snapshot, IEnumerable<string> observedIds)
+        => ExpectedPoles(snapshot).Select(p => p.PoleId).Except(observedIds)
+            .OrderBy(id => id.Length).ThenBy(id => id, StringComparer.Ordinal).ToArray();
+
+    public static IEnumerable<string> RequiredCommunes(string snapshot, IEnumerable<string> observed, IEnumerable<string> current)
+        => observed.Concat(ExpectedPoles(snapshot).Select(p => p.CommuneId)).Concat(current).Distinct();
+
+    public static PublicationTarget[] PublicationSet(string snapshot, IEnumerable<PoleObservation> observations)
+    {
+        var choices = observations.GroupBy(o => o.PoleId).ToDictionary(g => g.Key, Choose);
+        return ExpectedPoles(snapshot).Select(p => p.PoleId).Union(choices.Keys)
+            .Select(id => new PublicationTarget(id, choices.GetValueOrDefault(id))).ToArray();
+    }
+
+    public static LuminanceHistory History(PublicationTarget target, SurveySweep sweep, long runId,
+        string communeId, DateTime publishedAt, string publishedBy)
+    {
+        var choice = target.Choice;
+        var o = choice?.Observation;
+        return new() { SweepId = sweep.SweepId, PoleId = target.PoleId, CommuneId = communeId, RunId = runId,
+            ObservationId = o?.ObservationId, BaselineId = o?.BaselineId,
+            EvaluatedAt = o?.ObservedAt ?? sweep.AtElapsed(sweep.EndedElapsedNs)
+                ?? throw new InvalidOperationException("A completed sweep must have a valid end time."),
+            PeakLux = o?.PeakLux, CvState = choice?.Status == FixtureStatus.Unknown ? null : o?.CvState,
+            BaselineRatio = choice?.Ratio, StatusConfidence = choice?.Confidence, AssociationConfidence = o?.AssociationConfidence ?? 0,
+            ClassifiedAs = choice?.Status ?? FixtureStatus.Unknown, DimEvaluationEligible = choice?.DimEligible ?? false,
+            DataSource = sweep.DataSource, PublishedAt = publishedAt, PublishedBy = publishedBy,
+            ReasonCodes = JsonSerializer.Serialize(choice?.Reasons ?? ["not_observed"]) };
+    }
+
     public static string[] Flags(string json) => JsonSerializer.Deserialize<string[]>(json) ?? [];
 
     // Ranking deliberately never reads lux magnitude. Stable ties use capture time and observation ID.

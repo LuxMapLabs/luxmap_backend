@@ -302,3 +302,22 @@ Test tích hợp mới chỉ biên dịch; phần cần Claude kiểm gồm vòn
 
 Không `.env`, DB/Docker/MinIO, database update, test tích hợp, OpenAPI export, commit/push.
 Đã cập nhật tracking; dừng sau vòng sửa R1–R4 này.
+
+## Vòng 3 — R5, R6 (04/10/2026)
+
+Codex hết hạn mức giữa lượt R6 (sau khi đã sửa code, migration, test; chưa ghi mục này) — Claude hoàn tất kiểm và ghi.
+
+- **R5** (review độc lập lần 1): kiểm tương thích cột chỉ chạy khi accept. Claude sửa, test
+  `A_corrected_pole_blocks_accept_but_not_return`.
+- **R6** (review độc lập lần 2): cột dự kiến không quan sát ⇒ history `unknown`/`not_observed`, `observation_id` null,
+  `evaluated_at` = kết thúc phiên, current status theo D-08; không fault/baseline. Phạm vi người duyệt phủ xã của cột dự kiến
+  và xã hiện tại của chúng. Results liệt kê cột không quan sát sau mọi quan sát. CHECK `ck_luminance_history_unobserved`.
+  `SurveySweep.AtElapsed` dùng chung cho `ended_at` của listing và mốc công bố.
+- Claude thêm `Expected_poles_read_the_snapshot_exactly_as_the_worker_writes_it` — snapshot test dựng tay không canh được
+  định dạng `PolePosition` + `LuxMapJsonOptions` mà worker thật ghi.
+- Kiểm trên PostGIS `luxmap_test`: migration apply → rollback → apply hai vòng, không có thay đổi model chưa sinh migration.
+  Api 585, Persistence 44, Storage 39, Shared 318 (môi trường sạch). Không sót dữ liệu test.
+- Phá thử (đã khôi phục): bỏ cột dự kiến khỏi tập công bố ⇒ 4 test DB + 2 test không DB đỏ; bỏ xã cột dự kiến khỏi kiểm phạm
+  vi ⇒ 1 + 1 đỏ; gỡ CHECK trên DB ⇒ `Check_rejects_known_history_without_observation` đỏ (CHECK đã tạo lại đúng như migration).
+- OpenAPI xuất lại, spec hợp nhất sinh lại, lint hợp lệ.
+- ⚠️ Review độc lập lần 3 (Codex `exec review`) **chưa chạy** — hết hạn mức tới 10/10/2026.

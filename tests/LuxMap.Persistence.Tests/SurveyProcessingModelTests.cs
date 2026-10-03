@@ -76,6 +76,19 @@ public sealed class SurveyProcessingModelTests
         }
     }
 
+    [Fact]
+    public void Missing_observation_is_nullable_but_requires_unknown_without_measurements()
+    {
+        using var db = Create();
+        var entity = db.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(LuminanceHistory))!;
+        Assert.True(entity.FindProperty(nameof(LuminanceHistory.ObservationId))!.IsNullable);
+        var check = Assert.Single(entity.GetCheckConstraints(), c => c.Name == "ck_luminance_history_unobserved");
+        Assert.Equal("observation_id IS NOT NULL OR (classified_as = 'unknown' AND peak_lux IS NULL AND cv_state IS NULL AND baseline_id IS NULL AND baseline_ratio IS NULL AND status_confidence IS NULL)", check.Sql);
+        var fk = Assert.Single(entity.GetForeignKeys(), f => f.PrincipalEntityType.ClrType == typeof(PoleObservation));
+        Assert.False(fk.IsRequired);
+        Assert.Equal(new[] { "ObservationId", "PoleId", "CommuneId", "RunId" }, fk.Properties.Select(p => p.Name));
+    }
+
     private sealed class Stop : SaveChangesInterceptor
     {
         public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)

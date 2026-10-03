@@ -34,7 +34,7 @@ public sealed class LuminanceHistory : ICommuneScoped, IImmutableRecord, IAudite
     public required string PoleId { get; set; }
     public required string CommuneId { get; set; }
     public long RunId { get; set; }
-    public long ObservationId { get; set; }
+    public long? ObservationId { get; set; }
     public long? BaselineId { get; set; }
     public DateTime EvaluatedAt { get; set; }
     public double? PeakLux { get; set; }

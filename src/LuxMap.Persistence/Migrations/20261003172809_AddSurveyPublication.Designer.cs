@@ -1182,7 +1182,7 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("evaluated_at");
 
-                    b.Property<long>("ObservationId")
+                    b.Property<long?>("ObservationId")
                         .HasColumnType("bigint")
                         .HasColumnName("observation_id");
 
@@ -1245,6 +1245,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_luminance_history_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
 
                             t.HasCheckConstraint("ck_luminance_history_finite", "(peak_lux IS NULL OR (peak_lux >= 0 AND peak_lux < 'Infinity'::float8)) AND (baseline_ratio IS NULL OR (baseline_ratio >= 0 AND baseline_ratio < 'Infinity'::float8)) AND association_confidence BETWEEN 0 AND 1 AND (status_confidence IS NULL OR status_confidence BETWEEN 0 AND 1)");
+
+                            t.HasCheckConstraint("ck_luminance_history_unobserved", "observation_id IS NOT NULL OR (classified_as = 'unknown' AND peak_lux IS NULL AND cv_state IS NULL AND baseline_id IS NULL AND baseline_ratio IS NULL AND status_confidence IS NULL)");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -3130,7 +3132,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("ObservationId", "PoleId", "CommuneId", "RunId")
                         .HasPrincipalKey("ObservationId", "PoleId", "CommuneId", "RunId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_luminance_history_pole_observation_observation_id_pole_id_c");
                 });
 

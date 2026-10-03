@@ -42,6 +42,15 @@ public sealed class SurveySweep : ICommuneScoped, IAudited
     public DateTime? ReviewedAt { get; set; }
     public string? ReviewNote { get; set; }
     public uint Version { get; set; }
+
+    public DateTime? AtElapsed(long? elapsed)
+    {
+        if (elapsed is null) return null;
+        var ticks = (elapsed.Value - ElapsedAnchorNs) / 100;
+        if (ticks > DateTime.MaxValue.Ticks - UtcAnchor.Ticks || ticks < -UtcAnchor.Ticks) return null;
+        return new DateTime((UtcAnchor.Ticks + ticks) / 10 * 10, DateTimeKind.Utc);
+    }
+
 }
 
 public sealed class SurveyVideoClip

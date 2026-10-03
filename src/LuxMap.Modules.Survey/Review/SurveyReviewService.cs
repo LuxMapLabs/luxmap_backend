@@ -26,10 +26,10 @@ public sealed record ReviewSweepRequest(Guid ClientOpId, long RunId, [Required] 
     string? Note, [Required] uint? ExpectedVersion);
 public sealed record ReviewSweepResponse(string SweepId, SweepStatus Status, long? AcceptedRunId,
     string? ReviewedBy, DateTime? ReviewedAt, string? Note, uint Version);
-public sealed record SurveyResultItem(long ObservationId, string PoleId, long RunId, long PassId, string Direction,
+public sealed record SurveyResultItem(long? ObservationId, string PoleId, long RunId, long? PassId, string? Direction,
     DateTime EvaluatedAt, string? CvState, double? CvConfidence, double? PeakLux, long? BaselineId,
     double? BaselineValue, double? BaselineRatio, FixtureStatus ClassifiedAs, bool DimEvaluationEligible,
-    string[] ReasonCodes, string[] QualityFlags, string? FrameId, double AssociationConfidence, FixtureStatus PublishedAs, bool IsRepresentative);
+    string[] ReasonCodes, string[] QualityFlags, string? FrameId, double? AssociationConfidence, FixtureStatus PublishedAs, bool IsRepresentative);
 
 public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccessor actor,
     ICommuneScopeAccessor scope, IAuditTrail audit, IObjectStore store, IOptions<SurveyReviewOptions> options)
@@ -42,22 +42,26 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         .SingleOrDefaultAsync(s => s.SweepId == id, ct) ?? throw Error("SWEEP_NOT_FOUND", HttpStatusCode.NotFound);
 
     private sealed class CommuneRow { [Column("commune_id")] public string CommuneId { get; set; } = null!; }
-    private async Task RequireWholeRun(long runId, bool review, CancellationToken ct)
+    private async Task RequireWholeRun(SurveyProcessingRun run, bool review, CancellationToken ct)
     {
         // Only scope identifiers of an already-authorized parent. A filtered observation query alone
         // would silently publish half a cross-commune run. No out-of-scope payload is returned.
-        var communes = await db.Database.SqlQuery<CommuneRow>($"SELECT DISTINCT commune_id FROM pole_observation WHERE run_id = {runId}").ToArrayAsync(ct);
-        if (communes.Any(x => !scope.Scope.Allows(x.CommuneId)))
+        var communes = await db.Database.SqlQuery<CommuneRow>($"SELECT DISTINCT commune_id FROM pole_observation WHERE run_id = {run.RunId}").ToArrayAsync(ct);
+        var expected = SurveyPublicationRules.ExpectedPoles(run.GisSnapshot);
+        var ids = expected.Select(p => p.PoleId).Distinct().ToArray();
+        var current = await db.Database.SqlQuery<CommuneRow>($"SELECT DISTINCT commune_id FROM pole WHERE pole_id = ANY({ids})").ToArrayAsync(ct);
+        if (SurveyPublicationRules.RequiredCommunes(run.GisSnapshot, communes.Select(x => x.CommuneId), current.Select(x => x.CommuneId))
+            .Any(id => !scope.Scope.Allows(id)))
             throw Error(review ? "COMMUNE_FORBIDDEN" : "SWEEP_NOT_FOUND", review ? HttpStatusCode.Forbidden : HttpStatusCode.NotFound);
     }
 
     public async Task<PagedResult<SurveyResultItem>> Results(string id, long? runId, PageRequest page, CancellationToken ct)
     {
-        await Find(id, ct);
+        var sweep = await Find(id, ct);
         var runs = db.Set<SurveyProcessingRun>().Where(r => r.SweepId == id && r.ResultState == "succeeded");
         var run = await (runId.HasValue ? runs.Where(r => r.RunId == runId) : runs.OrderByDescending(r => r.Attempt))
             .FirstOrDefaultAsync(ct) ?? throw Error("RUN_NOT_FOUND", HttpStatusCode.NotFound);
-        await RequireWholeRun(run.RunId, false, ct);
+        await RequireWholeRun(run, false, ct);
         var query = db.Set<PoleObservation>().AsNoTracking().Where(o => o.RunId == run.RunId);
         var count = await query.CountAsync(ct);
         var rows = await query.Include(o => o.Pass).OrderBy(o => o.ObservedAt).ThenBy(o => o.PoleId.Length)
@@ -65,7 +69,11 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         // Fetch all passes for the page's poles before choosing: a conflicting pass can be on another page.
         var poleIds = rows.Select(o => o.PoleId).Distinct().ToArray();
         var allPasses = await query.Where(o => poleIds.Contains(o.PoleId)).ToArrayAsync(ct);
-        return PagedResult<SurveyResultItem>.From(page, count, Preview(rows, allPasses));
+        var observedIds = await query.Select(o => o.PoleId).Distinct().ToArrayAsync(ct);
+        var unobserved = SurveyPublicationRules.UnobservedPoles(run.GisSnapshot, observedIds);
+        var missingPage = unobserved.Skip(Math.Max(0, page.Skip - count)).Take(page.PageSize - rows.Length)
+            .Select(poleId => UnobservedPreview(poleId, run.RunId, sweep)).ToArray();
+        return PagedResult<SurveyResultItem>.From(page, count + unobserved.Length, Preview(rows, allPasses).Concat(missingPage).ToArray());
     }
 
     public static SurveyResultItem[] Preview(PoleObservation[] page, PoleObservation[] allPasses)
@@ -79,6 +87,12 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
             choices[o.PoleId].Observation.ObservationId == o.ObservationId)).ToArray();
     }
 
+    public static SurveyResultItem UnobservedPreview(string poleId, long runId, SurveySweep sweep)
+        => new(null, poleId, runId, null, null,
+            sweep.AtElapsed(sweep.EndedElapsedNs) ?? throw new InvalidOperationException("A completed sweep must have a valid end time."),
+            null, null, null, null, null, null, FixtureStatus.Unknown, false,
+            ["not_observed"], [], null, null, FixtureStatus.Unknown, false);
+
     public async Task<Stream> Thumbnail(string frameId, CancellationToken ct)
     {
         var visible = Visible();
@@ -90,7 +104,7 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         var runs = await db.Set<SurveyProcessingRun>().Where(r => r.SweepId == frame.SweepId).ToArrayAsync(ct);
         foreach (var run in runs)
         {
-            await RequireWholeRun(run.RunId, false, ct);
+            await RequireWholeRun(run, false, ct);
             using var snapshot = JsonDocument.Parse(run.GisSnapshot);
             if (snapshot.RootElement.TryGetProperty("communes", out var communes)
                 && communes.EnumerateArray().Any(x => !scope.Scope.Allows(x.GetString()!)))
@@ -117,7 +131,7 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         await db.Entry(sweep).ReloadAsync(ct);
         var run = await db.Set<SurveyProcessingRun>().SingleOrDefaultAsync(r => r.RunId == request.RunId && r.SweepId == id && r.ResultState == "succeeded", ct)
             ?? throw Error("INVALID_REVIEW_RUN", HttpStatusCode.Conflict);
-        await RequireWholeRun(run.RunId, true, ct);
+        await RequireWholeRun(run, true, ct);
         if (sweep.ReviewClientOpId == request.ClientOpId)
         {
             if (sweep.ReviewRequestHash != hash) throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
@@ -128,19 +142,20 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         if (await db.Set<SurveySweep>().AnyAsync(s => s.ReviewedBy == actorId && s.ReviewClientOpId == request.ClientOpId, ct))
             throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
         var observations = await db.Set<PoleObservation>().Include(o => o.Pass).Where(o => o.RunId == run.RunId).ToArrayAsync(ct);
-        var choices = observations.GroupBy(o => o.PoleId).Select(SurveyPublicationRules.Choose).ToArray();
+        var targets = SurveyPublicationRules.PublicationSet(run.GisSnapshot, observations);
         // Only accepting publishes, so only accepting needs the poles locked and still compatible with the
         // run. A return records a decision; refusing it after an asset correction would strand the sweep.
         var poles = new Dictionary<string, Pole>();
         if (request.Decision == "accept")
         {
             // Lock the parent pole, including poles without a current-status row, in a global order.
-            foreach (var poleId in choices.Select(c => c.Observation.PoleId).Order(StringComparer.Ordinal))
+            foreach (var poleId in targets.Select(c => c.PoleId).Order(StringComparer.Ordinal))
                 await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM pole WHERE pole_id = {poleId} FOR UPDATE", ct);
-            var ids = choices.Select(c => c.Observation.PoleId).ToArray();
+            var ids = targets.Select(c => c.PoleId).ToArray();
             poles = await db.Set<Pole>().AsNoTracking().Where(p => ids.Contains(p.PoleId)).ToDictionaryAsync(p => p.PoleId, ct);
-            if (choices.Any(c => !poles.TryGetValue(c.Observation.PoleId, out var pole)
-                || pole.CommuneId != c.Observation.CommuneId || pole.DataSource != sweep.DataSource))
+            if (targets.Any(c => !poles.TryGetValue(c.PoleId, out var pole) || pole.DataSource != sweep.DataSource
+                || c.Choice is { } choice && pole.CommuneId != choice.Observation.CommuneId)
+                || SurveyPublicationRules.ExpectedPoles(run.GisSnapshot).Any(p => poles[p.PoleId].CommuneId != p.CommuneId))
                 throw Error("SURVEY_SCOPE_CHANGED", HttpStatusCode.Conflict);
         }
         var now = UtcMicrosecondClock.UtcNow();
@@ -155,7 +170,7 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         try
         {
             await db.SaveChangesAsync(ct);
-            if (request.Decision == "accept") await Publish(sweep, run, choices, observations, poles, now, ct);
+            if (request.Decision == "accept") await Publish(sweep, run, targets, observations, poles, now, ct);
             await tx.CommitAsync(ct);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
@@ -163,40 +178,36 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         return Response(sweep);
     }
 
-    private async Task Publish(SurveySweep sweep, SurveyProcessingRun run, PublicationChoice[] choices,
+    private async Task Publish(SurveySweep sweep, SurveyProcessingRun run, PublicationTarget[] targets,
         PoleObservation[] observations, Dictionary<string, Pole> poles, DateTime now, CancellationToken ct)
     {
         var settings = options.Value;
         var modelVersion = run.ModelVersionId is null ? null : await db.Set<ArtifactVersion>()
             .Where(v => v.VersionId == run.ModelVersionId).Select(v => v.Version).SingleAsync(ct);
-        foreach (var commune in choices.GroupBy(c => c.Observation.CommuneId).OrderBy(g => g.Key, StringComparer.Ordinal))
+        foreach (var commune in targets.GroupBy(c => poles[c.PoleId].CommuneId).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
             var faults = new List<(PublicationChoice Choice, FaultType Type)>();
-            foreach (var choice in commune)
+            foreach (var target in commune)
             {
-                var o = choice.Observation;
-                db.Add(new LuminanceHistory { SweepId = sweep.SweepId, PoleId = o.PoleId, CommuneId = o.CommuneId,
-                    RunId = run.RunId, ObservationId = o.ObservationId, BaselineId = o.BaselineId, EvaluatedAt = o.ObservedAt,
-                    PeakLux = o.PeakLux, CvState = choice.Status == FixtureStatus.Unknown ? null : o.CvState,
-                    BaselineRatio = choice.Ratio, StatusConfidence = choice.Confidence, AssociationConfidence = o.AssociationConfidence,
-                    ClassifiedAs = choice.Status, DimEvaluationEligible = choice.DimEligible, DataSource = sweep.DataSource,
-                    PublishedAt = now, PublishedBy = ActorId, ReasonCodes = JsonSerializer.Serialize(choice.Reasons) });
-                var current = await db.Set<PoleCurrentStatus>().SingleOrDefaultAsync(p => p.PoleId == o.PoleId, ct);
-                if (SurveyPublicationRules.IsNewer(o.ObservedAt, current?.LastEvaluatedAt ?? current?.LastSeenAt))
+                var choice = target.Choice;
+                var history = SurveyPublicationRules.History(target, sweep, run.RunId, poles[target.PoleId].CommuneId, now, ActorId);
+                db.Add(history);
+                var current = await db.Set<PoleCurrentStatus>().SingleOrDefaultAsync(p => p.PoleId == target.PoleId, ct);
+                if (SurveyPublicationRules.IsNewer(history.EvaluatedAt, current?.LastEvaluatedAt ?? current?.LastSeenAt))
                 {
-                    if (current is null) { current = new() { PoleId = o.PoleId, CommuneId = o.CommuneId }; db.Add(current); }
-                    current.FixtureStatus = choice.Status; current.StatusConfidence = choice.Confidence;
-                    current.LastSeenAt = choice.Status == FixtureStatus.Unknown ? null : o.ObservedAt;
-                    current.LastEvaluatedAt = o.ObservedAt; current.LastRunId = run.RunId;
+                    if (current is null) { current = new() { PoleId = target.PoleId, CommuneId = history.CommuneId }; db.Add(current); }
+                    current.FixtureStatus = history.ClassifiedAs; current.StatusConfidence = history.StatusConfidence;
+                    current.LastSeenAt = history.ClassifiedAs == FixtureStatus.Unknown ? null : history.EvaluatedAt;
+                    current.LastEvaluatedAt = history.EvaluatedAt; current.LastRunId = run.RunId;
                     current.LastSweepId = sweep.SweepId; current.UpdatedAt = now;
-                    if (SurveyPublicationRules.FaultFor(choice.Status) is { } type) faults.Add((choice, type));
+                    if (choice is not null && SurveyPublicationRules.FaultFor(choice.Status) is { } type) faults.Add((choice, type));
                 }
-                if (choice.Status != FixtureStatus.Unknown)
-                    await BuildBaselines(sweep, run, observations.Where(x => x.PoleId == o.PoleId).ToArray(), now, ct);
+                if (choice is not null && choice.Status != FixtureStatus.Unknown)
+                    await BuildBaselines(sweep, run, observations.Where(x => x.PoleId == target.PoleId).ToArray(), now, ct);
             }
             audit.Record(new(now, AuditActorKind.User, ActorId, actor.Role, commune.Key, AuditEntityType.SurveySweep,
                 sweep.SweepId, AuditAction.Completed, null,
-                new { run.RunId, pole_ids = commune.Select(c => c.Observation.PoleId).ToArray(), settings.BaselineMinimumMembers }));
+                new { run.RunId, pole_ids = commune.Select(c => c.PoleId).ToArray(), settings.BaselineMinimumMembers }));
             await db.SaveChangesAsync(ct);
             // EF cannot translate `override ?? fault_type` on text-stored enums, nor Contains on a set:
             // two branches over the effective type, and the open set (still FaultStatusSets.Open) as an array.

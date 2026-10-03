@@ -177,7 +177,7 @@ namespace LuxMap.Persistence.Migrations
                     pole_id = table.Column<string>(type: "text", nullable: false),
                     commune_id = table.Column<string>(type: "text", nullable: false),
                     run_id = table.Column<long>(type: "bigint", nullable: false),
-                    observation_id = table.Column<long>(type: "bigint", nullable: false),
+                    observation_id = table.Column<long>(type: "bigint", nullable: true),
                     baseline_id = table.Column<long>(type: "bigint", nullable: true),
                     evaluated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     peak_lux = table.Column<double>(type: "double precision", nullable: true),
@@ -199,6 +199,7 @@ namespace LuxMap.Persistence.Migrations
                     table.CheckConstraint("ck_luminance_history_classified_as", "\"classified_as\" IN ('normal', 'dim', 'out', 'unknown')");
                     table.CheckConstraint("ck_luminance_history_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
                     table.CheckConstraint("ck_luminance_history_finite", "(peak_lux IS NULL OR (peak_lux >= 0 AND peak_lux < 'Infinity'::float8)) AND (baseline_ratio IS NULL OR (baseline_ratio >= 0 AND baseline_ratio < 'Infinity'::float8)) AND association_confidence BETWEEN 0 AND 1 AND (status_confidence IS NULL OR status_confidence BETWEEN 0 AND 1)");
+                    table.CheckConstraint("ck_luminance_history_unobserved", "observation_id IS NOT NULL OR (classified_as = 'unknown' AND peak_lux IS NULL AND cv_state IS NULL AND baseline_id IS NULL AND baseline_ratio IS NULL AND status_confidence IS NULL)");
                     table.ForeignKey(
                         name: "fk_luminance_history_administrative_unit_commune_id",
                         column: x => x.commune_id,
