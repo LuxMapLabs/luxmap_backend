@@ -147,6 +147,20 @@ public sealed class SurveyProcessingTests(ITestOutputHelper output)
         Assert.Contains("route_ambiguous", Assert.Single(SurveyAlgorithms.Associate(ambiguous, [new("P", "C", 35)], [], o).Observations).Flags);
     }
 
+    [Fact]
+    public void Inaccurate_fixes_drifting_toward_another_route_do_not_split_the_pass()
+    {
+        var o = new SurveyProcessingOptions();
+        // Seven fixes at 25 m accuracy look nearer another assigned route; they are noise, not a route change.
+        var track = Enumerable.Range(0, 21).Select(t => new TrackPoint(t * 1_000_000_000L, t * 5,
+            t is >= 5 and <= 11 ? 25 : 2, 5, OtherRoute: t is >= 5 and <= 11)).ToArray();
+        var pass = Assert.Single(SurveyAlgorithms.SplitPasses(track, o));
+        var observation = Assert.Single(SurveyAlgorithms.Associate(pass, [new("P", "C", 40)], [], o).Observations);
+        Assert.Contains("gps_degraded", observation.Flags);
+        // The same samples with good accuracy ARE a route change.
+        Assert.Equal(2, SurveyAlgorithms.SplitPasses(track.Select(p => p with { AccuracyM = 2 }).ToArray(), o).Length);
+    }
+
     public static TheoryData<int, string> Scenarios
     {
         get

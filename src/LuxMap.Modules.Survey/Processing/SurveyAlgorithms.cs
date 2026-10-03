@@ -153,7 +153,9 @@ public static class SurveyAlgorithms
         {
             if (previousTime is long previous && (point.TimeNs - previous > o.GpsGapSeconds * 1e9 || point.TimeNs <= previous)) Flush();
             previousTime = point.TimeNs;
-            if (point.OtherRoute) { Flush(); outsideSince = null; continue; }
+            // Only an ACCURATE fix nearer another route is a route change. A degraded fix drifting
+            // toward it is noise: it falls through to the degraded branch and keeps the pass whole.
+            if (point.OtherRoute && point.AccuracyM <= o.MaximumAccuracyM) { Flush(); outsideSince = null; continue; }
             if (point.OutsideCorridor)
             {
                 outsideSince ??= point.TimeNs;
