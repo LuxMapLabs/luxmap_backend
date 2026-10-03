@@ -78,6 +78,7 @@ public class LuxMapDbContext(
     /// </remarks>
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        EnforceImmutableRecords();
         AuditWriteGuard.Enforce(ChangeTracker, systemWriteDepth > 0);
         EnforceCommuneWriteScope();
         return base.SaveChanges(acceptAllChangesOnSuccess);
@@ -87,6 +88,7 @@ public class LuxMapDbContext(
     public override Task<int> SaveChangesAsync(
         bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        EnforceImmutableRecords();
         AuditWriteGuard.Enforce(ChangeTracker, systemWriteDepth > 0);
         EnforceCommuneWriteScope();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
@@ -100,6 +102,12 @@ public class LuxMapDbContext(
     /// wrapped in a <c>DbUpdateException</c>, and the BE-04 middleware would then answer 500 instead
     /// of the 403 this actually is.
     /// </remarks>
+    private void EnforceImmutableRecords()
+    {
+        if (ChangeTracker.Entries<IImmutableRecord>().Any(x => x.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Recorded processing results and versions cannot be changed or deleted.");
+    }
+
     private void EnforceCommuneWriteScope()
     {
         if (systemWriteDepth > 0)

@@ -15,5 +15,6 @@ public static class TestHostSettings
     /// Production, which has no value for it.
     /// </summary>
     public static IWebHostBuilder UseTestCorsOrigin(this IWebHostBuilder builder)
-        => builder.UseSetting("Cors:AllowedOrigins:0", WebOrigin);
+        => builder.UseSetting("Cors:AllowedOrigins:0", WebOrigin)
+            .UseSetting("SurveyProcessing:Enabled", "false");
 }

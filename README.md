@@ -511,4 +511,38 @@ API và payload tạm (SELF-SIGNED, chờ FW): [docs/survey-ingest-p2a.md](docs/
 Sidecar `minio-mc` tạo thêm bucket `luxmap-video` cho clip và file thô; cần chạy lại sidecar khi
 triển khai cấu hình compose mới. Video proxy multipart qua API, cap **300 MiB/clip** riêng endpoint;
 raw JSON/JSONL cap **10 MiB/file**. Không thay giới hạn JPEG, không dùng presigned URL.
-P2a chỉ nhận/nộp phiên; `queued` chưa có worker cho tới P2b.
+P2a nhận/nộp phiên; P2b-1 thêm worker xử lý GPS/lux, mặc định **tắt**.
+
+## Xử lý GPS/lux — BE-15 P2b-1
+
+Sau khi môi trường được migrate `AddSurveyProcessing`, bật bằng `SurveyProcessing:Enabled=true`
+(trong JSON config hoặc `SurveyProcessing__Enabled=true`). Worker polling `queued` và lease hết hạn;
+`PollSeconds=5`, `LeaseSeconds=120`, `MaxAttempts=3`. Tắt worker là cách rollback ứng dụng mà giữ
+nguyên dữ liệu; `Down()` của migration xoá kết quả xử lý, chỉ dùng ở DB thử nghiệm phù hợp.
+Test host luôn đặt `SurveyProcessing:Enabled=false`; test tích hợp gọi `ProcessOneAsync` trực tiếp.
+
+Tham số tạm nằm trong `SurveyProcessingOptions`, toàn bộ được chụp vào `settings_snapshot`:
+
+| Tham số | Mặc định | Ý nghĩa |
+|---|---:|---|
+| `MaximumKmh` / `SpeedWindowSeconds` | 25 / 3 | Chỉ gắn `speed_excess` khi vượt 25 km/h; đi chậm không bị cảnh báo |
+| `MaximumAccuracyM` / `GpsGapSeconds` | 15 / 2,5 | Bỏ vị trí GPS kém khỏi phép chiếu dọc tuyến; chỉ mất timestamp đủ lâu mới cắt lượt |
+| `RouteCorridorM` / `RouteAmbiguityM` / `RouteExitSeconds` | 25 / 2 / 5 | Chọn tuyến gần nhất; chênh khoảng cách <2 m là mơ hồ; ngoài hành lang liên tục >5 s mới cắt lượt |
+| `LuxGapSeconds` | 0,5 | Ngắt khoảng tìm đỉnh lux, không cắt lượt GPS |
+| `ClockReceiptBatchWindowMs` / `ClockResidualMs` | 5 / 80 | Gom timestamp nhận BLE gần nhau; ngưỡng residual của anchor sau fit |
+| `PeakMinimumProminenceLux` / `PeakNoiseMultiplier` | 0,5 / 6 | Prominence tối thiểu hoặc 6 lần MAD sai phân cục bộ, lấy giá trị lớn hơn |
+| `MaximumGpsOffsetSeconds` / `AssociationToleranceSeconds` | 2 / 0,6 | Ước lượng độ trễ chung trước, rồi ghép trong cửa sổ hẹp |
+| `MinimumOffsetAnchors` / `AmbiguousPoleDistanceM` | 3 / 3 | Số mốc tối thiểu để hiệu chỉnh; cặp cột gần nhau dùng chung thời điểm, không gán lux riêng |
+
+GPS chỉ định vị trên tuyến gần nhất không mơ hồ; mẫu trôi ngắn vẫn giữ timestamp và gắn
+`gps_degraded`, mẫu mơ hồ còn có `route_ambiguous`. Mẫu thuộc rõ tuyến khác kết thúc lượt tuyến cũ.
+Nếu ngoài mọi bbox, SQL đo khoảng cách trên tập tuyến hữu hạn của phiếu để giữ chẩn đoán;
+chainage ngoài hành lang không tham gia nội suy. Xe đứng yên giữ cả mốc đến và mốc rời đi.
+Phép chiếu GPS, cột và hình học lưu trong `gis_snapshot` đọc cùng transaction `RepeatableRead`;
+heartbeat chạy trước/sau transaction này.
+
+Heartbeat kiểm token và gia hạn khi còn dưới nửa lease, giữa các bước xử lý; lease đã hết không được
+hồi sinh. P2b-2 phải duy trì heartbeat trong các bước media dài. Lỗi bất ngờ và mất lease có log kèm
+sweep/attempt. Kết thúc chỉ ghi run/pass/observation, chuyển sweep sang `awaiting_review` và trả
+`coverage_pct` thật; `frame_count` còn 0. Không phân loại hay công bố trạng thái cột ở giai đoạn này.
+Các giá trị trên chưa được hiệu chỉnh bằng chuyến quay thử; `system_setting` để BE-33.
