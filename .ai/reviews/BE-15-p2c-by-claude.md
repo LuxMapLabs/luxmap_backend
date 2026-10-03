@@ -42,3 +42,31 @@ Sau khi sửa: build 0 warning, test không DB xanh, cập nhật `.ai/results/B
 - **R5 (review độc lập, xác nhận đúng):** kiểm tương thích cột (`SURVEY_SCOPE_CHANGED`) chạy cả khi **trả lại** — sửa `data_source`
   của một cột sau khi xử lý làm phiên kẹt `awaiting_review`. Claude sửa: khoá cột + kiểm chỉ khi `accept`. Test
   `A_corrected_pole_blocks_accept_but_not_return`; phá thử (kiểm luôn chạy) ⇒ đỏ. Api 578/578.
+
+## Vòng 3 — R6 (review độc lập lần 2, Claude xác nhận đúng; Codex sửa)
+
+**R6 (cao) — cột dự kiến mà phiên không quan sát được không được công bố `unknown`.** Contract mục 1: `unknown` = *sweep gần nhất
+không phủ được cột đó*; Phase 1 §2.5 đã ghi "một sweep vẫn ghi kết quả unknown cho tập dự kiến hợp lệ", `observation_id` NULL
+**chỉ** cho trường hợp này. Code hiện chỉ dựng lựa chọn công bố từ `pole_observation`, nên cột trong `run.GisSnapshot.poles`
+mà xe không đi qua (phiên dừng giữa đường) giữ nguyên `normal/dim/out` cũ trên bản đồ sau khi duyệt.
+
+Sửa:
+1. `luminance_history.observation_id` → nullable (sửa chính migration `AddSurveyPublication` chưa merge, sinh lại bằng
+   `ConnectionStrings__LuxMap` giả, giữ nguyên SQL trigger viết tay, đọc lại Up/Down). CHECK mới: `observation_id IS NOT NULL OR
+   (classified_as = 'unknown' AND peak_lux IS NULL AND cv_state IS NULL AND baseline_id IS NULL AND baseline_ratio IS NULL
+   AND status_confidence IS NULL)`. FK ghép tới `pole_observation` vẫn `MATCH SIMPLE` (null bỏ qua) — đừng siết `MATCH FULL`.
+2. Khi accept: tập công bố = **mọi cột trong `run.GisSnapshot.poles`** ∪ cột có observation. Cột dự kiến không có observation ⇒
+   history `unknown`, `observation_id` null, lý do `["not_observed"]`, `evaluated_at` = thời điểm kết thúc phiên (cùng cách tính
+   `ended_at` của `GET /sweeps`, không phải giờ duyệt); `commune_id` lấy từ bảng `pole` (đã khoá). Cập nhật `pole_current_status`
+   theo đúng luật D-08 (chỉ khi mới hơn). Không sinh sự cố, không dựng baseline cho các cột này.
+3. Phạm vi người duyệt (`RequireWholeRun`) và lượt khoá/kiểm tương thích cột (chỉ khi accept) phải phủ **cả** cột dự kiến không
+   quan sát, không chỉ cột có observation — nếu không, người duyệt thiếu xã của một cột không quan sát vẫn công bố được `unknown`
+   lên cột đó. Cột dự kiến đã bị xoá khỏi `pole` ⇒ `SURVEY_SCOPE_CHANGED` như hiện tại.
+4. `GET /sweeps/{id}/results` hiện chỉ liệt kê observation; thêm các cột dự kiến không quan sát (một item mỗi cột, các trường đo
+   null, `published_as = unknown`, `reason_codes = ["not_observed"]`) để Quản lý thấy trước — giữ phân trang ổn định
+   (thứ tự: theo thời điểm, cột không quan sát xếp cuối theo `length(pole_id), pole_id`). Nếu record `SurveyResultItem` cần
+   `observation_id`/`pass_id` nullable thì đổi, cập nhật spec (`gen_consolidated_spec.py` không có schema viết tay cho nó).
+5. Test (DB, Claude chạy): phiên phủ 1/2 cột dự kiến ⇒ cột còn lại có history `unknown`/`not_observed` và trạng thái hiện tại
+   đổi từ trạng thái cũ sang `unknown`; phiên muộn hơn (D-08) không đè; người duyệt thiếu xã của cột không quan sát ⇒ từ chối;
+   results liệt kê cột không quan sát; CHECK từ chối hàng `observation_id` null mà `classified_as` khác `unknown`.
+   Test không DB cho phần dựng tập công bố. Phá thử từng luật.
