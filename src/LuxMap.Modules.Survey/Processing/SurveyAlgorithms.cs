@@ -19,7 +19,11 @@ public sealed record LuxPeak(long TimeNs, double Lux, bool Saturated);
 /// <summary>Confidence is a provisional ordinal tier (.2/.4/.6/.9), not a calibrated probability (A8).</summary>
 public sealed record Passage(string PoleId, string CommuneId, double ChainageM, long TimeNs,
     LuxPeak? Peak, double SpeedMps, double Confidence, string[] Flags);
-public sealed record PassResult(TrackPoint[] Track, Passage[] Observations, double GpsOffsetSeconds, bool OffsetReliable, double ExcessTimeRatio);
+public sealed record PassResult(TrackPoint[] Track, Passage[] Observations, double GpsOffsetSeconds, bool OffsetReliable, double ExcessTimeRatio)
+{
+    /// <summary>The one definition of a pass's direction: stored on survey_pass and used to pick its baseline.</summary>
+    public string Direction => Track[^1].ChainageM > Track[0].ChainageM ? "forward" : "reverse";
+}
 
 /// <summary>Only projected metres enter here. Geographic projection belongs exclusively to PostGIS.</summary>
 public static class SurveyAlgorithms

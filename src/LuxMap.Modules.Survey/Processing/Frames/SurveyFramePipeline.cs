@@ -142,9 +142,9 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
             int side = Math.Sign(pole.SideOfRoute) * (pass.Pass.Track[^1].ChainageM > pass.Pass.Track[0].ChainageM ? 1 : -1);
             var association = DetectionAssociation.Match(frames, Math.Max(0, p.TimeNs - (long)(options.BeforeSeconds * 1e9)),
                 checked(p.TimeNs + (long)(options.AfterSeconds * 1e9)), mapping.CameraSide, side, options);
-            var direction = pass.Pass.Track[^1].ChainageM > pass.Pass.Track[0].ChainageM ? "forward" : "reverse";
-            var before = new DateTime((sweep.UtcAnchor.Ticks + (sweep.StartedElapsedNs - sweep.ElapsedAnchorNs) / 100) / 10 * 10, DateTimeKind.Utc);
-            var baseline = await baselines.FindAsync(new(p.PoleId, direction, sweep.SweepId, before, sweep.DataSource), ct);
+            var before = sweep.AtElapsed(sweep.StartedElapsedNs)
+                ?? throw new InvalidOperationException("A submitted sweep must have a valid start time.");
+            var baseline = await baselines.FindAsync(new(p.PoleId, pass.Pass.Direction, sweep.SweepId, before, sweep.DataSource), ct);
             result.Observations.Add((passNo, p.PoleId, p.TimeNs), EvaluateObservation(association, p.Peak?.Lux, baseline?.Value, flags, options.DimThresholdRatio) with { Baseline = baseline });
         }
         // Resolve once across the whole run, before coverage and persistence. A pole revisited in

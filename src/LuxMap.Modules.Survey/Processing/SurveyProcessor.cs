@@ -244,7 +244,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             var pass = new SurveyPass
             {
                 Run = run, SegmentId = result.Segment, PassNo = number++,
-                Direction = result.Pass.Track[^1].ChainageM > result.Pass.Track[0].ChainageM ? "forward" : "reverse",
+                Direction = result.Pass.Direction,
                 FromFraction = result.Pass.Track[0].ChainageM / result.Length, ToFraction = result.Pass.Track[^1].ChainageM / result.Length,
                 StartElapsedNs = result.Pass.Track[0].TimeNs, EndElapsedNs = result.Pass.Track[^1].TimeNs,
                 QualityFlags = Json(new { gps_offset_seconds = result.Pass.GpsOffsetSeconds, offset_reliable = result.Pass.OffsetReliable, excess_time_ratio = result.Pass.ExcessTimeRatio })
