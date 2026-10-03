@@ -85,6 +85,9 @@ jobs:
           Path('.env').write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
           PY
 
+      - name: Install frame extraction tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
       - name: Restore
         run: |
           dotnet restore LuxMap.slnx -warnaserror

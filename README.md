@@ -542,7 +542,55 @@ Phép chiếu GPS, cột và hình học lưu trong `gis_snapshot` đọc cùng 
 heartbeat chạy trước/sau transaction này.
 
 Heartbeat kiểm token và gia hạn khi còn dưới nửa lease, giữa các bước xử lý; lease đã hết không được
-hồi sinh. P2b-2 phải duy trì heartbeat trong các bước media dài. Lỗi bất ngờ và mất lease có log kèm
-sweep/attempt. Kết thúc chỉ ghi run/pass/observation, chuyển sweep sang `awaiting_review` và trả
-`coverage_pct` thật; `frame_count` còn 0. Không phân loại hay công bố trạng thái cột ở giai đoạn này.
+hồi sinh. P2b-2 duy trì heartbeat trong các bước media dài. Lỗi bất ngờ và mất lease có log kèm
+sweep/attempt. Kết thúc ghi run/pass/observation và (từ P2b-2) frame/detection/phân loại,
+chuyển sweep sang `awaiting_review`, trả `coverage_pct` mức đi ngang và `frame_count` thật.
+Chưa công bố trạng thái cột.
 Các giá trị trên chưa được hiệu chỉnh bằng chuyến quay thử; `system_setting` để BE-33.
+
+
+## Frame và CV mô phỏng — BE-15 P2b-2
+
+Cần migration `AddSurveyFrames` và `ffmpeg`/`ffprobe` trong PATH của worker; CI Ubuntu cài package
+`ffmpeg` trước test. Không có NuGet mới. Test media tự sinh video, thiếu executable là lỗi, không skip.
+Máy đã thử: ffmpeg/ffprobe 8.1.2 trên macOS; đường dẫn, version/build và hash binary cùng
+assembly bộ cắt được lưu vào `artifact_version` mỗi run. Chưa ghim bản triển khai production (chờ pilot).
+
+Cấu hình trong `SurveyProcessing:Frames`, được chụp trong `settings_snapshot`:
+
+| Tham số | Mặc định |
+|---|---|
+| `Detector` | `unconfigured` (run lỗi rõ cho tới khi cấu hình) |
+| `FakeManifestPath` | null; khi `Detector=fake` phải trỏ manifest fixture |
+| `FfmpegPath` / `FfprobePath` | `ffmpeg` / `ffprobe` |
+| `TempRoot` | thư mục `luxmap-frames` dưới temp hệ điều hành |
+| `MaximumConcurrentClips` / `TemporaryBytesPerClip` | 1 / 419430400 byte |
+| `MaximumFrameBytes` | 16777216 byte |
+| `TimeoutSeconds` / `DetectorTimeoutSeconds` | 60 / 30 giây |
+| `BeforeSeconds` / `AfterSeconds` / `FramesPerSecond` | 3 / 0,5 / 5 |
+| `MinimumConfidence` / `MinimumBoxArea` | 0,7 / 0,0001 diện tích chuẩn hoá |
+| `DimThresholdRatio` | 0,80 |
+
+Mỗi clip dùng một tiến trình ffmpeg để cắt dãy JPEG; số lượng và thứ tự file phải khớp các PTS đã chọn.
+Quota tổng clip + JPEG được kiểm trong lúc cắt và sau khi tiến trình kết thúc (kiểm định kỳ, không phải
+hạn mức cứng của hệ điều hành). RAM/channel giữ một frame tại một thời điểm. Timeout huỷ tiến trình con;
+`finally` dọn thư mục riêng của lượt cắt. Worker chết cứng có thể để file tạm: vận hành dọn thư mục temp
+khi worker đã dừng; không xoá dữ liệu object store để xử lý tình huống này.
+
+Fake chỉ hợp lệ ở `Development`/`Test` và nguồn `simulated`. Manifest là object JSON có key SHA-256 ảnh,
+value `{ "Outcome": "success", "Predictions": [...] }`. Mỗi prediction có `ItemNo`, `Label` (`on/off`),
+`Confidence`, `X`, `Y`, `Width`, `Height` (top-left, chuẩn hoá theo ảnh **đã xoay**).
+Các outcome fixture khác: `error`, `malformed`, `timeout`; `success` với mảng rỗng là **không phát hiện**.
+Xem fixture trong `SurveyFrameTests`/`SurveyFrameFixture`; không dùng pole ID làm nhãn model.
+
+ON thiếu baseline/đỉnh riêng, lux gap, `ambiguous_association` hoặc peak dùng chung → normal, ratio null, không tham gia đánh giá dim.
+OFF ghép rõ → out; CV mơ hồ/ảnh kém/video gap → unknown. Track dùng chung giữa hai cột được loại,
+không ép ghép. Một detection đạt chất lượng mỗi frame cùng phía, nhãn nhất quán được ghép thành một
+track dù bbox không giao nhau; nhiều detection cùng frame còn mơ hồ. Frame đại diện theo diện tích bbox × confidence, không theo lux.
+Baseline lookup hiện trả null; P2c mới chọn baseline tương thích và chấp nhận/công bố. Bản đồ/status,
+luminance history và fault không bị ghi ở bước này. Hợp đồng đồng hồ tạm ở
+[`docs/survey-ingest-p2a.md`](docs/survey-ingest-p2a.md).
+
+Rollback vận hành: tắt `SurveyProcessing:Enabled`, giữ dữ liệu. `Down()` mất frame/detection/CV và từ chối
+nếu registry còn artifact media/classification (CHECK phiên bản trước không nhận các component mới).
+Chỉ thử rollback trên DB thử nghiệm đã teardown; không tự xoá registry bất biến ở production.

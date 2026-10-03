@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LuxMap.Infrastructure.Storage\LuxMap.Infrastructure.Storage.csproj" />
     <ProjectReference Include="..\..\src\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="../../src/LuxMap.Modules.Survey/LuxMap.Modules.Survey.csproj" />
   </ItemGroup>
 
 </Project>

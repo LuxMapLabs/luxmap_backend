@@ -17,6 +17,7 @@ public sealed class ProjectedGps
 }
 public sealed class ProjectedPole
 {
+    public double SideOfRoute { get; set; }
     public required string SegmentId { get; set; }
     public required string PoleId { get; set; }
     public required string CommuneId { get; set; }
@@ -78,11 +79,17 @@ public static class SurveyChainageQuery
         string source, SurveyProcessingOptions o, CancellationToken ct) => db.Database.SqlQuery<ProjectedPole>($"""
         SELECT r.segment_id AS segment_id, p.pole_id AS pole_id, p.commune_id AS commune_id,
             ST_AsGeoJSON(p.geom) AS geometry_json, ST_AsGeoJSON(r.geom) AS route_geometry_json,
+            ((ST_X(tangent.b) - ST_X(tangent.a)) * (ST_Y(projected.pole) - ST_Y(tangent.a))
+             - (ST_Y(tangent.b) - ST_Y(tangent.a)) * (ST_X(projected.pole) - ST_X(tangent.a))) AS side_of_route,
             ST_LineLocatePoint(ST_Transform(r.geom,3405), ST_Transform(p.geom,3405))
                 * ST_Length(ST_Transform(r.geom,3405)) AS chainage_m,
             ST_Length(ST_Transform(r.geom,3405)) AS length_m
         FROM road_segment r JOIN pole p ON p.segment_id = r.segment_id
           AND ST_Intersects(p.geom, ST_Expand(ST_Envelope(r.geom), {o.BboxPaddingDegrees}))
+        CROSS JOIN LATERAL (SELECT ST_Transform(r.geom,3405) AS route, ST_Transform(p.geom,3405) AS pole) projected
+        CROSS JOIN LATERAL (SELECT ST_LineLocatePoint(projected.route, projected.pole) AS fraction) position
+        CROSS JOIN LATERAL (SELECT ST_LineInterpolatePoint(projected.route, greatest(0, position.fraction - 0.00001)) AS a,
+            ST_LineInterpolatePoint(projected.route, least(1, position.fraction + 0.00001)) AS b) tangent
         WHERE r.segment_id = ANY({segments}) AND r.commune_id = ANY({communes})
           AND p.commune_id = ANY({communes}) AND p.data_source = {source}
           AND ST_Distance(ST_Transform(r.geom,3405), ST_Transform(p.geom,3405)) <= {o.RouteCorridorM}

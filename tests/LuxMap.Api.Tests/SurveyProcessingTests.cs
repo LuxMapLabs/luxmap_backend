@@ -26,6 +26,7 @@ namespace LuxMap.Api.Tests;
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLifetime
 {
+    private readonly SurveyFrameFixture media = new();
     private NpgsqlDataSource source = null!;
     private ModuleAssemblyCatalog catalog = null!;
     private string a = null!, b = null!, road = null!, sweep = null!;
@@ -44,7 +45,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         if (interceptor is not null) options.AddInterceptors(interceptor);
         return new(options.Options, catalog, new Scope(communes ?? [a, b]));
     }
-    private SurveyProcessor Processor() => new(source, catalog, Options.Create(new SurveyProcessingOptions()), NullLogger<SurveyProcessor>.Instance);
+    private SurveyProcessor Processor() => new(source, catalog, Options.Create(new SurveyProcessingOptions()), NullLogger<SurveyProcessor>.Instance, frames: media.Pipeline);
 
     public async Task InitializeAsync()
     {
@@ -61,8 +62,8 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         var route = new RoadSegment { CommuneId = a, SegmentName = "Curve", RoadClass = RoadClass.InterVillage,
             DataSource = DataSource.Simulated, LengthM = 999, Geom = new LineString([new(108,16), new(108.0005,16.00002), new(108.001,16)]) { SRID = 4326 } };
         db.Add(route); await db.SaveChangesAsync(); road = route.SegmentId;
-        var assets = new[] { new Pole { CommuneId = a, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00025,16.00001) { SRID = 4326 } },
-            new Pole { CommuneId = b, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00075,16.00001) { SRID = 4326 } } };
+        var assets = new[] { new Pole { CommuneId = a, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00025,16.00004) { SRID = 4326 } },
+            new Pole { CommuneId = b, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00075,15.99998) { SRID = 4326 } } };
         db.AddRange(assets); await db.SaveChangesAsync(); poles = assets.Select(x => x.PoleId).ToArray();
         var now = DateTime.UtcNow;
         var order = new WorkOrder { CommuneId = a, CreatedBy = user.UserId, AssignedTo = user.UserId, AssignedAt = now,
@@ -78,6 +79,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
             Geom = new Point(108 + .001 * i / 20, 16 + .00002 * (1 - Math.Abs(i - 10) / 10d)) { SRID = 4326 }, AccuracyM = 2, SpeedMps = 5.4, Provider = "gps" });
         for (int i = 0; i <= 160; i++) db.Add(new SurveyLuxSample { SweepId = sweep, SampleNo = i, Seq = i,
             ModuleMs = i * 125, PhoneElapsedNs = i * 125_000_000L, Lux = 2 + 80 * Math.Exp(-Math.Pow((i / 8d - 5) / .3,2) / 2) });
+        await media.Initialize(db, sweep);
         await db.SaveChangesAsync();
     }
 
@@ -87,15 +89,19 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         await using var tx = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlRawAsync("SET LOCAL luxmap.audit_purge = 'on'");
         var versions = await db.Set<SurveyProcessingRun>().Where(x => x.SweepId == sweep)
-            .Select(x => new { x.AlgorithmVersionId, x.ClockVersionId }).ToArrayAsync();
-        var ids = versions.SelectMany(x => new[] { x.AlgorithmVersionId, x.ClockVersionId }).Distinct().ToArray();
+            .Select(x => new { x.AlgorithmVersionId, x.ClockVersionId, x.ClassificationVersionId, x.ModelVersionId, x.ExtractorVersionId }).ToArrayAsync();
+        var ids = versions.SelectMany(x => new[] { x.AlgorithmVersionId, x.ClockVersionId, x.ClassificationVersionId ?? 0, x.ModelVersionId ?? 0, x.ExtractorVersionId ?? 0 }).Distinct().ToArray();
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {a} OR commune_id = {b}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole_observation WHERE run_id IN (SELECT run_id FROM survey_processing_run WHERE sweep_id = {sweep})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM detection WHERE sweep_id = {sweep}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_frame WHERE sweep_id = {sweep}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_pass WHERE run_id IN (SELECT run_id FROM survey_processing_run WHERE sweep_id = {sweep})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_processing_run WHERE sweep_id = {sweep}");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM artifact_version WHERE version_id = ANY({ids}) AND NOT EXISTS (SELECT 1 FROM survey_processing_run WHERE algorithm_version_id = version_id OR clock_version_id = version_id)");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM artifact_version WHERE version_id = ANY({ids}) AND NOT EXISTS (SELECT 1 FROM survey_processing_run WHERE algorithm_version_id = version_id OR clock_version_id = version_id OR classification_version_id = version_id OR model_version_id = version_id OR extractor_version_id = version_id)");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_gps_sample WHERE sweep_id = {sweep}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_lux_sample WHERE sweep_id = {sweep}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_raw_file WHERE sweep_id = {sweep}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_video_clip WHERE sweep_id = {sweep}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_sweep WHERE sweep_id = {sweep}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_segment WHERE work_order_id = {orderId}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order WHERE work_order_id = {orderId}");
@@ -110,6 +116,49 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = {userId}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM administrative_unit WHERE commune_id = {a} OR commune_id = {b}");
         await tx.CommitAsync();
+        media.Dispose();
+    }
+
+    [Fact]
+    public async Task Frames_detections_classification_and_three_coverages_are_persisted_before_review()
+    {
+        Assert.True(await Processor().ProcessOneAsync(sweepId: sweep));
+        await using var db = Db();
+        var run = await db.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep);
+        Assert.Equal("succeeded", run.ResultState);
+        Assert.Equal(100, run.CoveragePct); Assert.Equal(100, run.DetectionCoveragePct); Assert.Equal(0, run.DimCoveragePct);
+        var item = await db.Set<SurveySweep>().SingleAsync(x => x.SweepId == sweep);
+        var frames = await db.Set<SurveyFrame>().Where(x => x.SweepId == sweep).ToArrayAsync();
+        Assert.NotEmpty(frames); Assert.Equal(frames.Length, item.FrameCount); Assert.Equal(SweepStatus.AwaitingReview, item.Status);
+        Assert.Equal(frames.Length * 2, await db.Set<Detection>().CountAsync(x => x.SweepId == sweep));
+        foreach (var frame in frames)
+        {
+            Assert.True(await media.ExistsAsync(LuxMap.Shared.Storage.StorageBucket.Survey, frame.ObjectKey));
+            Assert.True(await media.ExistsAsync(LuxMap.Shared.Storage.StorageBucket.Survey, frame.ThumbnailKey));
+        }
+        var observations = await db.Set<PoleObservation>().Where(x => x.RunId == run.RunId).ToArrayAsync();
+        Assert.Contains(observations, x => x.ClassifiedAs == FixtureStatus.Normal);
+        Assert.Contains(observations, x => x.ClassifiedAs == FixtureStatus.Out);
+        Assert.All(observations, x => { Assert.Null(x.BaselineRatio); Assert.False(x.DimEvaluationEligible); });
+        Assert.False(await db.Set<PoleCurrentStatus>().AnyAsync(x => poles.Contains(x.PoleId)));
+        var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE survey_frame SET width = width + 1 WHERE sweep_id = {sweep}"));
+        Assert.Equal("55000", error.SqlState);
+        error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
+            $"DELETE FROM detection WHERE sweep_id = {sweep}"));
+        Assert.Equal("55000", error.SqlState);
+    }
+
+    [Fact]
+    public async Task Object_failure_does_not_leave_a_row_pointing_to_missing_thumbnail()
+    {
+        media.FailThumbnail = true;
+        Assert.True(await Processor().ProcessOneAsync(sweepId: sweep));
+        await using var db = Db();
+        Assert.True(media.ImageWrites > 0);
+        Assert.False(await db.Set<SurveyFrame>().AnyAsync(x => x.SweepId == sweep));
+        Assert.False(await db.Set<Detection>().AnyAsync(x => x.SweepId == sweep));
+        Assert.Equal("failed", (await db.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep)).ResultState);
     }
 
     [Fact]
@@ -208,7 +257,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     public async Task Checkpoints_renew_the_lease_and_preserve_the_completion_audit()
     {
         var processor = new SurveyProcessor(source,catalog,Options.Create(new SurveyProcessingOptions()),
-            NullLogger<SurveyProcessor>.Instance,new AdvancingClock(35));
+            NullLogger<SurveyProcessor>.Instance,new AdvancingClock(35), media.Pipeline);
         Assert.True(await processor.ProcessOneAsync(sweepId: sweep));
         await using var db = Db();
         var run = await db.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep);
@@ -305,6 +354,17 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Contains("gps_degraded", observation.QualityFlags, StringComparison.Ordinal);
     }
 
+    private async Task PlacePolesOnRouteForChainageTests()
+    {
+        // Midpoints of the two route legs preserve the quarter/three-quarter assertions.
+        // CV tests keep the default off-route poles so their camera-side evidence remains valid.
+        await using var db = Db();
+        var assets = await db.Set<Pole>().Where(x => poles.Contains(x.PoleId)).ToArrayAsync();
+        foreach (var pole in assets)
+            pole.Geom = new Point(pole.PoleId == poles[0] ? 108.00025 : 108.00075, 16.00001) { SRID = 4326 };
+        await db.SaveChangesAsync();
+    }
+
     private sealed class ChangeRouteBetweenProjections(Func<Task> change) : DbCommandInterceptor
     {
         public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
@@ -322,6 +382,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     [Fact]
     public async Task Projection_snapshot_survives_a_concurrent_route_edit()
     {
+        await PlacePolesOnRouteForChainageTests();
         var interceptor = new ChangeRouteBetweenProjections(async () =>
         {
             await using var writer = Db();
@@ -356,6 +417,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     [Fact]
     public async Task Chainage_is_projected_metres_and_its_actual_sql_uses_gist()
     {
+        await PlacePolesOnRouteForChainageTests();
         var capture = new CaptureProjection();
         await using var db = Db(interceptor: capture);
         var projected = await SurveyChainageQuery.Poles(db, [road], [a,b], "simulated", new(), default);

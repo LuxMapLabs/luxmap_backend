@@ -35,6 +35,11 @@ public sealed class SurveyProcessingRun : ICommuneScoped, IImmutableRecord
     public DateTime StartedAt { get; set; }
     public DateTime FinishedAt { get; set; }
     public double? CoveragePct { get; set; }
+    public double? DetectionCoveragePct { get; set; }
+    public double? DimCoveragePct { get; set; }
+    public long? ModelVersionId { get; set; }
+    public long? ExtractorVersionId { get; set; }
+    public long? ClassificationVersionId { get; set; }
     public string? CoverageReason { get; set; }
 }
 
@@ -70,5 +75,12 @@ public sealed class PoleObservation : ICommuneScoped, IImmutableRecord
     public double? PeakLux { get; set; }
     public double SpeedMps { get; set; }
     public double AssociationConfidence { get; set; }
+    public string? CvState { get; set; }
+    public double? CvConfidence { get; set; }
+    public string? RepresentativeFrameId { get; set; }
+    public FixtureStatus ClassifiedAs { get; set; } = FixtureStatus.Unknown;
+    public double? BaselineRatio { get; set; }
+    public bool DimEvaluationEligible { get; set; }
+    public string ReasonCodes { get; set; } = "[]";
     public required string QualityFlags { get; set; }
 }

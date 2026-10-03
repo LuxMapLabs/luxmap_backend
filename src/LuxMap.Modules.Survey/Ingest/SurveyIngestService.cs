@@ -267,7 +267,7 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
             return new DateTime((s.UtcAnchor.Ticks + ticks) / 10 * 10, DateTimeKind.Utc);
         }
         return new(s.SweepId, s.WorkOrderId, At(s.StartedElapsedNs), At(s.EndedElapsedNs), segments,
-            0, s.CoveragePct, s.ProcessingStatus, s.Status, s.DataSource, s.SubmittedAt, clips, raw);
+            s.FrameCount, s.CoveragePct, s.ProcessingStatus, s.Status, s.DataSource, s.SubmittedAt, clips, raw);
     }
 
     private void Record(SurveySweep s, AuditAction action, object? before, DateTime now)

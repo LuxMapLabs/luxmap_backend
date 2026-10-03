@@ -30,7 +30,7 @@ public sealed class SurveyProcessingModelTests
     {
         using var db = Create();
         var model = db.GetService<IDesignTimeModel>().Model;
-        foreach (var type in new[] { typeof(ArtifactVersion), typeof(SurveyProcessingRun), typeof(SurveyPass), typeof(PoleObservation) })
+        foreach (var type in new[] { typeof(ArtifactVersion), typeof(SurveyProcessingRun), typeof(SurveyPass), typeof(PoleObservation), typeof(SurveyFrame), typeof(Detection) })
         {
             var entity = model.FindEntityType(type)!;
             Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
