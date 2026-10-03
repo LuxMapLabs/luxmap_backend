@@ -571,7 +571,11 @@ Cấu hình trong `SurveyProcessing:Frames`, được chụp trong `settings_sna
 | `MinimumConfidence` / `MinimumBoxArea` | 0,7 / 0,0001 diện tích chuẩn hoá |
 | `DimThresholdRatio` | 0,80 |
 
-Mỗi clip dùng một tiến trình ffmpeg để cắt dãy JPEG; số lượng và thứ tự file phải khớp các PTS đã chọn.
+Cắt theo cửa sổ theo thứ tự thời gian, khử trùng PTS ở phần chồng nhau. Mỗi lượt tối đa **64 vế**
+(`MaximumSelectionTerms`); cửa sổ lớn chia thêm lượt. Seek lùi 1 giây bằng `-ss`, `-seek_timestamp 1`,
+`-noaccurate_seek`, giữ `-copyts` và chọn `eq(pts,...)` theo tick/time_base gốc từ ffprobe.
+`select` bỏ phần giải mã từ keyframe trước điểm seek; không suy PTS từ số frame/FPS.
+Số lượng và thứ tự JPEG mỗi lượt phải khớp PTS đã chọn. JPEG dùng pixel format full-range `yuvj420p`.
 Quota tổng clip + JPEG được kiểm trong lúc cắt và sau khi tiến trình kết thúc (kiểm định kỳ, không phải
 hạn mức cứng của hệ điều hành). RAM/channel giữ một frame tại một thời điểm. Timeout huỷ tiến trình con;
 `finally` dọn thư mục riêng của lượt cắt. Worker chết cứng có thể để file tạm: vận hành dọn thư mục temp

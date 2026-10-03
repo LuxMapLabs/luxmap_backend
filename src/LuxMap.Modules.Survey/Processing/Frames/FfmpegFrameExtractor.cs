@@ -19,6 +19,8 @@ public interface IFrameExtractor
 /// <summary>Local files only, bounded subprocesses, actual frame PTS (never average FPS).</summary>
 public sealed class FfmpegFrameExtractor(IObjectStore store, SurveyFrameOptions options, IMediaProcessRunner? processRunner = null) : IFrameExtractor, IDisposable
 {
+    // Bound the depth of ffmpeg's select expression parser, independently of clip/frame count.
+    public const int MaximumSelectionTerms = 64;
     private readonly IMediaProcessRunner runner = processRunner ?? new LocalMediaProcessRunner();
     private readonly SemaphoreSlim slots = new(options.MaximumConcurrentClips);
     public void Dispose() => slots.Dispose();
@@ -98,8 +100,9 @@ public sealed class FfmpegFrameExtractor(IObjectStore store, SurveyFrameOptions 
             if (Math.Abs(rotation % 180) == 90) (width, height) = (height, width);
             if (width <= 0 || height <= 0 || (long)width * height > 3840L * 2160)
                 throw new ProcessingFailure("VIDEO_DIMENSIONS", "extractor");
-            var pts = doc.RootElement.GetProperty("frames").EnumerateArray()
-                .Select(f => checked((long)decimal.Round((decimal)f.GetProperty("pts").GetInt64() * num * 1_000_000_000 / den, 0, MidpointRounding.AwayFromZero))).ToArray();
+            var sourcePts = doc.RootElement.GetProperty("frames").EnumerateArray()
+                .Select(f => f.GetProperty("pts").GetInt64()).ToArray();
+            var pts = sourcePts.Select(value => checked((long)decimal.Round((decimal)value * num * 1_000_000_000 / den, 0, MidpointRounding.AwayFromZero))).ToArray();
             if (pts.Length == 0 || pts[0] != clock.FirstPtsNs || pts[^1] != clock.LastPtsNs
                 || pts.Zip(pts.Skip(1)).Any(pair => pair.First >= pair.Second))
                 throw new ProcessingFailure("CLOCK_VIDEO_MAPPING", "video_clock");
@@ -117,29 +120,44 @@ public sealed class FfmpegFrameExtractor(IObjectStore store, SurveyFrameOptions 
                     if (totalBytes > options.TemporaryBytesPerClip) throw new ProcessingFailure("VIDEO_TEMP_QUOTA", "extractor");
                 }
             }
-            // One decode per clip. Output order follows the increasing indices selected from real PTS.
-            // Passthrough prevents the muxer duplicating/dropping frames to manufacture a constant rate.
-            var selection = "select=" + string.Join("+", indices.Select(index =>
-                "eq(n\\," + index.ToString(CultureInfo.InvariantCulture) + ")"));
-            await runner.RunAsync(options.FfmpegPath,
-                ["-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-threads", "1", "-i", input,
-                    "-vf", selection, "-fps_mode", "passthrough", "-frames:v", indices.Length.ToString(CultureInfo.InvariantCulture),
-                    "-threads", "1", "-q:v", "2", "-f", "image2", "-start_number", "1", "-y", outputPattern],
-                options.TimeoutSeconds, ct, CheckOutputQuota);
-            CheckOutputQuota();
-            var outputs = Directory.GetFiles(directory, "frame_*.jpg").Order(StringComparer.Ordinal).ToArray();
-            if (outputs.Length != indices.Length) throw new ProcessingFailure("FRAME_COUNT_MISMATCH", "extractor");
-            // Validate the whole sequence before exposing any frame to the consumer.
-            for (int i = 0; i < outputs.Length; i++)
-                if (Path.GetFileName(outputs[i]) != "frame_" + (i + 1).ToString("D8", CultureInfo.InvariantCulture) + ".jpg"
-                    || new FileInfo(outputs[i]).Length == 0)
-                    throw new ProcessingFailure("FRAME_SEQUENCE_INVALID", "extractor");
-            for (int i = 0; i < outputs.Length; i++)
+            // Assign the sorted union to windows in chronological order. Overlaps emit each PTS
+            // once, including samples selected by a later window inside the current window.
+            int next = 0;
+            foreach (var window in windows.Where(w => clock.Covers(w.CenterNs)).OrderBy(w => w.StartNs).ThenBy(w => w.EndNs))
             {
-                var index = indices[i];
-                var bytes = await File.ReadAllBytesAsync(outputs[i], ct);
-                await consume(new(pts[index], clock.ToPhone(pts[index]), width, height, bytes), ct);
-                File.Delete(outputs[i]);
+                int through = next;
+                while (through < indices.Length && clock.ToPhone(pts[indices[through]]) <= window.EndNs) through++;
+                foreach (var batch in indices[next..through].Chunk(MaximumSelectionTerms))
+                {
+                    // Absolute input seek plus copyts retains the original stream time base/PTS,
+                    // even for clips whose first PTS is nonzero. Select discards keyframe pre-roll;
+                    // noaccurate_seek avoids ffmpeg discarding additional frames at nonzero starts.
+                    var seek = Math.Max((decimal)sourcePts[0] * num / den,
+                        (decimal)sourcePts[batch[0]] * num / den - 1).ToString("0.#########", CultureInfo.InvariantCulture);
+                    var selection = "select=" + string.Join("+", batch.Select(index =>
+                        "eq(pts\\," + sourcePts[index].ToString(CultureInfo.InvariantCulture) + ")"));
+                    await runner.RunAsync(options.FfmpegPath,
+                        ["-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-threads", "1", "-seek_timestamp", "1", "-ss", seek, "-noaccurate_seek", "-copyts", "-i", input, "-map", "0:v:0",
+                            "-vf", selection, "-fps_mode", "passthrough", "-frames:v", batch.Length.ToString(CultureInfo.InvariantCulture),
+                            "-threads", "1", "-q:v", "2", "-pix_fmt", "yuvj420p", "-f", "image2", "-start_number", "1", "-y", outputPattern],
+                        options.TimeoutSeconds, ct, CheckOutputQuota);
+                    CheckOutputQuota();
+                    var outputs = Directory.GetFiles(directory, "frame_*.jpg").Order(StringComparer.Ordinal).ToArray();
+                    if (outputs.Length != batch.Length) throw new ProcessingFailure("FRAME_COUNT_MISMATCH", "extractor");
+                    // Validate this entire batch before exposing any of its frames to the consumer.
+                    for (int i = 0; i < outputs.Length; i++)
+                        if (Path.GetFileName(outputs[i]) != "frame_" + (i + 1).ToString("D8", CultureInfo.InvariantCulture) + ".jpg"
+                            || new FileInfo(outputs[i]).Length == 0)
+                            throw new ProcessingFailure("FRAME_SEQUENCE_INVALID", "extractor");
+                    for (int i = 0; i < outputs.Length; i++)
+                    {
+                        var index = batch[i];
+                        var bytes = await File.ReadAllBytesAsync(outputs[i], ct);
+                        await consume(new(pts[index], clock.ToPhone(pts[index]), width, height, bytes), ct);
+                        File.Delete(outputs[i]);
+                    }
+                }
+                next = through;
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
