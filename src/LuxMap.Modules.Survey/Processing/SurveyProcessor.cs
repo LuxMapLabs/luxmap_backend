@@ -276,6 +276,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             CvConfidence = cv?.Association.Confidence,
             RepresentativeFrameId = cv?.Association.RepresentativeFrameId,
             ClassifiedAs = cv?.Classification.Status ?? FixtureStatus.Unknown,
+            BaselineId = cv?.Baseline?.Id, BaselineValue = cv?.Baseline?.Value,
             BaselineRatio = cv?.Classification.BaselineRatio,
             DimEvaluationEligible = cv?.Classification.DimEvaluationEligible ?? false,
             ReasonCodes = Json(cv?.Classification.Reasons ?? []),

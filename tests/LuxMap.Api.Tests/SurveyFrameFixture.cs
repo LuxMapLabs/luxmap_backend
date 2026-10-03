@@ -42,7 +42,7 @@ internal sealed class SurveyFrameFixture : IObjectStore, IDisposable
                 manifest[Hash(frame.Jpeg)] = new("success", [new(0, "on", .95, .1, .1, .2, .2), new(1, "off", .95, .7, .1, .2, .2)]);
                 return Task.CompletedTask;
             }, default);
-        Pipeline = new(this, extractor, new ManifestOnOffDetector(JsonSerializer.Serialize(manifest)), new EmptySurveyBaselineLookup(), options);
+        Pipeline = new(this, extractor, new ManifestOnOffDetector(JsonSerializer.Serialize(manifest)), options);
     }
     private static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     public Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)

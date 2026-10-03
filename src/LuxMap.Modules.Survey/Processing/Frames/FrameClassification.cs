@@ -5,13 +5,7 @@ namespace LuxMap.Modules.Survey.Processing.Frames;
 public sealed record Classification(FixtureStatus Status, double? BaselineRatio, bool DimEvaluationEligible, string[] Reasons);
 public interface ISurveyBaselineLookup
 {
-    Task<double?> FindAsync(string poleId, CancellationToken ct);
-}
-
-// P2c owns baseline creation and compatibility rules; no fabricated baseline in P2b.
-public sealed class EmptySurveyBaselineLookup : ISurveyBaselineLookup
-{
-    public Task<double?> FindAsync(string poleId, CancellationToken ct) => Task.FromResult<double?>(null);
+    Task<Review.BaselineReference?> FindAsync(Review.BaselineQuery query, CancellationToken ct);
 }
 
 public static class FrameClassification

@@ -3393,6 +3393,161 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/frames/{frame_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "SurveyFrames"
+        ],
+        "parameters": [
+          {
+            "name": "frame_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/sweeps/{id}/results": {
+      "get": {
+        "tags": [
+          "SurveyReview"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultItemPagedResult"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/sweeps/{id}/review": {
+      "post": {
+        "tags": [
+          "SurveyReview"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSweepRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSweepRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSweepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSweepResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSweepResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSweepResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_surveys",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/sweeps": {
       "post": {
         "tags": [
@@ -6301,6 +6456,67 @@
         },
         "additionalProperties": false
       },
+      "ReviewSweepRequest": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSweepResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SweepStatus"
+          },
+          "accepted_run_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "reviewed_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReviewWorkOrderRequest": {
         "type": "object",
         "properties": {
@@ -6588,6 +6804,120 @@
         },
         "additionalProperties": false
       },
+      "SurveyResultItem": {
+        "type": "object",
+        "properties": {
+          "observation_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pole_id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pass_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "evaluated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "cv_state": {
+            "type": "string",
+            "nullable": true
+          },
+          "cv_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "peak_lux": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "baseline_value": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "classified_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "dim_evaluation_eligible": {
+            "type": "boolean"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quality_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frame_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "association_confidence": {
+            "type": "number",
+            "format": "double"
+          },
+          "published_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "is_representative": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SurveyResultItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyResultItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SweepManifest": {
         "type": "object",
         "properties": {
@@ -6681,6 +7011,10 @@
             "items": {
               "$ref": "#/components/schemas/SurveyRawResponse"
             }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -7308,6 +7642,12 @@
     },
     {
       "name": "Map"
+    },
+    {
+      "name": "SurveyFrames"
+    },
+    {
+      "name": "SurveyReview"
     },
     {
       "name": "Sweeps"

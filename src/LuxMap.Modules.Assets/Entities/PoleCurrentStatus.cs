@@ -53,6 +53,9 @@ public class PoleCurrentStatus : ICommuneScoped
     /// </summary>
     public required string CommuneId { get; set; }
 
+    public DateTime? LastEvaluatedAt { get; set; }
+    public long? LastRunId { get; set; }
+
     public DateTime UpdatedAt { get; set; }
 
     public Pole Pole { get; set; } = null!;

@@ -35,6 +35,12 @@ public sealed class SurveySweep : ICommuneScoped, IAudited
     public int ProcessingAttempt { get; set; }
     public int FrameCount { get; set; }
     public double? CoveragePct { get; set; }
+    public long? AcceptedRunId { get; set; }
+    public Guid? ReviewClientOpId { get; set; }
+    public string? ReviewRequestHash { get; set; }
+    public string? ReviewedBy { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewNote { get; set; }
     public uint Version { get; set; }
 }
 

@@ -720,6 +720,34 @@ OpenAPI đã xuất lại (PR #69); **văn bản Contract chưa sửa**, sửa k
 (Mỹ gửi): WP5 — phiếu `survey`, `GET /sweeps`, nhãn Swagger; WP6 — luồng thu phiên, giới hạn upload, ns dạng chuỗi, nhãn Swagger,
 và xin phiên mẫu thật từ thiết bị (D-06). Chờ phản hồi ở FW kế tiếp.
 
+### BE-15 P2c — duyệt, công bố và baseline (04/10/2026)
+
+**SELF-SIGNED, nền tạm tới FW**, theo task P2c/D-03/05/08/10/12/14 đã duyệt; không sửa Contract hay enum.
+Bề mặt mới: `GET /sweeps/{id}/results` (`ReadSurveys`, run thành công mới nhất hoặc `run_id`, trang ≤200),
+`POST /sweeps/{id}/review` (`ReviewSurveys`, accept/return, `client_op_id`, `run_id`, `expected_version`,
+return bắt buộc note). GET sweep/list thêm `version`. Thumbnail `GET /frames/{frame_id}/thumbnail` hiện thực
+đúng JPEG proxy của Contract, kiểm cả parent/assignee/tập xã trước mở object; stub generator đã bỏ,
+**chưa xuất OpenAPI**, Claude làm sau review. Payload/mã lỗi tại [`survey-ingest-p2a.md`](survey-ingest-p2a.md).
+
+Công bố một transaction, mỗi xã một batch history/status/baseline kèm audit; mỗi fault mới một SaveChanges
+và audit `cv` riêng. Sweep cũ hoặc bằng timestamp không đè status và không tạo fault hiện tại (vẫn history).
+Gộp lượt theo chất lượng, ON/OFF mâu thuẫn → unknown; không tự đóng sự cố/hoàn thành phiếu.
+Baseline tách nguồn/chiều, trung vị, tối thiểu 3 member (cấu hình `SurveyReview:BaselineMinimumMembers`),
+mỗi run accepted tối đa một member/chiều; lookup loại mọi baseline chứa member của chính sweep hoặc
+không trước thời điểm bắt đầu sweep. Profile/protocol tương thích đầy đủ còn chờ D-05/D-06 + BE-33/34;
+worker hiện vẫn chỉ nhận simulated. Không dùng kết quả mô phỏng làm chứng cứ chất lượng thực địa.
+
+**Severity tạm cần WP4/FW xác nhận:** lamp_out Medium, lamp_dim Low; near_sensitive_poi tăng một bậc,
+trần High. Cấu hình `SurveyReview:LampOutSeverity` / `LampDimSeverity` (Low/Medium/High).
+`priority_score` vẫn null, chờ CV-16; nguồn dim vẫn `cv` theo D-14. Không đặt đây là quy tắc photometric.
+**Cần báo WP5/WP6/WP4; chưa gửi trong lượt này.** Test PostGIS và apply/rollback migration dành cho Claude.
+
+**Review P2c vòng 2 (04/10):** R1 chỉ nhận normal làm member; R2 thêm fixture_id FK Restrict trên baseline,
+member từ ngày lắp UTC của bóng đang dùng, lookup chỉ dùng baseline cùng bóng hiện tại; không có bóng/ngày
+lắp thì không lọc thời gian. R3 adapter đọc object thiếu →503 `STORAGE_OBJECT_MISSING`. R4 results thêm
+`published_as`, `is_representative` tính trên mọi lượt của cột trong run, độc lập trang. Không có schema viết
+tay cho SurveyResultItem trong generator; JSON OpenAPI chưa xuất lại theo giới hạn lượt Codex. Nền SELF-SIGNED giữ nguyên.
+
 ## Dữ liệu thực địa đầu tiên — đèn thật không phải LED (01/10/2026)
 
 | | |

@@ -170,6 +170,8 @@ public class Fault : ICommuneScoped, IAudited
     /// of the study rather than a nicety. The column exists from the first migration so BE-34 is not
     /// left retrofitting it onto rows that already lost the information.
     /// </remarks>
+    public long? OriginObservationId { get; set; }
+
     public string? DetectionModelVersion { get; set; }
 
     public DateTime CreatedAt { get; set; }

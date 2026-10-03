@@ -156,6 +156,14 @@ for method, suffix, summary in [
 ]:
     SUMMARY[(method, "/api/v1/sweeps" + suffix)] = "[TẠM — BE-15 P2a] " + summary
 
+# BE-15 P2c provisional review operations (SELF-SIGNED, temporary until FW).
+for method, path, summary in [
+    ("get", "/api/v1/sweeps/{id}/results", "Kết quả từng lượt quét theo cột của run (mặc định run thành công mới nhất), kèm published_as xem trước"),
+    ("post", "/api/v1/sweeps/{id}/review", "Quản lý chấp nhận (công bố trạng thái cột, chuỗi độ sáng, baseline, sự cố CV) hoặc trả lại; idempotent theo client_op_id"),
+    ("get", "/api/v1/frames/{frame_id}/thumbnail", "Thumbnail JPEG của khung hình khảo sát — proxy qua API, không presigned; 503 khi object thiếu"),
+]:
+    SUMMARY[(method, path)] = "[TẠM — BE-15 P2c] " + summary
+
 SECTION = {
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
@@ -165,6 +173,7 @@ SECTION = {
     "/api/v1/auth": "§4.1",
     "/api/v1/lux-readings": "§5.7",
     "/api/v1/sweeps": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/frames": "§2.7 + BE-15 P2c",
 }
 
 for path, item in d["paths"].items():
@@ -505,10 +514,7 @@ ni("post", "/api/v1/work-orders/{work_order_id}/evidence", "WorkOrders", "Ảnh 
     ("415", err("UNSUPPORTED_IMAGE_FORMAT — không phải JPEG theo magic bytes"))],
    parameters=[p("work_order_id", {"$ref": "#/components/schemas/WorkOrderId"}, True, where="path")],
    body={"$ref": "#/components/schemas/EvidenceUpload"}, body_ct="multipart/form-data")
-ni("get", "/api/v1/frames/{frame_id}/thumbnail", "IotSweeps", "Thumbnail JPEG của một khung hình — proxy qua API, không presigned", "§5.6", "BE-15",
-   [("200", {"description": "JPEG (320px cạnh dài, q80 — TẠM, Open item O-4)", "content": {"image/jpeg": {"schema": {"type": "string", "format": "binary"}}}}),
-    ("404", err("Không tồn tại hoặc ngoài phạm vi"))],
-   parameters=[p("frame_id", {"$ref": "#/components/schemas/FrameId"}, True, where="path")])
+# BE-15 P2c implements the authenticated JPEG thumbnail endpoint.
 ni("get", "/api/v1/sync/bundle", "Sync", "Gói dữ liệu theo segment để cache offline", "§5.8", "BE-43",
    [("200", {"description": "Bundle trong phạm vi địa bàn của user (§2)", "content": json_content("SyncBundle")}),
     ("400", err("VALIDATION_FAILED — thiếu segment_id"))],

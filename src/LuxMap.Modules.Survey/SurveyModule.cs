@@ -32,7 +32,10 @@ public sealed class SurveyModule : ILuxMapModule
         }).ValidateOnStart();
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SurveyProcessingOptions>>().Value.Frames);
         services.AddSingleton<IFrameExtractor, FfmpegFrameExtractor>();
-        services.AddSingleton<ISurveyBaselineLookup, EmptySurveyBaselineLookup>();
+        services.AddScoped<ISurveyBaselineLookup, Review.SurveyBaselineLookup>();
+        services.AddScoped<Review.SurveyReviewService>();
+        services.AddOptions<Review.SurveyReviewOptions>().Bind(configuration.GetSection("SurveyReview"))
+            .Validate(o => o.IsValid(), "Invalid SurveyReview options.").ValidateOnStart();
         services.AddSingleton<IOnOffDetector>(sp =>
         {
             var options = sp.GetRequiredService<SurveyFrameOptions>();

@@ -19,11 +19,11 @@ public sealed class SurveyObservationIdentityTests
         Assert.Equal(first.TimeNs, second.TimeNs);
         var result = new FramePipelineResult();
         var run = new SurveyProcessingRun { SweepId = "sweep", CommuneId = "commune", InputHash = new('a', 64), SettingsSnapshot = "{}", ResultState = "completed", Stage = "completed" };
-        await SurveyFramePipeline.ClassifyObservationsAsync(result, run,
+        await SurveyFramePipeline.ClassifyObservationsAsync(result, run, Sweep(),
             passes.Select(p => ("segment", 100d, p)).ToList(), [Pole("pole")],
             new("left", [new(0, 0, 20_000_000_000, 0, 20_000_000_000, 1, 1000)]),
             new Dictionary<int, List<DetectedFrame>> { [0] = [Frame(first.TimeNs)] },
-            new EmptySurveyBaselineLookup(), new(), default);
+            new NoBaseline(), new(), default);
         Assert.Equal(2, result.Observations.Count);
         var sweep = new SurveySweep { WorkOrderId = "order", CommuneId = "commune", CapturedBy = "user", CreateRequestHash = new('a', 64), UtcAnchor = DateTime.UnixEpoch, DataSource = DataSource.Simulated };
         var forward = new SurveyPass { PassNo = 0, Run = run, SegmentId = "segment", Direction = "forward", QualityFlags = "{}" };
@@ -49,12 +49,12 @@ public sealed class SurveyObservationIdentityTests
         var track = new[] { new TrackPoint(0, 0, 2, 10), new TrackPoint(20_000_000_000, 100, 2, 10) };
         var result = new FramePipelineResult();
         var run = new SurveyProcessingRun { SweepId = "sweep", CommuneId = "commune", InputHash = new('a', 64), SettingsSnapshot = "{}", ResultState = "completed", Stage = "completed" };
-        await SurveyFramePipeline.ClassifyObservationsAsync(result, run,
+        await SurveyFramePipeline.ClassifyObservationsAsync(result, run, Sweep(),
             [("segment", 100d, new(track, [first], 0, true, 0)), ("segment", 100d, new(track, [second], 0, true, 0))],
             samePole ? [Pole("pole")] : [Pole("pole"), Pole(other)],
             new("front", [new(0, 0, 20_000_000_000, 0, 20_000_000_000, 1, 1000)]),
             new Dictionary<int, List<DetectedFrame>> { [0] = [Frame(10_000_000_000)] },
-            new EmptySurveyBaselineLookup(), new(), default);
+            new NoBaseline(), new(), default);
         Assert.Equal(2, result.Observations.Count);
         Assert.All(result.Observations.Values, cv =>
         {
@@ -75,4 +75,10 @@ public sealed class SurveyObservationIdentityTests
         PoleId = id, CommuneId = "commune", SegmentId = "segment", SideOfRoute = 1,
         ChainageM = 100, LengthM = 100, GeometryJson = "{}", RouteGeometryJson = "{}"
     };
+    private static SurveySweep Sweep() => new() { SweepId = "SWP-test", WorkOrderId = "WO-test", CommuneId = "COM-001", CapturedBy = "USR-test", CreateRequestHash = "", UtcAnchor = DateTime.UnixEpoch };
+    private sealed class NoBaseline : ISurveyBaselineLookup
+    {
+        public Task<LuxMap.Modules.Survey.Review.BaselineReference?> FindAsync(LuxMap.Modules.Survey.Review.BaselineQuery query, CancellationToken ct)
+            => Task.FromResult<LuxMap.Modules.Survey.Review.BaselineReference?>(null);
+    }
 }

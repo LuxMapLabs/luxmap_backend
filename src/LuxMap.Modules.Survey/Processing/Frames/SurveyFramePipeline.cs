@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.Survey.Processing.Frames;
 
-public sealed record ObservationCv(Association Association, Classification Classification);
+public sealed record ObservationCv(Association Association, Classification Classification, Review.BaselineReference? Baseline = null);
 public sealed class FramePipelineResult
 {
     public List<SurveyFrame> NewFrames { get; } = [];
@@ -19,7 +19,7 @@ public sealed class FramePipelineResult
 }
 
 public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extractor, IOnOffDetector detector,
-    ISurveyBaselineLookup baselines, SurveyFrameOptions options)
+    SurveyFrameOptions options)
 {
     public async Task<FramePipelineResult> ProcessAsync(LuxMapDbContext db, SurveySweep sweep, SurveyProcessingRun run,
         List<(string Segment, double Length, PassResult Pass)> passes, ProjectedPole[] poles,
@@ -120,13 +120,13 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
                 try { await produce; } catch when (extractionStop.IsCancellationRequested) { /* Consumer reports the original failure. */ }
             }
         }
-        await ClassifyObservationsAsync(result, run, passes, poles, mapping,
-            clips.ToDictionary(c => c.ClipNo, c => outputs.GetValueOrDefault(c.ClipId) ?? []), baselines, options, ct);
+        await ClassifyObservationsAsync(result, run, sweep, passes, poles, mapping,
+            clips.ToDictionary(c => c.ClipNo, c => outputs.GetValueOrDefault(c.ClipId) ?? []), new Review.SurveyBaselineLookup(db), options, ct);
         result.FrameCount = await db.Set<SurveyFrame>().CountAsync(x => x.SweepId == sweep.SweepId, ct) + result.NewFrames.Count;
         return result;
     }
 
-    public static async Task ClassifyObservationsAsync(FramePipelineResult result, SurveyProcessingRun run,
+    public static async Task ClassifyObservationsAsync(FramePipelineResult result, SurveyProcessingRun run, SurveySweep sweep,
         List<(string Segment, double Length, PassResult Pass)> passes, ProjectedPole[] poles,
         VideoClockMapping mapping, IReadOnlyDictionary<int, List<DetectedFrame>> outputs,
         ISurveyBaselineLookup baselines, SurveyFrameOptions options, CancellationToken ct)
@@ -142,8 +142,10 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
             int side = Math.Sign(pole.SideOfRoute) * (pass.Pass.Track[^1].ChainageM > pass.Pass.Track[0].ChainageM ? 1 : -1);
             var association = DetectionAssociation.Match(frames, Math.Max(0, p.TimeNs - (long)(options.BeforeSeconds * 1e9)),
                 checked(p.TimeNs + (long)(options.AfterSeconds * 1e9)), mapping.CameraSide, side, options);
-            var baseline = await baselines.FindAsync(p.PoleId, ct);
-            result.Observations.Add((passNo, p.PoleId, p.TimeNs), EvaluateObservation(association, p.Peak?.Lux, baseline, flags, options.DimThresholdRatio));
+            var direction = pass.Pass.Track[^1].ChainageM > pass.Pass.Track[0].ChainageM ? "forward" : "reverse";
+            var before = new DateTime((sweep.UtcAnchor.Ticks + (sweep.StartedElapsedNs - sweep.ElapsedAnchorNs) / 100) / 10 * 10, DateTimeKind.Utc);
+            var baseline = await baselines.FindAsync(new(p.PoleId, direction, sweep.SweepId, before, sweep.DataSource), ct);
+            result.Observations.Add((passNo, p.PoleId, p.TimeNs), EvaluateObservation(association, p.Peak?.Lux, baseline?.Value, flags, options.DimThresholdRatio) with { Baseline = baseline });
         }
         // Resolve once across the whole run, before coverage and persistence. A pole revisited in
         // another pass may reuse evidence; distinct poles must never claim the same prediction.

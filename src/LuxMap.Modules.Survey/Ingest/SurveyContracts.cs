@@ -17,4 +17,4 @@ public sealed record SurveyClipResponse(int ClipNo, string Sha256, long ByteCoun
 public sealed record SurveyRawResponse(SurveyRawKind Kind, string Sha256, long ByteCount, int SchemaVersion);
 public sealed record SweepResponse(string SweepId, string WorkOrderId, DateTime? StartedAt, DateTime? EndedAt,
     string[] SegmentIds, int FrameCount, double? CoveragePct, SweepProcessingStatus ProcessingStatus,
-    SweepStatus Status, DataSource DataSource, DateTime? SubmittedAt, SurveyClipResponse[] Clips, SurveyRawResponse[] RawFiles);
+    SweepStatus Status, DataSource DataSource, DateTime? SubmittedAt, SurveyClipResponse[] Clips, SurveyRawResponse[] RawFiles, uint Version);
