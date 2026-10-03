@@ -80,3 +80,23 @@ Yêu cầu kèm:
 - **Test thực tế:** clip tự sinh **≥ 45 s, 30 fps (có VFR)**, **≥ 300 frame được chọn** trên ~18 cửa sổ ⇒ đủ frame, đúng PTS, đúng
   thứ tự. Test này phải đỏ với cách một-lượt-một-biểu-thức hiện tại (Claude sẽ phá thử để kiểm).
 - Giữ: kiểm số ảnh ra đúng bằng số frame chọn, quota đĩa tạm, timeout, dọn file tạm, `-copyts` để PTS khớp ánh xạ thời gian.
+
+# Vòng 4 — từ review độc lập (phiên Codex mới), Claude đã kiểm cả hai (03/10/2026)
+
+Mốc hiện tại `bf4efe1`. Vòng 3 (Claude) đã kiểm: toàn bộ test xanh, phá thử bộ cắt một-biểu-thức ⇒ test thực tế đỏ, video thật
+278/278 và 568/568 frame. **Làm tiếp trên HEAD, giữ nguyên mọi sửa trước.**
+
+**R4-1 — P2. Khoá tra kết quả thiếu danh tính lượt.** `SurveyFramePipeline` (khoảng dòng 135) và `SurveyProcessor.Complete` tra
+`Observations[(PoleId, TimeNs)]`. `SplitPasses` giữ điểm quay đầu ở **cả hai** lượt, nên cột nằm đúng chỗ quay đầu (đường cụt có
+đèn cuối đường) sinh hai observation cùng `(pole, time)` ở hai lượt — chiều đi khác nhau nên phía camera khác nhau — và lượt sau
+**ghi đè** kết quả lượt trước; khi lưu, cả hai observation nhận cùng phân loại. Sửa: khoá gồm **danh tính lượt** (chỉ số lượt trong
+run) ở cả nơi ghi lẫn nơi tra khi lưu. Test: track đi tới cuối tuyến rồi quay lại, có cột đúng ở điểm quay đầu, hai lượt cho hai
+kết quả khác nhau (ví dụ một lượt phía camera khớp, lượt kia không) ⇒ lưu đúng từng lượt.
+
+**R4-2 — P2. Kiểm "một phát hiện cho hai cột" chỉ trong từng lượt.** `ResolveSharedEvidence` chạy riêng mỗi lượt, nên cửa sổ chồng
+nhau giữa hai lượt (quay đầu, chuyển tuyến) có thể gán **cùng một dự đoán** của cùng một frame cho **hai cột khác nhau**, cả hai
+giữ phân loại tự tin và cùng được cộng vào độ phủ (b). Sửa: kiểm trên **toàn run**; phân biệt *cùng một cột* được quan sát lại ở
+lượt khác (hợp lệ) với *hai cột khác nhau* dùng chung bằng chứng (⇒ cả hai `shared_cv_evidence`, không tính vào độ phủ (b)). Test
+đúng ca này.
+
+Sau khi sửa: build 0 warning, test không DB xanh, thêm mục "Vòng 4" vào results. Không commit (Claude commit sau khi kiểm).
