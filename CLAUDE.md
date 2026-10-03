@@ -8,7 +8,7 @@ máy tính để quản lý tài sản và sự cố chiếu sáng đường gia
 năng, NFR và deliverable.
 
 > 🔴 **Phiếu v1.4 (27/09/2026) đổi kênh đo độ sáng — nền của BE-42 và của phân loại `dim` đã đổi, CHƯA
-> CHỐT.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750FVI gắn nóc xe**, lấy mẫu liên tục suốt sweep;
+> CHỐT.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750FVI gắn trên xe khảo sát — đầu xe máy**, lấy mẫu liên tục suốt sweep;
 > **Dim = CV nói ON + đỉnh lux lúc ngang cột dưới ngưỡng baseline của chính cột đó**. Enum mục 1 **không
 > đổi**. Các đề xuất D-R20…D-R28 ở `docs/contract-drift.md` (mục *Registration v1.4*) **chưa có chữ ký** và
 > đa số chạm API → mọi chỗ bên dưới nói "đo sáng bằng điện thoại", "lux là ground truth chấm CV" là **nền

@@ -125,7 +125,7 @@ thẳng v1.2 → v1.4. Enum Contract mục 1 **không phải lật** — đó l�
 |---|---|---|
 | CV quyết gì | Phát hiện bóng **và chấm** normal / dim / out từ độ sáng ảnh đã chuẩn hoá phơi sáng + khoảng cách | **Chỉ ON/OFF**, và xác nhận đỉnh lux là của chính bóng đó (không phải đèn pha, biển hiệu) |
 | Tín hiệu Dim | Độ sáng ảnh so baseline cột | **Đỉnh lux BH1750 lúc xe ngang cột** so baseline cột |
-| Đo sáng | Người đứng dưới cột, cảm biến **điện thoại**, từng lần (`LuxReading`, D-R15) | Module **BH1750FVI + vi điều khiển** gắn nóc xe, hướng lên, **lấy mẫu liên tục suốt sweep**, đồng bộ đồng hồ với điện thoại đầu phiên |
+| Đo sáng | Người đứng dưới cột, cảm biến **điện thoại**, từng lần (`LuxReading`, D-R15) | Module **BH1750FVI + vi điều khiển** gắn **đầu xe máy** (xác nhận 03/10/2026), hướng lên, **lấy mẫu liên tục suốt sweep**, đồng bộ đồng hồ với điện thoại đầu phiên |
 | Vai trò của lux | **Ground truth** chấm CV (CV-12, RQ1) | **Đầu vào** của phân loại Dim |
 | Ground truth `dim` | Lux điện thoại + Controlled Reference Capture Set | **Kiểm tra thực địa** (field verification) — phương pháp chưa định |
 | Controlled Reference Capture Set | Deliverable | **Không còn** trong deliverable |
