@@ -79,3 +79,29 @@ sẽ chạy.
 ## Còn thiếu
 
 - `.ai/results/BE-15-p2b1.md` chưa có — viết sau khi sửa, gồm bảng kết quả mới (T3) và trả lời từng mục review này.
+
+# Vòng 3 — từ review độc lập của Codex (phiên mới), Claude đã kiểm cả bốn (03/10/2026)
+
+Vòng 2 (Claude) đã sửa alias SQL snake_case và siết lại `AuditGuardTests` — xem results §9, **đừng đảo lại**.
+
+**R3-1 — P2. Hai tuyến trong cùng hành lang 25 m.** `SurveyChainageQuery.Gps` chiếu mỗi mẫu GPS lên mọi tuyến trong hành lang,
+rồi mỗi tuyến được xử lý độc lập với cùng các đỉnh lux ⇒ chạy một tuyến mà tuyến song song cũng "được phủ". Sửa: mỗi mẫu GPS
+chỉ thuộc **tuyến gần nhất** (khoảng cách 3405 trong SQL, ví dụ `DISTINCT ON (g.sample_no) … ORDER BY` khoảng cách); hai tuyến
+gần như bằng nhau (chênh dưới một ngưỡng cấu hình) ⇒ mẫu đó gắn cờ mơ hồ, không dùng để định vị trên tuyến nào. Test tích hợp:
+hai tuyến song song cách ~15 m, chỉ chạy một tuyến ⇒ tuyến kia không có lượt, không coverage.
+
+**R3-2 — P2. Xe dừng làm sai thời điểm ngang cột.** Envelope đơn điệu bỏ mọi mẫu đứng yên sau mẫu đầu, nên nội suy trải chuyển
+động lên cả quãng dừng (Codex tái hiện: 10 m từ t=1 tới t=10, 20 m ở t=11 ⇒ cột 15 m ra t=6 thay vì t=10,5). Sửa: giữ **thời
+điểm rời đi** của quãng đứng yên (mẫu cuối cùng trước khi chainage tăng) làm cận dưới khi nội suy. Unit test đúng ca trên; thêm
+một ca vào bộ mô phỏng: dừng hẳn 10 s dưới một đèn sáng (khớp lượt 11 của kịch bản quay thử).
+
+**R3-3 — P2. GPS trôi ngoài hành lang bị SQL loại, tạo khoảng hở giả.** Trả **mọi** mẫu GPS trong khoảng thời gian của phiên kèm
+khoảng cách tới tuyến; mẫu ngoài hành lang là **mẫu kém** (giữ liên tục thời gian, không dùng chainage), không phải khoảng hở.
+Chỉ khi ngoài hành lang **liên tục quá một ngưỡng thời gian cấu hình** mới coi là xe rời tuyến và cắt lượt. Test tích hợp: vài
+mẫu trôi 30–40 m ngang giữa đoạn đi thẳng ⇒ một lượt, cột trong đoạn đó có `gps_degraded`.
+
+**R3-4 — P2. Hai lần chiếu không cùng snapshot.** Đọc chiếu GPS và chiếu cột (và hình học tuyến lưu vào `gis_snapshot`) trong
+**một transaction `RepeatableRead`** (một snapshot Postgres), hoặc chiếu cả hai lên cùng hình học đã chụp. Ghi rõ lựa chọn.
+
+Sau khi sửa: build 0 warning, test không DB xanh, cập nhật bảng mô phỏng nếu đổi, và thêm mục "Vòng 3" vào results trả lời
+R3-1…R3-4. Không chạy test cần DB (Claude chạy). Không commit.
