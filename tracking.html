@@ -42,6 +42,21 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-15 P2b-2 — 03/10/2026: đã sửa review vòng 2, chờ Claude review</strong>
+    <p><span class="tag t-next">Bàn giao review</span> Frame PTS thật/áp xoay, detector giả theo hash,
+    ghép track và phân loại, schema <code>AddSurveyFrames</code>, worker heartbeat và ba mức độ phủ.
+    Build <strong>0 warning/0 error</strong>; <strong>364/364 test không DB</strong> xanh, gồm ffmpeg VFR/rotation,
+    clip hỏng, timeout/huỷ và dọn temp. Migration đã đọc, model snapshot khớp.
+    Vòng 2: cắt theo cửa sổ, seek/PTS gốc, tối đa 64 vế mỗi lượt; test VFR 50 s trên 300 frame.
+    Giữ sửa vòng 1: lux mơ hồ vẫn xét ON/OFF, ghép không phụ thuộc IoU,
+    mặc định 3 s/0,5 s/5 fps và tách fixture chainage. Claude đã kiểm 564/564 API và sửa default classified_as ở mốc 0b59a51.
+    <strong>Vòng 2 không đổi model/migration; Codex chỉ chạy test không DB. Chưa xuất OpenAPI.</strong>
+    Còn: Claude review/tích hợp/CI Linux, P2c công bố-baseline, D-06/D-07 dữ liệu thiết bị/model thật.</p>
+    <p>Files: <code>Survey/Processing/Frames</code>, entity/config/migration, test Shared/Storage/API/Persistence,
+    CI, README và hướng dẫn ingest. <strong>Không commit/push theo yêu cầu.</strong>
+    <a href=".ai/results/BE-15-p2b2.md">Kết quả, lệnh và bằng chứng</a>.</p>
+  </div>
+  <div class="card">
     <strong>BE-15 P2b-1 — 03/10/2026: xong trên nhánh, review độc lập sạch, chưa PR</strong>
     <p><span class="tag t-next">Xong trên nhánh, chưa PR</span> Khớp đồng hồ BLE theo gói, tách lượt GPS,
     hiệu chỉnh trễ GPS trước ghép đỉnh, giữ thời điểm đèn tắt và cặp cột, ngưỡng đỉnh theo nhiễu nền.
