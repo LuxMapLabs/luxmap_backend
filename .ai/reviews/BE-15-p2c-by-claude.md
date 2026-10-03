@@ -32,3 +32,13 @@ migration chỉ AddColumn/CreateTable/Index/Check/FK (không Drop lạ, không x
   chọn công bố không). Cập nhật spec hợp nhất / tài liệu nếu có schema viết tay.
 
 Sau khi sửa: build 0 warning, test không DB xanh, cập nhật `.ai/results/BE-15-p2c.md` (mục vòng 2). Không chạy test DB, không commit.
+
+## Vòng 2 (Claude) và review độc lập (Codex `exec review`)
+
+- R1–R4 đã sửa; Claude phá thử trên PostGIS: cho `dim` làm member ⇒ `Accepted_dim_sweeps_do_not_move_the_baseline` +
+  `Gradual_dimming_does_not_lower_its_own_baseline` đỏ; lookup bỏ lọc bóng ⇒ `Replacing_fixture_invalidates_old_baseline_until_three_new_members`
+  + `Replacement_lookup_uses_only_the_active_fixture` đỏ. Đã khôi phục. Api 577, Persistence 43, Shared 312 (môi trường sạch), Storage 39.
+- OpenAPI xuất lại; `gen_consolidated_spec.py` thiếu SUMMARY cho 3 endpoint P2c (KeyError) — đã thêm, lint hợp lệ.
+- **R5 (review độc lập, xác nhận đúng):** kiểm tương thích cột (`SURVEY_SCOPE_CHANGED`) chạy cả khi **trả lại** — sửa `data_source`
+  của một cột sau khi xử lý làm phiên kẹt `awaiting_review`. Claude sửa: khoá cột + kiểm chỉ khi `accept`. Test
+  `A_corrected_pole_blocks_accept_but_not_return`; phá thử (kiểm luôn chạy) ⇒ đỏ. Api 578/578.

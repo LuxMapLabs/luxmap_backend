@@ -189,6 +189,24 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     [Fact]
+    public async Task A_corrected_pole_blocks_accept_but_not_return()
+    {
+        var c = await Plant(1);
+        await using (var edit = Db())
+        {
+            var pole = await edit.Set<Pole>().SingleAsync(p => p.PoleId == poles[0]);
+            pole.DataSource = DataSource.CalibrationRig; await edit.SaveChangesAsync();
+        }
+        await using var db = Db(); var service = Service(db);
+        var accept = await Assert.ThrowsAsync<LuxMapException>(() => service.Review(c.Id, new(Guid.NewGuid(), c.Run, "accept", null, c.Version), default));
+        Assert.Equal(("SURVEY_SCOPE_CHANGED", HttpStatusCode.Conflict), (accept.Code, accept.StatusCode));
+        db.ChangeTracker.Clear();
+        var returned = await service.Review(c.Id, new(Guid.NewGuid(), c.Run, "return", "Pole data source was corrected", c.Version), default);
+        Assert.Equal(SweepStatus.Returned, returned.Status);
+        Assert.False(await db.Set<LuminanceHistory>().AnyAsync(h => h.SweepId == c.Id));
+    }
+
+    [Fact]
     public async Task Accepted_simulated_captures_build_median_then_next_capture_can_be_dim_or_normal_without_self_scoring()
     {
         var captures = new[] { await Plant(1, 100), await Plant(2, 110), await Plant(3, 90) };

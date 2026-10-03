@@ -129,14 +129,20 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
             throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
         var observations = await db.Set<PoleObservation>().Include(o => o.Pass).Where(o => o.RunId == run.RunId).ToArrayAsync(ct);
         var choices = observations.GroupBy(o => o.PoleId).Select(SurveyPublicationRules.Choose).ToArray();
-        // Lock the parent pole, including poles without a current-status row, in a global order.
-        foreach (var poleId in choices.Select(c => c.Observation.PoleId).Order(StringComparer.Ordinal))
-            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM pole WHERE pole_id = {poleId} FOR UPDATE", ct);
-        var ids = choices.Select(c => c.Observation.PoleId).ToArray();
-        var poles = await db.Set<Pole>().AsNoTracking().Where(p => ids.Contains(p.PoleId)).ToDictionaryAsync(p => p.PoleId, ct);
-        if (choices.Any(c => !poles.TryGetValue(c.Observation.PoleId, out var pole)
-            || pole.CommuneId != c.Observation.CommuneId || pole.DataSource != sweep.DataSource))
-            throw Error("SURVEY_SCOPE_CHANGED", HttpStatusCode.Conflict);
+        // Only accepting publishes, so only accepting needs the poles locked and still compatible with the
+        // run. A return records a decision; refusing it after an asset correction would strand the sweep.
+        var poles = new Dictionary<string, Pole>();
+        if (request.Decision == "accept")
+        {
+            // Lock the parent pole, including poles without a current-status row, in a global order.
+            foreach (var poleId in choices.Select(c => c.Observation.PoleId).Order(StringComparer.Ordinal))
+                await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM pole WHERE pole_id = {poleId} FOR UPDATE", ct);
+            var ids = choices.Select(c => c.Observation.PoleId).ToArray();
+            poles = await db.Set<Pole>().AsNoTracking().Where(p => ids.Contains(p.PoleId)).ToDictionaryAsync(p => p.PoleId, ct);
+            if (choices.Any(c => !poles.TryGetValue(c.Observation.PoleId, out var pole)
+                || pole.CommuneId != c.Observation.CommuneId || pole.DataSource != sweep.DataSource))
+                throw Error("SURVEY_SCOPE_CHANGED", HttpStatusCode.Conflict);
+        }
         var now = UtcMicrosecondClock.UtcNow();
         var before = new { sweep.Status };
         sweep.Status = request.Decision == "accept" ? SweepStatus.Accepted : SweepStatus.Returned;
