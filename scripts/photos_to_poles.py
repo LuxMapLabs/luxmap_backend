@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Turns a folder of clean field photos of street-light poles into a DRAFT for the asset import.
 
-    python3 scripts/photos_to_poles.py <photo-folder> --out <output-folder>
+    python3 scripts/photos_to_poles.py <photo-folder> --out <output-folder> --first-survey
     python3 scripts/photos_to_poles.py img --out out --commune-id COM-070 --segment-ref TUYEN-A \\
-        --ref-prefix LP --existing poles.geojson
+        --ref-prefix LP --existing existing-poles.csv
     python3 scripts/photos_to_poles.py img --out out --segments segments.csv --boundaries wards.geojson \\
-        --ref-prefix LP --fixture-watt 150 --fixture-install-date 2020-01-01
+        --first-survey --ref-prefix LP --fixture-watt 150 --fixture-install-date 2020-01-01
 
 Standard library only, so it runs on any team machine without installing anything.
 
@@ -17,11 +17,15 @@ WHAT COMES OUT, in <output-folder>:
 
   poles.csv          Header of docs/templates/poles.csv plus a trailing `photo_group` column, which
                      the importer ignores (it only checks that the required columns exist). One row
-                     per photo group. `data_source` is always `field`. `segment_external_ref`,
+                     per NEW photo group only. Matched/ambiguous groups never update assets.
+                     `data_source` is always `field`. `segment_external_ref`,
                      `commune_id` and `external_ref` are left blank unless given on the command line —
                      the import rejects blank required cells, so a person fills them before importing.
                      Coordinates are where the PHOTOGRAPHER stood, not the pole: a few metres off.
-  observations.csv   One row per group: photos, time, coordinates, and an empty `status` column for a
+  position_updates.csv  Matched external_ref, old/proposed coordinates, distance and photo count.
+                     HUMAN REVIEW ONLY, never an import file.
+  observations.csv   external_ref is old for matches, new for new poles, blank for ambiguous groups.
+                     One row per group: photos, time, coordinates, and an empty `status` column for a
                      PERSON to fill (on | off | unclear) from the photos. Never imported: the import
                      does not take lamp status, and a photo's auto exposure says nothing reliable about
                      brightness. It is the night visual check the registration counts as ground truth.
@@ -34,7 +38,8 @@ WHAT COMES OUT, in <output-folder>:
                        luot_khac_gan  a photo from another pass (>= 30 s apart) close by — the same pole
                                       seen again, or a different pole (facing poles look identical
                                       from the car)
-                       da_co_cot      sits on a pole already in the system; left out of poles.csv
+                       gan_cot_cu     ambiguous old pole / legacy pole without external_ref; no import
+                       trung_cot_cu   multiple groups match one old pole; no automatic assignment
                        gop_xa         a --merge of groups far apart — likely a typo
   fixtures.csv       Only with --fixture-watt and --fixture-install-date: one led_road_lamp / grid
                      fixture per pole row, ALL with the same given values. These are placeholders a
@@ -61,6 +66,16 @@ GPS fixes give a better estimate than deleting a row by hand. `--drop P095` remo
 a pole at all (a misfire); its photos are listed in rejected.csv. Deleting the file instead would shift
 every later group name and break the --merge list.
 
+EXISTING POLES ARE REQUIRED unless --first-survey explicitly declares there are none. Repeat --existing
+for local asset-list JSON pages ({items: [...]}, or an array of pages) or import poles.csv with POINT
+coordinates. Supply the complete inventory for the surveyed area. Empty/duplicate external_ref values
+are errors. Legacy GeoJSON without external_ref is warned about and can only block nearby new poles.
+After merge/drop/position repair, match only ONE old pole within --match-m (default 8 m). Multiple
+candidates, a nearest pole between match and review radii (default 20 m), or multiple groups matching
+one old pole need human review. Matched groups reuse permanent refs in observations, never poles.csv:
+asset import replaces whole rows and could clear feeders or change segments. New groups use assign_refs;
+matched/review groups do not reserve new refs. Re-runs with the same photos and matching inputs are stable.
+
 PER-POLE SEGMENT AND COMMUNE. A folder rarely covers one road in one commune. `--segments` takes a
 segments.csv (the import template) and gives each pole the nearest segment's external_ref, if within
 --review-m; `--boundaries` takes a GeoJSON of Polygon/MultiPolygon features with properties.commune_id
@@ -82,6 +97,7 @@ defines as UTC, and writes altitude 0.
 
 import argparse
 import csv
+import io
 import json
 import math
 import re
@@ -133,6 +149,8 @@ class Group:
     lat: float = field(init=False)
     lng: float = field(init=False)
     existing_pole: str = ""
+    matched: "ExistingPole | None" = None
+    needs_review: bool = False
 
     def __post_init__(self):
         self.lat = statistics.median(p.lat for p in self.photos)
@@ -378,18 +396,104 @@ def repair_positions(groups: list[Group], max_speed_kmh: float) -> list[Group]:
     return [Group(group.name, group.photos) for group in groups]  # recompute medians
 
 
-def read_existing(path: Path) -> list[tuple[str, float, float]]:
-    """Poles already in the system, from a GeoJSON FeatureCollection of Points with properties.pole_id."""
+@dataclass(frozen=True)
+class ExistingPole:
+    external_ref: str
+    lat: float
+    lng: float
+    pole_id: str = ""
+
+
+def read_existing(path: Path) -> list[ExistingPole]:
+    """Read local asset-list JSON, import CSV, or legacy map GeoJSON; never call an API."""
+    text = path.read_text(encoding="utf-8-sig")
     poles = []
-    for feature in json.loads(path.read_text(encoding="utf-8")).get("features", []):
-        geometry, props = feature.get("geometry") or {}, feature.get("properties") or {}
-        if geometry.get("type") == "Point" and props.get("pole_id"):
-            lng, lat = geometry["coordinates"][:2]
-            poles.append((props["pole_id"], lat, lng))
+
+    def add(ref, lat, lng, pole_id="", legacy=False):
+        if not isinstance(ref, str) or not ref.strip():
+            if not legacy:
+                raise ValueError("external_ref rỗng hoặc thiếu")
+            ref = ""
+        lat, lng = float(lat), float(lng)
+        if not (math.isfinite(lat) and math.isfinite(lng) and -90 <= lat <= 90 and -180 <= lng <= 180):
+            raise ValueError("toạ độ không hợp lệ")
+        poles.append(ExistingPole(ref.strip(), lat, lng, pole_id))
+
+    try:
+        if text.lstrip().startswith(("{", "[")):
+            data = json.loads(text)
+            if isinstance(data, dict) and data.get("type") == "FeatureCollection":
+                for feature in data["features"]:
+                    props, geom = feature["properties"], feature["geometry"]
+                    if geom["type"] != "Point" or not props.get("pole_id"):
+                        raise ValueError("GeoJSON cần Point và properties.pole_id")
+                    lng, lat = geom["coordinates"][:2]
+                    add(props.get("external_ref"), lat, lng, props["pole_id"],
+                        legacy="external_ref" not in props)
+                if any(not pole.external_ref for pole in poles):
+                    print(f"CẢNH BÁO --existing {path}: GeoJSON không có external_ref; chỉ đưa vào review, "
+                          "không tự gắn quan sát.", file=sys.stderr)
+            else:
+                for page in data if isinstance(data, list) else [data]:
+                    for item in page["items"]:
+                        add(item.get("external_ref"), item["location"]["lat"],
+                            item["location"]["lng"], item["pole_id"])
+        else:
+            reader = csv.DictReader(io.StringIO(text))
+            if not {"external_ref", "geom_wkt"}.issubset(reader.fieldnames or []):
+                raise ValueError("CSV cần external_ref và geom_wkt")
+            for row in reader:
+                match = re.fullmatch(r"POINT\s*\(\s*([^\s()]+)\s+([^\s()]+)\s*\)",
+                                     (row.get("geom_wkt") or "").strip(), re.IGNORECASE)
+                if not match:
+                    raise ValueError("geom_wkt phải là POINT(lng lat)")
+                add(row.get("external_ref"), match[2], match[1])
+        validate_existing(poles)
+    except (ValueError, KeyError, TypeError, IndexError, AttributeError) as error:
+        raise ValueError(f"--existing {path}: {error}") from None
     return poles
 
 
-def find_reviews(groups: list[Group], existing, pair_seconds: float, pair_m: float, review_m: float,
+def validate_existing(poles: list[ExistingPole]) -> None:
+    seen = set()
+    for pole in poles:
+        if pole.external_ref:
+            if pole.external_ref in seen:
+                raise ValueError(f"--existing: external_ref trùng: {pole.external_ref}")
+            seen.add(pole.external_ref)
+
+
+def match_existing(groups: list[Group], existing: list[ExistingPole], match_m: float,
+                   review_m: float) -> list[list]:
+    reviews, claims = [], {}
+    for group in groups:
+        nearby = sorted(((distance_m(group.lat, group.lng, pole.lat, pole.lng), pole)
+                         for pole in existing), key=lambda pair: pair[0])
+        nearby = [(d, pole) for d, pole in nearby if d <= review_m]
+        if not nearby:
+            continue
+        d, pole = nearby[0]
+        close = [(gap, old) for gap, old in nearby if gap <= match_m]
+        if len(close) == 1 and pole.external_ref:
+            group.matched = pole
+            claims.setdefault(pole.external_ref, []).append(group)
+        else:
+            group.needs_review = True
+            reviews.append(["gan_cot_cu", group.name,
+                            ";".join(old.external_ref or old.pole_id for _, old in nearby), f"{d:.1f}", "",
+                            "Cột cũ mơ hồ hoặc thiếu external_ref: không tự gắn, không ghi poles.csv."])
+    for ref, owners in claims.items():
+        if len(owners) > 1:
+            for group in owners:
+                group.needs_review, group.matched = True, None
+                reviews.append(["trung_cot_cu", group.name, ref, "", "",
+                                "Nhiều nhóm cùng khớp cột cũ: xem ảnh, --merge/--drop rồi chạy lại."])
+        else:
+            owners[0].existing_pole = owners[0].matched.pole_id
+    return reviews
+
+
+def find_reviews(groups: list[Group], pair_seconds: float, pair_m: float, review_m: float,
                  max_speed_kmh: float) -> tuple[list[list], list[tuple[str, str, float]]]:
     """Review rows plus suggested merges: pairs from different passes that are each other's nearest."""
     reviews = []
@@ -433,14 +537,6 @@ def find_reviews(groups: list[Group], existing, pair_seconds: float, pair_m: flo
                         + ("GỢI Ý GỘP: hai ảnh gần nhau nhất của nhau, có trong suggested_merges.txt."
                            if mutual else "")])
 
-    for group in groups:
-        nearest_pole = min(((distance_m(group.lat, group.lng, lat, lng), pole_id)
-                            for pole_id, lat, lng in existing), default=None)
-        if nearest_pole and nearest_pole[0] < review_m:
-            group.existing_pole = nearest_pole[1]
-            reviews.append(["da_co_cot", group.name, nearest_pole[1], f"{nearest_pole[0]:.1f}", "",
-                            "Đã có cột trong hệ thống gần đây nên nhóm này KHÔNG được ghi vào poles.csv. "
-                            "Nếu là cột mới thật thì thêm lại tay."])
     return reviews, suggestions
 
 
@@ -520,12 +616,11 @@ def commune_at(lat: float, lng: float, boundaries) -> str:
 
 
 def assign_refs(prefix: str | None, groups: list[Group]) -> dict[str, str]:
-    """external_ref per group, fixed BEFORE merging, dropping or matching existing poles.
+    """external_ref per original group, excluding photos matched to old poles or awaiting review.
 
-    Stable across re-runs on the same photos, so re-importing updates instead of duplicating. A suffix
-    for two groups in the same second is handed out in capture order over ALL photos; allocating it after
-    filtering would let a survivor inherit the reference of a group that was removed, and a re-import
-    would then overwrite the wrong pole. A merged pole keeps the reference of its earliest group.
+    Stable across re-runs with the same photos and matching inputs. A suffix for groups in the same
+    second is handed out in original capture order, retaining dropped/merged new candidates so a
+    survivor does not inherit their reference. A merged new pole keeps its earliest group's reference.
     """
     if not prefix:
         return {}
@@ -554,7 +649,11 @@ def main() -> int:
     parser.add_argument("--fixture-watt", type=int, help="xuất fixtures.csv với công suất TẠM này cho mọi cột")
     parser.add_argument("--fixture-install-date", help="ngày lắp TẠM (YYYY-MM-DD) cho fixtures.csv")
     parser.add_argument("--ref-prefix", help="sinh external_ref = <prefix>-<giờ chụp>; bỏ trống thì để người điền")
-    parser.add_argument("--existing", type=Path, help="GeoJSON các cột đã có (properties.pole_id) để tránh tạo trùng")
+    survey = parser.add_mutually_exclusive_group(required=True)
+    survey.add_argument("--existing", type=Path, action="append",
+                        help="JSON assets/poles hoặc poles.csv đã nạp; lặp lại để cung cấp đủ cột cũ")
+    survey.add_argument("--first-survey", action="store_true", help="xác nhận khảo sát đầu tiên, chưa có cột")
+    parser.add_argument("--match-m", type=float, default=8.0, help="bán kính ghép cột cũ (mặc định 8 m)")
     parser.add_argument("--assume-offset", help="múi giờ dùng khi ảnh thiếu OffsetTimeOriginal, ví dụ +07:00")
     parser.add_argument("--pair-seconds", type=float, default=3.0,
                         help="ảnh liền nhau cách dưới số giây này thì đưa vào review (mặc định 3)")
@@ -571,6 +670,10 @@ def main() -> int:
     parser.add_argument("--drop", action="append", default=[], metavar="P095",
                         help="loại nhóm không phải cột đèn: ảnh chụp nhầm, cột không lắp đèn (lặp lại được)")
     args = parser.parse_args()
+
+    if not (math.isfinite(args.match_m) and math.isfinite(args.review_m)
+            and 0 < args.match_m <= args.review_m):
+        parser.error("cần 0 < --match-m <= --review-m, các giá trị phải hữu hạn")
 
     source, out = args.photos.resolve(), args.out.resolve()
     if not source.is_dir():
@@ -589,6 +692,8 @@ def main() -> int:
         except ValueError:
             parser.error("--fixture-install-date phải có dạng YYYY-MM-DD")
     try:
+        existing = [pole for path in args.existing or [] for pole in read_existing(path)]
+        validate_existing(existing)
         segments = read_segments(args.segments) if args.segments else []
         boundaries = read_boundaries(args.boundaries) if args.boundaries else []
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
@@ -607,7 +712,7 @@ def main() -> int:
 
     photos = drop_duplicates(photos, rejected)
     groups = name_photos(photos)
-    refs = assign_refs(args.ref_prefix, groups)
+    original_groups = groups
     try:
         groups, merge_reviews = merge_groups(groups, args.merge, args.review_m)
         groups = drop_groups(groups, args.drop, rejected)
@@ -615,16 +720,23 @@ def main() -> int:
         parser.error(str(error))
     if not args.no_interpolate:
         groups = repair_positions(groups, args.max_speed_kmh)
-    existing = read_existing(args.existing) if args.existing else []
-    reviews, suggestions = find_reviews(groups, existing, args.pair_seconds, args.pair_m, args.review_m,
+    match_reviews = match_existing(groups, existing, args.match_m, args.review_m)
+    # Preserve pre-merge/drop allocation, excluding photos assigned to old/ambiguous poles.
+    excluded = {p.path for g in groups if g.matched or g.needs_review for p in g.photos}
+    refs = assign_refs(args.ref_prefix, [g for g in original_groups if g.photos[0].path not in excluded])
+    old_refs = {pole.external_ref for pole in existing if pole.external_ref}
+    for group in groups:
+        if not group.matched and not group.needs_review and refs.get(group.name) in old_refs:
+            parser.error(f"mã mới {refs[group.name]} trùng external_ref cũ ngoài vùng khớp; cần kiểm tra")
+    reviews, suggestions = find_reviews(groups, args.pair_seconds, args.pair_m, args.review_m,
                                         args.max_speed_kmh)
     moved = [[ "noi_suy", group.name, photo.path.name, "", "",
                f"Toạ độ GPS của ảnh hỏng ({photo.position}). Toạ độ là ƯỚC TÍNH trên đường thẳng giữa hai ảnh."]
              for group in groups for photo in group.photos if photo.position]
-    reviews = merge_reviews + moved + reviews
+    reviews = merge_reviews + moved + reviews + match_reviews
 
     (out / "photos").mkdir(parents=True, exist_ok=True)
-    pole_rows, observation_rows, fixture_rows = [], [], []
+    pole_rows, observation_rows, fixture_rows, position_rows = [], [], [], []
     for group in groups:
         for photo in group.photos:
             shutil.copy2(photo.path, out / "photos" / f"{group.name}_{photo.path.name}")
@@ -640,8 +752,14 @@ def main() -> int:
             if not commune_id:
                 reviews.append(["ngoai_ranh_gioi", group.name, "", "", "",
                                 "Cột nằm ngoài mọi ranh giới đã cho — commune_id để trống."])
-        if not group.existing_pole:
-            ref = refs.get(group.name, "")
+        ref = group.matched.external_ref if group.matched else (
+            "" if group.needs_review else refs.get(group.name, ""))
+        if group.matched:
+            old = group.matched
+            position_rows.append([ref, f"{old.lat:.7f}", f"{old.lng:.7f}",
+                                  f"{group.lat:.7f}", f"{group.lng:.7f}",
+                                  f"{distance_m(old.lat, old.lng, group.lat, group.lng):.1f}", len(group.photos)])
+        if not group.matched and not group.needs_review:
             pole_rows.append([ref, segment_ref, "", commune_id, f"POINT({group.lng:.7f} {group.lat:.7f})", "",
                               "field", group.name])
             if args.fixture_watt is not None:
@@ -650,7 +768,7 @@ def main() -> int:
         headings = [p.heading for p in group.photos if p.heading is not None]
         first = group.photos[0]
         observation_rows.append([
-            group.name, f"{group.lat:.7f}", f"{group.lng:.7f}",
+            group.name, ref, f"{group.lat:.7f}", f"{group.lng:.7f}",
             first.taken_utc.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             first.taken_local.isoformat(timespec="milliseconds"), len(group.photos),
             ";".join(f"{group.name}_{p.path.name}" for p in group.photos),
@@ -659,8 +777,11 @@ def main() -> int:
 
     write_csv(out / "poles.csv", POLES_HEADER + ["photo_group"], pole_rows)
     write_csv(out / "observations.csv",
-              ["photo_group", "lat", "lng", "taken_at_utc", "taken_at_local", "photo_count", "photos",
+              ["photo_group", "external_ref", "lat", "lng", "taken_at_utc", "taken_at_local", "photo_count", "photos",
                "heading_deg", "existing_pole", "position", "status", "status_note"], observation_rows)
+    write_csv(out / "position_updates.csv",
+              ["external_ref", "old_lat", "old_lng", "proposed_lat", "proposed_lng", "distance_m", "photo_count"],
+              position_rows)
     write_csv(out / "review.csv", ["kind", "photo_group", "other", "distance_m", "gap_s", "note"], reviews)
     write_csv(out / "rejected.csv", ["file", "reason"], rejected)
     if args.fixture_watt is not None:

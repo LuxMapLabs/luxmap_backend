@@ -260,6 +260,7 @@ Chỉ dùng thư viện chuẩn của Python, không cần cài gì:
 
 ```bash
 python3 scripts/photos_to_poles.py <thư-mục-ảnh> --out <thư-mục-kết-quả> \
+    --existing cot-da-nap.csv \
     --commune-id COM-070 --segment-ref TUYEN-A --ref-prefix LP   # ba tuỳ chọn này có thể bỏ
 ```
 
@@ -267,7 +268,27 @@ Mỗi ảnh là một cột ứng viên — tool **không tự gộp** (khảo s
 2,4 s mà hai cột khác nhau chỉ cách 1,6 s); tọa độ và giờ đọc từ EXIF. Kết quả: `poles.csv`
 (import được sau khi điền ô bắt buộc còn trống), `observations.csv` (cột `status` để **người** điền —
 không import), `review.csv` (ca tool không tự quyết), `rejected.csv` (ảnh bị loại kèm lý do) và
-`photos/` (ảnh chép nguyên byte). `--existing <geojson>` loại các nhóm nằm sát cột đã có. Xem ảnh trong `review.csv` xong, nếu hai nhóm là cùng một cột thì chạy lại
+`photos/` (ảnh chép nguyên byte).
+
+**Bắt buộc cung cấp `--existing`**, hoặc `--first-survey` nếu đây là khảo sát đầu tiên, chưa có cột.
+`--existing` lặp lại được, tự nhận dạng file cục bộ: JSON của `GET /api/v1/assets/poles` (một trang
+`{items:[…]}` hoặc mảng nhiều trang, có `external_ref`, `pole_id`, `location.lat/lng`) hay `poles.csv`
+đã nạp (`external_ref`, `geom_wkt` POINT). Cung cấp **đủ cột của vùng khảo sát**, không chỉ một trang
+nếu danh sách còn trang sau. Mã rỗng/trùng (kể cả giữa các file) làm tool dừng trước khi ghi kết quả.
+GeoJSON cũ chỉ có `pole_id` vẫn đọc được, nhưng cảnh báo thiếu `external_ref` và chỉ dùng để chặn
+nhóm gần cột cũ vào review; không tự gắn quan sát.
+
+Sau gộp/bỏ nhóm và sửa GPS, đúng một cột cũ trong `--match-m` (mặc định **8 m**) thì khớp.
+Hai cột trong bán kính này, cột gần nhất ngoài 8 m nhưng trong `--review-m` (mặc định **20 m**),
+hoặc nhiều nhóm cùng khớp một cột đều vào `review.csv` (`gan_cot_cu` / `trung_cot_cu`).
+`observations.csv.external_ref` dùng mã cũ khi khớp, mã mới khi là cột mới, để trống khi mơ hồ.
+Nhóm khớp/mơ hồ **không vào `poles.csv` hay `fixtures.csv`**: import thay thế toàn phần có thể
+xoá mạch hoặc đổi tuyến của cột cũ. `position_updates.csv` chứa `external_ref`, `old_lat/old_lng`,
+`proposed_lat/proposed_lng`, `distance_m`, `photo_count` **chỉ để người duyệt, không phải file import**.
+Mã mới vẫn sinh theo giờ chụp; nhóm khớp không chiếm mã mới. Giữ cùng bộ ảnh, danh sách cột cũ và
+tham số ghép để chạy lại ổn định. Mã mới trùng mã cũ ở ngoài vùng ghép cũng làm tool dừng để kiểm tra.
+
+Xem ảnh trong `review.csv` xong, nếu hai nhóm là cùng một cột thì chạy lại
 cùng thư mục với `--merge P002=P005` (lặp lại được): tọa độ thành trung vị ảnh của cả hai lượt.
 `suggested_merges.txt` gợi ý sẵn các cặp ở hai lượt khác nhau (gần nhất trước) — vẫn phải xem ảnh, cặp
 xa thường sai. `review.csv` gắn `gps_nhay` khi hai ảnh liền nhau ngụ ý vận tốc vô lý. Ảnh không phải cột (chụp nhầm) thì
@@ -283,6 +304,12 @@ Thư mục ảnh trải trên nhiều tuyến / nhiều xã thì gán **theo t�
 `ngoai_ranh_gioi` trong `review.csv` — không bao giờ lấy giá trị dự phòng. `--fixture-watt` +
 `--fixture-install-date` xuất thêm `fixtures.csv` với giá trị **tạm** giống nhau cho mọi cột (ảnh không
 cho biết công suất hay ngày lắp).
+
+Kiểm tra công cụ ảnh hoàn toàn offline bằng JPEG/EXIF tự sinh (chỉ thư viện chuẩn):
+
+```bash
+python3 -m unittest discover -s scripts/tests
+```
 
 ## Quy ước lỗi và phân trang
 
