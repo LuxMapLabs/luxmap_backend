@@ -12,7 +12,7 @@ public sealed class ArtifactVersionConfiguration : IEntityTypeConfiguration<Arti
     {
         b.ToTable("artifact_version", t =>
         {
-            t.HasCheckConstraint("ck_artifact_version_component", "component IN ('clock_algorithm','association_algorithm')");
+            t.HasCheckConstraint("ck_artifact_version_component", "component IN ('clock_algorithm','association_algorithm','classification_algorithm','cv_model','frame_extractor')");
             t.HasCheckConstraint("ck_artifact_version_hash", "artifact_hash ~ '^[0-9a-f]{64}$' AND length(version) > 0");
             t.HasCheckConstraint("ck_artifact_version_metadata", "jsonb_typeof(metadata) = 'object'");
         });
@@ -34,6 +34,7 @@ public sealed class SurveyProcessingRunConfiguration : IEntityTypeConfiguration<
             t.HasCheckConstraint("ck_survey_run_attempt", "attempt > 0 AND finished_at >= started_at");
             t.HasCheckConstraint("ck_survey_run_hash", "input_hash ~ '^[0-9a-f]{64}$'");
             t.HasCheckConstraint("ck_survey_run_json", "jsonb_typeof(settings_snapshot) = 'object' AND jsonb_typeof(gis_snapshot) = 'object' AND jsonb_typeof(clock_fit) = 'object'");
+            t.HasCheckConstraint("ck_survey_run_cv_coverage", "(detection_coverage_pct IS NULL OR detection_coverage_pct BETWEEN 0 AND 100) AND (dim_coverage_pct IS NULL OR dim_coverage_pct BETWEEN 0 AND 100)");
             t.HasCheckConstraint("ck_survey_run_coverage", "coverage_pct IS NULL OR coverage_pct BETWEEN 0 AND 100");
         });
         b.HasKey(x => x.RunId);
@@ -48,6 +49,9 @@ public sealed class SurveyProcessingRunConfiguration : IEntityTypeConfiguration<
             .HasPrincipalKey(x => new { x.SweepId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.AlgorithmVersionId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.ClockVersionId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.ModelVersionId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.ExtractorVersionId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.ClassificationVersionId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -77,6 +81,8 @@ public sealed class PoleObservationConfiguration : IEntityTypeConfiguration<Pole
     {
         b.ToTable("pole_observation", t =>
         {
+            t.HasCheckConstraint("ck_pole_observation_cv", "(cv_state IS NULL OR cv_state IN ('on','off')) AND (cv_confidence IS NULL OR cv_confidence BETWEEN 0 AND 1) AND (baseline_ratio IS NULL OR (baseline_ratio >= 0 AND baseline_ratio < 'Infinity'::float8))");
+            t.HasCheckConstraint("ck_pole_observation_classification", "jsonb_typeof(reason_codes) = 'array' AND (classified_as = 'unknown' OR (cv_state IS NOT NULL AND cv_confidence IS NOT NULL AND representative_frame_id IS NOT NULL)) AND (classified_as <> 'out' OR cv_state = 'off') AND (classified_as NOT IN ('normal','dim') OR cv_state = 'on') AND (NOT dim_evaluation_eligible OR (baseline_ratio IS NOT NULL AND cv_state = 'on')) AND (classified_as <> 'dim' OR dim_evaluation_eligible)");
             t.HasCheckConstraint("ck_pole_observation_time", "observed_elapsed_ns >= 0 AND (peak_at_elapsed_ns IS NULL OR peak_at_elapsed_ns >= 0)");
             t.HasCheckConstraint("ck_pole_observation_finite", "chainage_m >= 0 AND chainage_m < 'Infinity'::float8 AND speed_mps >= 0 AND speed_mps < 'Infinity'::float8 AND association_confidence BETWEEN 0 AND 1");
             t.HasCheckConstraint("ck_pole_observation_peak", "(peak_lux IS NULL) = (peak_at_elapsed_ns IS NULL) AND (peak_lux IS NULL OR (peak_lux >= 0 AND peak_lux < 'Infinity'::float8))");
@@ -91,6 +97,12 @@ public sealed class PoleObservationConfiguration : IEntityTypeConfiguration<Pole
         b.HasOne(x => x.Pass).WithMany().HasForeignKey(x => new { x.PassId, x.RunId })
             .HasPrincipalKey(x => new { x.PassId, x.RunId }).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Run).WithMany().HasForeignKey(x => x.RunId).OnDelete(DeleteBehavior.Restrict);
+        b.HasContractEnum(x => x.ClassifiedAs);
+        // No DB default here: Normal is the enum's CLR default (0), so EF would treat it as "unset", omit it
+        // from the INSERT and let the DB default rewrite every normal lamp as unknown. The entity initialiser
+        // already starts at Unknown. Guarded by Value_columns_never_carry_a_database_default_EF_could_mistake_for_unset.
+        b.Property(x => x.ReasonCodes).HasColumnType("jsonb").HasDefaultValue("[]");
+        b.HasOne<SurveyFrame>().WithMany().HasForeignKey(x => x.RepresentativeFrameId).OnDelete(DeleteBehavior.Restrict);
         // Commune is copied from the scoped GIS snapshot, never supplied by an API caller.
         b.HasOne<Pole>().WithMany().HasForeignKey(x => x.PoleId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -102,6 +114,7 @@ public sealed class SweepProcessingConfiguration : IEntityTypeConfiguration<Surv
     {
         b.ToTable("survey_sweep", t =>
         {
+            t.HasCheckConstraint("ck_survey_sweep_frame_count", "frame_count >= 0");
             t.HasCheckConstraint("ck_survey_sweep_lease", "(processing_lease_owner IS NULL) = (processing_lease_expires_at IS NULL) AND processing_attempt >= 0");
             t.HasCheckConstraint("ck_survey_sweep_coverage", "coverage_pct IS NULL OR coverage_pct BETWEEN 0 AND 100");
         });

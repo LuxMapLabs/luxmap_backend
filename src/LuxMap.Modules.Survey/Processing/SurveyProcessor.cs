@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using LuxMap.Modules.Survey.Processing.Frames;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Survey.Entities;
@@ -17,7 +18,7 @@ namespace LuxMap.Modules.Survey.Processing;
 
 /// <summary>Creates an isolated context per job, with a finite scope and all write/audit guards active.</summary>
 public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyCatalog catalog,
-    IOptions<SurveyProcessingOptions> options, ILogger<SurveyProcessor> logger, TimeProvider? timeProvider = null)
+    IOptions<SurveyProcessingOptions> options, ILogger<SurveyProcessor> logger, TimeProvider? timeProvider = null, SurveyFramePipeline? frames = null)
 {
     private sealed class JobScope : ICommuneScopeAccessor
     {
@@ -58,6 +59,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             InputHash = sweep.SubmissionRequestHash!, SettingsSnapshot = settings,
             ResultState = "succeeded", Stage = "complete"
         };
+        FramePipelineResult? media = null;
         var results = new List<(string Segment, double Length, PassResult Pass)>();
         try
         {
@@ -91,6 +93,9 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             if (gps.Length < 2) throw new ProcessingFailure("GPS_INSUFFICIENT", "chainage");
             run.CoveragePct = SurveyAlgorithms.Coverage(poles.Select(x => new PolePosition(x.PoleId, x.CommuneId, x.ChainageM)), results.Select(x => x.Pass));
             run.CoverageReason = poles.Length == 0 ? "no_expected_poles" : null;
+            if (frames is null) throw new ProcessingFailure("DETECTOR_NOT_CONFIGURED", "detector");
+            media = await frames.ProcessAsync(db, sweep, run, results, poles,
+                token => Heartbeat(db, sweep, job, o, token), o.LeaseSeconds, ct);
         }
         catch (ProcessingFailure ex) when (ex.Code == "LEASE_LOST")
         {
@@ -107,7 +112,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             run.ResultState = "failed"; run.Stage = "processing"; run.ErrorCode = "PROCESSING_ERROR";
             results.Clear(); run.CoveragePct = null;
         }
-        await Complete(db, scope, sweep, job, run, results, o, ct);
+        await Complete(db, scope, sweep, job, run, results, media, o, ct);
         return true;
     }
 
@@ -193,7 +198,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
 
     private async Task Complete(LuxMapDbContext db, JobScope scope, SurveySweep sweep, Claimed job,
         SurveyProcessingRun run, List<(string Segment, double Length, PassResult Pass)> results,
-        SurveyProcessingOptions o, CancellationToken ct)
+        FramePipelineResult? media, SurveyProcessingOptions o, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM work_order WHERE work_order_id = {sweep.WorkOrderId} FOR UPDATE", ct);
@@ -216,6 +221,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
         }
         run.AlgorithmVersionId = await Artifact(db, "association_algorithm", ct);
         run.ClockVersionId = await Artifact(db, "clock_algorithm", ct);
+        run.ClassificationVersionId = await Artifact(db, "classification_algorithm", ct);
         run.FinishedAt = Now();
         sweep.UpdatedAt = run.FinishedAt;
         bool retry = run.ErrorCode == "PROCESSING_ERROR" && job.Attempt < o.MaxAttempts;
@@ -223,6 +229,13 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
         sweep.ProcessingStatus = run.ResultState == "succeeded" ? SweepProcessingStatus.Succeeded : retry ? SweepProcessingStatus.Queued : SweepProcessingStatus.Failed;
         sweep.CoveragePct = run.CoveragePct;
         sweep.ProcessingLeaseOwner = null; sweep.ProcessingLeaseExpiresAt = null;
+        if (run.ResultState != "succeeded")
+        { media = null; run.DetectionCoveragePct = null; run.DimCoveragePct = null; }
+        if (media is not null)
+        {
+            db.AddRange(media.NewFrames); db.AddRange(media.Detections);
+            sweep.FrameCount = media.FrameCount;
+        }
         db.Add(run);
         var observations = new List<PoleObservation>();
         int number = 0;
@@ -237,14 +250,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
                 QualityFlags = Json(new { gps_offset_seconds = result.Pass.GpsOffsetSeconds, offset_reliable = result.Pass.OffsetReliable, excess_time_ratio = result.Pass.ExcessTimeRatio })
             };
             db.Add(pass);
-            observations.AddRange(result.Pass.Observations.Select(p => new PoleObservation
-            {
-                Pass = pass, Run = run, PoleId = p.PoleId, CommuneId = p.CommuneId, DataSource = sweep.DataSource,
-                ObservedElapsedNs = p.TimeNs,
-                ObservedAt = new DateTime((sweep.UtcAnchor.Ticks + (p.TimeNs - sweep.ElapsedAnchorNs) / 100) / 10 * 10, DateTimeKind.Utc),
-                ChainageM = p.ChainageM, PeakAtElapsedNs = p.Peak?.TimeNs, PeakLux = p.Peak?.Lux,
-                SpeedMps = p.SpeedMps, AssociationConfidence = p.Confidence, QualityFlags = Json(p.Flags)
-            }));
+            observations.AddRange(result.Pass.Observations.Select(p => CreateObservation(pass, run, sweep, p, media)));
         }
         foreach (var commune in new[] { sweep.CommuneId }.Concat(observations.Select(x => x.CommuneId)).Distinct())
         {
@@ -255,6 +261,27 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             await db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
+    }
+
+    public static PoleObservation CreateObservation(SurveyPass pass, SurveyProcessingRun run, SurveySweep sweep,
+        Passage p, FramePipelineResult? media)
+    {
+        var cv = media?.Observations[(pass.PassNo, p.PoleId, p.TimeNs)];
+        return new PoleObservation
+        {
+            Pass = pass, Run = run, PoleId = p.PoleId, CommuneId = p.CommuneId, DataSource = sweep.DataSource,
+            ObservedElapsedNs = p.TimeNs,
+            ObservedAt = new DateTime((sweep.UtcAnchor.Ticks + (p.TimeNs - sweep.ElapsedAnchorNs) / 100) / 10 * 10, DateTimeKind.Utc),
+            CvState = cv?.Association.State,
+            CvConfidence = cv?.Association.Confidence,
+            RepresentativeFrameId = cv?.Association.RepresentativeFrameId,
+            ClassifiedAs = cv?.Classification.Status ?? FixtureStatus.Unknown,
+            BaselineRatio = cv?.Classification.BaselineRatio,
+            DimEvaluationEligible = cv?.Classification.DimEvaluationEligible ?? false,
+            ReasonCodes = Json(cv?.Classification.Reasons ?? []),
+            ChainageM = p.ChainageM, PeakAtElapsedNs = p.Peak?.TimeNs, PeakLux = p.Peak?.Lux,
+            SpeedMps = p.SpeedMps, AssociationConfidence = p.Confidence, QualityFlags = Json(p.Flags)
+        };
     }
 
     private static void Audit(LuxMapDbContext db, SurveySweep sweep, string commune, AuditAction action, object state)

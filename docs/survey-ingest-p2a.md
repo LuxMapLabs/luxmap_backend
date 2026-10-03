@@ -94,9 +94,55 @@ khác → 409 `IDEMPOTENCY_CONFLICT`. Một audit tạo và một audit nộp, c
 Enum bộ lọc là snake_case. Sắp tăng `created_at, length(sweep_id), sweep_id`.
 `GET /sweeps/{id}` trả cùng thông tin phiên và manifest upload, không trả object key.
 `started_at/ended_at` suy từ anchor + đồng hồ thu, không lấy giờ upload; ended_at null khi chưa nộp.
-`frame_count=0`, `coverage_pct=null` tới P2b. Ngoài miền DateTime trả null thay vì tràn số.
+`frame_count` là số frame đã lưu của phiên sau P2b-2; `coverage_pct` giữ mức đi ngang cột (P2b-1). Ngoài miền DateTime trả null thay vì tràn số.
 
 Migration `AddSurveyIngest` chỉ thêm các bảng ingest và mở rộng CHECK, thêm FK
 `pole_current_status.last_sweep_id`. Apply phải kiểm dữ liệu mồ côi trước; migration không tự sửa/xóa
 lịch sử. `Down()` mất bảng dữ liệu khảo sát và không chạy được nếu còn phiếu/audit survey khi khôi
 phục enum cũ. Ưu tiên rollback ứng dụng tương thích, giữ dữ liệu; không chạy rollback để dọn dữ liệu.
+
+
+## Ánh xạ video — P2b-2 (SELF-SIGNED, chờ D-06/WP6)
+
+P2a vẫn giữ cấu hình gốc; worker P2b-2 yêu cầu `sensor_timestamp_source = "REALTIME"`,
+`mount.camera_side = "front" | "left" | "right"` và đủ một entry cho từng clip:
+
+```json
+"clips": [{
+  "clip_no": 0,
+  "first_pts_ns": "0",
+  "last_pts_ns": "280000000",
+  "first_sensor_timestamp_ns": "1000000000",
+  "last_sensor_timestamp_ns": "1280000000",
+  "time_base_num": 1,
+  "time_base_den": 1000
+}]
+```
+
+Đây là đoạn nằm trong object `capture_config` đã có metadata camera/mount đầy đủ ở trên.
+Nanosecond nhận chuỗi thập phân hoặc số nguyên JSON chính xác; ưu tiên chuỗi để không mất bit ở JavaScript.
+PTS có thể âm. Ánh xạ mô phỏng hiện tại có slope 1: `phone = first_sensor + pts - first_pts`;
+hai cặp đầu/cuối phải nhất quán. Clip phải có thời lượng dương, không lặp số clip/không chồng khoảng thời gian.
+Worker đối chiếu time base và PTS đầu/cuối **thực từ ffprobe**; thiếu hoặc mâu thuẫn trả mã run
+`CLOCK_VIDEO_MAPPING`. Không dùng FPS trung bình hay thời điểm bấm quay làm đồng hồ.
+Clip không phủ tâm cửa sổ của cột → `video_gap`, không lấy ảnh từ clip kế bên.
+
+Quy ước bên ảnh tạm: camera `front`, cột bên trái chiều đi dùng nửa trái ảnh; bên phải dùng nửa phải.
+Camera `left/right` chỉ nhận cột cùng bên chiều đi. Bên cột lấy dấu tích có hướng với tiếp tuyến tuyến
+trong SQL EPSG:3405, đảo dấu ở lượt ngược. Cột nằm trên tuyến/mơ hồ bị để `unknown`.
+Đây chưa là phép hiệu chuẩn camera; cần kiểm bằng mẫu gắn đầu xe của WP6/FO.
+
+Cờ `ambiguous_association` của ghép lux không chặn ON/OFF: bỏ peak khi phân loại, ON → normal,
+ratio null, không đủ điều kiện xét dim; OFF → out. Cờ `route_ambiguous` chặn CV vì không có thời điểm
+ngang cột đáng tin; `video_gap` chặn CV vì clip không phủ thời điểm đó. `gps_degraded` và
+`gps_offset_unresolved` vẫn giữ thời điểm ngang cột để xét CV. Ghép trong cửa sổ mặc định trước 3 s,
+sau 0,5 s, lấy 5 frame/giây: một detection đạt chất lượng mỗi frame ở phía cột, cùng nhãn là một track
+(dù bbox không giao nhau). Nhiều detection cùng frame, xung đột ON/OFF hoặc evidence dùng chung
+giữa hai cột khác nhau trong toàn run vẫn để unknown; cùng một cột ở hai lượt được phép dùng lại
+evidence. Khoá kết quả gồm chỉ số lượt, cột và thời điểm, giữ riêng hai lượt chung điểm quay đầu.
+
+D-06 chưa có mẫu Camera2/sidecar thực để chứng minh affine, D-07 chưa có model thật:
+worker P2b-2 chỉ xử lý nguồn `simulated`; nguồn khác thất bại `VIDEO_DEVICE_MAPPING_PENDING`.
+Fake không tự thay thế detector thật, và không được chọn ở Production/Staging.
+`frame_count` trả số row frame của sweep; coverage phát hiện và coverage đủ xét dim lưu riêng trong run,
+cùng mẫu số pole dự kiến của snapshot. Chưa thêm trường API cho hai mức này, chưa công bố kết quả.

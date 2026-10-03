@@ -1,6 +1,10 @@
 using LuxMap.Modules.Survey.LuxReadings;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using LuxMap.Modules.Survey.Processing;
+using LuxMap.Modules.Survey.Processing.Frames;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LuxMap.Modules.Survey;
@@ -21,6 +25,23 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddOptions<Processing.SurveyProcessingOptions>()
             .Bind(configuration.GetSection("SurveyProcessing"))
             .Validate(o => o.IsValid(), "Invalid SurveyProcessing options.").ValidateOnStart();
+        services.AddOptions<SurveyProcessingOptions>().Validate<IHostEnvironment>((o, environment) =>
+        {
+            o.Frames.ValidateEnvironment(environment.EnvironmentName);
+            return true;
+        }).ValidateOnStart();
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<SurveyProcessingOptions>>().Value.Frames);
+        services.AddSingleton<IFrameExtractor, FfmpegFrameExtractor>();
+        services.AddSingleton<ISurveyBaselineLookup, EmptySurveyBaselineLookup>();
+        services.AddSingleton<IOnOffDetector>(sp =>
+        {
+            var options = sp.GetRequiredService<SurveyFrameOptions>();
+            options.ValidateEnvironment(sp.GetRequiredService<IHostEnvironment>().EnvironmentName);
+            return options.Detector == "fake"
+                ? new ManifestOnOffDetector(File.ReadAllText(options.FakeManifestPath ?? throw new InvalidOperationException("FakeManifestPath is required.")))
+                : new UnconfiguredOnOffDetector();
+        });
+        services.AddSingleton<SurveyFramePipeline>();
         services.AddSingleton<Processing.SurveyProcessor>();
         services.AddHostedService<Processing.SurveyProcessingWorker>();
         services.AddScoped<LuxReadingService>();

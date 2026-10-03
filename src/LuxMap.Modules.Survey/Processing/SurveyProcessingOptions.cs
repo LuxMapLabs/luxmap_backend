@@ -3,6 +3,7 @@ namespace LuxMap.Modules.Survey.Processing;
 /// <summary>Provisional pilot parameters. Every run persists the complete effective options.</summary>
 public sealed class SurveyProcessingOptions
 {
+    public Frames.SurveyFrameOptions Frames { get; set; } = new();
     public bool Enabled { get; set; }
     public double PollSeconds { get; set; } = 5;
     public double LeaseSeconds { get; set; } = 120;
@@ -37,6 +38,6 @@ public sealed class SurveyProcessingOptions
 
     public bool IsValid() => GetType().GetProperties().Where(p => p.PropertyType == typeof(double))
         .All(p => p.GetValue(this) is double v && double.IsFinite(v) && v > 0)
-        && MaxAttempts > 0 && ClockMinimumSamples >= 3 && ClockMinimumInlierRatio <= 1
+        && Frames.IsValid() && MaxAttempts > 0 && ClockMinimumSamples >= 3 && ClockMinimumInlierRatio <= 1
         && MinimumOffsetAnchors >= 2 && AssociationToleranceSeconds < MaximumGpsOffsetSeconds && PeakMinimumWidthSeconds < PeakMaximumWidthSeconds;
 }
