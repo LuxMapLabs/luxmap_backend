@@ -42,8 +42,8 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
-    <strong>BE-15 P2b-2 — 03/10/2026: đã sửa review vòng 4, chờ Claude review</strong>
-    <p><span class="tag t-next">Bàn giao review</span> Frame PTS thật/áp xoay, detector giả theo hash,
+    <strong>BE-15 P2b-2 — 03/10/2026: xong trên nhánh, review độc lập sạch, chưa PR</strong>
+    <p><span class="tag t-next">Xong trên nhánh, chưa PR</span> <strong>Claude kiểm:</strong> Api 564, Persistence 41, Shared 290, Storage 36 xanh trên <code>luxmap_test</code>; video iPhone thật 278/278 và 568/568 frame; sửa lỗi câm <code>classified_as</code> (mọi đèn normal bị lưu unknown) + test canh toàn model; review độc lập 2 lượt: 2 P2 → sạch. Frame PTS thật/áp xoay, detector giả theo hash,
     ghép track và phân loại, schema <code>AddSurveyFrames</code>, worker heartbeat và ba mức độ phủ.
     Build <strong>0 warning/0 error</strong>; <strong>367/367 test không DB</strong> xanh, gồm ffmpeg VFR/rotation,
     clip hỏng, timeout/huỷ và dọn temp. Migration đã đọc, model snapshot khớp.
