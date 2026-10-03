@@ -747,3 +747,13 @@ và xin phiên mẫu thật từ thiết bị (D-06). Chờ phản hồi ở FW 
 | **Quyết định** | Mỹ yêu cầu, **SELF-SIGNED** — chạm bề mặt API nên chưa ổn định tới FW kế tiếp. Contract text chưa sửa; sửa khi lên version |
 
 **Phải báo:** WP5 (FW-08 bản đồ), WP6 (FM-15). **Đã báo ngày 02/10/2026** (Mỹ gửi, PR #70 đã merge). Chờ xác nhận ở FW kế tiếp.
+
+## `external_ref` — chốt (03/10/2026)
+
+| | |
+|---|---|
+| **Quyết định** | `external_ref` là **mã vĩnh viễn do nhóm quản lý**: cột thực địa giữ `KS-<ngày>-<giờ chụp>`, tuyến giữ `osm-…`, bộ mock giữ mã mock. Không đổi tên, không ghi đè sau khi đã nạp |
+| **Mã của xã** | Nếu xã giao mã kiểm kê (số sơn trên cột…) thì lưu ở cột **riêng** `inventory_code` (nullable, duy nhất trong xã), thêm khi có dữ liệu thật; **không** thay `external_ref`, **không** làm khoá import |
+| **Ảnh hưởng FO** | File import cột/tuyến **giữ nguyên `external_ref` cũ** cho cột đã có; cột mới mới được mã mới. Khảo sát ảnh lại phải dùng lại mã cũ (công cụ sẽ được sửa) — nếu không import sẽ tạo cột trùng |
+| **Ai ký** | Mỹ (BE1), đóng follow-up D-R10. Không chạm bề mặt API hiện có |
+

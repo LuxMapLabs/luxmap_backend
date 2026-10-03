@@ -1419,18 +1419,18 @@ Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` 
 
 FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
 
-> 🔴 **Lập trường về `external_ref` của bộ mock — MỞ LẠI, ưu tiên cao (D-R10, 25/09/2026).**
+> ✅ **`external_ref` — CHỐT 03/10/2026 (Mỹ, D-R10 đóng): mã VĨNH VIỄN do nhóm quản lý; mã kiểm kê của xã đi cột RIÊNG.**
 >
-> Bộ mock không mang mã kiểm kê nào, nên cách nạp duy nhất là lấy chính `pole_id` / `segment_id` của
-> mock làm `external_ref` (`AssetImportMockSetTests` làm đúng vậy).
->
-> Lập trường cũ ("danh tính ngoài VĨNH VIỄN, di trú mã ngoài phạm vi") dựa trên FO-01 — không có thử
-> nghiệm hiện trường nên không có mã kiểm kê thật nào sẽ về. **FO-01 nay `SUPERSEDED`**: phiếu v1.2 có
-> field trial với xã đối tác, nên mã kiểm kê thật **có thể** về. **Nền đã đổi, cần xét lại** — và phải xét
-> **trước khi** dữ liệu kiểm kê thật về, vì dữ kiện này vẫn nguyên: đường "xoá sạch nạp lại" **đóng từ
-> W5**, do `fault` và `lux_reading` trỏ vào `pole` bằng `Restrict` và FO-14 đo lux ở W5. Sau mốc đó chỉ
-> còn đường `UPDATE pole SET external_ref = …` kèm bảng ánh xạ.
-
+> - Cột thực địa giữ mã hiện có `KS-<ngày>-<giờ chụp>` (114 cột Long Phước / Long Bình), tuyến giữ `osm-…`; bộ mock giữ
+>   `pole_id` / `segment_id` của mock. **Không đổi tên, không ghi đè** `external_ref` sau khi đã nạp.
+> - Mã kiểm kê của xã (nếu xã giao, ví dụ số sơn trên cột) vào cột **`inventory_code`** riêng — nullable, unique trong mỗi xã —
+>   thêm bằng migration **khi xã thật sự giao**, ánh xạ bằng vị trí + người kiểm. **Không** dùng nó làm khoá import.
+> - 🔴 **Bẫy còn mở:** `KS-…` sinh từ **giờ chụp ảnh**, tức là mã của **lần chụp**, không phải của cột. Khảo sát lại bằng
+>   `scripts/photos_to_poles.py` sẽ cấp mã MỚI cho cột cũ ⇒ import tạo **cột trùng**. `--existing` hiện chỉ báo trong review,
+>   **chưa** dùng lại mã. Phải sửa công cụ (dùng lại `external_ref` của cột cũ khi vị trí khớp, ca mơ hồ vào review) **trước
+>   lần khảo sát ảnh thứ hai**.
+> - Đường "xoá sạch nạp lại" cho cột thực địa còn mở tới khi **phiên khảo sát thực địa đầu tiên được xử lý** (`pole_observation`
+>   trỏ vào `pole` bằng `Restrict`); quyết định này làm cho đường đó không còn cần thiết.
 ---
 
 ## Anti-pattern
