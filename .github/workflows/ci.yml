@@ -55,6 +55,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Test photo survey tool (standard library, offline)
+        run: python3 -m unittest discover -s scripts/tests
+
       - name: Create ephemeral configuration
         # AuthTestExtensions.SeedPassword walks upward to a REAL .env and reads it directly.
         # Merely exporting SEED_* variables breaks the current suite before its first login.
