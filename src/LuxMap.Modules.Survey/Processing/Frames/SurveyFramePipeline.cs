@@ -14,7 +14,7 @@ public sealed class FramePipelineResult
 {
     public List<SurveyFrame> NewFrames { get; } = [];
     public List<Detection> Detections { get; } = [];
-    public Dictionary<(string Pole, long Time), ObservationCv> Observations { get; } = [];
+    public Dictionary<(int PassNo, string Pole, long Time), ObservationCv> Observations { get; } = [];
     public int FrameCount { get; set; }
 }
 
@@ -120,34 +120,43 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
                 try { await produce; } catch when (extractionStop.IsCancellationRequested) { /* Consumer reports the original failure. */ }
             }
         }
-        foreach (var pass in passes)
+        await ClassifyObservationsAsync(result, run, passes, poles, mapping,
+            clips.ToDictionary(c => c.ClipNo, c => outputs.GetValueOrDefault(c.ClipId) ?? []), baselines, options, ct);
+        result.FrameCount = await db.Set<SurveyFrame>().CountAsync(x => x.SweepId == sweep.SweepId, ct) + result.NewFrames.Count;
+        return result;
+    }
+
+    public static async Task ClassifyObservationsAsync(FramePipelineResult result, SurveyProcessingRun run,
+        List<(string Segment, double Length, PassResult Pass)> passes, ProjectedPole[] poles,
+        VideoClockMapping mapping, IReadOnlyDictionary<int, List<DetectedFrame>> outputs,
+        ISurveyBaselineLookup baselines, SurveyFrameOptions options, CancellationToken ct)
+    {
+        foreach (var (pass, passNo) in passes.Select((pass, index) => (pass, index)))
         foreach (var p in pass.Pass.Observations)
         {
             var clock = mapping.Clips.SingleOrDefault(c => c.Covers(p.TimeNs));
             var flags = p.Flags.ToList();
             if (clock is null) flags.Add("video_gap");
-            var frames = clock is null ? [] : outputs.GetValueOrDefault(clips.Single(c => c.ClipNo == clock.ClipNo).ClipId) ?? [];
+            var frames = clock is null ? [] : outputs.GetValueOrDefault(clock.ClipNo) ?? [];
             var pole = poles.Single(x => x.PoleId == p.PoleId && x.SegmentId == pass.Segment);
             int side = Math.Sign(pole.SideOfRoute) * (pass.Pass.Track[^1].ChainageM > pass.Pass.Track[0].ChainageM ? 1 : -1);
             var association = DetectionAssociation.Match(frames, Math.Max(0, p.TimeNs - (long)(options.BeforeSeconds * 1e9)),
                 checked(p.TimeNs + (long)(options.AfterSeconds * 1e9)), mapping.CameraSide, side, options);
             var baseline = await baselines.FindAsync(p.PoleId, ct);
-            result.Observations[(p.PoleId, p.TimeNs)] = EvaluateObservation(association, p.Peak?.Lux, baseline, flags, options.DimThresholdRatio);
+            result.Observations.Add((passNo, p.PoleId, p.TimeNs), EvaluateObservation(association, p.Peak?.Lux, baseline, flags, options.DimThresholdRatio));
         }
-        foreach (var pass in passes)
-        {
-            var observations = pass.Pass.Observations;
-            var resolved = DetectionAssociation.ResolveSharedEvidence(observations.Select(p => result.Observations[(p.PoleId, p.TimeNs)].Association).ToArray());
-            for (int i = 0; i < observations.Length; i++)
-                if (resolved[i].Reason == "shared_cv_evidence")
-                    result.Observations[(observations[i].PoleId, observations[i].TimeNs)] = new(resolved[i],
-                        FrameClassification.Classify(resolved[i], null, null, [], options.DimThresholdRatio));
-        }
+        // Resolve once across the whole run, before coverage and persistence. A pole revisited in
+        // another pass may reuse evidence; distinct poles must never claim the same prediction.
+        var observations = result.Observations.ToArray();
+        var resolved = DetectionAssociation.ResolveSharedEvidence(observations
+            .Select(x => (x.Key.Pole, x.Value.Association)).ToArray());
+        for (int i = 0; i < observations.Length; i++)
+            if (resolved[i].Reason == "shared_cv_evidence")
+                result.Observations[observations[i].Key] = new(resolved[i],
+                    FrameClassification.Classify(resolved[i], null, null, [], options.DimThresholdRatio));
         int denominator = poles.Select(p => p.PoleId).Distinct().Count();
         run.DetectionCoveragePct = denominator == 0 ? null : 100d * result.Observations.Where(x => x.Value.Association.State != null).Select(x => x.Key.Pole).Distinct().Count() / denominator;
         run.DimCoveragePct = denominator == 0 ? null : 100d * result.Observations.Where(x => x.Value.Classification.DimEvaluationEligible).Select(x => x.Key.Pole).Distinct().Count() / denominator;
-        result.FrameCount = await db.Set<SurveyFrame>().CountAsync(x => x.SweepId == sweep.SweepId, ct) + result.NewFrames.Count;
-        return result;
     }
 
     public static ObservationCv EvaluateObservation(Association association, double? peakLux, double? baseline,

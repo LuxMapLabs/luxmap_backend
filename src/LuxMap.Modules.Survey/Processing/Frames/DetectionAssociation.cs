@@ -45,8 +45,8 @@ public static class DetectionAssociation
     }
 
     // Adjacent pole windows may overlap. The same detected track cannot prove two different poles.
-    public static Association[] ResolveSharedEvidence(IReadOnlyList<Association> associations)
-        => associations.Select((association, index) => associations.Where((_, other) => other != index)
-            .Any(other => association.EvidenceKeys.Intersect(other.EvidenceKeys).Any())
-                ? new Association(null, null, null, association.TrackCount, "shared_cv_evidence") : association).ToArray();
+    public static Association[] ResolveSharedEvidence(IReadOnlyList<(string PoleId, Association Association)> associations)
+        => associations.Select(association => associations.Where(other => other.PoleId != association.PoleId)
+            .Any(other => association.Association.EvidenceKeys.Intersect(other.Association.EvidenceKeys).Any())
+                ? new Association(null, null, null, association.Association.TrackCount, "shared_cv_evidence") : association.Association).ToArray();
 }

@@ -588,8 +588,9 @@ Các outcome fixture khác: `error`, `malformed`, `timeout`; `success` với m�
 Xem fixture trong `SurveyFrameTests`/`SurveyFrameFixture`; không dùng pole ID làm nhãn model.
 
 ON thiếu baseline/đỉnh riêng, lux gap, `ambiguous_association` hoặc peak dùng chung → normal, ratio null, không tham gia đánh giá dim.
-OFF ghép rõ → out; CV mơ hồ/ảnh kém/video gap → unknown. Track dùng chung giữa hai cột được loại,
-không ép ghép. Một detection đạt chất lượng mỗi frame cùng phía, nhãn nhất quán được ghép thành một
+OFF ghép rõ → out; CV mơ hồ/ảnh kém/video gap → unknown. Bằng chứng dự đoán dùng chung giữa hai cột khác nhau được loại trên toàn run,
+kể cả khác lượt; cùng một cột được quan sát lại ở lượt khác vẫn hợp lệ. Kết quả tra theo chỉ số lượt,
+cột và thời điểm để hai lượt chung điểm quay đầu không ghi đè nhau. Một detection đạt chất lượng mỗi frame cùng phía, nhãn nhất quán được ghép thành một
 track dù bbox không giao nhau; nhiều detection cùng frame còn mơ hồ. Frame đại diện theo diện tích bbox × confidence, không theo lux.
 Baseline lookup hiện trả null; P2c mới chọn baseline tương thích và chấp nhận/công bố. Bản đồ/status,
 luminance history và fault không bị ghi ở bước này. Hợp đồng đồng hồ tạm ở

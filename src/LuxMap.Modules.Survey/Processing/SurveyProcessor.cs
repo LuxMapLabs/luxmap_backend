@@ -250,21 +250,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
                 QualityFlags = Json(new { gps_offset_seconds = result.Pass.GpsOffsetSeconds, offset_reliable = result.Pass.OffsetReliable, excess_time_ratio = result.Pass.ExcessTimeRatio })
             };
             db.Add(pass);
-            observations.AddRange(result.Pass.Observations.Select(p => new PoleObservation
-            {
-                Pass = pass, Run = run, PoleId = p.PoleId, CommuneId = p.CommuneId, DataSource = sweep.DataSource,
-                ObservedElapsedNs = p.TimeNs,
-                ObservedAt = new DateTime((sweep.UtcAnchor.Ticks + (p.TimeNs - sweep.ElapsedAnchorNs) / 100) / 10 * 10, DateTimeKind.Utc),
-                CvState = media?.Observations[(p.PoleId, p.TimeNs)].Association.State,
-                CvConfidence = media?.Observations[(p.PoleId, p.TimeNs)].Association.Confidence,
-                RepresentativeFrameId = media?.Observations[(p.PoleId, p.TimeNs)].Association.RepresentativeFrameId,
-                ClassifiedAs = media?.Observations[(p.PoleId, p.TimeNs)].Classification.Status ?? FixtureStatus.Unknown,
-                BaselineRatio = media?.Observations[(p.PoleId, p.TimeNs)].Classification.BaselineRatio,
-                DimEvaluationEligible = media?.Observations[(p.PoleId, p.TimeNs)].Classification.DimEvaluationEligible ?? false,
-                ReasonCodes = Json(media?.Observations[(p.PoleId, p.TimeNs)].Classification.Reasons ?? []),
-                ChainageM = p.ChainageM, PeakAtElapsedNs = p.Peak?.TimeNs, PeakLux = p.Peak?.Lux,
-                SpeedMps = p.SpeedMps, AssociationConfidence = p.Confidence, QualityFlags = Json(p.Flags)
-            }));
+            observations.AddRange(result.Pass.Observations.Select(p => CreateObservation(pass, run, sweep, p, media)));
         }
         foreach (var commune in new[] { sweep.CommuneId }.Concat(observations.Select(x => x.CommuneId)).Distinct())
         {
@@ -275,6 +261,27 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             await db.SaveChangesAsync(ct);
         }
         await tx.CommitAsync(ct);
+    }
+
+    public static PoleObservation CreateObservation(SurveyPass pass, SurveyProcessingRun run, SurveySweep sweep,
+        Passage p, FramePipelineResult? media)
+    {
+        var cv = media?.Observations[(pass.PassNo, p.PoleId, p.TimeNs)];
+        return new PoleObservation
+        {
+            Pass = pass, Run = run, PoleId = p.PoleId, CommuneId = p.CommuneId, DataSource = sweep.DataSource,
+            ObservedElapsedNs = p.TimeNs,
+            ObservedAt = new DateTime((sweep.UtcAnchor.Ticks + (p.TimeNs - sweep.ElapsedAnchorNs) / 100) / 10 * 10, DateTimeKind.Utc),
+            CvState = cv?.Association.State,
+            CvConfidence = cv?.Association.Confidence,
+            RepresentativeFrameId = cv?.Association.RepresentativeFrameId,
+            ClassifiedAs = cv?.Classification.Status ?? FixtureStatus.Unknown,
+            BaselineRatio = cv?.Classification.BaselineRatio,
+            DimEvaluationEligible = cv?.Classification.DimEvaluationEligible ?? false,
+            ReasonCodes = Json(cv?.Classification.Reasons ?? []),
+            ChainageM = p.ChainageM, PeakAtElapsedNs = p.Peak?.TimeNs, PeakLux = p.Peak?.Lux,
+            SpeedMps = p.SpeedMps, AssociationConfidence = p.Confidence, QualityFlags = Json(p.Flags)
+        };
     }
 
     private static void Audit(LuxMapDbContext db, SurveySweep sweep, string commune, AuditAction action, object state)

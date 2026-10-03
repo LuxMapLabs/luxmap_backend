@@ -131,7 +131,7 @@ public sealed class SurveyFrameTests
     {
         var first = Match(new DetectedFrame("a", 0, [Lamp()]), new DetectedFrame("b", 400_000_000, [Lamp()]));
         var second = Match(new DetectedFrame("b", 400_000_000, [Lamp()]), new DetectedFrame("c", 800_000_000, [Lamp()]));
-        Assert.All(DetectionAssociation.ResolveSharedEvidence([first, second]), x =>
+        Assert.All(DetectionAssociation.ResolveSharedEvidence([("pole-a", first), ("pole-b", second)]), x =>
         { Assert.Null(x.State); Assert.Equal("shared_cv_evidence", x.Reason); });
     }
     [Theory]

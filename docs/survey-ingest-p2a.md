@@ -138,7 +138,8 @@ ngang cột đáng tin; `video_gap` chặn CV vì clip không phủ thời đi�
 `gps_offset_unresolved` vẫn giữ thời điểm ngang cột để xét CV. Ghép trong cửa sổ mặc định trước 3 s,
 sau 0,5 s, lấy 5 frame/giây: một detection đạt chất lượng mỗi frame ở phía cột, cùng nhãn là một track
 (dù bbox không giao nhau). Nhiều detection cùng frame, xung đột ON/OFF hoặc evidence dùng chung
-vẫn để unknown.
+giữa hai cột khác nhau trong toàn run vẫn để unknown; cùng một cột ở hai lượt được phép dùng lại
+evidence. Khoá kết quả gồm chỉ số lượt, cột và thời điểm, giữ riêng hai lượt chung điểm quay đầu.
 
 D-06 chưa có mẫu Camera2/sidecar thực để chứng minh affine, D-07 chưa có model thật:
 worker P2b-2 chỉ xử lý nguồn `simulated`; nguồn khác thất bại `VIDEO_DEVICE_MAPPING_PENDING`.
