@@ -48,3 +48,35 @@ chú lý do) hoặc tách dữ liệu riêng cho test chainage — không nới 
 
 - Video iPhone là HEVC 10-bit HDR; JPEG xuất ra chưa tone-map. Máy Android của WP6 có thể khác — xét khi có mẫu D-06.
 - `ffprobe -show_frames` giải mã cả clip để lấy PTS; chấp nhận với clip < 1 phút.
+
+# Vòng 2 — Claude (03/10/2026)
+
+Đã commit mốc `0b59a51` (code vòng 1 + sửa của Claude bên dưới). **Làm tiếp trên HEAD.**
+
+## Claude đã sửa trong vòng này — đừng đảo lại
+
+- **P1 lỗi câm:** `classified_as` có `HasDefaultValue(Unknown)`, mà `FixtureStatus.Normal` là giá trị 0 (mặc định CLR) ⇒ EF
+  bỏ cột khỏi INSERT ⇒ DB điền `unknown` ⇒ **mọi đèn `normal` bị lưu thành `unknown`**. Đã gỡ default khỏi model; migration
+  sinh lại thành `20261003071658_AddSurveyFrames` (đã khôi phục hai trigger bất biến và khối chặn rollback viết tay; cột mới
+  điền `unknown` cho hàng cũ rồi `DROP DEFAULT`). Test canh toàn model `ModelDefaultValueTests`; phá thử ⇒ đỏ đúng cột.
+  ⚠️ Migration có **SQL viết tay** — nếu phải sinh lại, giữ nguyên đoạn đó.
+- Tích hợp: Api 564/564, Persistence 41/41 trên `luxmap_test`; migration áp → gỡ → áp lại được.
+
+## R2-1 — P1. Biểu thức `select` một lượt vỡ ở số frame thực tế
+
+Chạy đúng lệnh hiện tại trên video thật (iPhone HEVC 45 s) với **324 chỉ số** (cỡ một clip 1 phút, ~18 cột × 18 frame):
+ffmpeg báo `Error while parsing expression … Cannot allocate memory`, exit 244, **không frame nào**. Test hiện chỉ chọn vài frame
+nên không lộ.
+
+**Đã thử thành công trên video thật** (nên làm theo): **mỗi cửa sổ cột một lượt ffmpeg**, `-ss <đầu cửa sổ − 1 s> -copyts -i clip`
+và chọn bằng **PTS gốc** `select='eq(pts\,p1)+eq(pts\,p2)+…'` (đơn vị time_base của stream, lấy từ ffprobe), `-fps_mode passthrough`,
+xuất `image2`. Kết quả: 18 lượt, **292/292 frame đúng**, 0 cửa sổ hụt, ~34 s cho clip 45 s. Mỗi lượt chỉ ~18 vế và chỉ giải mã vài
+giây quanh cửa sổ, nên không phụ thuộc độ dài clip. Gộp các cửa sổ chồng nhau thành một lượt nếu muốn bớt tiến trình, nhưng
+**giới hạn số vế mỗi lượt** (ví dụ ≤ 64) và nêu hằng số đó.
+
+Yêu cầu kèm:
+- Cập nhật test "một clip một tiến trình" thành: số tiến trình = số nhóm cửa sổ (không phụ thuộc số frame), và mỗi lượt ≤ giới
+  hạn vế.
+- **Test thực tế:** clip tự sinh **≥ 45 s, 30 fps (có VFR)**, **≥ 300 frame được chọn** trên ~18 cửa sổ ⇒ đủ frame, đúng PTS, đúng
+  thứ tự. Test này phải đỏ với cách một-lượt-một-biểu-thức hiện tại (Claude sẽ phá thử để kiểm).
+- Giữ: kiểm số ảnh ra đúng bằng số frame chọn, quota đĩa tạm, timeout, dọn file tạm, `-copyts` để PTS khớp ánh xạ thời gian.
