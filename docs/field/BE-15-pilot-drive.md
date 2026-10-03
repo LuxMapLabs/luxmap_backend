@@ -1,6 +1,7 @@
 # Kịch bản quay thử — khảo sát video đêm (BE-15)
 
-Dành cho **FO** (thực địa) và **WP6** (mobile). Soạn 02/10/2026 bởi WP2. Phiên bản 1 — sửa sau mỗi buổi thử.
+Dành cho **FO** (thực địa) và **WP6** (mobile). Soạn 02/10/2026 bởi WP2. Phiên bản 2 (03/10/2026): phương tiện là
+**xe máy**, điện thoại và module BH1750 gắn ở **đầu xe** — không phải ô tô. Sửa sau mỗi buổi thử.
 
 ## Vì sao cần buổi này
 
@@ -22,6 +23,7 @@ BH1750, đúng con đường** sẽ dùng thật. Kết quả cũng là dữ li�
 | Q4 | Tỉ lệ ghép đúng cột thay đổi thế nào theo vận tốc 15 / 20 / 25 / 30 km/h? | Ngưỡng vận tốc (đang giả định 15–25 km/h) |
 | Q5 | Cùng một cột, đỉnh lux dao động bao nhiêu giữa các lần quét lặp lại? | Số lần quét tối thiểu để có baseline (D-05) |
 | Q6 | Với profile camera đã khoá, đèn ON / OFF có phân biệt rõ trên frame không? Thấy đèn rõ nhất lúc cột còn cách bao xa? | Profile quay (D-R24), cửa sổ cắt frame |
+| Q7 | Trên xe máy: rung làm nhoè frame tới mức nào khi **tắt** chống rung (EIS)? Vị trí xe trong làn (cách mép đường bao xa) làm đỉnh lux của cùng một cột thay đổi bao nhiêu? | Giá gắn, có cần cho phép EIS không, quy định làn chạy |
 
 ## Chuẩn bị
 
@@ -34,14 +36,19 @@ BH1750, đúng con đường** sẽ dùng thật. Kết quả cũng là dữ li�
 
 ### Người
 
-Tối thiểu **hai người**: **lái xe** chỉ lo lái và giữ tốc độ; **người quan sát** đánh dấu cột và ghi chép.
+**Hai người trên một xe máy**: **người lái** chỉ lo lái, giữ tốc độ và **giữ vị trí trong làn ổn định** (ví dụ cách mép
+phải ~1 m, ghi lại con số đã chọn); **người ngồi sau** bấm nút đánh dấu cột và ghi chép. Người lái **không** thao tác điện thoại.
 
 ### Thiết bị
 
 - **Đúng mẫu điện thoại** sẽ dùng khi khảo sát thật, sạc đầy, tắt tiết kiệm pin.
-- Giá gắn điện thoại cố định; ghi lại vị trí, chiều cao, góc nghiêng, hướng camera (trái/phải/thẳng). **Chụp ảnh giá
-  gắn.** Không đổi giá gắn giữa các lượt.
-- **Module BH1750 trên nóc xe**, mặt cảm biến hướng lên, không bị che; ghi chiều cao so với mặt đường.
+- **Giá kẹp điện thoại ở đầu xe máy**, loại chắc, có giảm rung; **không cầm tay**. Ghi lại vị trí, chiều cao so với mặt đường,
+  góc ngẩng, hướng camera (trái/phải/thẳng). **Chụp ảnh giá gắn.** Không đổi giá gắn giữa các lượt. Video quay thử 28/09
+  quay cầm tay từ xe máy cho thấy nhoè nhiều và camera tự phơi sáng làm đèn sáng thành một đốm cháy — đúng hai thứ buổi này
+  phải loại bỏ.
+- **Module BH1750 ở đầu xe**, mặt cảm biến hướng thẳng lên trời, không bị tay lái, kính chắn gió, người lái hay đèn pha của
+  chính xe che hoặc rọi vào; ghi chiều cao so với mặt đường. Gắn chắc, không lắc theo tay lái nếu được (gắn vào phần đầu xe
+  cố định thay vì ghi-đông).
 - Nguồn điện cho module; một điện thoại phụ (tuỳ chọn) để ghi chép.
 
 ### App (WP6 xác nhận trước buổi quay)
@@ -86,8 +93,9 @@ lại mọi lần dừng, vượt xe, xe tải đỗ che đèn.
 | 7 | 30 km/h | A → B | **Cố ý vượt ngưỡng** để tìm điểm gãy — chỉ khi đường vắng và an toàn |
 | 8, 9, 10 | 20 km/h | A → B | **Lặp lại** để đo độ lặp của đỉnh lux (Q5) |
 | 11 | 20 km/h | A → B | **Dừng hẳn 10 giây** dưới một cột đang sáng, rồi đi tiếp |
+| 12, 13 | 20 km/h | A → B | **Đổi vị trí trong làn**: một lượt sát mép (~0,5 m), một lượt giữa làn — đo ảnh hưởng tới đỉnh lux (Q7) |
 
-Thời gian dự kiến khoảng 1,5–2 giờ. **An toàn trước hết**: không vượt tốc độ cho phép, bỏ lượt 7 nếu không an toàn.
+Thời gian dự kiến khoảng 2 giờ (13 lượt). **An toàn trước hết**: không vượt tốc độ cho phép, bỏ lượt 7 nếu không an toàn.
 
 ### Ghi chép mỗi lượt
 
@@ -105,7 +113,7 @@ Trong **24 giờ** sau buổi quay:
 
 ## WP2 sẽ báo lại
 
-Một báo cáo ngắn trả lời Q1–Q6 bằng số đo, gồm: độ lệch và độ trễ GPS dọc đường, hình dạng đỉnh lux theo vận tốc, **tỉ lệ
+Một báo cáo ngắn trả lời Q1–Q7 bằng số đo, gồm: độ lệch và độ trễ GPS dọc đường, hình dạng đỉnh lux theo vận tốc, **tỉ lệ
 ghép đúng cột theo vận tốc** (so với `marks`), độ lặp đỉnh lux giữa lượt 3, 8, 9, 10, và đề xuất số cho các tham số (cửa sổ
 cắt frame, ngưỡng vận tốc, số lần quét tối thiểu cho baseline). Các tham số này chốt cùng FO/WP4/WP6 rồi mới dùng cho khảo sát
 thật.
