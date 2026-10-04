@@ -42,79 +42,35 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
-    <strong>PHOTOS-REFS — 03/10/2026: hoàn thành triển khai trên fix/photos-existing-refs</strong>
-    <p><span class="tag t-done">Đã kiểm tra offline</span> Khảo sát lại dùng external_ref cũ trong quan sát;
-    ca mơ hồ chờ duyệt; poles.csv/fixtures.csv chỉ có cột mới. Bắt buộc --existing hoặc --first-survey.
-    19 test unittest dùng JPEG/EXIF tự sinh xanh; đã thêm bước CI. Còn: review/tích hợp và CI Linux.</p>
-    <p>Files: scripts/photos_to_poles.py, scripts/tests/test_photos_to_poles.py, .github/workflows/ci.yml,
-    README.md, tracking.html, .ai/results/PHOTOS-REFS.md. Không commit/push theo yêu cầu.
-    <a href=".ai/results/PHOTOS-REFS.md">Kết quả và bằng chứng</a>.</p>
+    <strong>BE-15 khảo sát video đêm — P2a → P2c đã merge vào dev, 04/10/2026</strong>
+    <p><span class="tag t-done">Đã merge</span> Toàn bộ vòng khảo sát chạy trên <code>dev</code> và <code>luxmap_dev</code>
+    (migration mới nhất <code>LuminanceHistoryPoleFk</code>): nhận phiên (P2a, #69) → xử lý tới lượt ngang cột (P2b-1, #75)
+    → frame, ON/OFF, phân loại (P2b-2, #76) → Quản lý duyệt, công bố trạng thái cột, chuỗi độ sáng, baseline, sự cố CV,
+    thumbnail (P2c, #80) → FK cột cho lịch sử <code>not_observed</code> (#81).</p>
+    <p><strong>P2c đã kiểm:</strong> migration apply/rollback/apply trên <code>luxmap_test</code>; Api 586, Persistence 44,
+    Shared 318, Storage 39 xanh; phá thử từng luật (dim không vào baseline, baseline theo bóng đang lắp, cột dự kiến không
+    quan sát → <code>unknown</code>, phạm vi người duyệt, CHECK/FK) đều đỏ đúng chỗ. Ba lượt Codex review độc lập: ba lỗi thật,
+    đã sửa kèm test. Endpoint mới và mức nghiêm trọng tạm là <strong>SELF-SIGNED</strong> (drift BE-15 P2c).
+    <a href=".ai/results/BE-15-p2c.md">Kết quả P2c</a> ·
+    <a href=".ai/results/BE-15-p2b2.md">P2b-2</a> · <a href=".ai/results/BE-15-p2b1.md">P2b-1</a>.</p>
+    <p><span class="tag t-block">Chờ người khác</span> Tin báo WP5/WP6/WP4 về P2c đã soạn, <strong>chưa gửi</strong>;
+    FW xác nhận endpoint + mức nghiêm trọng; WP4 gửi JSON model (D-07) để thay detector giả; WP6 mẫu thiết bị (D-06) và
+    buổi quay thử (<code>docs/field/BE-15-pilot-drive.md</code>) để chốt số member tối thiểu của baseline và các ngưỡng.
+    Worker hiện chỉ nhận <code>simulated</code> cho tới khi có model thật.</p>
   </div>
   <div class="card">
-    <strong>BE-15 P2c — 04/10/2026: đã triển khai trên feat/BE-15-survey-review, chờ Claude review/PostGIS</strong>
-    <p><span class="tag t-next">Đã kiểm offline</span> Duyệt accept/return idempotent, results phân trang, thumbnail proxy có scope;
-    công bố history/current/fault theo xã trong một transaction; D-08 chống duyệt muộn, audit CV riêng từng fault,
-    baseline median có version/member và chống tự chấm. Migration <code>AddSurveyPublication</code> đã sinh/đọc,
-    ba trigger bất biến; chưa apply. Build <strong>0 warning/0 error</strong>, <strong>387 test không DB xanh</strong>
-    (Shared 308, Persistence 43, Storage 36); model khớp snapshot. 11 test PostGIS mới chỉ biên dịch.</p>
-    <p>Còn: Claude kiểm SQL/khoá/rollback/test tích hợp và xuất OpenAPI; FW xác nhận API/severity tạm;
-    D-05/D-06 và BE-33/34 chốt matching baseline theo profile/protocol trước dữ liệu thật.
-    Files: <code>Survey/Review</code>, entities/configs/migration, pipeline baseline, tests Shared/Persistence/API,
-    README/hướng dẫn khảo sát/drift/generator thumbnail. <strong>Không commit/push theo yêu cầu</strong> (chưa có commit message).
-    <a href=".ai/results/BE-15-p2c.md">Kết quả, bằng chứng và giới hạn</a>.</p>
-    <p><strong>Vòng 2 — 04/10:</strong> giữ nguyên R0 của Claude; sửa R1 chỉ normal làm member,
-    R2 baseline theo fixture hiện tại/ngày lắp, R3 object thiếu →503, R4 preview published_as/is_representative qua mọi lượt.
-    Sinh lại chính AddSurveyPublication, giữ ID và SQL trigger/Down guard; diff chỉ fixture_id + FK/index.
-    <strong>394 test không DB xanh</strong> (312/43/39), build 0 warning/0 error; phá thử đỏ đúng 6 ca rồi khôi phục.
-    Hai ca PostGIS dim nhiều phiên/thay bóng đã viết, chỉ biên dịch; chờ Claude kiểm migration/SQL/HTTP.
-    Files vòng này: Survey/Review + baseline entity/config/migration, S3ObjectStore, tests Shared/Storage/API, tài liệu/results.
-    Không commit/push.</p>
+    <strong>Công cụ ảnh dùng lại mã cột cũ (PHOTOS-REFS) — merge #79, 03/10/2026</strong>
+    <p><span class="tag t-done">Đã merge</span> Khảo sát ảnh lại gắn <code>external_ref</code> cũ khi đúng một cột trong 8 m,
+    ca mơ hồ vào review; bắt buộc <code>--existing</code> hoặc <code>--first-survey</code>. Chạy lại trên 150 ảnh 28/09:
+    0 cột mới, 109 khớp, 5 vào review (ba cột cách 2,4 m và hai cột cách 4,1 m trong DB — có thể là cột chụp trùng, cần xem).
+    <a href=".ai/results/PHOTOS-REFS.md">Kết quả</a>.</p>
   </div>
   <div class="card">
-    <strong>BE-15 P2b-2 — 03/10/2026: xong trên nhánh, review độc lập sạch, chưa PR</strong>
-    <p><span class="tag t-next">Xong trên nhánh, chưa PR</span> <strong>Claude kiểm:</strong> Api 564, Persistence 41, Shared 290, Storage 36 xanh trên <code>luxmap_test</code>; video iPhone thật 278/278 và 568/568 frame; sửa lỗi câm <code>classified_as</code> (mọi đèn normal bị lưu unknown) + test canh toàn model; review độc lập 2 lượt: 2 P2 → sạch. Frame PTS thật/áp xoay, detector giả theo hash,
-    ghép track và phân loại, schema <code>AddSurveyFrames</code>, worker heartbeat và ba mức độ phủ.
-    Build <strong>0 warning/0 error</strong>; <strong>367/367 test không DB</strong> xanh, gồm ffmpeg VFR/rotation,
-    clip hỏng, timeout/huỷ và dọn temp. Migration đã đọc, model snapshot khớp.
-    Vòng 4: khoá CV gồm chỉ số lượt; kiểm evidence trên toàn run, cho phép cùng cột được quan sát lại.
-    Test quay đầu kiểm riêng hai observation chuẩn bị lưu và độ phủ sau loại evidence dùng chung.
-    Vòng 2: cắt theo cửa sổ, seek/PTS gốc, tối đa 64 vế mỗi lượt; test VFR 50 s trên 300 frame.
-    Giữ sửa vòng 1: lux mơ hồ vẫn xét ON/OFF, ghép không phụ thuộc IoU,
-    mặc định 3 s/0,5 s/5 fps và tách fixture chainage. Claude đã kiểm 564/564 API và sửa default classified_as ở mốc 0b59a51.
-    <strong>Vòng 4 không đổi model/migration; Codex chỉ chạy test không DB. Chưa xuất OpenAPI.</strong>
-    Còn: Claude review/tích hợp/CI Linux, P2c công bố-baseline, D-06/D-07 dữ liệu thiết bị/model thật.</p>
-    <p>Files: <code>Survey/Processing/Frames</code>, entity/config/migration, test Shared/Storage/API/Persistence,
-    CI, README và hướng dẫn ingest. <strong>Không commit/push theo yêu cầu.</strong>
-    <a href=".ai/results/BE-15-p2b2.md">Kết quả, lệnh và bằng chứng</a>.</p>
+    <strong>API-CLIENT-LABELS — merge #71, 02/10/2026</strong>
+    <p><span class="tag t-done">Đã merge</span> Nhãn Swagger <code>x-luxmap-client</code> = <code>mobile</code> / <code>web</code> /
+    <code>shared</code> trên mọi operation. <a href=".ai/results/API-CLIENT-LABELS.md">results</a>.</p>
   </div>
-  <div class="card">
-    <strong>BE-15 P2b-1 — 03/10/2026: xong trên nhánh, review độc lập sạch, chưa PR</strong>
-    <p><span class="tag t-next">Xong trên nhánh, chưa PR</span> Khớp đồng hồ BLE theo gói, tách lượt GPS,
-    hiệu chỉnh trễ GPS trước ghép đỉnh, giữ thời điểm đèn tắt và cặp cột, ngưỡng đỉnh theo nhiễu nền.
-    Worker có lease/heartbeat/retry/log và audit theo xã; coverage thật, chưa có frame/phân loại/công bố.
-    Đã xử lý A1–A7, W1–W2, T1–T4; A8 ghi nợ. Build <strong>0 warning</strong>;
-    <strong>288/288 test không DB</strong> xanh qua xUnit trong cùng tiến trình; 40 ca mô phỏng theo vận tốc/ca khó.
-    VSTest bị sandbox chặn socket. <strong>10 test tích hợp chỉ biên dịch, Claude chưa chạy bản sửa</strong>. <strong>Vòng 2 (Claude):</strong> 10 test tích hợp xanh trên <code>luxmap_test</code> sau khi sửa alias SQL snake_case (worker sẽ chết ở lần nhận việc đầu); teardown sạch 0 hàng; phá thử EXPLAIN → đỏ; migration rollback/áp lại được. Toàn bộ: Api 557, Persistence 40, Shared 223, Storage 25.</p>
-    <p><strong>Vòng 3 (Codex):</strong> sửa R3-1…R3-4: chọn tuyến gần nhất/mơ hồ,
-    giữ mẫu GPS trôi ngắn, giữ mốc rời quãng dừng, đọc GIS trong RepeatableRead.
-    Build <strong>0 warning/0 error</strong>; <strong>294/294 test không DB</strong> xanh,
-    44 ca mô phỏng, thêm dừng 10 giây. <strong>15 test xử lý cần DB chỉ biên dịch, chờ Claude chạy lại</strong>.
-    Giữ alias snake_case và AuditGuardTests của Vòng 2. Không đổi model/migration.
-    Files: <code>Survey/Processing</code>, test Shared/API, <code>README.md</code>, results.
-    Chưa commit bản sửa Vòng 3 theo yêu cầu.
-    Còn: P2b-2/P2c, cấu hình quản trị BE-33/34 và dữ liệu pilot D-06.
-    <a href=".ai/results/BE-15-p2b1.md">Kết quả và bảng mô phỏng</a>. <strong>Vòng 4 (Claude):</strong> Api 562 (5 test tích hợp mới), Persistence 40, Shared 229, Storage 25 xanh trên <code>luxmap_test</code>; teardown sạch; phá thử quãng dừng và chọn tuyến gần nhất → test đúng chỗ đỏ; OpenAPI không đổi. <strong>Review độc lập lần 2:</strong> 1 P2 (mẫu GPS kém gần tuyến khác cắt lượt) — đã sửa, có test, phá thử đỏ. <strong>Lần 3: sạch.</strong></p>
-  </div>
-  <div class="card">
-    <strong>API-CLIENT-LABELS — 02/10/2026: xong trên nhánh, chưa PR</strong>
-    <p>Nhãn Swagger <code>x-luxmap-client</code> = <code>mobile</code> / <code>web</code> / <code>shared</code> trên mọi
-    operation; tiền tố <code>[Mobile]</code> / <code>[Web]</code> cho nhóm auth, <code>[Dùng chung]</code> cho
-    <code>GET /auth/me</code>. Giữ tag, operationId, route, request/response (FM-04 sinh Kotlin theo đó).
-    Codex viết, Claude kiểm: build 0 warning; API 527/527, Shared/Persistence/Storage xanh trên
-    <code>luxmap_test</code>; spec xuất lại, lint không thêm cảnh báo.
-    <a href=".ai/results/API-CLIENT-LABELS.md">results</a>.</p>
-  </div>
-  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 25/09/2026</p>
+  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 04/10/2026</p>
 
   <div class="card">
     <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) đang chạy, BE-REVIEW-02 xong 18/09, Registration v1.2 xong 25/09</strong>
@@ -123,11 +79,11 @@
   </div>
 
   <div class="grid">
-    <div class="stat"><b>15</b><span>project trong solution</span></div>
-    <div class="stat"><b>589</b><span>test — tất cả xanh</span></div>
+    <div class="stat"><b>16</b><span>project trong solution</span></div>
+    <div class="stat"><b>987</b><span>test — tất cả xanh</span></div>
     <div class="stat"><b>0</b><span>warning khi build</span></div>
     <div class="stat"><b>12</b><span>enum contract đã khoá</span></div>
-    <div class="stat"><b>12</b><span>bảng trong database</span></div>
+    <div class="stat"><b>33</b><span>bảng trong database</span></div>
     <div class="stat"><b>3</b><span>cột hình học, đủ GIST index</span></div>
   </div>
 
@@ -471,14 +427,14 @@
       <li><strong>⚠️ Tag <code>Poles</code> / <code>Segments</code> trong <code>gen_consolidated_spec.py</code> vẫn ghi "CHƯA HIỆN THỰC (BE-14)"</strong> dù BE-14 đã xong 22/09 — lệch có sẵn, thấy khi sinh lại spec ở REG-v1.2, chưa sửa (ngoài phạm vi).</li>
       <li><strong>🔴 Rủi ro demo: <code>pole_id_seq</code> của DB dev ở 396 625 với 0 cột (test đẩy).</strong> Cột thật đầu tiên là <code>POLE-396626</code>, FE hardcode <code>POLE-0047</code>. Đã chốt D-6: seeder BE-39 INSERT ID tường minh + <code>setval</code>. <strong>20/09: phần &quot;test đẩy&quot; đã hết</strong> — sau khi gộp collection, <code>pole_id_seq</code> đứng yên ở 1715 qua ba lượt chạy đủ bộ, vì mọi fixture đều xoá hàng của mình và <code>AssetSchemaFixture</code> trả lại sequence. Còn lại là bẫy ngược: sequence đứng ở đâu thì khối 2500 cột của fixture rơi vào đó, nên <strong>không test nào được ghim ID bằng literal</strong> (xem <code>CLAUDE.md</code>). Gốc vẫn là BE-36 (Testcontainers) — đưa lên sớm (M-1).</li>
       <li><strong>✅ FK ghép <code>(feeder_id, commune_id)</code> (O-7) ĐÃ CÓ — 21/09.</strong> Kiểm cùng-xã không còn là lượt gọi hàm phải nhớ. <code>RequireFeederInCommuneAsync</code> <strong>vẫn giữ</strong> và vẫn là thứ trả lời 409 <code>CROSS_COMMUNE_REFERENCE</code> nêu hai xã — FK một mình nổ ra <code>DbUpdateException</code> trần và middleware BE-04 trả <strong>500</strong>, nên hai lớp đều cần. FK bắt được một ca tầng app <strong>chưa bao giờ phủ</strong>: đổi <code>commune_id</code> của chính cột trong khi nó đang đấu vào tủ điện (lượt kiểm đọc xã của cột làm vế cố định nên không gì kích hoạt). 🔴 Hai thứ trông thừa mà không thừa: <code>ak_feeder_feeder_id_commune_id</code> là <strong>đích</strong> của FK — xoá nó là kéo theo cả FK; và <code>MATCH SIMPLE</code> (mặc định) là thứ giữ cho cột không-có-mạch hợp lệ — <code>MATCH FULL</code> sẽ từ chối <strong>mọi</strong> cột không có feeder. <code>segment_id</code> cố ý KHÔNG có khoá tương tự (<code>inter_commune</code>). Contract mục 9 vẫn ghi O-7 là mở → <strong>drift 45</strong>, đóng ở v1.6 cùng drift 44.</li>
-      <li><strong>⚠️ Bản đồ sẽ TOÀN <code>unknown</code> cho tới BE-15/BE-17.</strong> <code>GET /poles</code> trả đủ 15 <code>properties</code> đúng mục 5.1, nhưng <code>pole_current_status</code> đang rỗng nên <code>fixture_status</code> = <code>unknown</code> và <code>status_confidence</code> = null với <strong>cả 103 cột</strong> — trong khi <code>mock-poles.geojson</code> mang 70 normal/10 dim/16 out/7 unknown. 🔴 <code>unknown</code> ở đây <strong>không phải giá trị tạm</strong>: mục 3.1 định nghĩa nó là "sweep gần nhất không phủ được cột đó", đúng trạng thái cột chưa ai phân loại. <code>has_iot_node</code> luôn false và <code>controller_node_id</code> luôn null vì <strong>chưa có bảng <code>iot_node</code></strong>. Khoá vẫn emit (tiền lệ <code>nearest_luminance</code> của BE-42) để WP5/WP6 bind hình dạng cuối ngay. Drift <strong>47</strong> — <strong>WP5 phải biết trước khi dựng màn bản đồ</strong>.</li>
+      <li><strong>Bản đồ còn <code>unknown</code> cho tới phiên khảo sát thực địa đầu tiên được duyệt.</strong> Từ BE-15 P2c (#80) <code>pole_current_status</code> đã có người ghi: chấp nhận một phiên công bố trạng thái từng cột. Nhưng worker chỉ nhận dữ liệu <code>simulated</code> cho tới khi có model thật (D-07), nên cột thực địa và bộ mock trên <code>luxmap_dev</code> vẫn <code>unknown</code> — đúng nghĩa Contract mục 1, không phải giá trị tạm.</li>
       <li><strong>⏳ Mock chưa có <code>feeder_id</code> (Contract O-6) — khuôn đã dựng, chờ FO điền.</strong> <code>mocks/mock-feeders.csv</code> và <code>mocks/mock-pole-feeders.csv</code> (103 dòng, phần tra cứu điền sẵn, cột <code>feeder_external_ref</code> để trống), hướng dẫn ở <code>mocks/README.md</code>. <strong>Chỉ 58/103 dòng cần điền</strong> — 45 cột <code>solar_all_in_one</code> không đấu vào mạch nào, để trống là đúng. 🔴 <strong>O-6 như Contract mục 9 đang ghi là THIẾU MỘT NỬA:</strong> chỉ nhắc file gán, nhưng bộ mock <strong>không có một tủ điện nào</strong> và bảng <code>feeder</code> trên DB dev đang rỗng — không gán cột vào tủ chưa tồn tại được. <code>SEG-002</code> toàn bộ solar (31 cột) nên tuyến đó sẽ không bao giờ sinh cụm theo mạch; đó là tính chất bộ mock, nêu ra để lúc đọc kết quả không ai đi tìm nguyên nhân. Chặn CV-15/RQ2.</li>
       <li><strong>✅ Đã cấm <code>ExecuteUpdate</code>/<code>ExecuteDelete</code> ở compile-time.</strong> Guard là override của <code>SaveChanges</code> và duyệt ChangeTracker; hai API bulk dịch thẳng ra SQL nên <strong>vô hiệu hoá hoàn toàn kiểm phạm vi mục 7 ở đường ghi</strong> — cùng họ với lỗ hổng BE-08 (query filter chỉ áp lên đọc). Bốn ký hiệu vào <code>BannedSymbols.txt</code>, RS0030 = error. Ngoại lệ hiện có đều đã pragma tường minh: <code>AuthService</code> 4 chỗ (<code>RefreshToken</code> không <code>ICommuneScoped</code>, và luồng xoay token BE-07 phụ thuộc số dòng UPDATE trả về) và teardown test 13 chỗ (<strong>BE-36 xoá luôn nhu cầu</strong>). Analyzer có lỗ với tham số tuỳ chọn nên có thêm <code>BannedBulkWriteApiTests</code> quét mã nguồn, khẳng định mọi lần gọi nằm trong vùng pragma và không vùng nào hở tới cuối file.</li>
       <li><strong>⚠️ Chi phí <code>CommuneWriteGuard</code>: KHÔNG đo được — và đó là kết luận dùng được.</strong> Đo A/B <strong>bắt cặp</strong> (delta trong từng cặp, không phải trung-vị-trừ-trung-vị), 1000 <code>Pole</code>, 30 cặp sau 8 cặp warm-up: <strong>20/30 cặp dương · trung vị 8,46 ms · IQR 14,33 ms</strong> — IQR rộng hơn trung vị, trượt cổng. <strong>Chi phí guard nhỏ hơn nhiễu của chính phép ghi nó bảo vệ</strong> (~8 ms trên nền ~55 ms cho 1000 dòng). Câu đó chặn lập luận "guard chậm, nới ra đi" <strong>mạnh hơn</strong> một con số điểm, vì con số mời người ta cãi về con số. Con số 3,7 µs cũ đo lượt <code>Entries&lt;T&gt;()</code> ấm; vòng kiểm phạm vi thật chỉ tốn <strong>0,21 µs</strong>. <strong>Đừng cộng các phần lại.</strong> <br><strong>Đừng đo lại bằng cách này:</strong> 10 cặp delta âm rơi đúng vào cặp 1, 4, 7, 10… — <strong>chu kỳ 3, không sót cặp nào</strong>. Đó là nhiễu hệ thống, tăng số lượt không làm nó biến mất.</li>
       <li><strong>🔧 Benchmark đã bị loại khỏi <code>dotnet test</code> mặc định.</strong> <code>Category=Benchmark</code> + <code>luxmap.runsettings</code> (nối qua <code>RunSettingsFilePath</code> nên không ai phải nhớ cờ). Benchmark không phải test hồi quy: nó ghi 64.000 dòng mỗi lượt, và một phép đo thời gian trên máy dùng chung là chỗ sinh flake — mà một test flake dạy người ta chạy lại tới khi xanh, đó là cách một lỗi thật bị bỏ sót. Chạy có chủ đích: <code>dotnet test --settings luxmap.benchmark.runsettings</code>. ⚠️ <code>--filter "Category=Benchmark"</code> <strong>không dùng được</strong> — VSTest lấy giao với filter trong runsettings, ra <code>(Category!=Benchmark)&amp;(Category=Benchmark)</code>, khớp 0 test. Đã thử trước rồi mới biết.</li>
       <li><strong>⚠️ Bộ mock FO-26 thiếu 4 trường để nạp được — BE-39 phải xử lý.</strong> <code>external_ref</code> (cả hai file), <code>commune_id</code> (segments không có; poles ghi <code>COM-001</code>), <code>data_source</code> (cả hai file), <code>feeder_id</code> (drift 23). Test <code>AssetImportMockSetTests</code> bổ sung ba trường đầu và <strong>cố ý KHÔNG bổ sung <code>feeder_id</code></strong>, khẳng định cả 103 cột có <code>feeder_id</code> NULL để khoảng trống không bị che đi.</li>
       <li><strong>⚠️ EF Core suýt DROP <code>ix_pole_commune_id</code> khi thêm index <code>external_ref</code>.</strong> Convention bỏ index khoá ngoại khi đã có index khác dẫn đầu bằng cùng cột — nhưng index mới là PARTIAL, không phủ hàng <code>external_ref IS NULL</code> (đa số cột nạp từ ảnh công khai), trong khi query filter BE-08 đưa <code>commune_id</code> vào <code>WHERE</code> của mọi truy vấn. Bắt được lúc đọc migration sinh ra. Đã khai lại tường minh trong <code>ExternalRefColumn.HasExternalRef</code> — <strong>đừng xoá tưởng thừa</strong>.</li>
-      <li><strong>🔴 <code>pole_current_status.status_confidence</code> nhận <code>NaN</code>, <code>Infinity</code> và giá trị ngoài <code>0..1</code> — CHƯA sửa.</strong> Đã chèn thật <code>42.5</code> và nó vào bảng. CHECK duy nhất trên cột đó (<code>ck_pole_current_status_confidence_matches_status</code>) chỉ ràng buộc NULL-hay-không so với <code>fixture_status</code>, không nói gì về giá trị; XML doc ghi "0..1" mà không có gì thực thi. <strong>Quyền ghi bảng thuộc BE-15/BE-17 nên bản sửa thuộc về đó.</strong> <code>fault.status_confidence</code> của BE-18 không lặp lại lỗi này. Xem <code>docs/contract-drift.md</code> mục 24.</li>
+      <li><strong>✅ <code>pole_current_status.status_confidence</code> đã có CHECK hữu hạn 0..1</strong> (<code>ck_pole_current_status_confidence_range</code>, BE-REVIEW-02, đóng drift 24); P2c ghi vào bảng qua đúng ràng buộc đó.</li>
       <li><strong>⚠️ Nợ có chủ — <code>FaultHistory</code> là việc của BE-19 nếu cần chuỗi đầy đủ.</strong> BE-18 chỉ ghi vết quyết định MỚI NHẤT trên bảng <code>fault</code>. Một fault đi <code>detected → confirmed → rejected</code> chỉ còn trạng thái cuối. Contract mục 2.5 chỉ cho đổi ba trường nên số quyết định là hữu hạn, nhưng nếu BE-19/BE-20 cần dựng lại chuỗi thì phải thêm bảng — <strong>đừng để rơi</strong>.</li>
       <li><strong>⚠️ <code>fault_cluster</code> chưa có gì ghi vào.</strong> CV-15 gom cụm, mà CV-15 phụ thuộc <code>BE-13</code> (chưa làm). Bảng và FK đã sẵn để không phải migration lại; <code>clustering_model_version</code> là thứ BE-34 cần để trả lời kết quả nào do model phiên bản nào sinh.</li>
       <li><strong>✅ <code>mock-faults.json</code> đã khớp Contract mục 2.4.</strong> Mười điểm lệch đã sửa: thêm <code>fixture_id</code> (null — không có mã <code>FIX-</code> nào trong <code>mocks/</code>), <code>data_source</code> (<code>cv</code>→<code>public_imagery</code> 26, <code>iot</code>→<code>simulated</code> 2), <code>status_confidence</code> (null), <code>updated_at</code>, <code>work_order_id</code> (<strong>đọc từ <code>fault_ids</code> của <code>mock-work-orders.json</code></strong>, 11 item có, 17 null), <code>note</code>, <code>reported_by</code> (null — cả 28 do engine sinh, đúng quy tắc BE-18); bỏ <code>confirmed_by</code>/<code>confirmed_at</code> (cả 28 đều null, không mất dữ liệu); <code>CLU-0001</code> → <strong><code>CLS-001</code></strong>. Cũng sửa prefix <code>CLU</code> trong <code>mock-work-orders.json</code> — chỉ prefix. Xem <code>docs/contract-drift.md</code> mục 28.</li>
