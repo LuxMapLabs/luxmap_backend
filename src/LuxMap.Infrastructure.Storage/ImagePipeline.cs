@@ -1,3 +1,7 @@
+using System.Net;
+using LuxMap.Shared.Contracts.Errors;
+using LuxMap.Shared.Http;
+
 namespace LuxMap.Infrastructure.Storage;
 
 /// <summary>
@@ -62,7 +66,18 @@ public static class ImagePipeline
             // Order matters: reject non-JPEG before handing anything to a decoder.
             await JpegMagicBytes.EnsureJpegAsync(buffered, cancellationToken);
 
-            var thumbnail = await ThumbnailFactory.CreateAsync(buffered, cancellationToken);
+            byte[] thumbnail;
+            try
+            {
+                thumbnail = await ThumbnailFactory.CreateAsync(buffered, cancellationToken);
+            }
+            catch (SixLabors.ImageSharp.ImageFormatException error)
+            {
+                // The signature only proves the file STARTS like a JPEG. A corrupt or truncated body fails here,
+                // in the decoder — and it is the client's file that is wrong, so it is a 415, never a 500.
+                throw new LuxMapException(ErrorCodes.UnsupportedImageFormat, HttpStatusCode.UnsupportedMediaType,
+                    "The upload starts like a JPEG but cannot be decoded as one: " + error.Message);
+            }
 
             // CreateAsync rewinds, but say so here too — the next thing to touch this stream is the
             // upload, and a wrong position there loses the first bytes of the stored file.

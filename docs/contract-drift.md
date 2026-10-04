@@ -686,6 +686,9 @@ gì nên không có trước/sau); phiếu khảo sát không nhận ảnh. Sai 
 Mã lỗi mới: `400 EVIDENCE_KIND_NOT_ALLOWED`, `409 WORK_ORDER_NOT_IN_PROGRESS`, **`409 AFTER_EVIDENCE_REQUIRED`** — `POST
 /work-orders/{id}/complete` của phiếu **sửa chữa** bị từ chối khi chưa có ảnh `after` (ảnh `before` không tính). Phiếu kiểm
 tra không bắt buộc ảnh. `415 UNSUPPORTED_IMAGE_FORMAT`, `404 WORK_ORDER_NOT_FOUND` giữ như Contract.
+`415 UNSUPPORTED_IMAGE_FORMAT` gồm cả file **bắt đầu như JPEG nhưng không giải mã được** (hỏng, bị cắt ngang) — trước đây ra
+500, nay quyết ở `ImagePipeline` nên ảnh khảo sát cũng hưởng. `captured_at` phải là **ngày-giờ ISO 8601 đầy đủ**
+(`2026-10-04T13:30:00Z`, có thể kèm offset); thiếu ngày hoặc thiếu giờ → `400 VALIDATION_FAILED`.
 
 ⚠️ `allowed_actions` của phiếu vẫn liệt kê `complete` khi chưa có ảnh `after`: FE nên tự khoá nút theo danh sách ảnh (hoặc
 xử lý 409). Ảnh bằng chứng **không** vào dữ liệu chấm CV (xem "Chung cho cả hai" ở trên). Bảng `repair_evidence` không

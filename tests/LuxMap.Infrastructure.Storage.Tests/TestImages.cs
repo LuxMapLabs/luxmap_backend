@@ -53,6 +53,12 @@ public static class TestImages
     /// Headers only. The magic-byte check runs before any decoder, so these never need to be valid
     /// files — and keeping them minimal makes it obvious that the FIRST BYTES are what decides.
     /// </summary>
+    /// <summary>The JPEG signature followed by bytes no decoder accepts: passes the magic-byte check, fails decoding.</summary>
+    public static byte[] CorruptJpeg => [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x13, 0x37, 0xDE, 0xAD, 0xBE, 0xEF];
+
+    /// <summary>A real JPEG cut to its first 300 bytes — what an interrupted phone upload looks like.</summary>
+    public static byte[] TruncatedJpeg => JpegWithExif()[..300];
+
     public static byte[] PngHeader => [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
 
     public static byte[] GifHeader => [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00, 0x00];

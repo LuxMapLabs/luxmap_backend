@@ -1048,13 +1048,17 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         Assert.Equal("EVIDENCE_NOT_FOUND", Code(JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement));
     }
 
-    [Fact]
-    public async Task A_file_that_is_not_a_jpeg_is_refused_by_its_bytes_and_nothing_is_written()
+    [Theory]
+    [InlineData("png")]
+    [InlineData("corrupt jpeg")]
+    public async Task A_file_that_is_not_a_jpeg_is_refused_by_its_bytes_and_nothing_is_written(string what)
     {
         var id = await StartedRepair();
-        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00];
+        byte[] bytes = what == "png"
+            ? [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00]
+            : [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x13, 0x37, 0xDE, 0xAD]; // passes the signature, not the decoder
 
-        var (status, body) = await Upload("a", id, "before", png);
+        var (status, body) = await Upload("a", id, "before", bytes);
 
         Assert.Equal((415, "UNSUPPORTED_IMAGE_FORMAT"), (status, Code(body)));
         Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
@@ -1062,6 +1066,8 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
 
     [Theory]
     [InlineData("captured_at", "not a time")]
+    [InlineData("captured_at", "13:30")]
+    [InlineData("captured_at", "2026-10-04")]
     [InlineData("lat", "91")]
     [InlineData("lng", "NaN")]
     [InlineData("kind", "selfie")]

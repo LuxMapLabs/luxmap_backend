@@ -50,7 +50,7 @@ public sealed record EvidenceItem
 /// the object key is derived from it; a rejected image leaves a gap in the numbering, which is accepted.
 /// </para>
 /// </remarks>
-public sealed class WorkOrderEvidenceService(LuxMapDbContext db, ICurrentActorAccessor actor, IObjectStore store)
+public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurrentActorAccessor actor, IObjectStore store)
 {
     /// <summary>A phone photo is a few MB; this leaves room without letting one request hold the server.</summary>
     public const long MaxUploadBytes = 16 * 1024 * 1024;
@@ -78,7 +78,10 @@ public sealed class WorkOrderEvidenceService(LuxMapDbContext db, ICurrentActorAc
         // Shape first, so a malformed request costs no database round trip and no storage write.
         if (file is null || file.Length == 0) throw OptionalJson.Invalid("file");
         var parsedKind = WireEnum.ParseCsv<EvidenceKind>(kind, "kind") is [var single] ? single : throw OptionalJson.Invalid("kind");
-        if (!DateTime.TryParse(capturedAt, CultureInfo.InvariantCulture,
+        // A COMPLETE ISO 8601 date-time: TryParse alone accepts "13:30" and quietly supplies today's date.
+        // Z or an offset is converted to UTC; no designator is read as UTC (Contract §0, as for query strings).
+        if (capturedAt is null || !CompleteTimestamp().IsMatch(capturedAt)
+            || !DateTime.TryParse(capturedAt, CultureInfo.InvariantCulture,
                 DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var captured))
             throw OptionalJson.Invalid("captured_at");
         // timestamptz keeps microseconds; trim here so the response equals what is stored.
@@ -172,6 +175,9 @@ public sealed class WorkOrderEvidenceService(LuxMapDbContext db, ICurrentActorAc
             throw Error("EVIDENCE_NOT_FOUND", HttpStatusCode.NotFound);
         return await store.OpenAsync(StorageBucket.Evidence, thumbnail ? row.ThumbnailKey : row.ObjectKey, ct);
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,7})?(Z|[+-][0-9]{2}:[0-9]{2})?$")]
+    private static partial System.Text.RegularExpressions.Regex CompleteTimestamp();
 
     private static double Coordinate(string? value, string field, double limit)
         => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)

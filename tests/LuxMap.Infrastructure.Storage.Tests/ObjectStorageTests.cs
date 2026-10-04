@@ -40,6 +40,8 @@ public class ObjectStorageTests
         { "PDF", TestImages.PdfHeader },
         { "empty file", TestImages.Empty },
         { "two bytes", TestImages.TruncatedToTwoBytes },
+        { "JPEG signature, corrupt body", TestImages.CorruptJpeg },
+        { "JPEG cut short", TestImages.TruncatedJpeg },
     };
 
     [Theory]
