@@ -71,7 +71,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     private sealed record Capture(string Id, long Run, uint Version, string Frame, DateTime At);
-    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false)
+    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false, string? alsoTouches = null)
     {
         await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
         var at = DateTime.UnixEpoch.AddDays(20000 + day);
@@ -81,6 +81,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         db.Add(sweep); await db.SaveChangesAsync();
         var run = new SurveyProcessingRun { SweepId = sweep.SweepId, CommuneId = a, Attempt = 1, LeaseOwner = Guid.NewGuid(),
             LeaseExpiresAt = at.AddMinutes(1), InputHash = new('b',64), SettingsSnapshot = "{}", GisSnapshot = System.Text.Json.JsonSerializer.Serialize(new {
+                communes = alsoTouches is null ? new[] { a, b } : new[] { a, b, alsoTouches },
                 poles = poles.Select((id, i) => new { pole_id = id, commune_id = i == 0 ? a : b }) }),
             AlgorithmVersionId = algorithm, ClockVersionId = clock, ModelVersionId = model, ExtractorVersionId = extractor,
             ResultState = "succeeded", Stage = "complete", StartedAt = at, FinishedAt = at.AddSeconds(10) };
@@ -550,6 +551,22 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         await using var narrow = Db([a]);
         var missing = await Assert.ThrowsAsync<LuxMapException>(() => Detail(narrow, [a]).GetAsync(poles[1], default));
         Assert.Equal((HttpStatusCode.NotFound, "POLE_NOT_FOUND"), (missing.StatusCode, missing.Code));
+    }
+
+    [Fact]
+    public async Task Pole_detail_finds_older_readable_frames_behind_a_wall_of_newer_unreadable_ones()
+    {
+        // The newest 31 sweeps also touch a commune the caller does not have; only the oldest is readable.
+        var readable = await Plant(1, 100); await Accept(readable);
+        for (int day = 2; day <= 32; day++) await Accept(await Plant(day, 100, alsoTouches: "COM-NOT-MINE"));
+
+        await using var db = Db();
+        var detail = await Detail(db).GetAsync(poles[0], default);
+
+        // Cutting to the newest 30 candidates BEFORE the access check would leave this empty.
+        var frame = Assert.Single(detail.RecentFrames);
+        Assert.Equal(readable.Frame, frame.FrameId);
+        Assert.Equal(PoleDetailService.HistoryPoints, detail.LuminanceHistory.Count);
     }
 
     [Fact]

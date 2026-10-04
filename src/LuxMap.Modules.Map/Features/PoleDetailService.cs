@@ -35,6 +35,8 @@ public sealed class PoleDetailService(
     public const int HistoryPoints = 30;
     public const int RecentFrameCount = 10;
     public const int OpenFaultCap = 50;
+    public const int FrameScanBatch = 30;
+    public const int FrameScanLimit = 300;
 
     private static readonly FaultStatus[] OpenStatuses = [.. FaultStatusSets.Open];
 
@@ -171,43 +173,57 @@ public sealed class PoleDetailService(
     /// observation — and only those the caller could open at <c>/frames/{id}/thumbnail</c>: a URL we
     /// list must not 404 when followed.
     /// </summary>
+    /// <remarks>
+    /// 🔴 <b>Authorization filters BEFORE the cut to ten.</b> Truncating the newest candidates first would
+    /// show nothing for a caller whose newest sweeps belong to someone else, even with older readable ones.
+    /// Candidates are scanned newest-first in batches until <see cref="RecentFrameCount"/> readable frames
+    /// are found, the candidates run out, or <see cref="FrameScanLimit"/> have been examined — a bound,
+    /// because every unseen sweep costs two access queries.
+    /// </remarks>
     private async Task<IReadOnlyList<PoleMapFrame>> RecentFramesAsync(string poleId, CancellationToken ct)
     {
-        var candidates = await (
+        var candidates = (
             from h in db.Set<LuminanceHistory>().AsNoTracking()
             join o in db.Set<PoleObservation>().AsNoTracking() on h.ObservationId equals o.ObservationId
             where h.PoleId == poleId && o.RepresentativeFrameId != null
             orderby h.EvaluatedAt descending, h.SweepId.Length descending, h.SweepId descending
-            select new { FrameId = o.RepresentativeFrameId!, h.SweepId })
-            .Take(HistoryPoints)
-            .ToListAsync(ct);
-        if (candidates.Count == 0) return [];
+            select new { FrameId = o.RepresentativeFrameId!, h.SweepId });
 
-        var sweepIds = candidates.Select(c => c.SweepId).Distinct().ToArray();
-        var sweeps = await mediaAccess.VisibleSweeps().AsNoTracking()
-            .Where(s => sweepIds.Contains(s.SweepId)).ToDictionaryAsync(s => s.SweepId, ct);
-
-        var readable = new HashSet<string>();
-        foreach (var id in sweeps.Keys)
-            if (await mediaAccess.CanReadMedia(id, ct)) readable.Add(id);
-
-        var frameIds = candidates.Where(c => readable.Contains(c.SweepId)).Select(c => c.FrameId).ToArray();
-        var frames = await db.Set<SurveyFrame>().AsNoTracking()
-            .Where(f => frameIds.Contains(f.FrameId)).ToDictionaryAsync(f => f.FrameId, ct);
-
+        // Per sweep, decided once: visible (work order + assignee) AND every commune of its runs in scope.
+        var readable = new Dictionary<string, SurveySweep?>();
         var result = new List<PoleMapFrame>();
-        foreach (var c in candidates)
+
+        for (var skip = 0; skip < FrameScanLimit && result.Count < RecentFrameCount; skip += FrameScanBatch)
         {
-            if (!readable.Contains(c.SweepId) || !frames.TryGetValue(c.FrameId, out var frame)) continue;
-            if (sweeps[c.SweepId].AtElapsed(frame.PhoneElapsedNs) is not { } capturedAt) continue;
-            result.Add(new PoleMapFrame
+            var batch = await candidates.Skip(skip).Take(FrameScanBatch).ToListAsync(ct);
+            if (batch.Count == 0) break;
+
+            var unseen = batch.Select(c => c.SweepId).Distinct().Where(id => !readable.ContainsKey(id)).ToArray();
+            if (unseen.Length > 0)
             {
-                FrameId = frame.FrameId,
-                SweepId = c.SweepId,
-                CapturedAt = capturedAt,
-                ThumbnailUrl = $"/api/v1/frames/{frame.FrameId}/thumbnail",
-            });
-            if (result.Count == RecentFrameCount) break;
+                var visible = await mediaAccess.VisibleSweeps().AsNoTracking()
+                    .Where(sweep => unseen.Contains(sweep.SweepId)).ToDictionaryAsync(sweep => sweep.SweepId, ct);
+                foreach (var id in unseen)
+                    readable[id] = visible.TryGetValue(id, out var sweep) && await mediaAccess.CanReadMedia(id, ct) ? sweep : null;
+            }
+
+            var frameIds = batch.Where(c => readable[c.SweepId] is not null).Select(c => c.FrameId).ToArray();
+            var frames = await db.Set<SurveyFrame>().AsNoTracking()
+                .Where(f => frameIds.Contains(f.FrameId)).ToDictionaryAsync(f => f.FrameId, ct);
+
+            foreach (var c in batch)
+            {
+                if (readable[c.SweepId] is not { } sweep || !frames.TryGetValue(c.FrameId, out var frame)) continue;
+                if (sweep.AtElapsed(frame.PhoneElapsedNs) is not { } capturedAt) continue;
+                result.Add(new PoleMapFrame
+                {
+                    FrameId = frame.FrameId,
+                    SweepId = c.SweepId,
+                    CapturedAt = capturedAt,
+                    ThumbnailUrl = $"/api/v1/frames/{frame.FrameId}/thumbnail",
+                });
+                if (result.Count == RecentFrameCount) break;
+            }
         }
         return result;
     }
