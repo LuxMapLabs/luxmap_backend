@@ -25,6 +25,7 @@ DB local mô phỏng Supabase** (role không phải superuser, PostGIS ở schem
 | D-5 | Sequence ở đích = giá trị hiện tại của nguồn. **Không** chép refresh token — mọi người đăng nhập lại |
 | D-6 | Connection string Supabase chỉ nằm trong **thư mục triển khai riêng**, không bao giờ ở `.env` của repo dev |
 | D-7 | Lúc chép: tắt API local, không chạy test. DB 53 MB, vài phút |
+| D-8 | **Giữ MinIO** cho ảnh, video và (sau này) PDF báo cáo — không chuyển sang Supabase Storage hay Firebase Storage (Mỹ, 04/10/2026). Lý do: clip 100–150 MB/phút, một đêm khảo sát vài GB, vượt gói miễn phí; mọi byte vẫn qua API nên đổi kho sau này chỉ là cấu hình + chép bucket. Muốn dùng kho S3 khác thì phải thêm cấu hình vùng ký (adapter đang ghim `us-east-1`) và chạy thử adapter trước |
 
 ## 1. Dashboard Supabase (Mỹ làm)
 
