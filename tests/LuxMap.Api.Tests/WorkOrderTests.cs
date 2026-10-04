@@ -83,7 +83,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
                 await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {home} OR commune_id = {foreign}");
                 await transaction.CommitAsync();
             }
-            foreach (var table in new[] { "work_order_fault", "work_order", "fault", "fault_cluster", "road_segment" })
+            foreach (var table in new[] { "work_order_fault", "work_order_segment", "work_order", "fault", "fault_cluster", "fixture", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);
@@ -688,6 +688,184 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         a.Note = "First decision"; b.Note = "Stale decision";
         await first.SaveChangesAsync();
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+    }
+
+    // ---- GET /work-orders/{id}/poles (drift WO-12) --------------------------------------------------
+
+    /// <summary>A pole at <paramref name="along"/> (0..1) of a road starting <paramref name="origin"/> degrees off the test road, so road order differs from insert order.</summary>
+    private Task<string> PlantPole(double along, string? road = null, string? commune = null,
+        FixtureStatus? status = null, double? confidence = null, bool lamp = false, bool sensitive = false, double origin = 0)
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var owner = commune ?? home;
+            var pole = new Pole { CommuneId = owner, SegmentId = road ?? segment, DataSource = DataSource.Simulated,
+                NearSensitivePoi = sensitive, Geom = new Point(108 + origin + 0.01 * along, 16 + origin + 0.01 * along) { SRID = 4326 } };
+            db.Add(pole); await db.SaveChangesAsync();
+            if (status is { } known)
+                db.Add(new PoleCurrentStatus { PoleId = pole.PoleId, CommuneId = owner, FixtureStatus = known, StatusConfidence = confidence,
+                    LastSeenAt = known == FixtureStatus.Unknown ? null : new DateTime(2026, 10, 3, 14, 0, 0, DateTimeKind.Utc), UpdatedAt = DateTime.UtcNow });
+            if (lamp)
+                db.Add(new Fixture { PoleId = pole.PoleId, CommuneId = owner, FixtureType = FixtureType.LedRoadLamp, PowerSource = PowerSource.Grid,
+                    LampWatt = 90, InstallDate = new DateOnly(2025, 1, 1), DataSource = DataSource.Simulated });
+            await db.SaveChangesAsync();
+            return pole.PoleId;
+        });
+
+    private Task<string> PlantPoleFault(string poleId, FaultStatus status, string? reportedOn = null)
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var pole = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(x => x.PoleId == poleId);
+            var fault = new Fault { CommuneId = pole.CommuneId, SegmentId = reportedOn ?? pole.SegmentId, PoleId = poleId, Lat = 16, Lng = 108,
+                FaultStatus = status, FaultType = FaultType.LampOut, Severity = Severity.Medium, SourceChannel = SourceChannel.Cv,
+                DataSource = DataSource.Simulated, DetectedAt = DateTime.UtcNow };
+            db.Add(fault); await db.SaveChangesAsync(); return fault.FaultId;
+        });
+
+    private async Task<JsonElement> PolesOf(string id, string who = "manager", string query = "", int expected = 200, string? error = null)
+        => await Send(who, "GET", $"/{id}/poles{query}", null, expected, error);
+
+    [Fact]
+    public async Task An_orders_poles_come_in_road_order_with_the_status_the_last_survey_left_before_any_visit()
+    {
+        // Planted OUT of road order, so the answer cannot be the insert order or the id order.
+        var far = await PlantPole(0.8, status: FixtureStatus.Out, confidence: 0.9, lamp: true, sensitive: true);
+        var near = await PlantPole(0.2, status: FixtureStatus.Dim, confidence: 0.8);
+        var middle = await PlantPole(0.5); // never covered by a sweep
+        await PlantPoleFault(near, FaultStatus.Confirmed);
+        await PlantPoleFault(near, FaultStatus.Resolved); // closed: not counted
+        var id = await Create();
+
+        var body = await PolesOf(id);
+
+        Assert.Equal(3, body.GetProperty("total").GetInt32());
+        var items = body.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal([near, middle, far], items.Select(x => x.GetProperty("pole_id").GetString()!));
+        Assert.Equal([1, 2, 3], items.Select(x => x.GetProperty("position").GetInt32()));
+        Assert.All(items, x => Assert.Equal(segment, x.GetProperty("segment_id").GetString()));
+
+        Assert.Equal(["dim", "unknown", "out"], items.Select(x => x.GetProperty("fixture_status").GetString()!));
+        Assert.Equal(0.8, items[0].GetProperty("status_confidence").GetDouble(), 6);
+        Assert.Equal("2026-10-03T14:00:00Z", items[0].GetProperty("last_seen_at").GetString());
+        // unknown means no published sweep: no confidence, no time.
+        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("status_confidence").ValueKind);
+        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("last_seen_at").ValueKind);
+
+        Assert.Equal([1, 0, 0], items.Select(x => x.GetProperty("open_fault_count").GetInt32()));
+        Assert.Equal([false, false, true], items.Select(x => x.GetProperty("near_sensitive_poi").GetBoolean()));
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("lamp_watt").ValueKind);
+        Assert.Equal(90, items[2].GetProperty("lamp_watt").GetInt32());
+        Assert.Equal("led_road_lamp", items[2].GetProperty("fixture_type").GetString());
+        Assert.Equal(16.008, items[2].GetProperty("location").GetProperty("lat").GetDouble(), 6);
+    }
+
+    [Fact]
+    public async Task A_survey_order_lists_its_segments_in_order_then_along_each_road()
+    {
+        var other = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var road = new RoadSegment { CommuneId = home, SegmentName = "WO second road", RoadClass = RoadClass.InterVillage,
+                DataSource = DataSource.Simulated, LengthM = 100, Geom = new LineString([new Coordinate(108.1, 16.1), new Coordinate(108.11, 16.11)]) { SRID = 4326 } };
+            db.Add(road); await db.SaveChangesAsync(); return road.SegmentId;
+        });
+        var onFirst = await PlantPole(0.4);
+        var onOther = await PlantPole(0.1, road: other, origin: 0.1);
+        var response = await Send("manager", "POST", "", new { task_kind = "survey", title = "Survey the poles", commune_id = home,
+            segment_ids = new[] { other, segment }, assigned_to = users["a"].UserId }, 201);
+        var id = response.GetProperty("work_order_id").GetString()!;
+
+        // The engineer the order is assigned to sees it too — this is what they open on the phone.
+        var body = await PolesOf(id, who: "a");
+
+        var items = body.GetProperty("items").EnumerateArray().ToArray();
+        // `other` was listed first on the order, so its pole comes first even though it was planted second.
+        Assert.Equal([onOther, onFirst], items.Select(x => x.GetProperty("pole_id").GetString()!));
+        Assert.Equal([1, 1], items.Select(x => x.GetProperty("position").GetInt32())); // position restarts per segment
+    }
+
+    [Fact]
+    public async Task A_repair_created_from_faults_lists_the_poles_carrying_them_with_the_fault_ids()
+    {
+        var offRoad = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var road = new RoadSegment { CommuneId = home, SegmentName = "WO fault road", RoadClass = RoadClass.InterVillage,
+                DataSource = DataSource.Simulated, LengthM = 100, Geom = new LineString([new Coordinate(108.2, 16.2), new Coordinate(108.21, 16.21)]) { SRID = 4326 } };
+            db.Add(road); await db.SaveChangesAsync(); return road.SegmentId;
+        });
+        // Planted in REVERSE road order on a road the order does not list: only the faults tie these poles to it.
+        var beyond = await PlantPole(0.7, road: offRoad, origin: 0.2);
+        var pole = await PlantPole(0.3, road: offRoad, status: FixtureStatus.Out, confidence: 0.9, origin: 0.2);
+        var fault = await PlantPoleFault(pole, FaultStatus.Confirmed, reportedOn: segment);
+        var beyondFault = await PlantPoleFault(beyond, FaultStatus.Confirmed, reportedOn: segment);
+        var response = await Send("manager", "POST", "", new { task_kind = "repair", title = "Repair those poles", fault_ids = new[] { fault, beyondFault } }, 201);
+        var id = response.GetProperty("work_order_id").GetString()!;
+
+        var items = (await PolesOf(id)).GetProperty("items").EnumerateArray().ToArray();
+
+        // Road order on the fault-only road too, not insert order or id order.
+        Assert.Equal([pole, beyond], items.Select(x => x.GetProperty("pole_id").GetString()!));
+        Assert.Equal([1, 2], items.Select(x => x.GetProperty("position").GetInt32()));
+        Assert.Equal([fault], items[0].GetProperty("work_order_fault_ids").EnumerateArray().Select(x => x.GetString()!));
+        Assert.Equal("out", items[0].GetProperty("fixture_status").GetString());
+    }
+
+    [Fact]
+    public async Task Road_order_survives_a_road_owned_by_a_commune_outside_the_callers_scope()
+    {
+        // The home engineer's poles stand on a road the FOREIGN commune owns (inter_commune); the commune
+        // filter hides that road from them, but the order along it must still be the road's.
+        var beyond = await PlantPole(0.7, road: foreignSegment);
+        var pole = await PlantPole(0.3, road: foreignSegment);
+        var faults = new[] { await PlantPoleFault(pole, FaultStatus.Confirmed, reportedOn: segment), await PlantPoleFault(beyond, FaultStatus.Confirmed, reportedOn: segment) };
+        var id = await Create("repair", faults, assigned: users["a"].UserId);
+
+        var items = (await PolesOf(id, who: "a")).GetProperty("items").EnumerateArray().ToArray();
+
+        Assert.Equal([pole, beyond], items.Select(x => x.GetProperty("pole_id").GetString()!));
+        Assert.Equal([1, 2], items.Select(x => x.GetProperty("position").GetInt32()));
+    }
+
+    [Fact]
+    public async Task Paging_keeps_road_positions_and_the_total()
+    {
+        foreach (var along in new[] { 0.1, 0.2, 0.3 }) await PlantPole(along);
+        var id = await Create();
+
+        var first = await PolesOf(id, query: "?page=1&page_size=2");
+        var second = await PolesOf(id, query: "?page=2&page_size=2");
+
+        Assert.Equal(3, first.GetProperty("total").GetInt32());
+        Assert.Equal([1, 2], first.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("position").GetInt32()));
+        Assert.Equal([3], second.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("position").GetInt32()));
+    }
+
+    [Fact]
+    public async Task A_caller_sees_only_poles_of_their_own_communes_on_a_shared_road()
+    {
+        var mine = await PlantPole(0.2);
+        var theirs = await PlantPole(0.4, commune: foreign); // a neighbouring commune's pole on the same road
+        var id = await Plant(WorkOrderStatus.InProgress, assigned: users["a"].UserId);
+
+        var engineer = (await PolesOf(id, who: "a")).GetProperty("items").EnumerateArray().Select(x => x.GetProperty("pole_id").GetString()!);
+        var manager = (await PolesOf(id)).GetProperty("items").EnumerateArray().Select(x => x.GetProperty("pole_id").GetString()!);
+
+        Assert.Equal([mine], engineer);
+        Assert.Equal([mine, theirs], manager); // the manager is scoped to both communes
+    }
+
+    [Fact]
+    public async Task An_order_the_caller_cannot_see_is_404_exactly_like_one_that_does_not_exist()
+    {
+        await PlantPole(0.2);
+        var foreignOrder = await Plant(WorkOrderStatus.Open, commune: foreign);
+        var someoneElses = await Plant(WorkOrderStatus.InProgress, assigned: users["a"].UserId);
+
+        await PolesOf(foreignOrder, who: "a", expected: 404, error: "WORK_ORDER_NOT_FOUND");
+        await PolesOf(someoneElses, who: "b", expected: 404, error: "WORK_ORDER_NOT_FOUND");
+        await PolesOf("WO-9999999", expected: 404, error: "WORK_ORDER_NOT_FOUND");
     }
 
     private sealed class SaveBarrier(string id, bool create = false) : SaveChangesInterceptor
