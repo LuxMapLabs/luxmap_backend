@@ -4443,6 +4443,60 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/work-orders/{id}/poles": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderPolePagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderPolePagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderPolePagedResult"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/work-orders/assignees": {
       "get": {
         "tags": [
@@ -7592,6 +7646,90 @@
           "lng": {
             "type": "number",
             "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderPole": {
+        "required": [
+          "location",
+          "pole_id",
+          "segment_id",
+          "work_order_fault_ids"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "location": {
+            "$ref": "#/components/schemas/WorkOrderLocation"
+          },
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "open_fault_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "near_sensitive_poi": {
+            "type": "boolean"
+          },
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "work_order_fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderPolePagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderPole"
+            }
           }
         },
         "additionalProperties": false

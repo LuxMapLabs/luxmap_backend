@@ -236,6 +236,7 @@ Ràng buộc nghiệp vụ đi kèm:
 | `GET /faults` | **Phân trang JSON, KHÔNG phải GeoJSON.** Mỗi item có `location{lat,lng}`. Sắp mặc định `-priority_score`. |
 | `PATCH /faults/{id}` | Body: `fault_status`, `override_fault_type?`, `note?`. |
 | `GET/POST/PATCH /work-orders` | `POST` body: `{title, fault_ids[], assigned_to?, due_date?}` |
+| `GET /work-orders/{id}/poles` | **WO-12.** Cột trên đoạn được giao (hợp cột mang fault của phiếu) kèm trạng thái đèn **lần khảo sát đã duyệt gần nhất**, theo thứ tự dọc đường — kỹ sư biết TRƯỚC khi đi. Quyền xem = quyền xem phiếu (ngoài phạm vi / không phải người được giao → 404); cột xã ngoài phạm vi trên đường liên xã không hiện. `position` là thứ tự, không phải khoảng cách. |
 | `POST /work-orders/{id}/evidence` | multipart: `file`, `kind=before\|after`, `captured_at`, `lat`, `lng` |
 | `GET /map/iot-nodes` | `bbox`, trả `FeatureCollection` |
 | `GET /sweeps` | `sweep_id, started_at, ended_at, segment_ids[], frame_count, coverage_pct, processing_status` |

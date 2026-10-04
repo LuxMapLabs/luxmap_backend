@@ -42,6 +42,13 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>WO-12 — cột trên đoạn được giao <code>GET /work-orders/{id}/poles</code>, 04/10/2026: xong trên nhánh, chờ Codex review</strong>
+    <p><span class="tag t-next">Chờ review</span> Khi giao việc, kỹ sư thấy các cột trên đoạn (segment) được giao cùng <strong>trạng thái đèn lần khảo sát
+    đã duyệt gần nhất, trước khi đi</strong> — không phải đợi khảo sát xong. Theo thứ tự dọc đường, kèm số sự cố mở, loại/công suất bóng và
+    <code>work_order_fault_ids</code> cho phiếu sửa chữa. Quyền xem = quyền xem phiếu; cột xã ngoài phạm vi không hiện. 6 test PostGIS mới,
+    phá thử bốn luật đều đỏ. Drift WO-12 (SELF-SIGNED). Còn: Codex review, báo WP5/WP6 (màn giao việc và màn khảo sát của kỹ sư).</p>
+  </div>
+  <div class="card">
     <strong>BE-15 khảo sát video đêm — P2a → P2c đã merge vào dev, 04/10/2026</strong>
     <p><span class="tag t-done">Đã merge</span> Toàn bộ vòng khảo sát chạy trên <code>dev</code> và <code>luxmap_dev</code>
     (migration mới nhất <code>LuminanceHistoryPoleFk</code>): nhận phiên (P2a, #69) → xử lý tới lượt ngang cột (P2b-1, #75)

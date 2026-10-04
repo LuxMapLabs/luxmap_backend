@@ -133,6 +133,7 @@ for method, suffix, summary in [
     ("get", "", "Danh sách việc trong phạm vi xã và người được giao"),
     ("get", "/{id}", "Chi tiết việc và các hành động được phép"),
     ("get", "/assignees", "Kỹ sư hiện trường đủ điều kiện trong xã"),
+    ("get", "/{id}/poles", "[WO-12] Cột trên đoạn được giao + trạng thái đèn lần khảo sát đã duyệt gần nhất, theo thứ tự dọc đường — biết TRƯỚC khi đi"),
     ("post", "", "Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)"),
     ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
@@ -143,7 +144,7 @@ for method, suffix, summary in [
     ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),
     ("post", "/{id}/follow-up", "[FR-2] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu; server mang sự cố fault_present sang, chung case_id"),
 ]:
-    SUMMARY[(method, "/api/v1/work-orders" + suffix)] = "[TẠM — WO-1…WO-11] " + summary
+    SUMMARY[(method, "/api/v1/work-orders" + suffix)] = "[TẠM — WO-1…WO-12] " + summary
 
 # BE-15 P2a provisional operations, exported from SweepsController (SELF-SIGNED, temporary until FW).
 for method, suffix, summary in [

@@ -13,7 +13,7 @@ namespace LuxMap.Modules.WorkOrders;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/work-orders")]
-public sealed class WorkOrdersController(WorkOrderService service) : ControllerBase
+public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
@@ -34,6 +34,15 @@ public sealed class WorkOrdersController(WorkOrderService service) : ControllerB
     [HttpGet("{id}")]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
     public Task<WorkOrderDetail> Detail(string id, CancellationToken ct) => service.Detail(id, ct);
+
+    /// <summary>
+    /// The poles on the order's segments with the status the latest accepted survey left on each lamp, in
+    /// order along the road — what the engineer is walking into, known BEFORE the visit (drift WO-12).
+    /// </summary>
+    [HttpGet("{id}/poles")]
+    [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
+    public Task<PagedResult<WorkOrderPole>> Poles(string id, PageQuery page, CancellationToken ct)
+        => poles.PolesAsync(id, page.ToPageRequest(), ct);
 
     [HttpGet("assignees")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
