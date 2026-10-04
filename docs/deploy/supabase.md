@@ -3,6 +3,13 @@
 Chỉ **database** lên Supabase. API và MinIO vẫn chạy ở máy dev. Không dùng Supabase Auth, Storage hay
 Data API: backend tự lo đăng nhập và phân quyền theo xã (Contract §2/§7), mọi đường khác đều đi vòng qua.
 
+> ⚠️ **Ảnh và video KHÔNG nằm trong database.** MinIO giữ byte, các bảng chỉ giữ khoá (`object_key`, `thumbnail_key`) —
+> ảnh khảo sát (`luxmap-survey`), ảnh phiếu (`luxmap-evidence`), clip và file thô (`luxmap-video`). Script dưới đây chỉ chép
+> **hàng**. Chừng nào API vẫn chạy trên máy có MinIO cũ thì không cần đổi gì. Nếu API chạy ở **máy khác** (hay cả nhóm cùng
+> trỏ vào Supabase), máy đó phải đọc được **cùng** kho file: một MinIO dùng chung, chép ba bucket bằng `mc mirror` **giữ
+> nguyên khoá**. Thiếu file thì API trả `503 STORAGE_OBJECT_MISSING` cho ảnh, không hỏng dữ liệu. Máy chạy API cũng cần
+> `ffmpeg` (worker cắt frame chạy trong tiến trình API).
+
 Quyết định D-1…D-7 chốt 01/10/2026, khảo sát và số đo ở
 [OPS-SUPABASE-p1](../../.ai/results/OPS-SUPABASE-p1.md). Toàn bộ quy trình dưới đây đã **diễn tập trên một
 DB local mô phỏng Supabase** (role không phải superuser, PostGIS ở schema `extensions`) — xem mục cuối.
@@ -56,7 +63,8 @@ cd ../luxmap_deploy
 dotnet ef database update -p src/LuxMap.Persistence -s src/LuxMap.Api
 ```
 
-Kỳ vọng: 23 migration, mới nhất `20260929125521_AddFaultReview`. Lệnh `CREATE EXTENSION IF NOT EXISTS
+Kỳ vọng: **đúng bằng lịch sử migration của `luxmap_dev`** — script so khớp từng dòng và dừng nếu lệch. Ngày 04/10/2026
+là 29 migration, mới nhất `20261004134151_AddRepairEvidence`. Lệnh `CREATE EXTENSION IF NOT EXISTS
 postgis` trong migration không làm gì vì PostGIS đã bật ở bước 1. Lỗi quyền hay extension → **dừng**, không
 cấp thêm quyền, không gỡ trigger hay SSL để chạy tiếp.
 
@@ -84,6 +92,21 @@ road_segment 20 · feeder 3 · pole 217 · fixture 217 · iot_node 3 · feeder_c
 fault_cluster 1 · fault 28 · work_order 3 · work_order_fault 11 · audit_event 0 · lux_reading 0
 bỏ qua: refresh_token, __ef_migrations_history, spatial_ref_sys
 ```
+
+**Bảng khảo sát và ảnh (thêm 04/10/2026, 16 bảng):** `work_order_segment`, `artifact_version` (sổ phiên bản thuật toán/model,
+không theo xã — chép nguyên), `survey_sweep` và mọi bảng con (`survey_raw_file`, `survey_video_clip`, `survey_gps_sample`,
+`survey_lux_sample`, `survey_processing_run`, `survey_frame`, `detection`, `survey_pass`, `pole_observation`), `luminance_baseline`,
+`baseline_member`, `luminance_history`, `repair_evidence`. Bảng không có `commune_id` đi theo cha đã giữ (phiên, run, baseline);
+phiên của xã test bị bỏ cùng toàn bộ con của nó. `pole_current_status` và `fault` nay **đứng sau** chuỗi khảo sát vì trỏ vào nó.
+
+🔴 **Vòng khoá ngoại `survey_sweep` ↔ `survey_processing_run`** (`accepted_run_id` một chiều, `sweep_id` chiều kia) và
+`ck_survey_sweep_review` (phiên `accepted` ⇔ có `accepted_run_id`) làm **không có thứ tự chép nào hợp lệ**. Script chép
+phiên đã duyệt ở dạng *chưa duyệt* (`awaiting_review`, các cột duyệt `NULL`), chép run, rồi **trả lại** các cột duyệt từ
+nguồn — cùng transaction, **trước** kiểm md5, nên trạng thái cuối trùng nguồn hoặc huỷ hết (`TWO_PASS` trong script).
+Bảng mới có vòng tương tự phải khai vào `TWO_PASS`, không gỡ ràng buộc.
+
+**Bảng mới luôn phải được thêm vào `PLAN` có chủ đích** — script dừng khi gặp bảng lạ. Ticket nào tạo bảng thì sửa script
+trong cùng PR.
 
 ## 5. Nghiệm thu trước khi cả nhóm dùng
 
@@ -116,6 +139,20 @@ bỏ qua: refresh_token, __ef_migrations_history, spatial_ref_sys
 - Mở ảnh MinIO bằng URL công khai hay presigned (BE-11 quy tắc 1).
 - Chạy `scripts/seed_mock_set.py --apply` lên DB dùng chung — nó `DELETE` toàn bảng.
 - Commit `.env`, chứng chỉ, file backup hay connection string thật.
+
+## Diễn tập 04/10/2026 — 16 bảng khảo sát và ảnh
+
+`luxmap_dev` chưa có dòng khảo sát nào, nên diễn tập từ **bản sao** `luxmap_copysrc` (pg_dump của `luxmap_dev`) có thêm
+một chuỗi khảo sát đầy đủ ở COM-001 — phiên `accepted`, run, lượt, frame, detection, quan sát, baseline + member, lịch sử
+(một điểm `not_observed`), trạng thái cột, sự cố CV trỏ vào quan sát, ảnh phiếu — và một phiên ở xã test. Cờ
+`--source-db` chỉ nhận khi đích là localhost (thử với đích ở xa → dừng, exit 2).
+
+- Đích `luxmap_copytgt`, chủ là role `rehearse` **không phải superuser**, PostGIS ở `extensions`: **29/29 migration**, kể cả
+  trigger bất biến của các bảng khảo sát.
+- `--apply`: **32 bảng** đúng số dòng và **trùng md5** với nguồn, **23 sequence** khớp; phiên `SWP-001` lên đích vẫn
+  `accepted` trỏ đúng run; phiên và file thô của xã test bị bỏ lại. `--apply` lần hai → dừng, exit 2.
+- Phá thử: bỏ lượt trả cột duyệt → `nội dung bảng survey_sweep lệch nguồn`, exit 2, đích `luxmap_copytgt2` còn 0 dòng,
+  `pole_id_seq` vẫn `1|f`.
 
 ## Diễn tập 01/10/2026
 
