@@ -107,9 +107,19 @@ public sealed class WorkOrderEvidenceService(LuxMapDbContext db, ICurrentActorAc
         await using (var content = file.OpenReadStream())
             stored = await store.StoreImageAsync(StorageBucket.Evidence, evidenceId, content, ct);
 
+        // 🔴 The write above can take seconds, and no lock was held across it (BE-15 P2a rule): the manager may
+        // have reassigned or cancelled the order meanwhile. Lock the order, read it again through its filter,
+        // and check again. Inserting a child row does not touch work_order's xmin, so nothing else would notice.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
+        var current = await VisibleOrder(id, ct);
+        if (current.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
+        if (current.WoStatus != WorkOrderStatus.InProgress)
+            throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict, ("wo_status", WireEnum.Name(current.WoStatus)));
+
         var row = new RepairEvidence
         {
-            EvidenceId = evidenceId, WorkOrderId = id, CommuneId = order.CommuneId, Kind = parsedKind,
+            EvidenceId = evidenceId, WorkOrderId = id, CommuneId = current.CommuneId, Kind = parsedKind,
             CapturedAt = captured, Lat = latitude, Lng = longitude, ObjectKey = stored.OriginalKey,
             ThumbnailKey = stored.ThumbnailKey, ByteCount = stored.OriginalBytes, ThumbnailBytes = stored.ThumbnailBytes,
             UploadedBy = ActorId, UploadedAt = UtcMicrosecondClock.UtcNow(), ClientOpId = operation,
@@ -118,11 +128,14 @@ public sealed class WorkOrderEvidenceService(LuxMapDbContext db, ICurrentActorAc
         try
         {
             await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
         }
         catch (DbUpdateException error) when (operation is { } retry
             && error.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            // Two retries raced past the replay check. The loser's object stays orphaned (BE-35 reconciles).
+            // Two retries raced past the replay check. A failed statement aborts the transaction, so roll back
+            // BEFORE asking again. The loser's object stays orphaned (BE-35 reconciles).
+            await transaction.RollbackAsync(ct);
             db.Entry(row).State = EntityState.Detached;
             return (await Replay(id, retry, parsedKind, ct) ?? throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict), false);
         }

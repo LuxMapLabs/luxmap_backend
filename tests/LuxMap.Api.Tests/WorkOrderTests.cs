@@ -896,8 +896,13 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
     private sealed class PhotoStore : IObjectStore
     {
         public readonly System.Collections.Concurrent.ConcurrentDictionary<(StorageBucket, string), byte[]> Objects = new();
+
+        /// <summary>Runs WHILE the image is being written — where a slow upload gives the manager time to act.</summary>
+        public Func<Task>? DuringWrite { get; set; }
+
         public async Task<StoredImage> StoreImageAsync(StorageBucket bucket, string id, Stream content, CancellationToken cancellationToken = default)
         {
+            if (DuringWrite is { } during) await during();
             using var prepared = await LuxMap.Infrastructure.Storage.ImagePipeline.PrepareAsync(content, cancellationToken);
             var original = StorageKeys.KeyFor(ObjectVariant.Original, id); var thumbnail = StorageKeys.KeyFor(ObjectVariant.Thumbnail, id);
             Objects[(bucket, original)] = prepared.Original.ToArray(); Objects[(bucket, thumbnail)] = prepared.Thumbnail;
@@ -1071,6 +1076,29 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
             _ => await Upload("a", id, value),
         };
         Assert.Equal((400, "VALIDATION_FAILED"), (status, Code(body)));
+        Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Theory]
+    [InlineData("reassigned")]
+    [InlineData("cancelled")]
+    public async Task An_order_changed_while_the_photo_uploads_is_checked_again_before_the_row_is_saved(string change)
+    {
+        var id = await StartedRepair();
+        photos.DuringWrite = () => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var order = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(x => x.WorkOrderId == id);
+            if (change == "reassigned") order.AssignedTo = users["b"].UserId;
+            else { order.WoStatus = WorkOrderStatus.Cancelled; order.ClosedAt = DateTime.UtcNow; order.ReviewNote = "Called off"; }
+            await db.SaveChangesAsync(); return 0;
+        });
+        try
+        {
+            var (status, body) = await Upload("a", id, "before");
+            Assert.Equal(change == "reassigned" ? (404, "WORK_ORDER_NOT_FOUND") : (409, "WORK_ORDER_NOT_IN_PROGRESS"), (status, Code(body)));
+        }
+        finally { photos.DuringWrite = null; }
         Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
     }
 
