@@ -9,7 +9,7 @@ namespace LuxMap.Modules.WorkOrders.Entities;
 public enum EvidenceKind { Before, After, Observation }
 
 /// <summary>
-/// A photo an engineer took on a work order (BE-24). A separate stream from survey frames (BE-11): it is
+/// A photo an engineer took on a work order (BE-24) or attached to a fault they reported (BE-41). A separate stream from survey frames (BE-11): it is
 /// for people to look at, never input to CV scoring — phone cameras set their own exposure.
 /// </summary>
 /// <remarks>
@@ -21,7 +21,11 @@ public enum EvidenceKind { Before, After, Observation }
 public class RepairEvidence : ICommuneScoped
 {
     public string EvidenceId { get; set; } = null!;
-    public required string WorkOrderId { get; set; }
+    /// <summary>The work order the photo belongs to — or null when it belongs to a reported fault (BE-41).</summary>
+    public string? WorkOrderId { get; set; }
+
+    /// <summary>The reported fault the photo belongs to (BE-41, drift EV-2). Exactly one of the two parents is set.</summary>
+    public string? FaultId { get; set; }
     public required string CommuneId { get; set; }
     public EvidenceKind Kind { get; set; }
 

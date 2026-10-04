@@ -111,6 +111,9 @@ SUMMARY = {
     ("get", "/api/v1/map/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
     # BE-40 — §5.4; lọc CSV, sort, commune_id và mặc định ẩn calibration_rig là drift F-1…F-6.
     ("get", "/api/v1/faults"): "Danh sách sự cố — phân trang JSON, KHÔNG GeoJSON; mặc định -severity rồi cũ trước (P-3)",
+    ("post", "/api/v1/faults"): "[TẠM — BE-41] Kỹ sư hiện trường báo sự cố tại chỗ: detected, field_report; cột cho xã/tuyến/data_source; client_op_id gửi lại → 200 cùng sự cố",
+    ("post", "/api/v1/faults/{id}/photos"): "[TẠM — BE-41, EV-2] Người báo gắn ảnh observation khi sự cố còn mở; JPEG theo magic bytes; client_op_id cho lần gửi lại",
+    ("get", "/api/v1/faults/{id}/photos"): "[TẠM — BE-41] Ảnh của sự cố theo thời điểm chụp, kèm đường dẫn ảnh qua API",
     ("patch", "/api/v1/faults/{id}"): "[TẠM — BE-19] Quản lý duyệt: detected → confirmed|rejected, phân loại lại lamp_out↔lamp_dim, severity, review_note",
     # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
@@ -308,26 +311,8 @@ S["SegmentFeatureCollection"] = {"type": "object", "required": ["type", "feature
 # BE-40: FaultItem and its page now come from the live code (FaultItem / FaultItemPagedResult).
 # The hand-written copies stood here and would OVERWRITE the exported schema (CLAUDE.md, BE-14b).
 # BE-19: PatchFaultRequest now comes from the live code; the hand-written copy would overwrite it.
-S["CreateFaultRequest"] = {"type": "object", "additionalProperties": False,
-    "required": ["client_op_id", "fault_type", "note"],
-    "description": "Contract §5.4 (POST). Server áp cứng source_channel=field_report, data_source=field, fault_status=detected, reported_by=JWT.",
-    "properties": OrderedDict([
-        ("client_op_id", {"type": "string", "format": "uuid"}),
-        ("pole_id", {"type": "string", "nullable": True, "pattern": "^POLE-[0-9]{4,}$"}),
-        ("fixture_id", {"type": "string", "nullable": True, "pattern": "^FIX-[0-9]{4,}$"}),
-        ("location", {"nullable": True, "allOf": [{"$ref": "#/components/schemas/LatLng"}], "type": "object",
-                      "description": "Bắt buộc khi pole_id null (LOCATION_REQUIRED)"}),
-        ("commune_id", {"type": "string", "nullable": True, "pattern": "^COM-[0-9]{3,}$",
-                        "description": "Chỉ khi pole_id null VÀ user có nhiều xã. Có pole thì server tra từ pole (gửi → 400)."}),
-        ("fault_type", {"$ref": "#/components/schemas/FaultType"}),
-        ("severity", {"nullable": True, "allOf": [{"$ref": "#/components/schemas/Severity"}], "type": "string", "description": "Mặc định medium"}),
-        ("note", {"type": "string", "minLength": 10}),
-        ("photo_frame_id", {"type": "string", "nullable": True}),
-    ])}
-S["CreatedFaultResponse"] = {"allOf": [{"$ref": "#/components/schemas/FaultItem"},
-                                        {"type": "object", "required": ["client_op_id"],
-                                         "properties": {"client_op_id": {"type": "string", "format": "uuid"}}}],
-                             "description": "§5.4: item kèm client_op_id đã gửi lên."}
+# BE-41: ReportFaultRequest / ReportedFault come from the live code; the hand-written CreateFaultRequest
+# (with photo_frame_id, removed by EV-2) and CreatedFaultResponse would describe the old shape.
 
 # BE-23: work-order schemas now come from the live code. Do not replace their
 # task_kind, partial-PATCH semantics or detail shape with the old §5.5 placeholders.
@@ -407,12 +392,7 @@ ENUM_CSV = lambda ref: {"type": "string", "description": f"CSV của {ref}"}
 # The lesson for the next ticket that implements a stub: DELETE ITS ni() CALL in the same commit, and
 # read the operation counter in the output line.
 
-ni("post", "/api/v1/faults", "Faults", "Kỹ sư hiện trường báo sự cố tại chỗ", "§5.4", "BE-41",
-   [("201", {"description": "Fault đầy đủ kèm client_op_id", "content": json_content("CreatedFaultResponse")}),
-    ("200", {"description": "DUPLICATE_OP — client_op_id đã xử lý, trả fault đã tạo (KHÔNG phải lỗi)", "content": json_content("CreatedFaultResponse")}),
-    ("400", err("LOCATION_REQUIRED | FAULT_TYPE_NOT_REPORTABLE | VALIDATION_FAILED")),
-    ("404", err("POLE_NOT_FOUND"))],
-   body={"$ref": "#/components/schemas/CreateFaultRequest"})
+# BE-41 implements POST /faults; the stub is gone.
 # BE-24 implements the evidence upload; the stub and its hand-written EvidenceUpload schema are gone.
 # BE-15 P2c implements the authenticated JPEG thumbnail endpoint.
 ni("get", "/api/v1/sync/bundle", "Sync", "Gói dữ liệu theo segment để cache offline", "§5.8", "BE-43",
