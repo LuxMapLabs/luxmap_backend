@@ -699,8 +699,8 @@ Các mục chạm bề mặt API — chưa sửa Contract, phải đưa ra FW:
 | **Scope** | BE-15/16/17; Contract §2 (capability), §5.6 (`GET /sweeps`, O-4), endpoint upload video mới. **Chưa đổi Contract** — ESCALATE ở FW kế tiếp |
 
 **Phải báo:** WP6 (định dạng file thô, sidecar frame, upload clip), WP4 (detector theo frame, CV-05 chuyển sang backend), WP5 (màn
-duyệt phiên, coverage). **Đã báo một phần (02/10/2026):** WP5/WP6 nhận phần P2a (xem mục dưới). **WP4 chưa báo**; sidecar frame
-và màn duyệt phiên báo cùng P2b/P2c.
+duyệt phiên, coverage). **Đã báo một phần (02/10/2026):** WP5/WP6 nhận phần P2a (xem mục dưới). **WP4 chưa báo** phần frame;
+màn duyệt phiên và baseline/phân loại đã báo cả ba bên ngày 04/10/2026 (mục P2c bên dưới).
 
 **Sửa D-05 (02/10/2026, Mỹ chốt, SELF-SIGNED):** đèn CV thấy **ON** mà cột **chưa có baseline** → `fixture_status = normal`,
 `luminance_history.baseline_ratio = null` (FE hiển thị "chưa đủ dữ liệu để đánh giá độ sáng"), loại khỏi precision/recall của
@@ -740,7 +740,16 @@ worker hiện vẫn chỉ nhận simulated. Không dùng kết quả mô phỏng
 **Severity tạm cần WP4/FW xác nhận:** lamp_out Medium, lamp_dim Low; near_sensitive_poi tăng một bậc,
 trần High. Cấu hình `SurveyReview:LampOutSeverity` / `LampDimSeverity` (Low/Medium/High).
 `priority_score` vẫn null, chờ CV-16; nguồn dim vẫn `cv` theo D-14. Không đặt đây là quy tắc photometric.
-**Cần báo WP5/WP6/WP4; chưa gửi trong lượt này.** Test PostGIS và apply/rollback migration dành cho Claude.
+**Đã báo WP5, WP6 và WP4 ngày 04/10/2026** (Mỹ gửi; PR #80 và #81 đã merge, `luxmap_dev` đã migrate). Chờ xác nhận ở FW
+kế tiếp. Nội dung từng bên:
+- **WP5:** màn duyệt (`results`, `published_as`, dòng `not_observed`, trường nullable), body và mã lỗi của `review`,
+  `version` trên sweep, thumbnail chạy thật (404/503), hệ quả bản đồ khi chấp nhận, mức nghiêm trọng tạm.
+- **WP6:** `version` trên sweep (sinh lại DTO), vòng `awaiting_review → accepted | returned` kèm `note`, phiên đã nộp bất biến
+  (khảo sát lại = phiên mới), 503 `STORAGE_OBJECT_MISSING` không retry, đi hết tuyến, baseline cần ≥ 3 lần quét mỗi chiều.
+- **WP4:** định nghĩa baseline (≥ 3 member `normal`, theo chiều, theo bóng đang lắp, không tự chấm), ngưỡng `dim` 0,80 và hai
+  ca `normal` + `baseline_ratio = null` loại khỏi P/R của `dim`, mức nghiêm trọng tạm, truy vết `origin_observation_id` /
+  `detection_model_version`, hạn chế *đèn mờ từ đầu*, và nhắc JSON model (D-07).
+Test PostGIS và apply/rollback migration: Claude đã chạy (xem `.ai/results/BE-15-p2c.md`).
 
 **Review P2c vòng 2 (04/10):** R1 chỉ nhận normal làm member; R2 thêm fixture_id FK Restrict trên baseline,
 member từ ngày lắp UTC của bóng đang dùng, lookup chỉ dùng baseline cùng bóng hiện tại; không có bóng/ngày
