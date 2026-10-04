@@ -42,6 +42,13 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>OPS-SUPABASE — script chép thêm 16 bảng khảo sát và ảnh, 04/10/2026: xong trên nhánh</strong>
+    <p><span class="tag t-next">Chờ review</span> <code>scripts/copy_dev_to_supabase.py</code> nay chép cả chuỗi khảo sát, lịch sử độ sáng,
+    baseline và ảnh phiếu; vòng khoá ngoại phiên ↔ run chép hai lượt trong một transaction. Diễn tập trên DB giả lập Supabase (role
+    không phải superuser): 29/29 migration, 32 bảng trùng md5, 23 sequence khớp; phá thử lượt hai → huỷ sạch. Runbook ghi rõ ảnh/video
+    nằm ở MinIO, không đi theo database. Còn: Codex review, PR; xoá DB diễn tập (cần Mỹ duyệt).</p>
+  </div>
+  <div class="card">
     <strong>BE-24 — ảnh của phiếu công việc, 04/10/2026: xong trên nhánh, Codex review sạch, chờ PR</strong>
     <p><span class="tag t-next">Chờ PR</span> Kỹ sư được giao tải ảnh khi phiếu đang làm: <code>before</code>/<code>after</code> cho phiếu
     sửa chữa, <code>observation</code> cho phiếu kiểm tra (EV-1, Mỹ chốt). Phiếu sửa chữa không báo hoàn thành được khi chưa có ảnh

@@ -1661,3 +1661,11 @@ tên đó trong cả `src/` trước.
 **Cái gì được LIỆT KÊ phải mở được.** Danh sách frame của chi tiết cột và `GET /frames/{id}/thumbnail` dùng **cùng một**
 `SurveyMediaAccess` (xã của cả run + người được giao của phiếu). Viết lại điều kiện ở chỗ thứ hai thì hai nơi sẽ lệch nhau và
 client nhận URL mà mở ra 404 — hoặc tệ hơn, thấy frame của xã khác.
+
+### Chép DB lên Supabase — bảng mới phải vào `PLAN` (04/10/2026)
+
+`scripts/copy_dev_to_supabase.py` **dừng** khi gặp bảng không có trong `PLAN` — cố ý, để không bảng nào bị bỏ sót âm
+thầm. **Ticket tạo bảng thì thêm bảng vào `PLAN` trong cùng PR**: bộ lọc giữ xã (bảng không có `commune_id` lọc theo cha), và
+đúng thứ tự khoá ngoại (script tự kiểm). Bảng nằm trong **vòng** khoá ngoại thì khai vào `TWO_PASS` như `survey_sweep` ↔
+`survey_processing_run`, không gỡ ràng buộc. Diễn tập theo `docs/deploy/supabase.md` (cờ `--source-db`, chỉ cho đích localhost).
+

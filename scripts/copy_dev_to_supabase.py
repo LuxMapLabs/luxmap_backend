@@ -12,7 +12,8 @@ local API and every test run stopped (D-7) so the source does not move under the
 
 WHAT IS KEPT. Communes COM-070 (FO-26 mock), COM-001 Phường Long Phước and COM-002 Phường Long Bình; the
 four seed accounts with their password hashes; every business row of those communes, with its own ids
-(POLE-0047 stays POLE-0047). WHAT IS LEFT BEHIND: test communes and accounts that integration runs left
+(POLE-0047 stays POLE-0047). Survey sessions, their processing records and work-order photos come with their
+commune; the photo and video BYTES live in MinIO and are not copied here. WHAT IS LEFT BEHIND: test communes and accounts that integration runs left
 in luxmap_dev, every refresh token (everyone signs in again), the EF migration history (the target has
 its own) and PostGIS's spatial_ref_sys (the extension provides it).
 
@@ -53,7 +54,12 @@ SEED_USERS = ("admin", "agency", "engineer", "crew")
 IN_COMMUNES = f"commune_id IN ({', '.join(repr(c) for c in KEEP_COMMUNES)})"
 IN_USERS = f"username IN ({', '.join(repr(u) for u in SEED_USERS)})"
 
+KEPT_SWEEPS = f"sweep_id IN (SELECT sweep_id FROM public.survey_sweep WHERE {IN_COMMUNES})"
+KEPT_RUNS = f"run_id IN (SELECT run_id FROM public.survey_processing_run WHERE {IN_COMMUNES})"
+
 # (table, row filter, ORDER BY). Order = foreign-key order; checked against the catalogue at runtime.
+# Survey tables (BE-15, added 04/10/2026) follow the chain sweep -> run -> pass/frame -> observation -> history;
+# pole_current_status and fault now point INTO that chain, so they come after it.
 PLAN = [
     ("administrative_unit", IN_COMMUNES, "commune_id"),
     ("app_user", IN_USERS, "user_id"),
@@ -63,17 +69,51 @@ PLAN = [
     ("feeder", IN_COMMUNES, "feeder_id"),
     ("pole", IN_COMMUNES, "pole_id"),
     ("fixture", IN_COMMUNES, "fixture_id"),
-    ("pole_current_status", IN_COMMUNES, "pole_id"),
     ("iot_node", IN_COMMUNES, "node_id"),
     ("feeder_control", IN_COMMUNES, "feeder_id"),
     ("fault_cluster", IN_COMMUNES, "cluster_id"),
-    ("fault", IN_COMMUNES, "fault_id"),
     ("lux_reading", IN_COMMUNES, "lux_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.
     ("work_order", IN_COMMUNES, "root_work_order_id IS NOT NULL, created_at, work_order_id"),
+    ("work_order_segment", IN_COMMUNES, "work_order_id, position"),
+    # A global registry of algorithm / model versions, no commune: kept whole, every run cites it.
+    ("artifact_version", "TRUE", "version_id"),
+    # survey_sweep <-> survey_processing_run is a CYCLE (accepted_run_id one way, sweep_id the other); see TWO_PASS.
+    ("survey_sweep", IN_COMMUNES, "sweep_id"),
+    ("survey_raw_file", KEPT_SWEEPS, "sweep_id, kind"),
+    ("survey_video_clip", KEPT_SWEEPS, "clip_id"),
+    ("survey_gps_sample", KEPT_SWEEPS, "sweep_id, sample_no"),
+    ("survey_lux_sample", KEPT_SWEEPS, "sweep_id, sample_no"),
+    ("survey_processing_run", f"{IN_COMMUNES} AND {KEPT_SWEEPS}", "run_id"),
+    ("survey_frame", KEPT_SWEEPS, "frame_id"),
+    ("detection", KEPT_RUNS, "detection_id"),
+    ("survey_pass", KEPT_RUNS, "pass_id"),
+    ("luminance_baseline", IN_COMMUNES, "baseline_id"),
+    ("pole_observation", f"{IN_COMMUNES} AND {KEPT_RUNS}", "observation_id"),
+    ("baseline_member", f"baseline_id IN (SELECT baseline_id FROM public.luminance_baseline WHERE {IN_COMMUNES})",
+     "baseline_id, observation_id"),
+    ("luminance_history", f"{IN_COMMUNES} AND {KEPT_RUNS}", "sweep_id, pole_id"),
+    ("pole_current_status", IN_COMMUNES, "pole_id"),
+    ("fault", IN_COMMUNES, "fault_id"),
     ("work_order_fault", IN_COMMUNES, "work_order_id, fault_id"),
+    ("repair_evidence", IN_COMMUNES, "evidence_id"),
     ("audit_event", IN_COMMUNES, "audit_id"),
 ]
+
+# Foreign keys that close a cycle. The child is copied FIRST with these columns replaced by values that
+# satisfy its CHECKs without the parent ("not reviewed yet"), and restored from the source right after the
+# parent table is in — inside the same transaction, before the md5 check, so the end state is the source's.
+# ck_survey_sweep_review ties status = 'accepted' to accepted_run_id NOT NULL and both review fields, so an
+# accepted sweep goes in as awaiting_review and becomes accepted again once its run exists.
+TWO_PASS = {
+    "survey_sweep": {
+        "parent": "survey_processing_run",
+        "when": "status = 'accepted'",
+        "first": {"status": "'awaiting_review'", "accepted_run_id": "NULL", "reviewed_by": "NULL",
+                  "reviewed_at": "NULL", "review_note": "NULL", "review_client_op_id": "NULL",
+                  "review_request_hash": "NULL"},
+    },
+}
 SKIPPED = {
     "refresh_token": "phiên đăng nhập — mọi người đăng nhập lại (D-5)",
     "__ef_migrations_history": "đích có lịch sử riêng do migration ghi",
@@ -159,6 +199,28 @@ def digest_sql(table: str, cols: str, where: str | None) -> str:
             f"FROM (SELECT ROW({cols})::text AS r FROM public.{table}{filtered}) AS rows")
 
 
+def restore_lines(src: "Db", child: str, tmp: Path) -> list[str]:
+    """Second pass of TWO_PASS: put back the deferred columns of the child, from the source, by primary key."""
+    spec = TWO_PASS[child]
+    where = next(filt for table, filt, _ in PLAN if table == child)
+    key = src.scalar(
+        "SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) "
+        f"WHERE i.indrelid = 'public.{child}'::regclass AND i.indisprimary")
+    deferred = list(spec["first"])
+    cols = ", ".join(f'"{c}"' for c in [key, *deferred])
+    data = tmp / f"{child}.restore.copy"
+    data.write_bytes(src.copy_out(f"COPY (SELECT {cols} FROM public.{child} WHERE ({where}) AND {spec['when']} "
+                                  f'ORDER BY "{key}") TO STDOUT WITH (ENCODING \'UTF8\')'))
+    stage = f"restore_{child}"
+    targets = ", ".join('"%s"' % c for c in deferred)
+    values = ", ".join('s."%s"' % c for c in deferred)
+    return [
+        f"CREATE TEMP TABLE {stage} ON COMMIT DROP AS SELECT {cols} FROM public.{child} WITH NO DATA;",
+        f"\\copy {stage} ({cols}) FROM '{data}' WITH (ENCODING 'UTF8')",
+        f'UPDATE public.{child} AS t SET ({targets}) = ({values}) FROM {stage} AS s WHERE t."{key}" = s."{key}";',
+    ]
+
+
 def unsafe_sequences(states: dict[str, tuple[int, bool]], maxima: dict[str, int]) -> list[str]:
     """Sequences whose NEXT value would hand out an id that a kept row already has."""
     problems = []
@@ -202,9 +264,9 @@ def check_sequences(src: Db) -> dict[str, tuple[int, bool]]:
     return states
 
 
-def preflight(src: Db, dst: Db) -> dict[str, list[str]]:
-    if (dbname := src.scalar("SELECT current_database()")) != "luxmap_dev":
-        raise Refused(f"nguồn là {dbname!r}, không phải luxmap_dev")
+def preflight(src: Db, dst: Db, source_db: str = "luxmap_dev") -> dict[str, list[str]]:
+    if (dbname := src.scalar("SELECT current_database()")) != source_db:
+        raise Refused(f"nguồn là {dbname!r}, không phải {source_db}")
     where, user, superuser = dst.rows("SELECT current_database(), current_user, "
                                       "(SELECT rolsuper FROM pg_roles WHERE rolname = current_user)")[0]
     print(f"đích: database {where}, user {user}, superuser {superuser}")
@@ -230,6 +292,8 @@ def preflight(src: Db, dst: Db) -> dict[str, list[str]]:
             "SELECT c.conrelid::regclass::text, c.confrelid::regclass::text FROM pg_constraint c "
             "WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace"):
         child, parent = child.removeprefix("public."), parent.removeprefix("public.")
+        if TWO_PASS.get(child, {}).get("parent") == parent:
+            continue  # the cycle edge, restored after the parent (TWO_PASS)
         if child in position and parent != child and position.get(parent, -1) >= position[child]:
             raise Refused(f"thứ tự khoá ngoại sai: {child} trỏ tới {parent} nhưng {parent} không đứng trước")
 
@@ -251,14 +315,19 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="chép thật; thiếu cờ này chỉ kiểm và in kế hoạch")
     parser.add_argument("--container", default="luxmap_postgres")
     parser.add_argument("--user", default="luxmap")
+    parser.add_argument("--source-db", default="luxmap_dev",
+                        help="REHEARSAL ONLY: another local database as the source; refused unless the target is localhost")
     args = parser.parse_args()
 
     try:
         session = [arg for key, value in SESSION.items() for arg in ("-e", f"{key}={value}")]
+        target = target_env()
+        if args.source_db != "luxmap_dev" and target.get("PGHOST") not in LOCAL_HOSTS:
+            raise Refused("--source-db chỉ dùng để diễn tập với đích localhost")
         src = Db("nguồn", ["docker", "exec", "-i", *session, args.container, "psql", "-U", args.user,
-                           "-d", "luxmap_dev"])
-        dst = Db("đích", ["psql"], target_env())
-        columns = preflight(src, dst)
+                           "-d", args.source_db])
+        dst = Db("đích", ["psql"], target)
+        columns = preflight(src, dst, args.source_db)
 
         print("\nkế hoạch (bảng: giữ / bỏ lại):")
         expected = {}
@@ -276,12 +345,19 @@ def main() -> int:
 
         with tempfile.TemporaryDirectory(prefix="luxmap-copy-") as tmp:  # holds password hashes: 0700, removed after
             lines, checks = ["BEGIN;"], []
+            restore_after = {spec["parent"]: child for child, spec in TWO_PASS.items()}
             for table, where, order in PLAN:
                 cols = ", ".join(f'"{c}"' for c in columns[table])
+                select = cols
+                if spec := TWO_PASS.get(table):
+                    select = ", ".join(f'CASE WHEN {spec["when"]} THEN {spec["first"][c]} ELSE "{c}" END'
+                                       if c in spec["first"] else f'"{c}"' for c in columns[table])
                 data = Path(tmp) / f"{table}.copy"
-                data.write_bytes(src.copy_out(f"COPY (SELECT {cols} FROM public.{table} WHERE {where} "
+                data.write_bytes(src.copy_out(f"COPY (SELECT {select} FROM public.{table} WHERE {where} "
                                               f"ORDER BY {order}) TO STDOUT WITH (ENCODING 'UTF8')"))
                 lines.append(f"\\copy public.{table} ({cols}) FROM '{data}' WITH (ENCODING 'UTF8')")
+                if child := restore_after.get(table):
+                    lines += restore_lines(src, child, Path(tmp))
                 expected_digest = src.scalar(digest_sql(table, cols, where))
                 checks.append(f"DO $check$ BEGIN IF ({digest_sql(table, cols, None)}) IS DISTINCT FROM "
                               f"'{expected_digest}' THEN RAISE EXCEPTION 'nội dung bảng {table} lệch nguồn'; "
