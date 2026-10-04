@@ -348,6 +348,11 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             || ((action is "return" or "cancel") && string.IsNullOrEmpty(note))) throw OptionalJson.Invalid("note");
         var wo = await Find(id, ct);
         RequireAction(wo, action);
+        // BE-24: a repair is not finished until there is a photo of the lamp AFTER the repair — the
+        // manager verifies against it. Inspections fix nothing, so they need no photo.
+        if (action == "complete" && wo.TaskKind == TaskKind.Repair
+            && !await db.Set<RepairEvidence>().AnyAsync(x => x.WorkOrderId == id && x.Kind == EvidenceKind.After, ct))
+            throw Error("AFTER_EVIDENCE_REQUIRED", HttpStatusCode.Conflict);
         var links = await db.Set<WorkOrderFault>().Where(x => x.WorkOrderId == id).ToListAsync(ct);
         var ids = links.Select(x => x.FaultId).ToArray();
         var before = Snapshot(wo, ids, links: links);

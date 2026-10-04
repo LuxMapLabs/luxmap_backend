@@ -17,6 +17,7 @@ public sealed class WorkOrdersModule : ILuxMapModule
     {
         services.AddScoped<WorkOrderService>();
         services.AddScoped<WorkOrderPoleService>();
+        services.AddScoped<WorkOrderEvidenceService>();
         services.AddScoped<IActiveWorkOrderLookup, ActiveWorkOrderLookup>();
     }
 }
