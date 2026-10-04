@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 59 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 60 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.7"
   },
   "paths": {
@@ -3761,6 +3761,106 @@
         "x-luxmap-status": "implemented"
       }
     },
+    "/api/v1/map/poles/{pole_id}": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleMapDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleMapDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleMapDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-20] Chi tiết cột đủ trong MỘT request: bóng đang dùng, trạng thái, baseline theo chiều, 30 điểm lịch sử, sự cố mở, frame gần đây; ngoài phạm vi xã → 404",
+        "operationId": "getMapPolesPoleId",
+        "x-luxmap-status": "implemented"
+      }
+    },
     "/api/v1/map/segments": {
       "get": {
         "tags": [
@@ -6032,62 +6132,6 @@
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
       }
     },
-    "/api/v1/map/poles/{pole_id}": {
-      "get": {
-        "tags": [
-          "Poles"
-        ],
-        "summary": "[NOT IMPLEMENTED] Chi tiết cột + lịch sử, đủ trong MỘT request",
-        "description": "Contract §5.1. Chưa có code — ticket BE-20. Giữ trong Contract, không xoá.",
-        "operationId": "getMapPolesPoleId",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-client": "shared",
-        "x-luxmap-contract": "§5.1",
-        "x-luxmap-ticket": "BE-20",
-        "parameters": [
-          {
-            "name": "pole_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/PoleId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Chi tiết cột",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PoleDetail"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/work-orders/{work_order_id}/evidence": {
       "post": {
         "tags": [
@@ -7503,84 +7547,30 @@
         "additionalProperties": false
       },
       "PoleDetail": {
-        "type": "object",
-        "additionalProperties": false,
-        "description": "Contract §5.1 — đủ trong MỘT request. Hình dạng theo mock-pole-detail.json.",
         "required": [
-          "pole_id",
-          "segment_id",
-          "segment_name",
-          "commune_id",
-          "location",
-          "fixture",
-          "current_status",
-          "iot_node",
-          "luminance_baseline",
-          "luminance_history",
-          "open_faults",
-          "recent_frames"
+          "created_at",
+          "geom_wkt",
+          "pole",
+          "segment_name"
         ],
+        "type": "object",
         "properties": {
-          "pole_id": {
-            "$ref": "#/components/schemas/PoleId"
-          },
-          "segment_id": {
-            "$ref": "#/components/schemas/SegmentId"
+          "pole": {
+            "$ref": "#/components/schemas/PoleListItem"
           },
           "segment_name": {
             "type": "string"
           },
-          "commune_id": {
-            "$ref": "#/components/schemas/CommuneId"
+          "geom_wkt": {
+            "type": "string"
           },
-          "location": {
-            "$ref": "#/components/schemas/LatLng"
-          },
-          "fixture": {
-            "$ref": "#/components/schemas/PoleDetailFixture"
-          },
-          "current_status": {
-            "$ref": "#/components/schemas/PoleCurrentStatus"
-          },
-          "iot_node": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/PoleIotNode"
-              }
-            ],
-            "type": "object"
-          },
-          "luminance_baseline": {
-            "$ref": "#/components/schemas/LuminanceBaseline"
-          },
-          "luminance_history": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LuminancePoint"
-            }
-          },
-          "runtime_history": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "$ref": "#/components/schemas/RuntimePoint"
-            },
-            "description": "Chỉ có khi cột có IoT node"
-          },
-          "open_faults": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OpenFaultSummary"
-            }
-          },
-          "recent_frames": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RecentFrame"
-            }
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "PoleListItem": {
         "required": [
@@ -7651,6 +7641,333 @@
             "items": {
               "$ref": "#/components/schemas/PoleListItem"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapBaseline": {
+        "required": [
+          "direction"
+        ],
+        "type": "object",
+        "properties": {
+          "baseline_value": {
+            "type": "number",
+            "format": "double"
+          },
+          "baseline_window_nights": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dim_threshold_ratio": {
+            "type": "number",
+            "format": "double"
+          },
+          "out_threshold_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "computed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "direction": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapDetail": {
+        "required": [
+          "commune_id",
+          "current_status",
+          "location",
+          "luminance_baselines",
+          "luminance_history",
+          "open_faults",
+          "pole_id",
+          "recent_frames",
+          "runtime_history",
+          "segment_id",
+          "segment_name"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/PoleMapLocation"
+          },
+          "fixture": {
+            "$ref": "#/components/schemas/PoleMapFixture"
+          },
+          "current_status": {
+            "$ref": "#/components/schemas/PoleMapStatus"
+          },
+          "iot_node": {
+            "$ref": "#/components/schemas/PoleMapIotNode"
+          },
+          "luminance_baseline": {
+            "$ref": "#/components/schemas/PoleMapBaseline"
+          },
+          "luminance_baselines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapBaseline"
+            }
+          },
+          "luminance_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapHistoryPoint"
+            }
+          },
+          "runtime_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapRuntimePoint"
+            }
+          },
+          "open_faults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapOpenFault"
+            }
+          },
+          "recent_frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapFrame"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapFixture": {
+        "type": "object",
+        "properties": {
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "power_source": {
+            "$ref": "#/components/schemas/PowerSource"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "install_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapFrame": {
+        "required": [
+          "frame_id",
+          "sweep_id",
+          "thumbnail_url"
+        ],
+        "type": "object",
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "sweep_id": {
+            "type": "string"
+          },
+          "captured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          },
+          "distance_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "heading_deg": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapHistoryPoint": {
+        "required": [
+          "reason_codes",
+          "sweep_id"
+        ],
+        "type": "object",
+        "properties": {
+          "observed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "sweep_id": {
+            "type": "string"
+          },
+          "normalized_luminance": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "classified_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "peak_lux": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapIotNode": {
+        "required": [
+          "node_id"
+        ],
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_status": {
+            "$ref": "#/components/schemas/NodeStatus"
+          },
+          "last_report_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapLocation": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapOpenFault": {
+        "required": [
+          "fault_id"
+        ],
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "fault_status": {
+            "$ref": "#/components/schemas/FaultStatus"
+          },
+          "priority_score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapRuntimePoint": {
+        "required": [
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "runtime_hours": {
+            "type": "number",
+            "format": "double"
+          },
+          "on_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "off_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapStatus": {
+        "type": "object",
+        "properties": {
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "determined_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "source_channel": {
+            "$ref": "#/components/schemas/SourceChannel"
           }
         },
         "additionalProperties": false
@@ -9238,252 +9555,6 @@
             "items": {
               "$ref": "#/components/schemas/SegmentFeature"
             }
-          }
-        }
-      },
-      "PoleDetailFixture": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "fixture_type",
-          "power_source",
-          "lamp_watt",
-          "install_date"
-        ],
-        "properties": {
-          "fixture_type": {
-            "$ref": "#/components/schemas/FixtureType"
-          },
-          "power_source": {
-            "$ref": "#/components/schemas/PowerSource"
-          },
-          "lamp_watt": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "install_date": {
-            "type": "string",
-            "format": "date"
-          },
-          "warranty_expiry": {
-            "type": "string",
-            "format": "date",
-            "nullable": true
-          }
-        },
-        "description": "Thông số lắp đặt của bóng ĐANG DÙNG (duy nhất, Contract §3.3)."
-      },
-      "PoleCurrentStatus": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "fixture_status",
-          "determined_at",
-          "source_channel"
-        ],
-        "properties": {
-          "fixture_status": {
-            "$ref": "#/components/schemas/FixtureStatus"
-          },
-          "status_confidence": {
-            "type": "number",
-            "format": "double",
-            "minimum": 0,
-            "maximum": 1,
-            "nullable": true
-          },
-          "determined_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "source_channel": {
-            "$ref": "#/components/schemas/SourceChannel"
-          }
-        }
-      },
-      "PoleIotNode": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "node_id",
-          "node_status",
-          "last_report_at"
-        ],
-        "properties": {
-          "node_id": {
-            "$ref": "#/components/schemas/NodeId"
-          },
-          "node_status": {
-            "$ref": "#/components/schemas/NodeStatus"
-          },
-          "last_report_at": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        }
-      },
-      "LuminanceBaseline": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "baseline_value",
-          "baseline_window_nights",
-          "dim_threshold_ratio",
-          "out_threshold_ratio",
-          "computed_at"
-        ],
-        "description": "Ngưỡng cấu hình qua BE-33 (mặc định dim 0.80, out 0.15), không hard-code.",
-        "properties": {
-          "baseline_value": {
-            "type": "number",
-            "format": "double"
-          },
-          "baseline_window_nights": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "dim_threshold_ratio": {
-            "type": "number",
-            "format": "double"
-          },
-          "out_threshold_ratio": {
-            "type": "number",
-            "format": "double"
-          },
-          "computed_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "LuminancePoint": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "observed_at",
-          "sweep_id",
-          "normalized_luminance",
-          "baseline_ratio",
-          "classified_as"
-        ],
-        "description": "baseline_ratio và classified_as TÍNH Ở BACKEND — FE không tự tính.",
-        "properties": {
-          "observed_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "sweep_id": {
-            "type": "string"
-          },
-          "normalized_luminance": {
-            "type": "number",
-            "format": "double"
-          },
-          "baseline_ratio": {
-            "type": "number",
-            "format": "double"
-          },
-          "classified_as": {
-            "$ref": "#/components/schemas/FixtureStatus"
-          }
-        }
-      },
-      "RuntimePoint": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "night_of",
-          "runtime_hours",
-          "source"
-        ],
-        "description": "Phiên đêm cắt qua nửa đêm; night_of là ngày bắt đầu phiên.",
-        "properties": {
-          "night_of": {
-            "type": "string",
-            "format": "date"
-          },
-          "runtime_hours": {
-            "type": "number",
-            "format": "double"
-          },
-          "on_at": {
-            "type": "string",
-            "nullable": true,
-            "description": "HH:mm:ssZ theo mock — định dạng chưa chốt"
-          },
-          "off_at": {
-            "type": "string",
-            "nullable": true
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "iot"
-            ]
-          }
-        }
-      },
-      "OpenFaultSummary": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "fault_id",
-          "fault_type",
-          "severity",
-          "fault_status"
-        ],
-        "properties": {
-          "fault_id": {
-            "$ref": "#/components/schemas/FaultId"
-          },
-          "fault_type": {
-            "$ref": "#/components/schemas/FaultType"
-          },
-          "severity": {
-            "$ref": "#/components/schemas/Severity"
-          },
-          "fault_status": {
-            "$ref": "#/components/schemas/FaultStatus"
-          },
-          "priority_score": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          }
-        }
-      },
-      "RecentFrame": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "frame_id",
-          "sweep_id",
-          "captured_at",
-          "thumbnail_url"
-        ],
-        "properties": {
-          "frame_id": {
-            "$ref": "#/components/schemas/FrameId"
-          },
-          "sweep_id": {
-            "$ref": "#/components/schemas/SweepId"
-          },
-          "captured_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "thumbnail_url": {
-            "type": "string",
-            "description": "Đường dẫn TƯƠNG ĐỐI qua API, không presigned: /api/v1/frames/{frame_id}/thumbnail"
-          },
-          "distance_m": {
-            "type": "number",
-            "format": "double"
-          },
-          "heading_deg": {
-            "type": "number",
-            "format": "double"
           }
         }
       },

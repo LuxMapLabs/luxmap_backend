@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -35,23 +34,14 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
     ICommuneScopeAccessor scope, IAuditTrail audit, IObjectStore store, IOptions<SurveyReviewOptions> options)
 {
     private string ActorId => actor.UserId ?? throw Error("UNAUTHENTICATED", HttpStatusCode.Unauthorized);
-    private IQueryable<SurveySweep> Visible() => db.Set<SurveySweep>().Where(s => db.Set<WorkOrder>().Any(w =>
-        w.WorkOrderId == s.WorkOrderId && !db.Set<WorkOrderSegment>().Any(link => link.WorkOrderId == w.WorkOrderId
-            && !db.Set<RoadSegment>().Any(r => r.SegmentId == link.SegmentId))));
+    private readonly SurveyMediaAccess access = new(db, scope);
+    private IQueryable<SurveySweep> Visible() => access.VisibleSweeps();
     private async Task<SurveySweep> Find(string id, CancellationToken ct) => await Visible().AsNoTracking()
         .SingleOrDefaultAsync(s => s.SweepId == id, ct) ?? throw Error("SWEEP_NOT_FOUND", HttpStatusCode.NotFound);
 
-    private sealed class CommuneRow { [Column("commune_id")] public string CommuneId { get; set; } = null!; }
     private async Task RequireWholeRun(SurveyProcessingRun run, bool review, CancellationToken ct)
     {
-        // Only scope identifiers of an already-authorized parent. A filtered observation query alone
-        // would silently publish half a cross-commune run. No out-of-scope payload is returned.
-        var communes = await db.Database.SqlQuery<CommuneRow>($"SELECT DISTINCT commune_id FROM pole_observation WHERE run_id = {run.RunId}").ToArrayAsync(ct);
-        var expected = SurveyPublicationRules.ExpectedPoles(run.GisSnapshot);
-        var ids = expected.Select(p => p.PoleId).Distinct().ToArray();
-        var current = await db.Database.SqlQuery<CommuneRow>($"SELECT DISTINCT commune_id FROM pole WHERE pole_id = ANY({ids})").ToArrayAsync(ct);
-        if (SurveyPublicationRules.RequiredCommunes(run.GisSnapshot, communes.Select(x => x.CommuneId), current.Select(x => x.CommuneId))
-            .Any(id => !scope.Scope.Allows(id)))
+        if (!await access.CoversWholeRun(run, ct))
             throw Error(review ? "COMMUNE_FORBIDDEN" : "SWEEP_NOT_FOUND", review ? HttpStatusCode.Forbidden : HttpStatusCode.NotFound);
     }
 
@@ -99,17 +89,9 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         var frame = await db.Set<SurveyFrame>().AsNoTracking().Where(f => f.FrameId == frameId
             && visible.Any(s => s.SweepId == f.SweepId)).SingleOrDefaultAsync(ct)
             ?? throw Error("FRAME_NOT_FOUND", HttpStatusCode.NotFound);
-        // The whole image can show neighbouring communes. Check all runs AND the processing snapshot
-        // communes, before opening the object. Work-order assignee scope was applied by Visible().
-        var runs = await db.Set<SurveyProcessingRun>().Where(r => r.SweepId == frame.SweepId).ToArrayAsync(ct);
-        foreach (var run in runs)
-        {
-            await RequireWholeRun(run, false, ct);
-            using var snapshot = JsonDocument.Parse(run.GisSnapshot);
-            if (snapshot.RootElement.TryGetProperty("communes", out var communes)
-                && communes.EnumerateArray().Any(x => !scope.Scope.Allows(x.GetString()!)))
-                throw Error("FRAME_NOT_FOUND", HttpStatusCode.NotFound);
-        }
+        // The whole image can show neighbouring communes: SurveyMediaAccess checks every run and the
+        // snapshot communes before the object is opened. Assignee scope was applied by Visible().
+        if (!await access.CanReadMedia(frame.SweepId, ct)) throw Error("FRAME_NOT_FOUND", HttpStatusCode.NotFound);
         return await store.OpenAsync(StorageBucket.Survey, frame.ThumbnailKey, ct);
     }
 

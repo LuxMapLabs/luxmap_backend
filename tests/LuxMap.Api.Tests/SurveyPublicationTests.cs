@@ -2,6 +2,7 @@ using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Map.Features;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Modules.Survey.Review;
@@ -464,6 +465,137 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
             """));
         Assert.Equal(PostgresErrorCodes.CheckViolation, error.SqlState);
         Assert.Equal("ck_luminance_history_unobserved", error.ConstraintName);
+    }
+
+    private PoleDetailService Detail(LuxMapDbContext db, string[]? ids = null)
+        => new(db, new SurveyFrameOptions(), new SurveyMediaAccess(db, new Scope(ids ?? [a, b])));
+
+    [Fact]
+    public async Task Pole_detail_shows_published_history_baseline_status_faults_and_frames()
+    {
+        var captures = new List<Capture>();
+        // One at a time: a capture is classified against the baselines that exist WHEN IT IS PLANTED, so the
+        // dim one must come after the three that build the baseline have been accepted.
+        foreach (var (day, lux) in new[] { (1, 100d), (2, 110d), (3, 90d), (4, 50d) })
+        {
+            var capture = await Plant(day, lux);
+            await Accept(capture);
+            captures.Add(capture);
+        }
+
+        await using var db = Db();
+        var detail = await Detail(db).GetAsync(poles[0], default);
+
+        // History: oldest first, one point per accepted sweep. The first three have no baseline yet,
+        // so no ratio — they are `normal` and not evaluated, not `dim`.
+        Assert.Equal(captures.Select(c => c.Id), detail.LuminanceHistory.Select(h => h.SweepId));
+        Assert.Equal(captures.Select(c => c.At.AddSeconds(5)), detail.LuminanceHistory.Select(h => h.ObservedAt));
+        Assert.All(detail.LuminanceHistory.Take(3), h => { Assert.Null(h.BaselineRatio); Assert.Equal(FixtureStatus.Normal, h.ClassifiedAs); });
+        var last = detail.LuminanceHistory[^1];
+        Assert.Equal(FixtureStatus.Dim, last.ClassifiedAs);
+        Assert.Equal(.5, last.BaselineRatio!.Value, 6);
+        Assert.Equal(last.BaselineRatio, last.NormalizedLuminance);
+        Assert.Equal(50, last.PeakLux);
+
+        // Baseline: median of 100/110/90 over three accepted sweeps, forward, with the configured dim ratio.
+        var baseline = Assert.Single(detail.LuminanceBaselines);
+        Assert.Equal(("forward", 100d, 3, .8), (baseline.Direction, baseline.BaselineValue, baseline.BaselineWindowNights, baseline.DimThresholdRatio));
+        Assert.Null(baseline.OutThresholdRatio);
+        Assert.Equal(baseline, detail.LuminanceBaseline);
+
+        Assert.Equal(FixtureStatus.Dim, detail.CurrentStatus.FixtureStatus);
+        Assert.Equal(SourceChannel.Cv, detail.CurrentStatus.SourceChannel);
+        Assert.Equal(captures[3].At.AddSeconds(5), detail.CurrentStatus.DeterminedAt);
+
+        var fault = Assert.Single(detail.OpenFaults);
+        Assert.Equal((FaultType.LampDim, FaultStatus.Detected, true), (fault.FaultType, fault.FaultStatus, fault.PriorityScore is null));
+
+        // Frames: newest first, relative thumbnail path, captured_at from the sweep clock; the two fields
+        // the frame table does not store stay null rather than invented.
+        Assert.Equal(Enumerable.Reverse(captures).Select(c => c.Frame), detail.RecentFrames.Select(f => f.FrameId));
+        Assert.All(detail.RecentFrames, f =>
+        {
+            Assert.Equal($"/api/v1/frames/{f.FrameId}/thumbnail", f.ThumbnailUrl);
+            Assert.Null(f.DistanceM); Assert.Null(f.HeadingDeg);
+        });
+        Assert.Equal(captures[3].At, detail.RecentFrames[0].CapturedAt);
+    }
+
+    [Fact]
+    public async Task Pole_detail_lists_no_frame_the_caller_could_not_open_but_keeps_the_history()
+    {
+        var capture = await Plant(1, 100, state: "off");
+        await Accept(capture);
+
+        // Commune B only: the work order (commune A) is invisible, so the sweep is too.
+        await using (var db = Db([b]))
+        {
+            var detail = await Detail(db, [b]).GetAsync(poles[1], default);
+            Assert.Single(detail.LuminanceHistory);
+            Assert.Empty(detail.RecentFrames);
+        }
+
+        // Commune A only: the sweep is visible but its run also covers pole B's commune, and a frame can
+        // show the neighbouring commune — so it is not listed, because opening it would be a 404.
+        await using (var db = Db([a]))
+        {
+            var detail = await Detail(db, [a]).GetAsync(poles[0], default);
+            Assert.Single(detail.LuminanceHistory);
+            Assert.Empty(detail.RecentFrames);
+            Assert.True(await new SurveyMediaAccess(db, new Scope([a, b])).CanReadMedia(capture.Id, default));
+            Assert.False(await new SurveyMediaAccess(db, new Scope([a])).CanReadMedia(capture.Id, default));
+        }
+
+        // A pole outside the scope is not found at all.
+        await using var narrow = Db([a]);
+        var missing = await Assert.ThrowsAsync<LuxMapException>(() => Detail(narrow, [a]).GetAsync(poles[1], default));
+        Assert.Equal((HttpStatusCode.NotFound, "POLE_NOT_FOUND"), (missing.StatusCode, missing.Code));
+    }
+
+    [Fact]
+    public async Task Pole_detail_history_is_the_newest_thirty_points_oldest_first()
+    {
+        var captures = new List<Capture>();
+        for (int day = 1; day <= 32; day++) { var c = await Plant(day, 100); await Accept(c); captures.Add(c); }
+
+        await using var db = Db();
+        var detail = await Detail(db).GetAsync(poles[0], default);
+
+        Assert.Equal(PoleDetailService.HistoryPoints, detail.LuminanceHistory.Count);
+        Assert.Equal(captures.Skip(2).Select(c => c.Id), detail.LuminanceHistory.Select(h => h.SweepId));
+        Assert.Equal(PoleDetailService.RecentFrameCount, detail.RecentFrames.Count);
+        Assert.Equal(captures[^1].Frame, detail.RecentFrames[0].FrameId);
+    }
+
+    [Fact]
+    public async Task Pole_detail_stops_showing_a_baseline_once_the_lamp_it_was_built_on_is_replaced()
+    {
+        async Task Install(int day)
+        {
+            await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
+            var date = DateOnly.FromDateTime(DateTime.UnixEpoch.AddDays(20000 + day));
+            var old = await db.Set<Fixture>().SingleOrDefaultAsync(f => f.PoleId == poles[0] && f.RemovedDate == null);
+            if (old is not null) { old.RemovedDate = date; await db.SaveChangesAsync(); }
+            db.Add(new Fixture { PoleId = poles[0], CommuneId = a, InstallDate = date,
+                FixtureType = FixtureType.LedRoadLamp, PowerSource = PowerSource.Grid, LampWatt = 100, DataSource = DataSource.Simulated });
+            await db.SaveChangesAsync();
+        }
+        await Install(0);
+        foreach (int day in new[] { 1, 2, 3 }) await Accept(await Plant(day, 100));
+
+        await using (var db = Db())
+        {
+            var before = await Detail(db).GetAsync(poles[0], default);
+            Assert.Single(before.LuminanceBaselines);
+            Assert.Equal(100, before.Fixture!.LampWatt);
+        }
+
+        await Install(4);
+        await using var after = Db();
+        var detail = await Detail(after).GetAsync(poles[0], default);
+        Assert.Empty(detail.LuminanceBaselines);
+        Assert.Null(detail.LuminanceBaseline);
+        Assert.Equal(3, detail.LuminanceHistory.Count); // history belongs to the pole, not the lamp
     }
 
     public async Task DisposeAsync()
