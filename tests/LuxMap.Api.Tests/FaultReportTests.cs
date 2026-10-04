@@ -214,6 +214,26 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
         Assert.Equal((400, code), (status, Code(body)));
     }
 
+    [Theory]
+    [InlineData("""{"lat": 16.31}""")]
+    [InlineData("""{"lng": 108.31}""")]
+    [InlineData("{}")]
+    public async Task A_location_missing_a_coordinate_is_refused_rather_than_read_as_zero(string location)
+    {
+        var json = $$"""{"client_op_id":"{{Guid.NewGuid()}}","fault_type":"lamp_out","note":"A lamp not on the map","location":{{location}}}""";
+        var response = await clients["crew"].PostAsync("/api/v1/faults", new StringContent(json, System.Text.Encoding.UTF8, "application/json"));
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal((400, "VALIDATION_FAILED"), ((int)response.StatusCode, Code(body)));
+        Assert.Equal(0, await Db(db => db.Set<Fault>().IgnoreQueryFilters().CountAsync(f => f.CommuneId == home && f.PoleId == null)));
+    }
+
+    [Fact]
+    public async Task An_undefined_numeric_severity_is_a_400_not_a_database_error()
+    {
+        var (status, body) = await Report("crew", new { client_op_id = Guid.NewGuid(), pole_id = pole, fault_type = "lamp_out", note = "Lamp is dark all night", severity = 999 });
+        Assert.Equal((400, "VALIDATION_FAILED"), (status, Code(body)));
+    }
+
     [Fact]
     public async Task A_fixture_must_be_the_lamp_in_use_on_that_pole_and_a_future_time_is_refused()
     {

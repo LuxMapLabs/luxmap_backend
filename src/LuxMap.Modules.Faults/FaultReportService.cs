@@ -26,7 +26,8 @@ public sealed class ReportFaultRequest
     /// <summary>Only when the reporter knows the exact lamp; must be the lamp in use on <c>pole_id</c>.</summary>
     public string? FixtureId { get; init; }
 
-    public FaultLocation? Location { get; init; }
+    /// <summary>Both coordinates, or none: a missing one must not be read as 0 and put the fault in the sea.</summary>
+    public ReportLocation? Location { get; init; }
 
     /// <summary>Only without a pole AND with several communes in scope. With a pole the server looks it up.</summary>
     public string? CommuneId { get; init; }
@@ -52,6 +53,9 @@ public sealed class ReportFaultRequest
     /// </summary>
     public string? PhotoFrameId { get; init; }
 }
+
+/// <summary><c>location</c> of a report. Nullable members so an omitted coordinate is seen as missing, not as 0.</summary>
+public sealed record ReportLocation(double? Lat, double? Lng);
 
 /// <summary>
 /// A field engineer reports a fault seen on site (BE-41). Every report starts <c>detected</c> with
@@ -98,8 +102,11 @@ public sealed class FaultReportService(
                 "Only lamp_out and lamp_dim can be reported; cluster and IoT faults come from the engines.");
         var note = request.Note?.Trim();
         if (note is null || note.Length < 10) throw Invalid("note", "note must say what was seen, in at least 10 characters.");
-        if (request.Location is { } at && (!Finite(at.Lat, 90) || !Finite(at.Lng, 180)))
-            throw Invalid("location", "location must hold a finite lat within ±90 and lng within ±180.");
+        if (request.Location is { } at && (at.Lat is not { } lat || at.Lng is not { } lng || !Finite(lat, 90) || !Finite(lng, 180)))
+            throw Invalid("location", "location must hold both lat (within ±90) and lng (within ±180), finite.");
+        // The shared enum converter also reads integers; an undefined number must not reach the CHECK as text.
+        if (request.Severity is { } severity && !Enum.IsDefined(severity))
+            throw Invalid("severity", "severity must be low, medium, high or critical.");
 
         var now = UtcMicrosecondClock.UtcNow(clock);
         var detected = now;
