@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-20 — chi tiết cột <code>GET /map/poles/{pole_id}</code>, 04/10/2026: xong trên nhánh, chờ Codex review</strong>
+    <p><span class="tag t-next">Chờ review</span> Một request trả bóng đang dùng, trạng thái, baseline theo chiều đi, 30 điểm lịch sử,
+    sự cố mở và frame gần đây. Nối vào dữ liệu P2c (<code>luminance_history</code>, <code>luminance_baseline</code>). Lệch Contract ở chín
+    chỗ (<code>docs/contract-drift.md</code> → BE-20, SELF-SIGNED): <code>iot_node</code> luôn null, <code>runtime_history</code> luôn rỗng,
+    <code>out_threshold_ratio</code> null, <code>distance_m</code>/<code>heading_deg</code> null. Frame chỉ liệt kê khi người gọi mở được
+    (dùng chung <code>SurveyMediaAccess</code> với endpoint thumbnail). Claude kiểm trên PostGIS; phá thử năm luật đều đỏ.</p>
+    <p>Còn: Codex review, báo WP5 (FW-12/FW-13) và WP6 (FM-17), nối <code>nearest_luminance</code> của <code>GET /lux-readings</code> (hiện luôn null).</p>
+  </div>
+  <div class="card">
     <strong>BE-15 khảo sát video đêm — P2a → P2c đã merge vào dev, 04/10/2026</strong>
     <p><span class="tag t-done">Đã merge</span> Toàn bộ vòng khảo sát chạy trên <code>dev</code> và <code>luxmap_dev</code>
     (migration mới nhất <code>LuminanceHistoryPoleFk</code>): nhận phiên (P2a, #69) → xử lý tới lượt ngang cột (P2b-1, #75)

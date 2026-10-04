@@ -12,6 +12,7 @@
          references belong HERE when they arrive, not on Assets. -->
     <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Telemetry\LuxMap.Modules.Telemetry.csproj" />
   </ItemGroup>
 
