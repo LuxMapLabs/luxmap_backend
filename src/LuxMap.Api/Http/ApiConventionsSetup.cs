@@ -54,9 +54,7 @@ public static class ApiConventionsSetup
             .ToDictionary(
                 entry => entry.Key.ToSnakeCaseLower(),
                 entry => (object?)entry.Value!.Errors
-                    .Select(error => string.IsNullOrWhiteSpace(error.ErrorMessage)
-                        ? "Invalid value."
-                        : error.ErrorMessage)
+                    .Select(error => Describe(error.ErrorMessage))
                     .ToArray());
 
         var correlation = context.HttpContext.RequestServices
@@ -72,6 +70,18 @@ public static class ApiConventionsSetup
             StatusCode = (int)HttpStatusCode.BadRequest,
         };
     }
+
+    /// <summary>
+    /// What a client is told about one invalid field. The JSON input formatter copies the serializer's own message,
+    /// and that message names .NET types — "could not be converted to System.Nullable`1[LuxMap.Modules…TaskKind]".
+    /// Internal type names are not the client's business, and they leak the module layout. Messages our converters
+    /// write themselves ("'NaN' is not a number.") name no type and are kept.
+    /// </summary>
+    private static string Describe(string message)
+        => string.IsNullOrWhiteSpace(message) ? "Invalid value."
+            : message.Contains("System.", StringComparison.Ordinal) || message.Contains("LuxMap.", StringComparison.Ordinal)
+                ? "The value is not valid for this field."
+                : message;
 
     /// <summary>
     /// Field names in <c>details</c> must be snake_case to match the body the client sent;

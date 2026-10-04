@@ -30,8 +30,10 @@ public static class LuxMapJsonOptions
         options.PropertyNameCaseInsensitive = true;
 
         // Section 5.5: enums go out as lowercase strings, NEVER numbers — .NET int enums break the
-        // front end, and the Contract calls this out by name.
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+        // front end, and the Contract calls this out by name. The converter otherwise accepts
+        // both JSON integers and quoted integers, including undefined values that can reach DB
+        // CHECK constraints as a 500. Reject them during JSON binding instead (400 VALIDATION_FAILED).
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false));
 
         // Section 0: ISO 8601 UTC with a Z suffix. DateOnly (install_date, warranty_expiry,
         // night_of) already renders as YYYY-MM-DD by default, so it needs no converter.

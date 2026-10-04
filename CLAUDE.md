@@ -982,6 +982,10 @@ kiểu số thực cờ đó nhận luôn chuỗi `"NaN"` / `"Infinity"`. Đã b
 `JsonNumberHandling.Strict` vì nó chặn luôn số có nháy kép hợp lệ như `"12.4"`, đổi hình dạng wire
 của mọi endpoint để sửa một vấn đề chỉ nằm ở ba literal.
 
+**Enum JSON cũng phải chặn số lúc đọc:** giữ `allowIntegerValues: false` ở `LuxMapJsonOptions` để từ chối
+cả `2` lẫn `"2"` (kể cả enum nullable), trả 400 `VALIDATION_FAILED` trước tầng ghi. Canh bằng
+`JsonEnumHandlingTests` và `JsonPipelineConventionTests`; query string vẫn đi qua `WireEnum`, không qua converter JSON.
+
 **Ticket sắp tạo cột kiểu này — phải áp quy ước ngay từ migration đầu:**
 
 | Ticket | Cột |

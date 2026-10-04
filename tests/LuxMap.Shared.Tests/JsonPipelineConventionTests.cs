@@ -90,6 +90,30 @@ public class JsonPipelineConventionTests
         Assert.NotNull(pipeline);
     }
 
+    [Theory]
+    [MemberData(nameof(Pipelines))]
+    public void Both_pipelines_reject_integer_enums(
+        string pipeline, Func<ServiceProvider, JsonSerializerOptions> resolve)
+    {
+        using var provider = Configured();
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<EnumBody>(
+            """{"status":1}""", resolve(provider)));
+        Assert.NotNull(pipeline);
+    }
+
+    [Theory]
+    [MemberData(nameof(Pipelines))]
+    public void Both_pipelines_reject_quoted_integer_enums(
+        string pipeline, Func<ServiceProvider, JsonSerializerOptions> resolve)
+    {
+        using var provider = Configured();
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<EnumBody>(
+            """{"status":"1"}""", resolve(provider)));
+        Assert.NotNull(pipeline);
+    }
+
     private sealed record SampleBody(string PoleId, int LampWatt);
 
     private sealed record EnumBody(SampleStatus Status);
