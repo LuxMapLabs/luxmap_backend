@@ -42,20 +42,20 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
-    <strong>OPS-SUPABASE — script chép thêm 16 bảng khảo sát và ảnh, 04/10/2026: xong trên nhánh</strong>
-    <p><span class="tag t-next">Chờ review</span> <code>scripts/copy_dev_to_supabase.py</code> nay chép cả chuỗi khảo sát, lịch sử độ sáng,
+    <strong>OPS-SUPABASE — script chép thêm 16 bảng khảo sát và ảnh — merge #88, 04/10/2026</strong>
+    <p><span class="tag t-done">Đã merge</span> <code>scripts/copy_dev_to_supabase.py</code> nay chép cả chuỗi khảo sát, lịch sử độ sáng,
     baseline và ảnh phiếu; vòng khoá ngoại phiên ↔ run chép hai lượt trong một transaction. Diễn tập trên DB giả lập Supabase (role
     không phải superuser): 29/29 migration, 32 bảng trùng md5, 23 sequence khớp; phá thử lượt hai → huỷ sạch. Runbook ghi rõ ảnh/video
-    nằm ở MinIO, không đi theo database. Còn: Codex review, PR; xoá DB diễn tập (cần Mỹ duyệt).</p>
+    nằm ở MinIO, không đi theo database. Codex review sạch; DB diễn tập đã xoá. D-8: giữ MinIO cho ảnh/video (#89).</p>
   </div>
   <div class="card">
-    <strong>BE-24 — ảnh của phiếu công việc, 04/10/2026: xong trên nhánh, Codex review sạch, chờ PR</strong>
-    <p><span class="tag t-next">Chờ PR</span> Kỹ sư được giao tải ảnh khi phiếu đang làm: <code>before</code>/<code>after</code> cho phiếu
+    <strong>BE-24 — ảnh của phiếu công việc — merge #87, 04/10/2026</strong>
+    <p><span class="tag t-done">Đã merge</span> Kỹ sư được giao tải ảnh khi phiếu đang làm: <code>before</code>/<code>after</code> cho phiếu
     sửa chữa, <code>observation</code> cho phiếu kiểm tra (EV-1, Mỹ chốt). Phiếu sửa chữa không báo hoàn thành được khi chưa có ảnh
     <code>after</code>. Quản lý xem danh sách và ảnh qua API (thumbnail + ảnh gốc nguyên byte), quyền theo phiếu cha. Bảng
     <code>repair_evidence</code> (migration <code>AddRepairEvidence</code>). 17 test PostGIS mới, phá thử bảy luật đều đỏ. Codex review bốn lượt: ba lỗi thật (kiểm lại phiếu sau khi ghi ảnh, JPEG hỏng ra 500,
     <code>captured_at</code> thiếu ngày, gửi lại chồng nhau), đã sửa kèm test. Drift BE-24 (SELF-SIGNED).
-    Còn: PR, migrate <code>luxmap_dev</code>, báo WP5/WP6.</p>
+    <code>luxmap_dev</code> đã migrate; đã báo WP5/WP6 (04/10).</p>
   </div>
   <div class="card">
     <strong>WO-12 — cột trên đoạn được giao <code>GET /work-orders/{id}/poles</code> — merge #85, 04/10/2026</strong>

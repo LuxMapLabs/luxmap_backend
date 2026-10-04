@@ -79,9 +79,10 @@ Sidecar `luxmap_minio_mc` **không** hiện ở đây: nó tạo hai bucket rồ
 
 ### Khi cache image còn rỗng
 
-Image MinIO kéo từ `quay.io` chứ không phải Docker Hub — Docker Hub đã gỡ `minio/*`, và `docker login` không giúp được gì. `docker-compose.yml` đã pin sẵn registry và digest, nên `docker compose up -d` chạy đúng mà không cần cấu hình thêm.
-
-Nếu `quay.io` cũng không kéo được, nạp từ bản tarball ngoại tuyến (amd64 + arm64, hỏi BE1 xin file):
+Image MinIO **không còn kéo được ẩn danh từ đâu cả**: Docker Hub đã gỡ `minio/*` (404), và `quay.io/minio/*` nay cũng
+trả **401** (kiểm lại 04/10/2026). `docker-compose.yml` pin registry `quay.io` và digest, nên máy đã có image trong cache vẫn
+chạy bình thường; **máy mới hoặc server mới phải nạp từ tarball ngoại tuyến** (amd64 + arm64, hỏi BE1 xin file — đây là bản
+duy nhất, đừng xoá):
 
 ```bash
 docker load -i luxmap-minio-images.tar

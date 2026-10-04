@@ -695,7 +695,8 @@ xử lý 409). Ảnh bằng chứng **không** vào dữ liệu chấm CV (xem "
 có endpoint sửa/xoá: ảnh là bản ghi của điều đã thấy.
 
 **Phải báo:** WP6 (FM-18: upload, nhãn theo loại phiếu, `client_op_id`, ảnh `after` trước khi báo hoàn thành), WP5 (màn
-chi tiết phiếu: danh sách và xem ảnh để nghiệm thu). **Chưa báo.**
+chi tiết phiếu: danh sách và xem ảnh để nghiệm thu). **Đã báo WP5 và WP6 ngày 04/10/2026** (Mỹ gửi; PR #87 đã merge,
+`luxmap_dev` đã migrate). Chờ xác nhận ở FW kế tiếp.
 
 ## OPS-SCHEMA — lược đồ đích theo Phiếu v1.4 (01/10/2026)
 
