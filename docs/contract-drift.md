@@ -835,7 +835,8 @@ CHECK một cha và ảnh sự cố luôn `observation`. `EvidenceItem` thêm `f
 `AttachPhotosToFaults` — `Down()` từ chối khi đã có ảnh sự cố.
 
 **Phải báo:** WP6 (FM-19: `POST /faults`, luồng một form → gửi sự cố rồi tải ảnh, `detected_at` cho hàng chờ offline,
-`photo_frame_id` bỏ), WP5 (sự cố `field_report` có ảnh; `GET /faults/{id}/photos`). **Chưa báo.**
+`photo_frame_id` bỏ), WP5 (sự cố `field_report` có ảnh; `GET /faults/{id}/photos`). **Đã báo WP5 và WP6 ngày 05/10/2026**
+(Mỹ gửi; PR #91 đã merge, `luxmap_dev` đã migrate). Chờ xác nhận ở FW kế tiếp.
 
 ## BE-20 — chi tiết cột `GET /map/poles/{pole_id}` (04/10/2026)
 
