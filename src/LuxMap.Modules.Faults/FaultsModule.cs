@@ -19,5 +19,6 @@ public sealed class FaultsModule : ILuxMapModule
         services.AddScoped<FaultTransitions>();
         services.AddScoped<FaultQueryService>();
         services.AddScoped<FaultReviewService>();
+        services.AddScoped<FaultReportService>();
     }
 }

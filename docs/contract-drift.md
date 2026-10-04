@@ -685,7 +685,11 @@ phơi sáng (D-R24). Byte ảnh vẫn qua API (BE-11 quy tắc 1).
 
 **EV-1 đã chốt (Mỹ, 04/10/2026) và hiện thực ở BE-24:** thêm `kind = observation`. Phiếu **sửa chữa** nhận `before`
 (đèn lúc tới nơi) và `after` (sau khi sửa); phiếu **kiểm tra** chỉ nhận `observation` (đã thấy thế này — kiểm tra không sửa
-gì nên không có trước/sau); phiếu khảo sát không nhận ảnh. Sai nhãn → `400 EVIDENCE_KIND_NOT_ALLOWED`. EV-2 vẫn mở (BE-41).
+gì nên không có trước/sau); phiếu khảo sát không nhận ảnh. Sai nhãn → `400 EVIDENCE_KIND_NOT_ALLOWED`.
+
+**EV-2 đã chốt (Mỹ, 04/10/2026) và hiện thực ở BE-41:** *tạo sự cố rồi gắn ảnh*. `POST /faults` giữ JSON như Contract; ảnh gửi
+sau qua `POST /faults/{fault_id}/photos`. Trên app vẫn là **một form** (chụp ảnh ngay trong form, bấm Gửi một lần); app tự gửi
+sự cố trước rồi tải ảnh — mất sóng chỉ làm chậm ảnh, không làm mất báo cáo. Trường `photo_frame_id` **bỏ**: gửi lên → 400.
 
 ### BE-24 — ảnh của phiếu công việc (04/10/2026)
 
@@ -807,6 +811,31 @@ của run mà xe không đi qua — đúng nghĩa `unknown` của Contract mục
 liệt kê cả các cột này (đứng sau mọi quan sát); trong `SurveyResultItem`, `observation_id`, `pass_id`, `direction`,
 `association_confidence` thành **nullable**. Người duyệt phải có xã của cả cột không quan sát. Trả lại không còn bị
 chặn khi cột đã được sửa sau xử lý (`SURVEY_SCOPE_CHANGED` chỉ cho accept). OpenAPI đã xuất lại.
+
+## BE-41 — kỹ sư báo sự cố tại chỗ `POST /faults` (04/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực Contract §5.4 (`POST /faults`) kèm luồng ảnh EV-2. Lệch Contract ở các chỗ dưới đây. **SELF-SIGNED, nền tạm tới FW** |
+| **Decision maker** | Mỹ chốt EV-2 (04/10/2026); Claude hiện thực. Chạm bề mặt API → **ESCALATE ở FW kế tiếp** |
+| **Date** | 04/10/2026 |
+| **Scope** | Contract §2 (capability mới), §5.4 (`POST /faults`), §5.5 (ảnh); FM-19 |
+
+| Mã | Chỗ lệch | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **R-1** | Contract §2 không có capability cho việc báo sự cố | **Thêm `ReportFaults` = chỉ `field_engineer`** (CLAUDE.md: sự cố do engine sinh hoặc do Kỹ sư hiện trường báo tại chỗ). Quản lý không báo — họ duyệt | **Có** (ma trận §2) |
+| **R-2** | Contract áp cứng `data_source = field` | Có `pole_id` → **lấy `data_source` của cột**; không có cột → `field`. Áp cứng `field` sẽ đếm báo cáo trên cột testbed thành dữ liệu thực địa — đúng lỗi luật tách `data_source` sinh ra để chặn | **Có** (ngữ nghĩa) |
+| **R-3** | `photo_frame_id` | **Bỏ** (EV-2): gửi lên → `400 VALIDATION_FAILED`. Ảnh: `POST /faults/{fault_id}/photos` (multipart `file`, `captured_at`, `lat`, `lng`, `client_op_id?`; luôn `observation`; chỉ **người báo**, chỉ khi sự cố còn **mở** — ngoài ra `404 FAULT_NOT_FOUND` / `409 FAULT_NOT_OPEN`), xem: `GET /faults/{fault_id}/photos` (`ReadFaults`), ảnh qua `GET /evidence/{id}/thumbnail\|original` như BE-24 | **Có** |
+| **R-4** | Báo cáo gửi từ hàng chờ offline tới muộn | **Thêm `detected_at` tuỳ chọn** (lúc nhìn thấy; mặc định giờ server; tương lai quá 5 phút → 400). Không có nó, giờ nhận bị coi là giờ phát hiện | **Có** (trường mới) |
+| **R-5** | `client_op_id` trùng | Cùng người báo → **200** trả sự cố đã tạo (`DUPLICATE_OP` là replay, không phải lỗi); người khác dùng lại khoá → `409 IDEMPOTENCY_CONFLICT` | Không |
+| **R-6** | Còn lại theo Contract | `fault_status = detected`, `source_channel = field_report`, `reported_by` = JWT, `severity` mặc định `medium`, chỉ `lamp_out`/`lamp_dim` (`400 FAULT_TYPE_NOT_REPORTABLE`), `note` ≥ 10 ký tự, có cột thì xã/tuyến lấy từ cột (gửi `commune_id` kèm → 400; cột ngoài phạm vi → `404 POLE_NOT_FOUND`), không cột thì bắt buộc `location` (`400 LOCATION_REQUIRED`) và xã lấy từ scope (nhiều xã → phải gửi `commune_id` trong scope). `fixture_id` phải là bóng đang dùng của cột. Response 201 = item như `GET /faults` + `client_op_id` | Không |
+
+Bảng ảnh `repair_evidence` nay nhận **một trong hai cha**: phiếu (`work_order_id`) **hoặc** sự cố (`fault_id`, FK ghép cùng xã);
+CHECK một cha và ảnh sự cố luôn `observation`. `EvidenceItem` thêm `fault_id`, `work_order_id` thành nullable. Migration
+`AttachPhotosToFaults` — `Down()` từ chối khi đã có ảnh sự cố.
+
+**Phải báo:** WP6 (FM-19: `POST /faults`, luồng một form → gửi sự cố rồi tải ảnh, `detected_at` cho hàng chờ offline,
+`photo_frame_id` bỏ), WP5 (sự cố `field_report` có ảnh; `GET /faults/{id}/photos`). **Chưa báo.**
 
 ## BE-20 — chi tiết cột `GET /map/poles/{pole_id}` (04/10/2026)
 

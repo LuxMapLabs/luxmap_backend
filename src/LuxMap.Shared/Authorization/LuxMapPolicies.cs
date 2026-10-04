@@ -55,6 +55,12 @@ public static class LuxMapPolicies
     /// <summary>Review a fault: confirm, reject, reclassify, set severity, write a review note (BE-19).</summary>
     public const string ReviewFaults = "cap:review_faults";
 
+    /// <summary>
+    /// Report a fault seen on site and attach photos to it (BE-41, Contract 5.4). Field engineers only: a report
+    /// is an observation from the road, and every report starts <c>detected</c> for a Manager to review.
+    /// </summary>
+    public const string ReportFaults = "cap:report_faults";
+
     public const string ReadSurveys = "cap:read_surveys";
     public const string SubmitSurveys = "cap:submit_surveys";
     public const string ReviewSurveys = "cap:review_surveys";
@@ -78,6 +84,7 @@ public static class LuxMapPolicies
             [ManageUsers] = [UserRole.SystemAdmin],
             [ReadFaults] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReviewFaults] = [UserRole.Manager],
+            [ReportFaults] = [UserRole.FieldEngineer],
             [ReadWorkOrders] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageWorkOrders] = [UserRole.Manager],
             [ExecuteWorkOrders] = [UserRole.FieldEngineer],

@@ -10,7 +10,7 @@ namespace LuxMap.Modules.Faults;
 /// <c>commune_id</c> is deliberately absent: section 5.4 does not list it and the mock does not carry
 /// it. BE-19 and BE-41 answer with this same shape.
 /// </remarks>
-public sealed record FaultItem
+public record FaultItem
 {
     public required string FaultId { get; init; }
     public string? PoleId { get; init; }
@@ -43,3 +43,12 @@ public sealed record FaultItem
 
 /// <summary><c>location{lat,lng}</c> — EPSG:4326 degrees.</summary>
 public sealed record FaultLocation(double Lat, double Lng);
+
+/// <summary>
+/// <c>POST /faults</c> answer (Contract 5.4): the full item plus the <c>client_op_id</c> it was sent with, so an
+/// offline queue can match the reply to the report it sent. 201 when created, 200 for a replay.
+/// </summary>
+public sealed record ReportedFault : FaultItem
+{
+    public required string ClientOpId { get; init; }
+}

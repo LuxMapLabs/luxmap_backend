@@ -28,6 +28,7 @@ public class CapabilityMatrixTests
         ["cap:manage_users"] = ["system_admin"],
         ["cap:read_faults"] = ["field_engineer", "manager", "superior", "system_admin"],
         ["cap:review_faults"] = ["manager"],
+        ["cap:report_faults"] = ["field_engineer"],
         ["cap:read_work_orders"] = ["field_engineer", "manager", "superior", "system_admin"],
         ["cap:manage_work_orders"] = ["manager"],
         ["cap:execute_work_orders"] = ["field_engineer"],

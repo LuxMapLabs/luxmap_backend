@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Net;
+using LuxMap.Modules.Faults;
+using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
@@ -19,7 +21,12 @@ namespace LuxMap.Modules.WorkOrders;
 public sealed record EvidenceItem
 {
     public required string EvidenceId { get; init; }
-    public required string WorkOrderId { get; init; }
+    /// <summary>The work order the photo belongs to; null for a photo of a reported fault.</summary>
+    public string? WorkOrderId { get; init; }
+
+    /// <summary>The reported fault the photo belongs to (BE-41); null for a work-order photo.</summary>
+    public string? FaultId { get; init; }
+
     public EvidenceKind Kind { get; init; }
     public DateTime CapturedAt { get; init; }
     public double Lat { get; init; }
@@ -72,8 +79,64 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
         _ => [],
     };
 
-    public async Task<(EvidenceItem Item, bool Created)> UploadAsync(string id, IFormFile? file, string? kind,
+    /// <summary>What a photo is attached to, and the checks that decide whether this caller may attach it now.</summary>
+    /// <param name="Own">Visibility and ownership; 404 when not the caller's. Returns the parent's commune.</param>
+    /// <param name="Writable">Label and state rules (400 / 409) — checked AFTER a replay, which answers whatever the state.</param>
+    /// <param name="Lock">Row lock on the parent, taken after the image write and before the row is inserted.</param>
+    private sealed record Target(string? WorkOrderId, string? FaultId, Func<CancellationToken, Task<string>> Own,
+        Func<CancellationToken, Task> Writable, FormattableString Lock);
+
+    private sealed record Upload(IFormFile File, EvidenceKind Kind, DateTime CapturedAt, double Lat, double Lng, Guid? Operation);
+
+    /// <summary>A photo on a work order: the assignee, while it is in progress, labelled for the kind of order.</summary>
+    public Task<(EvidenceItem Item, bool Created)> UploadAsync(string id, IFormFile? file, string? kind,
         string? capturedAt, string? lat, string? lng, string? clientOpId, CancellationToken ct)
+    {
+        var upload = Parse(file, kind, capturedAt, lat, lng, clientOpId);
+        async Task<string> Own(CancellationToken token)
+        {
+            var order = await VisibleOrder(id, token);
+            if (order.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
+            return order.CommuneId;
+        }
+        async Task Writable(CancellationToken token)
+        {
+            var order = await VisibleOrder(id, token);
+            if (!AllowedKinds(order.TaskKind).Contains(upload.Kind))
+                throw Error("EVIDENCE_KIND_NOT_ALLOWED", HttpStatusCode.BadRequest,
+                    ("kind", WireEnum.Name(upload.Kind)), ("task_kind", WireEnum.Name(order.TaskKind)));
+            if (order.WoStatus != WorkOrderStatus.InProgress)
+                throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict, ("wo_status", WireEnum.Name(order.WoStatus)));
+        }
+        return StoreAsync(new Target(id, null, Own, Writable,
+            $"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE"), upload, ct);
+    }
+
+    /// <summary>
+    /// A photo on a fault the caller REPORTED (BE-41, drift EV-2), while it is still open. Always an
+    /// <c>observation</c>: a report fixes nothing, so it has no before or after.
+    /// </summary>
+    public Task<(EvidenceItem Item, bool Created)> UploadToFaultAsync(string id, IFormFile? file,
+        string? capturedAt, string? lat, string? lng, string? clientOpId, CancellationToken ct)
+    {
+        var upload = Parse(file, "observation", capturedAt, lat, lng, clientOpId);
+        async Task<string> Own(CancellationToken token)
+        {
+            var fault = await VisibleFault(id, token);
+            if (fault.ReportedBy != ActorId) throw Error("FAULT_NOT_FOUND", HttpStatusCode.NotFound);
+            return fault.CommuneId;
+        }
+        async Task Writable(CancellationToken token)
+        {
+            var fault = await VisibleFault(id, token);
+            if (!FaultStatusSets.IsOpen(fault.FaultStatus))
+                throw Error("FAULT_NOT_OPEN", HttpStatusCode.Conflict, ("fault_status", WireEnum.Name(fault.FaultStatus)));
+        }
+        return StoreAsync(new Target(null, id, Own, Writable,
+            $"SELECT 1 FROM fault WHERE fault_id = {id} FOR UPDATE"), upload, ct);
+    }
+
+    private static Upload Parse(IFormFile? file, string? kind, string? capturedAt, string? lat, string? lng, string? clientOpId)
     {
         // Shape first, so a malformed request costs no database round trip and no storage write.
         if (file is null || file.Length == 0) throw OptionalJson.Invalid("file");
@@ -86,49 +149,43 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
             throw OptionalJson.Invalid("captured_at");
         // timestamptz keeps microseconds; trim here so the response equals what is stored.
         captured = new DateTime(captured.Ticks / 10 * 10, DateTimeKind.Utc);
-        var latitude = Coordinate(lat, "lat", 90);
-        var longitude = Coordinate(lng, "lng", 180);
         Guid? operation = null;
         if (!string.IsNullOrWhiteSpace(clientOpId))
             operation = Guid.TryParse(clientOpId, out var parsed) && parsed != Guid.Empty ? parsed : throw OptionalJson.Invalid("client_op_id");
+        return new Upload(file, parsedKind, captured, Coordinate(lat, "lat", 90), Coordinate(lng, "lng", 180), operation);
+    }
 
-        var order = await VisibleOrder(id, ct);
-        if (order.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
-
-        if (operation is { } op && await Replay(id, op, parsedKind, ct) is { } replayed) return (replayed, false);
-
-        if (!AllowedKinds(order.TaskKind).Contains(parsedKind))
-            throw Error("EVIDENCE_KIND_NOT_ALLOWED", HttpStatusCode.BadRequest,
-                ("kind", WireEnum.Name(parsedKind)), ("task_kind", WireEnum.Name(order.TaskKind)));
-        if (order.WoStatus != WorkOrderStatus.InProgress)
-            throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict, ("wo_status", WireEnum.Name(order.WoStatus)));
+    private async Task<(EvidenceItem Item, bool Created)> StoreAsync(Target target, Upload upload, CancellationToken ct)
+    {
+        await target.Own(ct);
+        if (upload.Operation is { } op && await Replay(target, op, upload.Kind, ct) is { } replayed) return (replayed, false);
+        await target.Writable(ct);
 
         // A fixed expression from the id registry, no user input: the same draw the column DEFAULT makes.
         var nextId = $"SELECT {PrefixedIds.RepairEvidence.DefaultValueSql} AS \"Value\"";
         var evidenceId = await db.Database.SqlQueryRaw<string>(nextId).SingleAsync(ct);
         StoredImage stored;
-        await using (var content = file.OpenReadStream())
+        await using (var content = upload.File.OpenReadStream())
             stored = await store.StoreImageAsync(StorageBucket.Evidence, evidenceId, content, ct);
 
-        // 🔴 The write above can take seconds, and no lock was held across it (BE-15 P2a rule): the manager may
-        // have reassigned or cancelled the order meanwhile. Lock the order, read it again through its filter,
-        // and check again. Inserting a child row does not touch work_order's xmin, so nothing else would notice.
+        // 🔴 The write above can take seconds, and no lock was held across it (BE-15 P2a rule): the parent may
+        // have been reassigned, cancelled or closed meanwhile. Lock it, read it again through its filter, check
+        // again. Inserting a child row does not touch the parent's xmin, so nothing else would notice.
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
-        var current = await VisibleOrder(id, ct);
-        if (current.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
-        // An overlapping retry with the same key may have committed while this one was writing — and the order
-        // may even have been completed since. The photo exists: answer the replay, not a state error.
-        if (operation is { } overlap && await Replay(id, overlap, parsedKind, ct) is { } committed) return (committed, false);
-        if (current.WoStatus != WorkOrderStatus.InProgress)
-            throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict, ("wo_status", WireEnum.Name(current.WoStatus)));
+        await db.Database.ExecuteSqlAsync(target.Lock, ct);
+        var communeId = await target.Own(ct);
+        // An overlapping retry with the same key may have committed while this one was writing — and the parent
+        // may even have moved on since. The photo exists: answer the replay, not a state error.
+        if (upload.Operation is { } overlap && await Replay(target, overlap, upload.Kind, ct) is { } committed) return (committed, false);
+        await target.Writable(ct);
 
         var row = new RepairEvidence
         {
-            EvidenceId = evidenceId, WorkOrderId = id, CommuneId = current.CommuneId, Kind = parsedKind,
-            CapturedAt = captured, Lat = latitude, Lng = longitude, ObjectKey = stored.OriginalKey,
-            ThumbnailKey = stored.ThumbnailKey, ByteCount = stored.OriginalBytes, ThumbnailBytes = stored.ThumbnailBytes,
-            UploadedBy = ActorId, UploadedAt = UtcMicrosecondClock.UtcNow(), ClientOpId = operation,
+            EvidenceId = evidenceId, WorkOrderId = target.WorkOrderId, FaultId = target.FaultId, CommuneId = communeId,
+            Kind = upload.Kind, CapturedAt = upload.CapturedAt, Lat = upload.Lat, Lng = upload.Lng,
+            ObjectKey = stored.OriginalKey, ThumbnailKey = stored.ThumbnailKey, ByteCount = stored.OriginalBytes,
+            ThumbnailBytes = stored.ThumbnailBytes, UploadedBy = ActorId, UploadedAt = UtcMicrosecondClock.UtcNow(),
+            ClientOpId = upload.Operation,
         };
         db.Add(row);
         try
@@ -136,33 +193,45 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }
-        catch (DbUpdateException error) when (operation is { } retry
+        catch (DbUpdateException error) when (upload.Operation is { } retry
             && error.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             // Two retries raced past the replay check. A failed statement aborts the transaction, so roll back
             // BEFORE asking again. The loser's object stays orphaned (BE-35 reconciles).
             await transaction.RollbackAsync(ct);
             db.Entry(row).State = EntityState.Detached;
-            return (await Replay(id, retry, parsedKind, ct) ?? throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict), false);
+            return (await Replay(target, retry, upload.Kind, ct) ?? throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict), false);
         }
         return (Item(row), true);
     }
 
-    /// <summary>The photo this user already sent with this key, if it was for the same order and label.</summary>
-    private async Task<EvidenceItem?> Replay(string id, Guid operation, EvidenceKind kind, CancellationToken ct)
+    /// <summary>The photo this user already sent with this key, if it was for the same parent and label.</summary>
+    private async Task<EvidenceItem?> Replay(Target target, Guid operation, EvidenceKind kind, CancellationToken ct)
     {
         var actorId = ActorId;
         var earlier = await db.Set<RepairEvidence>().AsNoTracking()
             .FirstOrDefaultAsync(x => x.UploadedBy == actorId && x.ClientOpId == operation, ct);
         if (earlier is null) return null;
-        if (earlier.WorkOrderId != id || earlier.Kind != kind) throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
+        if (earlier.WorkOrderId != target.WorkOrderId || earlier.FaultId != target.FaultId || earlier.Kind != kind)
+            throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
         return Item(earlier);
     }
 
     public async Task<PagedResult<EvidenceItem>> ListAsync(string id, PageRequest page, CancellationToken ct)
     {
         await VisibleOrder(id, ct);
-        var query = db.Set<RepairEvidence>().AsNoTracking().Where(x => x.WorkOrderId == id);
+        return await Page(db.Set<RepairEvidence>().AsNoTracking().Where(x => x.WorkOrderId == id), page, ct);
+    }
+
+    /// <summary>Photos of a fault, for everyone who may read the fault (commune scope).</summary>
+    public async Task<PagedResult<EvidenceItem>> ListForFaultAsync(string id, PageRequest page, CancellationToken ct)
+    {
+        await VisibleFault(id, ct);
+        return await Page(db.Set<RepairEvidence>().AsNoTracking().Where(x => x.FaultId == id), page, ct);
+    }
+
+    private static async Task<PagedResult<EvidenceItem>> Page(IQueryable<RepairEvidence> query, PageRequest page, CancellationToken ct)
+    {
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(x => x.CapturedAt).ThenBy(x => x.UploadedAt)
             .ThenBy(x => x.EvidenceId.Length).ThenBy(x => x.EvidenceId)
@@ -170,14 +239,25 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
         return PagedResult<EvidenceItem>.From(page, total, rows.Select(Item).ToList());
     }
 
-    /// <summary>The image bytes, after the same visibility check as the list. 404 for anything the caller cannot see.</summary>
+    /// <summary>The image bytes, after the same visibility check as the list — through the parent. 404 otherwise.</summary>
     public async Task<Stream> OpenAsync(string evidenceId, bool thumbnail, CancellationToken ct)
     {
         var row = await db.Set<RepairEvidence>().AsNoTracking().FirstOrDefaultAsync(x => x.EvidenceId == evidenceId, ct);
-        if (row is null || !await db.Set<WorkOrder>().AnyAsync(x => x.WorkOrderId == row.WorkOrderId, ct))
-            throw Error("EVIDENCE_NOT_FOUND", HttpStatusCode.NotFound);
-        return await store.OpenAsync(StorageBucket.Evidence, thumbnail ? row.ThumbnailKey : row.ObjectKey, ct);
+        var visible = row switch
+        {
+            null => false,
+            { WorkOrderId: { } order } => await db.Set<WorkOrder>().AnyAsync(x => x.WorkOrderId == order, ct),
+            { FaultId: { } fault } => await db.Set<Fault>().AnyAsync(x => x.FaultId == fault, ct),
+            _ => false,
+        };
+        if (!visible) throw Error("EVIDENCE_NOT_FOUND", HttpStatusCode.NotFound);
+        return await store.OpenAsync(StorageBucket.Evidence, thumbnail ? row!.ThumbnailKey : row!.ObjectKey, ct);
     }
+
+    /// <summary>The fault through its commune filter, or 404.</summary>
+    private async Task<Fault> VisibleFault(string id, CancellationToken ct)
+        => await db.Set<Fault>().AsNoTracking().FirstOrDefaultAsync(x => x.FaultId == id, ct)
+            ?? throw Error("FAULT_NOT_FOUND", HttpStatusCode.NotFound);
 
     [System.Text.RegularExpressions.GeneratedRegex(@"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,7})?(Z|[+-][0-9]{2}:[0-9]{2})?$")]
     private static partial System.Text.RegularExpressions.Regex CompleteTimestamp();
@@ -188,7 +268,7 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
 
     private static EvidenceItem Item(RepairEvidence x) => new()
     {
-        EvidenceId = x.EvidenceId, WorkOrderId = x.WorkOrderId, Kind = x.Kind, CapturedAt = x.CapturedAt,
+        EvidenceId = x.EvidenceId, WorkOrderId = x.WorkOrderId, FaultId = x.FaultId, Kind = x.Kind, CapturedAt = x.CapturedAt,
         Lat = x.Lat, Lng = x.Lng, UploadedBy = x.UploadedBy, UploadedAt = x.UploadedAt,
         ThumbnailUrl = $"/api/v1/evidence/{x.EvidenceId}/thumbnail",
         OriginalUrl = $"/api/v1/evidence/{x.EvidenceId}/original",
