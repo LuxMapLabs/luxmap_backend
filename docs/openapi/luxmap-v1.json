@@ -7529,7 +7529,7 @@
             "nullable": true
           },
           "location": {
-            "$ref": "#/components/schemas/FaultLocation"
+            "$ref": "#/components/schemas/ReportLocation"
           },
           "commune_id": {
             "type": "string",
@@ -7553,6 +7553,22 @@
           },
           "photo_frame_id": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportLocation": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         },
