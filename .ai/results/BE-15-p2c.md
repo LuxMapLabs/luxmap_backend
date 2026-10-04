@@ -321,3 +321,9 @@ Codex hết hạn mức giữa lượt R6 (sau khi đã sửa code, migration, t
   vi ⇒ 1 + 1 đỏ; gỡ CHECK trên DB ⇒ `Check_rejects_known_history_without_observation` đỏ (CHECK đã tạo lại đúng như migration).
 - OpenAPI xuất lại, spec hợp nhất sinh lại, lint hợp lệ.
 - ⚠️ Review độc lập lần 3 (Codex `exec review`) **chưa chạy** — hết hạn mức tới 10/10/2026.
+
+## Sau merge (#80) — review độc lập lần 3
+
+Codex `exec review` trên dev (chạy với `-c model="gpt-6-astra"`; `~/.codex/config.toml` đang trỏ `gpt-6.1-sol`, tài khoản
+ChatGPT không dùng được): hàng `not_observed` không có FK nào tới `pole` (hai FK ghép bỏ qua vì null). Claude sửa ở
+`fix/BE-15-history-pole-fk`: migration `LuminanceHistoryPoleFk` (chỉ `AddForeignKey`), test xoá cột; phá thử (gỡ FK) ⇒ đỏ.
