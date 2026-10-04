@@ -109,7 +109,11 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
         // Geometry for every road a returned pole stands on — including roads reached only through the
         // order's faults, whose poles would otherwise all project to 0 and sort by ID.
         var roadIds = rows.Select(r => r.SegmentId).Distinct().ToArray();
-        var lines = (await db.Set<RoadSegment>().AsNoTracking().Where(s => roadIds.Contains(s.SegmentId))
+        // 🔴 Unfiltered ON PURPOSE, and only for ordering. An inter_commune road belongs to another commune,
+        // so the commune filter hides it from this caller even though THEIR poles stand on it; with the
+        // geometry missing every pole would project to 0 and sort by id. The poles above already passed the
+        // filter, and nothing of the road except the order along it leaves this method.
+        var lines = (await db.Set<RoadSegment>().AsNoTracking().IgnoreQueryFilters().Where(s => roadIds.Contains(s.SegmentId))
             .Select(s => new { s.SegmentId, s.Geom }).ToListAsync(ct))
             .ToDictionary(s => s.SegmentId, s => new LengthIndexedLine(s.Geom));
 

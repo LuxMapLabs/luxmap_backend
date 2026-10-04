@@ -813,6 +813,22 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
     }
 
     [Fact]
+    public async Task Road_order_survives_a_road_owned_by_a_commune_outside_the_callers_scope()
+    {
+        // The home engineer's poles stand on a road the FOREIGN commune owns (inter_commune); the commune
+        // filter hides that road from them, but the order along it must still be the road's.
+        var beyond = await PlantPole(0.7, road: foreignSegment);
+        var pole = await PlantPole(0.3, road: foreignSegment);
+        var faults = new[] { await PlantPoleFault(pole, FaultStatus.Confirmed, reportedOn: segment), await PlantPoleFault(beyond, FaultStatus.Confirmed, reportedOn: segment) };
+        var id = await Create("repair", faults, assigned: users["a"].UserId);
+
+        var items = (await PolesOf(id, who: "a")).GetProperty("items").EnumerateArray().ToArray();
+
+        Assert.Equal([pole, beyond], items.Select(x => x.GetProperty("pole_id").GetString()!));
+        Assert.Equal([1, 2], items.Select(x => x.GetProperty("position").GetInt32()));
+    }
+
+    [Fact]
     public async Task Paging_keeps_road_positions_and_the_total()
     {
         foreach (var along in new[] { 0.1, 0.2, 0.3 }) await PlantPole(along);
