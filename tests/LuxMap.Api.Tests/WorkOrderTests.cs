@@ -1109,6 +1109,35 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
     }
 
     [Fact]
+    public async Task An_overlapping_retry_gets_the_photo_back_even_after_the_order_was_completed()
+    {
+        var id = await StartedRepair();
+        var key = Guid.NewGuid();
+        string? firstId = null;
+        // While this request writes its image, the overlapping first attempt commits the photo and the engineer
+        // completes the order. This request must then answer the replay, not "not in progress".
+        photos.DuringWrite = () => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var order = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(x => x.WorkOrderId == id);
+            var first = new RepairEvidence { WorkOrderId = id, CommuneId = order.CommuneId, Kind = EvidenceKind.After, CapturedAt = DateTime.UtcNow,
+                Lat = 16, Lng = 108, ObjectKey = "original/first.jpg", ThumbnailKey = "thumb/first.jpg", ByteCount = 1, ThumbnailBytes = 1,
+                UploadedBy = users["a"].UserId, ClientOpId = key };
+            db.Add(first);
+            order.WoStatus = WorkOrderStatus.Done; order.CompletedAt = DateTime.UtcNow; order.ReportNote = "The repair is complete";
+            await db.SaveChangesAsync(); firstId = first.EvidenceId; return 0;
+        });
+        try
+        {
+            var (status, body) = await Upload("a", id, "after", clientOpId: key.ToString());
+            Assert.Equal(200, status);
+            Assert.Equal(firstId, body.GetProperty("evidence_id").GetString());
+        }
+        finally { photos.DuringWrite = null; }
+        Assert.Equal(1, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Fact]
     public async Task A_retry_with_the_same_client_op_id_returns_the_same_photo()
     {
         var id = await StartedRepair();

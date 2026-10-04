@@ -117,6 +117,9 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
         var current = await VisibleOrder(id, ct);
         if (current.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
+        // An overlapping retry with the same key may have committed while this one was writing — and the order
+        // may even have been completed since. The photo exists: answer the replay, not a state error.
+        if (operation is { } overlap && await Replay(id, overlap, parsedKind, ct) is { } committed) return (committed, false);
         if (current.WoStatus != WorkOrderStatus.InProgress)
             throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict, ("wo_status", WireEnum.Name(current.WoStatus)));
 
