@@ -619,10 +619,27 @@ OFF ghép rõ → out; CV mơ hồ/ảnh kém/video gap → unknown. Bằng ch�
 kể cả khác lượt; cùng một cột được quan sát lại ở lượt khác vẫn hợp lệ. Kết quả tra theo chỉ số lượt,
 cột và thời điểm để hai lượt chung điểm quay đầu không ghi đè nhau. Một detection đạt chất lượng mỗi frame cùng phía, nhãn nhất quán được ghép thành một
 track dù bbox không giao nhau; nhiều detection cùng frame còn mơ hồ. Frame đại diện theo diện tích bbox × confidence, không theo lux.
-Baseline lookup hiện trả null; P2c mới chọn baseline tương thích và chấp nhận/công bố. Bản đồ/status,
-luminance history và fault không bị ghi ở bước này. Hợp đồng đồng hồ tạm ở
+Baseline lookup P2c dùng các member đã accepted, cùng nguồn/chiều, khác sweep và trước thời điểm bắt đầu sweep.
+Bản đồ/status, luminance history và fault chỉ được ghi khi Quản lý accept, không ở bước xử lý. Hợp đồng đồng hồ tạm ở
 [`docs/survey-ingest-p2a.md`](docs/survey-ingest-p2a.md).
 
 Rollback vận hành: tắt `SurveyProcessing:Enabled`, giữ dữ liệu. `Down()` mất frame/detection/CV và từ chối
 nếu registry còn artifact media/classification (CHECK phiên bản trước không nhận các component mới).
 Chỉ thử rollback trên DB thử nghiệm đã teardown; không tự xoá registry bất biến ở production.
+
+
+### Duyệt khảo sát — BE-15 P2c
+
+`GET /sweeps/{id}/results` trả quan sát theo run; `POST /sweeps/{id}/review` nhận accept/return,
+client_op_id và expected_version (lấy `version` từ GET sweep). Thumbnail JPEG qua
+`GET /frames/{frame_id}/thumbnail`; mọi endpoint kiểm scope/assignee, duyệt đòi đủ xã của run.
+Chi tiết payload, lỗi, luật công bố và rollback tại [hướng dẫn khảo sát](docs/survey-ingest-p2a.md#duyệt-và-công-bố--p2c-self-signed-nền-tạm-tới-fw).
+
+Cấu hình tạm: `SurveyReview:BaselineMinimumMembers=3`, `SurveyReview:LampOutSeverity=Medium`,
+`SurveyReview:LampDimSeverity=Low`. Severity chỉ nhận Low/Medium/High, cột gần điểm nhạy cảm tăng
+một bậc tới High. Baseline dùng trung vị các member đủ điều kiện, không tự chấm sweep.
+API SELF-SIGNED chờ FW; xử lý dữ liệu thật vẫn chờ D-06/D-07, profile/protocol baseline chờ D-05/BE-33/34.
+
+Review P2c vòng 2: member baseline chỉ nhận normal, lọc từ ngày lắp bóng đang dùng và lookup cùng
+fixture_id; thay bóng phải tích luỹ member mới. Results thêm `published_as`/`is_representative`
+để xem trước công bố qua mọi lượt. Thumbnail thiếu object trả 503 `STORAGE_OBJECT_MISSING`.

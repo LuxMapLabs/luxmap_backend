@@ -81,7 +81,7 @@ public class AuditGuardTests
         var files = Directory.GetFiles(Path.Combine(root.FullName, "src"), "*", SearchOption.AllDirectories)
             .Where(file => !file.Split(Path.DirectorySeparatorChar).Any(part => part is "bin" or "obj"))
             // Migrations whose immutable triggers use the switch. Each is listed here by name.
-            .Where(file => Path.GetFileName(file) is not ("20260927161055_AddAuditEvent.cs" or "20261002095348_AddSurveyProcessing.cs" or "20261003071658_AddSurveyFrames.cs"))
+            .Where(file => Path.GetFileName(file) is not ("20260927161055_AddAuditEvent.cs" or "20261002095348_AddSurveyProcessing.cs" or "20261003071658_AddSurveyFrames.cs" or "20261003172809_AddSurveyPublication.cs"))
             .Concat([Path.Combine(root.FullName, "docker-compose.yml"), Path.Combine(root.FullName, ".env.example")])
             .Concat(Directory.GetFiles(Path.Combine(root.FullName, ".github", "workflows"), "*", SearchOption.AllDirectories))
             .ToArray();

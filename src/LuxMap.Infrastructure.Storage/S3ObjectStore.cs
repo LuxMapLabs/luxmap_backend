@@ -54,11 +54,19 @@ public sealed class S3ObjectStore(IAmazonS3 client, ILogger<S3ObjectStore> logge
     public async Task<Stream> OpenAsync(
         StorageBucket bucket, string key, CancellationToken cancellationToken = default)
     {
-        var response = await client.GetObjectAsync(
-            new GetObjectRequest { BucketName = StorageKeys.NameOf(bucket), Key = key },
-            cancellationToken);
-
-        return response.ResponseStream;
+        try
+        {
+            var response = await client.GetObjectAsync(
+                new GetObjectRequest { BucketName = StorageKeys.NameOf(bucket), Key = key },
+                cancellationToken);
+            return response.ResponseStream;
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound
+            || exception.ErrorCode == "NoSuchKey")
+        {
+            throw new LuxMap.Shared.Http.LuxMapException("STORAGE_OBJECT_MISSING",
+                System.Net.HttpStatusCode.ServiceUnavailable, "Stored media is unavailable; storage repair is required.");
+        }
     }
 
     public async Task<bool> ExistsAsync(

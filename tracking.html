@@ -51,6 +51,26 @@
     <a href=".ai/results/PHOTOS-REFS.md">Kết quả và bằng chứng</a>.</p>
   </div>
   <div class="card">
+    <strong>BE-15 P2c — 04/10/2026: đã triển khai trên feat/BE-15-survey-review, chờ Claude review/PostGIS</strong>
+    <p><span class="tag t-next">Đã kiểm offline</span> Duyệt accept/return idempotent, results phân trang, thumbnail proxy có scope;
+    công bố history/current/fault theo xã trong một transaction; D-08 chống duyệt muộn, audit CV riêng từng fault,
+    baseline median có version/member và chống tự chấm. Migration <code>AddSurveyPublication</code> đã sinh/đọc,
+    ba trigger bất biến; chưa apply. Build <strong>0 warning/0 error</strong>, <strong>387 test không DB xanh</strong>
+    (Shared 308, Persistence 43, Storage 36); model khớp snapshot. 11 test PostGIS mới chỉ biên dịch.</p>
+    <p>Còn: Claude kiểm SQL/khoá/rollback/test tích hợp và xuất OpenAPI; FW xác nhận API/severity tạm;
+    D-05/D-06 và BE-33/34 chốt matching baseline theo profile/protocol trước dữ liệu thật.
+    Files: <code>Survey/Review</code>, entities/configs/migration, pipeline baseline, tests Shared/Persistence/API,
+    README/hướng dẫn khảo sát/drift/generator thumbnail. <strong>Không commit/push theo yêu cầu</strong> (chưa có commit message).
+    <a href=".ai/results/BE-15-p2c.md">Kết quả, bằng chứng và giới hạn</a>.</p>
+    <p><strong>Vòng 2 — 04/10:</strong> giữ nguyên R0 của Claude; sửa R1 chỉ normal làm member,
+    R2 baseline theo fixture hiện tại/ngày lắp, R3 object thiếu →503, R4 preview published_as/is_representative qua mọi lượt.
+    Sinh lại chính AddSurveyPublication, giữ ID và SQL trigger/Down guard; diff chỉ fixture_id + FK/index.
+    <strong>394 test không DB xanh</strong> (312/43/39), build 0 warning/0 error; phá thử đỏ đúng 6 ca rồi khôi phục.
+    Hai ca PostGIS dim nhiều phiên/thay bóng đã viết, chỉ biên dịch; chờ Claude kiểm migration/SQL/HTTP.
+    Files vòng này: Survey/Review + baseline entity/config/migration, S3ObjectStore, tests Shared/Storage/API, tài liệu/results.
+    Không commit/push.</p>
+  </div>
+  <div class="card">
     <strong>BE-15 P2b-2 — 03/10/2026: xong trên nhánh, review độc lập sạch, chưa PR</strong>
     <p><span class="tag t-next">Xong trên nhánh, chưa PR</span> <strong>Claude kiểm:</strong> Api 564, Persistence 41, Shared 290, Storage 36 xanh trên <code>luxmap_test</code>; video iPhone thật 278/278 và 568/568 frame; sửa lỗi câm <code>classified_as</code> (mọi đèn normal bị lưu unknown) + test canh toàn model; review độc lập 2 lượt: 2 P2 → sạch. Frame PTS thật/áp xoay, detector giả theo hash,
     ghép track và phân loại, schema <code>AddSurveyFrames</code>, worker heartbeat và ba mức độ phủ.

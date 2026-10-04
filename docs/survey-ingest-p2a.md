@@ -146,3 +146,77 @@ worker P2b-2 chỉ xử lý nguồn `simulated`; nguồn khác thất bại `VID
 Fake không tự thay thế detector thật, và không được chọn ở Production/Staging.
 `frame_count` trả số row frame của sweep; coverage phát hiện và coverage đủ xét dim lưu riêng trong run,
 cùng mẫu số pole dự kiến của snapshot. Chưa thêm trường API cho hai mức này, chưa công bố kết quả.
+
+## Duyệt và công bố — P2c (SELF-SIGNED, nền tạm tới FW)
+
+`GET /sweeps/{id}` và listing bổ sung `version` (`xmin`) để gửi lại khi duyệt.
+`GET /sweeps/{id}/results?run_id=…&page=1&page_size=50` dùng `ReadSurveys`, mặc định run thành công
+có attempt mới nhất, giới hạn trang 200. Mỗi item là một quan sát cột/lượt, có `observation_id`,
+`pole_id`, `run_id`, `pass_id`, `direction`, `evaluated_at`, `cv_state`, `cv_confidence`, `peak_lux`,
+`baseline_id`, `baseline_value`, `baseline_ratio`, `classified_as`, `dim_evaluation_eligible`,
+`reason_codes[]`, `quality_flags[]`, `frame_id`, `association_confidence`, `published_as`, `is_representative`.
+Hai trường cuối dùng mọi lượt của cột trong run, kể cả lượt nằm trên trang khác: `published_as` là
+kết quả sẽ công bố, `is_representative` đánh dấu observation được chọn.
+Cột **dự kiến** của run (`gis_snapshot.poles`) mà xe không đi qua cũng có một item: `observation_id`,
+`pass_id`, `direction`, các trường đo đều `null`, `evaluated_at` = lúc kết thúc phiên, `published_as = unknown`,
+`reason_codes = ["not_observed"]`. Các item này đứng **sau** mọi quan sát, theo `length(pole_id), pole_id`, và được
+tính vào `total`. Phiên dừng giữa đường sẽ hiện nhiều item như vậy — Quản lý nên trả lại thay vì chấp nhận.
+
+Quản lý (`ReviewSurveys`) gọi `POST /sweeps/{id}/review`:
+
+```json
+{"client_op_id":"6d3361de-e9d8-4c14-81dc-6d0052f09532","run_id":123,"decision":"accept","note":null,"expected_version":456}
+```
+
+`decision` nhận `accept` hoặc `return`; trả lại bắt buộc ghi chú không trắng. Response 200 gồm
+`sweep_id`, `status`, `accepted_run_id`, `reviewed_by`, `reviewed_at`, `note`, `version`.
+Retry cùng actor/key và body chuẩn hoá trả nguyên quyết định cũ (kể cả version cũ trong body retry);
+đổi payload cùng key → 409 `IDEMPOTENCY_CONFLICT`. Run sai sweep/không thành công → 409
+`INVALID_REVIEW_RUN`; sweep đã quyết bằng key khác → 409 `SWEEP_ALREADY_REVIEWED`; version cũ →
+409 `VERSION_CONFLICT`. Kiểm quyền trước cả retry. Thiếu bất kỳ xã nào của run — xã của quan sát, của
+cột dự kiến trong snapshot và xã hiện tại của các cột đó →
+403 `COMMUNE_FORBIDDEN`; parent ngoài scope/assignee → 404. Run không có kết quả ở GET → 404.
+
+Chấp nhận công bố **mọi cột dự kiến** cộng mọi cột có quan sát: cột không quan sát nhận history
+`unknown`/`not_observed` (`observation_id` null, CHECK `ck_luminance_history_unobserved` cấm số đo trên hàng đó) và
+trạng thái hiện tại `unknown` nếu mới hơn — đúng nghĩa *phiên gần nhất không phủ được cột* của Contract mục 1; không
+sinh sự cố, không dựng baseline. Kiểm tương thích cột (`SURVEY_SCOPE_CHANGED`: cột bị xoá, đổi xã hoặc đổi
+`data_source` sau khi xử lý) **chỉ** chạy khi accept; trả lại luôn được.
+Chấp nhận giữ khoá work order → sweep → toàn bộ pole theo thứ tự ID; một transaction bao gồm audit
+quyết định, các batch công bố theo xã và audit `cv` riêng cho từng fault mới. Một SaveChanges chỉ có
+một audit mới; batch xã không nhét pole của xã khác vào audit. Không tự hoàn thành phiếu công việc.
+Trả lại chỉ lưu quyết định/audit, không sinh history/status/fault/baseline; khảo sát lại tạo sweep mới.
+
+Một history/cột/sweep: ưu tiên quan sát known, CV confidence cao, association confidence cao, ít cờ
+chất lượng, rồi thời gian và observation ID để phá hoà. Không xếp theo độ lớn lux. ON/OFF mâu thuẫn
+qua các lượt → unknown, confidence/ratio null, không xét dim, không làm member và không tạo fault.
+`evaluated_at` là `observed_at` của quan sát đại diện. Chỉ timestamp mới hơn mới cập nhật current status
+và tạo fault; timestamp bằng hoặc cũ hơn chỉ thêm history (D-08). Unknown mới vẫn tiến last_evaluated_at.
+
+Fault `out` → `lamp_out`, `dim` → `lamp_dim`, source `cv`, data_source theo sweep; lưu observation nguồn,
+model version; priority_score null. Dưới khoá pole, tra `FaultStatusSets.Open` và loại hiệu lực
+`override_fault_type ?? fault_type` để không tạo trùng. Không tự đóng sự cố khi đèn sáng lại.
+`SurveyReview:LampOutSeverity` mặc định `Medium`, `LampDimSeverity` mặc định `Low`, chỉ cấu hình
+Low/Medium/High; gần điểm nhạy cảm tăng một bậc, trần High. Đây là luật tạm chờ WP4/FW.
+
+Baseline bất biến, tách pole/nguồn/chiều; sau công bố lấy tối đa một quan sát đủ chất lượng mỗi
+run đã accepted cho mỗi chiều. CV on, **normal** (kể cả chưa có baseline), peak hữu hạn ≥0; loại peak_shared, paired_poles,
+lux_gap, lux_saturated, ambiguous_association. Đủ `SurveyReview:BaselineMinimumMembers` (mặc định 3)
+và trung vị >0 thì tạo version mới và lưu đầy đủ member (không dùng baseline 0 làm mẫu số). Giữ baseline_id/value đã dùng trên observation;
+review không chấm lại bằng baseline mới. Lookup xét mọi member: đúng cột/nguồn/chiều, accepted run,
+khác sweep đang chấm và thời gian trước **lúc bắt đầu sweep**. Không dùng baseline tự chấm hay tương lai.
+Baseline lưu `fixture_id` của bóng đang dùng. Member phải có `observed_at` từ 00:00 UTC ngày lắp bóng
+đang dùng trở đi; nếu không có bóng/ngày lắp thì không lọc theo ngày. Schema hiện tại InstallDate không nullable.
+Lookup chỉ nhận baseline cùng fixture_id hiện tại (không có bóng thì chỉ nhận fixture_id null).
+Thay bóng cần đủ member mới; dim không bao giờ làm member, tránh kéo baseline xuống theo đèn mờ.
+Registry profile/cấu hình quản trị chưa có trong P2a/P2b: matching profile/protocol đầy đủ vẫn
+phải chốt trước khi mở xử lý thực địa (D-05/D-06, BE-33/34); không coi baseline mô phỏng là baseline thực địa.
+
+`GET /frames/{frame_id}/thumbnail` dùng `ReadSurveys`, trả stream JPEG qua API. Kiểm sweep cha,
+work order/assignee, xã trong các run và GIS snapshot trước khi mở object; ngoài quyền 404.
+Object thiếu trả 503 `STORAGE_OBJECT_MISSING` từ adapter S3; lỗi quyền truy cập không đổi thành missing.
+Không presigned URL. Stub thumbnail đã bỏ khỏi generator; OpenAPI đã xuất lại (`luxmap-v1.json`, `luxmap-v1.5.json`).
+
+Migration `AddSurveyPublication` thêm ba bảng bất biến, FK Restrict và truy vết review/current/fault.
+Giữ CHECK status_confidence 0..1 có sẵn. Down từ chối nếu đã có lịch sử/baseline/quyết định duyệt;
+rollback ứng dụng nên giữ dữ liệu. Claude đã apply → rollback → apply hai vòng trên `luxmap_test` và chạy toàn bộ test PostGIS.

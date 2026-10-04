@@ -244,7 +244,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             var pass = new SurveyPass
             {
                 Run = run, SegmentId = result.Segment, PassNo = number++,
-                Direction = result.Pass.Track[^1].ChainageM > result.Pass.Track[0].ChainageM ? "forward" : "reverse",
+                Direction = result.Pass.Direction,
                 FromFraction = result.Pass.Track[0].ChainageM / result.Length, ToFraction = result.Pass.Track[^1].ChainageM / result.Length,
                 StartElapsedNs = result.Pass.Track[0].TimeNs, EndElapsedNs = result.Pass.Track[^1].TimeNs,
                 QualityFlags = Json(new { gps_offset_seconds = result.Pass.GpsOffsetSeconds, offset_reliable = result.Pass.OffsetReliable, excess_time_ratio = result.Pass.ExcessTimeRatio })
@@ -276,6 +276,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             CvConfidence = cv?.Association.Confidence,
             RepresentativeFrameId = cv?.Association.RepresentativeFrameId,
             ClassifiedAs = cv?.Classification.Status ?? FixtureStatus.Unknown,
+            BaselineId = cv?.Baseline?.Id, BaselineValue = cv?.Baseline?.Value,
             BaselineRatio = cv?.Classification.BaselineRatio,
             DimEvaluationEligible = cv?.Classification.DimEvaluationEligible ?? false,
             ReasonCodes = Json(cv?.Classification.Reasons ?? []),

@@ -30,7 +30,7 @@ public sealed class SurveyProcessingModelTests
     {
         using var db = Create();
         var model = db.GetService<IDesignTimeModel>().Model;
-        foreach (var type in new[] { typeof(ArtifactVersion), typeof(SurveyProcessingRun), typeof(SurveyPass), typeof(PoleObservation), typeof(SurveyFrame), typeof(Detection) })
+        foreach (var type in new[] { typeof(ArtifactVersion), typeof(SurveyProcessingRun), typeof(SurveyPass), typeof(PoleObservation), typeof(SurveyFrame), typeof(Detection), typeof(LuminanceBaseline), typeof(BaselineMember), typeof(LuminanceHistory) })
         {
             var entity = model.FindEntityType(type)!;
             Assert.All(entity.GetForeignKeys(), fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
@@ -57,6 +57,36 @@ public sealed class SurveyProcessingModelTests
         db.Add(new PoleObservation { PoleId = "POLE-0001", CommuneId = "COM-002", QualityFlags = "[]" });
         var ex = await Assert.ThrowsAsync<LuxMapException>(() => db.SaveChangesAsync());
         Assert.Equal("COMMUNE_FORBIDDEN", ex.Code);
+    }
+
+    [Theory]
+    [InlineData(EntityState.Modified)] [InlineData(EntityState.Deleted)]
+    public async Task Publication_records_are_immutable_before_any_database_access(EntityState state)
+    {
+        object[] rows = [
+            new LuminanceBaseline { BaselineId = 1, PoleId = "POLE-0001", CommuneId = "COM-001", Direction = "forward", CreatedBy = "USR-001" },
+            new BaselineMember { BaselineId = 1, ObservationId = 1 },
+            new LuminanceHistory { SweepId = "SWP-001", PoleId = "POLE-0001", CommuneId = "COM-001", PublishedBy = "USR-001", ReasonCodes = "[]" }
+        ];
+        foreach (var row in rows)
+        {
+            using var db = Create();
+            db.Entry(row).State = state;
+            Assert.Contains("cannot be changed", (await Assert.ThrowsAsync<InvalidOperationException>(() => db.SaveChangesAsync())).Message);
+        }
+    }
+
+    [Fact]
+    public void Missing_observation_is_nullable_but_requires_unknown_without_measurements()
+    {
+        using var db = Create();
+        var entity = db.GetService<IDesignTimeModel>().Model.FindEntityType(typeof(LuminanceHistory))!;
+        Assert.True(entity.FindProperty(nameof(LuminanceHistory.ObservationId))!.IsNullable);
+        var check = Assert.Single(entity.GetCheckConstraints(), c => c.Name == "ck_luminance_history_unobserved");
+        Assert.Equal("observation_id IS NOT NULL OR (classified_as = 'unknown' AND peak_lux IS NULL AND cv_state IS NULL AND baseline_id IS NULL AND baseline_ratio IS NULL AND status_confidence IS NULL)", check.Sql);
+        var fk = Assert.Single(entity.GetForeignKeys(), f => f.PrincipalEntityType.ClrType == typeof(PoleObservation));
+        Assert.False(fk.IsRequired);
+        Assert.Equal(new[] { "ObservationId", "PoleId", "CommuneId", "RunId" }, fk.Properties.Select(p => p.Name));
     }
 
     private sealed class Stop : SaveChangesInterceptor

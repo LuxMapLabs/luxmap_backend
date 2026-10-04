@@ -259,15 +259,8 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
 
     private static SweepResponse Build(SurveySweep s, string[] segments, SurveyClipResponse[] clips, SurveyRawResponse[] raw)
     {
-        DateTime? At(long? elapsed)
-        {
-            if (elapsed is null) return null;
-            var ticks = (elapsed.Value - s.ElapsedAnchorNs) / 100;
-            if (ticks > DateTime.MaxValue.Ticks - s.UtcAnchor.Ticks || ticks < -s.UtcAnchor.Ticks) return null;
-            return new DateTime((s.UtcAnchor.Ticks + ticks) / 10 * 10, DateTimeKind.Utc);
-        }
-        return new(s.SweepId, s.WorkOrderId, At(s.StartedElapsedNs), At(s.EndedElapsedNs), segments,
-            s.FrameCount, s.CoveragePct, s.ProcessingStatus, s.Status, s.DataSource, s.SubmittedAt, clips, raw);
+        return new(s.SweepId, s.WorkOrderId, s.AtElapsed(s.StartedElapsedNs), s.AtElapsed(s.EndedElapsedNs), segments,
+            s.FrameCount, s.CoveragePct, s.ProcessingStatus, s.Status, s.DataSource, s.SubmittedAt, clips, raw, s.Version);
     }
 
     private void Record(SurveySweep s, AuditAction action, object? before, DateTime now)

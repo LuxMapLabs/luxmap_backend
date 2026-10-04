@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 56 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 59 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.7"
   },
   "paths": {
@@ -3993,6 +3993,233 @@
         "x-luxmap-status": "implemented"
       }
     },
+    "/api/v1/frames/{frame_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "SurveyFrames"
+        ],
+        "parameters": [
+          {
+            "name": "frame_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-15 P2c] Thumbnail JPEG của khung hình khảo sát — proxy qua API, không presigned; 503 khi object thiếu",
+        "operationId": "getFramesFrameIdThumbnail",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§2.7 + BE-15 P2c"
+      }
+    },
+    "/api/v1/sweeps/{id}/results": {
+      "get": {
+        "tags": [
+          "SurveyReview"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SurveyResultItemPagedResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-15 P2c] Kết quả từng lượt quét theo cột của run (mặc định run thành công mới nhất), kèm published_as xem trước",
+        "operationId": "getSweepsIdResults",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/sweeps/{id}/review": {
+      "post": {
+        "tags": [
+          "SurveyReview"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSweepRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSweepRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewSweepRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSweepResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSweepResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewSweepResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_surveys",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-15 P2c] Quản lý chấp nhận (công bố trạng thái cột, chuỗi độ sáng, baseline, sự cố CV) hoặc trả lại; idempotent theo client_op_id",
+        "operationId": "postSweepsIdReview",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
     "/api/v1/sweeps": {
       "post": {
         "tags": [
@@ -5930,63 +6157,6 @@
         }
       }
     },
-    "/api/v1/frames/{frame_id}/thumbnail": {
-      "get": {
-        "tags": [
-          "IotSweeps"
-        ],
-        "summary": "[NOT IMPLEMENTED] Thumbnail JPEG của một khung hình — proxy qua API, không presigned",
-        "description": "Contract §5.6. Chưa có code — ticket BE-15. Giữ trong Contract, không xoá.",
-        "operationId": "getFramesFrameIdThumbnail",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-client": "shared",
-        "x-luxmap-contract": "§5.6",
-        "x-luxmap-ticket": "BE-15",
-        "parameters": [
-          {
-            "name": "frame_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/FrameId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "JPEG (320px cạnh dài, q80 — TẠM, Open item O-4)",
-            "content": {
-              "image/jpeg": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Không tồn tại hoặc ngoài phạm vi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/sync/bundle": {
       "get": {
         "tags": [
@@ -7706,6 +7876,67 @@
         },
         "additionalProperties": false
       },
+      "ReviewSweepRequest": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decision": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReviewSweepResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SweepStatus"
+          },
+          "accepted_run_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "reviewed_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "reviewed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "ReviewWorkOrderRequest": {
         "type": "object",
         "properties": {
@@ -7998,6 +8229,124 @@
         },
         "additionalProperties": false
       },
+      "SurveyResultItem": {
+        "type": "object",
+        "properties": {
+          "observation_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "pole_id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pass_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string",
+            "nullable": true
+          },
+          "evaluated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "cv_state": {
+            "type": "string",
+            "nullable": true
+          },
+          "cv_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "peak_lux": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "baseline_value": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "classified_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "dim_evaluation_eligible": {
+            "type": "boolean"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "quality_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frame_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "association_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "published_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "is_representative": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SurveyResultItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyResultItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SweepManifest": {
         "type": "object",
         "properties": {
@@ -8091,6 +8440,10 @@
             "items": {
               "$ref": "#/components/schemas/SurveyRawResponse"
             }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

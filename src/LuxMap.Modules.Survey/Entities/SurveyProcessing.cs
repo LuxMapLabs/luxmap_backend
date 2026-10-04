@@ -79,6 +79,8 @@ public sealed class PoleObservation : ICommuneScoped, IImmutableRecord
     public double? CvConfidence { get; set; }
     public string? RepresentativeFrameId { get; set; }
     public FixtureStatus ClassifiedAs { get; set; } = FixtureStatus.Unknown;
+    public long? BaselineId { get; set; }
+    public double? BaselineValue { get; set; }
     public double? BaselineRatio { get; set; }
     public bool DimEvaluationEligible { get; set; }
     public string ReasonCodes { get; set; } = "[]";

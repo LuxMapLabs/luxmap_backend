@@ -35,7 +35,22 @@ public sealed class SurveySweep : ICommuneScoped, IAudited
     public int ProcessingAttempt { get; set; }
     public int FrameCount { get; set; }
     public double? CoveragePct { get; set; }
+    public long? AcceptedRunId { get; set; }
+    public Guid? ReviewClientOpId { get; set; }
+    public string? ReviewRequestHash { get; set; }
+    public string? ReviewedBy { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewNote { get; set; }
     public uint Version { get; set; }
+
+    public DateTime? AtElapsed(long? elapsed)
+    {
+        if (elapsed is null) return null;
+        var ticks = (elapsed.Value - ElapsedAnchorNs) / 100;
+        if (ticks > DateTime.MaxValue.Ticks - UtcAnchor.Ticks || ticks < -UtcAnchor.Ticks) return null;
+        return new DateTime((UtcAnchor.Ticks + ticks) / 10 * 10, DateTimeKind.Utc);
+    }
+
 }
 
 public sealed class SurveyVideoClip
