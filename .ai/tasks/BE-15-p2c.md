@@ -1,7 +1,7 @@
 ---
 ticket: BE-15
 title: Phase 2c — Quản lý duyệt phiên khảo sát, công bố trạng thái cột, baseline, sự cố CV, ảnh frame
-status: review
+status: done
 phase: 2
 owner: codex
 branch: feat/BE-15-survey-review
