@@ -106,7 +106,10 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
             })
             .ToListAsync(ct);
 
-        var lines = (await db.Set<RoadSegment>().AsNoTracking().Where(s => segmentIds.Contains(s.SegmentId))
+        // Geometry for every road a returned pole stands on — including roads reached only through the
+        // order's faults, whose poles would otherwise all project to 0 and sort by ID.
+        var roadIds = rows.Select(r => r.SegmentId).Distinct().ToArray();
+        var lines = (await db.Set<RoadSegment>().AsNoTracking().Where(s => roadIds.Contains(s.SegmentId))
             .Select(s => new { s.SegmentId, s.Geom }).ToListAsync(ct))
             .ToDictionary(s => s.SegmentId, s => new LengthIndexedLine(s.Geom));
 

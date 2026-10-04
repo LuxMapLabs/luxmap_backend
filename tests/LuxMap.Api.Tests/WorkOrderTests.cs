@@ -692,15 +692,15 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
 
     // ---- GET /work-orders/{id}/poles (drift WO-12) --------------------------------------------------
 
-    /// <summary>A pole at <paramref name="along"/> (0..1) of the test road, so road order differs from insert order.</summary>
+    /// <summary>A pole at <paramref name="along"/> (0..1) of a road starting <paramref name="origin"/> degrees off the test road, so road order differs from insert order.</summary>
     private Task<string> PlantPole(double along, string? road = null, string? commune = null,
-        FixtureStatus? status = null, double? confidence = null, bool lamp = false, bool sensitive = false)
+        FixtureStatus? status = null, double? confidence = null, bool lamp = false, bool sensitive = false, double origin = 0)
         => Db(async db =>
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
             var owner = commune ?? home;
             var pole = new Pole { CommuneId = owner, SegmentId = road ?? segment, DataSource = DataSource.Simulated,
-                NearSensitivePoi = sensitive, Geom = new Point(108 + 0.01 * along, 16 + 0.01 * along) { SRID = 4326 } };
+                NearSensitivePoi = sensitive, Geom = new Point(108 + origin + 0.01 * along, 16 + origin + 0.01 * along) { SRID = 4326 } };
             db.Add(pole); await db.SaveChangesAsync();
             if (status is { } known)
                 db.Add(new PoleCurrentStatus { PoleId = pole.PoleId, CommuneId = owner, FixtureStatus = known, StatusConfidence = confidence,
@@ -771,7 +771,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
             db.Add(road); await db.SaveChangesAsync(); return road.SegmentId;
         });
         var onFirst = await PlantPole(0.4);
-        var onOther = await PlantPole(0.1, road: other);
+        var onOther = await PlantPole(0.1, road: other, origin: 0.1);
         var response = await Send("manager", "POST", "", new { task_kind = "survey", title = "Survey the poles", commune_id = home,
             segment_ids = new[] { other, segment }, assigned_to = users["a"].UserId }, 201);
         var id = response.GetProperty("work_order_id").GetString()!;
@@ -795,17 +795,21 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
                 DataSource = DataSource.Simulated, LengthM = 100, Geom = new LineString([new Coordinate(108.2, 16.2), new Coordinate(108.21, 16.21)]) { SRID = 4326 } };
             db.Add(road); await db.SaveChangesAsync(); return road.SegmentId;
         });
-        var pole = await PlantPole(0.3, road: offRoad, status: FixtureStatus.Out, confidence: 0.9);
-        // The fault is filed on the test road while its pole stands on another: only the fault ties the pole to the order.
+        // Planted in REVERSE road order on a road the order does not list: only the faults tie these poles to it.
+        var beyond = await PlantPole(0.7, road: offRoad, origin: 0.2);
+        var pole = await PlantPole(0.3, road: offRoad, status: FixtureStatus.Out, confidence: 0.9, origin: 0.2);
         var fault = await PlantPoleFault(pole, FaultStatus.Confirmed, reportedOn: segment);
-        var response = await Send("manager", "POST", "", new { task_kind = "repair", title = "Repair that pole", fault_ids = new[] { fault } }, 201);
+        var beyondFault = await PlantPoleFault(beyond, FaultStatus.Confirmed, reportedOn: segment);
+        var response = await Send("manager", "POST", "", new { task_kind = "repair", title = "Repair those poles", fault_ids = new[] { fault, beyondFault } }, 201);
         var id = response.GetProperty("work_order_id").GetString()!;
 
         var items = (await PolesOf(id)).GetProperty("items").EnumerateArray().ToArray();
 
-        var item = Assert.Single(items, x => x.GetProperty("pole_id").GetString() == pole);
-        Assert.Equal([fault], item.GetProperty("work_order_fault_ids").EnumerateArray().Select(x => x.GetString()!));
-        Assert.Equal("out", item.GetProperty("fixture_status").GetString());
+        // Road order on the fault-only road too, not insert order or id order.
+        Assert.Equal([pole, beyond], items.Select(x => x.GetProperty("pole_id").GetString()!));
+        Assert.Equal([1, 2], items.Select(x => x.GetProperty("position").GetInt32()));
+        Assert.Equal([fault], items[0].GetProperty("work_order_fault_ids").EnumerateArray().Select(x => x.GetString()!));
+        Assert.Equal("out", items[0].GetProperty("fixture_status").GetString());
     }
 
     [Fact]
