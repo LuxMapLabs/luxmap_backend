@@ -15,7 +15,7 @@ namespace LuxMap.Modules.Faults;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/faults")]
-public sealed class FaultsController(FaultQueryService service, FaultReviewService review, LuxMapDbContext db) : ControllerBase
+public sealed class FaultsController(FaultQueryService service, FaultReviewService review, FaultReportService report, LuxMapDbContext db) : ControllerBase
 {
     /// <summary>
     /// Faults in the caller's communes as paginated JSON — NOT GeoJSON — each item with
@@ -74,6 +74,33 @@ public sealed class FaultsController(FaultQueryService service, FaultReviewServi
             },
             page.ToPageRequest(),
             ct);
+
+    /// <summary>A field engineer reports a fault seen on site (BE-41, Contract 5.4).</summary>
+    /// <remarks>
+    /// <para>
+    /// Starts <c>detected</c>, <c>source_channel = field_report</c>, <c>reported_by</c> = the caller, for a Manager
+    /// to review. 201 with the item and <c>client_op_id</c>; the same <c>client_op_id</c> again answers 200 with
+    /// the fault already created (<c>DUPLICATE_OP</c> is a replay, not an error).
+    /// </para>
+    /// <para>
+    /// With <c>pole_id</c> the commune, segment and data source come from the pole (404 <c>POLE_NOT_FOUND</c>
+    /// outside scope; sending <c>commune_id</c> too is 400). Without it <c>location</c> is required
+    /// (400 <c>LOCATION_REQUIRED</c>). Only <c>lamp_out</c> / <c>lamp_dim</c> (400 <c>FAULT_TYPE_NOT_REPORTABLE</c>).
+    /// Photos go separately: <c>POST /faults/{fault_id}/photos</c> (drift EV-2).
+    /// </para>
+    /// </remarks>
+    [HttpPost]
+    [Authorize(Policy = LuxMapPolicies.ReportFaults)]
+    [ProducesResponseType<ReportedFault>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ReportedFault>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ReportedFault>> ReportAsync(ReportFaultRequest request, CancellationToken ct)
+    {
+        var (fault, created) = await report.ReportAsync(request, ct);
+        return created ? StatusCode(StatusCodes.Status201Created, fault) : Ok(fault);
+    }
 
     /// <summary>A Manager reviews one fault (BE-19): confirm, reject, reclassify, set severity, write a note.</summary>
     /// <remarks>

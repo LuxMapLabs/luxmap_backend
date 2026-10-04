@@ -102,6 +102,9 @@ public sealed class RepairEvidenceConfiguration : IEntityTypeConfiguration<Repai
             table.HasCheckConstraint("ck_repair_evidence_lng", "lng >= -180 AND lng <= 180");
             table.HasCheckConstraint("ck_repair_evidence_bytes", "byte_count > 0 AND thumbnail_bytes > 0");
             table.HasCheckConstraint("ck_repair_evidence_keys_not_blank", "btrim(object_key) <> '' AND btrim(thumbnail_key) <> ''");
+            // One parent, never two and never none; a fault photo is what was SEEN, so it is always an observation.
+            table.HasCheckConstraint("ck_repair_evidence_one_parent", "(work_order_id IS NULL) <> (fault_id IS NULL)");
+            table.HasCheckConstraint("ck_repair_evidence_fault_observation", "fault_id IS NULL OR kind = 'observation'");
         });
         builder.HasKey(x => x.EvidenceId);
         builder.Property(x => x.EvidenceId).HasPrefixedId(PrefixedIds.RepairEvidence);
@@ -114,6 +117,10 @@ public sealed class RepairEvidenceConfiguration : IEntityTypeConfiguration<Repai
         builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
             .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.WorkOrderId, x.CommuneId });
+        // Same commune as the fault, by schema; Fault.CommuneId is already an alternate key for work_order_fault.
+        builder.HasOne<Fault>().WithMany().HasForeignKey(x => new { x.FaultId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.FaultId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => new { x.FaultId, x.CommuneId });
         builder.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict);
         // The partial unique index below leads with uploaded_by, and EF then skips the FK index by convention
         // — but a partial index does not cover rows without a client_op_id. Declared, not assumed.

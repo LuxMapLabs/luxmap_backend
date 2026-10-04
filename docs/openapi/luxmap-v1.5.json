@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 65 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 68 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.7"
   },
   "paths": {
@@ -2947,6 +2947,214 @@
         "x-luxmap-contract": "§5.5 + BE-24"
       }
     },
+    "/api/v1/faults/{id}/photos": {
+      "post": {
+        "tags": [
+          "FaultPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "captured_at": {
+                    "type": "string"
+                  },
+                  "lat": {
+                    "type": "string"
+                  },
+                  "lng": {
+                    "type": "string"
+                  },
+                  "client_op_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                },
+                "captured_at": {
+                  "style": "form"
+                },
+                "lat": {
+                  "style": "form"
+                },
+                "lng": {
+                  "style": "form"
+                },
+                "client_op_id": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:report_faults",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-41, EV-2] Người báo gắn ảnh observation khi sự cố còn mở; JPEG theo magic bytes; client_op_id cho lần gửi lại",
+        "operationId": "postFaultsIdPhotos",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.4 + drift F-1…F-6"
+      },
+      "get": {
+        "tags": [
+          "FaultPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItemPagedResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_faults",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-41] Ảnh của sự cố theo thời điểm chụp, kèm đường dẫn ảnh qua API",
+        "operationId": "getFaultsIdPhotos",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.4 + drift F-1…F-6"
+      }
+    },
     "/api/v1/faults": {
       "get": {
         "tags": [
@@ -3130,48 +3338,100 @@
         "tags": [
           "Faults"
         ],
-        "summary": "[NOT IMPLEMENTED] Kỹ sư hiện trường báo sự cố tại chỗ",
-        "description": "Contract §5.4. Chưa có code — ticket BE-41. Giữ trong Contract, không xoá.",
-        "operationId": "postFaults",
-        "x-luxmap-status": "not_implemented",
-        "x-luxmap-client": "shared",
-        "x-luxmap-contract": "§5.4",
-        "x-luxmap-ticket": "BE-41",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateFaultRequest"
+                "$ref": "#/components/schemas/ReportFaultRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportFaultRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportFaultRequest"
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": "Fault đầy đủ kèm client_op_id",
+            "description": "Created",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportedFault"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreatedFaultResponse"
+                  "$ref": "#/components/schemas/ReportedFault"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportedFault"
                 }
               }
             }
           },
           "200": {
-            "description": "DUPLICATE_OP — client_op_id đã xử lý, trả fault đã tạo (KHÔNG phải lỗi)",
+            "description": "OK",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportedFault"
+                }
+              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CreatedFaultResponse"
+                  "$ref": "#/components/schemas/ReportedFault"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportedFault"
                 }
               }
             }
           },
           "400": {
-            "description": "LOCATION_REQUIRED | FAULT_TYPE_NOT_REPORTABLE | VALIDATION_FAILED",
+            "description": "Bad Request",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
@@ -3179,9 +3439,19 @@
             }
           },
           "404": {
-            "description": "POLE_NOT_FOUND",
+            "description": "Not Found",
             "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
@@ -3189,7 +3459,7 @@
             }
           },
           "401": {
-            "description": "UNAUTHENTICATED",
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
               "application/json": {
                 "schema": {
@@ -3198,7 +3468,16 @@
               }
             }
           }
-        }
+        },
+        "x-luxmap-capability": "cap:report_faults",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-41] Kỹ sư hiện trường báo sự cố tại chỗ: detected, field_report; cột cho xã/tuyến/data_source; client_op_id gửi lại → 200 cùng sự cố",
+        "operationId": "postFaults",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.4 + drift F-1…F-6"
       }
     },
     "/api/v1/faults/{id}": {
@@ -7174,8 +7453,7 @@
           "evidence_id",
           "original_url",
           "thumbnail_url",
-          "uploaded_by",
-          "work_order_id"
+          "uploaded_by"
         ],
         "type": "object",
         "properties": {
@@ -7183,7 +7461,12 @@
             "type": "string"
           },
           "work_order_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
           },
           "kind": {
             "$ref": "#/components/schemas/EvidenceKind"
@@ -8586,6 +8869,146 @@
             }
           },
           "message": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportFaultRequest": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "pole_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fixture_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "$ref": "#/components/schemas/FaultLocation"
+          },
+          "commune_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "detected_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "photo_frame_id": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportedFault": {
+        "required": [
+          "allowed_actions",
+          "client_op_id",
+          "fault_id",
+          "location"
+        ],
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "pole_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fixture_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "location": {
+            "$ref": "#/components/schemas/FaultLocation"
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "fault_status": {
+            "$ref": "#/components/schemas/FaultStatus"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "source_channel": {
+            "$ref": "#/components/schemas/SourceChannel"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "priority_score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "cluster_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "detected_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "reported_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "review_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "allowed_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "client_op_id": {
             "type": "string"
           }
         },
@@ -10054,89 +10477,6 @@
           }
         }
       },
-      "CreateFaultRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "client_op_id",
-          "fault_type",
-          "note"
-        ],
-        "description": "Contract §5.4 (POST). Server áp cứng source_channel=field_report, data_source=field, fault_status=detected, reported_by=JWT.",
-        "properties": {
-          "client_op_id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "pole_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^POLE-[0-9]{4,}$"
-          },
-          "fixture_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^FIX-[0-9]{4,}$"
-          },
-          "location": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/LatLng"
-              }
-            ],
-            "type": "object",
-            "description": "Bắt buộc khi pole_id null (LOCATION_REQUIRED)"
-          },
-          "commune_id": {
-            "type": "string",
-            "nullable": true,
-            "pattern": "^COM-[0-9]{3,}$",
-            "description": "Chỉ khi pole_id null VÀ user có nhiều xã. Có pole thì server tra từ pole (gửi → 400)."
-          },
-          "fault_type": {
-            "$ref": "#/components/schemas/FaultType"
-          },
-          "severity": {
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Severity"
-              }
-            ],
-            "type": "string",
-            "description": "Mặc định medium"
-          },
-          "note": {
-            "type": "string",
-            "minLength": 10
-          },
-          "photo_frame_id": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "CreatedFaultResponse": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/FaultItem"
-          },
-          {
-            "type": "object",
-            "required": [
-              "client_op_id"
-            ],
-            "properties": {
-              "client_op_id": {
-                "type": "string",
-                "format": "uuid"
-              }
-            }
-          }
-        ],
-        "description": "§5.4: item kèm client_op_id đã gửi lên."
-      },
       "SyncBundle": {
         "type": "object",
         "additionalProperties": false,
@@ -10274,7 +10614,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
