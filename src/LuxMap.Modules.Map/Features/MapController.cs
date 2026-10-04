@@ -32,6 +32,7 @@ namespace LuxMap.Modules.Map.Features;
 [Route("api/v{version:apiVersion}/map")]
 public sealed class MapController(
     MapQueryService service,
+    PoleDetailService poleDetail,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
     /// <summary>
@@ -80,6 +81,22 @@ public sealed class MapController(
                 DataSource = WireEnum.ParseCsv<DataSource>(dataSource, "data_source"),
             },
             ct));
+
+    /// <summary>One pole with its lamp, status, baselines, history, open faults and recent frames (BE-20).</summary>
+    /// <remarks>
+    /// Everything the pole screen needs in ONE request (Contract 5.1) — the front end must not stitch
+    /// the screen together from several calls. <b>SELF-SIGNED, provisional until FW</b>: the shape differs
+    /// from the Contract in places listed in the BE-20 drift entry. A pole outside the caller's commune
+    /// scope is 404, never 403 (Contract section 7).
+    /// </remarks>
+    [HttpGet("poles/{pole_id}")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<PoleMapDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PoleMapDetail>> PoleDetailAsync(
+        [FromRoute(Name = "pole_id")] string poleId, CancellationToken ct)
+        => Ok(await poleDetail.GetAsync(poleId, ct));
 
     /// <summary>Road segments inside a bounding box, as a <c>FeatureCollection</c> of LineStrings.</summary>
     /// <remarks>

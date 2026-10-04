@@ -105,6 +105,7 @@ SUMMARY = {
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
     ("get", "/api/v1/map/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
+    ("get", "/api/v1/map/poles/{pole_id}"): "[TẠM — BE-20] Chi tiết cột đủ trong MỘT request: bóng đang dùng, trạng thái, baseline theo chiều, 30 điểm lịch sử, sự cố mở, frame gần đây; ngoài phạm vi xã → 404",
     ("get", "/api/v1/map/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
     # BE-14b — thiết bị ở tủ điện tổng, drift "BE-14 / IoT".
     ("get", "/api/v1/map/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
@@ -292,100 +293,10 @@ S["SegmentFeatureCollection"] = {"type": "object", "required": ["type", "feature
                                  "properties": {"type": {"type": "string", "enum": ["FeatureCollection"]},
                                                 "features": {"type": "array", "items": {"$ref": "#/components/schemas/SegmentFeature"}}}}
 
-S["PoleDetailFixture"] = {"type": "object", "additionalProperties": False,
-    "required": ["fixture_type", "power_source", "lamp_watt", "install_date"],
-    "properties": OrderedDict([
-        ("fixture_type", {"$ref": "#/components/schemas/FixtureType"}),
-        ("power_source", {"$ref": "#/components/schemas/PowerSource"}),
-        ("lamp_watt", {"type": "integer", "format": "int32"}),
-        ("install_date", {"type": "string", "format": "date"}),
-        ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),
-    ]),
-    "description": "Thông số lắp đặt của bóng ĐANG DÙNG (duy nhất, Contract §3.3)."}
-S["PoleCurrentStatus"] = {"type": "object", "additionalProperties": False,
-    "required": ["fixture_status", "determined_at", "source_channel"],
-    "properties": OrderedDict([
-        ("fixture_status", {"$ref": "#/components/schemas/FixtureStatus"}),
-        ("status_confidence", {"type": "number", "format": "double", "minimum": 0, "maximum": 1, "nullable": True}),
-        ("determined_at", {"type": "string", "format": "date-time"}),
-        ("source_channel", {"$ref": "#/components/schemas/SourceChannel"}),
-    ])}
-S["PoleIotNode"] = {"type": "object", "additionalProperties": False,
-    "required": ["node_id", "node_status", "last_report_at"],
-    "properties": OrderedDict([
-        ("node_id", {"$ref": "#/components/schemas/NodeId"}),
-        ("node_status", {"$ref": "#/components/schemas/NodeStatus"}),
-        ("last_report_at", {"type": "string", "format": "date-time", "nullable": True}),
-    ])}
-S["LuminanceBaseline"] = {"type": "object", "additionalProperties": False,
-    "required": ["baseline_value", "baseline_window_nights", "dim_threshold_ratio", "out_threshold_ratio", "computed_at"],
-    "description": "Ngưỡng cấu hình qua BE-33 (mặc định dim 0.80, out 0.15), không hard-code.",
-    "properties": OrderedDict([
-        ("baseline_value", {"type": "number", "format": "double"}),
-        ("baseline_window_nights", {"type": "integer", "format": "int32"}),
-        ("dim_threshold_ratio", {"type": "number", "format": "double"}),
-        ("out_threshold_ratio", {"type": "number", "format": "double"}),
-        ("computed_at", {"type": "string", "format": "date-time"}),
-    ])}
-S["LuminancePoint"] = {"type": "object", "additionalProperties": False,
-    "required": ["observed_at", "sweep_id", "normalized_luminance", "baseline_ratio", "classified_as"],
-    "description": "baseline_ratio và classified_as TÍNH Ở BACKEND — FE không tự tính.",
-    "properties": OrderedDict([
-        ("observed_at", {"type": "string", "format": "date-time"}),
-        ("sweep_id", {"type": "string"}),
-        ("normalized_luminance", {"type": "number", "format": "double"}),
-        ("baseline_ratio", {"type": "number", "format": "double"}),
-        ("classified_as", {"$ref": "#/components/schemas/FixtureStatus"}),
-    ])}
-S["RuntimePoint"] = {"type": "object", "additionalProperties": False,
-    "required": ["night_of", "runtime_hours", "source"],
-    "description": "Phiên đêm cắt qua nửa đêm; night_of là ngày bắt đầu phiên.",
-    "properties": OrderedDict([
-        ("night_of", {"type": "string", "format": "date"}),
-        ("runtime_hours", {"type": "number", "format": "double"}),
-        ("on_at", {"type": "string", "nullable": True, "description": "HH:mm:ssZ theo mock — định dạng chưa chốt"}),
-        ("off_at", {"type": "string", "nullable": True}),
-        ("source", {"type": "string", "enum": ["iot"]}),
-    ])}
-S["OpenFaultSummary"] = {"type": "object", "additionalProperties": False,
-    "required": ["fault_id", "fault_type", "severity", "fault_status"],
-    "properties": OrderedDict([
-        ("fault_id", {"$ref": "#/components/schemas/FaultId"}),
-        ("fault_type", {"$ref": "#/components/schemas/FaultType"}),
-        ("severity", {"$ref": "#/components/schemas/Severity"}),
-        ("fault_status", {"$ref": "#/components/schemas/FaultStatus"}),
-        ("priority_score", {"type": "number", "format": "double", "nullable": True}),
-    ])}
-S["RecentFrame"] = {"type": "object", "additionalProperties": False,
-    "required": ["frame_id", "sweep_id", "captured_at", "thumbnail_url"],
-    "properties": OrderedDict([
-        ("frame_id", {"$ref": "#/components/schemas/FrameId"}),
-        ("sweep_id", {"$ref": "#/components/schemas/SweepId"}),
-        ("captured_at", {"type": "string", "format": "date-time"}),
-        ("thumbnail_url", {"type": "string", "description": "Đường dẫn TƯƠNG ĐỐI qua API, không presigned: /api/v1/frames/{frame_id}/thumbnail"}),
-        ("distance_m", {"type": "number", "format": "double"}),
-        ("heading_deg", {"type": "number", "format": "double"}),
-    ])}
-S["PoleDetail"] = {"type": "object", "additionalProperties": False,
-    "description": "Contract §5.1 — đủ trong MỘT request. Hình dạng theo mock-pole-detail.json.",
-    "required": ["pole_id", "segment_id", "segment_name", "commune_id", "location", "fixture", "current_status",
-                 "iot_node", "luminance_baseline", "luminance_history", "open_faults", "recent_frames"],
-    "properties": OrderedDict([
-        ("pole_id", {"$ref": "#/components/schemas/PoleId"}),
-        ("segment_id", {"$ref": "#/components/schemas/SegmentId"}),
-        ("segment_name", {"type": "string"}),
-        ("commune_id", {"$ref": "#/components/schemas/CommuneId"}),
-        ("location", {"$ref": "#/components/schemas/LatLng"}),
-        ("fixture", {"$ref": "#/components/schemas/PoleDetailFixture"}),
-        ("current_status", {"$ref": "#/components/schemas/PoleCurrentStatus"}),
-        ("iot_node", {"nullable": True, "allOf": [{"$ref": "#/components/schemas/PoleIotNode"}], "type": "object"}),
-        ("luminance_baseline", {"$ref": "#/components/schemas/LuminanceBaseline"}),
-        ("luminance_history", {"type": "array", "items": {"$ref": "#/components/schemas/LuminancePoint"}}),
-        ("runtime_history", {"type": "array", "nullable": True, "items": {"$ref": "#/components/schemas/RuntimePoint"},
-                             "description": "Chỉ có khi cột có IoT node"}),
-        ("open_faults", {"type": "array", "items": {"$ref": "#/components/schemas/OpenFaultSummary"}}),
-        ("recent_frames", {"type": "array", "items": {"$ref": "#/components/schemas/RecentFrame"}}),
-    ])}
+# BE-20: PoleDetail and its parts (PoleDetailFixture/Status/Baseline/HistoryPoint/OpenFault/Frame) now come
+# from the live code. The hand-written copies stood here and would OVERWRITE the exported schemas
+# (CLAUDE.md, BE-14b) — they described the Contract's per-pole iot_node and runtime_history, which drift I-1 and
+# I-9 removed.
 
 # BE-40: FaultItem and its page now come from the live code (FaultItem / FaultItemPagedResult).
 # The hand-written copies stood here and would OVERWRITE the exported schema (CLAUDE.md, BE-14b).
@@ -498,10 +409,6 @@ ENUM_CSV = lambda ref: {"type": "string", "description": f"CSV của {ref}"}
 # The lesson for the next ticket that implements a stub: DELETE ITS ni() CALL in the same commit, and
 # read the operation counter in the output line.
 
-ni("get", "/api/v1/map/poles/{pole_id}", "Poles", "Chi tiết cột + lịch sử, đủ trong MỘT request", "§5.1", "BE-20",
-   [("200", {"description": "Chi tiết cột", "content": json_content("PoleDetail")}),
-    ("404", err("Không tồn tại HOẶC ngoài phạm vi xã — cùng một câu trả lời (§7)"))],
-   parameters=[p("pole_id", {"$ref": "#/components/schemas/PoleId"}, True, where="path")])
 ni("post", "/api/v1/faults", "Faults", "Kỹ sư hiện trường báo sự cố tại chỗ", "§5.4", "BE-41",
    [("201", {"description": "Fault đầy đủ kèm client_op_id", "content": json_content("CreatedFaultResponse")}),
     ("200", {"description": "DUPLICATE_OP — client_op_id đã xử lý, trả fault đã tạo (KHÔNG phải lỗi)", "content": json_content("CreatedFaultResponse")}),

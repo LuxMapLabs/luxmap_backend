@@ -765,6 +765,30 @@ liệt kê cả các cột này (đứng sau mọi quan sát); trong `SurveyResu
 `association_confidence` thành **nullable**. Người duyệt phải có xã của cả cột không quan sát. Trả lại không còn bị
 chặn khi cột đã được sửa sau xử lý (`SURVEY_SCOPE_CHANGED` chỉ cho accept). OpenAPI đã xuất lại.
 
+## BE-20 — chi tiết cột `GET /map/poles/{pole_id}` (04/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực màn chi tiết cột theo Contract §5.1 + `mock-pole-detail.json`, **lệch ở chín chỗ dưới đây** vì nền đã đổi (IoT ở tủ điện, đo sáng bằng lux, baseline theo chiều). **SELF-SIGNED, nền tạm tới FW**; không sửa văn bản Contract hay enum |
+| **Decision maker** | Claude hiện thực theo yêu cầu của Mỹ (04/10/2026); chạm bề mặt API → **ESCALATE ở FW kế tiếp** |
+| **Date** | 04/10/2026 |
+| **Scope** | Contract §5.1 (`GET /poles/{pole_id}`, đã dời `/map/…` ở MAP-1); mock `mock-pole-detail.json`; schema OpenAPI `PoleMapDetail*` (tên tránh trùng `PoleDetail` của BE-12b) |
+
+| Mã | Chỗ lệch | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **D-1** | `iot_node` theo cột (drift I-1, I-8) | **Luôn `null`**; khoá giữ. Thiết bị ở tủ điện, không gắn cột | Không (hình dạng giữ) |
+| **D-2** | `runtime_history[]` theo cột (I-9: runtime đo theo mạch) | **Luôn `[]`**; khoá giữ. Mock `POLE-0047` vẫn có chuỗi 18 đêm — câu hỏi I-10 cho WP5 còn mở | Không |
+| **D-3** | Contract có **một** `luminance_baseline`; P2c dựng baseline **theo chiều đi** | `luminance_baseline` = baseline **mới nhất của bóng đang dùng**; **thêm** `luminance_baselines[]` (mỗi chiều một phần tử, có `direction`). `baseline_value` là **trung vị đỉnh lux tương đối** (mock ghi 1.0); `baseline_window_nights` = số phiên đã duyệt tạo nên giá trị (`member_count`, một phiên ≈ một đêm); `computed_at` = lúc tạo. Baseline dựng trên bóng đã thay **không hiện** | **Có** (trường mới, nghĩa số đổi) |
+| **D-4** | `out_threshold_ratio` (mặc định 0.15) | **`null`**: từ Phiếu v1.4 `out` do CV ON/OFF quyết, không phải tỉ lệ lux. `dim_threshold_ratio` lấy từ cấu hình khảo sát (0.80) — BE-33 sẽ quản trị | **Có** (nullable) |
+| **D-5** | `luminance_history[]` | Tối đa **30** điểm đã công bố mới nhất, **cũ → mới**; gồm cả điểm `unknown` (cột không quan sát, `baseline_ratio` null). `normalized_luminance` = `baseline_ratio` (mock có baseline 1.0 nên hai số trùng); **thêm** `peak_lux`, `reason_codes[]`. `baseline_ratio` nullable khi chưa có baseline | **Có** (nullable + trường mới) |
+| **D-6** | `current_status` / `fixture` luôn là object | Chưa có sweep nào công bố cho cột ⇒ `fixture_status = unknown`, `status_confidence`, `determined_at`, `source_channel` đều `null`; `source_channel` là `cv` khi có dòng trạng thái (chỉ sweep được duyệt mới ghi). `determined_at` = lúc **khảo sát** (không phải lúc duyệt). `fixture = null` khi cột không có bóng đang dùng | **Có** (nullable) |
+| **D-7** | `open_faults[]` | Chỉ sự cố mở (`FaultStatusSets.Open`), nặng nhất trước (hạng severity, rồi `priority_score` giảm dần, chưa chấm xuống cuối), tối đa 50. `fault_type` là loại **hiệu lực** (`override ?? fault_type`) | Không |
+| **D-8** | `recent_frames[]` | Tối đa **10** frame đại diện của các lượt đã công bố, mới nhất trước, **chỉ frame người gọi mở được** ở `/frames/{id}/thumbnail` (cùng quy tắc quyền, `SurveyMediaAccess`) — URL đã liệt kê thì không 404. **`distance_m` và `heading_deg` luôn `null`**: bảng frame không lưu | **Có** (nullable) |
+| **D-9** | Phạm vi | Đọc cột trước: ngoài phạm vi xã ⇒ **404 `POLE_NOT_FOUND`**, giống cột không tồn tại (Contract §7). Không trả `data_source`, `external_ref`, `feeder_id` | Không |
+
+**Phải báo:** WP5 (FW-12/FW-13: biểu đồ lịch sử, đường ngưỡng — `out_threshold_ratio` null nên chỉ vẽ đường dim; baseline theo chiều;
+`iot_node`/`runtime_history` rỗng — màn biểu đồ runtime theo cột không còn nguồn), WP6 (FM-17: cùng hình dạng; frame chỉ khi mở được). **Chưa báo.**
+
 ## Dữ liệu thực địa đầu tiên — đèn thật không phải LED (01/10/2026)
 
 | | |

@@ -3187,6 +3187,93 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/map/poles/{pole_id}": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleMapDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleMapDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleMapDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/map/segments": {
       "get": {
         "tags": [
@@ -6291,6 +6378,333 @@
             "items": {
               "$ref": "#/components/schemas/PoleListItem"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapBaseline": {
+        "required": [
+          "direction"
+        ],
+        "type": "object",
+        "properties": {
+          "baseline_value": {
+            "type": "number",
+            "format": "double"
+          },
+          "baseline_window_nights": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dim_threshold_ratio": {
+            "type": "number",
+            "format": "double"
+          },
+          "out_threshold_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "computed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "direction": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapDetail": {
+        "required": [
+          "commune_id",
+          "current_status",
+          "location",
+          "luminance_baselines",
+          "luminance_history",
+          "open_faults",
+          "pole_id",
+          "recent_frames",
+          "runtime_history",
+          "segment_id",
+          "segment_name"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/PoleMapLocation"
+          },
+          "fixture": {
+            "$ref": "#/components/schemas/PoleMapFixture"
+          },
+          "current_status": {
+            "$ref": "#/components/schemas/PoleMapStatus"
+          },
+          "iot_node": {
+            "$ref": "#/components/schemas/PoleMapIotNode"
+          },
+          "luminance_baseline": {
+            "$ref": "#/components/schemas/PoleMapBaseline"
+          },
+          "luminance_baselines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapBaseline"
+            }
+          },
+          "luminance_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapHistoryPoint"
+            }
+          },
+          "runtime_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapRuntimePoint"
+            }
+          },
+          "open_faults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapOpenFault"
+            }
+          },
+          "recent_frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapFrame"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapFixture": {
+        "type": "object",
+        "properties": {
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "power_source": {
+            "$ref": "#/components/schemas/PowerSource"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "install_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapFrame": {
+        "required": [
+          "frame_id",
+          "sweep_id",
+          "thumbnail_url"
+        ],
+        "type": "object",
+        "properties": {
+          "frame_id": {
+            "type": "string"
+          },
+          "sweep_id": {
+            "type": "string"
+          },
+          "captured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          },
+          "distance_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "heading_deg": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapHistoryPoint": {
+        "required": [
+          "reason_codes",
+          "sweep_id"
+        ],
+        "type": "object",
+        "properties": {
+          "observed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "sweep_id": {
+            "type": "string"
+          },
+          "normalized_luminance": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "classified_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "peak_lux": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapIotNode": {
+        "required": [
+          "node_id"
+        ],
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "node_status": {
+            "$ref": "#/components/schemas/NodeStatus"
+          },
+          "last_report_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapLocation": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapOpenFault": {
+        "required": [
+          "fault_id"
+        ],
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "fault_status": {
+            "$ref": "#/components/schemas/FaultStatus"
+          },
+          "priority_score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapRuntimePoint": {
+        "required": [
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "runtime_hours": {
+            "type": "number",
+            "format": "double"
+          },
+          "on_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "off_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapStatus": {
+        "type": "object",
+        "properties": {
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "determined_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "source_channel": {
+            "$ref": "#/components/schemas/SourceChannel"
           }
         },
         "additionalProperties": false

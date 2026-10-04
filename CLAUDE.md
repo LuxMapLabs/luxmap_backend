@@ -231,7 +231,7 @@ Ràng buộc nghiệp vụ đi kèm:
 | Endpoint | Ràng buộc |
 |---|---|
 | `GET /map/poles` | `bbox` **bắt buộc**, không có endpoint "lấy tất cả". Lọc: `status`, `power_source`, `segment_id`, `commune_id`, `has_open_fault`. Quá 2000 cột → **413** `BBOX_TOO_LARGE`. |
-| `GET /map/poles/{id}` | Trả **đủ trong 1 request**: `fixture`, `current_status`, `iot_node` (null với đa số cột), `luminance_baseline`, `luminance_history[]`, `runtime_history[]` (chỉ khi có node), `open_faults[]`, `recent_frames[]`. |
+| `GET /map/poles/{id}` | Trả **đủ trong 1 request** (BE-20, hình dạng thật ở `docs/contract-drift.md` → BE-20): `fixture` (null nếu không có bóng đang dùng), `current_status` (`unknown` khi chưa có sweep công bố), `iot_node` (**luôn null**), `luminance_baseline` + `luminance_baselines[]` (theo chiều đi), `luminance_history[]` (≤30 điểm, cũ → mới), `runtime_history[]` (**luôn rỗng**), `open_faults[]`, `recent_frames[]` (chỉ frame người gọi mở được). Ngoài phạm vi xã → 404. |
 | `GET /map/segments` | `bbox` bắt buộc. `FeatureCollection` của `LineString`. |
 | `GET /faults` | **Phân trang JSON, KHÔNG phải GeoJSON.** Mỗi item có `location{lat,lng}`. Sắp mặc định `-priority_score`. |
 | `PATCH /faults/{id}` | Body: `fault_status`, `override_fault_type?`, `note?`. |
@@ -1650,3 +1650,14 @@ dù lịch sử bất biến vẫn trỏ vào nó (review Codex sau merge #80). 
 (`Restrict`). Bảng mới có FK ghép trên cột nullable phải tự hỏi: khi phần nullable là null, cái gì còn giữ các cột kia?
 Test xoá phải đọc dependent bằng `AsNoTracking` — entity đang track làm EF tự từ chối ở client, test xanh mà DB không
 hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`).
+
+### BE-20 — chi tiết cột (04/10/2026)
+
+**Một schemaId trong Swagger chỉ ứng một kiểu .NET — qua MỌI module.** `PoleDetail` đã là kiểu của BE-12b
+(`Assets.Crud`), nên kiểu cùng tên ở `Map` làm `swagger tofile` ném `Can't use schemaId` — mà `dotnet build` và toàn bộ test
+vẫn xanh, chỉ spec không xuất được. Kiểu của `/map/poles/{id}` mang tiền tố `PoleMap*`. Đặt tên response mới thì grep
+tên đó trong cả `src/` trước.
+
+**Cái gì được LIỆT KÊ phải mở được.** Danh sách frame của chi tiết cột và `GET /frames/{id}/thumbnail` dùng **cùng một**
+`SurveyMediaAccess` (xã của cả run + người được giao của phiếu). Viết lại điều kiện ở chỗ thứ hai thì hai nơi sẽ lệch nhau và
+client nhận URL mà mở ra 404 — hoặc tệ hơn, thấy frame của xã khác.
