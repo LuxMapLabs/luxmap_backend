@@ -2442,6 +2442,66 @@
         "x-luxmap-client": "mobile"
       }
     },
+    "/api/v1/evidence/{evidence_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "Evidence"
+        ],
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/evidence/{evidence_id}/original": {
+      "get": {
+        "tags": [
+          "Evidence"
+        ],
+        "parameters": [
+          {
+            "name": "evidence_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/faults": {
       "get": {
         "tags": [
@@ -4584,6 +4644,172 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/work-orders/{id}/evidence": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "captured_at": {
+                    "type": "string"
+                  },
+                  "lat": {
+                    "type": "string"
+                  },
+                  "lng": {
+                    "type": "string"
+                  },
+                  "client_op_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                },
+                "kind": {
+                  "style": "form"
+                },
+                "captured_at": {
+                  "style": "form"
+                },
+                "lat": {
+                  "style": "form"
+                },
+                "lng": {
+                  "style": "form"
+                },
+                "client_op_id": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItem"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:execute_work_orders",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceItemPagedResult"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/work-orders/assignees": {
       "get": {
         "tags": [
@@ -5572,6 +5798,87 @@
           "public_imagery",
           "calibration_rig",
           "simulated"
+        ],
+        "type": "string"
+      },
+      "EvidenceItem": {
+        "required": [
+          "evidence_id",
+          "original_url",
+          "thumbnail_url",
+          "uploaded_by",
+          "work_order_id"
+        ],
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string"
+          },
+          "work_order_id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EvidenceKind"
+          },
+          "captured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
+          },
+          "uploaded_by": {
+            "type": "string"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          },
+          "original_url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EvidenceItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "EvidenceKind": {
+        "enum": [
+          "before",
+          "after",
+          "observation"
         ],
         "type": "string"
       },
@@ -8189,6 +8496,9 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "Evidence"
     },
     {
       "name": "Faults"

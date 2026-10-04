@@ -91,3 +91,34 @@ public sealed class WorkOrderSegmentConfiguration : IEntityTypeConfiguration<Wor
         builder.HasOne<RoadSegment>().WithMany().HasForeignKey(x => x.SegmentId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public sealed class RepairEvidenceConfiguration : IEntityTypeConfiguration<RepairEvidence>
+{
+    public void Configure(EntityTypeBuilder<RepairEvidence> builder)
+    {
+        builder.ToTable("repair_evidence", table =>
+        {
+            table.HasCheckConstraint("ck_repair_evidence_lat", "lat >= -90 AND lat <= 90");
+            table.HasCheckConstraint("ck_repair_evidence_lng", "lng >= -180 AND lng <= 180");
+            table.HasCheckConstraint("ck_repair_evidence_bytes", "byte_count > 0 AND thumbnail_bytes > 0");
+            table.HasCheckConstraint("ck_repair_evidence_keys_not_blank", "btrim(object_key) <> '' AND btrim(thumbnail_key) <> ''");
+        });
+        builder.HasKey(x => x.EvidenceId);
+        builder.Property(x => x.EvidenceId).HasPrefixedId(PrefixedIds.RepairEvidence);
+        builder.Property(x => x.UploadedAt).HasDefaultValueSql("now()");
+        builder.HasContractEnum(x => x.Kind);
+        builder.HasCommuneScope();
+        builder.HasCommuneReference(x => x.CommuneId);
+        builder.HasIndex(x => x.CommuneId);
+        // Same commune as the order, by schema (khuôn O-7), so a photo can never sit in another commune.
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => new { x.WorkOrderId, x.CommuneId });
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict);
+        // The partial unique index below leads with uploaded_by, and EF then skips the FK index by convention
+        // — but a partial index does not cover rows without a client_op_id. Declared, not assumed.
+        builder.HasIndex(x => x.UploadedBy);
+        builder.HasIndex(x => new { x.UploadedBy, x.ClientOpId }).IsUnique().HasFilter("client_op_id IS NOT NULL")
+            .HasDatabaseName("ux_repair_evidence_uploaded_by_client_op_id");
+    }
+}

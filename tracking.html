@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-24 — ảnh của phiếu công việc, 04/10/2026: xong trên nhánh, Codex review sạch, chờ PR</strong>
+    <p><span class="tag t-next">Chờ PR</span> Kỹ sư được giao tải ảnh khi phiếu đang làm: <code>before</code>/<code>after</code> cho phiếu
+    sửa chữa, <code>observation</code> cho phiếu kiểm tra (EV-1, Mỹ chốt). Phiếu sửa chữa không báo hoàn thành được khi chưa có ảnh
+    <code>after</code>. Quản lý xem danh sách và ảnh qua API (thumbnail + ảnh gốc nguyên byte), quyền theo phiếu cha. Bảng
+    <code>repair_evidence</code> (migration <code>AddRepairEvidence</code>). 17 test PostGIS mới, phá thử bảy luật đều đỏ. Codex review bốn lượt: ba lỗi thật (kiểm lại phiếu sau khi ghi ảnh, JPEG hỏng ra 500,
+    <code>captured_at</code> thiếu ngày, gửi lại chồng nhau), đã sửa kèm test. Drift BE-24 (SELF-SIGNED).
+    Còn: PR, migrate <code>luxmap_dev</code>, báo WP5/WP6.</p>
+  </div>
+  <div class="card">
     <strong>WO-12 — cột trên đoạn được giao <code>GET /work-orders/{id}/poles</code> — merge #85, 04/10/2026</strong>
     <p><span class="tag t-done">Đã merge</span> Khi giao việc, kỹ sư thấy các cột trên đoạn (segment) được giao cùng <strong>trạng thái đèn lần khảo sát
     đã duyệt gần nhất, trước khi đi</strong> — không phải đợi khảo sát xong. Theo thứ tự dọc đường, kèm số sự cố mở, loại/công suất bóng và

@@ -669,6 +669,34 @@ phơi sáng (D-R24). Byte ảnh vẫn qua API (BE-11 quy tắc 1).
 
 **Phải báo / đưa ra FW kế tiếp:** WP6 (FM-18, FM-19), WP5 (màn chi tiết phiếu). **Chưa báo.**
 
+**EV-1 đã chốt (Mỹ, 04/10/2026) và hiện thực ở BE-24:** thêm `kind = observation`. Phiếu **sửa chữa** nhận `before`
+(đèn lúc tới nơi) và `after` (sau khi sửa); phiếu **kiểm tra** chỉ nhận `observation` (đã thấy thế này — kiểm tra không sửa
+gì nên không có trước/sau); phiếu khảo sát không nhận ảnh. Sai nhãn → `400 EVIDENCE_KIND_NOT_ALLOWED`. EV-2 vẫn mở (BE-41).
+
+### BE-24 — ảnh của phiếu công việc (04/10/2026)
+
+**SELF-SIGNED, nền tạm tới FW** (quyết định của Mỹ cùng ngày: thêm `observation`, thêm đường xem ảnh, bắt buộc ảnh `after`).
+
+| Endpoint | Quyền | Ghi chú |
+|---|---|---|
+| `POST /work-orders/{id}/evidence` | `ExecuteWorkOrders`, **chỉ người được giao**, phiếu **`in_progress`** | multipart: `file` (JPEG theo magic bytes, ≤ 16 MiB), `kind`, `captured_at` (ISO 8601, có offset thì quy về UTC), `lat`, `lng`, **`client_op_id` (tuỳ chọn, mới)** — gửi lại cùng khoá trả **200** cùng ảnh, khác phiếu/nhãn → `409 IDEMPOTENCY_CONFLICT`. Mới tạo **201** |
+| `GET /work-orders/{id}/evidence` | `ReadWorkOrders` | **Mới.** Phân trang, sắp theo `captured_at`; item `evidence_id, work_order_id, kind, captured_at, lat, lng, uploaded_by, uploaded_at, thumbnail_url, original_url` |
+| `GET /evidence/{evidence_id}/thumbnail`, `…/original` | `ReadWorkOrders` | **Mới.** JPEG qua API, không presigned; ảnh gốc **nguyên byte**. Quyền theo phiếu cha (xã **và** người được giao) → ngoài quyền `404 EVIDENCE_NOT_FOUND`; file mất trong kho `503 STORAGE_OBJECT_MISSING` |
+
+Mã lỗi mới: `400 EVIDENCE_KIND_NOT_ALLOWED`, `409 WORK_ORDER_NOT_IN_PROGRESS`, **`409 AFTER_EVIDENCE_REQUIRED`** — `POST
+/work-orders/{id}/complete` của phiếu **sửa chữa** bị từ chối khi chưa có ảnh `after` (ảnh `before` không tính). Phiếu kiểm
+tra không bắt buộc ảnh. `415 UNSUPPORTED_IMAGE_FORMAT`, `404 WORK_ORDER_NOT_FOUND` giữ như Contract.
+`415 UNSUPPORTED_IMAGE_FORMAT` gồm cả file **bắt đầu như JPEG nhưng không giải mã được** (hỏng, bị cắt ngang) — trước đây ra
+500, nay quyết ở `ImagePipeline` nên ảnh khảo sát cũng hưởng. `captured_at` phải là **ngày-giờ ISO 8601 đầy đủ**
+(`2026-10-04T13:30:00Z`, có thể kèm offset); thiếu ngày hoặc thiếu giờ → `400 VALIDATION_FAILED`.
+
+⚠️ `allowed_actions` của phiếu vẫn liệt kê `complete` khi chưa có ảnh `after`: FE nên tự khoá nút theo danh sách ảnh (hoặc
+xử lý 409). Ảnh bằng chứng **không** vào dữ liệu chấm CV (xem "Chung cho cả hai" ở trên). Bảng `repair_evidence` không
+có endpoint sửa/xoá: ảnh là bản ghi của điều đã thấy.
+
+**Phải báo:** WP6 (FM-18: upload, nhãn theo loại phiếu, `client_op_id`, ảnh `after` trước khi báo hoàn thành), WP5 (màn
+chi tiết phiếu: danh sách và xem ảnh để nghiệm thu). **Chưa báo.**
+
 ## OPS-SCHEMA — lược đồ đích theo Phiếu v1.4 (01/10/2026)
 
 | | |

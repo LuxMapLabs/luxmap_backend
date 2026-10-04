@@ -134,6 +134,8 @@ for method, suffix, summary in [
     ("get", "", "Danh sách việc trong phạm vi xã và người được giao"),
     ("get", "/{id}", "Chi tiết việc và các hành động được phép"),
     ("get", "/assignees", "Kỹ sư hiện trường đủ điều kiện trong xã"),
+    ("post", "/{id}/evidence", "[BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra); JPEG theo magic bytes; client_op_id cho lần gửi lại"),
+    ("get", "/{id}/evidence", "[BE-24] Ảnh của phiếu theo thời điểm chụp, kèm đường dẫn ảnh qua API"),
     ("get", "/{id}/poles", "[WO-12] Cột trên đoạn được giao + trạng thái đèn lần khảo sát đã duyệt gần nhất, theo thứ tự dọc đường — biết TRƯỚC khi đi"),
     ("post", "", "Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)"),
     ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
@@ -166,6 +168,10 @@ for method, path, summary in [
 ]:
     SUMMARY[(method, path)] = "[TẠM — BE-15 P2c] " + summary
 
+for suffix, summary in [("thumbnail", "Thumbnail JPEG của ảnh phiếu — proxy qua API; quyền theo phiếu cha"),
+                        ("original", "Ảnh gốc nguyên byte của phiếu — proxy qua API; quyền theo phiếu cha")]:
+    SUMMARY[("get", "/api/v1/evidence/{evidence_id}/" + suffix)] = "[TẠM — BE-24] " + summary
+
 SECTION = {
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
@@ -176,6 +182,7 @@ SECTION = {
     "/api/v1/lux-readings": "§5.7",
     "/api/v1/sweeps": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/frames": "§2.7 + BE-15 P2c",
+    "/api/v1/evidence": "§5.5 + BE-24",
 }
 
 for path, item in d["paths"].items():
@@ -324,15 +331,6 @@ S["CreatedFaultResponse"] = {"allOf": [{"$ref": "#/components/schemas/FaultItem"
 
 # BE-23: work-order schemas now come from the live code. Do not replace their
 # task_kind, partial-PATCH semantics or detail shape with the old §5.5 placeholders.
-S["EvidenceUpload"] = {"type": "object", "required": ["file", "kind", "captured_at", "lat", "lng"],
-    "properties": OrderedDict([
-        ("file", {"type": "string", "format": "binary", "description": "JPEG, quyết bằng magic bytes FF D8 FF (BE-11)"}),
-        ("kind", {"type": "string", "enum": ["before", "after"]}),
-        ("captured_at", {"type": "string", "format": "date-time"}),
-        ("lat", {"type": "number", "format": "double"}),
-        ("lng", {"type": "number", "format": "double"}),
-    ])}
-
 S["SyncBundle"] = {"type": "object", "additionalProperties": False,
     "description": "Contract §5.8 — hình dạng đề xuất, chốt ở FW kế tiếp (Open item O-5).",
     "required": ["poles", "segments", "open_faults", "work_orders", "generated_at"],
@@ -415,13 +413,7 @@ ni("post", "/api/v1/faults", "Faults", "Kỹ sư hiện trường báo sự cố
     ("400", err("LOCATION_REQUIRED | FAULT_TYPE_NOT_REPORTABLE | VALIDATION_FAILED")),
     ("404", err("POLE_NOT_FOUND"))],
    body={"$ref": "#/components/schemas/CreateFaultRequest"})
-# BE-23 implements list/create/detail/assignment/actions. Evidence remains BE-24.
-ni("post", "/api/v1/work-orders/{work_order_id}/evidence", "WorkOrders", "Ảnh before/after cho phiếu (multipart)", "§5.5", "BE-24",
-   [("201", {"description": "Đã lưu; hình dạng response chưa đặc tả"}),
-    ("404", err("Không tồn tại hoặc ngoài phạm vi")),
-    ("415", err("UNSUPPORTED_IMAGE_FORMAT — không phải JPEG theo magic bytes"))],
-   parameters=[p("work_order_id", {"$ref": "#/components/schemas/WorkOrderId"}, True, where="path")],
-   body={"$ref": "#/components/schemas/EvidenceUpload"}, body_ct="multipart/form-data")
+# BE-24 implements the evidence upload; the stub and its hand-written EvidenceUpload schema are gone.
 # BE-15 P2c implements the authenticated JPEG thumbnail endpoint.
 ni("get", "/api/v1/sync/bundle", "Sync", "Gói dữ liệu theo segment để cache offline", "§5.8", "BE-43",
    [("200", {"description": "Bundle trong phạm vi địa bàn của user (§2)", "content": json_content("SyncBundle")}),

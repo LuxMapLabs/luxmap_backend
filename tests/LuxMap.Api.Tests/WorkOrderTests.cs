@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using LuxMap.Shared.Storage;
 using NetTopologySuite.Geometries;
 using Xunit.Abstractions;
 
@@ -83,7 +85,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
                 await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {home} OR commune_id = {foreign}");
                 await transaction.CommitAsync();
             }
-            foreach (var table in new[] { "work_order_fault", "work_order_segment", "work_order", "fault", "fault_cluster", "fixture", "pole", "road_segment" })
+            foreach (var table in new[] { "work_order_fault", "work_order_segment", "repair_evidence", "work_order", "fault", "fault_cluster", "fixture", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);
@@ -94,6 +96,8 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
             return 0;
         });
         foreach (var client in clients.Values) client.Dispose();
+        foreach (var client in photoClients.Values) client.Dispose();
+        if (photoHost is not null) await photoHost.DisposeAsync();
     }
 
     private async Task<JsonElement> Send(string who, string method, string path, object? body, int expected, string? error = null, int auditExpected = 1, string? correlation = null)
@@ -313,6 +317,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
     {
         var fault = await Fault(FaultStatus.Confirmed);
         var id = await Create("repair", [fault], users["a"].UserId);
+        await PlantAfterPhoto(id);
         await Send("a", "POST", "/" + id + "/start", new { }, 200);
         await Send("a", "POST", "/" + id + "/complete", new { report_note = "The repair is complete" }, 200);
         Assert.Equal(FaultStatus.InProgress, await Db(db => db.Set<Fault>().IgnoreQueryFilters().Where(x => x.FaultId == fault).Select(x => x.FaultStatus).SingleAsync()));
@@ -381,6 +386,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         var created = await Send("manager", "POST", "", new { task_kind = "repair", title = "Materials test",
             fault_ids = new[] { fault }, assigned_to = users["a"].UserId, materials_note = "  2 LED 100W, 1 driver  " }, 201);
         var id = created.GetProperty("work_order_id").GetString()!;
+        await PlantAfterPhoto(id);
         Assert.Equal("2 LED 100W, 1 driver", created.GetProperty("materials_note").GetString());
         Assert.Equal(JsonValueKind.Null, created.GetProperty("materials_used").ValueKind);
 
@@ -449,6 +455,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         var repair = await Send("manager", "POST", "/" + inspect + "/follow-up",
             new { task_kind = "repair", assigned_to = users["a"].UserId, note = "Go and fix it" }, 201);
         var repairId = repair.GetProperty("work_order_id").GetString()!;
+        await PlantAfterPhoto(repairId);
         Assert.Equal("repair", repair.GetProperty("task_kind").GetString());
         Assert.Equal(inspect, repair.GetProperty("parent_work_order_id").GetString());
         Assert.Equal(inspect, repair.GetProperty("case_id").GetString());
@@ -866,6 +873,285 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         await PolesOf(foreignOrder, who: "a", expected: 404, error: "WORK_ORDER_NOT_FOUND");
         await PolesOf(someoneElses, who: "b", expected: 404, error: "WORK_ORDER_NOT_FOUND");
         await PolesOf("WO-9999999", expected: 404, error: "WORK_ORDER_NOT_FOUND");
+    }
+
+    // ---- BE-24: photos of a work order ------------------------------------------------------------
+
+    /// <summary>A repair cannot be completed without an after photo (BE-24); tests about other rules plant one.</summary>
+    private Task PlantAfterPhoto(string workOrderId)
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var order = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(x => x.WorkOrderId == workOrderId);
+            db.Add(new RepairEvidence { WorkOrderId = workOrderId, CommuneId = order.CommuneId, Kind = EvidenceKind.After,
+                CapturedAt = DateTime.UtcNow, Lat = 16, Lng = 108, ObjectKey = "original/planted.jpg", ThumbnailKey = "thumb/planted.jpg",
+                ByteCount = 1, ThumbnailBytes = 1, UploadedBy = order.AssignedTo ?? users["a"].UserId });
+            await db.SaveChangesAsync(); return 0;
+        });
+
+    /// <summary>
+    /// The default host's store is the S3 adapter, and CI runs no MinIO. Evidence calls go through a second host
+    /// whose store keeps objects in memory but runs the REAL image pipeline — magic bytes and thumbnail included.
+    /// </summary>
+    private sealed class PhotoStore : IObjectStore
+    {
+        public readonly System.Collections.Concurrent.ConcurrentDictionary<(StorageBucket, string), byte[]> Objects = new();
+
+        /// <summary>Runs WHILE the image is being written — where a slow upload gives the manager time to act.</summary>
+        public Func<Task>? DuringWrite { get; set; }
+
+        public async Task<StoredImage> StoreImageAsync(StorageBucket bucket, string id, Stream content, CancellationToken cancellationToken = default)
+        {
+            if (DuringWrite is { } during) await during();
+            using var prepared = await LuxMap.Infrastructure.Storage.ImagePipeline.PrepareAsync(content, cancellationToken);
+            var original = StorageKeys.KeyFor(ObjectVariant.Original, id); var thumbnail = StorageKeys.KeyFor(ObjectVariant.Thumbnail, id);
+            Objects[(bucket, original)] = prepared.Original.ToArray(); Objects[(bucket, thumbnail)] = prepared.Thumbnail;
+            return new(bucket, original, prepared.OriginalBytes, thumbnail, prepared.ThumbnailBytes);
+        }
+        public Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
+            => Task.FromResult<Stream>(new MemoryStream(Objects[(bucket, key)], false));
+        public Task<bool> ExistsAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
+            => Task.FromResult(Objects.ContainsKey((bucket, key)));
+        public Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content, StreamUpload upload, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    private readonly PhotoStore photos = new();
+    private Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program>? photoHost;
+    private readonly Dictionary<string, HttpClient> photoClients = [];
+
+    private async Task<HttpClient> PhotoClient(string who)
+    {
+        photoHost ??= factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.Replace(ServiceDescriptor.Singleton<IObjectStore>(photos))));
+        if (photoClients.TryGetValue(who, out var known)) return known;
+        var client = photoHost.CreateClient();
+        var token = await (await client.PostLoginAsync(users[who].Username, factory.AccountPassword)).ReadTokensAsync();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", token.AccessToken);
+        return photoClients[who] = client;
+    }
+
+    private static byte[] Jpeg(byte shade = 90)
+    {
+        using var image = new SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgb24>(640, 480);
+        image[320, 240] = new SixLabors.ImageSharp.PixelFormats.Rgb24(shade, 200, 255);
+        var buffer = new MemoryStream();
+        image.Save(buffer, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality = 90 });
+        return buffer.ToArray();
+    }
+
+    private async Task<(int Status, JsonElement Body)> Upload(string who, string id, string kind, byte[]? bytes = null,
+        string capturedAt = "2026-10-04T13:30:00Z", string lat = "16.0001", string lng = "108.0001", string? clientOpId = null)
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new ByteArrayContent(bytes ?? Jpeg());
+        file.Headers.ContentType = new("image/jpeg");
+        form.Add(file, "file", "photo.jpg");
+        form.Add(new StringContent(kind), "kind");
+        form.Add(new StringContent(capturedAt), "captured_at");
+        form.Add(new StringContent(lat), "lat");
+        form.Add(new StringContent(lng), "lng");
+        if (clientOpId is not null) form.Add(new StringContent(clientOpId), "client_op_id");
+        var response = await (await PhotoClient(who)).PostAsync($"{Route}/{id}/evidence", form);
+        var text = await response.Content.ReadAsStringAsync();
+        return ((int)response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
+    }
+
+    private static string? Code(JsonElement body) => body.ValueKind == JsonValueKind.Object && body.TryGetProperty("error", out var e) ? e.GetProperty("code").GetString() : null;
+
+    private async Task<string> StartedRepair()
+    {
+        var id = await Create("repair", [await Fault(FaultStatus.Confirmed)], users["a"].UserId);
+        await Send("a", "POST", "/" + id + "/start", new { }, 200);
+        return id;
+    }
+
+    [Fact]
+    public async Task A_repair_needs_an_after_photo_before_it_can_be_completed()
+    {
+        var id = await StartedRepair();
+        await Send("a", "POST", "/" + id + "/complete", new { report_note = "The repair is complete" }, 409, "AFTER_EVIDENCE_REQUIRED");
+
+        Assert.Equal(201, (await Upload("a", id, "before")).Status);
+        // A BEFORE photo is not proof of the repair.
+        await Send("a", "POST", "/" + id + "/complete", new { report_note = "The repair is complete" }, 409, "AFTER_EVIDENCE_REQUIRED");
+
+        Assert.Equal(201, (await Upload("a", id, "after")).Status);
+        await Send("a", "POST", "/" + id + "/complete", new { report_note = "The repair is complete" }, 200);
+    }
+
+    [Fact]
+    public async Task Photos_are_listed_in_capture_order_and_served_through_the_api_byte_for_byte()
+    {
+        var id = await StartedRepair();
+        var original = Jpeg(17);
+        var (status, after) = await Upload("a", id, "after", original, capturedAt: "2026-10-04T13:40:00Z");
+        Assert.Equal(201, status);
+        var (_, before) = await Upload("a", id, "before", capturedAt: "2026-10-04T13:10:00+07:00"); // offset normalised to UTC
+
+        var list = await Send("manager", "GET", "/" + id + "/evidence", null, 200);
+        var items = list.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal([before.GetProperty("evidence_id").GetString(), after.GetProperty("evidence_id").GetString()],
+            items.Select(x => x.GetProperty("evidence_id").GetString()));
+        Assert.Equal("2026-10-04T06:10:00Z", items[0].GetProperty("captured_at").GetString());
+        Assert.Equal(["before", "after"], items.Select(x => x.GetProperty("kind").GetString()!));
+
+        var evidenceId = after.GetProperty("evidence_id").GetString()!;
+        Assert.Matches("^EVD-[0-9]{4,}$", evidenceId);
+        Assert.Equal($"/api/v1/evidence/{evidenceId}/thumbnail", after.GetProperty("thumbnail_url").GetString());
+        var manager = await PhotoClient("manager");
+        var stored = await manager.GetByteArrayAsync(after.GetProperty("original_url").GetString());
+        Assert.Equal(original, stored); // never re-encoded (BE-11 rule 4)
+        var thumbnail = await manager.GetAsync(after.GetProperty("thumbnail_url").GetString());
+        Assert.Equal("image/jpeg", thumbnail.Content.Headers.ContentType?.MediaType);
+        Assert.NotEqual(original, await thumbnail.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task Labels_follow_the_kind_of_order()
+    {
+        var repair = await StartedRepair();
+        var (status, body) = await Upload("a", repair, "observation");
+        Assert.Equal((400, "EVIDENCE_KIND_NOT_ALLOWED"), (status, Code(body)));
+
+        var inspection = await Create("inspection", [await Fault(FaultStatus.Detected)], users["a"].UserId);
+        await Send("a", "POST", "/" + inspection + "/start", new { }, 200);
+        (status, body) = await Upload("a", inspection, "before");
+        Assert.Equal((400, "EVIDENCE_KIND_NOT_ALLOWED"), (status, Code(body)));
+        Assert.Equal(201, (await Upload("a", inspection, "observation")).Status);
+    }
+
+    [Fact]
+    public async Task Only_the_assigned_engineer_uploads_and_only_while_the_order_is_in_progress()
+    {
+        var notStarted = await Create("repair", [await Fault(FaultStatus.Confirmed)], users["a"].UserId);
+        var (status, body) = await Upload("a", notStarted, "before");
+        Assert.Equal((409, "WORK_ORDER_NOT_IN_PROGRESS"), (status, Code(body)));
+
+        var id = await StartedRepair();
+        (status, body) = await Upload("b", id, "before"); // another engineer of the same commune
+        Assert.Equal((404, "WORK_ORDER_NOT_FOUND"), (status, Code(body)));
+        (status, _) = await Upload("manager", id, "before"); // managers verify; they do not take the photos
+        Assert.Equal(403, status);
+        Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id || x.WorkOrderId == notStarted)));
+    }
+
+    [Fact]
+    public async Task Another_engineer_cannot_list_or_open_the_photos()
+    {
+        var id = await StartedRepair();
+        var (_, photo) = await Upload("a", id, "before");
+
+        await Send("b", "GET", "/" + id + "/evidence", null, 404, "WORK_ORDER_NOT_FOUND");
+        var response = await (await PhotoClient("b")).GetAsync(photo.GetProperty("thumbnail_url").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("EVIDENCE_NOT_FOUND", Code(JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement));
+    }
+
+    [Theory]
+    [InlineData("png")]
+    [InlineData("corrupt jpeg")]
+    public async Task A_file_that_is_not_a_jpeg_is_refused_by_its_bytes_and_nothing_is_written(string what)
+    {
+        var id = await StartedRepair();
+        byte[] bytes = what == "png"
+            ? [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00]
+            : [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x13, 0x37, 0xDE, 0xAD]; // passes the signature, not the decoder
+
+        var (status, body) = await Upload("a", id, "before", bytes);
+
+        Assert.Equal((415, "UNSUPPORTED_IMAGE_FORMAT"), (status, Code(body)));
+        Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Theory]
+    [InlineData("captured_at", "not a time")]
+    [InlineData("captured_at", "13:30")]
+    [InlineData("captured_at", "2026-10-04")]
+    [InlineData("lat", "91")]
+    [InlineData("lng", "NaN")]
+    [InlineData("kind", "selfie")]
+    public async Task Malformed_fields_are_400_before_anything_is_stored(string field, string value)
+    {
+        var id = await StartedRepair();
+        var (status, body) = field switch
+        {
+            "captured_at" => await Upload("a", id, "before", capturedAt: value),
+            "lat" => await Upload("a", id, "before", lat: value),
+            "lng" => await Upload("a", id, "before", lng: value),
+            _ => await Upload("a", id, value),
+        };
+        Assert.Equal((400, "VALIDATION_FAILED"), (status, Code(body)));
+        Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Theory]
+    [InlineData("reassigned")]
+    [InlineData("cancelled")]
+    public async Task An_order_changed_while_the_photo_uploads_is_checked_again_before_the_row_is_saved(string change)
+    {
+        var id = await StartedRepair();
+        photos.DuringWrite = () => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var order = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(x => x.WorkOrderId == id);
+            if (change == "reassigned") order.AssignedTo = users["b"].UserId;
+            else { order.WoStatus = WorkOrderStatus.Cancelled; order.ClosedAt = DateTime.UtcNow; order.ReviewNote = "Called off"; }
+            await db.SaveChangesAsync(); return 0;
+        });
+        try
+        {
+            var (status, body) = await Upload("a", id, "before");
+            Assert.Equal(change == "reassigned" ? (404, "WORK_ORDER_NOT_FOUND") : (409, "WORK_ORDER_NOT_IN_PROGRESS"), (status, Code(body)));
+        }
+        finally { photos.DuringWrite = null; }
+        Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Fact]
+    public async Task An_overlapping_retry_gets_the_photo_back_even_after_the_order_was_completed()
+    {
+        var id = await StartedRepair();
+        var key = Guid.NewGuid();
+        string? firstId = null;
+        // While this request writes its image, the overlapping first attempt commits the photo and the engineer
+        // completes the order. This request must then answer the replay, not "not in progress".
+        photos.DuringWrite = () => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var order = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(x => x.WorkOrderId == id);
+            var first = new RepairEvidence { WorkOrderId = id, CommuneId = order.CommuneId, Kind = EvidenceKind.After, CapturedAt = DateTime.UtcNow,
+                Lat = 16, Lng = 108, ObjectKey = "original/first.jpg", ThumbnailKey = "thumb/first.jpg", ByteCount = 1, ThumbnailBytes = 1,
+                UploadedBy = users["a"].UserId, ClientOpId = key };
+            db.Add(first);
+            order.WoStatus = WorkOrderStatus.Done; order.CompletedAt = DateTime.UtcNow; order.ReportNote = "The repair is complete";
+            await db.SaveChangesAsync(); firstId = first.EvidenceId; return 0;
+        });
+        try
+        {
+            var (status, body) = await Upload("a", id, "after", clientOpId: key.ToString());
+            Assert.Equal(200, status);
+            Assert.Equal(firstId, body.GetProperty("evidence_id").GetString());
+        }
+        finally { photos.DuringWrite = null; }
+        Assert.Equal(1, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Fact]
+    public async Task A_retry_with_the_same_client_op_id_returns_the_same_photo()
+    {
+        var id = await StartedRepair();
+        var key = Guid.NewGuid().ToString();
+
+        var first = await Upload("a", id, "after", clientOpId: key);
+        var retry = await Upload("a", id, "after", clientOpId: key);
+        var changed = await Upload("a", id, "before", clientOpId: key);
+
+        Assert.Equal(201, first.Status);
+        Assert.Equal(200, retry.Status);
+        Assert.Equal(first.Body.GetProperty("evidence_id").GetString(), retry.Body.GetProperty("evidence_id").GetString());
+        Assert.Equal((409, "IDEMPOTENCY_CONFLICT"), (changed.Status, Code(changed.Body)));
+        Assert.Equal(1, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
     }
 
     private sealed class SaveBarrier(string id, bool create = false) : SaveChangesInterceptor

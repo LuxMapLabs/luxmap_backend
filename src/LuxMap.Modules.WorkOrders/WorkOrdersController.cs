@@ -6,6 +6,7 @@ using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LuxMap.Modules.WorkOrders;
@@ -13,7 +14,7 @@ namespace LuxMap.Modules.WorkOrders;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/work-orders")]
-public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles) : ControllerBase
+public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles, WorkOrderEvidenceService evidence) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
@@ -43,6 +44,33 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
     public Task<PagedResult<WorkOrderPole>> Poles(string id, PageQuery page, CancellationToken ct)
         => poles.PolesAsync(id, page.ToPageRequest(), ct);
+
+    /// <summary>
+    /// The assigned engineer adds a photo while the order is in progress (BE-24): <c>before</c>/<c>after</c> on a
+    /// repair, <c>observation</c> on an inspection. JPEG decided by magic bytes; <c>client_op_id</c> makes a retry
+    /// return the same photo (200) instead of a second one (201).
+    /// </summary>
+    [HttpPost("{id}/evidence")]
+    [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(WorkOrderEvidenceService.MaxUploadBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = WorkOrderEvidenceService.MaxUploadBytes)]
+    [ProducesResponseType(typeof(EvidenceItem), 201)]
+    [ProducesResponseType(typeof(EvidenceItem), 200)]
+    public async Task<ActionResult<EvidenceItem>> UploadEvidence(string id, IFormFile? file,
+        [FromForm(Name = "kind")] string? kind, [FromForm(Name = "captured_at")] string? capturedAt,
+        [FromForm(Name = "lat")] string? lat, [FromForm(Name = "lng")] string? lng,
+        [FromForm(Name = "client_op_id")] string? clientOpId, CancellationToken ct)
+    {
+        var (item, created) = await evidence.UploadAsync(id, file, kind, capturedAt, lat, lng, clientOpId, ct);
+        return created ? StatusCode(201, item) : Ok(item);
+    }
+
+    /// <summary>The order's photos, oldest capture first, with API paths to each image (BE-24).</summary>
+    [HttpGet("{id}/evidence")]
+    [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
+    public Task<PagedResult<EvidenceItem>> Evidence(string id, PageQuery page, CancellationToken ct)
+        => evidence.ListAsync(id, page.ToPageRequest(), ct);
 
     [HttpGet("assignees")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
