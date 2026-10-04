@@ -59,6 +59,9 @@ public sealed class LuminanceHistoryConfiguration : IEntityTypeConfiguration<Lum
         b.HasOne<LuminanceBaseline>().WithMany().HasForeignKey(x => new { x.BaselineId, x.PoleId, x.CommuneId })
             .HasPrincipalKey(x => new { x.BaselineId, x.PoleId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<AppUser>().WithMany().HasForeignKey(x => x.PublishedBy).OnDelete(DeleteBehavior.Restrict);
+        // The composite FKs above skip a row whose observation_id and baseline_id are null (MATCH SIMPLE),
+        // which is every not_observed row. Published history must still keep its pole from being deleted.
+        b.HasOne<Pole>().WithMany().HasForeignKey(x => x.PoleId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 public sealed class ObservationBaselineConfiguration : IEntityTypeConfiguration<PoleObservation>

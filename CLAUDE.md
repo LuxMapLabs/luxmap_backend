@@ -1639,3 +1639,13 @@ kiểm lại, ghi dòng. Object mồ côi khi thua race là chấp nhận đư�
 factory tự liệt kê assembly module sẽ âm thầm thiếu module mới, và `migrations add` sinh `DropTable`
 cho bảng của module đó. Sinh migration trong môi trường không có `.env` thì đặt
 `ConnectionStrings__LuxMap` giả cho lệnh đó, đừng đổi đường dựng model.
+
+### BE-15 P2c — FK ghép không giữ được hàng có cột null (04/10/2026)
+
+**FK ghép `MATCH SIMPLE` bỏ qua hẳn hàng có BẤT KỲ cột nào null — kể cả các cột còn lại không null.**
+`luminance_history` trỏ tới `pole_observation` và `luminance_baseline` bằng FK ghép có `pole_id`; hàng
+`not_observed` có `observation_id` và `baseline_id` đều null nên **không FK nào kiểm `pole_id`**, và cột xoá được
+dù lịch sử bất biến vẫn trỏ vào nó (review Codex sau merge #80). Đã thêm FK đơn `fk_luminance_history_pole_pole_id`
+(`Restrict`). Bảng mới có FK ghép trên cột nullable phải tự hỏi: khi phần nullable là null, cái gì còn giữ các cột kia?
+Test xoá phải đọc dependent bằng `AsNoTracking` — entity đang track làm EF tự từ chối ở client, test xanh mà DB không
+hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`).

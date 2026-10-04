@@ -353,6 +353,20 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     [Fact]
+    public async Task A_pole_with_only_not_observed_history_cannot_be_deleted()
+    {
+        await Accept(await Plant(1, halfCovered: true));
+        await using var db = Db();
+        // Untracked, like DeletePoleAsync: the database, not the change tracker, must refuse.
+        Assert.Null((await db.Set<LuminanceHistory>().AsNoTracking().SingleAsync(h => h.PoleId == poles[1])).ObservationId);
+        Assert.False(await db.Set<PoleObservation>().AnyAsync(o => o.PoleId == poles[1]));
+        db.Remove(await db.Set<Pole>().SingleAsync(p => p.PoleId == poles[1]));
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        var postgres = Assert.IsType<PostgresException>(error.InnerException);
+        Assert.Equal((PostgresErrorCodes.ForeignKeyViolation, "fk_luminance_history_pole_pole_id"), (postgres.SqlState, postgres.ConstraintName));
+    }
+
+    [Fact]
     public async Task Half_covered_sweep_publishes_unknown_for_expected_pole_at_sweep_end()
     {
         await Accept(await Plant(1));
