@@ -117,6 +117,40 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         return json;
     }
 
+    [Fact]
+    public async Task An_unknown_enum_name_is_a_400_that_names_no_internal_type()
+    {
+        using var body = JsonDocument.Parse("""{"task_kind":"bogus","title":"Invalid enum"}""");
+        var json = await Send("manager", "POST", "", body.RootElement, 400, "VALIDATION_FAILED");
+        Assert.Equal("The value is not valid for this field.", json.GetProperty("error").GetProperty("details").GetProperty("$.task_kind")[0].GetString());
+        Assert.DoesNotContain("LuxMap.", json.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("999")]
+    [InlineData("\"1\"")]
+    [InlineData("\"999\"")]
+    public async Task Numeric_task_kind_is_a_validation_error_at_json_binding(string value)
+    {
+        // A real nullable enum body property. PATCH /faults uses JsonElement plus its own
+        // validation, so it would not prove that the global converter rejects integers.
+        using var body = JsonDocument.Parse($$"""{"task_kind":{{value}},"title":"Invalid enum"}""");
+        var correlation = Guid.NewGuid().ToString();
+        var json = await Send("manager", "POST", "", body.RootElement, 400, "VALIDATION_FAILED", correlation: correlation);
+
+        Assert.Equal(["error"], json.EnumerateObject().Select(x => x.Name).ToArray());
+        var error = json.GetProperty("error");
+        Assert.Equal(["code", "details", "message"], error.EnumerateObject().Select(x => x.Name).Order().ToArray());
+        Assert.Equal("The submitted payload is invalid.", error.GetProperty("message").GetString());
+        var details = error.GetProperty("details");
+        Assert.Equal(correlation, details.GetProperty("correlation_id").GetString());
+        Assert.Equal(JsonValueKind.Array, details.GetProperty("$.task_kind").ValueKind);
+        Assert.DoesNotContain("System.", json.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("LuxMap.", json.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("stack", json.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
     private Task<string> Fault(FaultStatus status = FaultStatus.Detected, string? commune = null, string? road = null, double? priority = null)
         => Db(async db =>
         {

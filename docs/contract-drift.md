@@ -23,6 +23,20 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### JSON-ENUM — enum trong body JSON chỉ nhận chuỗi (04/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Sửa converter toàn cục về đúng Contract §0/§3.1: từ chối enum dạng số JSON (`2`, `999`) và chuỗi chữ số (`"2"`, `"999"`), gồm enum nullable. Trước converter nhận các giá trị này, có thể đổi nghĩa hoặc gây 500 ở CHECK DB; nay body bind enum sai trả **400 `VALIDATION_FAILED`** qua cơ chế lỗi hiện có. Chuỗi enum hợp lệ vẫn serialize snake_case; tên enum và hình dạng response giữ nguyên. |
+| **Decision maker** | **Mỹ**, duyệt sửa toàn cục trong `.ai/tasks/JSON-ENUM.md` |
+| **Date** | 04/10/2026 |
+| **Scope** | `LuxMapJsonOptions`, cả MVC/HTTP JSON và các lượt deserialize thủ công dùng options chung. Query string và kiểm tra cục bộ giữ nguyên. Client gửi số phải chuyển sang tên enum trong Contract; không cần migration. |
+
+Đây là thay đổi quan sát được với client gửi sai Contract. `audit_event.before_state/after_state` hiện được ghi bằng
+options chung (enum có tên ra chuỗi); rà mã không thấy đường đọc lại audit thành enum. Chưa kiểm dữ liệu đã lưu trên DB
+theo giới hạn ticket. HTTP regression trên `POST /work-orders` chỉ biên dịch ở lượt thực thi; Claude chạy tích hợp sau.
+Rollback code: trả converter về cấu hình trước, nhưng sẽ mở lại việc nhận enum số; không có đổi schema/package.
+
 ### BE-REVIEW-02 — 18/09/2026
 
 | | |

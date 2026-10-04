@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>JSON-ENUM — enum JSON chỉ nhận chuỗi — 05/10/2026</strong>
+    <p><span class="tag t-next">Chờ Claude review / test tích hợp</span> Đã chặn số và chuỗi chữ số ở converter chung;
+    build 0 warning, 0 error; Shared 336/336 xanh bằng runner xUnit trong tiến trình (VSTest bị sandbox chặn socket).
+    Phá thử bật lại nhận số: 9/14 test enum đỏ; đã phục hồi và chạy xanh lại. Test HTTP trên <code>POST /work-orders</code>
+    chỉ biên dịch. Sửa <code>LuxMapJsonOptions.cs</code>, thêm <code>JsonEnumHandlingTests.cs</code>, bổ sung
+    <code>JsonPipelineConventionTests.cs</code>, <code>WorkOrderTests.cs</code>, <code>CLAUDE.md</code> và drift.
+    <a href=".ai/results/JSON-ENUM.md">Bằng chứng thực thi</a>. Chưa commit/push theo yêu cầu.</p>
+  </div>
+  <div class="card">
     <strong>OPS-SUPABASE — script chép thêm 16 bảng khảo sát và ảnh — merge #88, 04/10/2026</strong>
     <p><span class="tag t-done">Đã merge</span> <code>scripts/copy_dev_to_supabase.py</code> nay chép cả chuỗi khảo sát, lịch sử độ sáng,
     baseline và ảnh phiếu; vòng khoá ngoại phiên ↔ run chép hai lượt trong một transaction. Diễn tập trên DB giả lập Supabase (role
