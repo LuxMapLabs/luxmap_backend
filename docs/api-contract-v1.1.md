@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.9 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.10 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -8,17 +8,18 @@
 **v1.5:** 19/09/2026 (`GET /auth/me`) · **v1.6:** 22/09/2026 (bỏ đèn solar khỏi enum) ·
 **v1.7:** 25/09/2026 (hợp nhất BE-12b ngày 22/09 và vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability ngày 25/09) ·
 **v1.8:** 05/10/2026 (BE-33a — Quản trị hệ thống tạo tài khoản và mời qua email; gỡ `POST /auth/register`) ·
-**v1.9:** 05/10/2026 (POLE-NOTE — ghi chú của kỹ sư trên cột).
+**v1.9:** 05/10/2026 (POLE-NOTE — ghi chú của kỹ sư trên cột) ·
+**v1.10:** 05/10/2026 (BE-27 — thông báo trong ứng dụng, đọc bằng polling).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.9, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.10, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (79 operation: 77
-`implemented`, 2 `not_implemented` — đếm lại ở v1.9 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (83 operation: 81
+`implemented`, 2 `not_implemented` — đếm lại ở v1.10 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -78,6 +79,7 @@ tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải p
 | `ExternalUnit` | `EXT` | `EXT-001` | `^EXT-[0-9]{3,}$` |
 | `AppUser` | `USR` | `USR-001` | `^USR-[0-9]{3,}$` |
 | Cụm sự cố (`cluster_id`) | `CLS` | `CLS-001` | `^CLS-[0-9]{3,}$` |
+| `Notification` (v1.10) | `NTF` | `NTF-000001` | `^NTF-[0-9]{6,}$` |
 
 - **Số chữ số là TỐI THIỂU, không cố định.** `POLE-9999` kế tiếp là `POLE-10000`. Client **không** parse,
   **không** so sánh thứ tự, **không** giả định độ dài. Khuôn dùng `[0-9]` chứ không `\d` (`\d` khớp cả
@@ -229,6 +231,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 | `RecordLuxReading` | **field_engineer** | `POST /lux-readings` |
 | `ControlLighting` | **manager** | chưa có endpoint — điều khiển ON/OFF/AUTO thiết bị được hỗ trợ (testbed demo), mục 5.6 |
 | `ManageUsers` | **system_admin** | mọi `/admin/users*` — tạo tài khoản, gán vai trò và xã, khoá, gửi lại lời mời (v1.8, mục 4.9) |
+| `ReadNotifications` | superior, manager, field_engineer, system_admin | mọi `/notifications*` — chỉ thông báo **của chính người gọi** (v1.10, mục 5.9) |
 
 - `/auth/*` cấp token không cần token.
 - Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
@@ -758,6 +761,53 @@ qua API. Nợ có chủ: BE-15/BE-17.
   id}, conflicts[]{client_op_id, reason, server_state}}`; khử trùng lặp theo `client_op_id`; xung đột:
   **server thắng**. Hình dạng đề xuất: `[OPEN → O-5]`.
 
+### 5.9 Thông báo trong ứng dụng — `/api/v1/notifications` — `implemented` (v1.10, BE-27)
+
+Mỗi thông báo là **của một người**. Server sinh khi sự kiện xảy ra, **trong cùng giao dịch** với thay đổi
+đó: thao tác thất bại hay thua tranh chấp thì không có thông báo. Client **polling**: gọi
+`unread-count` mỗi 30–60 giây khi app mở, tải danh sách khi người dùng mở chuông. Một kênh push (Firebase)
+thêm sau sẽ đọc cùng dữ liệu — bốn endpoint này giữ nguyên.
+
+| Endpoint | Request | Response |
+|---|---|---|
+| **`GET /api/v1/notifications`** | `?unread_only=true\|false&page=&page_size=` (≤ 200) | `200 {page, page_size, total, unread_count, items[]}` — mới nhất trước |
+| **`GET /api/v1/notifications/unread-count`** | — | `200 {unread_count}` |
+| **`POST /api/v1/notifications/{notification_id}/read`** | — | `204`; gọi lại không đổi `read_at`; của người khác / không tồn tại → `404 NOTIFICATION_NOT_FOUND` |
+| **`POST /api/v1/notifications/read-all`** | — | `204` |
+
+```json
+{ "notification_id": "NTF-000123", "type": "work_order_assigned",
+  "title": "Bạn được giao phiếu sửa chữa WO-0042", "body": "WO-0042 — Thay bóng tuyến Long Phước 2. Hạn 12/10/2026.",
+  "entity_type": "work_order", "entity_id": "WO-0042", "created_at": "2026-10-05T08:00:00Z", "read_at": null }
+```
+
+- **`title` / `body` do server soạn sẵn bằng tiếng Việt** và là **bản chụp lúc xảy ra**: đổi tên phiếu sau
+  đó không sửa thông báo cũ. Client hiển thị nguyên văn; dùng `type` để chọn biểu tượng, `entity_type` +
+  `entity_id` để mở màn tương ứng (`work_order` → `GET /work-orders/{id}`, `survey_sweep` → `GET /sweeps/{id}`,
+  `fault` → màn danh sách sự cố, mục 5.4 — **chưa có `GET /faults/{id}`**, ghi ở drift BE-27 N-6). Endpoint
+  đó tự quyết quyền xem — phiếu đã giao cho người khác có thể là 404.
+- **Phạm vi:** mọi vai trò chỉ đọc thông báo của chính mình, trong các xã của claim. Người bị chuyển khỏi
+  xã thôi thấy thông báo của xã đó, theo cùng luật 60 phút của token (mục 2).
+- **Không báo cho chính người gây ra sự kiện.** "Quản lý của xã" = tài khoản `manager` đang hoạt động
+  (không khoá, đã đặt mật khẩu) được gán **đủ mọi xã** của sự kiện.
+
+| `type` | Khi nào | Ai nhận | `entity_type` |
+|---|---|---|---|
+| `work_order_assigned` | Tạo phiếu có người được giao; giao; giao lại | Kỹ sư **mới** được giao | `work_order` |
+| `work_order_unassigned` | Bỏ giao; giao lại cho người khác | Kỹ sư **cũ** | `work_order` |
+| `work_order_rescheduled` | Đổi `due_date` / `scheduled_date` (đổi tên phiếu thì không) | Kỹ sư được giao | `work_order` |
+| `work_order_returned` | Quản lý trả phiếu (body có lý do) | Kỹ sư được giao | `work_order` |
+| `work_order_cancelled` | Huỷ phiếu đang có người giữ (body có lý do) | Kỹ sư được giao | `work_order` |
+| `work_order_completed` | Kỹ sư báo xong, chờ nghiệm thu | Quản lý của xã | `work_order` |
+| `work_order_verified` | Quản lý nghiệm thu | Kỹ sư được giao | `work_order` |
+| `survey_returned` | Duyệt khảo sát: trả về (body có lý do) | Người **đang** giữ phiếu, và kỹ sư đã quay nếu khác người | `survey_sweep` |
+| `survey_ready_for_review` | Xử lý khảo sát xong, chờ duyệt | Quản lý có **đủ mọi xã** của lượt khảo sát | `survey_sweep` |
+| `survey_processing_failed` | Xử lý thất bại hẳn (thử lại giữa chừng không báo; body có mã lỗi) | Kỹ sư đã quay + Quản lý như trên | `survey_sweep` |
+| `fault_reported` | Kỹ sư báo sự cố tại chỗ (mục 5.4, `POST /faults`) | Quản lý của xã | `fault` |
+
+Danh sách `type` sẽ **thêm** giá trị (quá hạn, thiết bị mất kết nối — cùng BE-26); client gặp giá trị lạ thì
+vẫn hiển thị `title`/`body` với biểu tượng mặc định, **không** lỗi.
+
 ---
 
 ## 6. Việc BE phải khớp
@@ -801,6 +851,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.10 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-27 — thông báo trong ứng dụng.** Thêm mục 5.9 (4 endpoint `/notifications`, 11 `type`), capability `ReadNotifications` (cả bốn vai trò), prefix `NTF` (6 chữ số). Chỉ thêm, không đổi gì đã có. Drift BE-27 (N-1…N-6). Nền tạm tới FW |
 | v1.9 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **POLE-NOTE — ghi chú của kỹ sư trên cột.** Thêm `note?` vào `POST /assets/poles` và `PUT /assets/poles/{poleId}` (ở `PUT`: vắng = giữ nguyên), thêm `PUT /assets/poles/{poleId}/note` (capability mới **`EditPoleNotes`** = Quản lý + Kỹ sư hiện trường, mục 2) và trường `note: {text, updated_at, updated_by, updated_by_name} \| null` ở danh sách/chi tiết kiểm kê (5.3.1), `GET /map/poles/{pole_id}` và `GET /work-orders/{id}/poles`. Một ghi chú mỗi cột, ghi đè, ≤ 1000 ký tự. Không đổi trường nào có sẵn — chỉ **thêm**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.8 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33a — tài khoản do Quản trị tạo, mời qua email (D-R11).** Thêm mục 4.8 (`POST /auth/password/set`, `POST /auth/password/forgot` — ẩn danh, link 72 giờ / 1 giờ, dùng một lần, giới hạn 5/15 phút) và 4.9 (`/admin/users` — tạo, liệt kê, xem, sửa, khoá, mở khoá, gửi lại lời mời; capability `ManageUsers`). Mã lỗi mới: `INVALID_ACCOUNT_TOKEN`, `USER_NOT_FOUND`, `LAST_SYSTEM_ADMIN`, `CANNOT_LOCK_SELF`, `ACCOUNT_ALREADY_ACTIVE`, `RATE_LIMITED`. ⚠️ **BREAKING:** `POST /auth/register` **gỡ** (đã báo DEPRECATED từ v1.7). Quyết định D-1…D-14 ở `.ai/results/BE-33a-p1.md`, đăng ký ở `docs/contract-drift.md`. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận**; WP5 cần trang `/set-password` + màn quản trị tài khoản, WP6 bỏ màn đăng ký |
 | v1.7 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BE-12b — hình dạng ĐỌC tài sản, mục 5.3.1.** Thay `PagedResult<string>` (chỗ giữ chỗ từ BE-12a) bằng dòng kiểm kê đầy đủ, thêm `GET /assets/{kind}/{id}`. Ba câu treo từ 17/09 trả lời **CÓ** cả ba: emit `external_ref`, `data_source`, `feeder_id` ở nhóm kiểm kê — lệnh cấm ở mục 5.1 viết cho endpoint bản đồ, không ràng buộc bề mặt này. `active_fixture` có trong cả danh sách (bảng kiểm kê hiện công suất theo dòng); `feeder` không có `data_source` (mục 1.6 không gắn); `pole_count` đếm trong phạm vi người gọi. Quyết sau khi review độc lập đối chiếu repo WP5. ⚠️ **BREAKING** so với chỗ giữ chỗ, nhưng WP5 chưa đọc endpoint này — màn kiểm kê của họ đang dùng mock local. Chạm bề mặt API và ký một mình → **chưa ổn định tới FW kế tiếp** |

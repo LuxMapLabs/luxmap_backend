@@ -12,6 +12,8 @@
     <!-- measured_by is a real foreign key to app_user, for the same reason: a name in free text is
          not traceability. Also declared without a navigation property. -->
     <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
+    <!-- BE-27: stages notices in its own saves through Notifier. -->
+    <ProjectReference Include="..\LuxMap.Modules.Notifications\LuxMap.Modules.Notifications.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

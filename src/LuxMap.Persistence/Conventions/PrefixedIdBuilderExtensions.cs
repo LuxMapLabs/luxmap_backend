@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace LuxMap.Persistence.Conventions;
 
 /// <summary>
-/// Implements the Contract's ID convention (section 0.4) once for all 16 entities that carry a
+/// Implements the Contract's ID convention (section 0.4) once for all 17 entities that carry a
 /// display ID.
 /// <para>
 /// Use it inside any entity's <c>IEntityTypeConfiguration</c>:

@@ -521,6 +521,7 @@ Tóm tắt mã lỗi:
 | `src/LuxMap.Modules.WorkOrders` | WorkOrder, ExternalUnit, RepairEvidence (BE-21..BE-24) |
 | `src/LuxMap.Modules.Telemetry` | IotNode, TelemetryReading |
 | `src/LuxMap.Modules.Admin` | Danh mục, ngưỡng, model version, dashboard (BE-28..BE-35) |
+| `src/LuxMap.Modules.Notifications` | Notification — thông báo trong ứng dụng, polling (BE-27) |
 | `tests/LuxMap.Shared.Tests` | Khoá lại quy ước contract |
 | `tests/LuxMap.Persistence.Tests` | Enum lưu xuống DB đúng chuỗi Contract |
 | `tests/LuxMap.Api.Tests` | Hình dạng lỗi, correlation id, phân trang qua pipeline thật |

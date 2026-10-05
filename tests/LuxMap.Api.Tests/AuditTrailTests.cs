@@ -95,6 +95,8 @@ public class AuditTrailTests(AssetSchemaFixture fixture) : IAsyncLifetime
                         $"DELETE FROM audit_event WHERE correlation_id = {correlationId}");
                     await transaction.CommitAsync();
                 }
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM notification WHERE recipient_user_id IN (SELECT user_id FROM app_user WHERE username = {username})");
                 return await db.Database.ExecuteSqlInterpolatedAsync(
                     $"DELETE FROM app_user WHERE username = {username}");
             });

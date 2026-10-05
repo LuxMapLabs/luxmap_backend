@@ -2,6 +2,7 @@ using LuxMap.Modules.Assets;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Identity;
 using LuxMap.Modules.Survey;
+using LuxMap.Modules.Notifications;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Shared.Authorization;
@@ -33,7 +34,7 @@ public sealed class ModelDefaultValueTests
             .UseSnakeCaseNamingConvention().Options,
             new ModuleAssemblyCatalog([typeof(SurveyModule).Assembly, typeof(AssetsModule).Assembly,
                 typeof(IdentityModule).Assembly, typeof(WorkOrdersModule).Assembly, typeof(FaultsModule).Assembly,
-                typeof(TelemetryModule).Assembly]), new NoScope());
+                typeof(TelemetryModule).Assembly, typeof(NotificationsModule).Assembly]), new NoScope());
         var model = db.GetService<IDesignTimeModel>().Model;
 
         var traps = model.GetEntityTypes().SelectMany(entity => entity.GetProperties()

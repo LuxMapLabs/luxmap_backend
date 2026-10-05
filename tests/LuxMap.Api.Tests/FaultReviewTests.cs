@@ -95,7 +95,7 @@ public class FaultReviewTests(AssetImportFixture factory, ITestOutputHelper outp
                 await transaction.CommitAsync();
             }
 
-            foreach (var table in new[] { "work_order_fault", "work_order", "fault", "road_segment" })
+            foreach (var table in new[] { "notification", "work_order_fault", "work_order", "fault", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);

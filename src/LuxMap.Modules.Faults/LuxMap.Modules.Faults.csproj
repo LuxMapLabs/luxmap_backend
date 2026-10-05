@@ -9,6 +9,8 @@
     <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
     <!-- reported_by / confirmed_by / resolved_by are real foreign keys to app_user. -->
     <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
+    <!-- BE-27: stages notices in its own saves through Notifier. -->
+    <ProjectReference Include="..\LuxMap.Modules.Notifications\LuxMap.Modules.Notifications.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

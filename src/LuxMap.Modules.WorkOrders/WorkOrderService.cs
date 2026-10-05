@@ -4,6 +4,7 @@ using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Notifications;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
@@ -179,6 +180,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         for (var position = 0; position < ids.Length; position++)
             db.Add(new WorkOrderSegment { WorkOrderId = id, CommuneId = commune, Position = position, SegmentId = ids[position] });
         Record(wo, AuditAction.Created, null, new { work_order = Snapshot(wo, []), segment_ids = ids }, now);
+        Notify(WorkOrderNotices.Assigned(wo), [wo.AssignedTo], now);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return await Detail(id, ct);
@@ -276,6 +278,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             WorkOrderId = id, FaultId = fault.FaultId, CommuneId = commune, LinkedAt = now,
         });
         Record(wo, AuditAction.Created, null, Snapshot(wo, ids), now, order.Note);
+        Notify(WorkOrderNotices.Assigned(wo), [wo.AssignedTo], now);
         await Save(id, ids, ct);
         await transaction.CommitAsync(ct);
         return await Detail(id, ct);
@@ -300,6 +303,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         Schedule(nextScheduled, nextDue);
         if ((title ?? wo.Title) == wo.Title && nextDue == wo.DueDate && nextScheduled == wo.ScheduledDate
             && nextMaterials == wo.MaterialsNote) return await Detail(id, ct);
+        var rescheduled = nextDue != wo.DueDate || nextScheduled != wo.ScheduledDate;
         wo.Title = title ?? wo.Title;
         wo.DueDate = nextDue;
         wo.ScheduledDate = nextScheduled;
@@ -307,6 +311,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var now = UtcMicrosecondClock.UtcNow();
         wo.UpdatedAt = now;
         Record(wo, AuditAction.DetailsChanged, before, Snapshot(wo), now);
+        if (rescheduled) Notify(WorkOrderNotices.Rescheduled(wo), [wo.AssignedTo], now);
         await Save(id, [], ct);
         return await Detail(id, ct);
     }
@@ -330,12 +335,15 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var before = Snapshot(wo);
         var action = assigned is null ? AuditAction.Unassigned : wo.AssignedTo is null ? AuditAction.Assigned : AuditAction.Reassigned;
         var now = UtcMicrosecondClock.UtcNow();
+        var previous = wo.AssignedTo;
         wo.AssignedTo = assigned;
         wo.AssignedAt = assigned is null ? null : now;
         wo.WoStatus = assigned is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned;
         wo.StartedAt = null;
         wo.UpdatedAt = now;
         Record(wo, action, before, Snapshot(wo), now);
+        Notify(WorkOrderNotices.Assigned(wo), [assigned], now);
+        Notify(WorkOrderNotices.Unassigned(wo), [previous], now);
         await Save(id, [], ct);
         return await Detail(id, ct);
     }
@@ -420,6 +428,13 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             "return" => AuditAction.Returned, "verify" => AuditAction.Verified, _ => AuditAction.Cancelled,
         };
         Record(wo, auditAction, before, Snapshot(wo, ids, changes.ToArray(), skipped.ToArray(), links), now, note);
+        switch (action)
+        {
+            case "complete": Notify(WorkOrderNotices.Completed(wo), await Notifier.ManagersCoveringAsync(db, [wo.CommuneId], ct), now); break;
+            case "return": Notify(WorkOrderNotices.Returned(wo, note), [wo.AssignedTo], now); break;
+            case "verify": Notify(WorkOrderNotices.Verified(wo), [wo.AssignedTo], now); break;
+            case "cancel": Notify(WorkOrderNotices.Cancelled(wo, note), [wo.AssignedTo], now); break;
+        }
         await Save(id, [], ct);
         return await Detail(id, ct);
     }
@@ -469,6 +484,10 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             throw LinkConflict(link);
         }
     }
+
+    /// <summary>BE-27 — staged with the change, in the same save; the actor is never told about their own action.</summary>
+    private void Notify(NotificationMessage message, IEnumerable<string?> recipients, DateTime now)
+        => Notifier.Stage(db, message, recipients, ActorId, now);
 
     private void Record(WorkOrder wo, AuditAction action, object? before, object after, DateTime now, string? note = null)
         => audit.Record(new(now, AuditActorKind.User, ActorId, actor.Role, wo.CommuneId,

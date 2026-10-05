@@ -41,7 +41,7 @@ public sealed record PrefixedIdSpec(string Prefix, int Digits, string SequenceNa
 }
 
 /// <summary>
-/// The full prefix table from Contract section 0.2. All 16 rows are declared up front so that from
+/// The full prefix table from Contract section 0.2. All 17 rows are declared up front so that from
 /// BE-09 onward nobody retypes a prefix or a padding width — one typo corrupts every ID of that
 /// entity.
 /// </summary>
@@ -68,10 +68,12 @@ public static class PrefixedIds
     public static readonly PrefixedIdSpec ExternalUnit = new("EXT", 3, "external_unit_id_seq");
     public static readonly PrefixedIdSpec AppUser = new("USR", 3, "user_id_seq");
     public static readonly PrefixedIdSpec FaultCluster = new("CLS", 3, "cluster_id_seq");
+    public static readonly PrefixedIdSpec Notification = new("NTF", 6, "notification_id_seq");
 
     public static IReadOnlyList<PrefixedIdSpec> All { get; } =
     [
         Pole, Fault, RoadSegment, AdministrativeUnit, Fixture, Feeder, IotNode, SurveySweep,
         SurveyFrame, Detection, LuxReading, WorkOrder, RepairEvidence, ExternalUnit, AppUser, FaultCluster,
+        Notification,
     ];
 }

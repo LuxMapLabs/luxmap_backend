@@ -56,6 +56,9 @@ public static class LuxMapPolicies
     public const string EditPoleNotes = "cap:edit_pole_notes";
 
     /// <summary>Read the fault list (BE-40). Kept apart from <see cref="ReadNetwork"/> so fault access can change without touching the map.</summary>
+    /// <summary>BE-27 — read and mark one's OWN notifications. Every role, so no endpoint leans on the fallback.</summary>
+    public const string ReadNotifications = "cap:read_notifications";
+
     public const string ReadFaults = "cap:read_faults";
 
     /// <summary>Review a fault: confirm, reject, reclassify, set severity, write a review note (BE-19).</summary>
@@ -90,6 +93,7 @@ public static class LuxMapPolicies
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],
             [ReadFaults] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
+            [ReadNotifications] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReviewFaults] = [UserRole.Manager],
             [ReportFaults] = [UserRole.FieldEngineer],
             [ReadWorkOrders] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],

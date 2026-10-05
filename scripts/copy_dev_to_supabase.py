@@ -98,6 +98,9 @@ PLAN = [
     ("work_order_fault", IN_COMMUNES, "work_order_id, fault_id"),
     ("repair_evidence", IN_COMMUNES, "evidence_id"),
     ("audit_event", IN_COMMUNES, "audit_id"),
+    # BE-27: only the notices of the accounts copied above — recipient_user_id is a RESTRICT key to app_user.
+    ("notification", f"{IN_COMMUNES} AND recipient_user_id IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})",
+     "notification_id"),
 ]
 
 # Foreign keys that close a cycle. The child is copied FIRST with these columns replaced by values that

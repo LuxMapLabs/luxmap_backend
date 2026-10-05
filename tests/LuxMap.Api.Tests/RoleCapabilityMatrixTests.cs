@@ -54,6 +54,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ControlLighting"] = ("GET", "/api/v1/_scope/manager-only", ["manager"]),
         ["ManageUsers"] = ("POST", "/api/v1/admin/users", ["system_admin"]),
         ["ReadFaults"] = ("GET", "/api/v1/faults", ["system_admin", "superior", "manager", "field_engineer"]),
+        ["ReadNotifications"] = ("GET", "/api/v1/notifications/unread-count", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReviewFaults"] = ("PATCH", "/api/v1/faults/FAULT-0", ["manager"]),
         ["ReportFaults"] = ("POST", "/api/v1/faults", ["field_engineer"]),
         ["ReadWorkOrders"] = ("GET", "/api/v1/work-orders", ["system_admin", "superior", "manager", "field_engineer"]),

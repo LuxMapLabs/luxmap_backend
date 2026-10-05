@@ -1740,3 +1740,29 @@ xoá **cột trước, tài khoản sau** (`AssetImportFixture` đã đúng th�
 **Hình dạng đọc dùng chung `PoleNote.From(...)`** ở Assets (kiểm kê), Map (chi tiết cột) và WorkOrders (cột của phiếu):
 thêm nơi đọc thứ tư thì gọi nó, đừng dựng object tay — ghi chú đã xoá (text `null`) phải đọc ra `null` ở mọi nơi.
 
+### BE-27 — thông báo (05/10/2026)
+
+**Thông báo được STAGE trên DbContext của người gọi, không bao giờ tự lưu** (`Notifier.Stage`, module
+`LuxMap.Modules.Notifications`). Nó đi chung `SaveChanges` với thay đổi nghiệp vụ, nên thao tác thua tranh chấp hay
+rollback không để lại thông báo (canh bằng `NotificationTests.The_losing_side_of_a_race_leaves_no_notice`). Đừng gọi
+`SaveChanges` riêng cho thông báo, và đừng inject một service scoped giữ context của request: worker khảo sát là
+singleton, tự mở context theo job và lưu theo từng xã — nó stage đúng một lần, ở lượt lưu của **xã neo**.
+
+**FK `notification.recipient_user_id → app_user` là `Restrict`.** Mọi teardown xoá tài khoản test phải xoá
+`notification` trước (theo `commune_id` của fixture là đủ, vì thông báo luôn mang xã của sự kiện). Quên là teardown
+gãy, để lại tài khoản và xã — và `AccountAdminTests` (đọc `page_size=200` tài khoản đang hoạt động) đỏ ở lượt sau
+vì DB đã quá 200 tài khoản. Test đổi luật người nhận mà thấy hàng loạt `23503 … fk_notification_app_user…` là đây.
+
+**"Quản lý của xã" = `Notifier.ManagersCoveringAsync`** (đang hoạt động = không khoá **và** đã đặt mật khẩu; có
+**đủ** mọi xã truyền vào). Sự kiện mới cần báo Quản lý thì gọi nó, đừng viết lại truy vấn — khảo sát liên xã mà báo
+cho Quản lý thiếu một xã là báo cho người không duyệt được.
+
+**Văn bản tự do vào thông báo (lý do trả phiếu, tên phiếu) phải qua `Notifier.Clip`, không cắt `Substring` tay.**
+Cắt giữa một cặp surrogate (emoji) để lại nửa ký tự không mã hoá được UTF-8 — lượt ghi đó hỏng, kéo theo **cả thao tác
+nghiệp vụ** đi cùng giao dịch (review Codex). **Đánh dấu đã đọc khoá hàng trước rồi mới đọc** (khuôn `FaultLocks`), để
+hai thiết bị cùng bấm không ghi đè `read_at` đầu tiên.
+
+**Câu chữ thuộc module sở hữu sự kiện** (`WorkOrderNotices`, `SurveyNotices`, `FaultNotices`) — Notifications không
+tham chiếu ngược WorkOrders / Survey / Faults. Thêm `type` mới: thêm enum, câu chữ ở module đó, CHECK sinh lại qua
+migration, Contract 5.9.
+

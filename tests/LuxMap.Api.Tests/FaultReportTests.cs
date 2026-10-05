@@ -4,6 +4,7 @@ using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Notifications.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
@@ -86,7 +87,7 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
                 await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = ANY({communes})");
                 await transaction.CommitAsync();
             }
-            foreach (var table in new[] { "repair_evidence", "fault", "fixture", "pole", "road_segment", "app_user_commune" })
+            foreach (var table in new[] { "notification", "repair_evidence", "fault", "fixture", "pole", "road_segment", "app_user_commune" })
             {
                 var sql = "DELETE FROM " + table + " WHERE commune_id = ANY({0})"; // table names are this list's literals
                 await db.Database.ExecuteSqlRawAsync(sql, new object[] { communes });
@@ -147,6 +148,14 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
         var saved = await Db(db => db.Set<Fault>().IgnoreQueryFilters().SingleAsync(f => f.FaultId == faultId));
         Assert.Equal(home, saved.CommuneId);
         Assert.Equal(1, await Db(db => db.Set<AuditEvent>().IgnoreQueryFilters().CountAsync(e => e.EntityId == faultId && e.Action == AuditAction.Created)));
+
+        // BE-27: the commune's manager is told, the reporter is not.
+        var notices = await Db(db => db.Set<Notification>().IgnoreQueryFilters().Where(n => n.EntityId == faultId).ToListAsync());
+        var notice = Assert.Single(notices);
+        Assert.Equal((users["manager"].UserId, NotificationType.FaultReported, NotificationEntityType.Fault, home),
+            (notice.RecipientUserId, notice.Type, notice.EntityType, notice.CommuneId));
+        Assert.Equal($"Sự cố mới {faultId}: Đèn tắt", notice.Title);
+        Assert.Equal($"Kỹ sư hiện trường báo đèn tắt tại cột {pole}, mức trung bình.", notice.Body);
     }
 
     [Fact]
@@ -161,6 +170,8 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
         Assert.Equal(first.Body.GetProperty("fault_id").GetString(), again.Body.GetProperty("fault_id").GetString());
         Assert.Equal((409, "IDEMPOTENCY_CONFLICT"), (stranger.Status, Code(stranger.Body)));
         Assert.Equal(1, await Db(db => db.Set<Fault>().IgnoreQueryFilters().CountAsync(f => f.ClientOpId == key)));
+        var faultId = first.Body.GetProperty("fault_id").GetString();
+        Assert.Equal(1, await Db(db => db.Set<Notification>().IgnoreQueryFilters().CountAsync(n => n.EntityId == faultId)));
     }
 
     [Fact]
