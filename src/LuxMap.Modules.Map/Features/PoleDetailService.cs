@@ -1,6 +1,8 @@
 using System.Net;
+using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
+using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Modules.Survey.Review;
@@ -49,6 +51,9 @@ public sealed class PoleDetailService(
                 p.PoleId, p.SegmentId, p.CommuneId, p.Geom,
                 SegmentName = db.Set<RoadSegment>().Where(s => s.SegmentId == p.SegmentId)
                     .Select(s => s.SegmentName).FirstOrDefault(),
+                p.Note, p.NoteUpdatedAt, p.NoteUpdatedBy,
+                NoteUpdatedByName = db.Set<AppUser>().Where(u => u.UserId == p.NoteUpdatedBy)
+                    .Select(u => u.FullName).FirstOrDefault(),
             })
             .SingleOrDefaultAsync(ct)
             ?? throw new LuxMapException(ErrorCodes.PoleNotFound, HttpStatusCode.NotFound,
@@ -91,6 +96,7 @@ public sealed class PoleDetailService(
             RuntimeHistory = [],
             OpenFaults = await OpenFaultsAsync(poleId, ct),
             RecentFrames = await RecentFramesAsync(poleId, ct),
+            Note = PoleNote.From(pole.Note, pole.NoteUpdatedAt, pole.NoteUpdatedBy, pole.NoteUpdatedByName),
         };
     }
 

@@ -1,5 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using System.Net;
+using System.Text.Json;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Contracts.Errors;
+using LuxMap.Shared.Http;
 
 namespace LuxMap.Modules.Assets.Crud;
 
@@ -381,8 +385,75 @@ public sealed record PoleListItem
     /// </summary>
     public ActiveFixture? ActiveFixture { get; init; }
 
+    /// <summary>The engineer's note on this spot (POLE-NOTE); <c>null</c> when there is none.</summary>
+    public PoleNote? Note { get; init; }
+
     public required DateTime UpdatedAt { get; init; }
 }
+
+/// <summary>
+/// The free-text note on a pole, as every read shows it: inventory, the map's pole detail and a work
+/// order's pole list (POLE-NOTE). <c>null</c> in all three when the pole has no note.
+/// </summary>
+public sealed record PoleNote
+{
+    public required string Text { get; init; }
+
+    public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>The account that wrote it, e.g. <c>USR-004</c>.</summary>
+    public required string UpdatedBy { get; init; }
+
+    /// <summary>That account's display name now, so a screen can say who wrote it without another call.</summary>
+    public string? UpdatedByName { get; init; }
+
+    /// <summary>
+    /// Builds the read shape from the stored columns. A cleared note keeps who cleared it and when, but
+    /// reads as <c>null</c>: there is nothing to show.
+    /// </summary>
+    public static PoleNote? From(string? text, DateTime? updatedAt, string? updatedBy, string? updatedByName)
+        => text is null || updatedAt is null || updatedBy is null
+            ? null
+            : new PoleNote { Text = text, UpdatedAt = updatedAt.Value, UpdatedBy = updatedBy, UpdatedByName = updatedByName };
+}
+
+/// <summary><c>PUT /assets/poles/{id}/note</c>: the new note, or <c>null</c> / blank to clear it.</summary>
+/// <remarks>
+/// A JSON element, like <see cref="SetPoleFeederRequest"/>, so a body WITHOUT the key is a 400 rather than
+/// a silent clear: wiping an engineer's note must be something the caller said.
+/// </remarks>
+public sealed record SetPoleNoteRequest
+{
+    public const int MaxLength = 1000;
+
+    public JsonElement Note { get; init; }
+
+    /// <summary>The trimmed note, or <c>null</c> to clear. Throws 400 when the key is missing, not text, or too long.</summary>
+    public string? ReadNote()
+    {
+        var text = Note.ValueKind switch
+        {
+            JsonValueKind.String => Note.GetString()!.Trim(),
+            JsonValueKind.Null => null,
+            JsonValueKind.Undefined => throw Invalid("note is required. Send null or \"\" to clear the note."),
+            _ => throw Invalid("note must be text, or null to clear the note."),
+        };
+
+        if (text is { Length: > MaxLength })
+        {
+            throw Invalid($"note is at most {MaxLength} characters; this one has {text.Length}.");
+        }
+
+        return string.IsNullOrEmpty(text) ? null : text;
+    }
+
+    private static LuxMapException Invalid(string message)
+        => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message,
+            new Dictionary<string, object?> { ["field"] = "note" });
+}
+
+/// <summary>What <c>PUT /assets/poles/{id}/note</c> answers: the pole and its note as stored.</summary>
+public sealed record PoleNoteResponse(string PoleId, PoleNote? Note);
 
 /// <summary>One pole read on its own — the list row plus what only a detail view needs.</summary>
 public sealed record PoleDetail

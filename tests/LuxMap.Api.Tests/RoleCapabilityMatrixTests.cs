@@ -49,6 +49,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ReadNetwork"] = ("GET", "/api/v1/assets/segments", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReadLuxReadings"] = ("GET", "/api/v1/lux-readings", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ManageAssets"] = ("POST", "/api/v1/assets/segments", ["manager"]),
+        ["EditPoleNotes"] = ("PUT", "/api/v1/assets/poles/POLE-0/note", ["manager", "field_engineer"]),
         ["RecordLuxReading"] = ("POST", "/api/v1/lux-readings", ["field_engineer"]),
         ["ControlLighting"] = ("GET", "/api/v1/_scope/manager-only", ["manager"]),
         ["ManageUsers"] = ("POST", "/api/v1/admin/users", ["system_admin"]),
@@ -85,7 +86,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         var client = await ClientForAsync(role);
 
         using var request = new HttpRequestMessage(new HttpMethod(method), url);
-        if (method is "POST" or "PATCH")
+        if (method is "POST" or "PATCH" or "PUT")
         {
             request.Content = JsonContent.Create(new { });
         }
@@ -98,7 +99,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
 
         if (shouldPass)
         {
-            var expectedStatus = method is "POST" or "PATCH" ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
+            var expectedStatus = method is "POST" or "PATCH" or "PUT" ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
             Assert.Equal(expectedStatus, response.StatusCode);
         }
         else

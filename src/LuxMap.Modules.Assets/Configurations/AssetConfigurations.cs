@@ -1,4 +1,5 @@
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts;
@@ -133,10 +134,26 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
         builder.Property(pole => pole.FeederId).HasColumnType("text");
         builder.Property(pole => pole.Geom).HasColumnType(GeometryColumns.Point).IsRequired();
         builder.Property(pole => pole.NearSensitivePoi).HasDefaultValue(false);
+        builder.Property(pole => pole.Note).HasColumnType("text");
+        builder.Property(pole => pole.NoteUpdatedBy).HasColumnType("text");
         builder.Property(pole => pole.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(pole => pole.UpdatedAt).HasDefaultValueSql("now()");
 
         builder.HasContractEnum(pole => pole.DataSource);
+
+        builder.ToTable(table =>
+        {
+            // The API trims and checks the same limit and answers 400; this stops every other writer.
+            table.HasCheckConstraint("ck_pole_note_length", "char_length(note) <= 1000");
+
+            // Who and when travel together. A cleared note keeps both: "cleared by X at T" is history.
+            table.HasCheckConstraint("ck_pole_note_stamp_together", "(note_updated_by IS NULL) = (note_updated_at IS NULL)");
+        });
+
+        // Restrict, like every other "who did it" column: deleting the account must not erase who wrote it.
+        builder.HasOne<AppUser>().WithMany()
+            .HasForeignKey(pole => pole.NoteUpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasCommuneScope();
 

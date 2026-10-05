@@ -1,12 +1,14 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Import;
+using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
+using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.IO;
@@ -23,7 +25,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// and the foreign keys — <c>fault</c> and <c>lux_reading</c> hold it with <c>Restrict</c> — decide
 /// whether it may go. Retiring a lamp is a real event, which is what <c>fixture.removed_date</c> is for.
 /// </remarks>
-public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor)
+public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -474,6 +476,31 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         await dbContext.SaveChangesAsync(ct);
     }
 
+    /// <summary>
+    /// Sets or clears the free-text note on a pole (POLE-NOTE), stamping who and when. Out of the caller's
+    /// commune it is a 404, like every other pole write.
+    /// </summary>
+    /// <remarks>
+    /// <c>updated_at</c> moves too: a note is part of what a client caches about the pole, and offline sync
+    /// (BE-43) picks changed rows by that column.
+    /// </remarks>
+    public async Task<PoleNoteResponse> SetPoleNoteAsync(string poleId, string? note, CancellationToken ct)
+    {
+        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+        var userId = actor.UserId
+            ?? throw new LuxMapException(ErrorCodes.Unauthenticated, HttpStatusCode.Unauthorized, "Sign in to write a note.");
+
+        var now = UtcMicrosecondClock.UtcNow();
+        pole.Note = note;
+        pole.NoteUpdatedBy = userId;
+        pole.NoteUpdatedAt = now;
+        pole.UpdatedAt = now;
+        await dbContext.SaveChangesAsync(ct);
+
+        var name = await dbContext.Set<AppUser>().Where(user => user.UserId == userId).Select(user => user.FullName).FirstOrDefaultAsync(ct);
+        return new PoleNoteResponse(pole.PoleId, PoleNote.From(note, now, userId, name));
+    }
+
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
     /// <remarks>
     /// Once only, and never before the lamp was installed (BE-REVIEW-02, Q-4). A second retirement
@@ -650,8 +677,11 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     /// <remarks>
     /// The active lamp is a correlated sub-query, not an Include: one row per pole either way, and
     /// a join would multiply the pole across its retired lamps before being collapsed again.
+    /// <para>
+    /// An instance member, not static, because the note's author name is a sub-query on this context.
+    /// </para>
     /// </remarks>
-    private static readonly System.Linq.Expressions.Expression<Func<Pole, PoleListItem>> PoleRow =
+    private System.Linq.Expressions.Expression<Func<Pole, PoleListItem>> PoleRow =>
         pole => new PoleListItem
         {
             PoleId = pole.PoleId,
@@ -675,6 +705,8 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                     DataSource = lamp.DataSource,
                 })
                 .FirstOrDefault(),
+            Note = PoleNote.From(pole.Note, pole.NoteUpdatedAt, pole.NoteUpdatedBy,
+                dbContext.Set<AppUser>().Where(user => user.UserId == pole.NoteUpdatedBy).Select(user => user.FullName).FirstOrDefault()),
             UpdatedAt = pole.UpdatedAt,
         };
 

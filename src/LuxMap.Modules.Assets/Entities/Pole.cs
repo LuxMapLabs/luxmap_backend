@@ -79,6 +79,22 @@ public class Pole : ICommuneScoped, IExternallyReferenced
     public bool NearSensitivePoi { get; set; }
 
     /// <summary>
+    /// Free text an engineer leaves about this spot — what the sensitive place nearby is, access, hazards.
+    /// One note per pole, overwritten (POLE-NOTE). It belongs to the POLE, not the lamp: lamps are
+    /// replaced, the place stays. At most 1000 characters (<c>ck_pole_note_length</c>).
+    /// </summary>
+    /// <remarks>
+    /// Written ONLY through <c>PUT /assets/poles/{id}/note</c>. The full-replacement <c>PUT</c> and the
+    /// import never touch it, so neither can wipe a note by leaving the field out.
+    /// </remarks>
+    public string? Note { get; set; }
+
+    /// <summary>Who last set or cleared <see cref="Note"/>. Set together with <see cref="NoteUpdatedAt"/>.</summary>
+    public string? NoteUpdatedBy { get; set; }
+
+    public DateTime? NoteUpdatedAt { get; set; }
+
+    /// <summary>
     /// Which of Branch C's three data sources this pole belongs to. Contract section 2.9 registers
     /// the FO-07 calibration rig as ordinary poles on an ordinary segment so the pipeline never
     /// branches; this column is what keeps rig poles separable in every statistic afterwards.
