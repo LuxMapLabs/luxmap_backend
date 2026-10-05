@@ -26,7 +26,7 @@ Không có consumer nào khác. **Công dân (Citizen) không có tài khoản**
 
 Ba tài liệu, thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.7** (25/09/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.8** (05/10/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
 2. **`docs/tasks-backend.csv`** — task list v2.1, phạm vi và lịch.
 3. File này — quy ước làm việc và những chỗ dễ sai. Không phải đặc tả.
 
@@ -1347,8 +1347,8 @@ Phân quyền theo vai trò (ma trận capability, mục BE-12a quy tắc 4) **v
 xem nhiều xã bằng **danh sách xã được gán**, không có cấp huyện (D-R3). Username seed và biến
 `SEED_*_PASSWORD` **giữ tên cũ** — chúng là định danh, không phải nhãn (D-R6).
 
-**Không có tự đăng ký (D-R11).** Quản trị hệ thống tạo tài khoản, gán vai trò và xã. `POST /auth/register`
-còn chạy nhưng **DEPRECATED**, gỡ ở BE-33a — đừng xây gì mới lên nó.
+**Không có tự đăng ký (D-R11).** Quản trị hệ thống tạo tài khoản, gán vai trò và xã qua `/admin/users`; người
+dùng nhận **email mời** và tự đặt mật khẩu (BE-33a, Contract v1.8 §4.8–4.9). `POST /auth/register` **đã gỡ**.
 
 **Công dân (Citizen) không có tài khoản, không có vai trò (D-R1).** Họ báo sự cố qua **QR trên cột**; báo
 cáo vào **hàng chờ riêng**, Quản lý duyệt rồi mới thành `fault`. **Không** thêm giá trị vào
@@ -1673,4 +1673,42 @@ client nhận URL mà mở ra 404 — hoặc tệ hơn, thấy frame của xã k
 thầm. **Ticket tạo bảng thì thêm bảng vào `PLAN` trong cùng PR**: bộ lọc giữ xã (bảng không có `commune_id` lọc theo cha), và
 đúng thứ tự khoá ngoại (script tự kiểm). Bảng nằm trong **vòng** khoá ngoại thì khai vào `TWO_PASS` như `survey_sweep` ↔
 `survey_processing_run`, không gỡ ràng buộc. Diễn tập theo `docs/deploy/supabase.md` (cờ `--source-db`, chỉ cho đích localhost).
+
+### BE-33a — tài khoản do Quản trị tạo, mời qua email (05/10/2026)
+
+**Phạm vi `*` ⇔ `system_admin` nay là CHECK của DB** (`ck_app_user_system_wide_scope_matches_role`). Test muốn chứng
+minh lớp kiểm ở tầng phân quyền (`CommuneScopeConsistency`) phải **ký thẳng một JWT** lệch vai trò bằng
+`AccessTokenIssuer`, không `UPDATE` cờ trên tài khoản (DB từ chối, và tài khoản seed là của chung). DB dev cũ có cặn
+vi phạm thì chạy `scripts/cleanup_be12_leftover_accounts.sql` **trước** migration `AdminCreatedAccounts`.
+
+**`password_hash` NULL ⇔ `password_set_at` NULL** (`ck_app_user_password_set_together`; NULL = đã mời, chưa đặt mật
+khẩu). Mọi chỗ tạo `AppUser` có mật khẩu — seeder, fixture, test — phải đặt **cả hai**. Đăng nhập tài khoản chưa đặt
+mật khẩu trả đúng `401 INVALID_CREDENTIALS` như sai mật khẩu.
+
+**`user_id` rút từ sequence TRƯỚC khi chèn** (`UserAdminService.CreateAsync`, khuôn `FaultReportService.NextFaultId`),
+để danh sách xã và link mời gắn mã thật trong cùng một `SaveChanges`. Khoá có tiền tố sinh bằng `DEFAULT` của DB, EF
+không có giá trị tạm cho nó.
+
+**Cấu hình mail bắt buộc lúc khởi động** (`SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM_ADDRESS`, `SMTP_FROM_NAME`,
+`WEB_APP_BASE_URL`; `SMTP_USERNAME`/`SMTP_PASSWORD` đi cùng nhau). Dev trỏ Mailpit (`docker compose up -d mailpit`,
+hộp thư ở `http://localhost:8025`); CI ghi các biến này vào `.env` tạm; test thay `IEmailSender` bằng
+`RecordingEmailSender`. Có login thì **luôn TLS** (465 SSL, còn lại STARTTLS bắt buộc), không bao giờ "STARTTLS nếu có".
+**Không log link hay token thô** — chỉ băm SHA-256 nằm trong `account_token`.
+
+**`account_token` cascade từ `app_user`** — ngoại lệ có chủ đích của luật "mọi FK `Restrict`": nó là thông tin đăng
+nhập tạm như `refresh_token`, không thuộc xã nào nên vùng mù cascade của guard `SaveChanges` không áp. Nó nằm trong
+`SKIPPED` của `copy_dev_to_supabase.py` (link gắn với `WEB_APP_BASE_URL` của nguồn).
+
+**Bộ giới hạn tần suất chia theo `RemoteIpAddress`.** Sau reverse proxy mọi client chung một địa chỉ (của proxy) ⇒
+chung một xô 5 lần / 15 phút. Deploy sau proxy phải cấu hình forwarded headers **trước**.
+
+**`ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` — xoá luôn header đã đặt.** Lỗi nào cần header
+riêng (`Retry-After` của 429) phải tự ghi body, như `RateLimitSetup.OnRejected`.
+
+**`FakeTimeProvider` không lùi được** (`Advance` âm ném ngoại lệ). Đẩy đồng hồ host lên rồi không lùi làm **mọi access
+token cấp sau đó chưa tới hạn hiệu lực** → 401 hàng loạt ở các test sau, trông như lỗi phân quyền. Muốn test hết hạn
+thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản ghi đó về quá khứ (`AccountAdminTests.ExpireAsync`).
+
+**Test luật "Quản trị cuối cùng" chạy trong transaction rồi rollback** (khoá các admin khác chỉ trong transaction đó).
+Đổi trạng thái admin thật trên DB dùng chung sẽ đua với các class test khác đang tạo admin (`WorkOrderTests`).
 

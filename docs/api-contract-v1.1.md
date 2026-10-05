@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.7 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.8 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -6,17 +6,18 @@
 **Ngày chốt v1.0:** 23/08/2026 · **v1.1:** 24/08/2026 · **v1.2:** 11/09/2026 (mục 4 Auth) ·
 **v1.3:** 15/09/2026 (đổi đường dẫn lux) · **v1.4:** 18/09/2026 (hợp nhất — BE-REVIEW-02) ·
 **v1.5:** 19/09/2026 (`GET /auth/me`) · **v1.6:** 22/09/2026 (bỏ đèn solar khỏi enum) ·
-**v1.7:** 25/09/2026 (hợp nhất BE-12b ngày 22/09 và vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability ngày 25/09).
+**v1.7:** 25/09/2026 (hợp nhất BE-12b ngày 22/09 và vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability ngày 25/09) ·
+**v1.8:** 05/10/2026 (BE-33a — Quản trị hệ thống tạo tài khoản và mời qua email; gỡ `POST /auth/register`).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 và v1.7, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6, v1.7 và v1.8, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (48 operation: 35
-`implemented`, 13 `not_implemented` — đếm lại ở v1.7; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (78 operation: 76
+`implemented`, 2 `not_implemented` — đếm lại ở v1.8 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -129,7 +130,13 @@ client **không** parse.
 | `ASSET_NOT_FOUND` | 404 | Tài sản (`/assets/…`) không tồn tại **hoặc ngoài phạm vi** |
 | `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
 | `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
-| `IDENTIFIER_TAKEN` | 409 | Đăng ký trùng username/email (`POST /auth/register` — **DEPRECATED**, mục 4.1) |
+| `INVALID_ACCOUNT_TOKEN` | 400 | Link mời / đặt lại mật khẩu không tồn tại, hết hạn hoặc đã dùng — một mã (v1.8, mục 4.8) |
+| `USER_NOT_FOUND` | 404 | `/admin/users/{id}` không tồn tại (v1.8, mục 4.9) |
+| `IDENTIFIER_TAKEN` | 409 | Username hoặc email đã có tài khoản khác dùng, không phân biệt hoa thường (`POST`/`PATCH /admin/users`; v1.8) |
+| `LAST_SYSTEM_ADMIN` | 409 | Thao tác sẽ không còn Quản trị hệ thống nào đăng nhập được (hạ vai trò, khoá; v1.8) |
+| `CANNOT_LOCK_SELF` | 409 | Quản trị tự khoá tài khoản của chính mình (v1.8) |
+| `ACCOUNT_ALREADY_ACTIVE` | 409 | Gửi lại lời mời cho tài khoản đã đặt mật khẩu (v1.8) |
+| `RATE_LIMITED` | 429 | Quá số lần cho phép từ một địa chỉ (`POST /auth/password/forgot`); header `Retry-After` (v1.8) |
 | `EXTERNAL_REF_TAKEN` | 409 | `(commune_id, external_ref)` đã có |
 | `ASSET_IN_USE` | 409 | `DELETE` bị khoá ngoại từ chối; `details.constraint`, `details.table` |
 | `CROSS_COMMUNE_REFERENCE` | 409 | Gắn cột vào mạch điện **khác xã** với cột (v1.4, D-5) |
@@ -189,8 +196,8 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 - **Công dân (Citizen) không có tài khoản và không có role.** Công dân báo sự cố qua **mã QR trên cột**;
   báo cáo đó vào một hàng chờ riêng, Quản lý duyệt rồi mới thành `fault` — **không** thêm giá trị mới
   vào `source_channel` (v1.7, D-R1). Chưa có endpoint.
-- **Không có tự đăng ký.** Tài khoản do **Quản trị hệ thống** tạo, gán vai trò và gán xã (v1.7, D-R11).
-  `POST /auth/register` còn chạy nhưng **DEPRECATED**, gỡ ở BE-33a (mục 4.1).
+- **Không có tự đăng ký.** Tài khoản do **Quản trị hệ thống** tạo, gán vai trò và gán xã (v1.7, D-R11);
+  người dùng nhận **email mời** và tự đặt mật khẩu (v1.8, mục 4.8 – 4.9). `POST /auth/register` **đã gỡ** ở v1.8.
 - Cấp giám sát không có cấp "huyện" riêng: phạm vi của họ là danh sách xã được gán (v1.7, D-R3).
 
 **Quy tắc địa bàn**
@@ -219,7 +226,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 | `ManageAssets` | **manager** | mọi `POST`/`PUT`/`DELETE` `/assets/*` và `POST /assets/import/{kind}` |
 | `RecordLuxReading` | **field_engineer** | `POST /lux-readings` |
 | `ControlLighting` | **manager** | chưa có endpoint — điều khiển ON/OFF/AUTO thiết bị được hỗ trợ (testbed demo), mục 5.6 |
-| `ManageUsers` | **system_admin** | chưa có endpoint — tạo account, gán vai trò và xã (BE-33) |
+| `ManageUsers` | **system_admin** | mọi `/admin/users*` — tạo tài khoản, gán vai trò và xã, khoá, gửi lại lời mời (v1.8, mục 4.9) |
 
 - `/auth/*` cấp token không cần token.
 - Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
@@ -310,9 +317,9 @@ cố; `resolved` = đã sửa; `verified` = đã nghiệm thu.
 
 ## 4. Xác thực — `/api/v1/auth` — `implemented`
 
-Hai nhóm, client chọn bằng đường dẫn. **7 endpoint cấp token không cần access token**; endpoint thứ
-tám, `GET /auth/me` (mục 4.7), thì **cần**. Access token sống 60 phút, luôn ở body, không bao giờ
-trong cookie.
+Hai nhóm, client chọn bằng đường dẫn. **8 endpoint không cần access token**: 6 cấp / thu hồi token
+(mục 4.1, 4.2) và 2 làm việc với link mật khẩu trong email (mục 4.8). `GET /auth/me` (mục 4.7) thì
+**cần**. Access token sống 60 phút, luôn ở body, không bao giờ trong cookie.
 
 ### 4.1 Nhóm mobile
 
@@ -328,20 +335,8 @@ hồi ngay; client **phải lưu token mới**.
 **`POST /api/v1/auth/logout`** — body `{ "refresh_token" }` → **`204`** với mọi giá trị; thiếu trường
 → `400 VALIDATION_FAILED`.
 
-**`POST /api/v1/auth/register`** — 🔴 **DEPRECATED (v1.7, D-R11) — sẽ gỡ ở BE-33a.** Mô hình chính
-thức: **Quản trị hệ thống tạo account**, gán vai trò và gán xã; không có tự đăng ký. Endpoint còn chạy
-cho tới khi BE-33a thêm `POST /api/v1/admin/users` (capability `ManageUsers`), để không lúc nào hệ thống
-mất cách tạo tài khoản. **WP6: bỏ màn đăng ký.** Hành vi hiện tại, giữ nguyên tới lúc gỡ:
-body `{ "username", "email", "full_name", "password" }` → `201`:
-
-```json
-{ "user_id": "USR-005", "username": "...", "email": "...", "full_name": "...",
-  "role": "field_engineer", "commune_ids": [],
-  "message": "Account created. An administrator must assign communes before any data becomes visible." }
-```
-
-Server áp cứng `role` và `commune_ids` (trường thừa bị bỏ qua); mật khẩu tối thiểu **12 ký tự**, không
-ràng buộc thành phần; trùng → `409 IDENTIFIER_TAKEN`; **không trả token**. Giới hạn độ dài: OpenAPI.
+**`POST /api/v1/auth/register`** — **đã gỡ ở v1.8 (BE-33a, D-R11).** Gọi vào là `401` như mọi route
+không tồn tại khi chưa đăng nhập. Tài khoản do Quản trị hệ thống tạo ở mục 4.9. **WP6: bỏ màn đăng ký.**
 
 ### 4.2 Nhóm web
 
@@ -413,7 +408,7 @@ một cách, chỉ refresh token là khác nhau, nên **không có** `/auth/web/
   "full_name": "Quản lý", "role": "manager", "commune_ids": ["COM-001"] }
 ```
 
-Đúng sáu trường, bằng `register` (mục 4.1) bỏ `message`.
+Đúng sáu trường.
 
 | Trường | Ghi chú |
 |---|---|
@@ -438,6 +433,79 @@ tới khi hết hạn, và trả 403 riêng ở endpoint này là một luật k
 
 > ⚠️ **FE không nên tự giải mã JWT để lấy `role` hay `commune_ids`.** Làm vậy được, vì payload chỉ là
 > base64, nhưng giá trị sẽ cũ tới 60 phút. Dùng `/auth/me` khi vào app và sau khi quản trị đổi quyền.
+
+### 4.8 Link mật khẩu trong email — `implemented` (v1.8, BE-33a)
+
+**Không cần access token** — người cầm link chưa có mật khẩu. Link có dạng
+`{WEB_APP_BASE_URL}/set-password?token=<chuỗi mờ>`: trang web của WP5 đọc `token` rồi gọi endpoint dưới.
+Trang đó nên gửi `Referrer-Policy: no-referrer` để token không rò qua header `Referer`.
+
+| Loại link | Ai gửi | Hạn |
+|---|---|---|
+| Mời (`invite`) | Quản trị tạo tài khoản hoặc bấm gửi lại (mục 4.9); "quên mật khẩu" với tài khoản **chưa** đặt mật khẩu | **72 giờ** |
+| Đặt lại (`reset`) | "Quên mật khẩu" với tài khoản đã có mật khẩu | **1 giờ** |
+
+Mỗi link **dùng một lần**. Link mới cùng loại làm link cũ **hết hiệu lực**.
+
+**`POST /api/v1/auth/password/set`** — body `{ "token", "new_password" }` → **`204`**. Mật khẩu tối thiểu
+**12 ký tự**, không ràng buộc thành phần. Thành công thì: mọi link khác của tài khoản hết hiệu lực, **mọi
+phiên đăng nhập cũ bị thu hồi**, rồi người dùng đăng nhập bình thường (mục 4.1 / 4.2). Link không tồn
+tại / hết hạn / đã dùng → `400 INVALID_ACCOUNT_TOKEN` (một mã). Mật khẩu quá ngắn → `400 VALIDATION_FAILED`,
+link **vẫn dùng được**.
+
+**`POST /api/v1/auth/password/forgot`** — body `{ "email" }` → **luôn `202`** cùng một body, dù email có
+tài khoản hay không:
+
+```json
+{ "message": "If an account uses this address, a link to set a new password has been sent to it." }
+```
+
+Tài khoản bị khoá **không** nhận thư. Giới hạn **5 yêu cầu / 15 phút / địa chỉ IP** → `429 RATE_LIMITED`
+kèm `Retry-After` (giây).
+
+Tài khoản **chưa đặt mật khẩu** đăng nhập → `401 INVALID_CREDENTIALS`, giống hệt sai mật khẩu.
+
+### 4.9 Quản trị tài khoản — `/api/v1/admin/users` — `implemented` (v1.8, BE-33a)
+
+Capability **`ManageUsers`** (chỉ `system_admin`, mục 2). Endpoint của **web**.
+
+**Một tài khoản** (`GET` / `PATCH` / `lock` / `unlock` trả đúng hình dạng này):
+
+```json
+{ "user_id": "USR-012", "username": "ky.su.a", "email": "a@example.vn", "full_name": "Nguyễn Văn A",
+  "role": "field_engineer", "commune_ids": ["COM-001"], "status": "invited",
+  "created_at": "2026-10-05T07:09:53.165237Z", "password_set_at": null }
+```
+
+| Trường | Ghi chú |
+|---|---|
+| `commune_ids` | Như `/auth/me`: Quản trị hệ thống là `["*"]` |
+| `status` | `invited` (chưa đặt mật khẩu) · `active` · `locked` — **tính lúc đọc**, không lưu |
+| `password_set_at` | Lần đặt mật khẩu gần nhất; `null` khi `invited` |
+
+| Endpoint | Body | Trả |
+|---|---|---|
+| `POST /admin/users` | `{ username, email, full_name, role, commune_ids? }` — **không có mật khẩu** | `201 { "user": {…}, "invitation_sent": true }` |
+| `GET /admin/users` | `?role=` (CSV) `&status=` `&page=&page_size=` | phân trang, cũ trước |
+| `GET /admin/users/{id}` | — | một tài khoản |
+| `PATCH /admin/users/{id}` | `{ email?, full_name?, role?, commune_ids? }` — trường vắng giữ nguyên | một tài khoản |
+| `POST /admin/users/{id}/lock` | — | một tài khoản (`locked`) |
+| `POST /admin/users/{id}/unlock` | — | một tài khoản |
+| `POST /admin/users/{id}/invite` | — | `{ "invitation_sent": true, "expires_at": "…Z" }` |
+
+Luật:
+
+- **Xã:** `superior` / `manager` / `field_engineer` cần **ít nhất một** `commune_id` tồn tại;
+  `system_admin` **không** nhận `commune_ids` (gửi → `400`) và tự có phạm vi `["*"]`.
+- `PATCH` không có `commune_ids`: lên `system_admin` thì bỏ hết xã; chuyển giữa ba vai trò kia thì giữ xã;
+  **rời `system_admin` thì bắt buộc gửi `commune_ids`**. `username` **không bao giờ đổi**.
+- Đổi vai trò / xã **không** đá phiên đang mở: có hiệu lực ở lần refresh kế tiếp, chậm tối đa 60 phút.
+- **Khoá** thu hồi **mọi** refresh token; access token đã cấp còn chạy tới hết hạn (≤ 60 phút).
+  Không tự khoá chính mình (`409 CANNOT_LOCK_SELF`); không khoá hay hạ vai trò Quản trị cuối cùng còn
+  đăng nhập được (`409 LAST_SYSTEM_ADMIN`). Khoá / mở khoá lần hai là no-op, vẫn `200`.
+- **Gửi mail lỗi không làm hỏng thao tác:** tài khoản vẫn được tạo, `invitation_sent: false`, Quản trị
+  bấm gửi lại. Gửi lại cho tài khoản đã đặt mật khẩu → `409 ACCOUNT_ALREADY_ACTIVE`.
+- Không xoá tài khoản — khoá thay xoá (lịch sử sự cố, phiếu việc trỏ vào tài khoản).
 
 ---
 
@@ -721,6 +789,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.8 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33a — tài khoản do Quản trị tạo, mời qua email (D-R11).** Thêm mục 4.8 (`POST /auth/password/set`, `POST /auth/password/forgot` — ẩn danh, link 72 giờ / 1 giờ, dùng một lần, giới hạn 5/15 phút) và 4.9 (`/admin/users` — tạo, liệt kê, xem, sửa, khoá, mở khoá, gửi lại lời mời; capability `ManageUsers`). Mã lỗi mới: `INVALID_ACCOUNT_TOKEN`, `USER_NOT_FOUND`, `LAST_SYSTEM_ADMIN`, `CANNOT_LOCK_SELF`, `ACCOUNT_ALREADY_ACTIVE`, `RATE_LIMITED`. ⚠️ **BREAKING:** `POST /auth/register` **gỡ** (đã báo DEPRECATED từ v1.7). Quyết định D-1…D-14 ở `.ai/results/BE-33a-p1.md`, đăng ký ở `docs/contract-drift.md`. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận**; WP5 cần trang `/set-password` + màn quản trị tài khoản, WP6 bỏ màn đăng ký |
 | v1.7 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BE-12b — hình dạng ĐỌC tài sản, mục 5.3.1.** Thay `PagedResult<string>` (chỗ giữ chỗ từ BE-12a) bằng dòng kiểm kê đầy đủ, thêm `GET /assets/{kind}/{id}`. Ba câu treo từ 17/09 trả lời **CÓ** cả ba: emit `external_ref`, `data_source`, `feeder_id` ở nhóm kiểm kê — lệnh cấm ở mục 5.1 viết cho endpoint bản đồ, không ràng buộc bề mặt này. `active_fixture` có trong cả danh sách (bảng kiểm kê hiện công suất theo dòng); `feeder` không có `data_source` (mục 1.6 không gắn); `pole_count` đếm trong phạm vi người gọi. Quyết sau khi review độc lập đối chiếu repo WP5. ⚠️ **BREAKING** so với chỗ giữ chỗ, nhưng WP5 chưa đọc endpoint này — màn kiểm kê của họ đang dùng mock local. Chạm bề mặt API và ký một mình → **chưa ổn định tới FW kế tiếp** |
 | v1.7 | 25/09/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BREAKING, đổi giá trị claim `role`.** Vai trò theo Phiếu đăng ký FA26SE222 v1.2: `management_agency`→`superior`, `maintenance_engineer`→`manager`, `field_crew`→`field_engineer`, `administrator`→`system_admin` (song ánh; migration `RenameUserRolesToRegistrationV12`, `Down()` không mất dữ liệu). D-14 "một vai trò chính xác" → **danh sách vai trò chính xác cho mỗi capability**, vẫn cấm thứ bậc; ma trận ở mục 2. **Hai đổi hành vi:** ghi `/assets/*` + import chuyển từ Quản trị sang **Quản lý**; `POST /lux-readings` chỉ **Kỹ sư hiện trường** (trước: mọi vai trò). `POST /auth/register` **DEPRECATED**, gỡ ở BE-33a. Citizen không có account (QR, chưa có endpoint). Kèm: nguồn `data_source` theo phạm vi mới (mục 1.6, O-9); lux là số đọc tương đối (5.7); lưu trữ + cảnh báo hết bảo hành (3.3); audit trail bắt buộc (3.3); video và điều khiển ON/OFF/AUTO là planned (5.5, 5.6). Quyết định D-R1…D-R18 ở `docs/contract-drift.md`. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.6 | 22/09/2026 | **Dylan** · `SELF-SIGNED` | **BREAKING, thu hẹp enum.** `power_source` còn `grid`; `fixture_type` còn `led_road_lamp`. Đèn solar ra khỏi phạm vi đồ án. Xoá giá trị thay vì để lại không dùng — giá trị enum không ai sinh ra được là giá trị ticket sau tưởng mình được ghi. Kèm migration `DropSolarFixtures` (đổi 45 hàng RỒI mới siết CHECK — ngược lại là migration gãy), bộ mock FO-26 đổi 45 cột, và bỏ `power_source` khỏi listing cột-chưa-gán của BE-13 (trường đó chỉ sinh ra để tách "solar nên không mạch" khỏi "chưa ai gán"). **`runtime_decline` GIỮ NGUYÊN** — chỉ đèn solar bị bỏ, phần runtime/IoT thì không. ⚠️ Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
