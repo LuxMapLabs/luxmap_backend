@@ -57,7 +57,10 @@ public class AccountTestFactory : WebApplicationFactory<Program>
     /// <summary>A unique username under <see cref="UsernamePrefix"/>.</summary>
     public static string NewUsername() => $"{UsernamePrefix}{Guid.NewGuid():N}"[..24];
 
-    /// <summary>Removes every account a test created; links, sessions and assignments cascade with them.</summary>
+    /// <summary>
+    /// Removes every account a test created; links, sessions and assignments cascade with them. Called
+    /// after EACH test, never from the factory's Dispose: by then the host and its services are gone.
+    /// </summary>
     public Task DeleteTestAccountsAsync()
         => QueryAsync(async db =>
         {
@@ -65,16 +68,6 @@ public class AccountTestFactory : WebApplicationFactory<Program>
             return await db.Set<AppUser>().Where(user => user.Username.StartsWith(UsernamePrefix)).ExecuteDeleteAsync();
             #pragma warning restore RS0030
         });
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            DeleteTestAccountsAsync().GetAwaiter().GetResult();
-        }
-
-        base.Dispose(disposing);
-    }
 }
 
 /// <summary>Same host with the account-mail limiter down to two requests, to watch it refuse the third.</summary>
