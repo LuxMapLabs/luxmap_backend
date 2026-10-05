@@ -941,7 +941,7 @@ mật khẩu" gọi `/auth/password/forgot`, link mở trên trình duyệt). **
 | Mã | Điểm | Hướng đã làm | Chạm API |
 |---|---|---|---|
 | **N-1** | Ai ghi | Capability mới **`EditPoleNotes`** = Quản lý + Kỹ sư hiện trường, chỉ cho ghi chú; mọi ghi tài sản khác vẫn `ManageAssets` | **Có** (ma trận §2) |
-| **N-2** | Đường ghi | `PUT /assets/poles/{poleId}/note`, khoá `note` bắt buộc (`null`/rỗng = xoá), ≤ 1000 ký tự → `200 {pole_id, note}`. `PUT` thay thế toàn phần và import **không** đụng ghi chú | **Có** (endpoint mới) |
+| **N-2** | Đường ghi | Ba đường: `PUT /assets/poles/{poleId}/note` (khoá `note` bắt buộc, `null`/rỗng = xoá, ≤ 1000 ký tự → `200 {pole_id, note}`); form tạo `POST /assets/poles` (`note?`); form sửa `PUT /assets/poles/{poleId}` (`note?`, **vắng = giữ nguyên** dù `PUT` là thay thế toàn phần; gửi lại cùng nội dung không đổi tác giả). Import không đụng | **Có** (endpoint mới + trường mới ở 2 request) |
 | **N-3** | Hình dạng đọc | `note: {text, updated_at, updated_by, updated_by_name} \| null`, giống nhau ở 3 nơi; **không** đưa vào lớp bản đồ bbox | **Có** (thêm khoá) |
 
 **Lược đồ:** migration `AddPoleNote` — `pole.note`, `note_updated_by` (FK `app_user`, `Restrict`), `note_updated_at`;

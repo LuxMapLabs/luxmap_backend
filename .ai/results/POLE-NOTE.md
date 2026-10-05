@@ -12,3 +12,10 @@ ghi đè, kèm ai/lúc nào; hiện ở kiểm kê, chi tiết cột trên bản
 - Phá thử: `ReplacePole` gán `Note = null` → `Replacing_the_pole_keeps_its_note` đỏ; bỏ kiểm độ dài ở API →
   `A_body_without_the_key_or_with_more_than_1000_characters_is_400` đỏ. Đã khôi phục.
 - Còn: báo WP5/WP6; sync offline (BE-43) phải đưa sửa ghi chú vào hàng chờ.
+
+## Lượt 2 — form tạo / sửa (05/10/2026)
+
+Mỹ: FE còn tạo / sửa cột bằng form. Thêm `note?` vào `CreatePoleRequest` và `UpdatePoleRequest` (`JsonElement`: vắng = giữ,
+`null`/rỗng = xoá, chữ = ghi đè; gửi lại cùng nội dung không đổi tác giả). Ba đường ghi qua `StampNote`. Bộ lọc schema
+`JsonElementFieldSchemaFilter` nay phủ `note` (trước đó spec ra `{}`). Test `PoleNoteTests` 8/8; phá thử "vắng = xoá" và
+"cùng nội dung đổi tác giả" đều đỏ ở `Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author`.

@@ -1724,10 +1724,14 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 
 ### POLE-NOTE — ghi chú cột (05/10/2026)
 
-**Ghi chú chỉ đi qua `PUT /assets/poles/{id}/note` (capability `EditPoleNotes`).** `ReplacePole` và import KHÔNG gán
-`Note` — đừng thêm vào hai đường đó "cho đủ trường": `PUT` là thay thế toàn phần nên body thiếu khoá sẽ xoá mất ghi chú
-của kỹ sư (cùng bẫy `feeder_id`). Canh bằng `Replacing_the_pole_keeps_its_note`. Đặt ghi chú cũng dời `pole.updated_at`
-để sync offline (BE-43) thấy cột đã đổi.
+**Ghi chú đi qua ba đường, đều qua `StampNote`:** `PUT /assets/poles/{id}/note` (`EditPoleNotes`, kỹ sư + quản lý),
+form tạo (`POST /assets/poles`, `note?`) và form sửa (`PUT /assets/poles/{id}`). Ở form sửa, `note` là **trường duy nhất
+GIỮ NGUYÊN khi vắng** trong một `PUT` thay thế toàn phần (đọc bằng `PoleNoteInput.Read`, `JsonElement`): đừng "sửa cho
+nhất quán" thành vắng = xoá — form cũ chưa có ô ghi chú sẽ xoá sạch ghi chú của kỹ sư (cùng họ bẫy `feeder_id`). Gửi lại
+**cùng** nội dung thì không ghi lại tác giả. Import không đụng ghi chú. Canh bằng
+`Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author`. Đặt ghi chú cũng dời `pole.updated_at` để sync
+offline (BE-43) thấy cột đã đổi. Trường `JsonElement` mới trong request phải thêm vào `JsonElementFieldSchemaFilter`,
+nếu không spec ra `{}` và FM-04 sinh `Any`.
 
 **`pole.note_updated_by` là FK `Restrict` tới `app_user`.** Fixture test tạo tài khoản rồi để tài khoản đó ghi chú phải
 xoá **cột trước, tài khoản sau** (`AssetImportFixture` đã đúng thứ tự). Đảo lại là teardown gãy, và lỗi chỉ hiện thành
