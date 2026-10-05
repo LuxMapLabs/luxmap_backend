@@ -1722,3 +1722,17 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 **Test luật "Quản trị cuối cùng" chạy trong transaction rồi rollback** (khoá các admin khác chỉ trong transaction đó).
 Đổi trạng thái admin thật trên DB dùng chung sẽ đua với các class test khác đang tạo admin (`WorkOrderTests`).
 
+### POLE-NOTE — ghi chú cột (05/10/2026)
+
+**Ghi chú chỉ đi qua `PUT /assets/poles/{id}/note` (capability `EditPoleNotes`).** `ReplacePole` và import KHÔNG gán
+`Note` — đừng thêm vào hai đường đó "cho đủ trường": `PUT` là thay thế toàn phần nên body thiếu khoá sẽ xoá mất ghi chú
+của kỹ sư (cùng bẫy `feeder_id`). Canh bằng `Replacing_the_pole_keeps_its_note`. Đặt ghi chú cũng dời `pole.updated_at`
+để sync offline (BE-43) thấy cột đã đổi.
+
+**`pole.note_updated_by` là FK `Restrict` tới `app_user`.** Fixture test tạo tài khoản rồi để tài khoản đó ghi chú phải
+xoá **cột trước, tài khoản sau** (`AssetImportFixture` đã đúng thứ tự). Đảo lại là teardown gãy, và lỗi chỉ hiện thành
+"Test Class Cleanup Failure" — CI đỏ dù mọi test xanh (bài học PR #93).
+
+**Hình dạng đọc dùng chung `PoleNote.From(...)`** ở Assets (kiểm kê), Map (chi tiết cột) và WorkOrders (cột của phiếu):
+thêm nơi đọc thứ tư thì gọi nó, đừng dựng object tay — ghi chú đã xoá (text `null`) phải đọc ra `null` ở mọi nơi.
+
