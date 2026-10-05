@@ -949,3 +949,27 @@ CHECK `ck_pole_note_length` (≤ 1000) và `ck_pole_note_stamp_together`. Module
 
 **Phải báo:** WP5 (màn kiểm kê, chi tiết cột: hiện và sửa ghi chú), WP6 (danh sách cột của phiếu: hiện ghi chú; màn sửa ghi chú
 cho kỹ sư; đưa vào hàng chờ offline khi làm BE-43). **Chưa báo.**
+
+## BE-27 — thông báo trong ứng dụng (05/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Bảng `notification` + 4 endpoint `/notifications` đọc bằng **polling**; 11 `type`. Đã viết vào **Contract v1.10** (mục 1.2, 2, 5.9). **SELF-SIGNED, nền tạm tới FW** |
+| **Decision maker** | Mỹ chốt 05/10/2026: phạm vi (b) + 3 sự kiện phụ (đổi lịch, nghiệm thu, xử lý khảo sát lỗi); server soạn nội dung; D-3…D-8 theo đề xuất `.ai/results/BE-27-p1.md` (đã qua review Codex). Chạm bề mặt API → **ESCALATE ở FW kế tiếp** |
+| **Task list** | BE-27 ghi *"chốt tên bảng/entity cùng FE2-Ngọc trước W16"* — tên `notification` và hình dạng item **chưa** được FE2 xác nhận |
+
+| Mã | Điểm | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **N-1** | Kênh | Polling (`unread-count` mỗi 30–60 s). Push (Firebase) thêm sau, đọc cùng bảng, API giữ nguyên | **Có** (endpoint mới) |
+| **N-2** | Nội dung | Server soạn `title`/`body` tiếng Việt, **chụp lúc xảy ra**; client hiển thị nguyên văn, dùng `type` + `entity_*` để điều hướng | **Có** |
+| **N-3** | Người nhận | Không báo người gây ra; "Quản lý của xã" = `manager` đang hoạt động có **đủ mọi xã** của sự kiện; khảo sát trả về báo người **đang** giữ phiếu (+ người quay nếu khác) | Không (luật server) |
+| **N-4** | Phạm vi | `notification` mang `commune_id` + `ICommuneScoped`; ai bị chuyển khỏi xã thôi thấy thông báo của xã đó (theo luật 60 phút của token) | **Có** (hành vi) |
+| **N-5** | ID | Prefix mới `NTF`, tối thiểu 6 chữ số | **Có** (bảng prefix) |
+| **N-6** | Mở sự cố | **Không có `GET /faults/{id}`** — thông báo `fault_reported` chỉ dẫn được tới danh sách sự cố. Đề xuất: thêm endpoint chi tiết hoặc bộ lọc `fault_id` cho `GET /faults` (ticket riêng) | **Mở** |
+
+**Hoãn (cần BE-26 Hangfire):** `work_order_overdue`, `node_offline`. Sự cố CV sinh lúc Quản lý chấp nhận khảo sát
+**không** báo — người duy nhất cần biết chính là người vừa duyệt. Thêm `type` sau là **thêm giá trị enum**: Contract
+5.9 đã yêu cầu client không lỗi khi gặp giá trị lạ.
+
+**Phải báo:** WP5 (chuông + danh sách thông báo, polling), WP6 (FM-21: chuông, danh sách, polling khi app mở; push sau).
+**Chưa báo.**
