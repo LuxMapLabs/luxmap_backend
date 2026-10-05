@@ -95,7 +95,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
         await Db(async db =>
         {
             // Every table here holds a RESTRICT reference to the next one (CLAUDE.md, BE-14 trap 3).
-            foreach (var table in new[] { "work_order_fault", "work_order", "fault", "pole", "road_segment" })
+            foreach (var table in new[] { "notification", "work_order_fault", "work_order", "fault", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);

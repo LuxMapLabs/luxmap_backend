@@ -3,6 +3,7 @@ using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Map.Features;
+using LuxMap.Modules.Notifications.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Modules.Survey.Review;
@@ -29,6 +30,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     private NpgsqlDataSource source = null!;
     private ModuleAssemblyCatalog catalog = null!;
     private string a = null!, b = null!, road = null!, order = null!, user = null!;
+    /// <summary>BE-27: a second manager who reviews, so the person holding the order is someone else to tell.</summary>
+    private string reviewer = null!;
     private string[] poles = [];
     private long algorithm, clock, model, extractor;
     private readonly ObjectSpy objects = new();
@@ -42,7 +45,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         if (interceptor is not null) builder.AddInterceptors(interceptor);
         return new(builder.Options, catalog, new Scope(ids ?? [a, b]), new Actor(user));
     }
-    private SurveyReviewService Service(LuxMapDbContext db, string[]? ids = null) => new(db, new Actor(user),
+    private SurveyReviewService Service(LuxMapDbContext db, string[]? ids = null, string? actor = null) => new(db, new Actor(actor ?? user),
         new Scope(ids ?? [a, b]), new AuditTrail(db, new Correlation()), objects, Options.Create(new SurveyReviewOptions()));
 
     public async Task InitializeAsync()
@@ -54,6 +57,9 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         var person = new AppUser { Username = "review" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid",
             FullName = "Test manager", PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.Manager };
         db.Add(person); await db.SaveChangesAsync(); user = person.UserId;
+        var second = new AppUser { Username = "review" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid",
+            FullName = "Second manager", PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.Manager };
+        db.Add(second); await db.SaveChangesAsync(); reviewer = second.UserId;
         var segment = new RoadSegment { CommuneId = a, SegmentName = "Survey publication", RoadClass = RoadClass.InterVillage,
             DataSource = DataSource.Simulated, LengthM = 100, Geom = new LineString([new(108,16), new(108.001,16)]) { SRID = 4326 } };
         db.Add(segment); await db.SaveChangesAsync(); road = segment.SegmentId;
@@ -189,6 +195,20 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         Assert.Equal(SweepStatus.Returned, result.Status); Assert.Null(result.AcceptedRunId);
         Assert.False(await db.Set<LuminanceHistory>().AnyAsync(h => h.SweepId == c.Id));
         Assert.False(await db.Set<PoleCurrentStatus>().AnyAsync(h => poles.Contains(h.PoleId)));
+        // The reviewer here also holds the order and filmed it: nobody is told about their own decision.
+        Assert.False(await db.Set<Notification>().IgnoreQueryFilters().AnyAsync(n => n.EntityId == c.Id));
+    }
+
+    [Fact]
+    public async Task Return_by_another_manager_tells_the_person_holding_the_order_once()
+    {
+        var c = await Plant(1); await using var db = Db();
+        await Service(db, actor: reviewer).Review(c.Id, new(Guid.NewGuid(), c.Run, "return", "Quay lại đoạn cuối", c.Version), default);
+
+        var notice = Assert.Single(await db.Set<Notification>().IgnoreQueryFilters().Where(n => n.EntityId == c.Id).ToListAsync());
+        Assert.Equal((user, NotificationType.SurveyReturned, NotificationEntityType.SurveySweep, a),
+            (notice.RecipientUserId, notice.Type, notice.EntityType, notice.CommuneId));
+        Assert.Equal($"Phiếu {order}. Lý do: Quay lại đoạn cuối", notice.Body);
     }
 
     [Fact]
@@ -638,7 +658,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM artifact_version WHERE version_id = {algorithm} OR version_id = {clock} OR version_id = {model} OR version_id = {extractor}");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = {user}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM notification WHERE commune_id = {a} OR commune_id = {b}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = {user} OR user_id = {reviewer}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM administrative_unit WHERE commune_id = {a} OR commune_id = {b}");
         await tx.CommitAsync();
     }

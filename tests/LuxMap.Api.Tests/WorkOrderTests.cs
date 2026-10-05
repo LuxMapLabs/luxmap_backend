@@ -85,7 +85,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
                 await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {home} OR commune_id = {foreign}");
                 await transaction.CommitAsync();
             }
-            foreach (var table in new[] { "work_order_fault", "work_order_segment", "repair_evidence", "work_order", "fault", "fault_cluster", "fixture", "pole", "road_segment" })
+            foreach (var table in new[] { "notification", "work_order_fault", "work_order_segment", "repair_evidence", "work_order", "fault", "fault_cluster", "fixture", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);

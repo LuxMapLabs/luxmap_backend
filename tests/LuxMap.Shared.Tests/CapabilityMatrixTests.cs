@@ -28,6 +28,7 @@ public class CapabilityMatrixTests
         ["cap:control_lighting"] = ["manager"],
         ["cap:manage_users"] = ["system_admin"],
         ["cap:read_faults"] = ["field_engineer", "manager", "superior", "system_admin"],
+        ["cap:read_notifications"] = ["field_engineer", "manager", "superior", "system_admin"],
         ["cap:review_faults"] = ["manager"],
         ["cap:report_faults"] = ["field_engineer"],
         ["cap:read_work_orders"] = ["field_engineer", "manager", "superior", "system_admin"],

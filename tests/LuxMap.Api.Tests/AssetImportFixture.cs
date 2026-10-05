@@ -199,6 +199,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 "DELETE FROM iot_node WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM notification WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR user_id = @e OR token_hash = ANY(@h);",
                 "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w OR user_id = @e;",
                 "DELETE FROM app_user WHERE user_id = @u OR user_id = @w OR user_id = @e;",

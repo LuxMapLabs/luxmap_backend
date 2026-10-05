@@ -170,6 +170,12 @@ public static class ErrorCodes
     public const string IdentifierTaken = "IDENTIFIER_TAKEN";
 
     /// <summary>
+    /// 404 — the notification does not exist or belongs to someone else (BE-27). One answer for both, so
+    /// nobody learns which notification IDs exist.
+    /// </summary>
+    public const string NotificationNotFound = "NOTIFICATION_NOT_FOUND";
+
+    /// <summary>
     /// 429 — too many requests from this client address to a rate-limited endpoint (BE-33a:
     /// <c>POST /auth/password/forgot</c>). The <c>Retry-After</c> header says when to try again.
     /// </summary>

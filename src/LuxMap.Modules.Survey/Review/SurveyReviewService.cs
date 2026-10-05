@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
+using LuxMap.Modules.Notifications;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
@@ -149,6 +150,12 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         audit.Record(new(now, AuditActorKind.User, actorId, actor.Role, sweep.CommuneId, AuditEntityType.SurveySweep,
             id, request.Decision == "accept" ? AuditAction.Confirmed : AuditAction.Returned, before,
             new { sweep.Status, sweep.AcceptedRunId, request.RunId, request.ClientOpId }, request.Note));
+        if (request.Decision == "return")
+        {
+            // BE-27: whoever holds the work order NOW acts on it; the engineer who filmed it learns too.
+            var holder = await db.Set<WorkOrder>().Where(w => w.WorkOrderId == sweep.WorkOrderId).Select(w => w.AssignedTo).SingleOrDefaultAsync(ct);
+            Notifier.Stage(db, SurveyNotices.Returned(sweep, request.Note), [holder, sweep.CapturedBy], actorId, now);
+        }
         try
         {
             await db.SaveChangesAsync(ct);

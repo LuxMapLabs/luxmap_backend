@@ -1,6 +1,7 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
+using LuxMap.Modules.Notifications;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
@@ -156,6 +157,7 @@ public sealed class FaultReportService(
         audit.Record(new(now, AuditActorKind.User, ActorId, actor.Role, communeId, AuditEntityType.Fault, faultId,
             AuditAction.Created, null, new { fault.FaultId, fault.PoleId, fault.FixtureId, fault.FaultType, fault.FaultStatus,
                 fault.Severity, fault.SourceChannel, fault.DataSource, fault.DetectedAt, fault.Note, client_op_id = key }));
+        Notifier.Stage(db, FaultNotices.Reported(fault), await Notifier.ManagersCoveringAsync(db, [communeId], ct), ActorId, now);
         try
         {
             await db.SaveChangesAsync(ct);

@@ -3,10 +3,9 @@
   <ItemGroup>
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
     <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
-    <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+    <!-- recipient_user_id is a real foreign key to app_user, and "the managers of a commune" is read
+         from app_user_commune. WorkOrders, Survey and Faults reference THIS module to stage notices. -->
     <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
-    <!-- BE-27: stages notices in its own saves through Notifier. -->
-    <ProjectReference Include="..\LuxMap.Modules.Notifications\LuxMap.Modules.Notifications.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

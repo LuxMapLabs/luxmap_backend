@@ -90,7 +90,7 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
                 var sql = $"DELETE FROM {table} WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE commune_id = {{0}})";
                 await db.Database.ExecuteSqlRawAsync(sql, commune);
             }
-            foreach (var table in new[] { "survey_sweep", "work_order_segment", "work_order", "road_segment" })
+            foreach (var table in new[] { "notification", "survey_sweep", "work_order_segment", "work_order", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}}";
                 await db.Database.ExecuteSqlRawAsync(sql, commune);

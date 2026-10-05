@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
-using LuxMap.Modules.Survey.Processing.Frames;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Notifications;
+using LuxMap.Modules.Notifications.Entities;
 using LuxMap.Modules.Survey.Entities;
+using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
@@ -10,8 +12,8 @@ using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace LuxMap.Modules.Survey.Processing;
@@ -252,9 +254,18 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             db.Add(pass);
             observations.AddRange(result.Pass.Observations.Select(p => CreateObservation(pass, run, sweep, p, media)));
         }
+        // BE-27: told once, in the anchor commune's save. Managers must hold every commune of the job,
+        // the same set a review needs; a retry is not news.
+        var notice = sweep.Status == SweepStatus.AwaitingReview ? SurveyNotices.ReadyForReview(sweep)
+            : sweep.Status == SweepStatus.Failed ? SurveyNotices.ProcessingFailed(sweep, run.ErrorCode) : null;
+        var managers = notice is null ? [] : await Notifier.ManagersCoveringAsync(db,
+            job.Communes.Append(sweep.CommuneId).Concat(observations.Select(x => x.CommuneId)).Distinct().ToArray(), ct);
         foreach (var commune in new[] { sweep.CommuneId }.Concat(observations.Select(x => x.CommuneId)).Distinct())
         {
             scope.Scope = CommuneScope.ForCommunes([commune]);
+            if (notice is not null && commune == sweep.CommuneId)
+                Notifier.Stage(db, notice, notice.Type == NotificationType.SurveyProcessingFailed ? managers.Prepend(sweep.CapturedBy) : managers,
+                    null, sweep.UpdatedAt);
             db.AddRange(observations.Where(x => x.CommuneId == commune));
             Audit(db, sweep, commune, AuditAction.Completed, new { attempt = job.Attempt, run.ResultState, run.Stage, run.ErrorCode,
                 observation_count = observations.Count(x => x.CommuneId == commune) });

@@ -1,21 +1,22 @@
+using System.Data.Common;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Notifications.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.Processing;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
-using LuxMap.Shared.Http;
-using Microsoft.Extensions.Logging;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
-using System.Data.Common;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
 using Npgsql;
 
@@ -33,6 +34,8 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     private string[] poles = [];
     private string? parallelRoad;
     private string userId = null!, orderId = null!;
+    /// <summary>BE-27: a manager holding both communes of the job, and one holding only the anchor.</summary>
+    private string bothManager = null!, anchorManager = null!;
     private sealed class Scope(string[] communes) : ICommuneScopeAccessor
     {
         public CommuneScope ScopeValue { get; } = CommuneScope.ForCommunes(communes);
@@ -59,6 +62,12 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
             PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.FieldEngineer };
         db.Add(user); await db.SaveChangesAsync(); userId = user.UserId;
         db.AddRange(new AppUserCommune { UserId = user.UserId, CommuneId = a }, new AppUserCommune { UserId = user.UserId, CommuneId = b });
+        var managers = new[] { "both", "anchor" }.Select(name => new AppUser { Username = "processing" + Guid.NewGuid().ToString("N"),
+            Email = Guid.NewGuid() + "@example.invalid", FullName = name, PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3",
+            PasswordSetAt = DateTime.UtcNow, Role = UserRole.Manager }).ToArray();
+        db.AddRange(managers); await db.SaveChangesAsync(); bothManager = managers[0].UserId; anchorManager = managers[1].UserId;
+        db.AddRange(new AppUserCommune { UserId = bothManager, CommuneId = a }, new AppUserCommune { UserId = bothManager, CommuneId = b },
+            new AppUserCommune { UserId = anchorManager, CommuneId = a });
         var route = new RoadSegment { CommuneId = a, SegmentName = "Curve", RoadClass = RoadClass.InterVillage,
             DataSource = DataSource.Simulated, LengthM = 999, Geom = new LineString([new(108,16), new(108.0005,16.00002), new(108.001,16)]) { SRID = 4326 } };
         db.Add(route); await db.SaveChangesAsync(); road = route.SegmentId;
@@ -112,8 +121,10 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         }
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {road}");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE user_id = {userId}");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = {userId}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM notification WHERE commune_id = {a} OR commune_id = {b}");
+        var accounts = new[] { userId, bothManager, anchorManager };
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE user_id = ANY({accounts})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = ANY({accounts})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM administrative_unit WHERE commune_id = {a} OR commune_id = {b}");
         await tx.CommitAsync();
         media.Dispose();
@@ -147,7 +158,15 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM detection WHERE sweep_id = {sweep}"));
         Assert.Equal("55000", error.SqlState);
+
+        // BE-27: only the manager who can review the WHOLE run (both communes) is told; the engineer is not.
+        var notice = Assert.Single(await Notices(db));
+        Assert.Equal((bothManager, NotificationType.SurveyReadyForReview, a, $"Khảo sát {sweep} chờ duyệt"),
+            (notice.RecipientUserId, notice.Type, notice.CommuneId, notice.Title));
     }
+
+    private Task<List<Notification>> Notices(LuxMapDbContext db)
+        => db.Set<Notification>().IgnoreQueryFilters().Where(n => n.EntityId == sweep).OrderBy(n => n.RecipientUserId).ToListAsync();
 
     [Fact]
     public async Task Object_failure_does_not_leave_a_row_pointing_to_missing_thumbnail()
@@ -208,6 +227,9 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal("clock", run.Stage);
         Assert.Equal(SweepProcessingStatus.Failed, (await verify.Set<SurveySweep>().SingleAsync(x => x.SweepId == sweep)).ProcessingStatus);
         Assert.Empty(await verify.Set<PoleObservation>().Where(x => poles.Contains(x.PoleId)).ToArrayAsync());
+        var notices = await Notices(verify);
+        Assert.Equal(new[] { bothManager, userId }.Order(), notices.Select(n => n.RecipientUserId).Order());
+        Assert.All(notices, n => Assert.Equal((NotificationType.SurveyProcessingFailed, $"Phiếu {orderId}. Mã lỗi: CLOCK_INSUFFICIENT."), (n.Type, n.Body)));
     }
 
     [Fact]
@@ -303,6 +325,8 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal(SweepProcessingStatus.Failed,(await db.Set<SurveySweep>().SingleAsync(x=>x.SweepId==sweep)).ProcessingStatus);
         Assert.Equal(3,log.Events.Count(x=>x.Level==LogLevel.Error && x.Error is InvalidOperationException
             && x.Message.Contains(sweep,StringComparison.Ordinal)));
+        // BE-27: a retry is not news — only the final failure is told, once per person.
+        Assert.Equal(2, (await Notices(db)).Count);
     }
 
     [Theory]

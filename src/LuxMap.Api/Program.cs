@@ -3,6 +3,7 @@ using LuxMap.Modules.Assets;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Identity;
 using LuxMap.Modules.Map;
+using LuxMap.Modules.Notifications;
 using LuxMap.Modules.Survey;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
@@ -44,6 +45,7 @@ ILuxMapModule[] modules =
     new WorkOrdersModule(),
     new TelemetryModule(),
     new AdminModule(),
+    new NotificationsModule(),
 ];
 
 // BE-00 — Contract v1.1 section 0 JSON conventions (snake_case, lowercase string enums, ISO 8601 UTC with Z).
