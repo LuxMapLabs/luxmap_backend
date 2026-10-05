@@ -145,6 +145,32 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
     /// never runs. The two tied IDs sit either side of a width boundary picked above everything the
     /// live table and sequence hold, so they cannot collide (CLAUDE.md, no literal IDs).
     /// </remarks>
+    /// <summary>
+    /// Drift N-6: the detail is exactly the list item — same keys, same values, location falling back to the pole —
+    /// and a foreign fault answers like a missing one.
+    /// </summary>
+    [Fact]
+    public async Task One_fault_reads_exactly_as_its_list_item_and_a_foreign_one_is_404()
+    {
+        var pole = await PlantPoleAsync(home, 108.004, 16.003);
+        var mine = (await PlantAsync(new Plan { Pole = pole, Lat = null, Lng = null, Priority = 3 }))[0];
+        var theirs = (await PlantAsync(new Plan { Commune = foreign }))[0];
+
+        var listed = Single(await GetAsync("a", $"?pole_id={pole}"));
+        var detail = await clients["a"].GetAsync($"{Route}/{mine}");
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        Assert.Equal(listed.GetRawText(), JsonDocument.Parse(await detail.Content.ReadAsStringAsync()).RootElement.GetRawText());
+
+        foreach (var id in new[] { theirs, "FAULT-0" })
+        {
+            var missing = await clients["a"].GetAsync($"{Route}/{id}");
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+            var error = JsonDocument.Parse(await missing.Content.ReadAsStringAsync()).RootElement.GetProperty("error");
+            Assert.Equal(("FAULT_NOT_FOUND", id), (error.GetProperty("code").GetString(), error.GetProperty("details").GetProperty("fault_id").GetString()));
+        }
+        Assert.Equal(HttpStatusCode.OK, (await clients["manager"].GetAsync($"{Route}/{theirs}")).StatusCode);
+    }
+
     [Fact]
     public async Task Priority_order_is_descending_with_nulls_last_and_ties_by_numeric_id()
     {
