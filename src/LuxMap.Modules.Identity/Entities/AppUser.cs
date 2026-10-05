@@ -23,7 +23,17 @@ public class AppUser
     /// is no separate salt column. BE-07 implements hashing and verification; BE-06 only builds the
     /// schema.
     /// </summary>
-    public required string PasswordHash { get; set; }
+    /// <remarks>
+    /// NULL while the account is invited and no password has been set yet (BE-33a). The CHECK
+    /// <c>ck_app_user_password_set_together</c> keeps it NULL exactly when <see cref="PasswordSetAt"/> is.
+    /// </remarks>
+    public string? PasswordHash { get; set; }
+
+    /// <summary>
+    /// When the password was last set through an invite or reset link — or, for accounts created
+    /// before BE-33a, when the account was created. NULL = invited, cannot sign in yet.
+    /// </summary>
+    public DateTime? PasswordSetAt { get; set; }
 
     /// <summary>
     /// Which algorithm produced the hash, e.g. <c>pbkdf2-aspnetcore-v3</c>. Having this column means
@@ -39,7 +49,8 @@ public class AppUser
     /// <summary>
     /// Contract section 7: administrators have system-wide scope and their claim carries the special
     /// value <c>*</c>. A flag rather than every commune in the join table, so adding a commune
-    /// requires no change here.
+    /// requires no change here. True exactly when <see cref="Role"/> is <c>system_admin</c>: the CHECK
+    /// <c>ck_app_user_system_wide_scope_matches_role</c> enforces it (BE-33a, D-6).
     /// </summary>
     public bool HasSystemWideScope { get; set; }
 
@@ -50,6 +61,8 @@ public class AppUser
     public ICollection<AppUserCommune> CommuneAssignments { get; set; } = [];
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = [];
+
+    public ICollection<AccountToken> AccountTokens { get; set; } = [];
 }
 
 /// <summary>

@@ -2,7 +2,6 @@ using System.Net;
 using Asp.Versioning;
 using LuxMap.Modules.Identity.Entities;
 using Microsoft.AspNetCore.Http;
-using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
@@ -47,58 +46,6 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     /// The refresh token is the ONLY credential here: this endpoint does NOT read the Authorization
     /// header and does not need a valid access token. Refreshing is allowed at any time.
     /// </summary>
-    /// <summary>
-    /// Open registration. Creates an IDENTITY, never a PERMISSION. DEPRECATED (Contract v1.7, D-R11).
-    /// </summary>
-    /// <remarks>
-    /// 🔴 Registration form v1.2 has no self-registration: a system admin creates the account and assigns
-    /// its role and communes. This endpoint stays until BE-33a adds <c>POST /admin/users</c>, so there is
-    /// never a moment with no way to create an account; <c>[Obsolete]</c> publishes
-    /// <c>deprecated: true</c> in the spec so mobile drops the screen now.
-    /// <para>
-    /// The new account signs in immediately but sees NO data: it is created with the lowest role and
-    /// no commune assignment, and the BE-08 query filter admits nothing on an empty scope. An
-    /// administrator grants access separately (BE-33).
-    /// </para>
-    /// <para>
-    /// Deliberately returns NO token. The account calls <c>POST /auth/login</c> like everyone else, so
-    /// exactly one code path issues tokens and opens refresh chains.
-    /// </para>
-    /// </remarks>
-    [HttpPost("register")]
-    [ClientSurface(ClientSurface.Mobile)]
-    [AllowAnonymous]
-    [Obsolete("DEPRECATED in Contract v1.7 (D-R11): a system admin creates accounts. Removed by BE-33a.")]
-    [ProducesResponseType<RegisterResponse>(StatusCodes.Status201Created)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<RegisterResponse>> RegisterAsync(
-        [FromBody] RegisterRequest request,
-        CancellationToken cancellationToken)
-    {
-        var outcome = await authService.RegisterAsync(
-            request.Username!, request.Email!, request.FullName!, request.Password!, cancellationToken);
-
-        if (!outcome.Succeeded)
-        {
-            throw new LuxMapException(
-                KnownErrors.IdentifierTaken.Code,
-                KnownErrors.IdentifierTaken.StatusCode,
-                "That username or email address is already registered.",
-                outcome.TakenFields);
-        }
-
-        var user = outcome.User!;
-        return StatusCode(StatusCodes.Status201Created, new RegisterResponse(
-            user.UserId,
-            user.Username,
-            user.Email,
-            user.FullName,
-            ContractEnum.ToDbValue(user.Role),
-            [],
-            RegisterResponse.PendingAssignmentMessage));
-    }
-
     [HttpPost("refresh")]
     [ClientSurface(ClientSurface.Mobile)]
     [AllowAnonymous]

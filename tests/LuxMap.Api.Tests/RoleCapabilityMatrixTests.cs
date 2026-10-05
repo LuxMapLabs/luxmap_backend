@@ -21,8 +21,9 @@ namespace LuxMap.Api.Tests;
 /// <para>
 /// The write probes send an EMPTY body. An admitted role gets past authorization and is stopped by
 /// validation (400); a refused role never reaches the action (403 <c>ROLE_FORBIDDEN</c>). So the test
-/// tells the two apart without writing a single row. <c>ControlLighting</c> and <c>ManageUsers</c> have
-/// no production endpoint yet and go through the probes of <c>ScopeTestController</c>.
+/// tells the two apart without writing a single row. <c>ControlLighting</c> has no production endpoint
+/// yet and goes through a probe of <c>ScopeTestController</c>; <c>ManageUsers</c> uses
+/// <c>POST /admin/users</c> since BE-33a.
 /// </para>
 /// </remarks>
 [Collection(nameof(ScopeCollection))]
@@ -50,7 +51,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ManageAssets"] = ("POST", "/api/v1/assets/segments", ["manager"]),
         ["RecordLuxReading"] = ("POST", "/api/v1/lux-readings", ["field_engineer"]),
         ["ControlLighting"] = ("GET", "/api/v1/_scope/manager-only", ["manager"]),
-        ["ManageUsers"] = ("GET", "/api/v1/_scope/admin-only", ["system_admin"]),
+        ["ManageUsers"] = ("POST", "/api/v1/admin/users", ["system_admin"]),
         ["ReadFaults"] = ("GET", "/api/v1/faults", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReviewFaults"] = ("PATCH", "/api/v1/faults/FAULT-0", ["manager"]),
         ["ReportFaults"] = ("POST", "/api/v1/faults", ["field_engineer"]),

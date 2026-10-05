@@ -71,16 +71,12 @@ public sealed class ScopeTestController(
     });
 
     /// <summary>
-    /// Stand-ins for the two capabilities that have no production endpoint yet, so their matrix rows
-    /// can be exercised over HTTP before the tickets that build them (D-R7, BE-33).
+    /// Stand-in for the capability that has no production endpoint yet, so its matrix row can be
+    /// exercised over HTTP before the ticket that builds it (D-R7). ManageUsers has one since BE-33a.
     /// </summary>
     [HttpGet("manager-only")]
     [Authorize(Policy = LuxMapPolicies.ControlLighting)]
     public IActionResult ManagerOnly() => Ok(new { ok = true });
-
-    [HttpGet("admin-only")]
-    [Authorize(Policy = LuxMapPolicies.ManageUsers)]
-    public IActionResult AdminOnly() => Ok(new { ok = true });
 
     [HttpGet("open")]
     [AllowAnonymous]

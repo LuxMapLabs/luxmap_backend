@@ -50,7 +50,7 @@ public class FaultReviewTests(AssetImportFixture factory, ITestOutputHelper outp
                 var user = new AppUser
                 {
                     Username = "fr" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = key,
-                    PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", Role = role,
+                    PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = role,
                 };
                 user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, factory.AccountPassword);
                 users[key] = user;

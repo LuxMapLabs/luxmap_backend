@@ -80,7 +80,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
                 Role = UserRole.FieldEngineer,
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
-                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm, PasswordSetAt = DateTime.UtcNow,
             };
 
             user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, FieldEngineerPassword);

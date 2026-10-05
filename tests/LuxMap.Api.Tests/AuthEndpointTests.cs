@@ -226,7 +226,7 @@ public class AuthEndpointTests(AuthTestFactory factory, ITestOutputHelper output
                 FullName = "Locked-account probe",
                 Role = UserRole.FieldEngineer,
                 PasswordHash = string.Empty,
-                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm, PasswordSetAt = DateTime.UtcNow,
             };
             user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, password);
             db.Set<AppUser>().Add(user);

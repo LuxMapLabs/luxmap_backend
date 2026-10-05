@@ -52,7 +52,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         var communes = new[] { new AdministrativeUnit { Name = "publication A" }, new AdministrativeUnit { Name = "publication B" } };
         db.AddRange(communes); await db.SaveChangesAsync(); a = communes[0].CommuneId; b = communes[1].CommuneId;
         var person = new AppUser { Username = "review" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid",
-            FullName = "Test manager", PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", Role = UserRole.Manager };
+            FullName = "Test manager", PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.Manager };
         db.Add(person); await db.SaveChangesAsync(); user = person.UserId;
         var segment = new RoadSegment { CommuneId = a, SegmentName = "Survey publication", RoadClass = RoadClass.InterVillage,
             DataSource = DataSource.Simulated, LengthM = 100, Geom = new LineString([new(108,16), new(108.001,16)]) { SRID = 4326 } };

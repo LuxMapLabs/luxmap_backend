@@ -96,7 +96,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 // commune, so the territorial rules bite.
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
-                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm, PasswordSetAt = DateTime.UtcNow,
             };
 
             user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, AccountPassword);
@@ -116,7 +116,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 Role = UserRole.Manager,
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
-                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm, PasswordSetAt = DateTime.UtcNow,
             };
 
             wide.PasswordHash = new PasswordHasher<AppUser>().HashPassword(wide, AccountPassword);

@@ -62,6 +62,9 @@ builder.Services.AddLuxMapSwagger();
 // BE-08 — token validation, role policies, and the commune scoping of Contract section 7.
 builder.Services.AddLuxMapAuthorization();
 
+// BE-33a — per-endpoint rate limits; only the anonymous endpoint that sends mail uses one so far.
+builder.Services.AddLuxMapRateLimiting(builder.Configuration);
+
 // BE-03 — EF Core + Npgsql + NetTopologySuite, one shared DbContext.
 builder.Services.AddLuxMapPersistence(
     LuxMapConnectionString.FromEnvironment(),
@@ -107,6 +110,9 @@ if (!app.Environment.IsDevelopment())
 // still return an empty body instead of the Contract's error shape.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After routing (implicit in WebApplication), so [EnableRateLimiting] on an endpoint is seen.
+app.UseRateLimiter();
 
 app.MapControllers();
 

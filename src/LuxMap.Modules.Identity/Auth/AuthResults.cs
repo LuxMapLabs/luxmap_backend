@@ -36,17 +36,3 @@ public sealed record AuthResult(AuthTokens? Tokens, AuthFailure? Failure)
 
     public bool Succeeded => Tokens is not null;
 }
-
-/// <summary>Result of a registration attempt.</summary>
-/// <param name="User">The created account, or <c>null</c> when the identifier was taken.</param>
-/// <param name="TakenFields">Which identifiers clashed, shaped for <c>error.details</c>.</param>
-public sealed record RegisterOutcome(
-    LuxMap.Modules.Identity.Entities.AppUser? User,
-    IReadOnlyDictionary<string, object?>? TakenFields)
-{
-    public static RegisterOutcome Created(LuxMap.Modules.Identity.Entities.AppUser user) => new(user, null);
-
-    public static RegisterOutcome Taken(IReadOnlyDictionary<string, object?> fields) => new(null, fields);
-
-    public bool Succeeded => User is not null;
-}

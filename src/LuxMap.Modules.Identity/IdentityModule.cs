@@ -1,3 +1,4 @@
+using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Identity.Auth;
 using LuxMap.Modules.Identity.Seeding;
 using LuxMap.Shared.Modularity;
@@ -45,5 +46,13 @@ public sealed class IdentityModule : ILuxMapModule
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AccessTokenIssuer>();
         services.AddScoped<AuthService>();
+
+        // BE-33a — accounts created by the system admin, invited and reset by email. A missing SMTP
+        // setting STOPS startup (D-5); development points at Mailpit.
+        services.AddSingleton(EmailOptions.FromEnvironment());
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<AccountMailer>();
+        services.AddScoped<UserAdminService>();
+        services.AddScoped<PasswordService>();
     }
 }

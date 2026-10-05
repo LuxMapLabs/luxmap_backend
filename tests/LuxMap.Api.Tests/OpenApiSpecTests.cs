@@ -47,7 +47,6 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
 
     [Theory]
     [InlineData("post", "/api/v1/auth/login", "mobile", "[Mobile] ", "Auth")]
-    [InlineData("post", "/api/v1/auth/register", "mobile", "[Mobile] ", "Auth")]
     [InlineData("post", "/api/v1/auth/refresh", "mobile", "[Mobile] ", "Auth")]
     [InlineData("post", "/api/v1/auth/logout", "mobile", "[Mobile] ", "Auth")]
     [InlineData("post", "/api/v1/auth/web/login", "web", "[Web] ", "WebAuth")]
@@ -115,11 +114,17 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.True(checkedOps >= 24, $"only {checkedOps} business operations found");
     }
 
-    /// <summary><c>POST /auth/register</c> is DEPRECATED in Contract v1.7 (D-R11), and the spec says so.</summary>
+    /// <summary>
+    /// <c>POST /auth/register</c>, deprecated in Contract v1.7 (D-R11), is removed by BE-33a: a system
+    /// admin creates accounts through <c>POST /admin/users</c>.
+    /// </summary>
     [Fact]
-    public void Self_registration_is_published_as_deprecated()
-        => Assert.True(Spec.GetProperty("paths").GetProperty("/api/v1/auth/register").GetProperty("post")
-            .GetProperty("deprecated").GetBoolean());
+    public void Self_registration_is_gone_and_admin_account_creation_is_published()
+    {
+        var paths = Spec.GetProperty("paths");
+        Assert.False(paths.TryGetProperty("/api/v1/auth/register", out _));
+        Assert.True(paths.GetProperty("/api/v1/admin/users").TryGetProperty("post", out _));
+    }
 
     [Theory]
     [InlineData("FixtureStatus", new[] { "normal", "dim", "out", "unknown" })]

@@ -18,4 +18,10 @@ public enum RefreshTokenRevocationReason
 
     /// <summary>Revoked because a rotated token was replayed after the grace window.</summary>
     ReuseDetected,
+
+    /// <summary>A system admin locked the account (BE-33a). Every live session ends with it.</summary>
+    AccountLocked,
+
+    /// <summary>The password was set again through a reset link (BE-33a). Old sessions must not outlive it.</summary>
+    PasswordReset,
 }

@@ -5,8 +5,9 @@ using Xunit.Abstractions;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// Exactly seven endpoints may be reached without signing in, and all seven exist to hand out a
-/// token. There is no guest actor, and no data endpoint is readable anonymously.
+/// Exactly eight endpoints may be reached without signing in: six hand out or revoke a token, and two
+/// redeem or request an emailed password link (BE-33a). There is no guest actor, and no data endpoint
+/// is readable anonymously.
 /// </summary>
 /// <remarks>
 /// <b>Why a test and not just the fallback policy.</b> <c>SetFallbackPolicy</c> protects an endpoint
@@ -27,7 +28,9 @@ namespace LuxMap.Api.Tests;
 public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper output)
 {
     /// <summary>
-    /// The complete list. Every one of them issues or revokes a token, and none reads business data.
+    /// The complete list. Each issues or revokes a token, or works from an emailed link held by someone
+    /// with no password yet; none reads business data. <c>POST /auth/register</c> is gone (BE-33a, D-R11):
+    /// a system admin creates accounts.
     /// </summary>
     /// <remarks>
     /// They cannot require a token: you would need one to sign in, and signing in is how you get one.
@@ -38,8 +41,9 @@ public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper 
     [
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/logout",
+        "POST /api/v1/auth/password/forgot",
+        "POST /api/v1/auth/password/set",
         "POST /api/v1/auth/refresh",
-        "POST /api/v1/auth/register",
         "POST /api/v1/auth/web/login",
         "POST /api/v1/auth/web/logout",
         "POST /api/v1/auth/web/refresh",

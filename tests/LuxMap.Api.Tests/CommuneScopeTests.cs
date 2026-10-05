@@ -1,7 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using LuxMap.Modules.Identity.Auth;
+using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Identity.Seeding;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
 namespace LuxMap.Api.Tests;
@@ -144,23 +149,29 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
     [Fact]
     public async Task Wildcard_claim_on_a_non_administrator_is_rejected()
     {
-        // Simulate a BUG on the issuing side: turn on the system-wide flag for a field_engineer account.
-        await factory.SetSystemWideAsync("crew", true);
-        try
+        // Simulate a BUG on the issuing side: a correctly signed token naming a field_engineer with ["*"].
+        // Since BE-33a the database refuses that row (ck_app_user_system_wide_scope_matches_role), so
+        // the token is signed directly; this request-time check stays as the second line of defence.
+        var crew = new AppUser
         {
-            var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
-            var response = await client.GetAsync("/api/v1/_scope/probes");
+            UserId = "USR-004",
+            Username = "crew",
+            Email = "crew@luxmap.local",
+            FullName = "Forged scope",
+            Role = UserRole.FieldEngineer,
+            PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+        };
+        var token = factory.Services.GetRequiredService<AccessTokenIssuer>().Issue(crew, [AuthClaims.AllCommunes]).Token;
 
-            output.WriteLine($"  field_engineer carrying [\"*\"] → HTTP {(int)response.StatusCode}");
-            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var response = await client.GetAsync("/api/v1/_scope/probes");
 
-            var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync())
-                .RootElement.GetProperty("error");
-            Assert.Equal(ErrorCodes.CommuneForbidden, error.GetProperty("code").GetString());
-        }
-        finally
-        {
-            await factory.SetSystemWideAsync("crew", false);
-        }
+        output.WriteLine($"  field_engineer carrying [\"*\"] → HTTP {(int)response.StatusCode}");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("error");
+        Assert.Equal(ErrorCodes.CommuneForbidden, error.GetProperty("code").GetString());
     }
 }

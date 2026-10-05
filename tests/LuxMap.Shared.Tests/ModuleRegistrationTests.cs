@@ -2,6 +2,7 @@ using LuxMap.Modules.Admin;
 using LuxMap.Modules.Assets;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Identity;
+using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Survey;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
@@ -37,14 +38,64 @@ public class ModuleRegistrationTests
             })
             .Build();
 
+    /// <summary>
+    /// The outgoing-mail settings BE-33a fails fast without, read from the environment only. Set for the
+    /// duration of one test and restored after: nothing else in this assembly reads them.
+    /// </summary>
+    private static IDisposable WithMailSettings() => new EnvironmentScope(new Dictionary<string, string?>
+    {
+        [EmailOptions.HostVariable] = "localhost",
+        [EmailOptions.PortVariable] = "1025",
+        [EmailOptions.FromAddressVariable] = "no-reply@luxmap.local",
+        [EmailOptions.FromNameVariable] = "LuxMap",
+        [EmailOptions.WebAppBaseUrlVariable] = "http://localhost:5173",
+    });
+
     [Fact]
     public void Every_module_registers_without_throwing()
     {
         var services = new ServiceCollection();
 
-        services.AddLuxMapModules(ConfigurationWithSigningKey(), AllModules());
+        using (WithMailSettings())
+        {
+            services.AddLuxMapModules(ConfigurationWithSigningKey(), AllModules());
+        }
 
         Assert.NotNull(services.BuildServiceProvider());
+    }
+
+    /// <summary>BE-33a (D-5): no mail settings, no start — rather than accounts whose invitation never leaves.</summary>
+    [Fact]
+    public void Identity_module_refuses_to_start_without_mail_settings()
+    {
+        using var cleared = new EnvironmentScope(new Dictionary<string, string?> { [EmailOptions.HostVariable] = null });
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => new ServiceCollection().AddLuxMapModules(ConfigurationWithSigningKey(), AllModules()));
+
+        Assert.Contains(EmailOptions.HostVariable, error.Message, StringComparison.Ordinal);
+    }
+
+    private sealed class EnvironmentScope : IDisposable
+    {
+        private readonly Dictionary<string, string?> previous;
+
+        public EnvironmentScope(Dictionary<string, string?> values)
+        {
+            previous = values.Keys.ToDictionary(key => key, Environment.GetEnvironmentVariable);
+            foreach (var (key, value) in values)
+            {
+                Environment.SetEnvironmentVariable(key, value);
+            }
+        }
+
+        public void Dispose()
+        {
+            foreach (var (key, value) in previous)
+            {
+                Environment.SetEnvironmentVariable(key, value);
+            }
+        }
     }
 
     [Fact]

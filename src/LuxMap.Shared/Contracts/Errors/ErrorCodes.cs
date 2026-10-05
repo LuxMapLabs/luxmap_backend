@@ -168,4 +168,10 @@ public static class ErrorCodes
     /// clear answer is worth more than hiding which identifiers exist; see docs/contract-drift.md.
     /// </summary>
     public const string IdentifierTaken = "IDENTIFIER_TAKEN";
+
+    /// <summary>
+    /// 429 — too many requests from this client address to a rate-limited endpoint (BE-33a:
+    /// <c>POST /auth/password/forgot</c>). The <c>Retry-After</c> header says when to try again.
+    /// </summary>
+    public const string RateLimited = "RATE_LIMITED";
 }
