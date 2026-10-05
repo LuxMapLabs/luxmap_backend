@@ -425,6 +425,30 @@ POST /api/v1/admin/users           { username, email, full_name, role, commune_i
 `smtp.gmail.com:587` với mật khẩu ứng dụng): điền cả `SMTP_USERNAME` và `SMTP_PASSWORD`, kết nối luôn qua
 TLS. **Không commit mật khẩu thật.**
 
+**Gửi qua Gmail** (môi trường thật):
+
+1. Tài khoản Gmail gửi thư bật **xác minh 2 bước**, rồi tạo **mật khẩu ứng dụng** ở
+   <https://myaccount.google.com/apppasswords>.
+2. Điền `.env` trên máy chủ:
+
+   ```
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USERNAME=<địa chỉ Gmail>
+   SMTP_PASSWORD=<mật khẩu ứng dụng, 16 ký tự VIẾT LIỀN — bỏ dấu cách Google hiển thị>
+   SMTP_FROM_ADDRESS=<cùng địa chỉ Gmail>
+   SMTP_FROM_NAME=LuxMap
+   WEB_APP_BASE_URL=<địa chỉ web thật, không phải localhost>
+   ```
+
+3. Gmail mới tạo hay bị xếp **Spam** ở những thư đầu — dặn người dùng xem cả mục đó.
+
+⚠️ **Trên macOS, API không gửi được qua Gmail — dùng Mailpit khi phát triển trên Mac.** .NET trên macOS trả
+`RevocationStatusUnknown` cho chứng chỉ của `smtp.gmail.com` (Google chỉ công bố CRL, không OCSP), và MailKit từ chối
+kết nối — API báo `invitation_sent: false`. Trên Linux cùng code, cùng mạng, cùng phút thì kiểm tra thu hồi qua và
+đăng nhập thành công (đo 05/10/2026, `mcr.microsoft.com/dotnet/runtime-deps:10.0`, Ubuntu 24.04). **Không** nới kiểm
+tra chứng chỉ để chạy được trên Mac — xem CLAUDE.md mục BE-33a.
+
 Database dev tạo trước BE-33a có thể còn 14 tài khoản test `be12a-*` / `be12b-*` vi phạm CHECK mới; chạy
 `scripts/cleanup_be12_leftover_accounts.sql` (xem đầu file) **trước** `dotnet ef database update`.
 
