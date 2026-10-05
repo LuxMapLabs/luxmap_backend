@@ -35,27 +35,7 @@ public sealed class AccountMailer(IEmailSender sender, EmailOptions options, ILo
         var expires = new DateTimeOffset(expiresAt, TimeSpan.Zero).ToOffset(VietnamOffset)
             .ToString("HH:mm 'ngày' dd/MM/yyyy", CultureInfo.InvariantCulture);
 
-        var (subject, opening) = purpose == AccountTokenPurpose.Invite
-            ? ("LuxMap — Lời mời tạo tài khoản",
-                "Quản trị hệ thống LuxMap đã tạo tài khoản cho bạn. Hãy đặt mật khẩu để bắt đầu sử dụng.")
-            : ("LuxMap — Đặt lại mật khẩu",
-                "Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.");
-
-        var body = $"""
-            Chào {user.FullName},
-
-            {opening}
-
-            Tên đăng nhập: {user.Username}
-
-            Mở liên kết sau để đặt mật khẩu (hết hạn lúc {expires}, giờ Việt Nam):
-            {link}
-
-            Liên kết chỉ dùng được một lần. Nếu bạn không yêu cầu việc này, hãy bỏ qua email.
-
-            LuxMap
-            """;
-
-        return new EmailMessage(user.Email, user.FullName, subject, body);
+        var (subject, text, html) = AccountMailTemplate.Render(purpose, user.FullName, user.Username, link, expires);
+        return new EmailMessage(user.Email, user.FullName, subject, text, html);
     }
 }

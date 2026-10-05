@@ -49,6 +49,7 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
         var mail = Assert.Single(factory.Mail.To(email));
         Assert.Contains(username, mail.Body);
         Assert.Contains("http://localhost:5173/set-password?token=", mail.Body);
+        Assert.Contains("http://localhost:5173/set-password?token=", mail.HtmlBody);
 
         // Invited: no password yet, and sign-in says exactly what a wrong password says.
         var early = await factory.CreateClient().PostLoginAsync(username, NewPassword);
