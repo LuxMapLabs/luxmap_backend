@@ -101,6 +101,9 @@ public sealed record CreatePoleRequest
 
     [Required]
     public DataSource? DataSource { get; init; }
+
+    /// <summary>Optional engineer's note on the spot (POLE-NOTE); blank means none, at most 1000 characters.</summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>
@@ -235,6 +238,16 @@ public sealed record UpdatePoleRequest
     /// <summary>⚠️ Provenance — see <see cref="UpdateSegmentRequest.DataSource"/>.</summary>
     [Required]
     public DataSource? DataSource { get; init; }
+
+    /// <summary>
+    /// The engineer's note (POLE-NOTE). The ONE field of this full replacement that is not replaced when
+    /// absent: leaving the key out keeps the note, <c>null</c> or blank clears it, text overwrites it.
+    /// </summary>
+    /// <remarks>
+    /// A form that predates the note must not wipe what an engineer wrote on site. Read through
+    /// <see cref="PoleNoteInput.Read"/>.
+    /// </remarks>
+    public JsonElement Note { get; init; }
 }
 
 /// <summary>
@@ -417,28 +430,18 @@ public sealed record PoleNote
             : new PoleNote { Text = text, UpdatedAt = updatedAt.Value, UpdatedBy = updatedBy, UpdatedByName = updatedByName };
 }
 
-/// <summary><c>PUT /assets/poles/{id}/note</c>: the new note, or <c>null</c> / blank to clear it.</summary>
-/// <remarks>
-/// A JSON element, like <see cref="SetPoleFeederRequest"/>, so a body WITHOUT the key is a 400 rather than
-/// a silent clear: wiping an engineer's note must be something the caller said.
-/// </remarks>
-public sealed record SetPoleNoteRequest
+/// <summary>
+/// The one set of rules for a pole note, whichever request carries it: trimmed, blank means none, at most
+/// <see cref="MaxLength"/> characters (POLE-NOTE).
+/// </summary>
+public static class PoleNoteInput
 {
     public const int MaxLength = 1000;
 
-    public JsonElement Note { get; init; }
-
-    /// <summary>The trimmed note, or <c>null</c> to clear. Throws 400 when the key is missing, not text, or too long.</summary>
-    public string? ReadNote()
+    /// <summary>The trimmed note, or <c>null</c> when it is null or blank. 400 when it is too long.</summary>
+    public static string? Normalize(string? note)
     {
-        var text = Note.ValueKind switch
-        {
-            JsonValueKind.String => Note.GetString()!.Trim(),
-            JsonValueKind.Null => null,
-            JsonValueKind.Undefined => throw Invalid("note is required. Send null or \"\" to clear the note."),
-            _ => throw Invalid("note must be text, or null to clear the note."),
-        };
-
+        var text = note?.Trim();
         if (text is { Length: > MaxLength })
         {
             throw Invalid($"note is at most {MaxLength} characters; this one has {text.Length}.");
@@ -447,9 +450,37 @@ public sealed record SetPoleNoteRequest
         return string.IsNullOrEmpty(text) ? null : text;
     }
 
-    private static LuxMapException Invalid(string message)
-        => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message,
-            new Dictionary<string, object?> { ["field"] = "note" });
+    /// <summary>
+    /// Reads a <c>note</c> key that may be absent: <c>Present = false</c> when the body did not send it,
+    /// otherwise the normalized text (<c>null</c> = clear). 400 when the value is neither text nor null.
+    /// </summary>
+    public static (bool Present, string? Text) Read(JsonElement note) => note.ValueKind switch
+    {
+        JsonValueKind.Undefined => (false, null),
+        JsonValueKind.Null => (true, null),
+        JsonValueKind.String => (true, Normalize(note.GetString())),
+        _ => throw Invalid("note must be text, or null to clear the note."),
+    };
+
+    internal static LuxMapException Invalid(string message)
+        => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message, new Dictionary<string, object?> { ["field"] = "note" });
+}
+
+/// <summary><c>PUT /assets/poles/{id}/note</c>: the new note, or <c>null</c> / blank to clear it.</summary>
+/// <remarks>
+/// A JSON element, like <see cref="SetPoleFeederRequest"/>, so a body WITHOUT the key is a 400 rather than
+/// a silent clear: wiping an engineer's note must be something the caller said.
+/// </remarks>
+public sealed record SetPoleNoteRequest
+{
+    public JsonElement Note { get; init; }
+
+    /// <summary>The trimmed note, or <c>null</c> to clear. 400 when the key is missing, not text, or too long.</summary>
+    public string? ReadNote()
+    {
+        var (present, text) = PoleNoteInput.Read(Note);
+        return present ? text : throw PoleNoteInput.Invalid("note is required. Send null or \"\" to clear the note.");
+    }
 }
 
 /// <summary>What <c>PUT /assets/poles/{id}/note</c> answers: the pole and its note as stored.</summary>

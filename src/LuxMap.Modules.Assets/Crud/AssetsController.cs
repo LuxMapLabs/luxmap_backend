@@ -303,9 +303,8 @@ public sealed class AssetsController(
     /// blank clears it. At most 1000 characters.
     /// </summary>
     /// <remarks>
-    /// Its own endpoint and capability: field engineers write notes on site without any other asset write,
-    /// and the full-replacement <c>PUT /assets/poles/{id}</c> never touches the note, so leaving the field
-    /// out of that body can never wipe one.
+    /// Its own endpoint and capability: field engineers write notes on site without any other asset write.
+    /// Managers can also set it from the create and edit forms; there, an absent key keeps the note.
     /// </remarks>
     [HttpPut("poles/{poleId}/note")]
     [Authorize(Policy = LuxMapPolicies.EditPoleNotes)]

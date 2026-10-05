@@ -6413,6 +6413,10 @@
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8547,7 +8551,11 @@
       "SetPoleNoteRequest": {
         "type": "object",
         "properties": {
-          "note": { }
+          "note": {
+            "type": "string",
+            "description": "The engineer's note on this pole, at most 1000 characters; null or blank clears it. The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.",
+            "nullable": true
+          }
         },
         "additionalProperties": false
       },
@@ -9004,6 +9012,11 @@
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
+          },
+          "note": {
+            "type": "string",
+            "description": "The engineer's note. OPTIONAL and the one field this full replacement keeps when absent: leave the key out to keep the note, send null or blank to clear it, text (at most 1000 characters) to overwrite it.",
+            "nullable": true
           }
         },
         "additionalProperties": false

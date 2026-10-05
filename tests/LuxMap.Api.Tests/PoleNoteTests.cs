@@ -97,30 +97,84 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
     }
 
     /// <summary>
-    /// The full-replacement PUT clears whatever its body leaves out (it is a decision, see
-    /// <c>Replacing_a_pole_without_a_feeder_id_clears_its_circuit</c>) — but the note is not one of its
-    /// fields, so replacing a pole can never wipe an engineer's note.
+    /// The full-replacement PUT clears whatever its body leaves out (a decision, see
+    /// <c>Replacing_a_pole_without_a_feeder_id_clears_its_circuit</c>) — except the note: a form that
+    /// predates it must not wipe what an engineer wrote, nor make the manager its author.
     /// </summary>
     [Fact]
-    public async Task Replacing_the_pole_keeps_its_note()
+    public async Task Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author()
     {
         var poleId = await NewPoleAsync(fixture.CommuneId);
+        var written = await Json(await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "cột nghiêng" }));
         var manager = await fixture.ManagerClientAsync();
-        await manager.PutAsJsonAsync(NoteUrl(poleId), new { note = "cột nghiêng" });
 
-        var detail = await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"));
-        var replace = await manager.PutAsJsonAsync($"/api/v1/assets/poles/{poleId}", new
+        Assert.Equal(HttpStatusCode.NoContent, (await ReplaceAsync(manager, poleId, new { near_sensitive_poi = true })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await ReplaceAsync(manager, poleId, new { near_sensitive_poi = true, note = "cột nghiêng" })).StatusCode);
+
+        var after = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole");
+        Assert.True(after.GetProperty("near_sensitive_poi").GetBoolean());
+        Assert.Equal("cột nghiêng", after.GetProperty("note").GetProperty("text").GetString());
+        Assert.Equal(written.GetProperty("note").GetProperty("updated_by").GetString(), after.GetProperty("note").GetProperty("updated_by").GetString());
+        Assert.Equal(written.GetProperty("note").GetProperty("updated_at").GetString(), after.GetProperty("note").GetProperty("updated_at").GetString());
+    }
+
+    [Fact]
+    public async Task The_edit_form_overwrites_or_clears_the_note_and_the_manager_becomes_its_author()
+    {
+        var poleId = await NewPoleAsync(fixture.CommuneId);
+        await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "ghi chú của kỹ sư" });
+        var manager = await fixture.ManagerClientAsync();
+
+        await ReplaceAsync(manager, poleId, new { note = "  quản lý sửa  " });
+        var edited = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole").GetProperty("note");
+        Assert.Equal("quản lý sửa", edited.GetProperty("text").GetString());
+        Assert.Equal("BE-12a commune-scoped manager", edited.GetProperty("updated_by_name").GetString());
+
+        await ReplaceAsync(manager, poleId, new { note = (string?)null });
+        var cleared = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole");
+        Assert.Equal(JsonValueKind.Null, cleared.GetProperty("note").ValueKind);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await ReplaceAsync(manager, poleId, new { note = new string('x', 1001) })).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_create_form_takes_an_optional_note()
+    {
+        var existing = await NewPoleAsync(fixture.CommuneId);
+        var manager = await fixture.ManagerClientAsync();
+        var segmentId = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{existing}"))).GetProperty("pole").GetProperty("segment_id").GetString();
+        object Body(object? note) => new
         {
-            segment_id = detail.GetProperty("pole").GetProperty("segment_id").GetString(),
-            geom_wkt = detail.GetProperty("geom_wkt").GetString(),
-            near_sensitive_poi = true,
-            data_source = "public_imagery",
-        });
-        Assert.Equal(HttpStatusCode.NoContent, replace.StatusCode);
+            segment_id = segmentId, commune_id = fixture.CommuneId, geom_wkt = $"POINT ({Lng} {Lat})", data_source = "public_imagery", note,
+        };
 
-        var after = await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"));
-        Assert.True(after.GetProperty("pole").GetProperty("near_sensitive_poi").GetBoolean());
-        Assert.Equal("cột nghiêng", after.GetProperty("pole").GetProperty("note").GetProperty("text").GetString());
+        var created = await manager.PostAsJsonAsync("/api/v1/assets/poles", Body("Gần chợ"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var detail = (await Json(await manager.GetAsync(created.Headers.Location!))).GetProperty("pole").GetProperty("note");
+        Assert.Equal("Gần chợ", detail.GetProperty("text").GetString());
+
+        var withoutNote = await manager.PostAsJsonAsync("/api/v1/assets/poles", Body(null));
+        Assert.Equal(JsonValueKind.Null, (await Json(await manager.GetAsync(withoutNote.Headers.Location!))).GetProperty("pole").GetProperty("note").ValueKind);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PostAsJsonAsync("/api/v1/assets/poles", Body(new string('x', 1001)))).StatusCode);
+    }
+
+    /// <summary>The full-replacement PUT with the pole's current values, plus whatever <paramref name="change"/> overrides.</summary>
+    private async Task<HttpResponseMessage> ReplaceAsync(HttpClient manager, string poleId, object change)
+    {
+        var detail = await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"));
+        var body = new Dictionary<string, object?>
+        {
+            ["segment_id"] = detail.GetProperty("pole").GetProperty("segment_id").GetString(),
+            ["geom_wkt"] = detail.GetProperty("geom_wkt").GetString(),
+            ["data_source"] = "public_imagery",
+        };
+        foreach (var property in change.GetType().GetProperties())
+        {
+            body[property.Name] = property.GetValue(change);
+        }
+
+        return await manager.PutAsJsonAsync($"/api/v1/assets/poles/{poleId}", body);
     }
 
     [Fact]
