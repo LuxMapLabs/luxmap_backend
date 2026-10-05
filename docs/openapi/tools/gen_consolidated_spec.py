@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.7"
+d["info"]["version"] = "1.8"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -31,7 +31,8 @@ HTTP_METHODS = ("get", "post", "put", "patch", "delete")
 n_from_code = sum(1 for item in d["paths"].values() for m in item if m in HTTP_METHODS)
 
 d["info"]["description"] = (
-    "Contract v1.7 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). "
+    "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). "
+    "v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -122,7 +123,16 @@ SUMMARY = {
     ("put", "/api/v1/assets/fixtures/{fixtureId}/removal"): "Ngừng dùng bóng bằng removed_date; không có DELETE",
     ("get", "/api/v1/auth/me"): "Người đang đăng nhập, đọc từ DB nên role và commune_ids luôn tươi",
     ("post", "/api/v1/auth/login"): "Đăng nhập mobile; trả đúng bốn trường",
-    ("post", "/api/v1/auth/register"): "Đăng ký mở; tạo danh tính, không tạo quyền",
+    # BE-33a — Contract v1.8 §4.8 / §4.9, SELF-SIGNED tới FW.
+    ("post", "/api/v1/auth/password/set"): "[BE-33a] Đặt mật khẩu bằng link mời / đặt lại trong email; dùng một lần, kết thúc mọi phiên cũ",
+    ("post", "/api/v1/auth/password/forgot"): "[BE-33a] Gửi link đặt lại mật khẩu; LUÔN 202 cùng một body; giới hạn 5 lần / 15 phút / địa chỉ",
+    ("post", "/api/v1/admin/users"): "[BE-33a] Quản trị tạo tài khoản không mật khẩu và gửi email mời (72 giờ)",
+    ("get", "/api/v1/admin/users"): "[BE-33a] Danh sách tài khoản; lọc role, status (invited/active/locked)",
+    ("get", "/api/v1/admin/users/{id}"): "[BE-33a] Chi tiết một tài khoản",
+    ("patch", "/api/v1/admin/users/{id}"): "[BE-33a] Sửa họ tên, email, vai trò, xã; username không đổi",
+    ("post", "/api/v1/admin/users/{id}/lock"): "[BE-33a] Khoá và thu hồi mọi phiên; không tự khoá, không khoá Quản trị cuối",
+    ("post", "/api/v1/admin/users/{id}/unlock"): "[BE-33a] Mở khoá",
+    ("post", "/api/v1/admin/users/{id}/invite"): "[BE-33a] Gửi lại email mời; link cũ hết hiệu lực",
     ("post", "/api/v1/auth/refresh"): "Xoay vòng refresh token (mobile)",
     ("post", "/api/v1/auth/logout"): "Thu hồi refresh token (mobile); luôn 204",
     ("post", "/api/v1/lux-readings"): "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",

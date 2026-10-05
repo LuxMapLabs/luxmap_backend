@@ -20,4 +20,15 @@ public static class AuthClaims
 
     /// <summary>The special system-wide scope value from Contract section 7.</summary>
     public const string AllCommunes = "*";
+
+    /// <summary>
+    /// The communes an account may reach: <c>["*"]</c> for system-wide scope, otherwise its assignments
+    /// in ordinal order.
+    /// </summary>
+    /// <remarks>
+    /// ONE rule for the token, <c>GET /auth/me</c> and the admin screens (BE-33a). Copies would let them
+    /// disagree about the same account, and no client could tell which one is lying.
+    /// </remarks>
+    public static IReadOnlyList<string> CommuneIdsFor(bool hasSystemWideScope, IEnumerable<string> assignedCommuneIds)
+        => hasSystemWideScope ? [AllCommunes] : assignedCommuneIds.Order(StringComparer.Ordinal).ToArray();
 }

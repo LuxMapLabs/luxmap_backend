@@ -50,7 +50,7 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
             foreach (var name in new[] { "manager", "owner", "other", "outside" })
             {
                 var u = new AppUser { Username = "survey" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid",
-                    FullName = name, PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", Role = name == "manager" ? UserRole.Manager : UserRole.FieldEngineer };
+                    FullName = name, PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = name == "manager" ? UserRole.Manager : UserRole.FieldEngineer };
                 u.PasswordHash = new PasswordHasher<AppUser>().HashPassword(u, factory.AccountPassword);
                 users.Add(name, u); db.Add(u);
             }

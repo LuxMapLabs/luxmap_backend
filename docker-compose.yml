@@ -57,6 +57,20 @@ services:
       retries: 5
       start_period: 5s
 
+  # BE-33a — fake SMTP server for development: it accepts every mail and keeps it, so invitation and
+  # reset links can be opened from its web UI (http://localhost:8025) without a real mailbox. The API
+  # sends to 127.0.0.1:${SMTP_PORT}. Pinned to the MANIFEST LIST digest (all platforms), same rule as MinIO.
+  # Nothing persists: mails vanish when the container is recreated, which is what a dev inbox wants.
+  mailpit:
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    container_name: luxmap_mailpit
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${SMTP_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+
   # BE-11 — object store for survey frames and repair evidence.
   #
   # Bound to 127.0.0.1 like the other two, and that is load-bearing rather than habitual: BE-11 serves

@@ -67,13 +67,13 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Lần đầu sẽ kéo image (~340 MB cho cả bốn) và chạy `initdb`, mất khoảng 30–60 giây. Kiểm tra:
+Lần đầu sẽ kéo image (~340 MB cho bốn image gốc; Mailpit thêm dưới 60 MB) và chạy `initdb`, mất khoảng 30–60 giây. Kiểm tra:
 
 ```bash
 docker compose ps
 ```
 
-Ba service `postgres`, `redis` và `minio` phải ở trạng thái `healthy`. Nếu `postgres` còn `starting`, chờ thêm — healthcheck có `start_period` 30 giây.
+Bốn service `postgres`, `redis`, `minio` và `mailpit` phải ở trạng thái `healthy`. Nếu `postgres` còn `starting`, chờ thêm — healthcheck có `start_period` 30 giây.
 
 Sidecar `luxmap_minio_mc` **không** hiện ở đây: nó tạo hai bucket rồi thoát. `docker compose ps -a` sẽ thấy nó ở `Exited (0)` — đó là thành công, không phải crash.
 
@@ -104,10 +104,12 @@ Nạp xong chạy lại `docker compose up -d`; compose khớp theo digest nên 
 | Redis | **6380** | 6379 |
 | MinIO — S3 API | **9000** | 9000 |
 | MinIO — web console | **9001** | 9001 |
+| Mailpit — SMTP (thư mời / đặt lại mật khẩu) | **1025** | 1025 |
+| Mailpit — hộp thư web | **8025** | 8025 |
 
 Postgres và Redis cố ý KHÔNG dùng 5432/6379: máy dev thường đã có bản cài native chiếm sẵn. MinIO giữ nguyên 9000/9001 vì hiếm khi đụng thứ gì.
 
-Cả bốn cổng chỉ bind vào `127.0.0.1`, không phơi ra LAN. Riêng MinIO đó là ràng buộc bảo mật chứ không phải thói quen: BE-11 phục vụ mọi byte ảnh **qua API** để phạm vi xã (Contract mục 7) áp cho ảnh đúng như áp cho hàng dữ liệu. MinIO không biết `commune_id` là gì, nên chạm thẳng vào nó là đi vòng qua trọn bộ lớp kiểm tra đó.
+Mọi cổng chỉ bind vào `127.0.0.1`, không phơi ra LAN. Riêng MinIO đó là ràng buộc bảo mật chứ không phải thói quen: BE-11 phục vụ mọi byte ảnh **qua API** để phạm vi xã (Contract mục 7) áp cho ảnh đúng như áp cho hàng dữ liệu. MinIO không biết `commune_id` là gì, nên chạm thẳng vào nó là đi vòng qua trọn bộ lớp kiểm tra đó.
 
 Chuỗi kết nối dev:
 
@@ -394,17 +396,16 @@ $env:Swagger__Enabled="true"; $env:Cors__AllowedOrigins__0="https://localhost:30
 
 ## Xác thực
 
-Bảy endpoint cấp token **không cần** access token — nhóm mobile (token trong body) và nhóm web
-(`/api/v1/auth/web/*`, refresh token chỉ trong cookie `__Secure-luxmap_rt`). Endpoint thứ tám,
-`GET /auth/me`, thì **cần**. Đặc tả đầy đủ: Contract mục 4.
+Tám endpoint **không cần** access token: sáu cấp / thu hồi token — nhóm mobile (token trong body) và
+nhóm web (`/api/v1/auth/web/*`, refresh token chỉ trong cookie `__Secure-luxmap_rt`) — và hai làm việc
+với link mật khẩu trong email. `GET /auth/me` thì **cần**. Đặc tả đầy đủ: Contract mục 4.
 
-🔴 **`POST /auth/register` DEPRECATED (Contract v1.7, D-R11), gỡ ở BE-33a.** Không có tự đăng ký: Quản
-trị hệ thống tạo tài khoản, gán vai trò và gán xã. Tới khi BE-33a có `POST /api/v1/admin/users`, làm
-theo [`docs/authorization-guide.md`](docs/authorization-guide.md) mục "Tạo tài khoản".
+**Không có tự đăng ký** (D-R11): Quản trị hệ thống tạo tài khoản qua `POST /api/v1/admin/users`, người
+dùng nhận **email mời** và tự đặt mật khẩu (BE-33a, Contract v1.8 §4.8–4.9; hướng dẫn ở
+[`docs/authorization-guide.md`](docs/authorization-guide.md) mục "Tạo tài khoản"). `POST /auth/register` đã gỡ.
 
 ```bash
 POST /api/v1/auth/login      { "username": "...", "password": "..." }
-POST /api/v1/auth/register   { "username": "...", "email": "...", "full_name": "...", "password": "..." }   # DEPRECATED
 POST /api/v1/auth/refresh    { "refresh_token": "..." }
 POST /api/v1/auth/logout     { "refresh_token": "..." }
 POST /api/v1/auth/web/login  { "username": "...", "password": "...", "remember_me": true }
@@ -412,7 +413,20 @@ POST /api/v1/auth/web/refresh   (không body — cookie)
 POST /api/v1/auth/web/logout    (không body — cookie)
 
 GET  /api/v1/auth/me         → { user_id, username, email, full_name, role, commune_ids }
+
+POST /api/v1/auth/password/set     { "token": "...", "new_password": "..." }   → 204
+POST /api/v1/auth/password/forgot  { "email": "..." }                          → luôn 202
+POST /api/v1/admin/users           { username, email, full_name, role, commune_ids }   # system_admin
 ```
+
+**Email trong dev:** mọi thư đi vào **Mailpit** (`docker compose up -d mailpit`), mở hộp thư ở
+<http://localhost:8025> để bấm link mời / đặt lại. Biến `SMTP_*` và `WEB_APP_BASE_URL` trong `.env` là
+**bắt buộc** — thiếu thì app dừng lúc khởi động. Môi trường thật dùng một SMTP có đăng nhập (ví dụ Gmail
+`smtp.gmail.com:587` với mật khẩu ứng dụng): điền cả `SMTP_USERNAME` và `SMTP_PASSWORD`, kết nối luôn qua
+TLS. **Không commit mật khẩu thật.**
+
+Database dev tạo trước BE-33a có thể còn 14 tài khoản test `be12a-*` / `be12b-*` vi phạm CHECK mới; chạy
+`scripts/cleanup_be12_leftover_accounts.sql` (xem đầu file) **trước** `dotnet ef database update`.
 
 `/auth/me` đọc từ **database**, không phải từ claim: access token sống 60 phút nên xã vừa được gán
 không hiện trong claim cho tới lần đăng nhập sau, và `full_name` với `email` thì token không mang.

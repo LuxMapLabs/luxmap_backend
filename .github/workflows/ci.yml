@@ -80,6 +80,13 @@ jobs:
               'MINIO_PORT': '9000',
               'MINIO_CONSOLE_PORT': '9001',
               'MINIO_ENDPOINT': 'http://localhost:9000',
+              # BE-33a fails fast without these. Nothing listens there: the suite swaps in a
+              # recording sender, and a real send would only be logged as failed.
+              'SMTP_HOST': 'localhost',
+              'SMTP_PORT': '1025',
+              'SMTP_FROM_ADDRESS': 'no-reply@luxmap.local',
+              'SMTP_FROM_NAME': 'LuxMap',
+              'WEB_APP_BASE_URL': 'http://localhost:5173',
           }
           for key in ('POSTGRES_PASSWORD', 'MINIO_SECRET_KEY', 'JWT_SIGNING_KEY',
                       'SEED_ADMIN_PASSWORD', 'SEED_AGENCY_PASSWORD',

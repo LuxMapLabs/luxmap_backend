@@ -160,9 +160,9 @@ vẫn đúng từng request.
 Claim `commune_ids` mang `"*"` mà vai trò không phải `system_admin` → **403 + log Error**.
 
 Đây **không phải** chống client giả mạo — claim nằm trong JWT đã ký. Đây là lớp chặn **lỗi ở phía
-phát token**: BE-06 không có ràng buộc DB nào buộc `has_system_wide_scope` đi cùng
-`role = 'system_admin'`, nên một câu `UPDATE` tay hoặc một bug ở BE-33 là đủ để BE-07 phát `["*"]`
-cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bug, không phải dấu hiệu bị tấn công.
+phát token**. Từ BE-33a, DB đã có CHECK `ck_app_user_system_wide_scope_matches_role` buộc
+`has_system_wide_scope` đi cùng `role = 'system_admin'`, nên hàng sai không vào được bảng nữa; lớp này
+giữ lại làm hàng phòng thủ thứ hai. Log ở mức **Error** vì đó là dấu hiệu bug, không phải dấu hiệu bị tấn công.
 
 ---
 
@@ -182,46 +182,24 @@ cho tài khoản thường. Log ở mức **Error** vì đó là dấu hiệu bu
 
 ## Tạo tài khoản
 
-**Mô hình chính thức (Contract v1.7, D-R11): chỉ Quản trị hệ thống tạo tài khoản**, gán vai trò và gán
-xã. Không có tự đăng ký. API cho việc này là `POST /api/v1/admin/users` (capability `ManageUsers`) ở
-**BE-33a** — chưa có.
+**Chỉ Quản trị hệ thống tạo tài khoản** (D-R11), qua `POST /api/v1/admin/users` (capability `ManageUsers`,
+BE-33a, Contract v1.8 §4.9). Không có tự đăng ký — `POST /auth/register` đã gỡ.
 
-**Giai đoạn chuyển tiếp, tới BE-33a.** `POST /api/v1/auth/register` còn chạy nhưng **DEPRECATED** — chỉ
-dùng như công cụ tạo tài khoản của Quản trị hệ thống, không phải màn tự đăng ký cho người dùng (WP6 bỏ
-màn đó). Tài khoản vừa tạo nhận `field_engineer` và **không có xã nào**, nên **đăng nhập được nhưng
-không thấy bản ghi nào**. Quản trị hệ thống gán vai trò và xã bằng SQL:
+1. Quản trị gửi `{ username, email, full_name, role, commune_ids }`. Tài khoản tạo ra **chưa có mật khẩu**
+   (`status: invited`) và hệ thống gửi **email mời** chứa link `{WEB_APP_BASE_URL}/set-password?token=…`
+   (72 giờ, dùng một lần).
+2. Người dùng mở link, đặt mật khẩu (`POST /auth/password/set`), rồi đăng nhập bình thường.
+3. Mail lỗi thì response có `invitation_sent: false` — bấm gửi lại (`POST /admin/users/{id}/invite`).
 
-```bash
-docker compose exec postgres psql -U luxmap -d luxmap_dev
-```
+Luật xã: `superior` / `manager` / `field_engineer` cần **ít nhất một** xã tồn tại; `system_admin` không nhận
+xã và tự có `["*"]`. Cấp giám sát xem nhiều xã thì **gán nhiều xã** — không có cấp huyện (D-R3). Sửa vai trò
+hoặc xã bằng `PATCH /admin/users/{id}`; khoá bằng `POST /admin/users/{id}/lock` (thu hồi mọi phiên).
 
-Xem ai đang chờ được gán:
+⚠️ **Đừng sửa `role`, `has_system_wide_scope` hay `app_user_commune` bằng SQL tay** khi đã có API: API giữ các
+luật (ít nhất một xã, không bỏ Quản trị cuối cùng) mà câu `UPDATE` không biết. Bật cờ toàn hệ thống cho vai
+trò khác thì DB từ chối (CHECK ở trên).
 
-```sql
-SELECT u.user_id, u.username, u.role, count(c.commune_id) AS communes
-FROM app_user u LEFT JOIN app_user_commune c ON c.user_id = u.user_id
-GROUP BY u.user_id, u.username, u.role HAVING count(c.commune_id) = 0 ORDER BY u.user_id;
-```
-
-Gán địa bàn:
-
-```sql
-INSERT INTO app_user_commune (user_id, commune_id) VALUES ('USR-005', 'COM-001');
-```
-
-Đổi vai trò nếu cần:
-
-```sql
-UPDATE app_user SET role = 'manager' WHERE user_id = 'USR-005';
--- superior | manager | field_engineer | system_admin (CHECK ck_app_user_role từ chối giá trị khác)
-```
-
-Cấp giám sát xem nhiều xã thì **gán nhiều dòng `app_user_commune`** — không có cấp huyện (D-R3).
-
-⚠️ **Đừng bật `has_system_wide_scope` cho tài khoản không phải `system_admin`.** Không có ràng buộc DB nào
-chặn, nhưng BE-08 sẽ từ chối mọi request của tài khoản đó và ghi log mức Error.
-
-📌 Người dùng phải **đăng nhập lại** để thấy thay đổi: access token mang claim cũ tới 60 phút.
+📌 Thay đổi vai trò / xã có hiệu lực ở lần refresh kế tiếp: access token mang claim cũ tới 60 phút.
 
 ## Còn nợ
 

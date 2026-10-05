@@ -46,7 +46,7 @@ public class AuditTrailTests(AssetSchemaFixture fixture) : IAsyncLifetime
         var user = new AppUser
         {
             Username = username, Email = $"{username}@luxmap.local", FullName = "Audit throwaway actor",
-            PasswordHash = string.Empty, PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+            PasswordHash = string.Empty, PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm, PasswordSetAt = DateTime.UtcNow,
             Role = UserRole.Manager,
         };
         try

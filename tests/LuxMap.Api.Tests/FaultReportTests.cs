@@ -45,7 +45,7 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
                          ("other", UserRole.FieldEngineer, new[] { home }), ("manager", UserRole.Manager, new[] { home, second }) })
             {
                 var user = new AppUser { Username = "report" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = key,
-                    PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", Role = role };
+                    PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = role };
                 user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, factory.AccountPassword);
                 db.Add(user); await db.SaveChangesAsync(); users[key] = user;
                 foreach (var commune in scope) db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = commune });

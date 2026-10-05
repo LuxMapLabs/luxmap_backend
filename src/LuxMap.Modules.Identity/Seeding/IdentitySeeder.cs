@@ -123,6 +123,7 @@ public sealed class IdentitySeeder(
             };
 
             user.PasswordHash = hasher.HashPassword(user, credentials.PasswordFor(template.Role));
+            user.PasswordSetAt = DateTime.UtcNow;
             dbContext.Set<AppUser>().Add(user);
             await dbContext.SaveChangesAsync(cancellationToken);
 

@@ -56,7 +56,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         var communes = new[] { new AdministrativeUnit { Name = "A" }, new AdministrativeUnit { Name = "B" } };
         db.AddRange(communes); await db.SaveChangesAsync(); a = communes[0].CommuneId; b = communes[1].CommuneId;
         var user = new AppUser { Username = "processing" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = "Test engineer",
-            PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", Role = UserRole.FieldEngineer };
+            PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.FieldEngineer };
         db.Add(user); await db.SaveChangesAsync(); userId = user.UserId;
         db.AddRange(new AppUserCommune { UserId = user.UserId, CommuneId = a }, new AppUserCommune { UserId = user.UserId, CommuneId = b });
         var route = new RoadSegment { CommuneId = a, SegmentName = "Curve", RoadClass = RoadClass.InterVillage,

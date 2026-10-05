@@ -47,7 +47,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
                 var user = new AppUser
                 {
                     Username = "wo" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = key,
-                    PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", Role = role, HasSystemWideScope = role == UserRole.SystemAdmin,
+                    PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = role, HasSystemWideScope = role == UserRole.SystemAdmin,
                 };
                 user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, factory.AccountPassword);
                 users[key] = user; db.Add(user);

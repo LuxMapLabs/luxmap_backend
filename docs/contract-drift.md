@@ -99,7 +99,7 @@ Các quyết định con, để tra nhanh (chi tiết và lý do ở BE-REVIEW-0
 | **D-R7** | Điều khiển ON/OFF/AUTO: chỉ **Quản lý**; chỉ thiết bị `supports_remote_control = true` (testbed LED tự dựng) — thiết bị ngoài thực địa luôn `false`; mọi lệnh ghi audit; docs viết *"supported lighting devices (testbed demo)"*. PR này chỉ khai capability `ControlLighting`. Chốt trước khảo sát (Mỹ, 25/09/2026) | Không (chưa có endpoint) |
 | **D-R8, D-R9** | Mapping Member 1–5 → tên, và timeline 09/2026–03/2027 so với kế hoạch 13 tuần: **Mỹ xử lý riêng, KHÔNG thuộc PR này** — `CLAUDE.md`, `tracking.html`, `tasks-backend.csv` giữ nguyên mốc W0–W21 | — |
 | **D-R10** | **Phiếu v1.2 thay FO-01 (24/08/2026) — FO-01 `SUPERSEDED`.** Ngoài thực địa (xã đối tác): quay video đêm đèn thật, đo sáng tương đối bằng điện thoại, kiểm tra bằng mắt ban đêm (ground truth lớp out); **không** lắp thiết bị, **không** thao tác lưới xã. Testbed tự dựng: toàn bộ IoT, demo ON/OFF/AUTO, Controlled Reference Capture Set. AI khởi động bằng ảnh công khai + controlled reference. Nhãn "Nhánh C" bỏ khỏi văn hiện hành; **luật tách `data_source` giữ nguyên**. Dữ liệu thực địa mang `field`; dữ liệu testbed **không bao giờ** mang `field`. Bốn quyết định dựa trên Nhánh C thành follow-up "nền đã đổi, cần xét lại" (xem `tracking.html`) — `external_ref` **ưu tiên cao** | **Có** (§1.6 câu về `field`; O-9 mới) |
-| **D-R11** | Mô hình cuối: **chỉ Quản trị hệ thống tạo account**, không tự đăng ký. PR này: `LowestRole → field_engineer`, `POST /auth/register` **DEPRECATED** (Contract §4.1, README, `deprecated: true` trong spec) — **breaking đã báo trước**. **BE-33a** (ngay sau): `POST /api/v1/admin/users` (`ManageUsers`), gỡ `/auth/register` + `RegistrationTests`, `AnonymousEndpointTests` 7→6, báo WP6 bỏ màn đăng ký; Phase 1 của nó mở 3 D-item: mật khẩu tạm + đổi ở lần đầu, bắt buộc ≥1 xã cho 3 vai trò có phạm vi, khoá/mở khoá qua `is_locked` | **Có — breaking báo trước** |
+| **D-R11** | ✅ **Hiện thực ở BE-33a (05/10/2026)** — email mời thay mật khẩu tạm, xem mục *BE-33a* cuối file. Mô hình cuối: **chỉ Quản trị hệ thống tạo account**, không tự đăng ký. PR này: `LowestRole → field_engineer`, `POST /auth/register` **DEPRECATED** (Contract §4.1, README, `deprecated: true` trong spec) — **breaking đã báo trước**. **BE-33a** (ngay sau): `POST /api/v1/admin/users` (`ManageUsers`), gỡ `/auth/register` + `RegistrationTests`, `AnonymousEndpointTests` 7→6, báo WP6 bỏ màn đăng ký; Phase 1 của nó mở 3 D-item: mật khẩu tạm + đổi ở lần đầu, bắt buộc ≥1 xã cho 3 vai trò có phạm vi, khoá/mở khoá qua `is_locked` | **Có — breaking báo trước** |
 | **D-R12** | (1) Ghi tài sản + import → **Quản lý**; (2) Quản trị hệ thống vẫn **đọc** qua `*`; (3) Quản trị hệ thống **không ghi** nghiệp vụ — nạp đầu kỳ qua seeder / `EnterUnscopedSystemWriteBackdoor` như BE-39 | **Có** (13 endpoint ghi đổi người được ghi) |
 | **D-R13** | Audit trail **bắt buộc**, không còn "nếu BE-19 cần": một bảng audit **append-only dùng chung** cho quyết định fault, lệnh điều khiển, review survey session — không `FaultHistory` riêng từng loại. Thiết kế ở Phase 1 của BE-19. PR này không tạo bảng | Không (chưa có bảng) |
 | **D-R14** | Video (khảo sát + bằng chứng): ngoài phạm vi, **planned**. BE-11 chỉ nhận JPEG tới khi có ticket video. Hướng đề xuất (chốt cùng Thịnh/mobile): upload thẳng MinIO bằng presigned URL, sync khi có mạng; tách frame ở server hay máy chốt ở ticket đó. ⚠️ Presigned **ngược** BE-11 quy tắc 1 — ticket video phải giải quyết chuyện phân quyền đó, không mặc nhiên | Không (planned) |
@@ -899,3 +899,32 @@ CHECK một cha và ảnh sự cố luôn `observation`. `EvidenceItem` thêm `f
 | **Ảnh hưởng FO** | File import cột/tuyến **giữ nguyên `external_ref` cũ** cho cột đã có; cột mới mới được mã mới. Khảo sát ảnh lại phải dùng lại mã cũ (công cụ sẽ được sửa) — nếu không import sẽ tạo cột trùng |
 | **Ai ký** | Mỹ (BE1), đóng follow-up D-R10. Không chạm bề mặt API hiện có |
 
+
+## BE-33a — tài khoản do Quản trị tạo, mời qua email (05/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực D-R11: Quản trị hệ thống tạo tài khoản **không mật khẩu**, hệ thống **gửi email mời** chứa link đặt mật khẩu; gỡ `POST /auth/register`. Đã viết vào **Contract v1.8** (§4.8, §4.9, bảng lỗi, ma trận §2). **SELF-SIGNED, nền tạm tới FW** |
+| **Decision maker** | Mỹ chọn hướng email (05/10/2026) và chốt D-1…D-14 (`.ai/results/BE-33a-p1.md`); Claude hiện thực. Chạm bề mặt API → **ESCALATE ở FW kế tiếp** |
+| **Date** | 05/10/2026 |
+| **Scope** | Contract §2, §4 (bảng lỗi, 4.1, 4.8, 4.9); FW (màn quản trị tài khoản, trang đặt mật khẩu); FM-05 (bỏ màn đăng ký) |
+
+| Mã | Điểm | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **A-1** | `POST /auth/register` (DEPRECATED từ v1.7) | **Gỡ.** Gọi vào → `401` như route không tồn tại | **Có — BREAKING đã báo trước** |
+| **A-2** | Cách giao mật khẩu cho người mới | **Email mời**, không mật khẩu tạm: link `{WEB_APP_BASE_URL}/set-password?token=…`, 72 giờ, dùng một lần; gửi lại thì link cũ hết hiệu lực | **Có** (endpoint mới) |
+| **A-3** | Quên mật khẩu | `POST /auth/password/forgot` luôn `202` cùng body; tài khoản chưa đặt mật khẩu nhận **thư mời mới**, tài khoản khoá không nhận gì; giới hạn 5/15 phút/IP → `429 RATE_LIMITED` | **Có** |
+| **A-4** | Đặt mật khẩu | `POST /auth/password/set` → `204`; **thu hồi mọi phiên cũ** (lý do mới `password_reset`) | **Có** |
+| **A-5** | Khoá | Thu hồi mọi refresh token (lý do mới `account_locked`); không tự khoá, không khoá / hạ vai trò Quản trị cuối còn đăng nhập được | **Có** (ngữ nghĩa) |
+| **A-6** | Gửi mail lỗi | Tài khoản vẫn tạo, `invitation_sent: false`; chưa có outbox / thử lại tự động tới BE-26 (Hangfire) | Không |
+| **A-7** | Audit | Thao tác quản trị tài khoản **chỉ ghi log Serilog**, chưa vào `audit_event` (bảng đó bắt buộc `commune_id`). Follow-up cùng capability "system log" của Phiếu | Không |
+
+**Lược đồ:** migration `AdminCreatedAccounts` — `app_user.password_hash` thành nullable, thêm `password_set_at`, CHECK
+`ck_app_user_system_wide_scope_matches_role` (phạm vi `*` ⇔ `system_admin`) và `ck_app_user_password_set_together`;
+bảng `account_token` (chỉ lưu băm). `luxmap_dev` phải chạy `scripts/cleanup_be12_leftover_accounts.sql` **trước** migration
+(14 tài khoản test cũ vi phạm CHECK mới). Hạ tầng: MailKit (NuGet mới), Mailpit trong compose cho dev; biến `SMTP_*`,
+`WEB_APP_BASE_URL` bắt buộc lúc khởi động.
+
+**Phải báo:** WP5 (trang `/set-password` đọc `token` từ query rồi gọi `POST /auth/password/set`, gửi
+`Referrer-Policy: no-referrer`; màn quản trị tài khoản theo §4.9; nút "quên mật khẩu"), WP6 (bỏ màn đăng ký; nút "quên
+mật khẩu" gọi `/auth/password/forgot`, link mở trên trình duyệt). **Chưa báo.**

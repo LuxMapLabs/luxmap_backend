@@ -4,6 +4,9 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Identity.Seeding;
+using LuxMap.Shared.Contracts.Enums;
+using Microsoft.AspNetCore.Identity;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -246,15 +249,24 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
         var username = $"gone-{Guid.NewGuid():N}"[..20];
         const string password = "a-throwaway-password-long-enough";
 
-        var response = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/register", new
+        // Written straight to the table: self-registration is gone (BE-33a), and an invited account would
+        // need a mailed link before it could sign in.
+        await factory.QueryAsync(async db =>
         {
-            username,
-            email = $"{username}@luxmap.local",
-            full_name = "Account about to vanish",
-            password,
+            var user = new AppUser
+            {
+                Username = username,
+                Email = $"{username}@luxmap.local",
+                FullName = "Account about to vanish",
+                Role = UserRole.FieldEngineer,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+                PasswordSetAt = DateTime.UtcNow,
+            };
+            user.PasswordHash = new PasswordHasher<AppUser>().HashPassword(user, password);
+            db.Set<AppUser>().Add(user);
+            return await db.SaveChangesAsync();
         });
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return (username, password);
     }
 
