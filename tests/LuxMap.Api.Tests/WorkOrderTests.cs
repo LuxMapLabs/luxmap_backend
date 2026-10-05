@@ -776,6 +776,14 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         var middle = await PlantPole(0.5); // never covered by a sweep
         await PlantPoleFault(near, FaultStatus.Confirmed);
         await PlantPoleFault(near, FaultStatus.Resolved); // closed: not counted
+        // POLE-NOTE: what the engineer reads before going out.
+        await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var pole = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.PoleId == far);
+            (pole.Note, pole.NoteUpdatedBy, pole.NoteUpdatedAt) = ("Trước cổng chợ", users["a"].UserId, new DateTime(2026, 10, 4, 1, 0, 0, DateTimeKind.Utc));
+            return await db.SaveChangesAsync();
+        });
         var id = await Create();
 
         var body = await PolesOf(id);
@@ -799,6 +807,13 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         Assert.Equal(90, items[2].GetProperty("lamp_watt").GetInt32());
         Assert.Equal("led_road_lamp", items[2].GetProperty("fixture_type").GetString());
         Assert.Equal(16.008, items[2].GetProperty("location").GetProperty("lat").GetDouble(), 6);
+
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("note").ValueKind);
+        var note = items[2].GetProperty("note");
+        Assert.Equal("Trước cổng chợ", note.GetProperty("text").GetString());
+        Assert.Equal(users["a"].UserId, note.GetProperty("updated_by").GetString());
+        Assert.Equal(users["a"].FullName, note.GetProperty("updated_by_name").GetString());
+        Assert.Equal("2026-10-04T01:00:00Z", note.GetProperty("updated_at").GetString());
     }
 
     [Fact]

@@ -46,8 +46,14 @@ public static class LuxMapPolicies
     /// </summary>
     public const string ControlLighting = "cap:control_lighting";
 
-    /// <summary>Create accounts and assign roles and communes. No endpoint yet (BE-33).</summary>
+    /// <summary>Create accounts and assign roles and communes (BE-33a, <c>/admin/users</c>).</summary>
     public const string ManageUsers = "cap:manage_users";
+
+    /// <summary>
+    /// Write the free-text note on a pole (POLE-NOTE). Field engineers write it on site, managers too —
+    /// without either gaining any other asset write, which stays <see cref="ManageAssets"/>.
+    /// </summary>
+    public const string EditPoleNotes = "cap:edit_pole_notes";
 
     /// <summary>Read the fault list (BE-40). Kept apart from <see cref="ReadNetwork"/> so fault access can change without touching the map.</summary>
     public const string ReadFaults = "cap:read_faults";
@@ -79,6 +85,7 @@ public static class LuxMapPolicies
             [ReadNetwork] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReadLuxReadings] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageAssets] = [UserRole.Manager],
+            [EditPoleNotes] = [UserRole.Manager, UserRole.FieldEngineer],
             [RecordLuxReading] = [UserRole.FieldEngineer],
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],

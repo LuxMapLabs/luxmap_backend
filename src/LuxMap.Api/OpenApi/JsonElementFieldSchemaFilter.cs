@@ -6,7 +6,8 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace LuxMap.Api.OpenApi;
 
 /// <summary>
-/// Gives <c>SetPoleFeederRequest.feeder_id</c> a real type in the spec.
+/// Gives the <see cref="JsonElement"/> request fields a real type in the spec: <c>SetPoleFeederRequest.feeder_id</c>,
+/// and the pole note of <c>SetPoleNoteRequest</c> and <c>UpdatePoleRequest</c> (POLE-NOTE).
 /// </summary>
 /// <remarks>
 /// The property is a <see cref="JsonElement"/> at runtime so an ABSENT key and an explicit
@@ -25,25 +26,37 @@ namespace LuxMap.Api.OpenApi;
 /// </remarks>
 public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
 {
+    /// <summary>(request type, JSON property) → what the field means. Each is a nullable string on the wire.</summary>
+    private static readonly Dictionary<(Type Type, string Property), string> Fields = new()
+    {
+        [(typeof(SetPoleFeederRequest), "feeder_id")] =
+            "The feeder this pole hangs off, or null when it is on no circuit at all. "
+            + "The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.",
+        [(typeof(SetPoleNoteRequest), "note")] =
+            "The engineer's note on this pole, at most 1000 characters; null or blank clears it. "
+            + "The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.",
+        [(typeof(UpdatePoleRequest), "note")] =
+            "The engineer's note. OPTIONAL and the one field this full replacement keeps when absent: "
+            + "leave the key out to keep the note, send null or blank to clear it, text (at most 1000 characters) to overwrite it.",
+    };
+
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
         ArgumentNullException.ThrowIfNull(schema);
         ArgumentNullException.ThrowIfNull(context);
 
-        if (context.Type != typeof(SetPoleFeederRequest) || schema is not OpenApiSchema concrete)
+        if (schema is not OpenApiSchema concrete || concrete.Properties is null)
         {
             return;
         }
 
-        if (concrete.Properties?.TryGetValue("feeder_id", out var property) != true
-            || property is not OpenApiSchema field)
+        foreach (var ((type, name), description) in Fields)
         {
-            return;
+            if (type == context.Type && concrete.Properties.TryGetValue(name, out var property) && property is OpenApiSchema field)
+            {
+                field.Type = JsonSchemaType.String | JsonSchemaType.Null;
+                field.Description = description;
+            }
         }
-
-        field.Type = JsonSchemaType.String | JsonSchemaType.Null;
-        field.Description =
-            "The feeder this pole hangs off, or null when it is on no circuit at all. "
-            + "The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.";
     }
 }

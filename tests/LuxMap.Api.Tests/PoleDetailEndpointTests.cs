@@ -62,7 +62,7 @@ public sealed class PoleDetailEndpointTests(AssetImportFixture fixture)
         {
             "pole_id", "segment_id", "segment_name", "commune_id", "location", "fixture", "current_status",
             "iot_node", "luminance_baseline", "luminance_baselines", "luminance_history", "runtime_history",
-            "open_faults", "recent_frames",
+            "open_faults", "recent_frames", "note",
         }.ToHashSet(StringComparer.Ordinal), keys);
 
         Assert.Equal(poleId, body.GetProperty("pole_id").GetString());

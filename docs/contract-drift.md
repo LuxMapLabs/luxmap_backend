@@ -929,3 +929,23 @@ bảng `account_token` (chỉ lưu băm). `luxmap_dev` phải chạy `scripts/cl
 `Referrer-Policy: no-referrer`; màn quản trị tài khoản theo §4.9; nút "quên mật khẩu"), WP6 (bỏ màn đăng ký; nút "quên
 mật khẩu" gọi `/auth/password/forgot`, link mở trên trình duyệt). **Đã báo WP5 và WP6 ngày 05/10/2026** (Mỹ gửi; PR #93
 đã merge, `luxmap_dev` đã migrate). Chờ xác nhận Contract v1.8 ở FW kế tiếp.
+
+## POLE-NOTE — ghi chú của kỹ sư trên cột (05/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Thêm một ghi chú tự do cho **mỗi cột** (vị trí), để kỹ sư ghi nơi nhạy cảm gần đó hay lưu ý khác. Đã viết vào **Contract v1.9** (mục 2, 5.3, 5.3.1). **SELF-SIGNED, nền tạm tới FW** |
+| **Decision maker** | Mỹ chốt 05/10/2026: Kỹ sư hiện trường + Quản lý ghi; một ghi chú, ghi đè; hiện ở kiểm kê, chi tiết cột trên bản đồ, danh sách cột của phiếu. Chạm bề mặt API → **ESCALATE ở FW kế tiếp** |
+| **Scope** | Contract §2 (capability `EditPoleNotes`), §5.3 (endpoint), §5.3.1 (trường `note`); drift BE-20 (`GET /map/poles/{pole_id}` thêm khoá `note`) và WO-12 (`GET /work-orders/{id}/poles` thêm `note`) |
+
+| Mã | Điểm | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **N-1** | Ai ghi | Capability mới **`EditPoleNotes`** = Quản lý + Kỹ sư hiện trường, chỉ cho ghi chú; mọi ghi tài sản khác vẫn `ManageAssets` | **Có** (ma trận §2) |
+| **N-2** | Đường ghi | Ba đường: `PUT /assets/poles/{poleId}/note` (khoá `note` bắt buộc, `null`/rỗng = xoá, ≤ 1000 ký tự → `200 {pole_id, note}`); form tạo `POST /assets/poles` (`note?`); form sửa `PUT /assets/poles/{poleId}` (`note?`, **vắng = giữ nguyên** dù `PUT` là thay thế toàn phần; gửi lại cùng nội dung không đổi tác giả). Import không đụng | **Có** (endpoint mới + trường mới ở 2 request) |
+| **N-3** | Hình dạng đọc | `note: {text, updated_at, updated_by, updated_by_name} \| null`, giống nhau ở 3 nơi; **không** đưa vào lớp bản đồ bbox | **Có** (thêm khoá) |
+
+**Lược đồ:** migration `AddPoleNote` — `pole.note`, `note_updated_by` (FK `app_user`, `Restrict`), `note_updated_at`;
+CHECK `ck_pole_note_length` (≤ 1000) và `ck_pole_note_stamp_together`. Module Assets nay tham chiếu Identity (cùng khuôn Faults).
+
+**Phải báo:** WP5 (màn kiểm kê, chi tiết cột: hiện và sửa ghi chú), WP6 (danh sách cột của phiếu: hiện ghi chú; màn sửa ghi chú
+cho kỹ sư; đưa vào hàng chờ offline khi làm BE-43). **Chưa báo.**

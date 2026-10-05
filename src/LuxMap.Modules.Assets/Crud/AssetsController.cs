@@ -298,6 +298,23 @@ public sealed class AssetsController(
         return NoContent();
     }
 
+    /// <summary>
+    /// Sets or clears the engineer's note on a pole (POLE-NOTE). Body <c>{ "note": "…" }</c>; <c>null</c> or
+    /// blank clears it. At most 1000 characters.
+    /// </summary>
+    /// <remarks>
+    /// Its own endpoint and capability: field engineers write notes on site without any other asset write.
+    /// Managers can also set it from the create and edit forms; there, an absent key keeps the note.
+    /// </remarks>
+    [HttpPut("poles/{poleId}/note")]
+    [Authorize(Policy = LuxMapPolicies.EditPoleNotes)]
+    [ProducesResponseType<PoleNoteResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public Task<PoleNoteResponse> SetPoleNoteAsync(string poleId, [FromBody] SetPoleNoteRequest request, CancellationToken ct)
+        => service.SetPoleNoteAsync(poleId, request.ReadNote(), ct);
+
     // ── BE-13 topology ────────────────────────────────────────────────────────────────────────
     //
     // ⚠️ PROVISIONAL — the Contract specifies no topology endpoint at all. Proposed in

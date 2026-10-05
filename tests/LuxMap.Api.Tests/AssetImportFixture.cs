@@ -50,6 +50,11 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
 
     private string bothCommunesUserId = null!;
 
+    /// <summary>A field engineer in <see cref="CommuneId"/> only — the role that writes pole notes on site (POLE-NOTE).</summary>
+    public string FieldEngineerUsername { get; private set; } = null!;
+
+    private string fieldEngineerUserId = null!;
+
     /// <summary>
     /// Hashes of the refresh tokens this fixture obtained for the SEEDED accounts, so teardown can
     /// delete exactly those rows (BE-REVIEW-02, N-5 / F-06).
@@ -128,6 +133,24 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 new AppUserCommune { UserId = bothCommunesUserId, CommuneId = CommuneId },
                 new AppUserCommune { UserId = bothCommunesUserId, CommuneId = ForeignCommuneId });
             await db.SaveChangesAsync();
+
+            FieldEngineerUsername = $"be12e-{Guid.NewGuid():N}"[..20];
+            var engineer = new AppUser
+            {
+                Username = FieldEngineerUsername,
+                Email = $"{FieldEngineerUsername}@luxmap.local",
+                FullName = "Kỹ sư hiện trường thử",
+                Role = UserRole.FieldEngineer,
+                PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm, PasswordSetAt = DateTime.UtcNow,
+            };
+
+            engineer.PasswordHash = new PasswordHasher<AppUser>().HashPassword(engineer, AccountPassword);
+            db.Set<AppUser>().Add(engineer);
+            await db.SaveChangesAsync();
+
+            fieldEngineerUserId = engineer.UserId;
+            db.Set<AppUserCommune>().Add(new AppUserCommune { UserId = fieldEngineerUserId, CommuneId = CommuneId });
+            await db.SaveChangesAsync();
         }
     }
 
@@ -144,7 +167,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 await db.Database.ExecuteSqlInterpolatedAsync($"""
                     DELETE FROM audit_event
                     WHERE commune_id = {CommuneId} OR commune_id = {ForeignCommuneId}
-                       OR actor_user_id = {userId} OR actor_user_id = {bothCommunesUserId}
+                       OR actor_user_id = {userId} OR actor_user_id = {bothCommunesUserId} OR actor_user_id = {fieldEngineerUserId}
                     """);
                 await transaction.CommitAsync();
             }
@@ -176,9 +199,9 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 "DELETE FROM iot_node WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
-                "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR token_hash = ANY(@h);",
-                "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w;",
-                "DELETE FROM app_user WHERE user_id = @u OR user_id = @w;",
+                "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR user_id = @e OR token_hash = ANY(@h);",
+                "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w OR user_id = @e;",
+                "DELETE FROM app_user WHERE user_id = @u OR user_id = @w OR user_id = @e;",
                 "DELETE FROM administrative_unit WHERE commune_id = @c OR commune_id = @f;",
             })
             {
@@ -203,6 +226,15 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
     {
         var client = CreateClient();
         var tokens = await (await client.PostLoginAsync(BothCommunesUsername, AccountPassword)).ReadTokensAsync();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
+        return client;
+    }
+
+    /// <summary>An <see cref="HttpClient"/> for the field engineer of <see cref="CommuneId"/>.</summary>
+    public async Task<HttpClient> FieldEngineerClientAsync()
+    {
+        var client = CreateClient();
+        var tokens = await (await client.PostLoginAsync(FieldEngineerUsername, AccountPassword)).ReadTokensAsync();
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }
@@ -232,7 +264,7 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
 
         foreach (var (name, value) in new (string, object)[]
                  {
-                     ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", bothCommunesUserId),
+                     ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", bothCommunesUserId), ("e", fieldEngineerUserId),
                      ("h", issuedTokenHashes.ToArray()),
                  })
         {

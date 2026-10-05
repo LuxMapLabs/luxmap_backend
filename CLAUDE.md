@@ -1722,3 +1722,21 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 **Test luật "Quản trị cuối cùng" chạy trong transaction rồi rollback** (khoá các admin khác chỉ trong transaction đó).
 Đổi trạng thái admin thật trên DB dùng chung sẽ đua với các class test khác đang tạo admin (`WorkOrderTests`).
 
+### POLE-NOTE — ghi chú cột (05/10/2026)
+
+**Ghi chú đi qua ba đường, đều qua `StampNote`:** `PUT /assets/poles/{id}/note` (`EditPoleNotes`, kỹ sư + quản lý),
+form tạo (`POST /assets/poles`, `note?`) và form sửa (`PUT /assets/poles/{id}`). Ở form sửa, `note` là **trường duy nhất
+GIỮ NGUYÊN khi vắng** trong một `PUT` thay thế toàn phần (đọc bằng `PoleNoteInput.Read`, `JsonElement`): đừng "sửa cho
+nhất quán" thành vắng = xoá — form cũ chưa có ô ghi chú sẽ xoá sạch ghi chú của kỹ sư (cùng họ bẫy `feeder_id`). Gửi lại
+**cùng** nội dung thì không ghi lại tác giả. Import không đụng ghi chú. Canh bằng
+`Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author`. Đặt ghi chú cũng dời `pole.updated_at` để sync
+offline (BE-43) thấy cột đã đổi. Trường `JsonElement` mới trong request phải thêm vào `JsonElementFieldSchemaFilter`,
+nếu không spec ra `{}` và FM-04 sinh `Any`.
+
+**`pole.note_updated_by` là FK `Restrict` tới `app_user`.** Fixture test tạo tài khoản rồi để tài khoản đó ghi chú phải
+xoá **cột trước, tài khoản sau** (`AssetImportFixture` đã đúng thứ tự). Đảo lại là teardown gãy, và lỗi chỉ hiện thành
+"Test Class Cleanup Failure" — CI đỏ dù mọi test xanh (bài học PR #93).
+
+**Hình dạng đọc dùng chung `PoleNote.From(...)`** ở Assets (kiểm kê), Map (chi tiết cột) và WorkOrders (cột của phiếu):
+thêm nơi đọc thứ tư thì gọi nó, đừng dựng object tay — ghi chú đã xoá (text `null`) phải đọc ra `null` ở mọi nơi.
+
