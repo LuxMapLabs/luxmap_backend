@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.10 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.11 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -9,17 +9,18 @@
 **v1.7:** 25/09/2026 (hợp nhất BE-12b ngày 22/09 và vai trò theo Phiếu đăng ký FA26SE222 v1.2 + ma trận capability ngày 25/09) ·
 **v1.8:** 05/10/2026 (BE-33a — Quản trị hệ thống tạo tài khoản và mời qua email; gỡ `POST /auth/register`) ·
 **v1.9:** 05/10/2026 (POLE-NOTE — ghi chú của kỹ sư trên cột) ·
-**v1.10:** 05/10/2026 (BE-27 — thông báo trong ứng dụng, đọc bằng polling).
+**v1.10:** 05/10/2026 (BE-27 — thông báo trong ứng dụng, đọc bằng polling) ·
+**v1.11:** 06/10/2026 (`GET /faults/{fault_id}` — chi tiết một sự cố, drift N-6).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.10, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.11, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (83 operation: 81
-`implemented`, 2 `not_implemented` — đếm lại ở v1.10 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (84 operation: 82
+`implemented`, 2 `not_implemented` — đếm lại ở v1.11 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -662,6 +663,11 @@ Xem `mock-faults.json`. `priority_score` do CV-16 tính, client không sắp l�
 FE gộp hiển thị. `work_order_id` **luôn `null`** cho tới BE-21, khoá vẫn có mặt — không xây UI phụ
 thuộc nó.
 
+**`GET /api/v1/faults/{fault_id}`** — `implemented` (v1.11, drift N-6). Một sự cố, **đúng hình dạng một item** của
+danh sách trên (cùng khoá, cùng giá trị, `location` lấy điểm của cột khi sự cố không có toạ độ). Capability
+`ReadFaults`. Không tồn tại **và** ngoài phạm vi xã trả giống hệt: `404 FAULT_NOT_FOUND`, `details.fault_id`. Đây là
+màn mà thông báo `fault_reported` mở (mục 5.9).
+
 **`PATCH /api/v1/faults/{fault_id}`** — `[NOT IMPLEMENTED]` (BE-19). Body
 `{ fault_status, override_fault_type?, note? }`; sai luồng (mục 3.2) → `409` để FE disable nút trước.
 
@@ -784,7 +790,7 @@ thêm sau sẽ đọc cùng dữ liệu — bốn endpoint này giữ nguyên.
 - **`title` / `body` do server soạn sẵn bằng tiếng Việt** và là **bản chụp lúc xảy ra**: đổi tên phiếu sau
   đó không sửa thông báo cũ. Client hiển thị nguyên văn; dùng `type` để chọn biểu tượng, `entity_type` +
   `entity_id` để mở màn tương ứng (`work_order` → `GET /work-orders/{id}`, `survey_sweep` → `GET /sweeps/{id}`,
-  `fault` → màn danh sách sự cố, mục 5.4 — **chưa có `GET /faults/{id}`**, ghi ở drift BE-27 N-6). Endpoint
+  `fault` → `GET /faults/{id}`, mục 5.4, từ v1.11). Endpoint
   đó tự quyết quyền xem — phiếu đã giao cho người khác có thể là 404.
 - **Phạm vi:** mọi vai trò chỉ đọc thông báo của chính mình, trong các xã của claim. Người bị chuyển khỏi
   xã thôi thấy thông báo của xã đó, theo cùng luật 60 phút của token (mục 2).
@@ -851,6 +857,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.11 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | Thêm `GET /faults/{fault_id}` (mục 5.4): một sự cố đúng hình dạng item danh sách; ngoài phạm vi = không tồn tại = `404 FAULT_NOT_FOUND`. Thông báo `fault_reported` mở thẳng được sự cố. Chỉ thêm. Đóng drift N-6 |
 | v1.10 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-27 — thông báo trong ứng dụng.** Thêm mục 5.9 (4 endpoint `/notifications`, 11 `type`), capability `ReadNotifications` (cả bốn vai trò), prefix `NTF` (6 chữ số). Chỉ thêm, không đổi gì đã có. Drift BE-27 (N-1…N-6). Nền tạm tới FW |
 | v1.9 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **POLE-NOTE — ghi chú của kỹ sư trên cột.** Thêm `note?` vào `POST /assets/poles` và `PUT /assets/poles/{poleId}` (ở `PUT`: vắng = giữ nguyên), thêm `PUT /assets/poles/{poleId}/note` (capability mới **`EditPoleNotes`** = Quản lý + Kỹ sư hiện trường, mục 2) và trường `note: {text, updated_at, updated_by, updated_by_name} \| null` ở danh sách/chi tiết kiểm kê (5.3.1), `GET /map/poles/{pole_id}` và `GET /work-orders/{id}/poles`. Một ghi chú mỗi cột, ghi đè, ≤ 1000 ký tự. Không đổi trường nào có sẵn — chỉ **thêm**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.8 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33a — tài khoản do Quản trị tạo, mời qua email (D-R11).** Thêm mục 4.8 (`POST /auth/password/set`, `POST /auth/password/forgot` — ẩn danh, link 72 giờ / 1 giờ, dùng một lần, giới hạn 5/15 phút) và 4.9 (`/admin/users` — tạo, liệt kê, xem, sửa, khoá, mở khoá, gửi lại lời mời; capability `ManageUsers`). Mã lỗi mới: `INVALID_ACCOUNT_TOKEN`, `USER_NOT_FOUND`, `LAST_SYSTEM_ADMIN`, `CANNOT_LOCK_SELF`, `ACCOUNT_ALREADY_ACTIVE`, `RATE_LIMITED`. ⚠️ **BREAKING:** `POST /auth/register` **gỡ** (đã báo DEPRECATED từ v1.7). Quyết định D-1…D-14 ở `.ai/results/BE-33a-p1.md`, đăng ký ở `docs/contract-drift.md`. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận**; WP5 cần trang `/set-password` + màn quản trị tài khoản, WP6 bỏ màn đăng ký |
