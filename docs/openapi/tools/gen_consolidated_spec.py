@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.10"
+d["info"]["version"] = "1.11"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -35,6 +35,7 @@ d["info"]["description"] = (
     "v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. "
     "v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. "
     "v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. "
+    "v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -122,6 +123,7 @@ SUMMARY = {
     ("post", "/api/v1/faults"): "[TẠM — BE-41] Kỹ sư hiện trường báo sự cố tại chỗ: detected, field_report; cột cho xã/tuyến/data_source; client_op_id gửi lại → 200 cùng sự cố",
     ("post", "/api/v1/faults/{id}/photos"): "[TẠM — BE-41, EV-2] Người báo gắn ảnh observation khi sự cố còn mở; JPEG theo magic bytes; client_op_id cho lần gửi lại",
     ("get", "/api/v1/faults/{id}/photos"): "[TẠM — BE-41] Ảnh của sự cố theo thời điểm chụp, kèm đường dẫn ảnh qua API",
+    ("get", "/api/v1/faults/{id}"): "[N-6] Một sự cố, đúng hình dạng item của GET /faults; ngoài phạm vi xã = không tồn tại = 404",
     ("patch", "/api/v1/faults/{id}"): "[TẠM — BE-19] Quản lý duyệt: detected → confirmed|rejected, phân loại lại lamp_out↔lamp_dim, severity, review_note",
     # BE-13 topology — ⚠️ PROVISIONAL, ngoài Contract, drift 46.
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",

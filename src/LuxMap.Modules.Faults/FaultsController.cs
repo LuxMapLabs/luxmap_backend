@@ -1,3 +1,4 @@
+using System.Net;
 using Asp.Versioning;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
@@ -114,6 +115,20 @@ public sealed class FaultsController(FaultQueryService service, FaultReviewServi
     /// the fault, <c>INVALID_STATE_TRANSITION</c> for any other move, <c>CONCURRENT_MODIFICATION</c> on a race.
     /// </para>
     /// </remarks>
+    /// <summary>One fault, in the same shape as an item of <c>GET /faults</c> (drift N-6).</summary>
+    /// <remarks>
+    /// What a <c>fault_reported</c> notification opens. A fault outside the caller's communes and one that does
+    /// not exist answer the same 404, so the ID of a foreign fault confirms nothing.
+    /// </remarks>
+    [HttpGet("{id}")]
+    [Authorize(Policy = LuxMapPolicies.ReadFaults)]
+    [ProducesResponseType<FaultItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<FaultItem> GetAsync(string id, CancellationToken ct)
+        => await service.ItemAsync(id, ct) ?? throw new LuxMapException("FAULT_NOT_FOUND", HttpStatusCode.NotFound,
+            "That fault does not exist, or it is outside your permitted commune scope.", new Dictionary<string, object?> { ["fault_id"] = id });
+
     [HttpPatch("{id}")]
     [Authorize(Policy = LuxMapPolicies.ReviewFaults)]
     [ProducesResponseType<FaultItem>(StatusCodes.Status200OK)]

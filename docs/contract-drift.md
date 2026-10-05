@@ -965,7 +965,7 @@ cho kỹ sư; đưa vào hàng chờ offline khi làm BE-43). **Chưa báo.**
 | **N-3** | Người nhận | Không báo người gây ra; "Quản lý của xã" = `manager` đang hoạt động có **đủ mọi xã** của sự kiện; khảo sát trả về báo người **đang** giữ phiếu (+ người quay nếu khác) | Không (luật server) |
 | **N-4** | Phạm vi | `notification` mang `commune_id` + `ICommuneScoped`; ai bị chuyển khỏi xã thôi thấy thông báo của xã đó (theo luật 60 phút của token) | **Có** (hành vi) |
 | **N-5** | ID | Prefix mới `NTF`, tối thiểu 6 chữ số | **Có** (bảng prefix) |
-| **N-6** | Mở sự cố | **Không có `GET /faults/{id}`** — thông báo `fault_reported` chỉ dẫn được tới danh sách sự cố. Đề xuất: thêm endpoint chi tiết hoặc bộ lọc `fault_id` cho `GET /faults` (ticket riêng) | **Mở** |
+| **N-6** | Mở sự cố | ~~Không có `GET /faults/{id}`~~ → **ĐÓNG 06/10/2026**: thêm `GET /faults/{fault_id}` (Contract v1.11 §5.4), cùng hình dạng item danh sách, ngoài phạm vi = 404 `FAULT_NOT_FOUND`. SELF-SIGNED, báo WP5/WP6 cùng tin BE-27 | **Có** (endpoint mới) |
 
 **Hoãn (cần BE-26 Hangfire):** `work_order_overdue`, `node_offline`. Sự cố CV sinh lúc Quản lý chấp nhận khảo sát
 **không** báo — người duy nhất cần biết chính là người vừa duyệt. Thêm `type` sau là **thêm giá trị enum**: Contract
