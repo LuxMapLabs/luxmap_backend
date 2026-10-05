@@ -64,9 +64,16 @@ public static class Notifier
     public static string Date(DateOnly date) => date.ToString("dd/MM/yyyy", Vietnamese);
 
     /// <summary>Cuts free text (a title, a manager's note) so the notice fits its column.</summary>
+    /// <remarks>
+    /// Never between the two halves of a surrogate pair: a lone half cannot be encoded as UTF-8, so the save —
+    /// and with it the work-order change the notice reports — would fail over an emoji in a manager's note.
+    /// </remarks>
     public static string Clip(string text, int max)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return text.Length <= max ? text : string.Concat(text.AsSpan(0, max - 1), "…");
+        if (text.Length <= max) return text;
+        var keep = max - 1;
+        if (char.IsHighSurrogate(text[keep - 1])) keep--;
+        return string.Concat(text.AsSpan(0, keep), "…");
     }
 }

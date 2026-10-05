@@ -10,7 +10,9 @@ using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
+using Npgsql;
 
 namespace LuxMap.Api.Tests;
 
@@ -201,6 +203,39 @@ public class NotificationTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, (await clients["a"].PostAsync("/api/v1/notifications/read-all", null)).StatusCode);
         Assert.Equal(0, await UnreadAsync("a"));
         Assert.Equal(2, (await NoticesAsync("a")).Count);
+    }
+
+    /// <summary>
+    /// The phone and the browser mark the same notice read at once. Another connection holds the row and sets
+    /// the FIRST read time; the request that waited behind it must keep that time, not write its own.
+    /// </summary>
+    [Fact]
+    public async Task Marking_read_while_another_device_does_keeps_the_first_read_time()
+    {
+        await CreateAsync(users["a"].UserId);
+        var id = (await NoticesAsync("a"))[0].GetProperty("notification_id").GetString()!;
+        var first = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+
+        await using var connection = await factory.Services.GetRequiredService<NpgsqlDataSource>().OpenConnectionAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        await using (var hold = new NpgsqlCommand("SELECT 1 FROM notification WHERE notification_id = $1 FOR UPDATE", connection, transaction))
+        {
+            hold.Parameters.AddWithValue(id);
+            await hold.ExecuteScalarAsync();
+        }
+        var second = clients["a"].PostAsync($"/api/v1/notifications/{id}/read", null);
+        await Task.Delay(500);
+        Assert.False(second.IsCompleted, "The second device must wait for the row, not read past it.");
+        await using (var mark = new NpgsqlCommand("UPDATE notification SET read_at = $1 WHERE notification_id = $2", connection, transaction))
+        {
+            mark.Parameters.AddWithValue(first);
+            mark.Parameters.AddWithValue(id);
+            await mark.ExecuteNonQueryAsync();
+        }
+        await transaction.CommitAsync();
+
+        Assert.Equal(HttpStatusCode.NoContent, (await second).StatusCode);
+        Assert.Equal(first, await Db(db => db.Set<Notification>().IgnoreQueryFilters().Where(n => n.NotificationId == id).Select(n => n.ReadAt).SingleAsync()));
     }
 
     /// <summary>
