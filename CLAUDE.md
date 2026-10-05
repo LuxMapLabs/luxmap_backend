@@ -1699,6 +1699,16 @@ hộp thư ở `http://localhost:8025`); CI ghi các biến này vào `.env` t�
 nhập tạm như `refresh_token`, không thuộc xã nào nên vùng mù cascade của guard `SaveChanges` không áp. Nó nằm trong
 `SKIPPED` của `copy_dev_to_supabase.py` (link gắn với `WEB_APP_BASE_URL` của nguồn).
 
+**Kiểm tra thu hồi chứng chỉ SMTP giữ mặc định CHẶT của MailKit — không soft-fail, không tắt (05/10/2026).** Trên
+macOS, .NET trả `RevocationStatusUnknown` cho chứng chỉ của `smtp.gmail.com` (chỉ có CRL, không OCSP) nên gửi thư thất
+bại; trên Linux cùng code, cùng mạng, cùng phút thì qua (đo trong container `runtime-deps:10.0`). Mỹ giao làm theo khuyến
+nghị của Codex: **Mac dùng Mailpit, Gmail chỉ chạy từ Linux**. Chấp nhận "không xác định" (soft-fail) nghĩa là ai giữ
+khoá của một chứng chỉ đã thu hồi mà chặn được đường tải CRL sẽ được cho qua — và kết nối đó mang mật khẩu ứng dụng
+Gmail cùng link đặt mật khẩu. Đừng thêm `CheckCertificateRevocation = false` hay callback nới lỏng "cho chạy được".
+Nếu máy chủ Linux đích cũng lỗi thì mới xét lại, và callback phải: chỉ dung thứ `RevocationStatusUnknown` /
+`OfflineRevocation`, đòi `SslPolicyErrors` **bằng đúng** `RemoteCertificateChainErrors` (sai tên miền luôn bị từ chối),
+kèm test cho từng cờ.
+
 **Bộ giới hạn tần suất chia theo `RemoteIpAddress`.** Sau reverse proxy mọi client chung một địa chỉ (của proxy) ⇒
 chung một xô 5 lần / 15 phút. Deploy sau proxy phải cấu hình forwarded headers **trước**.
 

@@ -4,8 +4,9 @@ using MimeKit;
 
 namespace LuxMap.Modules.Identity.Accounts;
 
-/// <summary>One plain-text message to one recipient. Account mail needs nothing richer.</summary>
-public sealed record EmailMessage(string ToAddress, string ToName, string Subject, string Body);
+/// <summary>One message to one recipient: plain text, plus an HTML version when there is one.</summary>
+/// <param name="Body">The plain-text version, always present: what a client without HTML shows.</param>
+public sealed record EmailMessage(string ToAddress, string ToName, string Subject, string Body, string? HtmlBody = null);
 
 /// <summary>Sends account mail. Replaced by a recording fake in the tests; nothing else implements it.</summary>
 public interface IEmailSender
@@ -18,11 +19,7 @@ public sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
 {
     public async Task SendAsync(EmailMessage message, CancellationToken ct)
     {
-        var mime = new MimeMessage();
-        mime.From.Add(new MailboxAddress(options.FromName, options.FromAddress));
-        mime.To.Add(new MailboxAddress(message.ToName, message.ToAddress));
-        mime.Subject = message.Subject;
-        mime.Body = new TextPart("plain") { Text = message.Body };
+        var mime = ToMime(message, options);
 
         using var client = new SmtpClient();
 
@@ -40,5 +37,19 @@ public sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
 
         await client.SendAsync(mime, ct);
         await client.DisconnectAsync(quit: true, ct);
+    }
+
+    /// <summary>
+    /// multipart/alternative with the plain text FIRST and the HTML last: clients show the last part they
+    /// can render, so an HTML client shows HTML and any other falls back to text.
+    /// </summary>
+    public static MimeMessage ToMime(EmailMessage message, EmailOptions options)
+    {
+        var mime = new MimeMessage();
+        mime.From.Add(new MailboxAddress(options.FromName, options.FromAddress));
+        mime.To.Add(new MailboxAddress(message.ToName, message.ToAddress));
+        mime.Subject = message.Subject;
+        mime.Body = new BodyBuilder { TextBody = message.Body, HtmlBody = message.HtmlBody }.ToMessageBody();
+        return mime;
     }
 }
