@@ -1757,6 +1757,11 @@ vì DB đã quá 200 tài khoản. Test đổi luật người nhận mà thấy
 **đủ** mọi xã truyền vào). Sự kiện mới cần báo Quản lý thì gọi nó, đừng viết lại truy vấn — khảo sát liên xã mà báo
 cho Quản lý thiếu một xã là báo cho người không duyệt được.
 
+**Văn bản tự do vào thông báo (lý do trả phiếu, tên phiếu) phải qua `Notifier.Clip`, không cắt `Substring` tay.**
+Cắt giữa một cặp surrogate (emoji) để lại nửa ký tự không mã hoá được UTF-8 — lượt ghi đó hỏng, kéo theo **cả thao tác
+nghiệp vụ** đi cùng giao dịch (review Codex). **Đánh dấu đã đọc khoá hàng trước rồi mới đọc** (khuôn `FaultLocks`), để
+hai thiết bị cùng bấm không ghi đè `read_at` đầu tiên.
+
 **Câu chữ thuộc module sở hữu sự kiện** (`WorkOrderNotices`, `SurveyNotices`, `FaultNotices`) — Notifications không
 tham chiếu ngược WorkOrders / Survey / Faults. Thêm `type` mới: thêm enum, câu chữ ở module đó, CHECK sinh lại qua
 migration, Contract 5.9.
