@@ -927,4 +927,5 @@ bảng `account_token` (chỉ lưu băm). `luxmap_dev` phải chạy `scripts/cl
 
 **Phải báo:** WP5 (trang `/set-password` đọc `token` từ query rồi gọi `POST /auth/password/set`, gửi
 `Referrer-Policy: no-referrer`; màn quản trị tài khoản theo §4.9; nút "quên mật khẩu"), WP6 (bỏ màn đăng ký; nút "quên
-mật khẩu" gọi `/auth/password/forgot`, link mở trên trình duyệt). **Chưa báo.**
+mật khẩu" gọi `/auth/password/forgot`, link mở trên trình duyệt). **Đã báo WP5 và WP6 ngày 05/10/2026** (Mỹ gửi; PR #93
+đã merge, `luxmap_dev` đã migrate). Chờ xác nhận Contract v1.8 ở FW kế tiếp.
