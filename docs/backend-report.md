@@ -656,5 +656,5 @@ Cổng mặc định: PostgreSQL **5433**, Redis **6380** (tránh đụng bản 
 chỉ bind `127.0.0.1`.
 
 Xem thêm:
-- [`README.md`](../README.md) — chi tiết từng phần
+- [`development.md`](development.md) — chi tiết từng phần; [`README.md`](../README.md) — chạy lần đầu
 - [`authorization-guide.md`](authorization-guide.md) — **bắt buộc đọc trước khi viết endpoint mới**

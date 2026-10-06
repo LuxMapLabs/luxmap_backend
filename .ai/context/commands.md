@@ -1,7 +1,8 @@
 # Lệnh hay dùng
 
-Bản rút gọn để agent chạy được ngay. **`README.md` là bản đầy đủ và thắng khi lệch** — nó giải thích
-vì sao từng lệnh như vậy. Lệnh ở đây chạy sai thì sửa theo README rồi cập nhật file này.
+Bản rút gọn để agent chạy được ngay. **`docs/development.md` là bản đầy đủ và thắng khi lệch** — nó giải
+thích vì sao từng lệnh như vậy (`README.md` chỉ còn các bước chạy lần đầu). Lệnh ở đây chạy sai thì sửa theo
+`docs/development.md` rồi cập nhật file này.
 
 ## Build / test
 
@@ -90,7 +91,7 @@ ngoài Development thì `CorsSetup` dừng khởi động khi danh sách rỗng.
 **vẫn nằm nguyên**, rất dễ tưởng là spec không đổi.
 
 ⚠️ **Tên file spec đổi theo version** — nay là `luxmap-v1.5.json`. Khi version nhảy, `DST` trong
-`gen_consolidated_spec.py` đổi theo, và phải sửa cùng lúc: `README.md`, `CLAUDE.md` (mục Nguồn sự
+`gen_consolidated_spec.py` đổi theo, và phải sửa cùng lúc: `docs/development.md`, `CLAUDE.md` (mục Nguồn sự
 thật và ràng buộc BE-REVIEW-02 số 8), và file này. Kiểm tra `ls docs/openapi/` trước khi chạy.
 
 ## Kiểm tra nhanh trước khi báo xong

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds docs/openapi/luxmap-v1.5.json — the CONSOLIDATED spec that matches api-contract-v1.1.md 1-1.
 
-Run from the repository root after regenerating luxmap-v1.json from code (README):
+Run from the repository root after regenerating luxmap-v1.json from code (docs/development.md):
 
     python3 docs/openapi/tools/gen_consolidated_spec.py
     npx @redocly/cli lint docs/openapi/luxmap-v1.5.json
