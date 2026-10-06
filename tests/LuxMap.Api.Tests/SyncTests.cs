@@ -70,7 +70,8 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
             await db.SaveChangesAsync();
             (road1, road2, foreignRoad) = (roads[0].SegmentId, roads[1].SegmentId, roads[2].SegmentId);
 
-            var poles = new[] { (road1, home, 108.0), (road1, home, 108.005), (road2, home, 108.1), (foreignRoad, foreign, 108.2) }.Select(p => new Pole
+            // The last two: a foreign road, and a FOREIGN pole on a home road (inter-commune) — neither may reach the caller.
+            var poles = new[] { (road1, home, 108.0), (road1, home, 108.005), (road2, home, 108.1), (foreignRoad, foreign, 108.2), (road1, foreign, 108.008) }.Select(p => new Pole
             {
                 SegmentId = p.Item1, CommuneId = p.Item2, DataSource = DataSource.Simulated, Geom = new Point(p.Item3, 16) { SRID = 4326 },
             }).ToArray();
@@ -119,7 +120,9 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
     {
         var fault = await FaultAsync(pole1, FaultStatus.Confirmed);
         var mine = await CreateOrderAsync("repair", users["a"], faults: [fault]);
-        await CreateOrderAsync("inspection", users["b"], road: road2);
+        await CreateOrderAsync("inspection", users["b"], road: road1);   // same road, someone else's order
+        var closed = await CreateOrderAsync("inspection", users["a"], road: road2);
+        await SendAsync("manager", HttpMethod.Post, $"/api/v1/work-orders/{closed}/cancel", new { note = "Huỷ vì trùng việc" }, HttpStatusCode.OK);
         await NoteAsync(pole1, "Cạnh cổng trường");
 
         var bundle = await GetAsync("a", Bundle);
