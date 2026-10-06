@@ -129,20 +129,27 @@ của xã mình biết rõ mình đang ở xã nào; thêm cột tên vào cả 
 hội lệch dữ liệu**. `segment_name` vẫn là cột **thật** trong `segments.csv` vì nó được LƯU vào
 `road_segment.segment_name`; điều vừa bỏ là bản sao chỉ-để-đọc của nó trong `poles.csv`.
 
-### `note` trong `poles.csv` — tuỳ chọn, chỉ ĐIỀN, không bao giờ ghi đè
+### `note` trong `poles.csv` — tuỳ chọn; ô có chữ ghi đè, ô trống giữ nguyên
 
-Ghi chú tự do về **vị trí cột**, tối đa 1000 ký tự: *"Cạnh cổng trường TH Long Phước, tan học 17h"*.
+Ghi chú tự do về **vị trí / tài sản**, tối đa 1000 ký tự: *"Cạnh cổng trường TH Long Phước, tan học 17h"*.
 Có dấu phẩy thì bọc ô trong nháy kép. Cột này **không bắt buộc** trong header.
 
 - **Vẫn phải bật `near_sensitive_poi = true`** cho cột gần trường, chợ, cầu, ngã ba. Hệ thống dùng
   cờ đó (biểu tượng trên bản đồ, mức ưu tiên); chữ trong ghi chú chỉ để người đọc, không gì tính từ nó.
-- Ghi chú chỉ được ghi vào cột **chưa từng có ghi chú**. Người nạp file đứng tên tác giả.
-- Ô trống, hoặc file không có cột `note` → ghi chú trên cột giữ nguyên.
-- Cột **đã có** ghi chú khác nội dung — kể cả ghi chú đã bị xoá — thì **không ghi đè, không khôi phục**:
-  các trường khác của dòng vẫn được nạp, ghi chú giữ nguyên, kết quả trả một mục trong `warnings[]`.
-  Lý do: kỹ sư có thể đã sửa ghi chú ngoài hiện trường; nạp lại một file kiểm kê cũ không được xoá
-  điều đó. Muốn sửa thì sửa trên cột (form hoặc `PUT /assets/poles/{id}/note`).
+- Ô có chữ → **ghi đè** ghi chú trên cột.
+- Ô trống, hoặc file không có cột `note` → ghi chú trên cột **giữ nguyên**. Import không bao giờ xoá ghi
+  chú; muốn xoá thì xoá trên cột (form hoặc `PUT /assets/poles/{id}/note`).
+- Thay một ghi chú **khác nội dung** → dòng vẫn nạp, và kết quả có một mục `warnings[]` **trích nguyên văn
+  ghi chú cũ**. Đọc kỹ mục này: hệ thống không giữ lịch sử ghi chú, nên đó là chỗ duy nhất lấy lại được
+  nếu kỹ sư đã sửa ngoài hiện trường sau khi file được soạn.
 - Quá 1000 ký tự → lỗi dòng, dòng đó không được nạp.
+
+### Ai nạp, lúc nào — `updated_by` / `updated_at`
+
+Mỗi cột, tuyến, tủ điện, bóng ghi **người sửa gần nhất** (`updated_by`) và **lúc đó** (`updated_at`) — sửa
+bằng form hay bằng import đều tính. Màn kiểm kê hiện cả tên người đó. Chỉ dòng **thật sự đổi** mới được đóng
+dấu: nạp lại y nguyên một file thì các dòng đó vào `unchanged` trong kết quả, không đổi người hay giờ.
+Chỉ giữ người **gần nhất**, không giữ lịch sử từng lượt nạp.
 
 ### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 
