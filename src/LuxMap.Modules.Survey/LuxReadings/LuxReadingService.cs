@@ -20,6 +20,42 @@ public sealed class LuxReadingService(LuxMapDbContext dbContext, ILogger<LuxRead
     public const double ImplausibleLuxThreshold = 200;
 
     /// <summary>
+    /// Refuses a body that sets something the server owns.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in the controller so the offline queue (BE-43 <c>POST /sync/push</c>) refuses the
+    /// same bodies. Loudly, not silently. A client that sent <c>commune_id</c> and got 201 back would reasonably
+    /// believe it chose the commune — and it did not.
+    /// </remarks>
+    public static void RejectServerOwnedFields(CreateLuxReadingRequest request)
+    {
+        var offending = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(request.LuxId))
+        {
+            offending.Add("lux_id");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CommuneId))
+        {
+            offending.Add("commune_id");
+        }
+
+        if (offending.Count == 0)
+        {
+            return;
+        }
+
+        throw new LuxMapException(
+            ErrorCodes.ServerOwnedField,
+            HttpStatusCode.BadRequest,
+            "These fields are set by the server and must not be sent: "
+            + string.Join(", ", offending)
+            + ". The id comes from the database and the commune is taken from the pole.",
+            new Dictionary<string, object?> { ["fields"] = offending.ToArray() });
+    }
+
+    /// <summary>
     /// Creates a reading, or returns the existing one when <c>client_op_id</c> repeats.
     /// </summary>
     /// <returns><c>Created</c> is false when this was a duplicate — the caller answers 200, not 201.</returns>

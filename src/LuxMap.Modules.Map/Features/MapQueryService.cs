@@ -72,6 +72,30 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                 new Dictionary<string, object?> { ["count"] = total, ["max"] = MaxPoles });
         }
 
+        return await ProjectPolesAsync(poles, ct);
+    }
+
+    /// <summary>
+    /// Every pole on the given segments, in id order — the offline bundle's pole layer (BE-43). Same
+    /// properties as the bbox layer, from the same projection; no data_source default and no size limit,
+    /// because the caller named the roads (at most twenty).
+    /// </summary>
+    public Task<FeatureCollection<PoleProperties>> PolesOnSegmentsAsync(IReadOnlyCollection<string> segmentIds, CancellationToken ct)
+        => ProjectPolesAsync(dbContext.Set<Pole>().AsNoTracking()
+            .Where(pole => segmentIds.Contains(pole.SegmentId))
+            .OrderBy(pole => pole.CreatedAt).ThenBy(pole => pole.PoleId.Length).ThenBy(pole => pole.PoleId), ct);
+
+    /// <summary>The given segments, in the order asked — the offline bundle's segment layer (BE-43).</summary>
+    public async Task<FeatureCollection<SegmentProperties>> SegmentsByIdAsync(IReadOnlyList<string> segmentIds, CancellationToken ct)
+    {
+        var layer = await ProjectSegmentsAsync(dbContext.Set<RoadSegment>().AsNoTracking()
+            .Where(segment => segmentIds.Contains(segment.SegmentId)), ct);
+        var order = segmentIds.Select((id, index) => (id, index)).ToDictionary(x => x.id, x => x.index, StringComparer.Ordinal);
+        return new FeatureCollection<SegmentProperties> { Features = [.. layer.Features.OrderBy(f => order[f.Properties.SegmentId])] };
+    }
+
+    private async Task<FeatureCollection<PoleProperties>> ProjectPolesAsync(IQueryable<Pole> poles, CancellationToken ct)
+    {
         var rows = await poles
             .Select(pole => new
             {
@@ -169,6 +193,11 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
             segments = segments.Where(segment => communes.Contains(segment.CommuneId));
         }
 
+        return await ProjectSegmentsAsync(segments, ct);
+    }
+
+    private async Task<FeatureCollection<SegmentProperties>> ProjectSegmentsAsync(IQueryable<RoadSegment> segments, CancellationToken ct)
+    {
         var rows = await segments
             .Select(segment => new
             {

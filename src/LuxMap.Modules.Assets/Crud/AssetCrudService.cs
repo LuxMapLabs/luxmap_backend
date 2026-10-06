@@ -496,14 +496,38 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     /// A changed note stamps the pole's <c>updated_by</c> / <c>updated_at</c> like any other edit — a note is
     /// part of what a client caches about the pole, and offline sync (BE-43) picks changed rows by that
     /// column. Sending the note it already has changes nothing.
+    /// <para>
+    /// <paramref name="expected"/> (BE-43 D-8, offline <c>pole_note</c>): the note the caller last saw. When the
+    /// pole's note differs, nothing is written and the answer is 409 <c>NOTE_CHANGED</c> — the server's note wins.
+    /// Compared by TEXT, not by time: <c>updated_at</c> moves on any edit of the pole, so a moved pole would
+    /// otherwise look like a changed note. The row is locked for the compare so two writers cannot interleave.
+    /// </para>
     /// </remarks>
-    public async Task<PoleNoteResponse> SetPoleNoteAsync(string poleId, string? note, CancellationToken ct)
+    public async Task<PoleNoteResponse> SetPoleNoteAsync(string poleId, string? note, CancellationToken ct, ExpectedNote? expected = null)
     {
+        await using var transaction = expected is null ? null : await dbContext.Database.BeginTransactionAsync(ct);
+        if (expected is not null)
+        {
+            // Lock first, read after: the read below still goes through the commune filter, so a pole out of
+            // scope is a 404 whether or not this matched a row.
+            await dbContext.Database.ExecuteSqlRawAsync("SELECT 1 FROM pole WHERE pole_id = {0} FOR UPDATE", [poleId], ct);
+        }
+
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+        if (expected is not null && expected.Text != pole.Note)
+        {
+            throw new LuxMapException(ErrorCodes.NoteChanged, HttpStatusCode.Conflict,
+                "The pole's note changed after the version you edited; it was not overwritten.",
+                new Dictionary<string, object?> { ["pole_id"] = pole.PoleId, ["note"] = pole.Note });
+        }
 
         pole.Note = note;
         Touch(pole);
         await dbContext.SaveChangesAsync(ct);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct);
+        }
 
         var name = await dbContext.Set<AppUser>().Where(user => user.UserId == pole.UpdatedBy).Select(user => user.FullName).FirstOrDefaultAsync(ct);
         return new PoleNoteResponse(pole.PoleId, pole.Note, pole.UpdatedAt, pole.UpdatedBy, name);

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
+    <!-- BE-43 sits on top of the graph: the bundle reads Map, Faults and WorkOrders, and every queued
+         operation is replayed through the service of its own endpoint (Faults, Survey, Assets, WorkOrders).
+         Nothing references this module back. -->
+    <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Map\LuxMap.Modules.Map.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.WorkOrders\LuxMap.Modules.WorkOrders.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

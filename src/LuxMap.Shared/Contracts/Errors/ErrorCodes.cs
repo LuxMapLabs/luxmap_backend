@@ -180,4 +180,16 @@ public static class ErrorCodes
     /// <c>POST /auth/password/forgot</c>). The <c>Retry-After</c> header says when to try again.
     /// </summary>
     public const string RateLimited = "RATE_LIMITED";
+
+    /// <summary>
+    /// 409 — a pole note was changed since the version the caller last saw (BE-43 D-8, offline <c>pole_note</c>
+    /// with <c>base_note</c>). Nothing was written; the server's note wins and comes back for the person to merge.
+    /// </summary>
+    public const string NoteChanged = "NOTE_CHANGED";
+
+    /// <summary>
+    /// <c>POST /sync/push</c> — an operation skipped because an earlier operation of the same batch, on the same
+    /// work order or pole, was a conflict or was rejected (BE-43 D-7). <c>details.blocked_by</c> names it.
+    /// </summary>
+    public const string BlockedByEarlierOp = "BLOCKED_BY_EARLIER_OP";
 }

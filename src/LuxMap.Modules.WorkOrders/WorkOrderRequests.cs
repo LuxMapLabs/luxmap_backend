@@ -49,6 +49,16 @@ public sealed class CompleteWorkOrderRequest
     [Required] public string ReportNote { get; init; } = null!;
     public string? MaterialsUsed { get; init; }
     public JsonElement FaultOutcomes { get; init; }
+
+    /// <summary>When the work was actually finished, for a step sent later from the offline queue (BE-43 D-6). Defaults to now.</summary>
+    public DateTime? PerformedAt { get; init; }
+}
+
+/// <summary>Optional body of <c>POST /work-orders/{id}/start</c>; sending none starts it now.</summary>
+public sealed class StartWorkOrderRequest
+{
+    /// <summary>When the work actually started, for a step sent later from the offline queue (BE-43 D-6). Defaults to now.</summary>
+    public DateTime? PerformedAt { get; init; }
 }
 
 /// <summary>Body of <c>POST /work-orders/{id}/follow-up</c>; the targets come from the parent (drift FR-2).</summary>
