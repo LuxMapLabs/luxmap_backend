@@ -84,9 +84,9 @@ public class Pole : ICommuneScoped, IExternallyReferenced
     /// replaced, the place stays. At most 1000 characters (<c>ck_pole_note_length</c>).
     /// </summary>
     /// <remarks>
-    /// Written by three paths, all through <c>AssetCrudService.StampNote</c>: the note endpoint, the create
-    /// form and the full-replacement <c>PUT</c> — where it is the one field KEPT when absent, so a form that
-    /// predates it cannot wipe it. The import never touches it.
+    /// Written by four paths, all through <c>PoleNoteInput.Stamp</c>: the note endpoint, the create form, the
+    /// full-replacement <c>PUT</c> — where it is the one field KEPT when absent, so a form that predates it
+    /// cannot wipe it — and the import, which only fills a pole that never had a note (drift N-4).
     /// </remarks>
     public string? Note { get; set; }
 

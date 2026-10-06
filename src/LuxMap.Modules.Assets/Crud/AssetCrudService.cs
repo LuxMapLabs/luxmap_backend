@@ -508,18 +508,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         return new PoleNoteResponse(pole.PoleId, PoleNote.From(pole.Note, pole.NoteUpdatedAt, pole.NoteUpdatedBy, name));
     }
 
-    /// <summary>
-    /// The one place a note is written, by any of the three paths (create, replace, note endpoint): the
-    /// text, who, when, and the pole's own <c>updated_at</c> so offline sync (BE-43) sees the change.
-    /// </summary>
-    private void StampNote(Pole pole, string? note, DateTime now)
-    {
-        pole.Note = note;
-        pole.NoteUpdatedBy = actor.UserId
-            ?? throw new LuxMapException(ErrorCodes.Unauthenticated, HttpStatusCode.Unauthorized, "Sign in to write a note.");
-        pole.NoteUpdatedAt = now;
-        pole.UpdatedAt = now;
-    }
+    private void StampNote(Pole pole, string? note, DateTime now) => PoleNoteInput.Stamp(pole, note, actor, now);
 
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
     /// <remarks>

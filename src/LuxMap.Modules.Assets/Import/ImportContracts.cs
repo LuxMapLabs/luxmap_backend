@@ -50,13 +50,20 @@ public sealed record ImportRowError(int Row, string? Column, string Message);
 /// <param name="Failed">Rows rejected in validation. Nothing was written for them.</param>
 /// <param name="TotalErrors">Every error found, which can exceed <see cref="Rows"/> — one row may break several rules.</param>
 /// <param name="Truncated">True when <see cref="Rows"/> was cut at <see cref="ImportResult.MaxReportedErrors"/>.</param>
+/// <param name="TotalWarnings">Every warning found; <see cref="Warnings"/> is cut at the same cap as <see cref="Rows"/>.</param>
+/// <param name="Warnings">
+/// Something in a row that was NOT applied while the row itself was — today only a pole <c>note</c> differing
+/// from the note the pole already has, which the import never overwrites. Not counted in <see cref="Failed"/>.
+/// </param>
 public sealed record ImportResult(
     int Inserted,
     int Updated,
     int Failed,
     int TotalErrors,
     bool Truncated,
-    IReadOnlyList<ImportRowError> Rows)
+    IReadOnlyList<ImportRowError> Rows,
+    int TotalWarnings,
+    IReadOnlyList<ImportRowError> Warnings)
 {
     /// <summary>
     /// A person fixing a spreadsheet works through the first handful of mistakes and re-uploads;
@@ -65,12 +72,15 @@ public sealed record ImportResult(
     /// </summary>
     public const int MaxReportedErrors = 100;
 
-    public static ImportResult From(int inserted, int updated, int failedRows, IReadOnlyList<ImportRowError> errors)
+    public static ImportResult From(int inserted, int updated, int failedRows, IReadOnlyList<ImportRowError> errors,
+        IReadOnlyList<ImportRowError>? warnings = null)
         => new(
             inserted,
             updated,
             failedRows,
             errors.Count,
             errors.Count > MaxReportedErrors,
-            [.. errors.Take(MaxReportedErrors)]);
+            [.. errors.Take(MaxReportedErrors)],
+            warnings?.Count ?? 0,
+            [.. (warnings ?? []).Take(MaxReportedErrors)]);
 }

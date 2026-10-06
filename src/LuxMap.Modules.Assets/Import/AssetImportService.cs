@@ -1,9 +1,11 @@
 using System.Text.Json;
+using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Csv;
+using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 
@@ -42,7 +44,7 @@ namespace LuxMap.Modules.Assets.Import;
 /// every row with a clear message naming the missing <c>segment_external_ref</c>.
 /// </para>
 /// </remarks>
-public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor)
+public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor)
 {
     public Task<ImportResult> ImportCsvAsync(ImportKind kind, string text, CancellationToken cancellationToken)
     {
@@ -107,13 +109,14 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         ImportKind kind, IReadOnlyList<IImportRow> rows, CancellationToken cancellationToken)
     {
         var errors = new List<ImportRowError>();
+        var warnings = new List<ImportRowError>();
         var readers = rows.Select(row => new ImportRowReader(row, errors)).ToList();
 
         var plan = kind switch
         {
             ImportKind.Segments => await PlanSegmentsAsync(readers, cancellationToken),
             ImportKind.Feeders => await PlanFeedersAsync(readers, cancellationToken),
-            ImportKind.Poles => await PlanPolesAsync(readers, cancellationToken),
+            ImportKind.Poles => await PlanPolesAsync(readers, warnings, cancellationToken),
             ImportKind.Fixtures => await PlanFixturesAsync(readers, cancellationToken),
             _ => new WritePlan(0, 0),
         };
@@ -125,7 +128,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             // Nothing tracked, so nothing to commit. Detach anything a planner attached before it
             // discovered the row was bad, so a later request in the same scope starts clean.
             dbContext.ChangeTracker.Clear();
-            return ImportResult.From(0, 0, failed, errors);
+            return ImportResult.From(0, 0, failed, errors, warnings);
         }
 
         // One transaction for the whole batch. `await using` rolls back on any escape — including the
@@ -135,7 +138,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return ImportResult.From(plan.Inserted, plan.Updated, failed, errors);
+        return ImportResult.From(plan.Inserted, plan.Updated, failed, errors, warnings);
     }
 
     private sealed record WritePlan(int Inserted, int Updated);
@@ -240,7 +243,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         return new WritePlan(inserted, updated);
     }
 
-    private async Task<WritePlan> PlanPolesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
+    private async Task<WritePlan> PlanPolesAsync(
+        List<ImportRowReader> readers, List<ImportRowError> warnings, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<Pole>(readers, pole => pole.ExternalRef, cancellationToken);
         var segments = await ReferenceIndexAsync<RoadSegment>(readers, "segment_external_ref", cancellationToken);
@@ -255,6 +259,13 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
             var nearPoi = reader.Flag("near_sensitive_poi", fallback: false);
             var geometry = reader.Geometry<Point>(CsvImportRow.GeometryColumn);
+
+            // Optional, and never required in the header. Already trimmed, blank = no note.
+            var note = reader.Optional("note");
+            if (note is { Length: > PoleNoteInput.MaxLength })
+            {
+                reader.Fail("note", $"A note is at most {PoleNoteInput.MaxLength} characters; this one has {note.Length}.");
+            }
 
             var segment = Resolve(reader, segments, "segment_external_ref", required: true);
 
@@ -288,6 +299,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
                 pole.UpdatedAt = DateTime.UtcNow;
+                ImportNote(reader, pole, note, warnings);
                 updated++;
                 continue;
             }
@@ -302,6 +314,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 NearSensitivePoi = nearPoi,
                 DataSource = dataSource,
             };
+            ImportNote(reader, created, note, warnings);
 
             dbContext.Set<Pole>().Add(created);
             existing[(communeId!, externalRef!)] = created;
@@ -309,6 +322,33 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         }
 
         return new WritePlan(inserted, updated);
+    }
+
+    /// <summary>
+    /// A file note fills a pole that has NEVER had one; it never overwrites or clears (POLE-NOTE, drift N-4).
+    /// </summary>
+    /// <remarks>
+    /// An engineer may have changed the note on site since the file was written, so a re-imported inventory
+    /// file must not put the old text back — nor resurrect a note someone deliberately cleared, which is why
+    /// "never had one" is <c>note_updated_at IS NULL</c>, not <c>note IS NULL</c>. A different note is
+    /// reported as a warning, not an error: the rest of the row is still applied.
+    /// </remarks>
+    private void ImportNote(ImportRowReader reader, Pole pole, string? note, List<ImportRowError> warnings)
+    {
+        if (note is null || note == pole.Note)
+        {
+            return;
+        }
+
+        if (pole.NoteUpdatedAt is null)
+        {
+            PoleNoteInput.Stamp(pole, note, actor, UtcMicrosecondClock.UtcNow());
+            return;
+        }
+
+        warnings.Add(new ImportRowError(reader.Row.Row, "note", pole.Note is null
+            ? "The pole's note was cleared after it was written; the import does not restore it. Edit the note on the pole instead."
+            : "The pole already has a different note; the import never overwrites one. Edit the note on the pole instead."));
     }
 
     /// <summary>

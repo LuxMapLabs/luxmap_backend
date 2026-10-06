@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text.Json;
+using LuxMap.Modules.Assets.Entities;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
@@ -464,6 +466,19 @@ public static class PoleNoteInput
 
     internal static LuxMapException Invalid(string message)
         => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message, new Dictionary<string, object?> { ["field"] = "note" });
+
+    /// <summary>
+    /// The one place a note is written, by every path (create and replace forms, note endpoint, import): the
+    /// text, who, when, and the pole's own <c>updated_at</c> so offline sync (BE-43) sees the change.
+    /// </summary>
+    internal static void Stamp(Pole pole, string? note, ICurrentActorAccessor actor, DateTime now)
+    {
+        pole.Note = note;
+        pole.NoteUpdatedBy = actor.UserId
+            ?? throw new LuxMapException(ErrorCodes.Unauthenticated, HttpStatusCode.Unauthorized, "Sign in to write a note.");
+        pole.NoteUpdatedAt = now;
+        pole.UpdatedAt = now;
+    }
 }
 
 /// <summary><c>PUT /assets/poles/{id}/note</c>: the new note, or <c>null</c> / blank to clear it.</summary>

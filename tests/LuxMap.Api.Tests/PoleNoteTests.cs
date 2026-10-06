@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -158,6 +159,109 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
 
         Assert.Equal(HttpStatusCode.BadRequest, (await manager.PostAsJsonAsync("/api/v1/assets/poles", Body(new string('x', 1001)))).StatusCode);
     }
+
+    [Fact]
+    public async Task The_import_fills_a_note_on_a_new_pole_and_on_a_pole_that_never_had_one()
+    {
+        var manager = await fixture.ManagerClientAsync();
+        var tag = await ImportSegmentAsync(manager);
+
+        var created = await ImportPolesAsync(manager, tag, ("P1", "\"Gần trường TH Long Phước, tan học 17h\""), ("P2", ""));
+        Assert.Equal(2, created.GetProperty("inserted").GetInt32());
+        Assert.Equal(0, created.GetProperty("total_warnings").GetInt32());
+
+        var filled = await ImportPolesAsync(manager, tag, ("P1", "\"Gần trường TH Long Phước, tan học 17h\""), ("P2", "Gần chợ"));
+        Assert.Equal(2, filled.GetProperty("updated").GetInt32());
+        Assert.Equal(0, filled.GetProperty("total_warnings").GetInt32());
+
+        var p1 = await StoredNoteAsync(tag, "P1");
+        var p2 = await StoredNoteAsync(tag, "P2");
+        Assert.Equal("Gần trường TH Long Phước, tan học 17h", p1.Note);
+        Assert.Equal("Gần chợ", p2.Note);
+        Assert.Equal(p1.NoteUpdatedBy, p2.NoteUpdatedBy);
+        Assert.Equal("BE-12a commune-scoped manager", await fixture.QueryAsync(db =>
+            db.Set<Modules.Identity.Entities.AppUser>().Where(u => u.UserId == p1.NoteUpdatedBy).Select(u => u.FullName).SingleAsync()));
+    }
+
+    /// <summary>
+    /// An engineer may have changed the note on site since the inventory file was written: re-importing that
+    /// file must neither put the old text back nor resurrect a note someone cleared. The row's other fields
+    /// still apply, and the skipped note comes back as a warning rather than an error.
+    /// </summary>
+    [Fact]
+    public async Task The_import_never_overwrites_or_restores_a_note_and_warns_instead()
+    {
+        var manager = await fixture.ManagerClientAsync();
+        var engineer = await fixture.FieldEngineerClientAsync();
+        var tag = await ImportSegmentAsync(manager);
+        await ImportPolesAsync(manager, tag, ("P1", "ghi chú trong file"));
+        var poleId = (await StoredNoteAsync(tag, "P1")).PoleId;
+
+        await engineer.PutAsJsonAsync(NoteUrl(poleId), new { note = "kỹ sư sửa ngoài hiện trường" });
+        var edited = await StoredNoteAsync(tag, "P1");
+
+        var overwrite = await ImportPolesAsync(manager, tag, ("P1", "ghi chú trong file"));
+        Assert.Equal(1, overwrite.GetProperty("updated").GetInt32());
+        Assert.Equal(0, overwrite.GetProperty("failed").GetInt32());
+        var warning = Assert.Single(overwrite.GetProperty("warnings").EnumerateArray());
+        Assert.Equal("note", warning.GetProperty("column").GetString());
+        Assert.Equal(2, warning.GetProperty("row").GetInt32());
+        Assert.Equal(edited, await StoredNoteAsync(tag, "P1"));
+
+        foreach (var unchanged in new[] { "", "kỹ sư sửa ngoài hiện trường" })
+        {
+            Assert.Equal(0, (await ImportPolesAsync(manager, tag, ("P1", unchanged))).GetProperty("total_warnings").GetInt32());
+            Assert.Equal(edited, await StoredNoteAsync(tag, "P1"));
+        }
+
+        await engineer.PutAsJsonAsync(NoteUrl(poleId), new { note = (string?)null });
+        var cleared = await StoredNoteAsync(tag, "P1");
+
+        var restore = await ImportPolesAsync(manager, tag, ("P1", "ghi chú trong file"));
+        Assert.Equal(1, restore.GetProperty("total_warnings").GetInt32());
+        Assert.Null((await StoredNoteAsync(tag, "P1")).Note);
+        Assert.Equal(cleared, await StoredNoteAsync(tag, "P1"));
+    }
+
+    [Fact]
+    public async Task An_imported_note_longer_than_1000_characters_fails_its_row()
+    {
+        var manager = await fixture.ManagerClientAsync();
+        var tag = await ImportSegmentAsync(manager);
+
+        var result = await ImportPolesAsync(manager, tag, ("P1", new string('x', 1001)), ("P2", new string('x', 1000)));
+
+        Assert.Equal(1, result.GetProperty("inserted").GetInt32());
+        Assert.Equal(1, result.GetProperty("failed").GetInt32());
+        var error = Assert.Single(result.GetProperty("rows").EnumerateArray());
+        Assert.Equal("note", error.GetProperty("column").GetString());
+        Assert.Equal(2, error.GetProperty("row").GetInt32());
+    }
+
+    private async Task<string> ImportSegmentAsync(HttpClient manager)
+    {
+        var tag = $"N{Guid.NewGuid():N}"[..9].ToUpperInvariant();
+        var result = await AssetImportTests.ImportAsync(manager, "segments", "segments.csv",
+            "external_ref,segment_name,road_class,length_m,geom_wkt,commune_id,data_source\n"
+            + string.Create(CultureInfo.InvariantCulture,
+                $"{tag}-S1,note import road,inter_village,100,\"LINESTRING({Lng} {Lat}, {Lng + 0.01} {Lat + 0.01})\",{fixture.CommuneId},public_imagery"));
+        Assert.Equal(1, result.GetProperty("inserted").GetInt32());
+        return tag;
+    }
+
+    /// <summary>A poles file with a <c>note</c> column; each row is <c>(suffix, raw note cell)</c>.</summary>
+    private Task<JsonElement> ImportPolesAsync(HttpClient manager, string tag, params (string Suffix, string Note)[] rows)
+        => AssetImportTests.ImportAsync(manager, "poles", "poles.csv",
+            "external_ref,segment_external_ref,commune_id,geom_wkt,data_source,note"
+            + string.Concat(rows.Select(row => string.Create(CultureInfo.InvariantCulture,
+                $"\n{tag}-{row.Suffix},{tag}-S1,{fixture.CommuneId},POINT({Lng} {Lat}),public_imagery,{row.Note}"))));
+
+    private Task<StoredNote> StoredNoteAsync(string tag, string suffix)
+        => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.ExternalRef == $"{tag}-{suffix}")
+            .Select(p => new StoredNote(p.PoleId, p.Note, p.NoteUpdatedBy, p.NoteUpdatedAt)).SingleAsync());
+
+    private sealed record StoredNote(string PoleId, string? Note, string? NoteUpdatedBy, DateTime? NoteUpdatedAt);
 
     /// <summary>The full-replacement PUT with the pole's current values, plus whatever <paramref name="change"/> overrides.</summary>
     private async Task<HttpResponseMessage> ReplaceAsync(HttpClient manager, string poleId, object change)

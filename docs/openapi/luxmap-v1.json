@@ -7377,6 +7377,16 @@
             "items": {
               "$ref": "#/components/schemas/ImportRowError"
             }
+          },
+          "total_warnings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowError"
+            }
           }
         },
         "additionalProperties": false
