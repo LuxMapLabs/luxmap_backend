@@ -103,7 +103,11 @@ public sealed class FfmpegFrameExtractor(IObjectStore store, SurveyFrameOptions 
             var sourcePts = doc.RootElement.GetProperty("frames").EnumerateArray()
                 .Select(f => f.GetProperty("pts").GetInt64()).ToArray();
             var pts = sourcePts.Select(value => checked((long)decimal.Round((decimal)value * num * 1_000_000_000 / den, 0, MidpointRounding.AwayFromZero))).ToArray();
-            if (pts.Length == 0 || pts[0] != clock.FirstPtsNs || pts[^1] != clock.LastPtsNs
+            // The phone declares PTS from its encoder (µs); the file stores integer ticks of the time base (1/90000 s =
+            // 11.1 µs on Android). They agree within one tick, never exactly — the first real capture was 1 333 ns apart.
+            // Exact rational comparison: |difference| ≤ 1e9·num/den without rounding the tick.
+            bool WithinTick(long file, long declared) => checked(Math.Abs(file - declared) * den) <= checked(1_000_000_000L * num);
+            if (pts.Length == 0 || !WithinTick(pts[0], clock.FirstPtsNs) || !WithinTick(pts[^1], clock.LastPtsNs)
                 || pts.Zip(pts.Skip(1)).Any(pair => pair.First >= pair.Second))
                 throw new ProcessingFailure("CLOCK_VIDEO_MAPPING", "video_clock");
             var indices = SelectFrames(pts, clock, windows, options.FramesPerSecond);

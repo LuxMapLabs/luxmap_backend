@@ -79,6 +79,57 @@ public sealed class SurveyFrameMediaTests
         finally { Directory.Delete(directory, true); }
     }
 
+    /// <summary>
+    /// A phone declares PTS from its encoder (microseconds); the MP4 stores integer ticks of 1/90000 s (11.1 µs). They
+    /// agree within one tick, never exactly: the first real capture (SM-A075F, 02/10/2026) declared a last PTS of
+    /// 29 908 732 000 ns while the file holds 29 908 733 333 ns. Within a tick is the same frame; beyond it is not.
+    /// </summary>
+    [Theory]
+    [InlineData(1_333, true)] [InlineData(-1_333, true)] [InlineData(11_111, true)]
+    [InlineData(11_112, false)] [InlineData(-20_000, false)]
+    public async Task Declared_pts_within_one_container_tick_of_the_file_is_the_same_frame(long declaredOffsetNs, bool accepted)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "luxmap-tick-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var raw = Path.Combine(directory, "pixels.rgb");
+            await File.WriteAllBytesAsync(raw, Enumerable.Repeat((byte)90, 5 * 32 * 16 * 3).ToArray());
+            var video = Path.Combine(directory, "phone-like.mp4");
+            await MediaProcess.RunAsync("ffmpeg", ["-v", "error", "-f", "rawvideo", "-pixel_format", "rgb24", "-video_size", "32x16",
+                "-framerate", "30", "-i", raw, "-c:v", "libx264", "-crf", "0", "-bf", "0", "-video_track_timescale", "90000", "-y", video], 30, default);
+            using var probe = JsonDocument.Parse(await MediaProcess.RunAsync("ffprobe", ["-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=time_base:frame=pts", "-of", "json", video], 30, default));
+            Assert.Equal("1/90000", probe.RootElement.GetProperty("streams")[0].GetProperty("time_base").GetString());
+            var filePts = probe.RootElement.GetProperty("frames").EnumerateArray()
+                .Select(f => (long)decimal.Round(f.GetProperty("pts").GetInt64() * 1_000_000_000m / 90000, 0, MidpointRounding.AwayFromZero)).ToArray();
+            Assert.NotEqual(0, filePts[^1] % 1000); // the file's own ticks are not whole microseconds: exact equality was never possible
+
+            const long sensorStart = 112_160_279_118_000; // magnitude of the real capture's elapsedRealtimeNanos
+            long declaredLast = filePts[^1] + declaredOffsetNs;
+            var clock = new ClipClock(0, filePts[0], declaredLast, sensorStart, sensorStart + declaredLast - filePts[0], 1, 90000);
+            var bytes = await File.ReadAllBytesAsync(video);
+            var options = new SurveyFrameOptions { TempRoot = Path.Combine(directory, "extract"), FramesPerSecond = 30 };
+            using var extractor = new FfmpegFrameExtractor(new ClipStore(bytes), options);
+            var output = new List<ExtractedFrame>();
+            Task Run() => extractor.ExtractAsync("clip", bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), clock,
+                [new(sensorStart + filePts[2], sensorStart, sensorStart + filePts[^1])], (frame, _) => { output.Add(frame); return Task.CompletedTask; }, default);
+
+            if (!accepted)
+            {
+                Assert.Equal("CLOCK_VIDEO_MAPPING", (await Assert.ThrowsAsync<ProcessingFailure>(Run)).Code);
+                return;
+            }
+            await Run();
+            // Which frames is SelectFrames' business (tested on its own); here: frames come out, and each is a real file frame.
+            Assert.NotEmpty(output);
+            Assert.All(output, f => Assert.Contains(f.PtsNs, filePts));
+            // Phone time comes from the file's real PTS on the declared affine clock, never from the declared last value.
+            Assert.All(output, f => Assert.Equal(sensorStart + f.PtsNs, f.PhoneElapsedNs));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
     [Theory]
     [InlineData(false)] [InlineData(true)]
     public async Task Long_vfr_clip_extracts_over_300_frames_in_window_batches_with_original_pts(bool oversizedWindow)
