@@ -1041,3 +1041,19 @@ của framework đọc ngày theo văn hoá bất biến (kiểu Mỹ tháng/ng�
 
 **Phải báo:** WP6 (FM màn mở app: endpoint + luật gom để gom offline giống server; `night_of` mặc định theo mốc 12:00 tạm; **mọi** ngày trên
 query string phải là ISO), WP5 (lịch của Quản lý: `assigned_to` bắt buộc; lọc `scheduled_from/to` phải gửi `YYYY-MM-DD`). **Chưa báo.**
+
+## BE-15 D-06 — ánh xạ video trên máy thật, dung sai một tick (06/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Worker nhận PTS đầu/cuối khai lệch PTS thực trong file **tối đa một tick** time base (so số nguyên chính xác `\|lệch\| × den ≤ 10⁹ × num`), thay vì bằng tuyệt đối. Kiểm nhất quán NỘI BỘ của số khai (`Δpts == Δsensor`, `VideoClockMapping.Parse`) **giữ nguyên chặt** |
+| **Decision maker** | Mỹ chốt 06/10/2026 ("ok" sau khi Claude báo lỗi lúc soi mẫu WP6). Không chạm bề mặt API — chỉ nới một kiểm tra nội bộ |
+| **Lý do** | Mẫu thật đầu tiên của WP6 (`Mobile_Report`, SM-A075F, 02/10): điện thoại ghi PTS encoder theo µs, MP4 lưu tick 1/90000 s ⇒ PTS cuối khai 29 908 732 000 ns, trong file 29 908 733 333 ns. Bằng tuyệt đối thì **mọi** phiên thật hỏng `CLOCK_VIDEO_MAPPING` dù mobile làm đúng |
+
+**Bằng chứng trên clip thật** (chạy một lần bằng test tạm, không đưa file 30 MB vào repo): 9 frame trích trong cửa sổ 14–16 s, ảnh
+1080×1920 (cờ xoay −90° được áp), thời điểm điện thoại của từng frame so với `sensor_timestamp_ns` của sidecar lệch −4 556…+4 111 ns.
+Ánh xạ affine độ dốc 1 đúng trên máy thật ⇒ **phần ánh xạ của D-06 đã chứng minh**. Cổng `VIDEO_DEVICE_MAPPING_PENDING` **vẫn giữ**: còn D-07
+(model thật của WP4) và package mobile theo schema v1.
+
+**Phải báo:** WP6 — `*_pts_ns` khai = `(video_pts_us − video_pts_us frame đầu) × 1000`, lệch trong một tick là hợp lệ; `time_base` khai phải đúng
+time base của file (`1/90000`). **Chưa báo** (gộp vào tin phản hồi package đã soạn).

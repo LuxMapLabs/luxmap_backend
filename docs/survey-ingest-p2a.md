@@ -124,7 +124,8 @@ Nanosecond nhận chuỗi thập phân hoặc số nguyên JSON chính xác; ưu
 PTS có thể âm. Ánh xạ mô phỏng hiện tại có slope 1: `phone = first_sensor + pts - first_pts`;
 hai cặp đầu/cuối phải nhất quán. Clip phải có thời lượng dương, không lặp số clip/không chồng khoảng thời gian.
 Worker đối chiếu time base và PTS đầu/cuối **thực từ ffprobe**; thiếu hoặc mâu thuẫn trả mã run
-`CLOCK_VIDEO_MAPPING`. Không dùng FPS trung bình hay thời điểm bấm quay làm đồng hồ.
+`CLOCK_VIDEO_MAPPING`. PTS đầu/cuối khai được lệch PTS trong file **tối đa một tick** của time base (1/90000 s ≈ 11,1 µs trên Android): điện thoại ghi PTS
+của encoder theo µs, file MP4 lưu số nguyên tick, nên hai số không bao giờ trùng tuyệt đối (mẫu thật SM-A075F lệch 1 333 ns). `*_pts_ns` khai = `(video_pts_us − video_pts_us của frame đầu) × 1000`. Không dùng FPS trung bình hay thời điểm bấm quay làm đồng hồ.
 Clip không phủ tâm cửa sổ của cột → `video_gap`, không lấy ảnh từ clip kế bên.
 
 Quy ước bên ảnh tạm: camera `front`, cột bên trái chiều đi dùng nửa trái ảnh; bên phải dùng nửa phải.
@@ -141,7 +142,9 @@ sau 0,5 s, lấy 5 frame/giây: một detection đạt chất lượng mỗi fra
 giữa hai cột khác nhau trong toàn run vẫn để unknown; cùng một cột ở hai lượt được phép dùng lại
 evidence. Khoá kết quả gồm chỉ số lượt, cột và thời điểm, giữ riêng hai lượt chung điểm quay đầu.
 
-D-06 chưa có mẫu Camera2/sidecar thực để chứng minh affine, D-07 chưa có model thật:
+D-06 **đã có mẫu thật** (06/10/2026, SM-A075F, 899 frame, REALTIME): PTS và `SENSOR_TIMESTAMP` lệch nhau một hằng số trên cả clip,
+chạy qua extractor thì thời điểm điện thoại của từng frame khớp sidecar trong ±4,6 µs. Vẫn chặn vì D-07 chưa có model thật và
+package mobile chưa theo schema v1:
 worker P2b-2 chỉ xử lý nguồn `simulated`; nguồn khác thất bại `VIDEO_DEVICE_MAPPING_PENDING`.
 Fake không tự thay thế detector thật, và không được chọn ở Production/Staging.
 `frame_count` trả số row frame của sweep; coverage phát hiện và coverage đủ xét dim lưu riêng trong run,
