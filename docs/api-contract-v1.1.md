@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.12 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.13 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -11,11 +11,12 @@
 **v1.9:** 05/10/2026 (POLE-NOTE — ghi chú của kỹ sư trên cột) ·
 **v1.10:** 05/10/2026 (BE-27 — thông báo trong ứng dụng, đọc bằng polling) ·
 **v1.11:** 06/10/2026 (`GET /faults/{fault_id}` — chi tiết một sự cố, drift N-6) ·
-**v1.12:** 06/10/2026 (người sửa cuối `updated_by` trên tài sản, `note` thành chuỗi, import nạp ghi chú; BREAKING).
+**v1.12:** 06/10/2026 (người sửa cuối `updated_by` trên tài sản, `note` thành chuỗi, import nạp ghi chú; BREAKING) ·
+**v1.13:** 06/10/2026 (BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push`; `performed_at?` cho bước của phiếu).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.12, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.13, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
@@ -146,6 +147,8 @@ client **không** parse.
 | `ASSET_IN_USE` | 409 | `DELETE` bị khoá ngoại từ chối; `details.constraint`, `details.table` |
 | `CROSS_COMMUNE_REFERENCE` | 409 | Gắn cột vào mạch điện **khác xã** với cột (v1.4, D-5) |
 | `POLE_HAS_ACTIVE_FIXTURE` | 409 | Cột đã có bóng đang dùng; ngừng dùng trước (v1.4, D-11) |
+| `NOTE_CHANGED` | 409 | Ghi chú cột đã đổi so với `base_note` client gửi — không ghi đè (v1.13, mục 5.8; trong push là `conflicts[]`) |
+| `BLOCKED_BY_EARLIER_OP` | — | Chỉ trong `rejected[]` của `POST /sync/push`: thao tác trước trên cùng phiếu / cột đã thất bại (v1.13, mục 5.8) |
 | `BBOX_TOO_LARGE` | 413 | bbox quá 2000 cột |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | Upload không phải `.csv`/`.geojson`, hoặc `Content-Type` sai |
 | `UNSUPPORTED_IMAGE_FORMAT` | 415 | Ảnh không phải JPEG theo magic bytes `FF D8 FF` |
@@ -234,6 +237,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 | `ControlLighting` | **manager** | chưa có endpoint — điều khiển ON/OFF/AUTO thiết bị được hỗ trợ (testbed demo), mục 5.6 |
 | `ManageUsers` | **system_admin** | mọi `/admin/users*` — tạo tài khoản, gán vai trò và xã, khoá, gửi lại lời mời (v1.8, mục 4.9) |
 | `ReadNotifications` | superior, manager, field_engineer, system_admin | mọi `/notifications*` — chỉ thông báo **của chính người gọi** (v1.10, mục 5.9) |
+| `SyncOffline` | **field_engineer** | `GET /sync/bundle`, `POST /sync/push` (v1.13, mục 5.8) — mỗi thao tác trong hàng chờ **còn** kiểm capability của chính nó |
 
 - `/auth/*` cấp token không cần token.
 - Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
@@ -767,14 +771,76 @@ nhất theo **thời gian** ±48 giờ của cùng cột, ghép ở server. ⚠�
 tạo `luminance_history` — khác với "không có điểm trong ±48 giờ"; CV-12 không phân biệt được hai ca
 qua API. Nợ có chủ: BE-15/BE-17.
 
-### 5.8 Đồng bộ offline — `[NOT IMPLEMENTED]` (BE-43)
+### 5.8 Đồng bộ offline — `/api/v1/sync` — `implemented` (v1.13, BE-43)
 
-- **`GET /api/v1/sync/bundle`** — `?segment_id=&since=` → `{generated_at, poles (5.1), segments (5.2),
-  open_faults[] (item 5.4), work_orders[] (item 5.5)}`, trong phạm vi claim. Hình dạng đề xuất, chốt
-  ở FW kế tiếp: `[OPEN → O-5]`.
-- **`POST /api/v1/sync/push`** — `{operations[]{client_op_id, op_type, payload}}` → `{applied[]{client_op_id,
-  id}, conflicts[]{client_op_id, reason, server_state}}`; khử trùng lặp theo `client_op_id`; xung đột:
-  **server thắng**. Hình dạng đề xuất: `[OPEN → O-5]`.
+Cho **Kỹ sư hiện trường** làm việc ở chỗ không có sóng: tải **gói dữ liệu** trước khi đi, xếp các thao tác
+vào **hàng chờ** trên máy, đẩy lên khi có mạng. Capability **`SyncOffline`** = chỉ `field_engineer` (mục 2).
+Ảnh và clip **không** đi qua đây — dùng endpoint riêng (đã khử trùng lặp theo `client_op_id`); **tải ảnh lên
+trước rồi mới đẩy hàng chờ** (báo xong phiếu sửa chữa cần ảnh `after`, mục 5.5).
+
+**`GET /api/v1/sync/bundle`** — `?segment_id=…&segment_id=…` (lặp được, tối đa **20**). Vắng `segment_id` =
+mọi tuyến của các phiếu **đang mở giao cho người gọi** (`assigned`, `in_progress`): tuyến của phiếu, tuyến khảo
+sát, tuyến của sự cố trong phiếu và của cột mang chúng. Tuyến không tồn tại / ngoài phạm vi → `404
+ASSET_NOT_FOUND`. **Luôn là bản chụp ĐẦY ĐỦ**, không có delta: gửi `since` → `400 VALIDATION_FAILED`; client
+**thay** cache của các tuyến đó (cột bị xoá, phiếu giao cho người khác, xã bị gỡ tự biến mất). Đọc trong một
+giao dịch `REPEATABLE READ`.
+
+```jsonc
+{ "generated_at": "2026-10-06T12:00:00Z",
+  "segment_ids": ["SEG-003"],                 // phạm vi thật đã đóng gói
+  "segments": { "type": "FeatureCollection", "features": [ … ] },   // properties như GET /map/segments
+  "poles":    { "type": "FeatureCollection", "features": [ … ] },   // properties như GET /map/poles + "note"
+  "open_faults": [ … ],                       // item như GET /faults, chỉ sự cố mở, thứ tự mặc định
+  "work_orders": [ … ] }                      // phiếu mở CỦA NGƯỜI GỌI chạm các tuyến này, dạng CHI TIẾT
+```
+
+Phiếu dạng **chi tiết** (có `faults[]`, `allowed_actions[]`) vì offline cần chúng. Thứ tự cột dọc đường của một
+phiếu vẫn lấy ở `GET /work-orders/{id}/poles` lúc có mạng — gói không lồng lại.
+
+**`POST /api/v1/sync/push`** — `{ "operations": [ { "client_op_id": "uuid", "op_type": "…", "payload": { … } } ] }`,
+**1–100** thao tác. Áp **theo thứ tự gửi**, mỗi thao tác một đơn vị ghi riêng, **qua đúng service của endpoint
+gốc** (cùng kiểm tra, cùng audit, cùng thông báo). Mỗi thao tác **còn được kiểm capability của chính nó**
+ngoài `SyncOffline`.
+
+| `op_type` | `payload` | Capability | Khử trùng lặp |
+|---|---|---|---|
+| `fault_report` | body của `POST /faults` (mục 5.4); `client_op_id` lấy từ thao tác — gửi kèm khác giá trị → rejected | `ReportFaults` | cột `fault.client_op_id` — **chung khoá** với `POST /faults` |
+| `lux_reading` | body của `POST /lux-readings` (mục 5.7), cùng luật | `RecordLuxReading` | cột `lux_reading.client_op_id` |
+| `pole_note` | `{pole_id, note, base_note?}` — `note` như `PUT /assets/poles/{id}/note`; `base_note` = ghi chú client **đã thấy** (`null` = chưa có) | `EditPoleNotes` | bảng `sync_operation` |
+| `work_order_start` | `{work_order_id, performed_at?}` | `ExecuteWorkOrders` | bảng `sync_operation` |
+| `work_order_complete` | `{work_order_id, report_note, materials_used?, fault_outcomes?, performed_at?}` — như `POST /work-orders/{id}/complete` | `ExecuteWorkOrders` | bảng `sync_operation` |
+
+- **`performed_at?`** — lúc thật sự bắt đầu / báo xong, cho bước gửi muộn; mặc định giờ server; tương lai quá
+  5 phút hoặc sớm hơn lúc được giao (start) / lúc bắt đầu (complete) → `VALIDATION_FAILED`. Ghi vào
+  `started_at` / `completed_at`; audit và `updated_at` vẫn là giờ server nhận. Không gửi `performed_at` mà giờ
+  server còn sớm hơn mốc trước (mốc đó đặt trước tối đa 5 phút) → ghi bằng mốc trước, không bao giờ
+  `completed_at < started_at`. **Cũng nhận ở endpoint gốc**
+  `POST /work-orders/{id}/start` (body tuỳ chọn `{performed_at?}`) và `…/complete`.
+- **`base_note`** — so theo **nội dung**, không theo giờ: ghi chú hiện tại khác → **conflict `NOTE_CHANGED`**,
+  không ghi, `server_state` là dòng cột hiện tại. Không gửi `base_note` = ghi đè như endpoint gốc.
+
+**Response `200`** (cả khi có xung đột / bị từ chối — các thao tác đã áp là đã ghi thật):
+
+```jsonc
+{ "applied":   [ { "client_op_id": "…", "op_type": "fault_report", "id": "FAULT-0042", "replayed": false } ],
+  "conflicts": [ { "client_op_id": "…", "op_type": "work_order_start", "reason": "INVALID_STATE_TRANSITION",
+                   "message": "…", "server_state": { …chi tiết phiếu… } } ],
+  "rejected":  [ { "client_op_id": "…", "op_type": "pole_note",
+                   "error": { "code": "VALIDATION_FAILED", "message": "…", "details": { "field": "note" } } } ] }
+```
+
+- **`applied`** — đã áp; `id` = sự cố / số đo / cột / phiếu. `replayed = true`: `client_op_id` này **đã áp
+  trước đó**, không ghi gì mới. Gửi lại cả lô là an toàn.
+- **`conflicts`** — trạng thái server khác với thao tác (409 của endpoint gốc), hoặc thứ đó không còn với người
+  gọi (404): **server thắng**, không ghi; `reason` = mã lỗi endpoint gốc sẽ trả; `server_state` = phiếu (chi
+  tiết) / dòng cột kiểm kê như hiện tại, `null` khi người gọi không còn thấy.
+- **`rejected`** — bản thân thao tác sai, cần người xem: `VALIDATION_FAILED` (gồm `op_type` lạ),
+  `ROLE_FORBIDDEN`, `IDEMPOTENCY_CONFLICT` (`client_op_id` đã dùng cho thao tác **khác** — kể cả khác loại; hai
+  yêu cầu **đồng thời** dùng chung khoá cho hai loại khác nhau có thể cùng được áp, mỗi loại vẫn chỉ một lần), và
+  **`BLOCKED_BY_EARLIER_OP`** — thao tác sau trên **cùng** phiếu / cột của một thao tác đã conflict hay bị từ
+  chối trong lô này, không được thử (`details.blocked_by`).
+- **`400`** chỉ khi **vỏ** sai: thiếu `operations`, quá 100, `client_op_id` thiếu / không phải UUID / trùng
+  trong cùng lô.
 
 ### 5.9 Thông báo trong ứng dụng — `/api/v1/notifications` — `implemented` (v1.10, BE-27)
 
@@ -856,7 +922,7 @@ highlight `SEG-003`.
 | **O-2** | Capability cho sweep/frame + review session (BE-15/17), fault (BE-19/41), work order + lịch làm việc (BE-21/24) — theo luật danh sách vai trò của mục 2 (v1.7) | Dylan + WP5/WP6 | cùng ticket, trước khi hiện thực |
 | **O-3** | Máy trạng thái `wo_status` (BE-22) | Dylan | trước BE-21 |
 | **O-4** | Enum `processing_status` của sweep; kích thước thumbnail (320/q80 tạm) | Dylan + WP5 | FW kế tiếp, trước W6 |
-| **O-5** | Hình dạng `sync/bundle` / `sync/push` (đề xuất ở 5.8) | Dylan + WP6 | FW kế tiếp, trước W14 |
+| ~~O-5~~ | ~~Hình dạng `sync/bundle` / `sync/push`~~ → **hiện thực ở v1.13** (mục 5.8, BE-43), SELF-SIGNED — WP6 xác nhận ở FW kế tiếp | Dylan + WP6 | FW kế tiếp |
 | **O-6** | `feeder_id` cho 103 cột mock: file gán riêng `mocks/mock-pole-feeders.csv` (D-7) — cần người biết mạch điện; chặn RQ2/CV-15 | Dylan + FO | trước BE-13 |
 | **O-7** | FK ghép `(feeder_id, commune_id)` (D-10) — ticket riêng trước BE-13; tới lúc đó mọi đường ghi phải gọi kiểm cùng xã | BE1 | trước BE-13 |
 | **O-8** | Thư viện Redocly `license` cho spec; server staging/prod trong `servers` | Dylan | khi có |
@@ -866,6 +932,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.13 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-43 — đồng bộ offline** (mục 5.8, drift BE-43; đóng O-5). `GET /sync/bundle`: bản chụp đầy đủ theo tuyến (`segment_id` lặp ≤ 20; vắng = tuyến của phiếu mở của tôi), **không** `since`; cột kèm `note`, phiếu dạng chi tiết. `POST /sync/push`: 5 `op_type` qua service của endpoint gốc, kiểm capability từng thao tác, kết quả `applied` / `conflicts` / `rejected`, `BLOCKED_BY_EARLIER_OP`; khử trùng lặp bằng cột sẵn có hoặc bảng mới `sync_operation`. Capability mới **`SyncOffline`** = `field_engineer`. Mã lỗi mới `NOTE_CHANGED`, `BLOCKED_BY_EARLIER_OP`. **Thêm** `performed_at?` cho `POST /work-orders/{id}/start` (body tuỳ chọn) và `…/complete`. Chỉ thêm. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.12 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **Người sửa cuối trên tài sản + ghi chú qua import** (mục 5.3, 5.3.1; drift POLE-NOTE N-4). **BREAKING:** `note` ở danh sách / chi tiết kiểm kê, `GET /map/poles/{pole_id}`, `GET /work-orders/{id}/poles` đổi từ object `{text, updated_at, updated_by, updated_by_name}` thành **chuỗi \| null**; response của `PUT /assets/poles/{poleId}/note` thành `{pole_id, note, updated_at, updated_by, updated_by_name}`. **Thêm:** `updated_by` + `updated_by_name` trên dòng cột / tuyến / tủ điện của kiểm kê (người sửa gần nhất, chỉ đổi khi giá trị thật sự đổi); kết quả import thêm `unchanged`, `total_warnings`, `warnings[]`; cột `note` tuỳ chọn trong file `poles` (ô có chữ ghi đè, ô trống giữ, thay ghi chú khác thì cảnh báo kèm nguyên văn cũ). `updated` của import nay chỉ đếm dòng thật sự đổi. WP5/WP6 chưa được báo hình dạng v1.9 nên đổi lúc này; chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.11 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | Thêm `GET /faults/{fault_id}` (mục 5.4): một sự cố đúng hình dạng item danh sách; ngoài phạm vi = không tồn tại = `404 FAULT_NOT_FOUND`. Thông báo `fault_reported` mở thẳng được sự cố. Chỉ thêm. Đóng drift N-6 |
 | v1.10 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-27 — thông báo trong ứng dụng.** Thêm mục 5.9 (4 endpoint `/notifications`, 11 `type`), capability `ReadNotifications` (cả bốn vai trò), prefix `NTF` (6 chữ số). Chỉ thêm, không đổi gì đã có. Drift BE-27 (N-1…N-6). Nền tạm tới FW |

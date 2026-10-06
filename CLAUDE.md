@@ -241,8 +241,8 @@ Ràng buộc nghiệp vụ đi kèm:
 | `POST /work-orders/{id}/evidence` | multipart: `file`, `kind`, `captured_at`, `lat`, `lng`, `client_op_id?` (BE-24). `kind`: **`before`/`after` chỉ ở phiếu sửa chữa, `observation` chỉ ở phiếu kiểm tra** (EV-1). Chỉ người được giao, phiếu `in_progress`. Phiếu sửa chữa **không `complete` được khi chưa có ảnh `after`** (409 `AFTER_EVIDENCE_REQUIRED`). Xem: `GET /work-orders/{id}/evidence`, `GET /evidence/{id}/thumbnail\|original` (proxy, quyền theo phiếu cha). |
 | `GET /map/iot-nodes` | `bbox`, trả `FeatureCollection` |
 | `GET /sweeps` | `sweep_id, started_at, ended_at, segment_ids[], frame_count, coverage_pct, processing_status` |
-| `GET /sync/bundle` | `?segment_id=&since=` → poles + segments + open faults + work orders được giao |
-| `POST /sync/push` | Khử trùng lặp theo `client_op_id` (UUID client sinh). Xung đột: **server thắng**, trả `conflicts[]` |
+| `GET /sync/bundle` | **BE-43, Contract v1.13 §5.8.** Chỉ `field_engineer` (`SyncOffline`). `segment_id` lặp ≤ 20, vắng = tuyến của phiếu mở của tôi. **Bản chụp đầy đủ, không `since`** (gửi → 400). Cột = properties bản đồ + `note`; phiếu dạng chi tiết |
+| `POST /sync/push` | **BE-43.** 5 `op_type` qua **service của endpoint gốc**, kiểm capability **từng thao tác**. `applied` / `conflicts` (server thắng, kèm `server_state`) / `rejected`. Khử trùng lặp: cột `client_op_id` sẵn có, hoặc bảng `sync_operation` |
 
 ### `properties` của `GET /map/poles`
 
@@ -1777,4 +1777,47 @@ hai thiết bị cùng bấm không ghi đè `read_at` đầu tiên.
 **Câu chữ thuộc module sở hữu sự kiện** (`WorkOrderNotices`, `SurveyNotices`, `FaultNotices`) — Notifications không
 tham chiếu ngược WorkOrders / Survey / Faults. Thêm `type` mới: thêm enum, câu chữ ở module đó, CHECK sinh lại qua
 migration, Contract 5.9.
+
+### BE-43 — đồng bộ offline (06/10/2026)
+
+**Module `LuxMap.Modules.Sync` đứng trên đỉnh đồ thị phụ thuộc** (tham chiếu Map, Faults, WorkOrders, Survey, Assets) và
+**không ghi dòng nghiệp vụ nào** — mỗi thao tác của hàng chờ gọi đúng service của endpoint gốc. Thêm `op_type` mới thì gọi service
+của nó, đừng chép logic kiểm tra / ghi vào Sync: hai đường ghi sẽ lệch nhau ngày một trong hai đổi. Kiểm tra mà controller gốc làm
+ngoài service (DataAnnotations, `RejectServerOwnedFields`) phải chuyển **vào service** hoặc gọi lại tường minh — `LuxReadingService.
+RejectServerOwnedFields` đã chuyển vì lý do đó.
+
+🔴 **Kiểm capability TỪNG thao tác**, ngoài `SyncOffline` ở cửa (`SyncPushService.PolicyFor` → `IAuthorizationService`, cùng tên
+policy với endpoint gốc, không chép danh sách vai trò). Một endpoint gói năm loại ghi mà chỉ kiểm cửa là mở `ReportFaults` cho mọi vai
+trò được sync. Test HTTP không phân biệt được hai lớp khi `SyncOffline` chỉ có `field_engineer`, nên lớp thứ hai được canh bằng một host
+**từ chối riêng `ReportFaults`** (`Each_operation_is_checked_against_its_own_capability_not_only_the_door`).
+
+**`sync_operation` được STAGE trước khi gọi service** và ghi bởi chính `SaveChanges` của service (khuôn `Notifier.Stage`): thao tác lỗi
+hay thua tranh chấp không để lại dòng. Chỉ thao tác **đã áp** được ghi; conflict / rejected thì lần gửi lại đánh giá lại. Có **hai lớp**
+khử trùng lặp, cả hai đều so `op_type` + `entity_id` trước khi báo "replayed": tra sớm (`RecordedAsync`) và bắt trùng
+`pk_sync_operation` khi đua. Phá thử cho thấy tắt riêng một lớp vẫn xanh — cố ý; tắt cả hai thì
+`A_client_op_id_reused_for_a_different_operation_is_rejected_and_writes_nothing` đỏ. Đừng "đơn giản hoá" đường bắt trùng thành
+"luôn replayed": thao tác KHÁC dùng lại khoá sẽ bị báo đã áp dù không ghi gì.
+
+**Tra chéo khoá giữa ba nơi giữ khoá** (`fault`, `lux_reading`, `sync_operation` — `SpentElsewhereAsync`) chỉ là best effort: không
+nguyên tử với lượt ghi, nên hai yêu cầu đồng thời dùng chung khoá cho hai *loại* khác nhau có thể cùng qua. Chấp nhận vì mỗi nơi vẫn
+áp thao tác của nó tối đa một lần. Đừng mô tả nó như ràng buộc chặt.
+
+**`performed_at` không bao giờ để bước sau sớm hơn bước trước** (`WorkOrderService.Effective`): không gửi giờ mà giờ server còn sớm
+hơn mốc trước thì lấy mốc trước. Canh bằng `A_completion_is_never_stored_before_its_start`.
+
+**Giữa hai thao tác phải `ResetAsync`** (rollback giao dịch đang mở + `ChangeTracker.Clear()`): entity mà thao tác lỗi để lại sẽ bị
+`SaveChanges` của thao tác sau ghi luôn.
+
+**`SetPoleNoteAsync(…, expected)` khoá hàng `pole` (`SELECT 1 … FOR UPDATE`) rồi mới đọc qua query filter** — chỉ khi có `base_note`;
+so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa bất cứ gì của cột).
+
+**`PoleProperties` không còn `sealed`** — chỉ để `SyncPoleProperties` thêm `note` mà vẫn phẳng. Dựng bằng copy constructor của record
+(`[SetsRequiredMembers]`); thêm trường vào `PoleProperties` thì gói tự có.
+
+**Test dựng nhiều cột trong MỘT `SaveChanges` không được giả định ID theo thứ tự `AddRange`** — EF không giữ thứ tự khi DB sinh khoá
+(cùng bẫy 7b). Kỳ vọng thứ tự phải sắp theo luật ID (`IdOrder` trong `SyncTests`).
+
+**Generator spec:** stub `ni()` của hai endpoint sync và các schema viết tay `Sync*`, `PoleFeature(Collection)`, `SegmentFeature(Collection)`,
+`PointGeometry`, `LineStringGeometry` đã xoá (mồ côi khi stub đi). `object?` trong C# xuất `nullable` không `type` → lint lỗi; vá ở phần
+"lint fix" của generator như `ApiError.details`.
 
