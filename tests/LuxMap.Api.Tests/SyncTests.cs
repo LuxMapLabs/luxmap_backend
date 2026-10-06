@@ -267,6 +267,35 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
 
         Assert.Equal("IDEMPOTENCY_CONFLICT", Assert.Single(reused.GetProperty("rejected").EnumerateArray()).GetProperty("error").GetProperty("code").GetString());
         Assert.Null(await Db(db => db.Set<Pole>().IgnoreQueryFilters().Where(p => p.PoleId == pole2).Select(p => p.Note).SingleAsync()));
+
+        // Across stores too (review finding): the step's key cannot then carry a report, nor a report's key a reading.
+        var report = Guid.NewGuid();
+        await PushAsync("a", Op("fault_report", new { pole_id = pole1, fault_type = "lamp_out", note = "Đèn tắt hẳn lúc kiểm tra tối nay" }, report));
+        var crossed = await PushAsync("a",
+            Op("fault_report", new { pole_id = pole2, fault_type = "lamp_out", note = "Một báo cáo khác hẳn báo cáo trước" }, key),
+            Op("lux_reading", new { pole_id = pole2, measured_at = DateTime.UtcNow, lux_value = 2.0, data_source = "field" }, report));
+        Assert.Equal(["IDEMPOTENCY_CONFLICT", "IDEMPOTENCY_CONFLICT"],
+            crossed.GetProperty("rejected").EnumerateArray().Select(r => r.GetProperty("error").GetProperty("code").GetString()!));
+        Assert.Equal(1, await Db(db => db.Set<Fault>().IgnoreQueryFilters().CountAsync(f => f.CommuneId == home)));
+        Assert.Equal(0, await Db(db => db.Set<LuxReading>().IgnoreQueryFilters().CountAsync(l => l.CommuneId == home)));
+    }
+
+    /// <summary>
+    /// A start dated ahead of the server (within the five-minute tolerance) followed by a complete without
+    /// <c>performed_at</c> must not store the completion before the start (review finding).
+    /// </summary>
+    [Fact]
+    public async Task A_completion_is_never_stored_before_its_start()
+    {
+        var order = await CreateOrderAsync("inspection", users["a"], road: road1);
+
+        var result = await PushAsync("a",
+            Op("work_order_start", new { work_order_id = order, performed_at = DateTime.UtcNow.AddMinutes(4) }),
+            Op("work_order_complete", new { work_order_id = order, report_note = "Đã kiểm tra hết cột trên tuyến" }));
+
+        Assert.Equal(2, result.GetProperty("applied").GetArrayLength());
+        var stored = await Db(db => db.Set<WorkOrder>().IgnoreQueryFilters().AsNoTracking().SingleAsync(w => w.WorkOrderId == order));
+        Assert.True(stored.CompletedAt >= stored.StartedAt, $"completed_at {stored.CompletedAt:O} < started_at {stored.StartedAt:O}");
     }
 
     [Fact]

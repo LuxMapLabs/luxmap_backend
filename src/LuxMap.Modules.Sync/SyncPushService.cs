@@ -5,6 +5,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Faults;
+using LuxMap.Modules.Faults.Entities;
+using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.LuxReadings;
 using LuxMap.Modules.Sync.Entities;
 using LuxMap.Modules.WorkOrders;
@@ -333,6 +335,14 @@ public sealed class SyncPushService(
 
     private async Task<(string Id, bool Replayed)> ApplyAsync(SyncOpType type, Guid key, Parsed parsed, CancellationToken ct)
     {
+        // Three stores hold keys (fault, lux_reading, sync_operation); a key already spent in ANOTHER store is a
+        // reuse, not a new operation. Best effort — the check is not atomic with the write — because each store
+        // still applies its own operation at most once: a missed reuse is a client bug unreported, never a double write.
+        if (await SpentElsewhereAsync(type, key, ct))
+        {
+            throw KeyReused(key);
+        }
+
         switch (parsed.Body)
         {
             case ReportFaultRequest report:
@@ -382,6 +392,17 @@ public sealed class SyncPushService(
 
     private static LuxMapException KeyReused(Guid key) => new("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict,
         "This client_op_id was already used for a different operation.", new Dictionary<string, object?> { ["client_op_id"] = key });
+
+    private async Task<bool> SpentElsewhereAsync(SyncOpType type, Guid key, CancellationToken ct)
+    {
+        var text = key.ToString("D");
+        var asFault = type != SyncOpType.FaultReport
+            && await db.Set<Fault>().IgnoreQueryFilters().AnyAsync(fault => fault.ClientOpId == text, ct);
+        var asReading = type != SyncOpType.LuxReading
+            && await db.Set<LuxReading>().IgnoreQueryFilters().AnyAsync(reading => reading.ClientOpId == text, ct);
+        var asStep = type is SyncOpType.FaultReport or SyncOpType.LuxReading && await RecordedAsync(key, ct) is not null;
+        return asFault || asReading || asStep;
+    }
 
     private Task<SyncOperation?> RecordedAsync(Guid key, CancellationToken ct)
         => db.Set<SyncOperation>().AsNoTracking().SingleOrDefaultAsync(op => op.UserId == ActorId && op.ClientOpId == key, ct);
