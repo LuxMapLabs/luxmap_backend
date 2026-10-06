@@ -1350,6 +1350,19 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
     }
 
     [Fact]
+    public async Task A_date_that_is_not_yyyy_mm_dd_is_a_400_never_another_day()
+    {
+        // en-US parsing used to read 06/10/2026 as 10 June: another month's work, no error.
+        foreach (var (path, field) in new[] { ("/agenda?night_of=06/10/2026", "night_of"), ("/agenda?night_of=2026-10-06T00:00:00", "night_of"),
+                     ("?scheduled_from=06/10/2026", "scheduled_from"), ("?scheduled_to=2026-6-1", "scheduled_to") })
+        {
+            var body = await Send("a", "GET", path, null, 400, "VALIDATION_FAILED");
+            Assert.True(body.GetProperty("error").GetProperty("details").TryGetProperty(field, out _), body.GetRawText());
+        }
+        Assert.Equal("2026-10-06", (await AgendaOf("a", "?night_of=2026-10-06")).GetProperty("night_of").GetString());
+    }
+
+    [Fact]
     public async Task A_position_that_is_not_lat_comma_lng_on_the_globe_is_a_400()
     {
         foreach (var near in new[] { "abc", "16.2", "16,2,3", "91,108", "16,181", "NaN,108", "16,Infinity" })
