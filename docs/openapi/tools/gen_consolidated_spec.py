@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.12"
+d["info"]["version"] = "1.13"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -37,6 +37,7 @@ d["info"]["description"] = (
     "v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. "
     "v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. "
     "v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. "
+    "v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -53,6 +54,12 @@ d["components"]["schemas"]["ApiError"]["properties"]["details"]["additionalPrope
 d["components"]["schemas"]["ApiError"]["properties"]["details"]["description"] = (
     "Túi ngữ cảnh tự do. Luôn có mặt và luôn chứa correlation_id (Contract §1.4)."
 )
+# Same lint fix for BE-43's two free-form fields: an untyped `object?` in C# exports `nullable` without `type`.
+d["components"]["schemas"]["SyncConflict"]["properties"]["server_state"] = {
+    "type": "object", "additionalProperties": True, "nullable": True,
+    "description": "Thực thể như hiện tại: WorkOrderDetail (work_order_*) hoặc dòng cột kiểm kê (pole_note); null khi người gọi không còn thấy nó.",
+}
+d["components"]["schemas"]["SyncError"]["properties"]["details"]["additionalProperties"] = {}
 
 # ── tags ───────────────────────────────────────────────────────────────────────
 TAGS = OrderedDict([
@@ -67,7 +74,7 @@ TAGS = OrderedDict([
     ("WorkOrders", "Phiếu công việc — BE-23 đã hiện thực, drift WO-1…WO-11 (nền tạm tới FW). Evidence còn BE-24."),
     ("Sweeps", "Phiên khảo sát video — BE-15 P2a đã hiện thực nhận/nộp phiên và đọc (SELF-SIGNED, nền tạm tới FW). Xử lý ở P2b, duyệt ở P2c."),
     ("IotSweeps", "Thumbnail khung hình — Contract §5.6. CHƯA HIỆN THỰC (BE-15 P2b)."),
-    ("Sync", "Đồng bộ offline — Contract §5.8. CHƯA HIỆN THỰC (BE-43)."),
+    ("Sync", "Đồng bộ offline cho Kỹ sư hiện trường — Contract §5.8 (BE-43): gói dữ liệu đầy đủ theo tuyến + hàng chờ thao tác."),
 ])
 d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
 
@@ -108,6 +115,8 @@ SUMMARY = {
     ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
+    ("get", "/api/v1/sync/bundle"): "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Không có since",
+    ("post", "/api/v1/sync/push"): "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id",
     ("put", "/api/v1/assets/poles/{poleId}/note"): "[POLE-NOTE] Kỹ sư hiện trường / Quản lý ghi hoặc xoá ghi chú của cột (≤ 1000 ký tự; null hay rỗng = xoá)",
     ("get", "/api/v1/notifications"): "[BE-27] Thông báo của chính người gọi, mới nhất trước, kèm số chưa đọc (polling)",
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
@@ -256,17 +265,6 @@ S["WorkOrderId"] = pid("WO", 4)
 S["LatLng"] = {"type": "object", "required": ["lat", "lng"], "additionalProperties": False,
                "properties": {"lat": {"type": "number", "format": "double", "minimum": -90, "maximum": 90},
                               "lng": {"type": "number", "format": "double", "minimum": -180, "maximum": 180}}}
-S["PointGeometry"] = {"type": "object", "required": ["type", "coordinates"], "additionalProperties": False,
-                      "properties": {"type": {"type": "string", "enum": ["Point"]},
-                                     "coordinates": {"type": "array", "minItems": 2, "maxItems": 2,
-                                                     "items": {"type": "number", "format": "double"},
-                                                     "description": "[lng, lat] — EPSG:4326"}}}
-S["LineStringGeometry"] = {"type": "object", "required": ["type", "coordinates"], "additionalProperties": False,
-                           "properties": {"type": {"type": "string", "enum": ["LineString"]},
-                                          "coordinates": {"type": "array", "minItems": 2,
-                                                          "items": {"type": "array", "minItems": 2, "maxItems": 2,
-                                                                    "items": {"type": "number", "format": "double"}},
-                                                          "description": "[[lng, lat], …] — EPSG:4326"}}}
 
 S["PoleProperties"] = {
     "type": "object", "additionalProperties": False,
@@ -292,14 +290,6 @@ S["PoleProperties"] = {
         ("has_iot_node", {"type": "boolean"}),
         ("near_sensitive_poi", {"type": "boolean"}),
     ])}
-S["PoleFeature"] = {"type": "object", "required": ["type", "geometry", "properties"], "additionalProperties": False,
-                    "description": "Không dùng feature.id — dùng properties.pole_id.",
-                    "properties": {"type": {"type": "string", "enum": ["Feature"]},
-                                   "geometry": {"$ref": "#/components/schemas/PointGeometry"},
-                                   "properties": {"$ref": "#/components/schemas/PoleProperties"}}}
-S["PoleFeatureCollection"] = {"type": "object", "required": ["type", "features"], "additionalProperties": False,
-                              "properties": {"type": {"type": "string", "enum": ["FeatureCollection"]},
-                                             "features": {"type": "array", "items": {"$ref": "#/components/schemas/PoleFeature"}}}}
 
 S["SegmentProperties"] = {
     "type": "object", "additionalProperties": False,
@@ -315,13 +305,9 @@ S["SegmentProperties"] = {
                                  "description": "I-7b: thiết bị điều khiển feeder của cột trên tuyến, tính lúc đọc; [] khi không có — không bao giờ null"}),
         ("has_active_segment_fault", {"type": "boolean", "description": "true → FE highlight cả tuyến (đầu ra CV-15)"}),
     ])}
-S["SegmentFeature"] = {"type": "object", "required": ["type", "geometry", "properties"], "additionalProperties": False,
-                       "properties": {"type": {"type": "string", "enum": ["Feature"]},
-                                      "geometry": {"$ref": "#/components/schemas/LineStringGeometry"},
-                                      "properties": {"$ref": "#/components/schemas/SegmentProperties"}}}
-S["SegmentFeatureCollection"] = {"type": "object", "required": ["type", "features"], "additionalProperties": False,
-                                 "properties": {"type": {"type": "string", "enum": ["FeatureCollection"]},
-                                                "features": {"type": "array", "items": {"$ref": "#/components/schemas/SegmentFeature"}}}}
+# BE-43: PointGeometry / LineStringGeometry / PoleFeature(Collection) / SegmentFeature(Collection) were only
+# referenced by the hand-written SyncBundle stub; with it gone they were orphans. The map layers are exported
+# from the code; PoleProperties / SegmentProperties above still override those exported schemas.
 
 # BE-20: PoleDetail and its parts (PoleDetailFixture/Status/Baseline/HistoryPoint/OpenFault/Frame) now come
 # from the live code. The hand-written copies stood here and would OVERWRITE the exported schemas
@@ -336,39 +322,8 @@ S["SegmentFeatureCollection"] = {"type": "object", "required": ["type", "feature
 
 # BE-23: work-order schemas now come from the live code. Do not replace their
 # task_kind, partial-PATCH semantics or detail shape with the old §5.5 placeholders.
-S["SyncBundle"] = {"type": "object", "additionalProperties": False,
-    "description": "Contract §5.8 — hình dạng đề xuất, chốt ở FW kế tiếp (Open item O-5).",
-    "required": ["poles", "segments", "open_faults", "work_orders", "generated_at"],
-    "properties": OrderedDict([
-        ("generated_at", {"type": "string", "format": "date-time"}),
-        ("poles", {"$ref": "#/components/schemas/PoleFeatureCollection"}),
-        ("segments", {"$ref": "#/components/schemas/SegmentFeatureCollection"}),
-        ("open_faults", {"type": "array", "items": {"$ref": "#/components/schemas/FaultItem"}}),
-        ("work_orders", {"type": "array", "items": {"$ref": "#/components/schemas/WorkOrderItem"}}),
-    ])}
-S["SyncOperation"] = {"type": "object", "additionalProperties": False, "required": ["client_op_id", "op_type", "payload"],
-    "description": "Contract §5.8 — hình dạng đề xuất (Open item O-5); op_type dự kiến: create_fault | create_lux_reading | patch_fault | patch_work_order.",
-    "properties": OrderedDict([
-        ("client_op_id", {"type": "string", "format": "uuid"}),
-        ("op_type", {"type": "string"}),
-        ("payload", {"type": "object", "additionalProperties": True}),
-    ])}
-S["SyncPushRequest"] = {"type": "object", "additionalProperties": False, "required": ["operations"],
-    "properties": {"operations": {"type": "array", "items": {"$ref": "#/components/schemas/SyncOperation"}}}}
-S["SyncConflict"] = {"type": "object", "additionalProperties": False, "required": ["client_op_id", "reason"],
-    "properties": OrderedDict([
-        ("client_op_id", {"type": "string", "format": "uuid"}),
-        ("reason", {"type": "string"}),
-        ("server_state", {"type": "object", "additionalProperties": True, "nullable": True}),
-    ])}
-S["SyncPushResponse"] = {"type": "object", "additionalProperties": False, "required": ["applied", "conflicts"],
-    "description": "Contract §5.8 — xung đột: server thắng, trả conflicts[]. Ánh xạ client_op_id → id thật (§1.2). Hình dạng đề xuất (Open item O-5).",
-    "properties": OrderedDict([
-        ("applied", {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["client_op_id", "id"],
-                                                 "properties": {"client_op_id": {"type": "string", "format": "uuid"},
-                                                                "id": {"type": "string"}}}}),
-        ("conflicts", {"type": "array", "items": {"$ref": "#/components/schemas/SyncConflict"}}),
-    ])}
+# BE-43: SyncBundle / SyncPushRequest / SyncPushResult come from the live code. The hand-written §5.8
+# proposals stood here and would OVERWRITE them (SyncPushRequest has the same name).
 
 # ── NOT IMPLEMENTED operations ─────────────────────────────────────────────────
 def p(name, schema, required=False, desc=None, where="query"):
@@ -415,15 +370,7 @@ ENUM_CSV = lambda ref: {"type": "string", "description": f"CSV của {ref}"}
 # BE-41 implements POST /faults; the stub is gone.
 # BE-24 implements the evidence upload; the stub and its hand-written EvidenceUpload schema are gone.
 # BE-15 P2c implements the authenticated JPEG thumbnail endpoint.
-ni("get", "/api/v1/sync/bundle", "Sync", "Gói dữ liệu theo segment để cache offline", "§5.8", "BE-43",
-   [("200", {"description": "Bundle trong phạm vi địa bàn của user (§2)", "content": json_content("SyncBundle")}),
-    ("400", err("VALIDATION_FAILED — thiếu segment_id"))],
-   parameters=[p("segment_id", {"$ref": "#/components/schemas/SegmentId"}, True),
-               p("since", {"type": "string", "format": "date-time"}, desc="ISO 8601 UTC hậu tố Z")])
-ni("post", "/api/v1/sync/push", "Sync", "Đẩy thay đổi offline; khử trùng lặp theo client_op_id; server thắng khi xung đột", "§5.8", "BE-43",
-   [("200", {"description": "applied[] + conflicts[]", "content": json_content("SyncPushResponse")}),
-    ("400", err("VALIDATION_FAILED"))],
-   body={"$ref": "#/components/schemas/SyncPushRequest"})
+# BE-43 implements GET /sync/bundle and POST /sync/push; the stubs and their hand-written schemas are gone.
 
 # Order paths: implemented first in original order, then the rest as inserted.
 json.dump(d, open(DST, "w"), ensure_ascii=False, indent=2)

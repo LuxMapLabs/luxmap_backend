@@ -16,8 +16,11 @@ namespace LuxMap.Modules.Map.Features;
 /// <c>data_source</c>, <c>external_ref</c> and <c>feeder_id</c> (section 5.1). <c>data_source</c> is
 /// filterable but invisible; that is the point of the default that hides the calibration rig.
 /// </para>
+/// <para>
+/// Not sealed only so the offline bundle (BE-43) can add <c>note</c> on top of the same fifteen fields.
+/// </para>
 /// </remarks>
-public sealed record PoleProperties
+public record PoleProperties
 {
     public required string PoleId { get; init; }
 

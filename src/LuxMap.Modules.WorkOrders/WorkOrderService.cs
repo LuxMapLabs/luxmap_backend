@@ -349,13 +349,17 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     }
 
     public async Task<WorkOrderDetail> Act(string id, string action, string? note,
-        JsonElement outcomes, CancellationToken ct, string? materialsUsed = null)
+        JsonElement outcomes, CancellationToken ct, string? materialsUsed = null, DateTime? performedAt = null)
     {
         note = note?.Trim();
         if ((action == "complete" && (note?.Length ?? 0) < 10)
             || ((action is "return" or "cancel") && string.IsNullOrEmpty(note))) throw OptionalJson.Invalid("note");
+        var claimed = Performed(performedAt);
         var wo = await Find(id, ct);
         RequireAction(wo, action);
+        // BE-43 D-6: the engineer's own clock may not put the step before the step it follows.
+        var previous = action switch { "start" => wo.AssignedAt, "complete" => wo.StartedAt, _ => null };
+        if (claimed is { } at && at < previous) throw OptionalJson.Invalid("performed_at");
         // BE-24: a repair is not finished until there is a photo of the lamp AFTER the repair — the
         // manager verifies against it. Inspections fix nothing, so they need no photo.
         if (action == "complete" && wo.TaskKind == TaskKind.Repair
@@ -413,8 +417,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         }
         switch (action)
         {
-            case "start": wo.WoStatus = WorkOrderStatus.InProgress; wo.StartedAt = now; break;
-            case "complete": wo.WoStatus = WorkOrderStatus.Done; wo.CompletedAt = now; wo.ReportNote = note;
+            case "start": wo.WoStatus = WorkOrderStatus.InProgress; wo.StartedAt = Effective(claimed, previous, now); break;
+            case "complete": wo.WoStatus = WorkOrderStatus.Done; wo.CompletedAt = Effective(claimed, previous, now); wo.ReportNote = note;
                 wo.MaterialsUsed = Materials(materialsUsed); break;
             case "return": wo.WoStatus = WorkOrderStatus.InProgress; wo.ReviewNote = note; wo.CompletedAt = null; break;
             case "verify": wo.WoStatus = WorkOrderStatus.Verified; wo.ReviewNote = note; wo.ClosedAt = now; break;
@@ -438,6 +442,30 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         await Save(id, [], ct);
         return await Detail(id, ct);
     }
+
+    /// <summary>
+    /// BE-43 D-6 — when the engineer actually started or finished, for a step queued offline and sent later.
+    /// Same rule as a fault's <c>detected_at</c> (drift R-4): microseconds, and no more than five minutes ahead.
+    /// </summary>
+    /// <remarks>
+    /// Only <c>started_at</c> / <c>completed_at</c> take it. The fault transitions, the audit time and
+    /// <c>updated_at</c> stay the moment the server received the step: that is when the system learnt of it.
+    /// </remarks>
+    private static DateTime? Performed(DateTime? claimed)
+    {
+        if (claimed is not { } value) return null;
+        var utc = UtcNormalization.ToUtc(value);
+        var at = new DateTime(utc.Ticks / 10 * 10, DateTimeKind.Utc);
+        return at > UtcMicrosecondClock.UtcNow() + FaultReportService.FutureTolerance ? throw OptionalJson.Invalid("performed_at") : at;
+    }
+
+    /// <summary>
+    /// The time the step is recorded at. Without <c>performed_at</c> it is the server's now — but never before the step
+    /// it follows: a previous step may sit up to the five-minute tolerance ahead of the server clock, and a step that
+    /// is ACCEPTED must not be stored as happening earlier (review finding on BE-43: completed_at &lt; started_at).
+    /// </summary>
+    private static DateTime Effective(DateTime? claimed, DateTime? previous, DateTime now)
+        => claimed ?? (previous is { } before && before > now ? before : now);
 
     private void RequireAction(WorkOrder wo, string action)
     {

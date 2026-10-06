@@ -446,6 +446,11 @@ public static class PoleNoteInput
         => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message, new Dictionary<string, object?> { ["field"] = "note" });
 }
 
+/// <summary>
+/// The note a caller last saw on a pole (BE-43 D-8), already normalized like any note: <c>null</c> = it saw none.
+/// </summary>
+public sealed record ExpectedNote(string? Text);
+
 /// <summary><c>PUT /assets/poles/{id}/note</c>: the new note, or <c>null</c> / blank to clear it.</summary>
 /// <remarks>
 /// A JSON element, like <see cref="SetPoleFeederRequest"/>, so a body WITHOUT the key is a 400 rather than

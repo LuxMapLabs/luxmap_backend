@@ -78,6 +78,12 @@ public static class LuxMapPolicies
     public const string ManageWorkOrders = "cap:manage_work_orders";
     public const string ExecuteWorkOrders = "cap:execute_work_orders";
 
+    /// <summary>
+    /// BE-43 — download the offline bundle and push the offline queue. Field engineers only: the five queued
+    /// operations are theirs. Every queued operation is ALSO checked against its own capability.
+    /// </summary>
+    public const string SyncOffline = "cap:sync_offline";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -99,5 +105,6 @@ public static class LuxMapPolicies
             [ReadWorkOrders] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageWorkOrders] = [UserRole.Manager],
             [ExecuteWorkOrders] = [UserRole.FieldEngineer],
+            [SyncOffline] = [UserRole.FieldEngineer],
         };
 }

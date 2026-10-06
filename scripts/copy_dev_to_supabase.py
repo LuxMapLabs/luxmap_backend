@@ -120,6 +120,7 @@ TWO_PASS = {
 SKIPPED = {
     "refresh_token": "phiên đăng nhập — mọi người đăng nhập lại (D-5)",
     "account_token": "link mời / đặt lại mật khẩu trong email (BE-33a) — gắn với WEB_APP_BASE_URL của nguồn; gửi lại ở đích",
+    "sync_operation": "bộ nhớ gửi lại của hàng chờ offline (BE-43) — điện thoại trỏ vào máy chủ nguồn không đẩy hàng chờ sang đích",
     "__ef_migrations_history": "đích có lịch sử riêng do migration ghi",
     "spatial_ref_sys": "bảng của PostGIS, extension ở đích tự có",
 }

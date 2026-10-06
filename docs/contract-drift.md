@@ -974,3 +974,34 @@ cho kỹ sư; đưa vào hàng chờ offline khi làm BE-43). **Chưa báo.** N-
 
 **Phải báo:** WP5 (chuông + danh sách thông báo, polling), WP6 (FM-21: chuông, danh sách, polling khi app mở; push sau).
 **Chưa báo.**
+
+## BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push` (06/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực mục 5.8 theo 8 đề xuất D-1…D-8 ở `.ai/results/BE-43-p1.md`, đã viết vào **Contract v1.13** (mục 1.4, 2, 5.8; đóng O-5). **SELF-SIGNED, nền tạm tới FW** |
+| **Decision maker** | Mỹ chốt 06/10/2026 "theo 8 đề xuất"; hai câu để ngỏ lấy mặc định: `SyncOffline` = **chỉ `field_engineer`**, thao tác bị bỏ qua **gộp vào `rejected`** (`BLOCKED_BY_EARLIER_OP`). Chạm bề mặt API → **ESCALATE ở FW kế tiếp** |
+| **Task list** | BE-43 ghi phụ thuộc **BE-25** (chưa làm). D-2 làm luôn phần "việc của tôi" (gói không `segment_id` = tuyến của phiếu mở của người gọi) — phần gom theo địa lý / lịch trong ngày của BE-25 vẫn còn |
+
+| Mã | Điểm | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **S-1** | `since` (D-1) | **Bỏ** — luôn bản chụp đầy đủ theo tuyến; `since` → 400. Delta cần tombstone + tính lại thuộc tính dẫn xuất từ 4 bảng; tuyến lớn nhất trên dev 46 cột | **Có** (bỏ tham số đề xuất) |
+| **S-2** | Phạm vi gói (D-2) | `segment_id` lặp ≤ 20; vắng = tuyến của phiếu `assigned`/`in_progress` của người gọi | **Có** |
+| **S-3** | Nội dung (D-3) | cột = properties bản đồ + `note`; phiếu dạng **chi tiết** (đề xuất cũ: item); thêm `segment_ids[]`; không lồng cột theo phiếu (WO-12) | **Có** |
+| **S-4** | `op_type` (D-4) | 5 loại; ảnh/clip **không** qua push | **Có** |
+| **S-5** | Khử trùng lặp (D-5) | `fault_report` / `lux_reading` dùng cột `client_op_id` sẵn có (**chung khoá** với endpoint gốc); 3 loại còn lại → bảng mới **`sync_operation`** (PK `(user_id, client_op_id)`, CASCADE từ `app_user`, chỉ ghi thao tác ĐÃ áp, cùng `SaveChanges` với thao tác) | Không (lược đồ) |
+| **S-6** | Giờ thao tác (D-6) | `performed_at?` ở push **và** ở `POST /work-orders/{id}/start` (body tuỳ chọn mới) + `…/complete` | **Có** (trường mới) |
+| **S-7** | Kết quả (D-7) | `applied[]{client_op_id, op_type, id, replayed}` / `conflicts[]{…, reason, message, server_state}` / `rejected[]{…, error}` — đề xuất v1.4 chỉ có hai nhóm; 404 tính là conflict; `IDEMPOTENCY_CONFLICT` là rejected | **Có** |
+| **S-8** | Ghi chú xung đột (D-8) | `base_note` so theo **nội dung** (ghi chú không còn giờ riêng từ N-4) → `409 NOTE_CHANGED` | **Có** (trường + mã mới) |
+
+**Lược đồ:** migration `AddSyncOperation` (chỉ `CreateTable`; apply → rollback → apply trên `luxmap_test`). Bảng nằm trong `SKIPPED`
+của `copy_dev_to_supabase.py`.
+
+**Review Codex (06/10/2026, một lượt + một lượt xác nhận):** hai phát hiện, đã sửa ở commit riêng — (1) `client_op_id` dùng lại giữa hai
+*loại* thao tác không bị bắt → nay tra chéo ba nơi giữ khoá; (2) bắt đầu với `performed_at` sớm hơn giờ server rồi báo xong không
+`performed_at` lưu được `completed_at < started_at` → nay lấy mốc trước. **Hạn chế đã biết, không sửa:** hai yêu cầu **đồng thời** dùng
+chung khoá cho hai loại khác nhau vẫn có thể cùng được áp (lượt tra chéo không nguyên tử với lượt ghi). Mỗi loại vẫn chỉ áp một lần,
+nên đây là lỗi client không được báo, không phải ghi đôi; đóng hẳn thì cần một bảng khoá chung cho cả `fault` / `lux_reading`.
+
+**Phải báo:** WP6 (FM-20: toàn bộ mục 5.8; tải ảnh **trước** khi đẩy hàng chờ; `performed_at`; `base_note` lấy từ `poles[].note` của gói;
+xử lý ba nhóm kết quả). **Chưa báo.**

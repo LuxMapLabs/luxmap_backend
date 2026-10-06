@@ -5133,6 +5133,172 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/sync/bundle": {
+      "get": {
+        "tags": [
+          "Sync"
+        ],
+        "parameters": [
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncBundle"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncBundle"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncBundle"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:sync_offline",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/sync/push": {
+      "post": {
+        "tags": [
+          "Sync"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncPushRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncPushResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:sync_offline",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/auth/web/login": {
       "post": {
         "tags": [
@@ -6003,6 +6169,25 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartWorkOrderRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartWorkOrderRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartWorkOrderRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -6501,6 +6686,12 @@
               "$ref": "#/components/schemas/FaultOutcomeRequest"
             },
             "description": "Required exactly once per linked fault for inspection; forbidden for repair or segment-only inspection."
+          },
+          "performed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8956,6 +9147,18 @@
         ],
         "type": "string"
       },
+      "StartWorkOrderRequest": {
+        "type": "object",
+        "properties": {
+          "performed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "SubmitSweepRequest": {
         "type": "object",
         "properties": {
@@ -9274,6 +9477,306 @@
           "failed"
         ],
         "type": "string"
+      },
+      "SyncApplied": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "op_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncBundle": {
+        "required": [
+          "generated_at",
+          "open_faults",
+          "poles",
+          "segment_ids",
+          "segments",
+          "work_orders"
+        ],
+        "type": "object",
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "segments": {
+            "$ref": "#/components/schemas/SegmentPropertiesFeatureCollection"
+          },
+          "poles": {
+            "$ref": "#/components/schemas/SyncPolePropertiesFeatureCollection"
+          },
+          "open_faults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FaultItem"
+            }
+          },
+          "work_orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderDetail"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncConflict": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "op_type": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "server_state": {
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncOperationRequest": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "op_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "payload": { }
+        },
+        "additionalProperties": false
+      },
+      "SyncPoleProperties": {
+        "required": [
+          "commune_id",
+          "fixture_status",
+          "has_iot_node",
+          "near_sensitive_poi",
+          "open_fault_count",
+          "pole_id",
+          "segment_id"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "status_confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "power_source": {
+            "$ref": "#/components/schemas/PowerSource"
+          },
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "install_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_sweep_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "open_fault_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "has_iot_node": {
+            "type": "boolean"
+          },
+          "near_sensitive_poi": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncPolePropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/SyncPoleProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncPolePropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncPolePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncPushRequest": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncOperationRequest"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncPushResult": {
+        "required": [
+          "applied",
+          "conflicts",
+          "rejected"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncApplied"
+            }
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncConflict"
+            }
+          },
+          "rejected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncRejected"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SyncRejected": {
+        "type": "object",
+        "properties": {
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "op_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "error": {
+            "$ref": "#/components/schemas/SyncError"
+          }
+        },
+        "additionalProperties": false
       },
       "TaskKind": {
         "enum": [
@@ -10032,7 +10535,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -10091,6 +10594,9 @@
     },
     {
       "name": "Sweeps"
+    },
+    {
+      "name": "Sync"
     },
     {
       "name": "WebAuth"

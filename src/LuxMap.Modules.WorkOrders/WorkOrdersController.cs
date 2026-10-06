@@ -8,6 +8,7 @@ using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace LuxMap.Modules.WorkOrders;
 
@@ -100,12 +101,14 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
 
     [HttpPost("{id}/start")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
-    public Task<WorkOrderDetail> Start(string id, CancellationToken ct) => service.Act(id, "start", null, default, ct);
+    public Task<WorkOrderDetail> Start(string id,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] StartWorkOrderRequest? request, CancellationToken ct)
+        => service.Act(id, "start", null, default, ct, performedAt: request?.PerformedAt);
 
     [HttpPost("{id}/complete")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     public Task<WorkOrderDetail> Complete(string id, CompleteWorkOrderRequest request, CancellationToken ct)
-        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed);
+        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed, request.PerformedAt);
 
     [HttpPost("{id}/verify")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]

@@ -42,7 +42,7 @@ public sealed class LuxReadingsController(LuxReadingService service) : Controlle
         [FromBody] CreateLuxReadingRequest request,
         CancellationToken cancellationToken)
     {
-        RejectServerOwnedFields(request);
+        LuxReadingService.RejectServerOwnedFields(request);
 
         var (created, reading) = await service.CreateAsync(request, CurrentUserId(), cancellationToken);
 
@@ -78,41 +78,6 @@ public sealed class LuxReadingsController(LuxReadingService service) : Controlle
         PageQuery page,
         CancellationToken cancellationToken)
         => Ok(await service.SearchAsync(poleId, from, to, dataSource, page.ToPageRequest(), cancellationToken));
-
-    /// <summary>
-    /// Refuses a body that sets something the server owns.
-    /// </summary>
-    /// <remarks>
-    /// Loudly, not silently. A client that sent <c>commune_id</c> and got 201 back would reasonably
-    /// believe it chose the commune — and it did not.
-    /// </remarks>
-    private static void RejectServerOwnedFields(CreateLuxReadingRequest request)
-    {
-        var offending = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(request.LuxId))
-        {
-            offending.Add("lux_id");
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.CommuneId))
-        {
-            offending.Add("commune_id");
-        }
-
-        if (offending.Count == 0)
-        {
-            return;
-        }
-
-        throw new LuxMapException(
-            ErrorCodes.ServerOwnedField,
-            HttpStatusCode.BadRequest,
-            "These fields are set by the server and must not be sent: "
-            + string.Join(", ", offending)
-            + ". The id comes from the database and the commune is taken from the pole.",
-            new Dictionary<string, object?> { ["fields"] = offending.ToArray() });
-    }
 
     /// <summary>
     /// The signed-in user, for <c>measured_by</c> — the same shape as <c>reported_by</c> in
