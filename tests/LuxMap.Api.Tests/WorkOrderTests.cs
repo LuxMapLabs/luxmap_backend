@@ -781,7 +781,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
             var pole = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.PoleId == far);
-            (pole.Note, pole.NoteUpdatedBy, pole.NoteUpdatedAt) = ("Trước cổng chợ", users["a"].UserId, new DateTime(2026, 10, 4, 1, 0, 0, DateTimeKind.Utc));
+            pole.Note = "Trước cổng chợ";
             return await db.SaveChangesAsync();
         });
         var id = await Create();
@@ -809,11 +809,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         Assert.Equal(16.008, items[2].GetProperty("location").GetProperty("lat").GetDouble(), 6);
 
         Assert.Equal(JsonValueKind.Null, items[0].GetProperty("note").ValueKind);
-        var note = items[2].GetProperty("note");
-        Assert.Equal("Trước cổng chợ", note.GetProperty("text").GetString());
-        Assert.Equal(users["a"].UserId, note.GetProperty("updated_by").GetString());
-        Assert.Equal(users["a"].FullName, note.GetProperty("updated_by_name").GetString());
-        Assert.Equal("2026-10-04T01:00:00Z", note.GetProperty("updated_at").GetString());
+        Assert.Equal("Trước cổng chợ", items[2].GetProperty("note").GetString());
     }
 
     [Fact]

@@ -82,12 +82,14 @@ public sealed class AssetImportMockSetTests(AssetImportFixture fixture, ITestOut
             $"Loaded {stored.Count} poles across {stored.Select(p => p.SegmentId).Distinct().Count()} segments. "
             + "All 103 have feeder_id NULL — drift 23, the mock set carries no circuit at all.");
 
-        // Re-running is an UPDATE, not 103 duplicates. This is what external_ref bought.
+        // Re-running matches every row instead of creating 103 duplicates — what external_ref bought. The
+        // file is identical, so nothing changed: all 103 are unchanged, not updated (drift POLE-NOTE N-4).
         var again = await AssetImportTests.ImportAsync(
             client, "poles", "mock-poles.geojson", PreparePoles(tag));
 
         Assert.Equal(0, again.GetProperty("inserted").GetInt32());
-        Assert.Equal(103, again.GetProperty("updated").GetInt32());
+        Assert.Equal(0, again.GetProperty("updated").GetInt32());
+        Assert.Equal(103, again.GetProperty("unchanged").GetInt32());
         Assert.Equal(103, await fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters()
             .CountAsync(pole => pole.ExternalRef!.StartsWith(tag))));
     }

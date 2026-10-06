@@ -61,6 +61,23 @@ internal static class ExternalRefColumn
     }
 }
 
+/// <summary>
+/// <c>updated_by</c> — who last changed an asset row (drift POLE-NOTE N-4). Declared once for the four tables.
+/// </summary>
+internal static class UpdatedByColumn
+{
+    public static void HasUpdatedBy<TEntity>(this EntityTypeBuilder<TEntity> builder)
+        where TEntity : class, IUpdateStamped
+    {
+        builder.Property(entity => entity.UpdatedBy).HasColumnType("text");
+
+        // Restrict, like every other "who did it" column: deleting the account must not erase who changed it.
+        builder.HasOne<AppUser>().WithMany()
+            .HasForeignKey(entity => entity.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public sealed class RoadSegmentConfiguration : IEntityTypeConfiguration<RoadSegment>
 {
     public void Configure(EntityTypeBuilder<RoadSegment> builder)
@@ -75,6 +92,7 @@ public sealed class RoadSegmentConfiguration : IEntityTypeConfiguration<RoadSegm
         builder.Property(segment => segment.Geom).HasColumnType(GeometryColumns.LineString).IsRequired();
         builder.Property(segment => segment.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(segment => segment.UpdatedAt).HasDefaultValueSql("now()");
+        builder.HasUpdatedBy();
 
         builder.HasContractEnum(segment => segment.RoadClass);
         builder.HasContractEnum(segment => segment.DataSource);
@@ -103,6 +121,7 @@ public sealed class FeederConfiguration : IEntityTypeConfiguration<Feeder>
         builder.Property(feeder => feeder.Geom).HasColumnType(GeometryColumns.LineString);
         builder.Property(feeder => feeder.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(feeder => feeder.UpdatedAt).HasDefaultValueSql("now()");
+        builder.HasUpdatedBy();
 
         builder.HasCommuneScope();
 
@@ -135,25 +154,14 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
         builder.Property(pole => pole.Geom).HasColumnType(GeometryColumns.Point).IsRequired();
         builder.Property(pole => pole.NearSensitivePoi).HasDefaultValue(false);
         builder.Property(pole => pole.Note).HasColumnType("text");
-        builder.Property(pole => pole.NoteUpdatedBy).HasColumnType("text");
         builder.Property(pole => pole.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(pole => pole.UpdatedAt).HasDefaultValueSql("now()");
+        builder.HasUpdatedBy();
 
         builder.HasContractEnum(pole => pole.DataSource);
 
-        builder.ToTable(table =>
-        {
-            // The API trims and checks the same limit and answers 400; this stops every other writer.
-            table.HasCheckConstraint("ck_pole_note_length", "char_length(note) <= 1000");
-
-            // Who and when travel together. A cleared note keeps both: "cleared by X at T" is history.
-            table.HasCheckConstraint("ck_pole_note_stamp_together", "(note_updated_by IS NULL) = (note_updated_at IS NULL)");
-        });
-
-        // Restrict, like every other "who did it" column: deleting the account must not erase who wrote it.
-        builder.HasOne<AppUser>().WithMany()
-            .HasForeignKey(pole => pole.NoteUpdatedBy)
-            .OnDelete(DeleteBehavior.Restrict);
+        // The API trims and checks the same limit and answers 400; this stops every other writer.
+        builder.ToTable(table => table.HasCheckConstraint("ck_pole_note_length", "char_length(note) <= 1000"));
 
         builder.HasCommuneScope();
 
@@ -214,6 +222,7 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
 
         builder.Property(fixture => fixture.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(fixture => fixture.UpdatedAt).HasDefaultValueSql("now()");
+        builder.HasUpdatedBy();
 
         builder.HasContractEnum(fixture => fixture.FixtureType);
         builder.HasContractEnum(fixture => fixture.PowerSource);

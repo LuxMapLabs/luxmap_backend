@@ -5,7 +5,6 @@ using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Csv;
-using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 
@@ -55,7 +54,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         {
             // A header problem is not N row problems: reporting it once, against line 1, is the whole
             // truth. Most often it is a file saved with the wrong delimiter or a stray BOM.
-            return Task.FromResult(ImportResult.From(0, 0, document.Rows.Count,
+            return Task.FromResult(ImportResult.From(0, 0, 0, document.Rows.Count,
                 [new ImportRowError(1, string.Join(", ", missing), "Column missing from the header row.")]));
         }
 
@@ -76,7 +75,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         if (!document.RootElement.TryGetProperty("features", out var features)
             || features.ValueKind != JsonValueKind.Array)
         {
-            return ImportResult.From(0, 0, 0,
+            return ImportResult.From(0, 0, 0, 0,
                 [new ImportRowError(0, "features", "Not a GeoJSON FeatureCollection.")]);
         }
 
@@ -118,7 +117,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             ImportKind.Feeders => await PlanFeedersAsync(readers, cancellationToken),
             ImportKind.Poles => await PlanPolesAsync(readers, warnings, cancellationToken),
             ImportKind.Fixtures => await PlanFixturesAsync(readers, cancellationToken),
-            _ => new WritePlan(0, 0),
+            _ => new WritePlan(0, 0, 0),
         };
 
         var failed = readers.Count(reader => !reader.IsValid);
@@ -128,7 +127,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             // Nothing tracked, so nothing to commit. Detach anything a planner attached before it
             // discovered the row was bad, so a later request in the same scope starts clean.
             dbContext.ChangeTracker.Clear();
-            return ImportResult.From(0, 0, failed, errors, warnings);
+            return ImportResult.From(0, 0, plan.Unchanged, failed, errors, warnings);
         }
 
         // One transaction for the whole batch. `await using` rolls back on any escape — including the
@@ -138,15 +137,15 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return ImportResult.From(plan.Inserted, plan.Updated, failed, errors, warnings);
+        return ImportResult.From(plan.Inserted, plan.Updated, plan.Unchanged, failed, errors, warnings);
     }
 
-    private sealed record WritePlan(int Inserted, int Updated);
+    private sealed record WritePlan(int Inserted, int Updated, int Unchanged);
 
     private async Task<WritePlan> PlanSegmentsAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<RoadSegment>(readers, segment => segment.ExternalRef, cancellationToken);
-        int inserted = 0, updated = 0;
+        int inserted = 0, updated = 0, unchanged = 0;
 
         foreach (var reader in readers)
         {
@@ -170,8 +169,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 segment.LengthM = length;
                 segment.Geom = geometry!;
                 segment.DataSource = dataSource;
-                segment.UpdatedAt = DateTime.UtcNow;
-                updated++;
+                Count(segment, ref updated, ref unchanged);
                 continue;
             }
 
@@ -187,17 +185,18 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             };
 
             dbContext.Set<RoadSegment>().Add(created);
+            Touch(created);
             existing[(communeId!, externalRef!)] = created;
             inserted++;
         }
 
-        return new WritePlan(inserted, updated);
+        return new WritePlan(inserted, updated, unchanged);
     }
 
     private async Task<WritePlan> PlanFeedersAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<Feeder>(readers, feeder => feeder.ExternalRef, cancellationToken);
-        int inserted = 0, updated = 0;
+        int inserted = 0, updated = 0, unchanged = 0;
 
         foreach (var reader in readers)
         {
@@ -222,8 +221,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             {
                 feeder.FeederName = name!;
                 feeder.Geom = geometry;
-                feeder.UpdatedAt = DateTime.UtcNow;
-                updated++;
+                Count(feeder, ref updated, ref unchanged);
                 continue;
             }
 
@@ -236,11 +234,12 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             };
 
             dbContext.Set<Feeder>().Add(created);
+            Touch(created);
             existing[(communeId!, externalRef!)] = created;
             inserted++;
         }
 
-        return new WritePlan(inserted, updated);
+        return new WritePlan(inserted, updated, unchanged);
     }
 
     private async Task<WritePlan> PlanPolesAsync(
@@ -250,7 +249,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         var segments = await ReferenceIndexAsync<RoadSegment>(readers, "segment_external_ref", cancellationToken);
         var feeders = await ReferenceIndexAsync<Feeder>(readers, "feeder_external_ref", cancellationToken);
 
-        int inserted = 0, updated = 0;
+        int inserted = 0, updated = 0, unchanged = 0;
 
         foreach (var reader in readers)
         {
@@ -298,9 +297,8 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 pole.Geom = geometry!;
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
-                pole.UpdatedAt = DateTime.UtcNow;
                 ImportNote(reader, pole, note, warnings);
-                updated++;
+                Count(pole, ref updated, ref unchanged);
                 continue;
             }
 
@@ -313,43 +311,55 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 Geom = geometry!,
                 NearSensitivePoi = nearPoi,
                 DataSource = dataSource,
+                Note = note,
             };
-            ImportNote(reader, created, note, warnings);
 
             dbContext.Set<Pole>().Add(created);
+            Touch(created);
             existing[(communeId!, externalRef!)] = created;
             inserted++;
         }
 
-        return new WritePlan(inserted, updated);
+        return new WritePlan(inserted, updated, unchanged);
     }
 
     /// <summary>
-    /// A file note fills a pole that has NEVER had one; it never overwrites or clears (POLE-NOTE, drift N-4).
+    /// A note in the file overwrites the pole's note; a blank cell or a missing column keeps it (drift POLE-NOTE N-4).
     /// </summary>
     /// <remarks>
-    /// An engineer may have changed the note on site since the file was written, so a re-imported inventory
-    /// file must not put the old text back — nor resurrect a note someone deliberately cleared, which is why
-    /// "never had one" is <c>note_updated_at IS NULL</c>, not <c>note IS NULL</c>. A different note is
-    /// reported as a warning, not an error: the rest of the row is still applied.
+    /// Replacing a DIFFERENT note is reported as a warning that carries the old text: there is no note
+    /// history, and a stale inventory file re-imported over an engineer's edit is otherwise lost without a
+    /// trace. The import never clears a note — that is a decision for the pole itself, not a gap in a file.
     /// </remarks>
-    private void ImportNote(ImportRowReader reader, Pole pole, string? note, List<ImportRowError> warnings)
+    private static void ImportNote(ImportRowReader reader, Pole pole, string? note, List<ImportRowError> warnings)
     {
         if (note is null || note == pole.Note)
         {
             return;
         }
 
-        if (pole.NoteUpdatedAt is null)
+        if (pole.Note is not null)
         {
-            PoleNoteInput.Stamp(pole, note, actor, UtcMicrosecondClock.UtcNow());
-            return;
+            warnings.Add(new ImportRowError(reader.Row.Row, "note", $"Replaced the pole's previous note: \"{pole.Note}\""));
         }
 
-        warnings.Add(new ImportRowError(reader.Row.Row, "note", pole.Note is null
-            ? "The pole's note was cleared after it was written; the import does not restore it. Edit the note on the pole instead."
-            : "The pole already has a different note; the import never overwrites one. Edit the note on the pole instead."));
+        pole.Note = note;
     }
+
+    /// <summary>An existing row the file matched: <c>updated</c> only if a value really changed.</summary>
+    private void Count(IUpdateStamped asset, ref int updated, ref int unchanged)
+    {
+        if (Touch(asset))
+        {
+            updated++;
+        }
+        else
+        {
+            unchanged++;
+        }
+    }
+
+    private bool Touch(IUpdateStamped asset) => AssetStamp.Touch(dbContext, asset, actor);
 
     /// <summary>
     /// Fixtures are INSERT-ONLY — see <see cref="Fixture"/> and the note on
@@ -408,7 +418,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
             // the pole carrying it, and letting the file say otherwise would let the two drift with
             // nothing to detect it. The reference index already carries the commune (BE-REVIEW-02,
             // F-03): this used to be one extra query per row.
-            dbContext.Set<Fixture>().Add(new Fixture
+            var fixture = new Fixture
             {
                 PoleId = poleId!,
                 CommuneId = pole!.CommuneId,
@@ -419,12 +429,14 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 RemovedDate = removedDate,
                 WarrantyExpiry = warranty,
                 DataSource = dataSource,
-            });
+            };
+            dbContext.Set<Fixture>().Add(fixture);
+            Touch(fixture);
 
             inserted++;
         }
 
-        return new WritePlan(inserted, 0);
+        return new WritePlan(inserted, 0, 0);
     }
 
     /// <summary>

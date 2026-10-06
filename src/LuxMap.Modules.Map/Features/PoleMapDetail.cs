@@ -55,8 +55,8 @@ public sealed record PoleMapDetail
     /// <summary>Representative frames of published passes the caller may open, newest first, at most 10.</summary>
     public required IReadOnlyList<PoleMapFrame> RecentFrames { get; init; }
 
-    /// <summary>The engineer's note on this spot (POLE-NOTE), the same shape as the inventory's; <c>null</c> when none.</summary>
-    public PoleNote? Note { get; init; }
+    /// <summary>The free-text note on this spot (POLE-NOTE), the same text as the inventory's; <c>null</c> when none.</summary>
+    public string? Note { get; init; }
 }
 
 public sealed record PoleMapLocation(double Lat, double Lng);

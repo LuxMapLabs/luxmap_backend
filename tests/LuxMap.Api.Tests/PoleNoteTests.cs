@@ -21,42 +21,43 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
     private const double Lng = 107.71;
     private const double Lat = 11.71;
 
+    private const string ManagerName = "BE-12a commune-scoped manager";
+
     private static string NoteUrl(string poleId) => $"/api/v1/assets/poles/{poleId}/note";
 
     [Fact]
-    public async Task A_field_engineer_writes_a_note_and_all_three_reads_show_it_with_who_and_when()
+    public async Task A_field_engineer_writes_a_note_and_all_three_reads_show_it()
     {
         var poleId = await NewPoleAsync(fixture.CommuneId);
         var engineer = await fixture.FieldEngineerClientAsync();
 
         var response = await engineer.PutAsJsonAsync(NoteUrl(poleId), new { note = "  Trước cổng trường tiểu học, giờ tan học đông xe.  " });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var written = (await Json(response)).GetProperty("note");
-        Assert.Equal("Trước cổng trường tiểu học, giờ tan học đông xe.", written.GetProperty("text").GetString());
+        var written = await Json(response);
+        Assert.Equal("Trước cổng trường tiểu học, giờ tan học đông xe.", written.GetProperty("note").GetString());
         Assert.Equal("Kỹ sư hiện trường thử", written.GetProperty("updated_by_name").GetString());
         Assert.StartsWith("USR-", written.GetProperty("updated_by").GetString());
 
         var manager = await fixture.ManagerClientAsync();
-        var inventory = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole").GetProperty("note");
-        var map = (await Json(await manager.GetAsync($"/api/v1/map/poles/{poleId}"))).GetProperty("note");
+        var inventory = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole");
+        var map = await Json(await manager.GetAsync($"/api/v1/map/poles/{poleId}"));
 
-        foreach (var read in new[] { inventory, map })
-        {
-            Assert.Equal(written.GetProperty("text").GetString(), read.GetProperty("text").GetString());
-            Assert.Equal(written.GetProperty("updated_by").GetString(), read.GetProperty("updated_by").GetString());
-            Assert.Equal(written.GetProperty("updated_at").GetString(), read.GetProperty("updated_at").GetString());
-        }
+        Assert.Equal(written.GetProperty("note").GetString(), inventory.GetProperty("note").GetString());
+        Assert.Equal(written.GetProperty("note").GetString(), map.GetProperty("note").GetString());
+        Assert.Equal(written.GetProperty("updated_by").GetString(), inventory.GetProperty("updated_by").GetString());
+        Assert.Equal(written.GetProperty("updated_at").GetString(), inventory.GetProperty("updated_at").GetString());
     }
 
     [Fact]
-    public async Task A_manager_overwrites_it_and_null_or_blank_clears_it_but_keeps_who_cleared()
+    public async Task A_manager_overwrites_it_and_null_or_blank_clears_it_and_becomes_the_last_editor()
     {
         var poleId = await NewPoleAsync(fixture.CommuneId);
         var manager = await fixture.ManagerClientAsync();
 
         await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "ghi chú đầu" });
         var overwritten = await Json(await manager.PutAsJsonAsync(NoteUrl(poleId), new { note = "ghi chú của quản lý" }));
-        Assert.Equal("ghi chú của quản lý", overwritten.GetProperty("note").GetProperty("text").GetString());
+        Assert.Equal("ghi chú của quản lý", overwritten.GetProperty("note").GetString());
+        Assert.Equal(ManagerName, overwritten.GetProperty("updated_by_name").GetString());
 
         foreach (var clear in new object[] { new { note = (string?)null }, new { note = "   " } })
         {
@@ -64,11 +65,23 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
             Assert.Equal(JsonValueKind.Null, cleared.GetProperty("note").ValueKind);
         }
 
-        var stored = await fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AsNoTracking().Where(p => p.PoleId == poleId)
-            .Select(p => new { p.Note, p.NoteUpdatedBy, p.NoteUpdatedAt }).SingleAsync());
+        var stored = await StoredPoleAsync(poleId);
         Assert.Null(stored.Note);
-        Assert.NotNull(stored.NoteUpdatedBy);
-        Assert.NotNull(stored.NoteUpdatedAt);
+        Assert.Equal(overwritten.GetProperty("updated_by").GetString(), stored.UpdatedBy);
+    }
+
+    /// <summary>Re-sending the note a pole already has is not an edit: nobody becomes its last editor.</summary>
+    [Fact]
+    public async Task Sending_the_same_note_again_changes_nothing()
+    {
+        var poleId = await NewPoleAsync(fixture.CommuneId);
+        await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "cột nghiêng" });
+        var before = await StoredPoleAsync(poleId);
+
+        var again = await (await fixture.ManagerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "  cột nghiêng " });
+
+        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+        Assert.Equal(before, await StoredPoleAsync(poleId));
     }
 
     [Fact]
@@ -100,36 +113,39 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
     /// <summary>
     /// The full-replacement PUT clears whatever its body leaves out (a decision, see
     /// <c>Replacing_a_pole_without_a_feeder_id_clears_its_circuit</c>) — except the note: a form that
-    /// predates it must not wipe what an engineer wrote, nor make the manager its author.
+    /// predates it must not wipe it. A PUT that changes nothing leaves the last editor and time alone.
     /// </summary>
     [Fact]
-    public async Task Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author()
+    public async Task Replacing_the_pole_without_the_note_key_keeps_the_note()
     {
         var poleId = await NewPoleAsync(fixture.CommuneId);
-        var written = await Json(await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "cột nghiêng" }));
+        await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "cột nghiêng" });
         var manager = await fixture.ManagerClientAsync();
 
         Assert.Equal(HttpStatusCode.NoContent, (await ReplaceAsync(manager, poleId, new { near_sensitive_poi = true })).StatusCode);
+        var edited = await StoredPoleAsync(poleId);
+        Assert.Equal("cột nghiêng", edited.Note);
+
         Assert.Equal(HttpStatusCode.NoContent, (await ReplaceAsync(manager, poleId, new { near_sensitive_poi = true, note = "cột nghiêng" })).StatusCode);
+        Assert.Equal(edited, await StoredPoleAsync(poleId));
 
         var after = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole");
         Assert.True(after.GetProperty("near_sensitive_poi").GetBoolean());
-        Assert.Equal("cột nghiêng", after.GetProperty("note").GetProperty("text").GetString());
-        Assert.Equal(written.GetProperty("note").GetProperty("updated_by").GetString(), after.GetProperty("note").GetProperty("updated_by").GetString());
-        Assert.Equal(written.GetProperty("note").GetProperty("updated_at").GetString(), after.GetProperty("note").GetProperty("updated_at").GetString());
+        Assert.Equal("cột nghiêng", after.GetProperty("note").GetString());
+        Assert.Equal(ManagerName, after.GetProperty("updated_by_name").GetString());
     }
 
     [Fact]
-    public async Task The_edit_form_overwrites_or_clears_the_note_and_the_manager_becomes_its_author()
+    public async Task The_edit_form_overwrites_or_clears_the_note()
     {
         var poleId = await NewPoleAsync(fixture.CommuneId);
         await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "ghi chú của kỹ sư" });
         var manager = await fixture.ManagerClientAsync();
 
         await ReplaceAsync(manager, poleId, new { note = "  quản lý sửa  " });
-        var edited = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole").GetProperty("note");
-        Assert.Equal("quản lý sửa", edited.GetProperty("text").GetString());
-        Assert.Equal("BE-12a commune-scoped manager", edited.GetProperty("updated_by_name").GetString());
+        var edited = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole");
+        Assert.Equal("quản lý sửa", edited.GetProperty("note").GetString());
+        Assert.Equal(ManagerName, edited.GetProperty("updated_by_name").GetString());
 
         await ReplaceAsync(manager, poleId, new { note = (string?)null });
         var cleared = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{poleId}"))).GetProperty("pole");
@@ -151,8 +167,9 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
 
         var created = await manager.PostAsJsonAsync("/api/v1/assets/poles", Body("Gần chợ"));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var detail = (await Json(await manager.GetAsync(created.Headers.Location!))).GetProperty("pole").GetProperty("note");
-        Assert.Equal("Gần chợ", detail.GetProperty("text").GetString());
+        var detail = (await Json(await manager.GetAsync(created.Headers.Location!))).GetProperty("pole");
+        Assert.Equal("Gần chợ", detail.GetProperty("note").GetString());
+        Assert.Equal(ManagerName, detail.GetProperty("updated_by_name").GetString());
 
         var withoutNote = await manager.PostAsJsonAsync("/api/v1/assets/poles", Body(null));
         Assert.Equal(JsonValueKind.Null, (await Json(await manager.GetAsync(withoutNote.Headers.Location!))).GetProperty("pole").GetProperty("note").ValueKind);
@@ -161,66 +178,57 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task The_import_fills_a_note_on_a_new_pole_and_on_a_pole_that_never_had_one()
+    public async Task The_import_writes_a_note_and_the_importer_becomes_the_last_editor()
     {
         var manager = await fixture.ManagerClientAsync();
         var tag = await ImportSegmentAsync(manager);
 
         var created = await ImportPolesAsync(manager, tag, ("P1", "\"Gần trường TH Long Phước, tan học 17h\""), ("P2", ""));
         Assert.Equal(2, created.GetProperty("inserted").GetInt32());
-        Assert.Equal(0, created.GetProperty("total_warnings").GetInt32());
 
         var filled = await ImportPolesAsync(manager, tag, ("P1", "\"Gần trường TH Long Phước, tan học 17h\""), ("P2", "Gần chợ"));
-        Assert.Equal(2, filled.GetProperty("updated").GetInt32());
+        Assert.Equal(1, filled.GetProperty("updated").GetInt32());
+        Assert.Equal(1, filled.GetProperty("unchanged").GetInt32());
         Assert.Equal(0, filled.GetProperty("total_warnings").GetInt32());
 
-        var p1 = await StoredNoteAsync(tag, "P1");
-        var p2 = await StoredNoteAsync(tag, "P2");
+        var p1 = await StoredPoleAsync(await PoleIdAsync(tag, "P1"));
+        var p2 = await StoredPoleAsync(await PoleIdAsync(tag, "P2"));
         Assert.Equal("Gần trường TH Long Phước, tan học 17h", p1.Note);
         Assert.Equal("Gần chợ", p2.Note);
-        Assert.Equal(p1.NoteUpdatedBy, p2.NoteUpdatedBy);
-        Assert.Equal("BE-12a commune-scoped manager", await fixture.QueryAsync(db =>
-            db.Set<Modules.Identity.Entities.AppUser>().Where(u => u.UserId == p1.NoteUpdatedBy).Select(u => u.FullName).SingleAsync()));
+        Assert.Equal(p1.UpdatedBy, p2.UpdatedBy);
+        Assert.Equal(ManagerName, await fixture.QueryAsync(db =>
+            db.Set<Modules.Identity.Entities.AppUser>().Where(u => u.UserId == p1.UpdatedBy).Select(u => u.FullName).SingleAsync()));
     }
 
     /// <summary>
-    /// An engineer may have changed the note on site since the inventory file was written: re-importing that
-    /// file must neither put the old text back nor resurrect a note someone cleared. The row's other fields
-    /// still apply, and the skipped note comes back as a warning rather than an error.
+    /// The file is the inventory, so a note in it overwrites — but there is no note history, so replacing a
+    /// DIFFERENT note comes back as a warning quoting the old text. A blank cell never clears a note.
     /// </summary>
     [Fact]
-    public async Task The_import_never_overwrites_or_restores_a_note_and_warns_instead()
+    public async Task The_import_overwrites_a_different_note_warning_with_the_old_text_and_never_clears_one()
     {
         var manager = await fixture.ManagerClientAsync();
-        var engineer = await fixture.FieldEngineerClientAsync();
         var tag = await ImportSegmentAsync(manager);
         await ImportPolesAsync(manager, tag, ("P1", "ghi chú trong file"));
-        var poleId = (await StoredNoteAsync(tag, "P1")).PoleId;
-
-        await engineer.PutAsJsonAsync(NoteUrl(poleId), new { note = "kỹ sư sửa ngoài hiện trường" });
-        var edited = await StoredNoteAsync(tag, "P1");
+        var poleId = await PoleIdAsync(tag, "P1");
+        await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(NoteUrl(poleId), new { note = "kỹ sư sửa ngoài hiện trường" });
 
         var overwrite = await ImportPolesAsync(manager, tag, ("P1", "ghi chú trong file"));
         Assert.Equal(1, overwrite.GetProperty("updated").GetInt32());
-        Assert.Equal(0, overwrite.GetProperty("failed").GetInt32());
         var warning = Assert.Single(overwrite.GetProperty("warnings").EnumerateArray());
         Assert.Equal("note", warning.GetProperty("column").GetString());
         Assert.Equal(2, warning.GetProperty("row").GetInt32());
-        Assert.Equal(edited, await StoredNoteAsync(tag, "P1"));
+        Assert.Contains("kỹ sư sửa ngoài hiện trường", warning.GetProperty("message").GetString());
+        var overwritten = await StoredPoleAsync(poleId);
+        Assert.Equal("ghi chú trong file", overwritten.Note);
 
-        foreach (var unchanged in new[] { "", "kỹ sư sửa ngoài hiện trường" })
+        foreach (var keep in new[] { "", "ghi chú trong file" })
         {
-            Assert.Equal(0, (await ImportPolesAsync(manager, tag, ("P1", unchanged))).GetProperty("total_warnings").GetInt32());
-            Assert.Equal(edited, await StoredNoteAsync(tag, "P1"));
+            var result = await ImportPolesAsync(manager, tag, ("P1", keep));
+            Assert.Equal(1, result.GetProperty("unchanged").GetInt32());
+            Assert.Equal(0, result.GetProperty("total_warnings").GetInt32());
+            Assert.Equal(overwritten, await StoredPoleAsync(poleId));
         }
-
-        await engineer.PutAsJsonAsync(NoteUrl(poleId), new { note = (string?)null });
-        var cleared = await StoredNoteAsync(tag, "P1");
-
-        var restore = await ImportPolesAsync(manager, tag, ("P1", "ghi chú trong file"));
-        Assert.Equal(1, restore.GetProperty("total_warnings").GetInt32());
-        Assert.Null((await StoredNoteAsync(tag, "P1")).Note);
-        Assert.Equal(cleared, await StoredNoteAsync(tag, "P1"));
     }
 
     [Fact]
@@ -256,12 +264,16 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
             + string.Concat(rows.Select(row => string.Create(CultureInfo.InvariantCulture,
                 $"\n{tag}-{row.Suffix},{tag}-S1,{fixture.CommuneId},POINT({Lng} {Lat}),public_imagery,{row.Note}"))));
 
-    private Task<StoredNote> StoredNoteAsync(string tag, string suffix)
-        => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AsNoTracking()
-            .Where(p => p.ExternalRef == $"{tag}-{suffix}")
-            .Select(p => new StoredNote(p.PoleId, p.Note, p.NoteUpdatedBy, p.NoteUpdatedAt)).SingleAsync());
+    private Task<string> PoleIdAsync(string tag, string suffix)
+        => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters()
+            .Where(p => p.ExternalRef == $"{tag}-{suffix}").Select(p => p.PoleId).SingleAsync());
 
-    private sealed record StoredNote(string PoleId, string? Note, string? NoteUpdatedBy, DateTime? NoteUpdatedAt);
+    private Task<StoredPole> StoredPoleAsync(string poleId)
+        => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.PoleId == poleId)
+            .Select(p => new StoredPole(p.Note, p.UpdatedBy, p.UpdatedAt)).SingleAsync());
+
+    private sealed record StoredPole(string? Note, string? UpdatedBy, DateTime UpdatedAt);
 
     /// <summary>The full-replacement PUT with the pole's current values, plus whatever <paramref name="change"/> overrides.</summary>
     private async Task<HttpResponseMessage> ReplaceAsync(HttpClient manager, string poleId, object change)
@@ -292,8 +304,6 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
             {
                 var pole = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.PoleId == poleId);
                 pole.Note = new string('x', 1001);
-                pole.NoteUpdatedBy = await db.Set<Modules.Identity.Entities.AppUser>().Select(u => u.UserId).FirstAsync();
-                pole.NoteUpdatedAt = DateTime.UtcNow;
                 return await db.SaveChangesAsync();
             }
         }));
