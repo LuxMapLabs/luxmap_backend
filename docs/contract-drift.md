@@ -941,14 +941,15 @@ mật khẩu" gọi `/auth/password/forgot`, link mở trên trình duyệt). **
 | Mã | Điểm | Hướng đã làm | Chạm API |
 |---|---|---|---|
 | **N-1** | Ai ghi | Capability mới **`EditPoleNotes`** = Quản lý + Kỹ sư hiện trường, chỉ cho ghi chú; mọi ghi tài sản khác vẫn `ManageAssets` | **Có** (ma trận §2) |
-| **N-2** | Đường ghi | Ba đường: `PUT /assets/poles/{poleId}/note` (khoá `note` bắt buộc, `null`/rỗng = xoá, ≤ 1000 ký tự → `200 {pole_id, note}`); form tạo `POST /assets/poles` (`note?`); form sửa `PUT /assets/poles/{poleId}` (`note?`, **vắng = giữ nguyên** dù `PUT` là thay thế toàn phần; gửi lại cùng nội dung không đổi tác giả). Import không đụng | **Có** (endpoint mới + trường mới ở 2 request) |
+| **N-2** | Đường ghi | Ba đường: `PUT /assets/poles/{poleId}/note` (khoá `note` bắt buộc, `null`/rỗng = xoá, ≤ 1000 ký tự → `200 {pole_id, note}`); form tạo `POST /assets/poles` (`note?`); form sửa `PUT /assets/poles/{poleId}` (`note?`, **vắng = giữ nguyên** dù `PUT` là thay thế toàn phần; gửi lại cùng nội dung không đổi tác giả). ~~Import không đụng~~ → xem N-4 | **Có** (endpoint mới + trường mới ở 2 request) |
 | **N-3** | Hình dạng đọc | `note: {text, updated_at, updated_by, updated_by_name} \| null`, giống nhau ở 3 nơi; **không** đưa vào lớp bản đồ bbox | **Có** (thêm khoá) |
+| **N-4** | Import (06/10/2026, Mỹ chốt) | Ghi chú dùng cho thông tin vị trí biết từ lúc lập hồ sơ (gần trường, chợ…), nên import nạp được: cột **`note` tuỳ chọn** trong file `poles`. Chỉ ghi vào cột **chưa từng có** ghi chú (`note_updated_at IS NULL`), người nạp file là tác giả. Ô trống / thiếu cột = giữ. **Không bao giờ ghi đè, không khôi phục ghi chú đã xoá** — nạp lại file kiểm kê cũ không được xoá ghi chú kỹ sư sửa ngoài hiện trường; khác nội dung → dòng vẫn áp, trả **`warnings[]`** (trường mới của kết quả import, kèm `total_warnings`). > 1000 ký tự = lỗi dòng. Contract **v1.12**. Cờ `near_sensitive_poi` vẫn phải bật — hệ thống không đọc chữ trong ghi chú | **Có** (cột file mới + trường kết quả mới) |
 
 **Lược đồ:** migration `AddPoleNote` — `pole.note`, `note_updated_by` (FK `app_user`, `Restrict`), `note_updated_at`;
 CHECK `ck_pole_note_length` (≤ 1000) và `ck_pole_note_stamp_together`. Module Assets nay tham chiếu Identity (cùng khuôn Faults).
 
 **Phải báo:** WP5 (màn kiểm kê, chi tiết cột: hiện và sửa ghi chú), WP6 (danh sách cột của phiếu: hiện ghi chú; màn sửa ghi chú
-cho kỹ sư; đưa vào hàng chờ offline khi làm BE-43). **Chưa báo.**
+cho kỹ sư; đưa vào hàng chờ offline khi làm BE-43). **Chưa báo.** N-4: WP5 (modal import hiện `warnings[]`; template `poles.csv` có cột `note`). **Chưa báo.**
 
 ## BE-27 — thông báo trong ứng dụng (05/10/2026)
 

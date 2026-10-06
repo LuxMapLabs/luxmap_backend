@@ -1724,12 +1724,16 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 
 ### POLE-NOTE — ghi chú cột (05/10/2026)
 
-**Ghi chú đi qua ba đường, đều qua `StampNote`:** `PUT /assets/poles/{id}/note` (`EditPoleNotes`, kỹ sư + quản lý),
-form tạo (`POST /assets/poles`, `note?`) và form sửa (`PUT /assets/poles/{id}`). Ở form sửa, `note` là **trường duy nhất
+**Ghi chú đi qua bốn đường, đều qua `PoleNoteInput.Stamp`:** `PUT /assets/poles/{id}/note` (`EditPoleNotes`, kỹ sư + quản lý),
+form tạo (`POST /assets/poles`, `note?`), form sửa (`PUT /assets/poles/{id}`) và import cột (cột `note` tuỳ chọn, drift N-4). Ở form sửa, `note` là **trường duy nhất
 GIỮ NGUYÊN khi vắng** trong một `PUT` thay thế toàn phần (đọc bằng `PoleNoteInput.Read`, `JsonElement`): đừng "sửa cho
 nhất quán" thành vắng = xoá — form cũ chưa có ô ghi chú sẽ xoá sạch ghi chú của kỹ sư (cùng họ bẫy `feeder_id`). Gửi lại
-**cùng** nội dung thì không ghi lại tác giả. Import không đụng ghi chú. Canh bằng
-`Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author`. Đặt ghi chú cũng dời `pole.updated_at` để sync
+**cùng** nội dung thì không ghi lại tác giả. Canh bằng
+`Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author`.
+**Import chỉ ĐIỀN, không bao giờ ghi đè:** ghi khi `note_updated_at IS NULL` (chưa từng có), **không** khi `note IS NULL` —
+ghi chú đã bị xoá có chủ ý không được nạp lại file cũ khôi phục. Khác nội dung là `warnings[]`, không phải lỗi dòng. Đừng
+"sửa cho tiện" thành ghi đè: file kiểm kê cũ sẽ xoá ghi chú kỹ sư vừa sửa ngoài hiện trường. Canh bằng
+`The_import_never_overwrites_or_restores_a_note_and_warns_instead` (phá thử cả hai điều kiện đều đỏ). Đặt ghi chú cũng dời `pole.updated_at` để sync
 offline (BE-43) thấy cột đã đổi. Trường `JsonElement` mới trong request phải thêm vào `JsonElementFieldSchemaFilter`,
 nếu không spec ra `{}` và FM-04 sinh `Any`.
 

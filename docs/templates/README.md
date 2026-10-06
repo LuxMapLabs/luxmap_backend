@@ -118,16 +118,31 @@ Không điền, không thêm cột. Gửi lên sẽ bị từ chối chứ khôn
 `commune_id` và các cột `*_external_ref` là thứ được dùng, và trong template **không còn cột tên
 nào đi kèm**.
 
-`poles.csv` từng có `segment_name` / `feeder_name` "chỉ để đọc". Đã **bỏ hẳn**: kết quả import chỉ
-có lỗi theo dòng, **không có kênh cảnh báo**, nên một cái tên gõ sai sẽ bị nuốt im lặng — người
-điền tin là mình đã khai một thứ, hệ thống không khai gì cả, và không ai biết. Cột trang trí mà
-không kiểm được thì tệ hơn là không có cột. Nếu sau này muốn giữ tên để đọc thì phải thêm
-`warnings[]` vào kết quả import trước — đó là đổi hình dạng response, phải qua Thịnh/Ngọc.
+`poles.csv` từng có `segment_name` / `feeder_name` "chỉ để đọc". Đã **bỏ hẳn**: một cái tên gõ sai
+sẽ bị nuốt im lặng — người điền tin là mình đã khai một thứ, hệ thống không khai gì cả, và không ai
+biết. Cột trang trí mà không kiểm được thì tệ hơn là không có cột. Kết quả import **đã có**
+`warnings[]` từ Contract v1.12, nhưng hiện chỉ dùng cho `note` (mục dưới); đưa lại cột tên để đọc vẫn
+là quyết định riêng, phải qua Thịnh/Ngọc.
 
 **Không có `commune_name` ở đâu cả, và đó là chủ đích** — cùng một lý do. Người soạn file kiểm kê
 của xã mình biết rõ mình đang ở xã nào; thêm cột tên vào cả ba file không giúp gì mà **nhân ba cơ
 hội lệch dữ liệu**. `segment_name` vẫn là cột **thật** trong `segments.csv` vì nó được LƯU vào
 `road_segment.segment_name`; điều vừa bỏ là bản sao chỉ-để-đọc của nó trong `poles.csv`.
+
+### `note` trong `poles.csv` — tuỳ chọn, chỉ ĐIỀN, không bao giờ ghi đè
+
+Ghi chú tự do về **vị trí cột**, tối đa 1000 ký tự: *"Cạnh cổng trường TH Long Phước, tan học 17h"*.
+Có dấu phẩy thì bọc ô trong nháy kép. Cột này **không bắt buộc** trong header.
+
+- **Vẫn phải bật `near_sensitive_poi = true`** cho cột gần trường, chợ, cầu, ngã ba. Hệ thống dùng
+  cờ đó (biểu tượng trên bản đồ, mức ưu tiên); chữ trong ghi chú chỉ để người đọc, không gì tính từ nó.
+- Ghi chú chỉ được ghi vào cột **chưa từng có ghi chú**. Người nạp file đứng tên tác giả.
+- Ô trống, hoặc file không có cột `note` → ghi chú trên cột giữ nguyên.
+- Cột **đã có** ghi chú khác nội dung — kể cả ghi chú đã bị xoá — thì **không ghi đè, không khôi phục**:
+  các trường khác của dòng vẫn được nạp, ghi chú giữ nguyên, kết quả trả một mục trong `warnings[]`.
+  Lý do: kỹ sư có thể đã sửa ghi chú ngoài hiện trường; nạp lại một file kiểm kê cũ không được xoá
+  điều đó. Muốn sửa thì sửa trên cột (form hoặc `PUT /assets/poles/{id}/note`).
+- Quá 1000 ký tự → lỗi dòng, dòng đó không được nạp.
 
 ### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 

@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.11 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.12 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -10,11 +10,12 @@
 **v1.8:** 05/10/2026 (BE-33a — Quản trị hệ thống tạo tài khoản và mời qua email; gỡ `POST /auth/register`) ·
 **v1.9:** 05/10/2026 (POLE-NOTE — ghi chú của kỹ sư trên cột) ·
 **v1.10:** 05/10/2026 (BE-27 — thông báo trong ứng dụng, đọc bằng polling) ·
-**v1.11:** 06/10/2026 (`GET /faults/{fault_id}` — chi tiết một sự cố, drift N-6).
+**v1.11:** 06/10/2026 (`GET /faults/{fault_id}` — chi tiết một sự cố, drift N-6) ·
+**v1.12:** 06/10/2026 (import cột nhận cột `note` tuỳ chọn, kết quả import thêm `warnings[]`).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.11, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.12, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
@@ -576,9 +577,9 @@ do Quản lý **và** Kỹ sư hiện trường ghi (`EditPoleNotes`, v1.9).
 | **`POST /api/v1/assets/fixtures`** | `{pole_id, fixture_type, power_source, lamp_watt, install_date, removed_date?, warranty_expiry?, data_source}` — `commune_id` chép từ cột | `201` + `Location`; `409 POLE_HAS_ACTIVE_FIXTURE`; `400` nếu `removed_date < install_date` |
 | **`DELETE /api/v1/assets/poles/{poleId}`** | — | `204`; `404 ASSET_NOT_FOUND`; `409 ASSET_IN_USE` (khoá ngoại từ chối — kể cả qua bóng của cột) |
 | **`PUT /api/v1/assets/poles/{poleId}/feeder`** | `{"feeder_id": "FDR-001" \| null}` — khoá **bắt buộc**, `null` = không mạch | `204`; thiếu khoá → `400`; `409 CROSS_COMMUNE_REFERENCE` |
-| **`PUT /api/v1/assets/poles/{poleId}/note`** (v1.9) | `{"note": "…" \| null}` — khoá **bắt buộc**; `null` hoặc chuỗi rỗng = xoá ghi chú; tối đa **1000** ký tự sau khi bỏ khoảng trắng đầu cuối | **`200`** `{pole_id, note: {text, updated_at, updated_by, updated_by_name} \| null}`; thiếu khoá / quá dài → `400`; cột ngoài phạm vi xã → `404 ASSET_NOT_FOUND`. Ghi chú cũng nhập được ở form tạo / sửa cột (Quản lý, xem hai dòng trên); import **không** đụng tới ghi chú |
+| **`PUT /api/v1/assets/poles/{poleId}/note`** (v1.9) | `{"note": "…" \| null}` — khoá **bắt buộc**; `null` hoặc chuỗi rỗng = xoá ghi chú; tối đa **1000** ký tự sau khi bỏ khoảng trắng đầu cuối | **`200`** `{pole_id, note: {text, updated_at, updated_by, updated_by_name} \| null}`; thiếu khoá / quá dài → `400`; cột ngoài phạm vi xã → `404 ASSET_NOT_FOUND`. Ghi chú cũng nhập được ở form tạo / sửa cột (Quản lý, xem hai dòng trên) và qua import cột (v1.12, dòng dưới) |
 | **`PUT /api/v1/assets/fixtures/{fixtureId}/removal`** | `{removed_date}` | `204`; `400` nếu trước `install_date` hoặc đã ngừng dùng |
-| **`POST /api/v1/assets/import/{kind}`** | multipart `file` ≤ 10 MB, `kind ∈ segments\|feeders\|poles\|fixtures`, `.csv`/`.geojson`/`.json` | **`200`** `{inserted, updated, failed, total_errors, truncated, rows[]{row, column, message}}` — 200 kể cả khi có dòng hỏng; `rows[]` cắt ở 100; `400` kind sai; `415` đuôi file sai |
+| **`POST /api/v1/assets/import/{kind}`** | multipart `file` ≤ 10 MB, `kind ∈ segments\|feeders\|poles\|fixtures`, `.csv`/`.geojson`/`.json` | **`200`** `{inserted, updated, failed, total_errors, truncated, rows[]{row, column, message}, total_warnings, warnings[]{row, column, message}}` — 200 kể cả khi có dòng hỏng; `rows[]` và `warnings[]` cắt ở 100; `400` kind sai; `415` đuôi file sai. **Cột `note` tuỳ chọn của `poles` (v1.12):** chỉ ghi vào cột **chưa từng có ghi chú** (người nạp file là tác giả); ô trống hay thiếu cột = giữ nguyên; **không bao giờ ghi đè hay khôi phục** — cột đã có (hoặc đã xoá) ghi chú khác nội dung thì dòng vẫn được áp, ghi chú giữ nguyên và trả một mục `warnings[]` (`column = "note"`); quá 1000 ký tự = lỗi dòng. Cảnh báo không tính vào `failed` |
 
 Nhập: kiểm **toàn bộ** file trước, ghi tập hợp lệ trong **một** transaction. Upsert theo
 `(commune_id, external_ref)` cho tuyến/mạch/cột; bóng **insert-only** (từ chối khi cột đang có bóng
@@ -857,6 +858,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.12 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **Import cột nhận ghi chú** (mục 5.3, drift POLE-NOTE N-4): cột `note` tuỳ chọn trong file `poles`, chỉ điền cột **chưa từng có** ghi chú, không bao giờ ghi đè hay khôi phục ghi chú đã xoá. Kết quả import thêm `total_warnings` + `warnings[]{row, column, message}` (dòng vẫn áp nhưng một phần không được áp). Chỉ **thêm**; v1.9 ghi "import không đụng ghi chú" nay hết đúng. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.11 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | Thêm `GET /faults/{fault_id}` (mục 5.4): một sự cố đúng hình dạng item danh sách; ngoài phạm vi = không tồn tại = `404 FAULT_NOT_FOUND`. Thông báo `fault_reported` mở thẳng được sự cố. Chỉ thêm. Đóng drift N-6 |
 | v1.10 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-27 — thông báo trong ứng dụng.** Thêm mục 5.9 (4 endpoint `/notifications`, 11 `type`), capability `ReadNotifications` (cả bốn vai trò), prefix `NTF` (6 chữ số). Chỉ thêm, không đổi gì đã có. Drift BE-27 (N-1…N-6). Nền tạm tới FW |
 | v1.9 | 05/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **POLE-NOTE — ghi chú của kỹ sư trên cột.** Thêm `note?` vào `POST /assets/poles` và `PUT /assets/poles/{poleId}` (ở `PUT`: vắng = giữ nguyên), thêm `PUT /assets/poles/{poleId}/note` (capability mới **`EditPoleNotes`** = Quản lý + Kỹ sư hiện trường, mục 2) và trường `note: {text, updated_at, updated_by, updated_by_name} \| null` ở danh sách/chi tiết kiểm kê (5.3.1), `GET /map/poles/{pole_id}` và `GET /work-orders/{id}/poles`. Một ghi chú mỗi cột, ghi đè, ≤ 1000 ký tự. Không đổi trường nào có sẵn — chỉ **thêm**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
