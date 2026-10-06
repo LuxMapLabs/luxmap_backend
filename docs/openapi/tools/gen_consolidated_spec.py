@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.13"
+d["info"]["version"] = "1.14"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -38,6 +38,7 @@ d["info"]["description"] = (
     "v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. "
     "v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. "
     "v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. "
+    "v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -169,6 +170,7 @@ for method, suffix, summary in [
     ("post", "/{id}/evidence", "[BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra); JPEG theo magic bytes; client_op_id cho lần gửi lại"),
     ("get", "/{id}/evidence", "[BE-24] Ảnh của phiếu theo thời điểm chụp, kèm đường dẫn ảnh qua API"),
     ("get", "/{id}/poles", "[WO-12] Cột trên đoạn được giao + trạng thái đèn lần khảo sát đã duyệt gần nhất, theo thứ tự dọc đường — biết TRƯỚC khi đi"),
+    ("get", "/agenda", "[BE-25] Việc đêm nay của một kỹ sư, gom theo tuyến, tuyến gần nhất trước khi có near=lat,lng; kỹ sư xem của mình, vai trò khác phải truyền assigned_to"),
     ("post", "", "Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)"),
     ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),

@@ -15,7 +15,8 @@ namespace LuxMap.Modules.WorkOrders;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/work-orders")]
-public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles, WorkOrderEvidenceService evidence) : ControllerBase
+public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles, WorkOrderEvidenceService evidence,
+    WorkOrderAgendaService agenda) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
@@ -32,6 +33,17 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
         => service.List(statuses?.Split(',').Select(x => Wire<WorkOrderStatus>(x, "wo_status")).ToArray(),
             kind is null ? null : Wire<TaskKind>(kind, "task_kind"), assigned, segment, communes, from, to, page.ToPageRequest(), ct,
             string.IsNullOrWhiteSpace(caseId) ? null : caseId.Trim());
+
+    /// <summary>
+    /// What one field engineer can work on tonight, grouped by road — nearest road first when <c>near=lat,lng</c> is
+    /// given (BE-25, SELF-SIGNED). A field engineer always gets their own; anyone else must name one in
+    /// <c>assigned_to</c>. <c>night_of</c> defaults to the current night in the communes' time zone.
+    /// </summary>
+    [HttpGet("agenda")]
+    [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
+    public Task<WorkOrderAgenda> Agenda([FromQuery(Name = "night_of")] DateOnly? nightOf,
+        [FromQuery(Name = "near")] string? near, [FromQuery(Name = "assigned_to")] string? assigned, CancellationToken ct)
+        => agenda.AgendaAsync(nightOf, near, assigned, ct);
 
     [HttpGet("{id}")]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
