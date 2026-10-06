@@ -80,7 +80,7 @@ Trước khi bắt đầu một ticket, đọc theo thứ tự:
 
 1. `.ai/context/sources.md` — tra nhanh file nào trả lời câu hỏi gì
 2. `.ai/tasks/<ticket>.md` — phạm vi, tiêu chí xong, và mục **KHÔNG ĐƯỢC làm**
-3. `.ai/context/commands.md` — lệnh build/test/migrate (bản đầy đủ: `README.md`)
+3. `.ai/context/commands.md` — lệnh build/test/migrate (bản đầy đủ: `docs/development.md`; chạy lần đầu: `README.md`)
 
 Ghi kết quả vào `.ai/results/<ticket>.md`, review vào `.ai/reviews/<ticket>-by-<agent>.md`. Quy ước
 đầy đủ, vòng đời ticket và quy tắc hai pha: `.ai/README.md`.

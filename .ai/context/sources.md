@@ -14,7 +14,7 @@ sẽ lệch trong vòng một tuần (`AGENTS.md` đã lệch `CLAUDE.md` 102 d�
 | Viết endpoint mới thì phải làm gì để không hở quyền | `docs/authorization-guide.md` — **đọc trước khi viết** |
 | Đọc code theo thứ tự nào để hiểu hệ thống | `docs/code-walkthrough.md` |
 | Ticket nào xong, ticket nào đang treo | `tracking.html` — **nguồn duy nhất** về tiến độ |
-| Chạy lệnh gì | `README.md`; bản rút gọn ở `.ai/context/commands.md` |
+| Chạy lệnh gì | `README.md` (chạy lần đầu) → `docs/development.md` (đầy đủ); bản rút gọn ở `.ai/context/commands.md` |
 
 ## Ba thứ tuyệt đối không tự ý làm
 
