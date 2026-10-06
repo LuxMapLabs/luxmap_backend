@@ -1032,5 +1032,12 @@ vị trí lấy từ phiếu — không lộ tên hay hình học tuyến của 
 `SyncPoleProperties` của BE-43) — hình dạng JSON không đổi. Phần dựng item của listing tách thành `WorkOrderService.ItemsAsync`, dùng
 chung với agenda. Không migration.
 
-**Phải báo:** WP6 (FM màn mở app: endpoint + luật gom để gom offline giống server; `night_of` mặc định theo mốc 12:00 tạm), WP5 (lịch của
-Quản lý: `assigned_to` bắt buộc). **Chưa báo.**
+**Review (06/10/2026, Claude tự review sau khi hiện thực):** `night_of=06/10/2026` được trả **200** với `night_of = 2026-06-10` — binder
+của framework đọc ngày theo văn hoá bất biến (kiểu Mỹ tháng/ngày). **Cùng lỗi có từ trước** ở `scheduled_from` / `scheduled_to` (BE-23,
+đã thử: lọc `06/10/2026` trả phiếu ngày 10/06) và `from` / `to` của lux (BE-42). Sửa chung: `IsoDateQueryModelBinderProvider` chỉ kiểm
+**hình dạng** ISO rồi giao lại binder cũ (giữ nguyên nghĩa `DateTime` không `Z` = UTC); sai → `400 VALIDATION_FAILED`. Ghi vào Contract mục 0
+(v1.14). Ba điểm còn lại ghi thành câu trong Contract mục 5.5: Quản lý phạm vi một phần thấy agenda thiếu mà không có dấu hiệu;
+`distance_m` tới tuyến chứ không tới chỗ cần làm; vị trí phiếu `null` khi tuyến thuộc xã ngoài phạm vi.
+
+**Phải báo:** WP6 (FM màn mở app: endpoint + luật gom để gom offline giống server; `night_of` mặc định theo mốc 12:00 tạm; **mọi** ngày trên
+query string phải là ISO), WP5 (lịch của Quản lý: `assigned_to` bắt buộc; lọc `scheduled_from/to` phải gửi `YYYY-MM-DD`). **Chưa báo.**
