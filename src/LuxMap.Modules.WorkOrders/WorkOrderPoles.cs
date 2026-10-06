@@ -2,7 +2,6 @@ using System.Net;
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
-using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
@@ -46,8 +45,8 @@ public sealed record WorkOrderPole
     /// <summary>Faults of THIS work order standing on the pole — the poles to repair or inspect.</summary>
     public required string[] WorkOrderFaultIds { get; init; }
 
-    /// <summary>The engineer's note on this spot (POLE-NOTE), read BEFORE the visit; <c>null</c> when none.</summary>
-    public PoleNote? Note { get; init; }
+    /// <summary>The free-text note on this spot (POLE-NOTE), read BEFORE the visit; <c>null</c> when none.</summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>
@@ -102,8 +101,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
             .Select(p => new
             {
                 p.PoleId, p.SegmentId, p.Geom, p.NearSensitivePoi,
-                p.Note, p.NoteUpdatedAt, p.NoteUpdatedBy,
-                NoteUpdatedByName = db.Set<AppUser>().Where(u => u.UserId == p.NoteUpdatedBy).Select(u => u.FullName).FirstOrDefault(),
+                p.Note,
                 Status = db.Set<PoleCurrentStatus>().Where(s => s.PoleId == p.PoleId)
                     .Select(s => new { s.FixtureStatus, s.StatusConfidence, s.LastSeenAt }).FirstOrDefault(),
                 Lamp = db.Set<Fixture>().Where(f => f.PoleId == p.PoleId && f.RemovedDate == null)
@@ -154,7 +152,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 FixtureType = r.Lamp?.FixtureType,
                 LampWatt = r.Lamp?.LampWatt,
                 WorkOrderFaultIds = faultsByPole.GetValueOrDefault(r.PoleId, []),
-                Note = PoleNote.From(r.Note, r.NoteUpdatedAt, r.NoteUpdatedBy, r.NoteUpdatedByName),
+                Note = r.Note,
             };
         }).ToList();
 

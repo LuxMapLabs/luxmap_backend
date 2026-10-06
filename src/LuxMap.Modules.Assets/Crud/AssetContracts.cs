@@ -398,36 +398,16 @@ public sealed record PoleListItem
     /// </summary>
     public ActiveFixture? ActiveFixture { get; init; }
 
-    /// <summary>The engineer's note on this spot (POLE-NOTE); <c>null</c> when there is none.</summary>
-    public PoleNote? Note { get; init; }
-
-    public required DateTime UpdatedAt { get; init; }
-}
-
-/// <summary>
-/// The free-text note on a pole, as every read shows it: inventory, the map's pole detail and a work
-/// order's pole list (POLE-NOTE). <c>null</c> in all three when the pole has no note.
-/// </summary>
-public sealed record PoleNote
-{
-    public required string Text { get; init; }
+    /// <summary>The free-text note on this spot (POLE-NOTE); <c>null</c> when there is none.</summary>
+    public string? Note { get; init; }
 
     public required DateTime UpdatedAt { get; init; }
 
-    /// <summary>The account that wrote it, e.g. <c>USR-004</c>.</summary>
-    public required string UpdatedBy { get; init; }
+    /// <summary>Who last changed the row by form, note or import (e.g. <c>USR-004</c>); <c>null</c> for system-loaded rows.</summary>
+    public string? UpdatedBy { get; init; }
 
-    /// <summary>That account's display name now, so a screen can say who wrote it without another call.</summary>
+    /// <summary>That account's display name now, so a screen can say who without another call.</summary>
     public string? UpdatedByName { get; init; }
-
-    /// <summary>
-    /// Builds the read shape from the stored columns. A cleared note keeps who cleared it and when, but
-    /// reads as <c>null</c>: there is nothing to show.
-    /// </summary>
-    public static PoleNote? From(string? text, DateTime? updatedAt, string? updatedBy, string? updatedByName)
-        => text is null || updatedAt is null || updatedBy is null
-            ? null
-            : new PoleNote { Text = text, UpdatedAt = updatedAt.Value, UpdatedBy = updatedBy, UpdatedByName = updatedByName };
 }
 
 /// <summary>
@@ -483,8 +463,8 @@ public sealed record SetPoleNoteRequest
     }
 }
 
-/// <summary>What <c>PUT /assets/poles/{id}/note</c> answers: the pole and its note as stored.</summary>
-public sealed record PoleNoteResponse(string PoleId, PoleNote? Note);
+/// <summary>What <c>PUT /assets/poles/{id}/note</c> answers: the pole's note as stored and who last changed the pole.</summary>
+public sealed record PoleNoteResponse(string PoleId, string? Note, DateTime UpdatedAt, string? UpdatedBy, string? UpdatedByName);
 
 /// <summary>One pole read on its own — the list row plus what only a detail view needs.</summary>
 public sealed record PoleDetail
@@ -522,6 +502,12 @@ public sealed record SegmentListItem
     public required int PoleCount { get; init; }
 
     public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>Who last changed the row by form, note or import (e.g. <c>USR-004</c>); <c>null</c> for system-loaded rows.</summary>
+    public string? UpdatedBy { get; init; }
+
+    /// <summary>That account's display name now, so a screen can say who without another call.</summary>
+    public string? UpdatedByName { get; init; }
 }
 
 /// <summary>One road segment read on its own.</summary>
@@ -564,6 +550,12 @@ public sealed record FeederListItem
     public required int PoleCount { get; init; }
 
     public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>Who last changed the row by form, note or import (e.g. <c>USR-004</c>); <c>null</c> for system-loaded rows.</summary>
+    public string? UpdatedBy { get; init; }
+
+    /// <summary>That account's display name now, so a screen can say who without another call.</summary>
+    public string? UpdatedByName { get; init; }
 }
 
 /// <summary>One feeder read on its own.</summary>

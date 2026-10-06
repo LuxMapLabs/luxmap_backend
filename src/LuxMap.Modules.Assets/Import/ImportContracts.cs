@@ -46,17 +46,29 @@ public sealed record ImportRowError(int Row, string? Column, string Message);
 /// </para>
 /// </remarks>
 /// <param name="Inserted">Rows that created a new asset.</param>
-/// <param name="Updated">Rows that matched an existing <c>(commune_id, external_ref)</c> and overwrote it.</param>
+/// <param name="Updated">Rows that matched an existing <c>(commune_id, external_ref)</c> and changed at least one value.</param>
+/// <param name="Unchanged">
+/// Rows that matched an existing asset whose every value already equalled the file's. Nothing was written,
+/// so neither <c>updated_at</c> nor <c>updated_by</c> moved (drift POLE-NOTE N-4).
+/// </param>
 /// <param name="Failed">Rows rejected in validation. Nothing was written for them.</param>
 /// <param name="TotalErrors">Every error found, which can exceed <see cref="Rows"/> — one row may break several rules.</param>
 /// <param name="Truncated">True when <see cref="Rows"/> was cut at <see cref="ImportResult.MaxReportedErrors"/>.</param>
+/// <param name="TotalWarnings">Every warning found; <see cref="Warnings"/> is cut at the same cap as <see cref="Rows"/>.</param>
+/// <param name="Warnings">
+/// Something the person should know about a row that WAS applied — today only a pole <c>note</c> that replaced a
+/// different one, quoting the old text so it can be restored. Not counted in <see cref="Failed"/>.
+/// </param>
 public sealed record ImportResult(
     int Inserted,
     int Updated,
+    int Unchanged,
     int Failed,
     int TotalErrors,
     bool Truncated,
-    IReadOnlyList<ImportRowError> Rows)
+    IReadOnlyList<ImportRowError> Rows,
+    int TotalWarnings,
+    IReadOnlyList<ImportRowError> Warnings)
 {
     /// <summary>
     /// A person fixing a spreadsheet works through the first handful of mistakes and re-uploads;
@@ -65,12 +77,16 @@ public sealed record ImportResult(
     /// </summary>
     public const int MaxReportedErrors = 100;
 
-    public static ImportResult From(int inserted, int updated, int failedRows, IReadOnlyList<ImportRowError> errors)
+    public static ImportResult From(int inserted, int updated, int unchanged, int failedRows, IReadOnlyList<ImportRowError> errors,
+        IReadOnlyList<ImportRowError>? warnings = null)
         => new(
             inserted,
             updated,
+            unchanged,
             failedRows,
             errors.Count,
             errors.Count > MaxReportedErrors,
-            [.. errors.Take(MaxReportedErrors)]);
+            [.. errors.Take(MaxReportedErrors)],
+            warnings?.Count ?? 0,
+            [.. (warnings ?? []).Take(MaxReportedErrors)]);
 }

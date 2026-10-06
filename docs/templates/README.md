@@ -118,16 +118,38 @@ Không điền, không thêm cột. Gửi lên sẽ bị từ chối chứ khôn
 `commune_id` và các cột `*_external_ref` là thứ được dùng, và trong template **không còn cột tên
 nào đi kèm**.
 
-`poles.csv` từng có `segment_name` / `feeder_name` "chỉ để đọc". Đã **bỏ hẳn**: kết quả import chỉ
-có lỗi theo dòng, **không có kênh cảnh báo**, nên một cái tên gõ sai sẽ bị nuốt im lặng — người
-điền tin là mình đã khai một thứ, hệ thống không khai gì cả, và không ai biết. Cột trang trí mà
-không kiểm được thì tệ hơn là không có cột. Nếu sau này muốn giữ tên để đọc thì phải thêm
-`warnings[]` vào kết quả import trước — đó là đổi hình dạng response, phải qua Thịnh/Ngọc.
+`poles.csv` từng có `segment_name` / `feeder_name` "chỉ để đọc". Đã **bỏ hẳn**: một cái tên gõ sai
+sẽ bị nuốt im lặng — người điền tin là mình đã khai một thứ, hệ thống không khai gì cả, và không ai
+biết. Cột trang trí mà không kiểm được thì tệ hơn là không có cột. Kết quả import **đã có**
+`warnings[]` từ Contract v1.12, nhưng hiện chỉ dùng cho `note` (mục dưới); đưa lại cột tên để đọc vẫn
+là quyết định riêng, phải qua Thịnh/Ngọc.
 
 **Không có `commune_name` ở đâu cả, và đó là chủ đích** — cùng một lý do. Người soạn file kiểm kê
 của xã mình biết rõ mình đang ở xã nào; thêm cột tên vào cả ba file không giúp gì mà **nhân ba cơ
 hội lệch dữ liệu**. `segment_name` vẫn là cột **thật** trong `segments.csv` vì nó được LƯU vào
 `road_segment.segment_name`; điều vừa bỏ là bản sao chỉ-để-đọc của nó trong `poles.csv`.
+
+### `note` trong `poles.csv` — tuỳ chọn; ô có chữ ghi đè, ô trống giữ nguyên
+
+Ghi chú tự do về **vị trí / tài sản**, tối đa 1000 ký tự: *"Cạnh cổng trường TH Long Phước, tan học 17h"*.
+Có dấu phẩy thì bọc ô trong nháy kép. Cột này **không bắt buộc** trong header.
+
+- **Vẫn phải bật `near_sensitive_poi = true`** cho cột gần trường, chợ, cầu, ngã ba. Hệ thống dùng
+  cờ đó (biểu tượng trên bản đồ, mức ưu tiên); chữ trong ghi chú chỉ để người đọc, không gì tính từ nó.
+- Ô có chữ → **ghi đè** ghi chú trên cột.
+- Ô trống, hoặc file không có cột `note` → ghi chú trên cột **giữ nguyên**. Import không bao giờ xoá ghi
+  chú; muốn xoá thì xoá trên cột (form hoặc `PUT /assets/poles/{id}/note`).
+- Thay một ghi chú **khác nội dung** → dòng vẫn nạp, và kết quả có một mục `warnings[]` **trích nguyên văn
+  ghi chú cũ**. Đọc kỹ mục này: hệ thống không giữ lịch sử ghi chú, nên đó là chỗ duy nhất lấy lại được
+  nếu kỹ sư đã sửa ngoài hiện trường sau khi file được soạn.
+- Quá 1000 ký tự → lỗi dòng, dòng đó không được nạp.
+
+### Ai nạp, lúc nào — `updated_by` / `updated_at`
+
+Mỗi cột, tuyến, tủ điện, bóng ghi **người sửa gần nhất** (`updated_by`) và **lúc đó** (`updated_at`) — sửa
+bằng form hay bằng import đều tính. Màn kiểm kê hiện cả tên người đó. Chỉ dòng **thật sự đổi** mới được đóng
+dấu: nạp lại y nguyên một file thì các dòng đó vào `unchanged` trong kết quả, không đổi người hay giờ.
+Chỉ giữ người **gần nhất**, không giữ lịch sử từng lượt nạp.
 
 ### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 

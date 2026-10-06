@@ -46,7 +46,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
         string[] expected =
         [
             "pole_id", "external_ref", "segment_id", "feeder_id", "commune_id", "data_source",
-            "near_sensitive_poi", "location", "active_fixture", "note", "updated_at",
+            "near_sensitive_poi", "location", "active_fixture", "note", "updated_at", "updated_by", "updated_by_name",
         ];
 
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], [.. keys.Order(StringComparer.Ordinal)]);

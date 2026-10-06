@@ -1724,21 +1724,33 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 
 ### POLE-NOTE — ghi chú cột (05/10/2026)
 
-**Ghi chú đi qua ba đường, đều qua `StampNote`:** `PUT /assets/poles/{id}/note` (`EditPoleNotes`, kỹ sư + quản lý),
-form tạo (`POST /assets/poles`, `note?`) và form sửa (`PUT /assets/poles/{id}`). Ở form sửa, `note` là **trường duy nhất
-GIỮ NGUYÊN khi vắng** trong một `PUT` thay thế toàn phần (đọc bằng `PoleNoteInput.Read`, `JsonElement`): đừng "sửa cho
-nhất quán" thành vắng = xoá — form cũ chưa có ô ghi chú sẽ xoá sạch ghi chú của kỹ sư (cùng họ bẫy `feeder_id`). Gửi lại
-**cùng** nội dung thì không ghi lại tác giả. Import không đụng ghi chú. Canh bằng
-`Replacing_the_pole_without_the_note_key_keeps_the_note_and_its_author`. Đặt ghi chú cũng dời `pole.updated_at` để sync
-offline (BE-43) thấy cột đã đổi. Trường `JsonElement` mới trong request phải thêm vào `JsonElementFieldSchemaFilter`,
-nếu không spec ra `{}` và FM-04 sinh `Any`.
+**Ghi chú đi qua bốn đường:** `PUT /assets/poles/{id}/note` (`EditPoleNotes`, kỹ sư + quản lý), form tạo
+(`POST /assets/poles`, `note?`), form sửa (`PUT /assets/poles/{id}`) và import cột (cột `note` tuỳ chọn). Ở form sửa, `note`
+là **trường duy nhất GIỮ NGUYÊN khi vắng** trong một `PUT` thay thế toàn phần (đọc bằng `PoleNoteInput.Read`, `JsonElement`):
+đừng "sửa cho nhất quán" thành vắng = xoá — form cũ chưa có ô ghi chú sẽ xoá sạch ghi chú (cùng họ bẫy `feeder_id`). Ở import,
+**ô trống cũng là giữ** — import không bao giờ xoá ghi chú; thay ghi chú khác nội dung thì `warnings[]` **trích nguyên văn cũ**,
+vì không có lịch sử ghi chú nào khác để khôi phục. Canh bằng
+`Replacing_the_pole_without_the_note_key_keeps_the_note` và
+`The_import_overwrites_a_different_note_warning_with_the_old_text_and_never_clears_one`. Trường `JsonElement` mới trong request
+phải thêm vào `JsonElementFieldSchemaFilter`, nếu không spec ra `{}` và FM-04 sinh `Any`.
 
-**`pole.note_updated_by` là FK `Restrict` tới `app_user`.** Fixture test tạo tài khoản rồi để tài khoản đó ghi chú phải
-xoá **cột trước, tài khoản sau** (`AssetImportFixture` đã đúng thứ tự). Đảo lại là teardown gãy, và lỗi chỉ hiện thành
-"Test Class Cleanup Failure" — CI đỏ dù mọi test xanh (bài học PR #93).
+**Ghi chú KHÔNG có tác giả riêng từ N-4 (06/10/2026).** Ai sửa — ghi chú hay bất cứ gì — là `updated_by` của cột.
 
-**Hình dạng đọc dùng chung `PoleNote.From(...)`** ở Assets (kiểm kê), Map (chi tiết cột) và WorkOrders (cột của phiếu):
-thêm nơi đọc thứ tư thì gọi nó, đừng dựng object tay — ghi chú đã xoá (text `null`) phải đọc ra `null` ở mọi nơi.
+### `updated_by` của tài sản — chỉ đóng dấu khi giá trị THẬT SỰ đổi (06/10/2026, drift N-4)
+
+`pole`, `road_segment`, `feeder`, `fixture` implement `IUpdateStamped`; **mọi** đường ghi gọi `AssetStamp.Touch` **sau khi**
+gán giá trị (sau `Add` với hàng mới). `Touch` đọc `Entry().State` — `Entry()` chạy dò thay đổi cho đúng entity đó — nên gán
+lại giá trị bằng giá trị đang lưu thì hàng vẫn `Unchanged` và **không** đóng dấu. Hệ quả cho code mới:
+
+- 🔴 **Không gán `UpdatedAt` trực tiếp** trên bốn bảng này. Chính phép gán đó làm hàng thành `Modified`, phá luật "nạp lại file
+  y hệt không đổi gì" — và test so `updated_at` mới bắt được, test so dữ liệu thì không.
+- Geometry đọc lại từ WKT là object mới mỗi lần, nhưng comparer của NTS so theo giá trị nên vẫn `Unchanged` — đã kiểm bằng
+  test (`Re_importing_an_identical_file_changes_nothing_and_a_changed_row_names_the_importer`), đừng thêm so sánh tay.
+- Import đếm `updated` / `unchanged` theo **giá trị trả về** của `Touch`, không đếm theo "khớp `external_ref`".
+- `updated_by` là FK `Restrict` tới `app_user` trên **cả bốn bảng**: fixture test tạo tài khoản rồi để tài khoản đó ghi tài
+  sản phải xoá **tài sản trước, tài khoản sau** (bài học PR #93). Script `copy_dev_to_supabase.py` chỉ chép tài khoản seed, nên
+  hàng có `updated_by` là tài khoản khác sẽ vấp FK — cùng giới hạn đã có với `reported_by` / `created_by`.
+- Chỉ người **gần nhất**. Cần lịch sử lượt nạp thì là bảng riêng (`asset_import`), không phải nới cột này.
 
 ### BE-27 — thông báo (05/10/2026)
 

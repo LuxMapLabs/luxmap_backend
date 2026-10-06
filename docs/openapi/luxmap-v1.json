@@ -7220,6 +7220,14 @@
             "type": "string",
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by_name": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -7361,6 +7369,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
           "failed": {
             "type": "integer",
             "format": "int32"
@@ -7373,6 +7385,16 @@
             "type": "boolean"
           },
           "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowError"
+            }
+          },
+          "total_warnings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ImportRowError"
@@ -7903,12 +7925,21 @@
             "$ref": "#/components/schemas/ActiveFixture"
           },
           "note": {
-            "$ref": "#/components/schemas/PoleNote"
+            "type": "string",
+            "nullable": true
           },
           "updated_at": {
             "type": "string",
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by_name": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8045,7 +8076,8 @@
             }
           },
           "note": {
-            "$ref": "#/components/schemas/PoleNote"
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8267,32 +8299,6 @@
         },
         "additionalProperties": false
       },
-      "PoleNote": {
-        "required": [
-          "text",
-          "updated_at",
-          "updated_by"
-        ],
-        "type": "object",
-        "properties": {
-          "text": {
-            "type": "string"
-          },
-          "updated_at": {
-            "type": "string",
-            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-            "format": "date-time"
-          },
-          "updated_by": {
-            "type": "string"
-          },
-          "updated_by_name": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "PoleNoteResponse": {
         "type": "object",
         "properties": {
@@ -8300,7 +8306,21 @@
             "type": "string"
           },
           "note": {
-            "$ref": "#/components/schemas/PoleNote"
+            "type": "string",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by_name": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -8757,6 +8777,14 @@
             "type": "string",
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by_name": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -9959,7 +9987,8 @@
             }
           },
           "note": {
-            "$ref": "#/components/schemas/PoleNote"
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
