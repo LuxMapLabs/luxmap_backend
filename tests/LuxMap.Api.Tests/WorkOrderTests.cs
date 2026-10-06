@@ -1,9 +1,11 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.WorkOrders;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
@@ -1163,6 +1165,208 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         Assert.Equal(first.Body.GetProperty("evidence_id").GetString(), retry.Body.GetProperty("evidence_id").GetString());
         Assert.Equal((409, "IDEMPOTENCY_CONFLICT"), (changed.Status, Code(changed.Body)));
         Assert.Equal(1, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    // ---- GET /work-orders/agenda (BE-25) --------------------------------------------------------------
+
+    private async Task<JsonElement> AgendaOf(string who, string query = "", int expected = 200, string? error = null)
+        => await Send(who, "GET", $"/agenda{query}", null, expected, error);
+
+    private static JsonElement[] Groups(JsonElement agenda) => agenda.GetProperty("groups").EnumerateArray().ToArray();
+    private static string[] OrderIds(JsonElement group) => group.GetProperty("work_orders").EnumerateArray().Select(x => x.GetProperty("work_order_id").GetString()!).ToArray();
+    private static string[] Strings(JsonElement item, string property) => item.GetProperty(property).EnumerateArray().Select(x => x.GetString()!).ToArray();
+
+    /// <summary>A home road <paramref name="origin"/> degrees north-east of the test road.</summary>
+    private Task<string> PlantRoad(double origin) => Db(async db =>
+    {
+        using var system = db.EnterUnscopedSystemWriteBackdoor();
+        var road = new RoadSegment { CommuneId = home, SegmentName = "WO agenda road", RoadClass = RoadClass.InterVillage, DataSource = DataSource.Simulated,
+            LengthM = 100, Geom = new LineString([new Coordinate(108 + origin, 16 + origin), new Coordinate(108.01 + origin, 16.01 + origin)]) { SRID = 4326 } };
+        db.Add(road); await db.SaveChangesAsync(); return road.SegmentId;
+    });
+
+    private Task SetDates(string id, DateOnly? scheduled, DateOnly? due) => Db(async db =>
+    {
+        using var system = db.EnterUnscopedSystemWriteBackdoor();
+        var wo = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(x => x.WorkOrderId == id);
+        wo.ScheduledDate = scheduled; wo.DueDate = due;
+        return await db.SaveChangesAsync();
+    });
+
+    /// <summary>A fault the agenda must place without help from a road: no pole, no segment unless a pole gives one.</summary>
+    private Task<string> RoadlessFault(double? lat, double? lng, string? pole = null) => Db(async db =>
+    {
+        using var system = db.EnterUnscopedSystemWriteBackdoor();
+        var f = new Fault { CommuneId = home, PoleId = pole, Lat = lat, Lng = lng, FaultStatus = FaultStatus.Confirmed, FaultType = FaultType.LampOut,
+            Severity = Severity.Medium, SourceChannel = SourceChannel.Cv, DataSource = DataSource.Simulated, DetectedAt = DateTime.UtcNow };
+        db.Add(f); await db.SaveChangesAsync(); return f.FaultId;
+    });
+
+    // Independent measurements: PostGIS directly, not the code under test.
+    private Task<double> RoadMetres(string road, double lat, double lng) => Db(db => db.Database.SqlQuery<double>(
+        $"SELECT ST_Distance(ST_Transform(geom, 3405), ST_Transform(ST_SetSRID(ST_MakePoint({lng}, {lat}), 4326), 3405)) AS \"Value\" FROM road_segment WHERE segment_id = {road}").SingleAsync());
+    private Task<double> PointMetres(double lat1, double lng1, double lat2, double lng2) => Db(db => db.Database.SqlQuery<double>(
+        $"SELECT ST_Distance(ST_Transform(ST_SetSRID(ST_MakePoint({lng1}, {lat1}), 4326), 3405), ST_Transform(ST_SetSRID(ST_MakePoint({lng2}, {lat2}), 4326), 3405)) AS \"Value\"").SingleAsync());
+
+    [Fact]
+    public async Task Tonights_agenda_lists_the_engineers_open_orders_once_with_why_and_only_counts_later_nights()
+    {
+        var started = await Plant(WorkOrderStatus.InProgress);
+        var tonight = await Plant(WorkOrderStatus.Assigned);
+        var late = await Plant(WorkOrderStatus.Assigned);
+        var anyNight = await Plant(WorkOrderStatus.Assigned);
+        var later = await Plant(WorkOrderStatus.Assigned);
+        await Plant(WorkOrderStatus.Done);
+        await Plant(WorkOrderStatus.Open);
+        await Plant(WorkOrderStatus.Assigned, assigned: users["b"].UserId);
+        await SetDates(started, new DateOnly(2026, 10, 8), null); // started counts even when planned for later
+        await SetDates(tonight, new DateOnly(2026, 10, 6), new DateOnly(2026, 10, 10));
+        await SetDates(late, new DateOnly(2026, 10, 4), new DateOnly(2026, 10, 5));
+        await SetDates(later, new DateOnly(2026, 10, 9), null);
+
+        var body = await AgendaOf("a", "?night_of=2026-10-06");
+
+        Assert.Equal("2026-10-06", body.GetProperty("night_of").GetString());
+        Assert.Equal(users["a"].UserId, body.GetProperty("assigned_to").GetString());
+        Assert.Equal(1, body.GetProperty("upcoming_count").GetInt32());
+        var group = Assert.Single(Groups(body));
+        Assert.Equal(segment, group.GetProperty("segment_id").GetString());
+        Assert.Equal("WO test road", group.GetProperty("segment_name").GetString());
+        Assert.Equal(home, group.GetProperty("commune_id").GetString());
+        Assert.Equal(16, group.GetProperty("location").GetProperty("lat").GetDouble(), 9); // the road's start without `near`
+        Assert.Equal(JsonValueKind.Null, group.GetProperty("distance_m").ValueKind);
+
+        // In progress first, then overdue, then by due date — a dated order before an undated one.
+        Assert.Equal([started, late, tonight, anyNight], OrderIds(group));
+        var orders = group.GetProperty("work_orders").EnumerateArray().ToArray();
+        Assert.Equal(["in_progress"], Strings(orders[0], "flags"));
+        Assert.Equal(["carried_over", "overdue"], Strings(orders[1], "flags"));
+        Assert.Equal(["scheduled_tonight"], Strings(orders[2], "flags"));
+        Assert.Equal(["unscheduled"], Strings(orders[3], "flags"));
+        Assert.Equal([segment], Strings(orders[0], "segment_ids"));
+        // The list shape is the listing's own.
+        Assert.Equal("inspection", orders[0].GetProperty("task_kind").GetString());
+        Assert.Equal("in_progress", orders[0].GetProperty("wo_status").GetString());
+        Assert.Equal(started, orders[0].GetProperty("case_id").GetString());
+    }
+
+    [Fact]
+    public async Task A_survey_appears_once_under_its_first_road_and_near_puts_the_nearest_road_first()
+    {
+        var nearRoad = await PlantRoad(0.2);
+        var survey = (await Send("manager", "POST", "", new { task_kind = "survey", title = "Survey both roads", commune_id = home,
+            segment_ids = new[] { nearRoad, segment }, assigned_to = users["a"].UserId }, 201)).GetProperty("work_order_id").GetString()!;
+        var inspection = await Plant(WorkOrderStatus.Assigned);
+
+        // Without a position, roads come in id order: the test road was created first.
+        Assert.Equal([segment, nearRoad], Groups(await AgendaOf("a", "?night_of=2026-10-06")).Select(x => x.GetProperty("segment_id").GetString()!));
+
+        var groups = Groups(await AgendaOf("a", "?night_of=2026-10-06&near=16.2,108.2"));
+
+        Assert.Equal([nearRoad, segment], groups.Select(x => x.GetProperty("segment_id").GetString()!));
+        Assert.Equal([survey], OrderIds(groups[0])); // once, under its FIRST road, although it also covers the second
+        Assert.Equal([inspection], OrderIds(groups[1]));
+        Assert.Equal([nearRoad, segment], Strings(groups[0].GetProperty("work_orders")[0], "segment_ids"));
+        Assert.Equal(await RoadMetres(nearRoad, 16.2, 108.2), groups[0].GetProperty("distance_m").GetDouble(), 6);
+        Assert.Equal(await RoadMetres(segment, 16.2, 108.2), groups[1].GetProperty("distance_m").GetDouble(), 6);
+        Assert.True(groups[1].GetProperty("distance_m").GetDouble() > 20_000); // metres, never degrees
+        // The far road's point to head for is its end nearest the engineer, not its start.
+        Assert.Equal(16.01, groups[1].GetProperty("location").GetProperty("lat").GetDouble(), 6);
+        Assert.Equal(108.01, groups[1].GetProperty("location").GetProperty("lng").GetDouble(), 6);
+    }
+
+    [Fact]
+    public async Task An_engineer_gets_only_their_own_agenda_and_everyone_else_must_name_an_engineer_of_their_communes()
+    {
+        var mine = await Plant(WorkOrderStatus.Assigned);
+        var stranger = await Db(async db =>
+        {
+            var user = new AppUser { Username = "wo" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = "stranger",
+                PasswordHash = "x", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.FieldEngineer };
+            db.Add(user); await db.SaveChangesAsync(); return user; // a field engineer of NO commune
+        });
+        users["stranger"] = stranger;
+
+        await AgendaOf("a", $"?assigned_to={users["b"].UserId}", 404, "USER_NOT_FOUND");
+        Assert.Equal([mine], Groups(await AgendaOf("a", "?assigned_to=me")).SelectMany(OrderIds));
+        Assert.Equal([mine], Groups(await AgendaOf("a", $"?assigned_to={users["a"].UserId}")).SelectMany(OrderIds));
+        Assert.Empty(Groups(await AgendaOf("b"))); // b sees nothing of a's
+
+        await AgendaOf("manager", "", 400, "VALIDATION_FAILED");
+        foreach (var who in new[] { "manager", "superior", "admin" })
+            Assert.Equal([mine], Groups(await AgendaOf(who, $"?assigned_to={users["a"].UserId}")).SelectMany(OrderIds));
+        await AgendaOf("manager", $"?assigned_to={users["superior"].UserId}", 404, "USER_NOT_FOUND"); // not a field engineer
+        await AgendaOf("manager", $"?assigned_to={stranger.UserId}", 404, "USER_NOT_FOUND");      // in none of my communes
+        await AgendaOf("manager", "?assigned_to=USR-9999999", 404, "USER_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task Without_night_of_the_agenda_is_for_the_current_night_in_the_communes_time_zone()
+    {
+        var options = new WorkOrderAgendaOptions();
+        var before = options.NightOf(DateTimeOffset.UtcNow);
+        var body = await AgendaOf("a");
+        var after = options.NightOf(DateTimeOffset.UtcNow);
+
+        Assert.Contains(DateOnly.ParseExact(body.GetProperty("night_of").GetString()!, "yyyy-MM-dd", CultureInfo.InvariantCulture), new[] { before, after });
+    }
+
+    [Fact]
+    public async Task An_order_on_a_fault_with_no_pole_and_no_road_is_grouped_by_commune_at_the_faults_spot()
+    {
+        var fault = await RoadlessFault(16.3, 108.3);
+        var id = await Create("repair", [fault], assigned: users["a"].UserId);
+
+        var group = Assert.Single(Groups(await AgendaOf("a", "?night_of=2026-10-06&near=16.31,108.3")));
+
+        Assert.Equal(JsonValueKind.Null, group.GetProperty("segment_id").ValueKind);
+        Assert.Equal(JsonValueKind.Null, group.GetProperty("segment_name").ValueKind);
+        Assert.Equal(home, group.GetProperty("commune_id").GetString());
+        Assert.Equal(16.3, group.GetProperty("location").GetProperty("lat").GetDouble(), 9);
+        Assert.Equal(await PointMetres(16.31, 108.3, 16.3, 108.3), group.GetProperty("distance_m").GetDouble(), 6);
+        var item = group.GetProperty("work_orders")[0];
+        Assert.Equal(id, item.GetProperty("work_order_id").GetString());
+        Assert.Empty(Strings(item, "segment_ids"));
+        Assert.Equal(108.3, item.GetProperty("location").GetProperty("lng").GetDouble(), 9);
+    }
+
+    [Fact]
+    public async Task A_road_of_a_commune_outside_the_callers_scope_lends_it_no_name_and_no_place()
+    {
+        // A home pole on the FOREIGN commune's road (inter_commune), carrying a fault with no road of its own.
+        var pole = await PlantPole(0.3, road: foreignSegment);
+        var fault = await RoadlessFault(null, null, pole);
+        await Create("repair", [fault], assigned: users["a"].UserId);
+
+        var engineer = Assert.Single(Groups(await AgendaOf("a", "?night_of=2026-10-06")));
+        var manager = Assert.Single(Groups(await AgendaOf("manager", $"?night_of=2026-10-06&assigned_to={users["a"].UserId}")));
+
+        Assert.Equal(foreignSegment, engineer.GetProperty("segment_id").GetString());
+        Assert.Equal(JsonValueKind.Null, engineer.GetProperty("segment_name").ValueKind);
+        Assert.Equal(home, engineer.GetProperty("commune_id").GetString());
+        Assert.Equal(16.003, engineer.GetProperty("location").GetProperty("lat").GetDouble(), 9); // the pole, not the road
+        Assert.Equal("WO test road", manager.GetProperty("segment_name").GetString()); // the manager covers both communes
+        Assert.Equal(foreign, manager.GetProperty("commune_id").GetString());
+    }
+
+    [Fact]
+    public async Task A_date_that_is_not_yyyy_mm_dd_is_a_400_never_another_day()
+    {
+        // en-US parsing used to read 06/10/2026 as 10 June: another month's work, no error.
+        foreach (var (path, field) in new[] { ("/agenda?night_of=06/10/2026", "night_of"), ("/agenda?night_of=2026-10-06T00:00:00", "night_of"),
+                     ("?scheduled_from=06/10/2026", "scheduled_from"), ("?scheduled_to=2026-6-1", "scheduled_to") })
+        {
+            var body = await Send("a", "GET", path, null, 400, "VALIDATION_FAILED");
+            Assert.True(body.GetProperty("error").GetProperty("details").TryGetProperty(field, out _), body.GetRawText());
+        }
+        Assert.Equal("2026-10-06", (await AgendaOf("a", "?night_of=2026-10-06")).GetProperty("night_of").GetString());
+    }
+
+    [Fact]
+    public async Task A_position_that_is_not_lat_comma_lng_on_the_globe_is_a_400()
+    {
+        foreach (var near in new[] { "abc", "16.2", "16,2,3", "91,108", "16,181", "NaN,108", "16,Infinity" })
+            await AgendaOf("a", "?near=" + Uri.EscapeDataString(near), 400, "VALIDATION_FAILED");
     }
 
     private sealed class SaveBarrier(string id, bool create = false) : SaveChangesInterceptor

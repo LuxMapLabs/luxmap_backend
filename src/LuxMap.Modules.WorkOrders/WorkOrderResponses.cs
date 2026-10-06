@@ -3,7 +3,8 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.WorkOrders;
 
-public class WorkOrderItem
+/// <summary>A record so a richer view (the agenda, BE-25) can extend it through the copy constructor instead of re-listing fields.</summary>
+public record WorkOrderItem
 {
     public required string WorkOrderId { get; init; }
     public required string Title { get; init; }
@@ -25,7 +26,7 @@ public class WorkOrderItem
     public DateOnly? ScheduledDate { get; init; }
 }
 
-public sealed class WorkOrderDetail : WorkOrderItem
+public sealed record WorkOrderDetail : WorkOrderItem
 {
     /// <summary>SELF-SIGNED BE-15, pending FW: ordered survey targets.</summary>
     public string[] SegmentIds { get; init; } = [];

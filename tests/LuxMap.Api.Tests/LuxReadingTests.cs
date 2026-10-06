@@ -449,6 +449,28 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
         Assert.Equal(1, withZ.RootElement.GetProperty("total").GetInt32());
     }
 
+    /// <summary>
+    /// The framework parses query dates with the invariant (en-US) culture, so <c>10/01/2026</c> silently meant
+    /// 1 October and <c>01/10/2026</c> meant 10 January. Only ISO 8601 is accepted (Contract section 0).
+    /// </summary>
+    [Theory]
+    [InlineData("from=01/10/2026")]
+    [InlineData("to=10/01/2026")]
+    [InlineData("from=2026-10-01%2000:00:00")]
+    [InlineData("to=1%20Oct%202026")]
+    public async Task A_bound_that_is_not_iso_8601_is_a_400_never_a_guess(string query)
+    {
+        using var client = await FieldEngineerClientAsync();
+
+        var response = await client.GetAsync("/api/v1/lux-readings?" + query);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var error = json.RootElement.GetProperty("error");
+        Assert.Equal("VALIDATION_FAILED", error.GetProperty("code").GetString());
+        Assert.True(error.GetProperty("details").TryGetProperty(query.Split('=')[0], out _), json.RootElement.GetRawText());
+    }
+
     [Fact]
     public async Task The_per_pole_endpoint_omits_nearest_luminance_and_sorts_oldest_first()
     {

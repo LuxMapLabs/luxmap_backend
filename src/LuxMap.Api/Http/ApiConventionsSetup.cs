@@ -34,7 +34,8 @@ public static class ApiConventionsSetup
             options.SubstituteApiVersionInUrl = true;
         });
 
-        services.AddControllers();
+        // First, so no query-string date reaches the culture-dependent framework parser unchecked.
+        services.AddControllers(options => options.ModelBinderProviders.Insert(0, new IsoDateQueryModelBinderProvider()));
 
         services.Configure<ApiBehaviorOptions>(options =>
         {

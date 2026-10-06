@@ -17,6 +17,11 @@ public sealed class WorkOrdersModule : ILuxMapModule
     {
         services.AddScoped<WorkOrderService>();
         services.AddScoped<WorkOrderPoleService>();
+        var agenda = configuration.GetSection(WorkOrderAgendaOptions.SectionName).Get<WorkOrderAgendaOptions>() ?? new WorkOrderAgendaOptions();
+        // An unknown time zone STOPS startup rather than putting every engineer on the wrong night.
+        agenda.Validate();
+        services.AddSingleton(agenda);
+        services.AddScoped<WorkOrderAgendaService>();
         services.AddScoped<WorkOrderEvidenceService>();
         services.AddScoped<IActiveWorkOrderLookup, ActiveWorkOrderLookup>();
     }

@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.13 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.14 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -12,17 +12,18 @@
 **v1.10:** 05/10/2026 (BE-27 — thông báo trong ứng dụng, đọc bằng polling) ·
 **v1.11:** 06/10/2026 (`GET /faults/{fault_id}` — chi tiết một sự cố, drift N-6) ·
 **v1.12:** 06/10/2026 (người sửa cuối `updated_by` trên tài sản, `note` thành chuỗi, import nạp ghi chú; BREAKING) ·
-**v1.13:** 06/10/2026 (BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push`; `performed_at?` cho bước của phiếu).
+**v1.13:** 06/10/2026 (BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push`; `performed_at?` cho bước của phiếu) ·
+**v1.14:** 06/10/2026 (BE-25 — `GET /work-orders/agenda`, việc đêm nay của kỹ sư gom theo tuyến).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.13, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.14, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (84 operation: 82
-`implemented`, 2 `not_implemented` — đếm lại ở v1.11 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (85 operation, cả 85
+`implemented` — đếm lại ở v1.14 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -52,6 +53,7 @@ tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải p
 | Hệ toạ độ API | **EPSG:4326**, GeoJSON `[lng, lat]` | EPSG:3405 chỉ nội bộ DB / báo cáo, **không bao giờ ra API** |
 | Thời gian | ISO 8601 UTC hậu tố `Z` | DB `TIMESTAMPTZ`. Giá trị **không có** hậu tố (kể cả trên query string) được đọc là UTC, không bao giờ là giờ máy chủ |
 | Ngày không giờ | `YYYY-MM-DD` | `install_date`, `removed_date`, `warranty_expiry`, `night_of`, `due_date` |
+| Ngày / giờ trên query string | **Chỉ ISO 8601** (v1.14) | Ngày: đúng `YYYY-MM-DD`; giờ: `YYYY-MM-DD[THH:MM[:SS[.f…]]][Z\|±HH:MM]`. Định dạng khác (`06/10/2026`, `2026-6-1`, có dấu cách) → `400 VALIDATION_FAILED` nêu tên tham số — trước v1.14 server đoán theo kiểu Mỹ tháng/ngày và **lặng lẽ** đọc `06/10/2026` thành 10/06 |
 | ID | Chuỗi có prefix — mục 1.2 | Chuỗi đục |
 | Phân trang | `?page=1&page_size=50` → `{page, page_size, total, items[]}` | mục 1.3 |
 | Lỗi | `{ "error": { "code", "message", "details" } }` | mục 1.4 |
@@ -137,7 +139,7 @@ client **không** parse.
 | `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
 | `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
 | `INVALID_ACCOUNT_TOKEN` | 400 | Link mời / đặt lại mật khẩu không tồn tại, hết hạn hoặc đã dùng — một mã (v1.8, mục 4.8) |
-| `USER_NOT_FOUND` | 404 | `/admin/users/{id}` không tồn tại (v1.8, mục 4.9) |
+| `USER_NOT_FOUND` | 404 | `/admin/users/{id}` không tồn tại (v1.8, mục 4.9); `GET /work-orders/agenda`: `assigned_to` không phải kỹ sư hiện trường thuộc xã của người gọi, hoặc kỹ sư hỏi lịch của người khác (v1.14, mục 5.5) |
 | `IDENTIFIER_TAKEN` | 409 | Username hoặc email đã có tài khoản khác dùng, không phân biệt hoa thường (`POST`/`PATCH /admin/users`; v1.8) |
 | `LAST_SYSTEM_ADMIN` | 409 | Thao tác sẽ không còn Quản trị hệ thống nào đăng nhập được (hạ vai trò, khoá; v1.8) |
 | `CANNOT_LOCK_SELF` | 409 | Quản trị tự khoá tài khoản của chính mình (v1.8) |
@@ -702,7 +704,11 @@ Server áp cứng `source_channel = field_report`, `data_source = field`, `fault
 (kể cả cán bộ báo), `reported_by` = JWT. `201` item đầy đủ kèm `client_op_id`; trùng → **`200
 DUPLICATE_OP`**; `404 POLE_NOT_FOUND`; `400 LOCATION_REQUIRED` / `FAULT_TYPE_NOT_REPORTABLE`.
 
-### 5.5 Phiếu công việc — `[NOT IMPLEMENTED]` (BE-21..BE-24)
+### 5.5 Phiếu công việc — `implemented` theo drift BE-23 / WO-1…WO-12 và BE-25 (BE-21..BE-25)
+
+> Ba gạch đầu dòng đầu tiên (`GET` / `POST` / `PATCH`) là đặc tả **v1.0**, giữ làm lịch sử. Hình dạng thật của phiếu, luồng trạng
+> thái và các endpoint con nằm ở `docs/contract-drift.md` (BE-23, WO-1…WO-12, FR-2, BE-24) — SELF-SIGNED, chờ FW gộp vào đây.
+
 
 - **`GET /api/v1/work-orders`** — query `wo_status`, `assigned_to`, `segment_id`, phân trang; item theo
   `mock-work-orders.json`: `work_order_id, title, segment_id, cluster_id, fault_ids[], wo_status,
@@ -713,6 +719,31 @@ DUPLICATE_OP`**; `404 POLE_NOT_FOUND`; `400 LOCATION_REQUIRED` / `FAULT_TYPE_NOT
   magic bytes), `kind=before|after`, `captured_at`, `lat`, `lng`; sai định dạng → `415
   UNSUPPORTED_IMAGE_FORMAT`. Video bằng chứng: **planned** (v1.7, D-R14) — tới lúc có ticket video,
   endpoint này vẫn chỉ nhận JPEG.
+- **`GET /api/v1/work-orders/agenda`** — `implemented` (v1.14, BE-25, SELF-SIGNED). Việc **đêm nay** của **một** kỹ sư hiện
+  trường, gom theo tuyến; không phân trang. Capability `ReadWorkOrders`. Query:
+  - `night_of?` `YYYY-MM-DD` — vắng = đêm hiện tại theo giờ `Asia/Ho_Chi_Minh`; **trước 12:00 là đêm hôm trước** (ca đêm cắt qua
+    nửa đêm, `scheduled_date` là ngày buổi tối). Mốc 12:00 là **tạm**, cấu hình `WorkOrders:Agenda`.
+  - `near?` `lat,lng` EPSG:4326 — sai định dạng / ngoài địa cầu / không hữu hạn → `400 VALIDATION_FAILED`.
+  - `assigned_to?` — Kỹ sư: vắng, `me` hoặc chính mình; tên người khác → `404 USER_NOT_FOUND`. Vai trò khác: **bắt buộc**
+    (vắng → `400`), phải là kỹ sư hiện trường có ít nhất một xã trong phạm vi người gọi, nếu không → `404 USER_NOT_FOUND`.
+
+  Response `{night_of, assigned_to, upcoming_count, groups[]}`; group `{segment_id, segment_name, commune_id, location{lat,lng},
+  distance_m, work_orders[]}`; mỗi phiếu = item của `GET /work-orders` cộng `segment_ids[]`, `flags[]`
+  (`in_progress | scheduled_tonight | carried_over | unscheduled | overdue`, theo thứ tự này) và `location`.
+  - **Phiếu nào:** `assigned` và `in_progress` của người đó. `in_progress` luôn có; phiếu còn lại có trừ khi lịch **sau** đêm này
+    — những phiếu đó chỉ đếm vào `upcoming_count`. `open` (chưa giao) và `done` (chờ nghiệm thu) không có.
+  - **Mỗi phiếu xuất hiện đúng một lần**, dưới tuyến đầu của nó: tuyến khảo sát đầu tiên, rồi `segment_id` của phiếu, rồi tuyến
+    của cột mang sự cố theo thứ tự ID tuyến (cùng thứ tự `GET /work-orders/{id}/poles`). Phiếu không tuyến nào (sự cố không cột,
+    không tuyến) → nhóm `segment_id = null` theo xã. `location` của phiếu: vị trí sự cố đầu tiên (của sự cố, thiếu thì của cột),
+    không có sự cố thì điểm đầu tuyến; `null` khi tuyến đó thuộc xã ngoài phạm vi người gọi (không lộ hình học).
+  - **Thứ tự nhóm:** có `near` → `distance_m` tăng dần (mét EPSG:3405 tới tuyến, hoặc tới `location` khi nhóm không có tuyến);
+    không `near` → tuyến theo thứ tự tạo, `distance_m = null`. `location` của nhóm: điểm trên tuyến gần `near` nhất, không có
+    `near` thì điểm đầu tuyến. **Trong nhóm:** đang làm, quá hạn, `due_date` tăng dần (không hạn ở cuối), rồi thứ tự tạo.
+  - Tuyến của xã ngoài phạm vi người gọi (đường liên xã): `segment_name = null`, `commune_id` và vị trí lấy từ phiếu.
+  - Phạm vi xã vẫn áp: Quản lý chỉ quản **một phần** số xã của một kỹ sư thì chỉ thấy phiếu ở các xã của mình — agenda **không** báo
+    là đang thiếu phiếu ở xã khác.
+  - `distance_m` đo tới **tuyến**, không tới chỗ cần làm: phiếu ở cuối một tuyến dài vẫn "gần" khi kỹ sư đứng đầu tuyến (D-4).
+  - Offline: **không** có trong `/sync/bundle` (mục 5.8) — app gom từ gói theo đúng các luật trên.
 
 ### 5.6 IoT, sweep, ảnh — `[NOT IMPLEMENTED]`
 
@@ -932,6 +963,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.14 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-25 — việc đêm nay của kỹ sư, gom theo tuyến** (mục 5.5, drift BE-25; D-1…D-8 chốt theo đề xuất A). **Thêm** `GET /work-orders/agenda` (`night_of?`, `near?`, `assigned_to?`; capability `ReadWorkOrders`, không capability mới); `USER_NOT_FOUND` dùng thêm cho `assigned_to` không hợp lệ. **Siết** ngày/giờ trên query string thành chỉ ISO 8601 (mục 0) cho mọi endpoint — `scheduled_from` / `scheduled_to` của `GET /work-orders` và `from` / `to` của `GET /lux-readings` trước đây nhận cả `06/10/2026` và đọc sai thành 10/06; nay `400`. Client đã gửi ISO không bị ảnh hưởng. Không đổi trường nào có sẵn, không migration. Chiều đi của tuyến khảo sát (D-7) **tách ticket riêng**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.13 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-43 — đồng bộ offline** (mục 5.8, drift BE-43; đóng O-5). `GET /sync/bundle`: bản chụp đầy đủ theo tuyến (`segment_id` lặp ≤ 20; vắng = tuyến của phiếu mở của tôi), **không** `since`; cột kèm `note`, phiếu dạng chi tiết. `POST /sync/push`: 5 `op_type` qua service của endpoint gốc, kiểm capability từng thao tác, kết quả `applied` / `conflicts` / `rejected`, `BLOCKED_BY_EARLIER_OP`; khử trùng lặp bằng cột sẵn có hoặc bảng mới `sync_operation`. Capability mới **`SyncOffline`** = `field_engineer`. Mã lỗi mới `NOTE_CHANGED`, `BLOCKED_BY_EARLIER_OP`. **Thêm** `performed_at?` cho `POST /work-orders/{id}/start` (body tuỳ chọn) và `…/complete`. Chỉ thêm. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.12 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **Người sửa cuối trên tài sản + ghi chú qua import** (mục 5.3, 5.3.1; drift POLE-NOTE N-4). **BREAKING:** `note` ở danh sách / chi tiết kiểm kê, `GET /map/poles/{pole_id}`, `GET /work-orders/{id}/poles` đổi từ object `{text, updated_at, updated_by, updated_by_name}` thành **chuỗi \| null**; response của `PUT /assets/poles/{poleId}/note` thành `{pole_id, note, updated_at, updated_by, updated_by_name}`. **Thêm:** `updated_by` + `updated_by_name` trên dòng cột / tuyến / tủ điện của kiểm kê (người sửa gần nhất, chỉ đổi khi giá trị thật sự đổi); kết quả import thêm `unchanged`, `total_warnings`, `warnings[]`; cột `note` tuỳ chọn trong file `poles` (ô có chữ ghi đè, ô trống giữ, thay ghi chú khác thì cảnh báo kèm nguyên văn cũ). `updated` của import nay chỉ đếm dòng thật sự đổi. WP5/WP6 chưa được báo hình dạng v1.9 nên đổi lúc này; chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.11 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | Thêm `GET /faults/{fault_id}` (mục 5.4): một sự cố đúng hình dạng item danh sách; ngoài phạm vi = không tồn tại = `404 FAULT_NOT_FOUND`. Thông báo `fault_reported` mở thẳng được sự cố. Chỉ thêm. Đóng drift N-6 |

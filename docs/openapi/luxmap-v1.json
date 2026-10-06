@@ -5710,6 +5710,69 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/work-orders/agenda": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "night_of",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "near",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assigned_to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAgenda"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAgenda"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAgenda"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/work-orders/{id}": {
       "get": {
         "tags": [
@@ -6572,6 +6635,111 @@
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AgendaFlag": {
+        "enum": [
+          "in_progress",
+          "scheduled_tonight",
+          "carried_over",
+          "unscheduled",
+          "overdue"
+        ],
+        "type": "string"
+      },
+      "AgendaWorkOrder": {
+        "required": [
+          "case_id",
+          "commune_id",
+          "fault_ids",
+          "title",
+          "work_order_id"
+        ],
+        "type": "object",
+        "properties": {
+          "work_order_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cluster_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "parent_work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "case_id": {
+            "type": "string"
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "wo_status": {
+            "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority_score": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgendaFlag"
+            }
+          },
+          "location": {
+            "$ref": "#/components/schemas/WorkOrderLocation"
           }
         },
         "additionalProperties": false
@@ -10090,6 +10258,69 @@
           },
           "remember_me": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderAgenda": {
+        "required": [
+          "assigned_to",
+          "groups"
+        ],
+        "type": "object",
+        "properties": {
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "assigned_to": {
+            "type": "string"
+          },
+          "upcoming_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderAgendaGroup"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderAgendaGroup": {
+        "required": [
+          "commune_id",
+          "work_orders"
+        ],
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/WorkOrderLocation"
+          },
+          "distance_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "work_orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgendaWorkOrder"
+            }
           }
         },
         "additionalProperties": false

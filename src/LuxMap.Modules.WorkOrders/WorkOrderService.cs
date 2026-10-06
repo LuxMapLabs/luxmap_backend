@@ -73,13 +73,19 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var total = await query.CountAsync(ct);
         var orders = await query.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.WorkOrderId.Length)
             .ThenByDescending(x => x.WorkOrderId).Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
+        return PagedResult<WorkOrderItem>.From(page, total, await ItemsAsync(db, orders, ct));
+    }
+
+    /// <summary>The list shape of <paramref name="orders"/>, in the same order — shared by the listing and the agenda (BE-25).</summary>
+    internal static async Task<WorkOrderItem[]> ItemsAsync(LuxMapDbContext db, IReadOnlyList<WorkOrder> orders, CancellationToken ct)
+    {
         var ids = orders.Select(x => x.WorkOrderId).ToArray();
         var members = await (from link in db.Set<WorkOrderFault>()
                              join fault in db.Set<Fault>() on link.FaultId equals fault.FaultId
                              where ids.Contains(link.WorkOrderId)
                              orderby fault.CreatedAt, fault.FaultId.Length, fault.FaultId
                              select new { link.WorkOrderId, fault.FaultId, fault.PriorityScore }).ToListAsync(ct);
-        var items = orders.Select(wo => new WorkOrderItem
+        return orders.Select(wo => new WorkOrderItem
         {
             WorkOrderId = wo.WorkOrderId, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
@@ -88,7 +94,6 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             FaultIds = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.FaultId).ToArray(),
             PriorityScore = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.PriorityScore).DefaultIfEmpty().Max(),
         }).ToArray();
-        return PagedResult<WorkOrderItem>.From(page, total, items);
     }
 
     public async Task<WorkOrderDetail> Detail(string id, CancellationToken ct)

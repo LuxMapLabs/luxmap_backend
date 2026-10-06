@@ -1005,3 +1005,39 @@ nên đây là lỗi client không được báo, không phải ghi đôi; đón
 
 **Phải báo:** WP6 (FM-20: toàn bộ mục 5.8; tải ảnh **trước** khi đẩy hàng chờ; `performed_at`; `base_note` lấy từ `poles[].note` của gói;
 xử lý ba nhóm kết quả). **Chưa báo.**
+
+## BE-25 — việc đêm nay của kỹ sư, gom theo tuyến (06/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực theo 8 đề xuất A của `.ai/results/BE-25-p1.md` (D-1…D-8), đã viết vào **Contract v1.14** (mục 5.5). **SELF-SIGNED, nền tạm tới FW** |
+| **Decision maker** | Mỹ chốt 06/10/2026 "theo bạn đề xuất". Chạm bề mặt API (endpoint mới) → **ESCALATE ở FW kế tiếp** |
+| **Task list** | `tasks-backend.csv:28` (W11–W12): *"Mở app thấy đúng việc được gán, gom theo địa lý"* |
+
+| Mã | Điểm | Hướng đã làm | Chạm API |
+|---|---|---|---|
+| **A-1** | Bề mặt (D-1) | Endpoint mới `GET /work-orders/agenda`, cấu trúc đã gom nhóm, không phân trang; listing giữ nguyên | **Có** (endpoint mới) |
+| **A-2** | "Đêm nay" (D-2) | `night_of?`; vắng = giờ `Asia/Ho_Chi_Minh`, **trước 12:00 là đêm hôm trước**. Mốc 12:00 là **tạm** — cấu hình `WorkOrders:Agenda:NightStartsAt` / `TimeZone`, múi giờ sai thì dừng khởi động. FO chốt giờ ca | **Có** |
+| **A-3** | Phiếu nào (D-3) | `assigned` + `in_progress` của người đó; `in_progress` luôn có, còn lại trừ phiếu lịch **sau** đêm này (chỉ đếm `upcoming_count`). Cờ `in_progress`, `scheduled_tonight` / `carried_over` / `unscheduled` (tối đa một), `overdue` | **Có** |
+| **A-4** | Gom (D-4) | Theo tuyến; `near=lat,lng` → nhóm gần nhất trước, `distance_m` qua `SpatialFunctions.DistanceMeters` (EPSG:3405); không `near` → tuyến theo thứ tự tạo. Vị trí nhóm: điểm tuyến gần `near` nhất / điểm đầu tuyến — **gợi ý dẫn đường, không phải phép đo** (chiếu trên toạ độ đã lưu như WO-12) | **Có** |
+| **A-5** | Phiếu nhiều tuyến (D-5) | Xuất hiện **một lần** dưới tuyến đầu (khảo sát: tuyến đầu; còn lại: `segment_id`, rồi tuyến của **cột** mang sự cố theo thứ tự ID — cùng thứ tự WO-12); kèm `segment_ids[]` đầy đủ. Không tuyến nào → nhóm `segment_id = null` theo xã, vị trí của sự cố | **Có** |
+| **A-6** | Ai xem (D-6) | `ReadWorkOrders`. Kỹ sư: của mình (`me` / vắng / chính mình); tên người khác → `404 USER_NOT_FOUND`. Vai trò khác: `assigned_to` **bắt buộc**, phải là kỹ sư hiện trường có ≥ 1 xã trong phạm vi người gọi, nếu không `404 USER_NOT_FOUND` | **Có** (dùng thêm mã có sẵn) |
+| **A-7** | Chiều đi tuyến khảo sát (D-7) | **Tách ticket riêng** (migration `work_order_segment.direction` + đổi `POST /work-orders`) — trùng P2 của file đề xuất sửa Phiếu và D-FS-01; chốt cùng lúc | Không (ở ticket này) |
+| **A-8** | Offline (D-8) | **Không** thêm vào `/sync/bundle`; app gom từ gói theo đúng luật A-3…A-5 | Không |
+
+**Tuyến của xã ngoài phạm vi** (đường liên xã): nhóm giữ `segment_id` (đã có trên sự cố) nhưng `segment_name = null`, `commune_id` và
+vị trí lấy từ phiếu — không lộ tên hay hình học tuyến của xã khác (cùng nguyên tắc WO-12).
+
+**Code:** `WorkOrderItem` / `WorkOrderDetail` đổi từ `class` sang `record` để mục agenda mở rộng item bằng copy constructor (khuôn
+`SyncPoleProperties` của BE-43) — hình dạng JSON không đổi. Phần dựng item của listing tách thành `WorkOrderService.ItemsAsync`, dùng
+chung với agenda. Không migration.
+
+**Review (06/10/2026, Claude tự review sau khi hiện thực):** `night_of=06/10/2026` được trả **200** với `night_of = 2026-06-10` — binder
+của framework đọc ngày theo văn hoá bất biến (kiểu Mỹ tháng/ngày). **Cùng lỗi có từ trước** ở `scheduled_from` / `scheduled_to` (BE-23,
+đã thử: lọc `06/10/2026` trả phiếu ngày 10/06) và `from` / `to` của lux (BE-42). Sửa chung: `IsoDateQueryModelBinderProvider` chỉ kiểm
+**hình dạng** ISO rồi giao lại binder cũ (giữ nguyên nghĩa `DateTime` không `Z` = UTC); sai → `400 VALIDATION_FAILED`. Ghi vào Contract mục 0
+(v1.14). Ba điểm còn lại ghi thành câu trong Contract mục 5.5: Quản lý phạm vi một phần thấy agenda thiếu mà không có dấu hiệu;
+`distance_m` tới tuyến chứ không tới chỗ cần làm; vị trí phiếu `null` khi tuyến thuộc xã ngoài phạm vi.
+
+**Phải báo:** WP6 (FM màn mở app: endpoint + luật gom để gom offline giống server; `night_of` mặc định theo mốc 12:00 tạm; **mọi** ngày trên
+query string phải là ISO), WP5 (lịch của Quản lý: `assigned_to` bắt buộc; lọc `scheduled_from/to` phải gửi `YYYY-MM-DD`). **Chưa báo.**

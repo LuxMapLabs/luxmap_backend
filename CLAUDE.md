@@ -1170,6 +1170,12 @@ máy chủ (đo được 7 giờ trên máy Asia/Saigon). Chuẩn hoá bằng `U
 = UTC, đúng Contract. Test `A_from_or_to_bound_without_a_Z_suffix…` chỉ đỏ trên máy không phải UTC,
 đừng xoá vì thấy nó "luôn xanh" trên CI.
 
+   ⚠️ **Hình dạng cũng phải chặn, không chỉ múi giờ.** Binder của framework đọc ngày theo văn hoá bất biến (kiểu Mỹ), nên
+   `06/10/2026` thành **10/06**, trả 200, không lỗi (gặp ở BE-25 `night_of`; có sẵn ở `scheduled_from/to`, lux `from/to`).
+   `IsoDateQueryModelBinderProvider` (`LuxMap.Api/Http`) chặn mọi `DateOnly`/`DateTime` trên query string không đúng ISO → 400,
+   rồi giao lại binder cũ nên nghĩa không đổi. Tham số ngày mới **không cần làm gì** — chỉ đừng nhận ngày dưới dạng `string`
+   rồi tự `DateTime.Parse`, như vậy là đi vòng qua chốt chặn. Canh bằng `A_bound_that_is_not_iso_8601_is_a_400_never_a_guess`.
+
 **3. Một cột có tối đa MỘT bóng đang dùng.** `ux_fixture_pole_id_active` là UNIQUE partial
 (`pole_id WHERE removed_date IS NULL`). Thay bóng = ngừng dùng bóng cũ rồi ghi bóng mới; bóng có
 `removed_date` là lịch sử, không chặn và không bị chặn. CRUD trả 409 `POLE_HAS_ACTIVE_FIXTURE`, import
