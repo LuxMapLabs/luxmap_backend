@@ -1,7 +1,7 @@
 ---
 ticket: BE-15-followup
 title: Tấm lọc ND trong capture_config (D-R23 B) + baseline đếm theo đêm (D-05)
-status: ready
+status: blocked
 phase: 1
 owner: claude
 branch: feat/BE-15-followup
@@ -9,6 +9,7 @@ contract_refs:
   - "docs/contract-drift.md — BE-15 Phase 1 (02/10) và Quyết định khảo sát 07/10 (D-R23, D-05)"
   - "Survey ingest / review chưa có trong Contract — bề mặt SELF-SIGNED, chờ FW"
 depends_on:
+  - "TẠM DỪNG 07/10 (Mỹ): nhóm IoT chưa mua phần cứng module lux — chưa có buổi quay tấm lọc để phục vụ"
   - "D-R23 (chốt 07/10) — hướng B trước"
   - "D-05 đếm theo đêm (duyệt 07/10)"
 ---
