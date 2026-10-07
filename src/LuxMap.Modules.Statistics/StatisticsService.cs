@@ -31,6 +31,12 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
     /// <summary>Default window of <c>repair-timeliness</c>: the last 30 nights, tonight included.</summary>
     public const int DefaultNights = 30;
 
+    /// <summary>
+    /// Bounds a <c>from</c>/<c>to</c> must sit in. Not a business rule: <c>DateOnly</c> arithmetic on the edges of its
+    /// range throws, and an ISO date such as 9999-12-31 binds fine — without this it is a 500, not a 400.
+    /// </summary>
+    public static readonly DateOnly EarliestNight = new(2000, 1, 1), LatestNight = new(2099, 12, 31);
+
     public async Task<FixtureStatusStatistics> FixtureStatusAsync(FixtureStatusQuery query, CancellationToken ct)
     {
         var byCommune = query.GroupBy.Contains(StatisticsDimension.Commune);
@@ -91,6 +97,9 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
 
         var now = clock.GetUtcNow();
         var tonight = nights.NightOf(now);
+        foreach (var (field, night) in new[] { ("from", query.From), ("to", query.To) })
+            if (night is { } given && (given < EarliestNight || given > LatestNight))
+                throw Invalid(field, $"{field} must be between {EarliestNight:yyyy-MM-dd} and {LatestNight:yyyy-MM-dd}.");
         var to = query.To ?? tonight;
         var from = query.From ?? to.AddDays(-(DefaultNights - 1));
         if (from > to) throw Invalid("from", "from must not be after to.");

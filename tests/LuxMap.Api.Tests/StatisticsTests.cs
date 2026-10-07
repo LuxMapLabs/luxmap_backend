@@ -171,6 +171,8 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
     [InlineData("repair-timeliness?group_by=segment")]
     [InlineData("repair-timeliness?from=2026-09-30&to=2026-09-01")]
     [InlineData("repair-timeliness?from=30/09/2026")]
+    [InlineData("repair-timeliness?to=9999-12-31")]
+    [InlineData("repair-timeliness?to=0001-01-01")]
     public async Task A_malformed_query_is_a_400(string query)
     {
         var response = await clients["superior"].GetAsync("/api/v1/statistics/" + query);
@@ -203,18 +205,37 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Cancelled, due, Local(2026, 9, 9, 20));
         await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, due, Local(2026, 9, 1, 11)); // night of 31/08
         await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, due, Local(2026, 10, 1, 12)); // night of 01/10
+        // Both edges of the window from the inside: the first hour of the night of `from`, and the morning
+        // after `to` — still the night of 30/09, so it counts (on time against a due date of 30/09).
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, new DateOnly(2026, 9, 1), Local(2026, 9, 1, 12));
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, new DateOnly(2026, 9, 30), Local(2026, 10, 1, 11));
 
         var body = await Get("superior", $"repair-timeliness?commune_id={home}&from=2026-09-01&to=2026-09-30");
 
         Assert.Equal("2026-09-01", body.GetProperty("from").GetString());
         Assert.Equal("2026-09-30", body.GetProperty("to").GetString());
         var row = Assert.Single(body.GetProperty("rows").EnumerateArray());
-        Assert.Equal(4, row.GetProperty("completed").GetInt32());
-        Assert.Equal(2, row.GetProperty("on_time").GetInt32());
+        Assert.Equal(6, row.GetProperty("completed").GetInt32());
+        Assert.Equal(4, row.GetProperty("on_time").GetInt32());
         Assert.Equal(1, row.GetProperty("late").GetInt32());
         Assert.Equal(1, row.GetProperty("no_due_date").GetInt32());
-        Assert.Equal(0.6667, row.GetProperty("on_time_rate").GetDouble());
+        Assert.Equal(0.8, row.GetProperty("on_time_rate").GetDouble());
         Assert.Equal(0, row.GetProperty("open_overdue").GetInt32());
+    }
+
+    /// <summary>A repair due TONIGHT is not overdue yet; one due last night is. Tonight follows the 12:00 local rule.</summary>
+    [Fact]
+    public async Task A_repair_due_tonight_is_not_overdue_and_one_due_last_night_is()
+    {
+        var tonight = Tonight();
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Assigned, tonight, null);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Assigned, tonight.AddDays(-1), null);
+
+        var body = await Get("superior", $"repair-timeliness?commune_id={home}");
+
+        // Skip only if the request itself crossed 12:00 local, where "tonight" legitimately moves.
+        if (Tonight() != tonight) return;
+        Assert.Equal(1, Assert.Single(body.GetProperty("rows").EnumerateArray()).GetProperty("open_overdue").GetInt32());
     }
 
     [Fact]
@@ -243,14 +264,20 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
     {
         var body = await Get("superior", $"repair-timeliness?commune_id={home}");
 
-        var local = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"));
-        var tonight = DateOnly.FromDateTime(local.DateTime.Hour < 12 ? local.DateTime.AddDays(-1) : local.DateTime);
+        var tonight = Tonight();
         Assert.Equal(tonight.ToString("yyyy-MM-dd"), body.GetProperty("to").GetString());
         Assert.Equal(tonight.AddDays(-29).ToString("yyyy-MM-dd"), body.GetProperty("from").GetString());
         Assert.Empty(body.GetProperty("rows").EnumerateArray());
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------
+
+    /// <summary>Tonight by the agenda's rule, worked out independently: local date, minus one before 12:00.</summary>
+    private static DateOnly Tonight()
+    {
+        var local = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh")).DateTime;
+        return DateOnly.FromDateTime(local.Hour < 12 ? local.AddDays(-1) : local);
+    }
 
     private static DateTime Local(int year, int month, int day, int hour)
         => new DateTime(year, month, day, hour, 0, 0, DateTimeKind.Utc).AddHours(-7);
