@@ -1,7 +1,7 @@
 ---
 ticket: BE-xx
 title: <một dòng>
-status: draft          # draft | ready | in_progress | blocked | done
+status: draft          # draft | ready | in_progress | blocked | done | wontfix  (ánh xạ triage: docs/agents/triage-labels.md)
 phase: 1               # 1 = khảo sát (không sửa code) · 2 = implement
 owner: <agent>         # agent đang giữ quyền ghi
 branch: <branch>
