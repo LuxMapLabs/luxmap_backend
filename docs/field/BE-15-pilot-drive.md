@@ -1,7 +1,8 @@
 # Kịch bản quay thử — khảo sát video đêm (BE-15)
 
 Dành cho **FO** (thực địa) và **WP6** (mobile). Soạn 02/10/2026 bởi WP2. Phiên bản 2 (03/10/2026): phương tiện là
-**xe máy**, điện thoại và module BH1750 gắn ở **đầu xe** — không phải ô tô. Sửa sau mỗi buổi thử.
+**xe máy**, điện thoại và module BH1750 gắn ở **đầu xe** — không phải ô tô. Phiên bản 3 (07/10/2026): **đi–về trong một
+phiên** là quy trình mặc định (mục *Quy trình khảo sát thật*), module lux ~8 mẫu/giây (D-FS-20). Sửa sau mỗi buổi thử.
 
 ## Vì sao cần buổi này
 
@@ -23,6 +24,7 @@ BH1750, đúng con đường** sẽ dùng thật. Kết quả cũng là dữ li�
 | Q4 | Tỉ lệ ghép đúng cột thay đổi thế nào theo vận tốc 15 / 20 / 25 / 30 km/h? | Ngưỡng vận tốc (đang giả định 15–25 km/h) |
 | Q5 | Cùng một cột, đỉnh lux dao động bao nhiêu giữa các lần quét lặp lại? | Số lần quét tối thiểu để có baseline (D-05) |
 | Q6 | Với profile camera đã khoá, đèn ON / OFF có phân biệt rõ trên frame không? Thấy đèn rõ nhất lúc cột còn cách bao xa? | Profile quay (D-R24), cửa sổ cắt frame |
+| Q8 | Đi–về trong **một phiên**, camera cố định một bên: lượt về có thấy cột phía bên kia không? Đi sát cột ở lượt về, bóng đèn có ra khỏi khung hình không? Đỉnh lux cùng cột khác nhau bao nhiêu giữa hai chiều? | Quy trình đi–về mặc định |
 | Q7 | Trên xe máy: rung làm nhoè frame tới mức nào khi **tắt** chống rung (EIS)? Vị trí xe trong làn (cách mép đường bao xa) làm đỉnh lux của cùng một cột thay đổi bao nhiêu? | Giá gắn, có cần cho phép EIS không, quy định làn chạy |
 
 ## Chuẩn bị
@@ -60,7 +62,9 @@ phải ~1 m, ghi lại con số đã chọn); **người ngồi sau** bấm nút
 3. **Khoá profile camera** (ISO, shutter, lấy nét vô cực, cân bằng trắng, độ phân giải, fps); **tắt** EIS, HDR, night
    mode, tự động phơi sáng. Ghi giá trị **thực tế** camera báo, không chỉ giá trị app yêu cầu.
 4. GPS ghi `speed_mps` và `heading_deg` nếu máy có; tần suất GPS cao nhất máy cho phép.
-5. BH1750 ở chế độ đo liên tục; ghi rõ **chế độ và tần suất lấy mẫu** (ví dụ phân giải cao ~8 mẫu/giây).
+5. BH1750 đo liên tục ở **H-Resolution Mode 2, ~8 mẫu/giây**; mỗi mẫu mang `seq` và `module_ms` = `millis()` **lúc đo**
+   (D-FS-20, đã báo nhóm IoT 07/10). Firmware cũ 1 mẫu/giây, `module_ms` làm tròn giây **không dùng được**: backend không tìm
+   ra đỉnh lux nào và log thật đã bị từ chối `CLOCK_QUALITY`.
 6. **Nút đánh dấu cột** (rất cần): người quan sát bấm đúng lúc xe **ngang cột**; app ghi `phone_elapsed_ns` của mỗi lần bấm
    vào một file thứ năm `marks.jsonl` (`{"mark_no":0,"phone_elapsed_ns":"…"}`). Đây là **ground truth** để chấm ghép cột.
    Nếu app chưa kịp làm nút: người quan sát **đọc to số thứ tự cột** khi ngang cột — tiếng nằm trong audio của video, cùng
@@ -94,13 +98,32 @@ lại mọi lần dừng, vượt xe, xe tải đỗ che đèn.
 | 8, 9, 10 | 20 km/h | A → B | **Lặp lại** để đo độ lặp của đỉnh lux (Q5) |
 | 11 | 20 km/h | A → B | **Dừng hẳn 10 giây** dưới một cột đang sáng, rồi đi tiếp |
 | 12, 13 | 20 km/h | A → B | **Đổi vị trí trong làn**: một lượt sát mép (~0,5 m), một lượt giữa làn — đo ảnh hưởng tới đỉnh lux (Q7) |
+| 14 | 20 km/h | A → B → A | **Đi–về trong MỘT phiên**, không dừng quay lúc quay đầu; quay đầu ở chỗ rộng — kiểm quy trình mặc định (Q8) |
 
-Thời gian dự kiến khoảng 2 giờ (13 lượt). **An toàn trước hết**: không vượt tốc độ cho phép, bỏ lượt 7 nếu không an toàn.
+Thời gian dự kiến khoảng 2 giờ (14 lượt). **An toàn trước hết**: không vượt tốc độ cho phép, bỏ lượt 7 nếu không an toàn.
 
 ### Ghi chép mỗi lượt
 
 Giờ bắt đầu/kết thúc, thời tiết (khô/mưa, có trăng), lượt có sự cố gì (mất GPS, mất BLE, app lỗi, dừng xe), và **tên phiên
 (sweep) trên app**.
+
+## Quy trình khảo sát thật — chiều đi (chốt 07/10/2026)
+
+Camera gắn **chéo về một bên** (Phiếu v1.4) và `camera_side` khai **một lần cho cả phiên**: backend chỉ nhận cột nằm **cùng phía
+camera** theo chiều đi (cột phía kia ra `unknown`). Vì vậy:
+
+1. **Mặc định: mỗi đêm đi–về trọn tuyến trong CÙNG MỘT phiên.** Camera cố định một bên, **không đổi phía giữa phiên**, khai đúng
+   `mount.camera_side` (`left` / `right`). Lượt đi thấy cột một bên, lượt về thấy cột bên kia — mỗi cột được thấy đúng một lần.
+   Không cần dừng quay khi quay đầu: backend tự tách lượt đi và lượt về.
+2. **Ngoại lệ — đi một chiều** (tuyến vòng, về bằng lối khác, hoặc không quay đầu an toàn được): chọn chiều để **cột nằm cùng phía
+   camera**. Tuyến có cột hai bên mà chỉ đi một chiều thì sót cột phía kia — ghi lại. FO đánh dấu tuyến nào thuộc ngoại lệ.
+3. **Mỗi chiều giữ một thói quen cố định**: đi bên phải đường, cùng khoảng cách tới mép, 15–25 km/h (backend gắn cờ trên 25 km/h).
+   Độ lặp lại của phép đo — không phải số lần quét — là thứ quyết định báo nhầm "mờ".
+4. **An toàn ban đêm ở đường quê:** hai người (một lái, một theo dõi app — người lái không thao tác điện thoại); quay đầu ở chỗ
+   rộng (ngã ba, sân, bãi đất), không quay giữa đoạn hẹp; gặp xe ngược chiều bật pha thì giảm tốc/tạm dừng và ghi lại; đoạn
+   đường xấu đi chậm, giá gắn chắc.
+
+Không có trường "chiều đi" khi giao tuyến: chiều **thực tế** của từng lượt được ghi lại và baseline tính riêng theo chiều.
 
 ## Bàn giao cho WP2
 
