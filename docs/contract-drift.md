@@ -1100,3 +1100,27 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | ST-8 | Capability mới **`ReadStatistics`** = `superior`, `manager`, `system_admin`. Không `field_engineer`: `work_order` lọc theo người được giao nên số của họ sẽ khác số thật |
 | ST-9 | `group_by`: `commune`, `segment` (fixture-status); `commune` (repair-timeliness). Khoá dòng **luôn có mặt**, `null` khi không nhóm theo chiều đó. Chỉ trả nhóm có dữ liệu. BE-30 thêm giá trị `group_by` mà không đổi hình dạng |
 | ST-10 | Xuất CSV để **BE-31**, chung cho mọi báo cáo |
+
+## CABINET — trụ / tủ điện tổng thành tài sản riêng (07/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Trụ / tủ điện tổng là **tài sản** (`electrical_cabinet`, có toạ độ điểm, luôn tồn tại); IoT node là **thiết bị gắn lên trụ**, lắp theo yêu cầu của địa phương nên không trụ nào bắt buộc có. Cùng quan hệ `Pole` / `Fixture` (BE-09). Hiện thực **Q10** của `docs/database/erd.md`, sửa ba điểm của Q10 |
+| **Decision maker** | **Mỹ (Dylan)**, 07/10/2026 — đồng ý D-1…D-5 trên đề xuất của Claude; Codex review, cả 5 phát hiện đã áp. D-6 do review thêm, **Mỹ chưa duyệt riêng** |
+| **Nguồn** | FE hỏi vì sao `GET /assets/feeders` trả `has_geometry` thay vì toạ độ — `feeder.geom` là LineString **tuyến cáp**, toạ độ tủ chỉ có ở `iot_node.geom` nên trụ không IoT không có chỗ lưu |
+| **Chạm API** | **Có** — tài nguyên mới + trường mới trên feeder. **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa lên Contract, **chưa có code** |
+| **Chi tiết** | `.ai/tasks/CABINET.md` (lược đồ, migration, kéo theo) · review `.ai/reviews/CABINET-by-codex.md` |
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **CAB-1** | Bảng `electrical_cabinet`: `cabinet_id` prefix **`CAB`**, độ rộng tối thiểu 3 (`CAB-001`), `cabinet_name`, `commune_id`, `external_ref` (partial unique theo xã), **`geom` Point 4326 bắt buộc**, `data_source`. `external_ref` dạng `CAB-HVC-A` không xung đột với ID — không parse nó như ID | Có (§0.2 prefix mới) |
+| **CAB-2** | `feeder.cabinet_id` nullable (trụ nào cấp mạch này). `feeder.geom` (LineString) **giữ**, không bỏ | Có |
+| **CAB-3** | `iot_node.cabinet_id` **bắt buộc**, tối đa **một** thiết bị / trụ (UNIQUE đầy đủ — node chưa có trạng thái ngừng dùng). **`iot_node.geom` bỏ**, toạ độ thiết bị = toạ độ trụ. `GET /map/iot-nodes` **giữ nguyên hình dạng** | Không (hình dạng giữ) |
+| **CAB-4** | Rơ-le chỉ điều khiển feeder **cùng trụ** với thiết bị. DB (FK ghép qua `feeder_control.cabinet_id NOT NULL`) + service | Không |
+| **CAB-5** | Thiết bị **không** gắn lên trụ `data_source = field` (D-R10). DB (FK ghép tới `(cabinet_id, data_source)` + CHECK) + service | Không |
+| **CAB-6** | `GET /assets/feeders` (list + detail) thêm `cabinet: {cabinet_id, cabinet_name, location{lat,lng}} \| null` — tiền lệ `active_fixture`. `PUT /assets/feeders/{id}`: `cabinet_id` **vắng = giữ**, `null` = tháo — ngoại lệ thứ hai của thay thế toàn phần, khuôn `note` | Có (§5.3.1) |
+| **CAB-7** | Nhóm `/assets/cabinets` (CRUD + `POST /assets/import/cabinets`, nạp trụ **trước** feeder, feeder tham chiếu `cabinet_external_ref`); `GET /map/cabinets` (bbox bắt buộc, trụ không IoT cũng hiện) | Có (endpoint mới) |
+| **CAB-8** | Hình dạng đọc (Mỹ, 07/10/2026). `GET /assets/cabinets` item: `cabinet_id, external_ref, cabinet_name, commune_id, data_source, location{lat,lng}, feeder_ids[], iot_node_id\|null, updated_at, updated_by, updated_by_name`; chi tiết `{cabinet, geom_wkt, created_at}`; `/map/cabinets` properties `cabinet_id, cabinet_name, commune_id, feeder_ids[], iot_node_id\|null`. `iot_node_id` **trần** — trạng thái thiết bị chỉ ở `/map/iot-nodes` (không hai nguồn sự thật). `feeder_ids[]` tính lúc đọc, **trong phạm vi xã của người gọi**, `[]` khi rỗng | Có (§5.3.1, endpoint mới) |
+
+**Phải báo:** WP5 (trả lời câu hỏi `has_geometry`: toạ độ tủ sẽ đến qua `cabinet.location`; màn quản lý trụ mới; lớp bản đồ trụ),
+IOT-09 / Đạt (testbed: tạo trụ trước, thiết bị gắn vào trụ). **Chưa báo.**
