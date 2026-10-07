@@ -50,11 +50,11 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
 
     private const string FeederSource =
         "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved "
-            + "feeder, KEPT when the feeder stays. null, or a label with no feeder, is 400.";
+            + "feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.";
 
     private const string CabinetSource =
         "Provenance of the feeder → cabinet relation (TOPO-INFER D-10): verified | inferred. OPTIONAL: absent = inferred for a new or "
-            + "moved cabinet, KEPT when the cabinet stays. null, or a label with no cabinet, is 400.";
+            + "moved cabinet, KEPT when the cabinet stays. null while a cabinet is set, or a label with no cabinet, is 400.";
 
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {

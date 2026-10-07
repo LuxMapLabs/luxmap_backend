@@ -101,8 +101,10 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
 
         foreach (var feeder in feeders)
         {
+            // A road missing here was deleted after its poles were read (a pole cannot outlive its segment — RESTRICT), so
+            // its poles are gone too: skip them rather than answer 500 on a concurrent delete (Codex review P2).
             var bySegment = poles
-                .Where(pole => pole.FeederId == feeder.FeederId)
+                .Where(pole => pole.FeederId == feeder.FeederId && roads.ContainsKey(pole.SegmentId))
                 .GroupBy(pole => pole.SegmentId, StringComparer.Ordinal)
                 .OrderBy(group => roads[group.Key].CreatedAt)
                 .ThenBy(group => group.Key.Length)

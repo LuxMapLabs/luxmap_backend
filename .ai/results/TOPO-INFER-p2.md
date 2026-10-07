@@ -29,13 +29,13 @@ feeder|inferred|3
 Rollback về `DropFieldCabinetRule` → 0 cột nhãn; apply lại sạch. `has-pending-model-changes` → không đổi.
 Migration chỉ có `AddColumn` + `AddCheckConstraint` (+ khối backfill) — không `Drop*` nào ngoài `Down()`.
 
-**Test:** trước 1202 (sau #112) → sau **1219/1219 xanh** (+2 enum, +16 `TopologyInferenceTests`, −1 không đổi):
+**Test:** trước 1202 (sau #112) → sau **1224/1224 xanh** (+2 enum, +21 `TopologyInferenceTests`, −1 không đổi):
 
 ```
 Passed!  - Failed:     0, Passed:   351 ... LuxMap.Shared.Tests.dll
 Passed!  - Failed:     0, Passed:    44 ... LuxMap.Persistence.Tests.dll
 Passed!  - Failed:     0, Passed:    46 ... LuxMap.Infrastructure.Storage.Tests.dll
-Passed!  - Failed:     0, Passed:   778 ... LuxMap.Api.Tests.dll
+Passed!  - Failed:     0, Passed:   783 ... LuxMap.Api.Tests.dll
 ```
 
 Release `--no-incremental`: 0 warning, 0 error. 26 test cũ đỏ giữa chừng đều là fixture gán quan hệ không nhãn / danh sách khoá
@@ -50,13 +50,23 @@ literal — đã sửa theo luật mới (`TopologyQueryTests`, `IotNodeTests`, 
 | Bỏ ghi theo cặp (`IsModified`) | `Interleaved_writers_never_leave_a_pair_nobody_asserted` |
 | Cạnh đầu không lấy nhãn thấp hơn | `An_edge_is_only_as_verified_as_its_weakest_relation` |
 | Đọc hình học tuyến qua query filter | `A_foreign_road_still_orders_the_branch_and_ties_follow_the_id_rule` |
+| Gỡ `ThenBy(length)` khi sắp feeder | `Branches_follow_feeder_order_across_a_width_boundary` |
 
 **OpenAPI** so ngữ nghĩa với `HEAD`: +1 path, +4 schema (`TopologySource`, `CabinetTopologyEdge*`), 8 schema thêm đúng một trường
 nhãn; không xoá / đổi gì. Redocly hợp lệ, 8 cảnh báo (= trước).
 
+## Review
+
+Codex (gpt-6.1-sol, high, chỉ đọc, 78k token) — `.ai/reviews/TOPO-INFER-code-by-codex.md`: **0 P1 · 1 P2 · 2 P3** + một lệch câu
+chữ; Claude đối chiếu, **cả bốn đúng, đã sửa**:
+- **P2:** cột + tuyến bị xoá đồng thời giữa hai lượt đọc → `roads[...]` ném → 500. Sửa: bỏ qua nhóm không còn tuyến (cột không
+  sống lâu hơn tuyến — `Restrict`, nên cột đó cũng đã mất).
+- **P3:** thứ tự `branch` theo feeder qua ngưỡng ID (`Branches_follow_feeder_order_across_a_width_boundary`); ma trận lỗi nhãn
+  phía feeder — POST / PUT / import, và dữ liệu không đổi khi bị từ chối.
+- **Lệch câu chữ:** drift TI-2 + mô tả OpenAPI nay nói rõ `null` chỉ 400 **khi quan hệ còn**; tháo quan hệ kèm `null` hợp lệ.
+
 ## Chưa kiểm được / còn lại
 
 - `luxmap_dev` chưa migrate (`AddElectricalCabinet`, `DropFieldCabinetRule`, `AddTopologySource`).
-- Codex review code (Phase 2) — chưa chạy lúc viết file này.
 - Báo WP5: thay `useElectricalCascade` bằng `/map/cabinets/{id}/topology`; ô nhãn trên form cột / mạch.
 - Ticket riêng (D-7, D-8): chặn trộn `field` / mô hình ở ba đường; script đề xuất quan hệ suy luận.

@@ -518,7 +518,7 @@ public sealed record SetPoleFeederRequest
 
     /// <summary>
     /// Provenance of the relation (TOPO-INFER TI-2): <c>verified</c> | <c>inferred</c>. Optional — absent means <c>inferred</c>
-    /// for a new or moved feeder, KEEP when the feeder stays; <c>null</c>, or a label with <c>feeder_id: null</c>, is 400.
+    /// for a new or moved feeder, KEEP when the feeder stays; <c>null</c> with a feeder, or a label with <c>feeder_id: null</c>, is 400.
     /// </summary>
     public JsonElement FeederSource { get; init; }
 

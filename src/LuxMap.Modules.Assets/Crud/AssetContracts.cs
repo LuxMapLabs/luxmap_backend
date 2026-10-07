@@ -139,7 +139,7 @@ public sealed record CreatePoleRequest
 
     /// <summary>
     /// Provenance of the pole → feeder relation (TOPO-INFER TI-2): <c>verified</c> | <c>inferred</c>. Optional: absent means
-    /// <c>inferred</c> for a new or moved relation and KEEP when the feeder stays; <c>null</c>, or a label without a feeder, is 400.
+    /// <c>inferred</c> for a new or moved relation and KEEP when the feeder stays; <c>null</c> while a feeder is set, or a label without a feeder, is 400.
     /// </summary>
     public JsonElement FeederSource { get; init; }
 }
@@ -338,7 +338,7 @@ public sealed record UpdatePoleRequest
 
     /// <summary>
     /// Provenance of the pole → feeder relation (TOPO-INFER TI-2): <c>verified</c> | <c>inferred</c>. Optional: absent means
-    /// <c>inferred</c> for a new or moved relation and KEEP when the feeder stays; <c>null</c>, or a label without a feeder, is 400.
+    /// <c>inferred</c> for a new or moved relation and KEEP when the feeder stays; <c>null</c> while a feeder is set, or a label without a feeder, is 400.
     /// </summary>
     public JsonElement FeederSource { get; init; }
 }

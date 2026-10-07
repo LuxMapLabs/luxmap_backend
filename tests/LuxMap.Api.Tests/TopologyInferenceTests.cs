@@ -152,6 +152,54 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         Assert.Equal(((string?)null, (TopologySource?)null), await CabinetRelationAsync(feeder));
     }
 
+    [Theory]
+    [InlineData("""{ "cabinet_id": null, "cabinet_source": "verified" }""")] // a label with no cabinet
+    [InlineData("""{ "cabinet_id": "CABINET", "cabinet_source": null }""")]  // null while the cabinet stays
+    [InlineData("""{ "cabinet_id": "CABINET", "cabinet_source": ["verified"] }""")]
+    public async Task A_feeder_label_that_records_nothing_is_a_400_and_writes_nothing(string extra)
+    {
+        var client = await fixture.ManagerClientAsync();
+        var cabinet = await NewCabinetAsync();
+        var feeder = await NewFeederAsync(cabinet, TopologySource.Verified);
+
+        var body = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(extra.Replace("CABINET", cabinet))!;
+        body["feeder_name"] = JsonSerializer.SerializeToElement("refused");
+
+        var created = await client.PostAsJsonAsync(
+            Feeders, new Dictionary<string, JsonElement>(body) { ["commune_id"] = JsonSerializer.SerializeToElement(fixture.CommuneId) });
+        Assert.Equal(HttpStatusCode.BadRequest, created.StatusCode);
+        Assert.Equal("cabinet_source", (await ErrorAsync(created)).GetProperty("details").GetProperty("field").GetString());
+
+        var replaced = await client.PutAsJsonAsync($"{Feeders}/{feeder}", body);
+        Assert.Equal(HttpStatusCode.BadRequest, replaced.StatusCode);
+        Assert.Equal((cabinet, TopologySource.Verified), await CabinetRelationAsync(feeder));
+    }
+
+    [Fact]
+    public async Task A_feeder_import_refuses_an_unknown_label_and_a_label_without_a_cabinet_per_row()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var tag = $"TC{Guid.NewGuid():N}"[..10].ToUpperInvariant();
+        await AssetImportTests.ImportAsync(client, "cabinets", "c.csv",
+            "external_ref,cabinet_name,commune_id,geom_wkt,data_source" + $"\n{tag}-C,Tủ,{fixture.CommuneId},POINT({Lng} {Lat}),field");
+
+        var result = await AssetImportTests.ImportAsync(client, "feeders", "f.csv",
+            "external_ref,feeder_name,commune_id,cabinet_external_ref,cabinet_source"
+            + $"\n{tag}-F1,Lộ 1,{fixture.CommuneId},{tag}-C,maybe"
+            + $"\n{tag}-F2,Lộ 2,{fixture.CommuneId},,verified"
+            + $"\n{tag}-F3,Lộ 3,{fixture.CommuneId},{tag}-C,verified");
+
+        Assert.Equal(1, result.GetProperty("inserted").GetInt32());
+        Assert.Equal(
+            [(2, "cabinet_source"), (3, "cabinet_source")],
+            result.GetProperty("rows").EnumerateArray()
+                .Select(row => (row.GetProperty("row").GetInt32(), row.GetProperty("column").GetString() ?? "<null>")).ToArray());
+
+        var verified = await fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
+            .Where(f => f.ExternalRef == $"{tag}-F3").Select(f => f.FeederId).SingleAsync());
+        Assert.Equal(TopologySource.Verified, (await CabinetRelationAsync(verified)).Source);
+    }
+
     // ── Import ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -383,6 +431,46 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         }
     }
 
+    /// <summary>
+    /// Branches are numbered across the whole collection in feeder order — and feeders written in ONE statement share
+    /// <c>created_at</c>, so the id-length tiebreaker decides: as text <c>FDR-10000000</c> would come first.
+    /// </summary>
+    [Fact]
+    public async Task Branches_follow_feeder_order_across_a_width_boundary()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var segment = await NewSegmentAsync(fixture.CommuneId);
+        var cabinet = await NewCabinetAsync(Lng - 0.001, Lat);
+        var (shorter, longer) = await FreeStraddlingFeederIdsAsync();
+
+        try
+        {
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"""
+                INSERT INTO feeder (feeder_id, feeder_name, commune_id, cabinet_id, cabinet_source) VALUES
+                ({longer}, 'order probe', {fixture.CommuneId}, {cabinet}, 'inferred'),
+                ({shorter}, 'order probe', {fixture.CommuneId}, {cabinet}, 'inferred')
+                """));
+            var onLonger = await NewPoleAsync(segment, longer, TopologySource.Inferred, Lng + 0.001);
+            var onShorter = await NewPoleAsync(segment, shorter, TopologySource.Inferred, Lng + 0.002);
+
+            var edges = Features(await GetAsync(client, Topology(cabinet)))
+                .Select(f => (f.GetProperty("properties").GetProperty("branch").GetInt32(),
+                    f.GetProperty("properties").GetProperty("feeder_id").GetString() ?? "<null>",
+                    f.GetProperty("properties").GetProperty("to_pole_id").GetString() ?? "<null>"))
+                .ToArray();
+
+            Assert.Equal([(1, shorter, onShorter), (2, longer, onLonger)], edges);
+        }
+        finally
+        {
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"DELETE FROM pole WHERE feeder_id IN ({shorter}, {longer})"));
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"DELETE FROM feeder WHERE feeder_id IN ({shorter}, {longer})"));
+        }
+    }
+
     [Fact]
     public async Task No_relation_is_an_empty_diagram_and_a_foreign_cabinet_is_a_404()
     {
@@ -478,6 +566,23 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         }
 
         throw new InvalidOperationException("No free straddling pair of pole ids.");
+    }
+
+    /// <summary>A free pair like <c>FDR-9999999</c> / <c>FDR-10000000</c>, chosen from the live table.</summary>
+    private async Task<(string Shorter, string Longer)> FreeStraddlingFeederIdsAsync()
+    {
+        for (var nines = 7; nines <= 14; nines++)
+        {
+            var shorter = "FDR-" + new string('9', nines);
+            var longer = "FDR-1" + new string('0', nines);
+            if (!await fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
+                    .AnyAsync(f => f.FeederId == shorter || f.FeederId == longer)))
+            {
+                return (shorter, longer);
+            }
+        }
+
+        throw new InvalidOperationException("No free straddling pair of feeder ids.");
     }
 
     private Task<T> AsSystemAsync<T>(Func<LuxMapDbContext, Task<T>> write)
