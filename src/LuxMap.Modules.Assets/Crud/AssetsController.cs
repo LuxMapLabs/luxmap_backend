@@ -357,7 +357,8 @@ public sealed class AssetsController(
     public async Task<IActionResult> SetPoleFeederAsync(
         string poleId, [FromBody] SetPoleFeederRequest request, CancellationToken ct)
     {
-        await service.SetPoleFeederAsync(poleId, request.ReadFeederId(), ct);
+        await service.SetPoleFeederAsync(
+            poleId, request.ReadFeederId(), TopologyLink.Read(request.FeederSource, "feeder_source"), ct);
         return NoContent();
     }
 
@@ -514,6 +515,12 @@ public sealed class AssetsController(
 public sealed record SetPoleFeederRequest
 {
     public JsonElement FeederId { get; init; }
+
+    /// <summary>
+    /// Provenance of the relation (TOPO-INFER TI-2): <c>verified</c> | <c>inferred</c>. Optional — absent means <c>inferred</c>
+    /// for a new or moved feeder, KEEP when the feeder stays; <c>null</c>, or a label with <c>feeder_id: null</c>, is 400.
+    /// </summary>
+    public JsonElement FeederSource { get; init; }
 
     /// <summary>The feeder id, or <c>null</c> to clear. Throws when the key was not sent at all.</summary>
     public string? ReadFeederId() => FeederId.ValueKind switch

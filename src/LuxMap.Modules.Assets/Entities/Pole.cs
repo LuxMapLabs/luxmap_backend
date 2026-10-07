@@ -59,6 +59,15 @@ public class Pole : ICommuneScoped, IExternallyReferenced, IUpdateStamped
     /// </summary>
     public string? FeederId { get; set; }
 
+    /// <summary>
+    /// Where the pole → feeder relation came from (TOPO-INFER TI-1): <c>verified</c> or <c>inferred</c>, and <c>null</c>
+    /// exactly when <see cref="FeederId"/> is (<c>ck_pole_feeder_source_matches_feeder</c>).
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ Written ONLY as a pair with <see cref="FeederId"/> through <c>TopologyLink</c> — never set it alone (TI-2).
+    /// </remarks>
+    public TopologySource? FeederSource { get; set; }
+
     public required string CommuneId { get; set; }
 
     /// <summary>

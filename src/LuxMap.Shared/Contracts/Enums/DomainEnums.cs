@@ -132,3 +132,16 @@ public enum RoadClass
     InterCommune,
     InterVillage,
 }
+
+/// <summary>topology_source : verified | inferred — drift TOPO-INFER TI-1 (SELF-SIGNED, not yet in Contract section 1).</summary>
+/// <remarks>
+/// Where an electrical relation came from: a pole on a feeder (<c>pole.feeder_source</c>) or a feeder leaving a cabinet
+/// (<c>feeder.cabinet_source</c>). <c>verified</c> = confirmed by the commune / EVN or by dusk video (the lamps switched on
+/// together); <c>inferred</c> = deduced from where the cabinet and the poles stand. No relation is <c>null</c>, never a
+/// third value. Nothing ever becomes <c>verified</c> by default (TI-2).
+/// </remarks>
+public enum TopologySource
+{
+    Verified,
+    Inferred,
+}

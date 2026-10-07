@@ -29,5 +29,6 @@ public sealed class MapModule : ILuxMapModule
     {
         services.AddScoped<MapQueryService>();
         services.AddScoped<PoleDetailService>();
+        services.AddScoped<CabinetTopologyService>();
     }
 }

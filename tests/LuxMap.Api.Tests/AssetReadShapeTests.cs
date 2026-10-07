@@ -47,6 +47,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
         [
             "pole_id", "external_ref", "segment_id", "feeder_id", "commune_id", "data_source",
             "near_sensitive_poi", "location", "active_fixture", "note", "updated_at", "updated_by", "updated_by_name",
+            "feeder_source",
         ];
 
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], [.. keys.Order(StringComparer.Ordinal)]);
@@ -462,6 +463,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
                     SegmentId = segmentId,
                     CommuneId = communeId,
                     FeederId = feederId,
+                    FeederSource = feederId is null ? null : TopologySource.Inferred,
                     ExternalRef = externalRef,
                     Geom = new Point(Lng, Lat) { SRID = 4326 },
                     DataSource = source,

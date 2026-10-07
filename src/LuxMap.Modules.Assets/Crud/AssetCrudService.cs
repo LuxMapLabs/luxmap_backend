@@ -242,6 +242,9 @@ public sealed class AssetCrudService(
         await RejectDuplicateRefAsync<Feeder>(communeId, request.ExternalRef, ct);
         await RequireCabinetInCommuneAsync(request.CabinetId, communeId, ct);
 
+        var cabinetSource = TopologyLink.ResolveOrThrow(
+            null, null, request.CabinetId, TopologyLink.Read(request.CabinetSource, CabinetSourceField), CabinetSourceField, "cabinet_id");
+
         var feeder = new Feeder
         {
             ExternalRef = request.ExternalRef,
@@ -249,6 +252,7 @@ public sealed class AssetCrudService(
             CommuneId = communeId,
             Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt),
             CabinetId = request.CabinetId,
+            CabinetSource = cabinetSource,
         };
 
         dbContext.Set<Feeder>().Add(feeder);
@@ -268,11 +272,15 @@ public sealed class AssetCrudService(
 
         await RequireFeederInCommuneAsync(request.FeederId, communeId, ct);
 
+        var feederSource = TopologyLink.ResolveOrThrow(
+            null, null, request.FeederId, TopologyLink.Read(request.FeederSource, FeederSourceField), FeederSourceField, "feeder_id");
+
         var pole = new Pole
         {
             ExternalRef = request.ExternalRef,
             SegmentId = request.SegmentId!,
             FeederId = request.FeederId,
+            FeederSource = feederSource,
             CommuneId = communeId,
             Geom = Read<Point>(request.GeomWkt),
             NearSensitivePoi = request.NearSensitivePoi,
@@ -390,12 +398,19 @@ public sealed class AssetCrudService(
 
         await RejectDuplicateRefAsync<Feeder>(feeder.CommuneId, request.ExternalRef, ct, feeder.ExternalRef);
 
-        if (cabinetSent && !string.Equals(cabinetId, feeder.CabinetId, StringComparison.Ordinal))
+        // Absent cabinet_id keeps the cabinet (CAB-6); a label may still be sent for the kept cabinet.
+        var newCabinetId = cabinetSent ? cabinetId : feeder.CabinetId;
+        var cabinetSource = TopologyLink.ResolveOrThrow(
+            feeder.CabinetId, feeder.CabinetSource, newCabinetId,
+            TopologyLink.Read(request.CabinetSource, CabinetSourceField), CabinetSourceField, "cabinet_id");
+
+        if (!string.Equals(newCabinetId, feeder.CabinetId, StringComparison.Ordinal))
         {
-            await RequireCabinetInCommuneAsync(cabinetId, feeder.CommuneId, ct);
+            await RequireCabinetInCommuneAsync(newCabinetId, feeder.CommuneId, ct);
             await RejectSwitchedFeederMoveAsync(feeder.FeederId, ct);
-            feeder.CabinetId = cabinetId;
         }
+
+        TopologyLink.ApplyFeederCabinet(dbContext, feeder, newCabinetId, cabinetSource);
 
         feeder.ExternalRef = request.ExternalRef;
         feeder.FeederName = request.FeederName!;
@@ -439,9 +454,13 @@ public sealed class AssetCrudService(
 
         await RequireFeederInCommuneAsync(request.FeederId, pole.CommuneId, ct);
 
+        var feederSource = TopologyLink.ResolveOrThrow(
+            pole.FeederId, pole.FeederSource, request.FeederId,
+            TopologyLink.Read(request.FeederSource, FeederSourceField), FeederSourceField, "feeder_id");
+
         pole.ExternalRef = request.ExternalRef;
         pole.SegmentId = request.SegmentId!;
-        pole.FeederId = request.FeederId;
+        TopologyLink.ApplyPoleFeeder(dbContext, pole, request.FeederId, feederSource);
         pole.Geom = Read<Point>(request.GeomWkt);
         pole.NearSensitivePoi = request.NearSensitivePoi;
         pole.DataSource = request.DataSource!.Value;
@@ -584,13 +603,15 @@ public sealed class AssetCrudService(
     /// only thing standing there.
     /// </para>
     /// </remarks>
-    public async Task SetPoleFeederAsync(string poleId, string? feederId, CancellationToken ct)
+    public async Task SetPoleFeederAsync(string poleId, string? feederId, TopologyLink.Label feederSource, CancellationToken ct)
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
 
         await RequireFeederInCommuneAsync(feederId, pole.CommuneId, ct);
 
-        pole.FeederId = feederId;
+        var source = TopologyLink.ResolveOrThrow(
+            pole.FeederId, pole.FeederSource, feederId, feederSource, FeederSourceField, "feeder_id");
+        TopologyLink.ApplyPoleFeeder(dbContext, pole, feederId, source);
         Touch(pole);
         await dbContext.SaveChangesAsync(ct);
     }
@@ -641,6 +662,10 @@ public sealed class AssetCrudService(
     }
 
     private void Touch(IUpdateStamped asset) => AssetStamp.Touch(dbContext, asset, actor);
+
+    private const string FeederSourceField = "feeder_source";
+
+    private const string CabinetSourceField = "cabinet_source";
 
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
     /// <remarks>
@@ -752,6 +777,7 @@ public sealed class AssetCrudService(
                 PoleId = pole.PoleId,
                 SegmentId = pole.SegmentId,
                 FeederId = pole.FeederId,
+                FeederSource = pole.FeederSource,
                 // EPSG:4326 straight off the column. 3405 never leaves the SQL tree (BE-10, rule 3).
                 Lat = pole.Geom.Y,
                 Lng = pole.Geom.X,
@@ -829,6 +855,7 @@ public sealed class AssetCrudService(
             ExternalRef = pole.ExternalRef,
             SegmentId = pole.SegmentId,
             FeederId = pole.FeederId,
+            FeederSource = pole.FeederSource,
             CommuneId = pole.CommuneId,
             DataSource = pole.DataSource,
             NearSensitivePoi = pole.NearSensitivePoi,
@@ -891,6 +918,9 @@ public sealed class AssetCrudService(
                     CabinetId = cabinet.CabinetId,
                     CabinetName = cabinet.CabinetName,
                     Location = new AssetLocation { Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X },
+
+                    // Never null here: ck_feeder_cabinet_source_matches_cabinet ties it to cabinet_id.
+                    CabinetSource = feeder.CabinetSource ?? TopologySource.Inferred,
                 })
                 .FirstOrDefault(),
             UpdatedAt = feeder.UpdatedAt,

@@ -1,4 +1,5 @@
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Contracts.Enums;
 using NetTopologySuite.Geometries;
 
 namespace LuxMap.Modules.Assets.Entities;
@@ -70,6 +71,12 @@ public class Feeder : ICommuneScoped, IExternallyReferenced, IUpdateStamped
     /// (<c>feeder_control</c>) carries the cabinet too and its foreign keys refuse the move (CAB-4).
     /// </remarks>
     public string? CabinetId { get; set; }
+
+    /// <summary>
+    /// Where the feeder → cabinet relation came from (TOPO-INFER D-10): <c>verified</c> or <c>inferred</c>, and <c>null</c>
+    /// exactly when <see cref="CabinetId"/> is. Written only as a pair with it, through <c>TopologyLink</c>.
+    /// </summary>
+    public TopologySource? CabinetSource { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

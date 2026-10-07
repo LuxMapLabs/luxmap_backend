@@ -307,6 +307,15 @@ public sealed class AssetImportService(
                     $"Device '{nodeId}' in the feeder's cabinet switches it, so the feeder cannot move to another cabinet.");
             }
 
+            // TOPO-INFER D-10: the label follows TopologyLink's rule; a blank cabinet cell keeps the cabinet (CAB-6).
+            var newCabinetId = cabinet?.Id ?? feeder?.CabinetId;
+            var (cabinetSource, labelError) = TopologyLink.Resolve(
+                feeder?.CabinetId, feeder?.CabinetSource, newCabinetId, reader.Label("cabinet_source"), "cabinet_source", "cabinet_id");
+            if (labelError is not null)
+            {
+                reader.Fail("cabinet_source", labelError);
+            }
+
             if (!reader.IsValid)
             {
                 continue;
@@ -316,11 +325,7 @@ public sealed class AssetImportService(
             {
                 feeder.FeederName = name!;
                 feeder.Geom = geometry;
-                if (cabinet is not null)
-                {
-                    feeder.CabinetId = cabinet.Id;
-                }
-
+                TopologyLink.ApplyFeederCabinet(dbContext, feeder, newCabinetId, cabinetSource);
                 Count(feeder, ref updated, ref unchanged);
                 continue;
             }
@@ -331,7 +336,8 @@ public sealed class AssetImportService(
                 FeederName = name!,
                 CommuneId = communeId!,
                 Geom = geometry,
-                CabinetId = cabinet?.Id,
+                CabinetId = newCabinetId,
+                CabinetSource = cabinetSource,
             };
 
             dbContext.Set<Feeder>().Add(created);
@@ -386,15 +392,30 @@ public sealed class AssetImportService(
                     $"'{reader.Optional("feeder_external_ref")}' belongs to commune '{feeder.CommuneId}', not to the pole's commune '{communeId}'.");
             }
 
+            Pole? pole = null;
+            if (communeId is not null && externalRef is not null)
+            {
+                existing.TryGetValue((communeId, externalRef), out pole);
+            }
+
+            // TOPO-INFER TI-2: the label follows TopologyLink's rule. An empty feeder cell still clears the circuit here
+            // (full replacement, as before), and with it the label.
+            var (feederSource, labelError) = TopologyLink.Resolve(
+                pole?.FeederId, pole?.FeederSource, feeder?.Id, reader.Label("feeder_source"), "feeder_source", "feeder_id");
+            if (labelError is not null)
+            {
+                reader.Fail("feeder_source", labelError);
+            }
+
             if (!reader.IsValid)
             {
                 continue;
             }
 
-            if (existing.TryGetValue((communeId!, externalRef!), out var pole))
+            if (pole is not null)
             {
                 pole.SegmentId = segment!.Id;
-                pole.FeederId = feeder?.Id;
+                TopologyLink.ApplyPoleFeeder(dbContext, pole, feeder?.Id, feederSource);
                 pole.Geom = geometry!;
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
@@ -408,6 +429,7 @@ public sealed class AssetImportService(
                 ExternalRef = externalRef,
                 SegmentId = segment!.Id,
                 FeederId = feeder?.Id,
+                FeederSource = feederSource,
                 CommuneId = communeId!,
                 Geom = geometry!,
                 NearSensitivePoi = nearPoi,

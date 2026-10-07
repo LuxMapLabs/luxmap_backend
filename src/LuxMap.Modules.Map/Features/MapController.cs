@@ -33,6 +33,7 @@ namespace LuxMap.Modules.Map.Features;
 public sealed class MapController(
     MapQueryService service,
     PoleDetailService poleDetail,
+    CabinetTopologyService topology,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
     /// <summary>
@@ -147,6 +148,23 @@ public sealed class MapController(
                 DataSource = WireEnum.ParseCsv<DataSource>(dataSource, "data_source"),
             },
             ct));
+
+    /// <summary>
+    /// The branch diagram of one cabinet (TOPO-INFER TI-4): a <c>FeatureCollection</c> of <c>LineString</c> edges, one feature
+    /// per edge, chained cabinet → pole → pole along each road. Built from stored relations only.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ SELF-SIGNED (drift TOPO-INFER), not yet in the Contract. A logical diagram, NOT a cable route; style by
+    /// <c>feeder_source</c> (dashed for <c>inferred</c>). No relation → <c>features: []</c>. Absent or out of scope → 404.
+    /// One cabinet, so no <c>bbox</c> — the shape of <c>/map/poles/{id}</c>.
+    /// </remarks>
+    [HttpGet("cabinets/{cabinetId}/topology")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<FeatureCollection<CabinetTopologyEdgeProperties>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<FeatureCollection<CabinetTopologyEdgeProperties>>> CabinetTopologyAsync(
+        string cabinetId, CancellationToken ct)
+        => Ok(await topology.TopologyAsync(cabinetId, ct));
 
     /// <summary>Electrical cabinets inside a bounding box, as a <c>FeatureCollection</c> of points (CAB-7).</summary>
     /// <remarks>
