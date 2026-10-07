@@ -10,6 +10,7 @@
     <Project Path="src/LuxMap.Modules.Survey/LuxMap.Modules.Survey.csproj" />
     <Project Path="src/LuxMap.Modules.Telemetry/LuxMap.Modules.Telemetry.csproj" />
     <Project Path="src/LuxMap.Modules.Notifications/LuxMap.Modules.Notifications.csproj" />
+    <Project Path="src/LuxMap.Modules.Statistics/LuxMap.Modules.Statistics.csproj" />
     <Project Path="src/LuxMap.Modules.Sync/LuxMap.Modules.Sync.csproj" />
     <Project Path="src/LuxMap.Modules.WorkOrders/LuxMap.Modules.WorkOrders.csproj" />
     <Project Path="src/LuxMap.Persistence/LuxMap.Persistence.csproj" />

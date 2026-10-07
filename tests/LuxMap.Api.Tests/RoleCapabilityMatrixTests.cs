@@ -61,6 +61,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ManageWorkOrders"] = ("POST", "/api/v1/work-orders", ["manager"]),
         ["ExecuteWorkOrders"] = ("POST", "/api/v1/work-orders/WO-0/complete", ["field_engineer"]),
         ["SyncOffline"] = ("POST", "/api/v1/sync/push", ["field_engineer"]),
+        ["ReadStatistics"] = ("GET", "/api/v1/statistics/fixture-status", ["system_admin", "superior", "manager"]),
     };
 
     private static readonly string[] RetiredRoleValues =

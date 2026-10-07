@@ -35,6 +35,7 @@ public class CapabilityMatrixTests
         ["cap:manage_work_orders"] = ["manager"],
         ["cap:execute_work_orders"] = ["field_engineer"],
         ["cap:sync_offline"] = ["field_engineer"],
+        ["cap:read_statistics"] = ["manager", "superior", "system_admin"],
     };
 
     [Fact]
