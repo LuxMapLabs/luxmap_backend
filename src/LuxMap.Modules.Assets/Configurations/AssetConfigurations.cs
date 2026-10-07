@@ -179,9 +179,6 @@ public sealed class ElectricalCabinetConfiguration : IEntityTypeConfiguration<El
         // target of the composite keys from feeder and iot_node that keep both in the cabinet's commune.
         builder.HasAlternateKey(cabinet => new { cabinet.CabinetId, cabinet.CommuneId });
 
-        // ⚠️ ux_electrical_cabinet_cabinet_id_data_source (target of iot_node's provenance key, CAB-5) is
-        // created by raw SQL, not here: as an EF key it would freeze DataSource on a tracked cabinet.
-
         builder.HasCommuneReference(cabinet => cabinet.CommuneId);
     }
 }

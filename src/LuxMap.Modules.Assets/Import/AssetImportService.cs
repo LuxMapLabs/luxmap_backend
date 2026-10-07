@@ -197,21 +197,9 @@ public sealed class AssetImportService(
     }
 
     /// <summary>Cabinets (CAB-7) — upserted on <c>(commune_id, external_ref)</c> like segments.</summary>
-    /// <remarks>
-    /// A cabinet that carries a device cannot become <c>field</c> (CAB-5): a ROW error here, because the database
-    /// refusal (<c>ck_iot_node_cabinet_not_field</c>) would arrive at the write and fail the whole batch.
-    /// <para>
-    /// ⚠️ <b>Same known limitation as the upsert (class remarks):</b> the device lookup here and the relay lookup in
-    /// <see cref="PlanFeedersAsync"/> are read BEFORE the write transaction. A device or relay wired in between
-    /// makes the database refuse at the write — the batch rolls back whole and answers 500, nothing is corrupted.
-    /// Accepted while the only writer of <c>iot_node</c> / <c>feeder_control</c> is a seed script (Codex review
-    /// 07/10/2026, P2); the fix is locking the rows inside the transaction, not another pre-check.
-    /// </para>
-    /// </remarks>
     private async Task<WritePlan> PlanCabinetsAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<ElectricalCabinet>(readers, cabinet => cabinet.ExternalRef, cancellationToken);
-        var mounted = await devices.DevicesAsync([.. existing.Values.Select(cabinet => cabinet.CabinetId)], cancellationToken);
         int inserted = 0, updated = 0, unchanged = 0;
 
         foreach (var reader in readers)
@@ -226,12 +214,6 @@ public sealed class AssetImportService(
             if (communeId is not null && externalRef is not null)
             {
                 existing.TryGetValue((communeId, externalRef), out cabinet);
-            }
-
-            if (cabinet is not null && dataSource == DataSource.Field && cabinet.DataSource != DataSource.Field
-                && mounted.TryGetValue(cabinet.CabinetId, out var nodeId))
-            {
-                reader.Fail("data_source", $"Device '{nodeId}' is mounted in this cabinet; the team installs no device in the field, so it cannot become 'field'.");
             }
 
             if (!reader.IsValid)
@@ -270,6 +252,13 @@ public sealed class AssetImportService(
     /// <c>cabinet_external_ref</c> is optional, and a blank cell or a missing column KEEPS the feeder's cabinet —
     /// the import never detaches one, the same rule as a pole's note and as <c>PUT</c> (CAB-6). Moving a feeder a
     /// device switches is a row error (CAB-4).
+    /// <para>
+    /// ⚠️ <b>Same known limitation as the upsert (class remarks):</b> the relay lookup is read BEFORE the write
+    /// transaction. A relay wired in between makes the database refuse at the write — the batch rolls back whole
+    /// and answers 500, nothing is corrupted. Accepted while the only writer of <c>feeder_control</c> is a seed
+    /// script (Codex review 07/10/2026, P2); the fix is locking the rows inside the transaction, not another
+    /// pre-check.
+    /// </para>
     /// </remarks>
     private async Task<WritePlan> PlanFeedersAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {

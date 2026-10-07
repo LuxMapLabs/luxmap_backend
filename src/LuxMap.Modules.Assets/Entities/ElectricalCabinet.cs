@@ -39,10 +39,7 @@ public class ElectricalCabinet : ICommuneScoped, IExternallyReferenced, IUpdateS
     /// </summary>
     public required Point Geom { get; set; }
 
-    /// <summary>
-    /// Field cabinets and the testbed cabinet must stay apart all the way to the statistics. A device may
-    /// sit only on a cabinet that is NOT <c>field</c> (CAB-5, D-R10).
-    /// </summary>
+    /// <summary>Field cabinets and the testbed cabinet must stay apart all the way to the statistics.</summary>
     public DataSource DataSource { get; set; }
 
     public DateTime CreatedAt { get; set; }

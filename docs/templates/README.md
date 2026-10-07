@@ -236,7 +236,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `cabinet_name` | **Có** | text | |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | **Có** | Point | Vị trí trụ — **bắt buộc** (CAB-1): trụ là thứ đứng cạnh chụp được |
-| `data_source` | **Có** | enum | `field` / `public_imagery` / `calibration_rig` / `simulated`. ⚠️ Trụ **đang mang thiết bị IoT** không đổi được sang `field` — lỗi theo dòng (CAB-5) |
+| `data_source` | **Có** | enum | `field` / `public_imagery` / `calibration_rig` / `simulated` |
 
 ## `feeders.csv`
 

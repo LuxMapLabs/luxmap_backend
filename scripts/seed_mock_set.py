@@ -222,9 +222,9 @@ END $$;""".strip())
             f"{quote(cabinet_id)}, {quote('Tủ ' + p['node_id'])}, {quote('DEMO-' + cabinet_id)}, {COMMUNE}, "
             f"{geometry(node['geometry'])}, 'simulated');")
         sql.append(
-            "INSERT INTO iot_node (node_id, commune_id, node_role, cabinet_id, cabinet_data_source, "
+            "INSERT INTO iot_node (node_id, commune_id, node_role, cabinet_id, "
             "supports_remote_control, data_source, last_report_at) VALUES ("
-            f"{quote(p['node_id'])}, {COMMUNE}, {quote(p['node_role'])}, {quote(cabinet_id)}, 'simulated', "
+            f"{quote(p['node_id'])}, {COMMUNE}, {quote(p['node_role'])}, {quote(cabinet_id)}, "
             f"{str(p['supports_remote_control']).lower()}, 'simulated', {quote(p['last_report_at'])});")
         for relay, feeder_id in enumerate(p["feeder_ids"], start=1):
             # A relay switches only a feeder of the device's own cabinet (CAB-4).

@@ -306,7 +306,6 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
 
     /// <summary>
     /// A device in a cabinet of its own at (<see cref="Lng"/>, <see cref="Lat"/>) — the point the map shows (CAB-3).
-    /// The cabinet is <c>simulated</c> whatever the device is, so the device's own CHECK is the one under test.
     /// </summary>
     private async Task<string> NewNodeAsync(
         string communeId, DateTime? lastReportAt = null, DataSource source = DataSource.Simulated, bool remote = false)
@@ -318,7 +317,6 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
             {
                 CommuneId = communeId,
                 CabinetId = cabinet,
-                CabinetDataSource = DataSource.Simulated,
                 DataSource = source,
                 SupportsRemoteControl = remote,
                 LastReportAt = lastReportAt,

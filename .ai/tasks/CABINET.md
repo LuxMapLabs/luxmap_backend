@@ -36,7 +36,7 @@ Phiếu v1.4 dòng 197/215/239/349 liệt kê *electrical cabinets* là tài s�
 | **D-2** | **Bỏ `iot_node.geom`**; toạ độ thiết bị = toạ độ trụ, tính lúc đọc. `iot_node.cabinet_id` **bắt buộc**. `/map/iot-nodes` giữ nguyên hình dạng (điểm vẫn là điểm của trụ) |
 | **D-3** | Một trụ tối đa **một** thiết bị (testbed: 1) |
 | **D-4** | Rơ-le của thiết bị chỉ điều khiển feeder **thuộc cùng trụ** (`feeder.cabinet_id = iot_node.cabinet_id`) — **DB + service** (sửa sau review, xem dưới) |
-| **D-6** | Thiết bị **không** gắn lên trụ `data_source = field` (D-R10) — **DB + service** (thêm sau review). ⚠️ **Mỹ chưa duyệt riêng** — Codex đề xuất, Claude áp |
+| **D-6** | ~~Thiết bị **không** gắn lên trụ `data_source = field` (D-R10)~~ — **Mỹ gỡ 07/10/2026: không cần.** Migration `DropFieldCabinetRule` |
 | **D-5** | Prefix ID: đề xuất `CAB`, độ rộng 3 (`CAB-001`), sequence `cabinet_id_seq` |
 
 ## Lược đồ đề xuất

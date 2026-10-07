@@ -89,3 +89,19 @@ Codex (gpt-6.1-sol, high, chỉ đọc) — `.ai/reviews/CABINET-code-by-codex.m
 - ⚠️ `copy_dev_to_supabase.py`: chỉ thêm `electrical_cabinet` vào `PLAN` (trước `feeder`); **chưa chạy** diễn tập (cần đích localhost).
 - ⚠️ Template `cabinets.example.csv` / `feeders.example.csv` dùng `COM-070` — chưa nạp thử; định dạng giống hệt file test `CabinetTests`.
 - `luxmap_dev` **chưa migrate** (theo quy ước: chỉ sau khi xanh hết và Mỹ đồng ý).
+
+## Gỡ CAB-5 — 07/10/2026 (sau khi PR #111 merge)
+
+Mỹ: luật "không gắn thiết bị lên trụ `field`" **không cần**. Nhánh `refactor/CABINET-drop-field-cabinet-rule`, migration mới
+`DropFieldCabinetRule` (không sửa `AddElectricalCabinet` đã merge): bỏ `fk_iot_node_cabinet_data_source`,
+`ux_electrical_cabinet_cabinet_id_data_source`, `ck_iot_node_cabinet_not_field`, `ck_iot_node_cabinet_data_source` và cột
+`iot_node.cabinet_data_source`; bỏ kiểm tra ở `UpdateCabinetAsync` và import trụ. CAB-4 (rơ-le cùng trụ) và
+`ck_iot_node_data_source_not_field` (thiết bị tự nó không `field`) **giữ nguyên**. Các bảng bằng chứng ở trên ghi luật CAB-5
+là lịch sử của PR #111.
+
+Kiểm trên `luxmap_test`: apply → 0/3 ràng buộc CAB-5, 0 cột `cabinet_data_source`, `fk_feeder_control_feeder_same_cabinet`
+còn; rollback về `AddElectricalCabinet` → cột được điền lại từ trụ (`NODE-001…003` → `simulated`), 3/3 ràng buộc trở lại;
+apply lại → 0/3. `has-pending-model-changes` → không đổi. Test: `A_cabinet_carrying_a_device_cannot_become_field_data` đổi
+thành `…_may_become_field_data` (ghim quyết định mới), bỏ test SQL thô của CAB-5, `Every_database_only_cabinet_constraint_exists`
+khẳng định thêm ba ràng buộc cũ và cột đã biến mất.
+

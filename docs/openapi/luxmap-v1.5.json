@@ -2143,7 +2143,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; trụ mang thiết bị IoT không đổi sang field được (409, CAB-5)",
+        "summary": "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được",
         "operationId": "putAssetsCabinetsCabinetid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW)"

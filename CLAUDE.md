@@ -1848,17 +1848,13 @@ Single-context: thuật ngữ ở `CONTEXT.md` gốc repo; quyết định vào 
 `iot_node.cabinet_id`. Lọc bbox thì `ST_Intersects` trên **`electrical_cabinet.geom` trần** (`MapQueryService.IotNodeQuery`),
 canh bằng `MapQueryPlanTests.The_device_and_cabinet_bbox_queries_can_ride_the_cabinet_gist_index`.
 
-🔴 **Sáu ràng buộc chỉ có ở DB, EF không biết** (`CabinetConstraints`, raw SQL trong `AddElectricalCabinet`): ba unique đích
-`(feeder_id, cabinet_id)`, `(node_id, cabinet_id)`, `(cabinet_id, data_source)` và ba FK của CAB-4/CAB-5. Lý do: mỗi đích
+🔴 **Bốn ràng buộc chỉ có ở DB, EF không biết** (`CabinetConstraints`, raw SQL trong `AddElectricalCabinet`): hai unique đích
+`(feeder_id, cabinet_id)`, `(node_id, cabinet_id)` và hai FK rơ-le-cùng-trụ của CAB-4. Lý do: mỗi đích
 chứa một cột người ta sửa được; khai `HasAlternateKey` là biến cột đó thành key property và EF ném ngay trong
 `DetectChanges` (cùng bẫy `Feeder.CommuneId` của O-7), còn alternate key trên cột nullable thì EF không cho. Hệ quả:
 **snapshot không thấy chúng, migration sau không tự dựng lại, và không ai biết khi một cái mất** — chỉ
 `CabinetTests.Every_database_only_cabinet_constraint_exists` biết. Gộp/squash migration thì phải chép khối SQL đó theo.
 
-- **Viết `iot_node` thì đặt `cabinet_data_source` = `data_source` của trụ.** Nó là bản sao để FK
-  `fk_iot_node_cabinet_data_source` (`ON UPDATE CASCADE`) + CHECK `ck_iot_node_cabinet_not_field` từ chối thiết bị trên trụ
-  `field` (D-R10). Ghi sai giá trị là FK từ chối; đổi `data_source` của trụ thì cascade tự chép xuống. Cascade này chỉ đổi một
-  cột không phải commune trên hàng cùng xã, nên **không** mở vùng mù của guard (mục 1c).
 - **Viết `feeder_control` thì `cabinet_id` phải là trụ của CẢ thiết bị lẫn feeder** — gắn feeder vào trụ trước. Hệ quả ngược:
   feeder đang có rơ-le **không đổi trụ / tháo trụ được**, thiết bị đang có rơ-le không chuyển trụ được (FK `NO ACTION`).
   Service trả 409 `ASSET_IN_USE`; import báo lỗi theo dòng — **phải** bắt ở bước kiểm, FK ở bước ghi làm hỏng cả mẻ (500).
@@ -1869,6 +1865,7 @@ chứa một cột người ta sửa được; khai `HasAlternateKey` là biến
   Import feeder: ô trống / thiếu cột = giữ, import không bao giờ tháo trụ. Đừng "sửa cho nhất quán" với `feeder_id` của cột.
 - **Teardown xoá `feeder_control` → `iot_node` → `feeder` → `electrical_cabinet`** (tất cả `Restrict`). Fixture tài sản đã làm;
   fixture mới tạo thiết bị phải theo.
-- Trụ có thể `field`; thiết bị thì không bao giờ (`ck_iot_node_data_source_not_field` giữ nguyên). Mở rộng một trong hai là
-  quyết định phạm vi (lắp IoT ngoài xã), không phải sửa lỗi.
+- Trụ có thể `field`, **kể cả khi đang mang thiết bị** — luật CAB-5 đã **gỡ** (Mỹ, 07/10/2026, migration
+  `DropFieldCabinetRule`), canh bằng `A_cabinet_carrying_a_device_may_become_field_data`. Thiết bị thì không bao giờ `field`
+  (`ck_iot_node_data_source_not_field` giữ nguyên); mở rộng nó là quyết định phạm vi (lắp IoT ngoài xã), không phải sửa lỗi.
 
