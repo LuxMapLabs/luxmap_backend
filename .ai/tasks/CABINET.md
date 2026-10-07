@@ -106,8 +106,33 @@ kiểm trước để ra 409/lỗi theo dòng. Cùng ràng buộc "chỉ DB, kh�
 | `POST /assets/import/cabinets` | Upsert theo `(commune_id, external_ref)`. Thứ tự nạp: **cabinets → feeders** (feeder tham chiếu `cabinet_external_ref`) |
 | `GET /assets/feeders` item | Thêm `cabinet: {cabinet_id, cabinet_name, location{lat,lng}} \| null` — tiền lệ `active_fixture` trong list cột (§5.3.1: một cờ sẽ ép gọi thêm một request mỗi dòng). **Đây là câu trả lời cho câu hỏi của FE** |
 | `POST/PUT /assets/feeders` | Thêm `cabinet_id?`. **PUT: vắng = GIỮ, `null` = tháo, chuỗi = đổi** — ngoại lệ thứ hai của thay thế toàn phần, cùng khuôn `note` của cột (R-3): form feeder hiện tại chưa có ô trụ, coi vắng là xoá thì đổi tên feeder sẽ tháo trụ (hoặc nhận 409 vì D-4). Đọc bằng `JsonElement` + thêm vào `JsonElementFieldSchemaFilter`. `cabinet` emit ở cả list lẫn detail qua cùng projection |
-| `GET /map/cabinets` | `bbox` bắt buộc, `FeatureCollection<Point>`; properties `cabinet_id, cabinet_name, commune_id, feeder_ids[], node_id\|null` (tính lúc đọc). Trụ không IoT cũng hiện |
+| `GET /map/cabinets` | `bbox` bắt buộc, `FeatureCollection<Point>`; properties `cabinet_id, cabinet_name, commune_id, feeder_ids[], iot_node_id\|null` (tính lúc đọc). Trụ không IoT cũng hiện |
 | `GET /map/iot-nodes` | Hình dạng **giữ nguyên**; geometry lấy từ trụ. Lọc bbox chạy trên `electrical_cabinet.geom` (GIST) rồi join |
+
+### Hình dạng khi ĐỌC trụ — CAB-8 (Mỹ chốt 07/10/2026)
+
+```jsonc
+// GET /assets/cabinets → items[]   (PagedResult, lọc commune_id[], page, page_size)
+{ "cabinet_id": "CAB-001", "external_ref": "CAB-HVC-A", "cabinet_name": "Tủ A - Huỳnh Văn Cọ",
+  "commune_id": "COM-001", "data_source": "field",
+  "location": { "lat": 10.97, "lng": 106.50 },
+  "feeder_ids": ["FDR-005"],
+  "iot_node_id": null,
+  "updated_at": "…", "updated_by": "USR-003", "updated_by_name": "…" }
+
+// GET /assets/cabinets/{cabinetId} → thêm
+{ "cabinet": { …dòng danh sách… }, "geom_wkt": "POINT (106.50 10.97)", "created_at": "…" }
+```
+
+- **`location{lat,lng}`, không GeoJSON** — danh sách phân trang, khuôn `location` của `GET /faults` và `/assets/poles`.
+- **`iot_node_id` trần, KHÔNG lồng trạng thái thiết bị** (`node_status`, `last_report_at`, `supports_remote_control`):
+  chúng đã ở `/map/iot-nodes`. §5.3.1 "KHÔNG lặp lại mục 5.1" — hai endpoint cùng trả một trường là hai nguồn sự thật.
+- **`feeder_ids[]` chứ không phải số đếm** — màn trụ cần bấm sang mạch. Tính lúc đọc, sắp theo khuôn `created_at,
+  length(id), id` (không `ORDER BY feeder_id`), `[]` khi không có — không `null`. **Chỉ feeder trong phạm vi xã của
+  người gọi** (query filter), cùng lý lẽ `pole_count` của §5.3.1.
+- `data_source` **được emit** ở đây (khác `feeder`, vốn không có trường này): trụ có nguồn thật, và tách trụ testbed khỏi
+  trụ thực địa là điều kiện của D-6.
+- Không tồn tại **và** ngoài phạm vi xã → `404 ASSET_NOT_FOUND` như ba loại tài sản khác.
 
 ## Migration
 

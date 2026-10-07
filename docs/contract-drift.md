@@ -1120,6 +1120,7 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | **CAB-5** | Thiết bị **không** gắn lên trụ `data_source = field` (D-R10). DB (FK ghép tới `(cabinet_id, data_source)` + CHECK) + service | Không |
 | **CAB-6** | `GET /assets/feeders` (list + detail) thêm `cabinet: {cabinet_id, cabinet_name, location{lat,lng}} \| null` — tiền lệ `active_fixture`. `PUT /assets/feeders/{id}`: `cabinet_id` **vắng = giữ**, `null` = tháo — ngoại lệ thứ hai của thay thế toàn phần, khuôn `note` | Có (§5.3.1) |
 | **CAB-7** | Nhóm `/assets/cabinets` (CRUD + `POST /assets/import/cabinets`, nạp trụ **trước** feeder, feeder tham chiếu `cabinet_external_ref`); `GET /map/cabinets` (bbox bắt buộc, trụ không IoT cũng hiện) | Có (endpoint mới) |
+| **CAB-8** | Hình dạng đọc (Mỹ, 07/10/2026). `GET /assets/cabinets` item: `cabinet_id, external_ref, cabinet_name, commune_id, data_source, location{lat,lng}, feeder_ids[], iot_node_id\|null, updated_at, updated_by, updated_by_name`; chi tiết `{cabinet, geom_wkt, created_at}`; `/map/cabinets` properties `cabinet_id, cabinet_name, commune_id, feeder_ids[], iot_node_id\|null`. `iot_node_id` **trần** — trạng thái thiết bị chỉ ở `/map/iot-nodes` (không hai nguồn sự thật). `feeder_ids[]` tính lúc đọc, **trong phạm vi xã của người gọi**, `[]` khi rỗng | Có (§5.3.1, endpoint mới) |
 
 **Phải báo:** WP5 (trả lời câu hỏi `has_geometry`: toạ độ tủ sẽ đến qua `cabinet.location`; màn quản lý trụ mới; lớp bản đồ trụ),
 IOT-09 / Đạt (testbed: tạo trụ trước, thiết bị gắn vào trụ). **Chưa báo.**
