@@ -97,7 +97,6 @@ erDiagram
     iot_node {
         text node_id PK "SỬA: + cabinet_id, - geom"
         text cabinet_id FK "BẮT BUỘC, UNIQUE (CAB-3)"
-        text cabinet_data_source "bản sao data_source của trụ, không bao giờ field (CAB-5)"
     }
     feeder_control {
         text feeder_id PK "HIỆN CÓ"
