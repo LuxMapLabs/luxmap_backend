@@ -1869,3 +1869,23 @@ chứa một cột người ta sửa được; khai `HasAlternateKey` là biến
   `DropFieldCabinetRule`), canh bằng `A_cabinet_carrying_a_device_may_become_field_data`. Thiết bị thì không bao giờ `field`
   (`ck_iot_node_data_source_not_field` giữ nguyên); mở rộng nó là quyết định phạm vi (lắp IoT ngoài xã), không phải sửa lỗi.
 
+
+### TOPO-INFER — nhãn nguồn gốc topology (07/10/2026, drift TI-1…TI-6)
+
+Topology ngoài thực địa là **suy luận công khai**: `pole.feeder_source` và `feeder.cabinet_source` (`verified | inferred`), mỗi
+nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`, `ck_feeder_cabinet_source_matches_cabinet`).
+
+- 🔴 **Mọi đường ghi `pole.feeder_id` / `feeder.cabinet_id` đi qua `TopologyLink`** (`Resolve` rồi `ApplyPoleFeeder` /
+  `ApplyFeederCabinet`). Đó là chỗ DUY NHẤT có luật TI-2 (vắng + quan hệ không đổi → giữ; đổi → `inferred`; `null` / sai kiểu /
+  nhãn không quan hệ → 400) và chỗ **ghi theo cặp**: EF chỉ ghi cột đổi so với snapshot, nên hai lượt xen nhau (A xác minh F1,
+  B chuyển sang F2) sẽ để lại `(F2, verified)` — cặp không ai khẳng định. `Apply*` đánh dấu cả hai cột khi một trong hai đổi,
+  và **không** đánh dấu gì khi cả hai giữ nguyên (giữ luật N-4: nạp lại file y hệt không đóng dấu). Canh bằng
+  `Interleaved_writers_never_leave_a_pair_nobody_asserted`. Gán `FeederId` / `CabinetId` trực tiếp trong code mới là mở lại lỗ đó.
+- **Không đường nào tự nhận `verified`.** Backfill, seed, mặc định đều `inferred`. Fixture test gán quan hệ phải kèm nhãn (CHECK).
+- **Import: ô trống = vắng.** GeoJSON object / mảng ở ô nhãn phải là lỗi dòng — `GeoJsonImportRow` đọc chúng thành `null`, tức
+  "trống", nên cột có nghĩa "trống = giữ" phải hỏi `IImportRow.IsNonScalar` trước (`ImportRowReader.Label`).
+- **`GET /map/cabinets/{id}/topology`** (`CabinetTopologyService`): sơ đồ **logic**, thứ tự dọc đường bằng `LengthIndexedLine`
+  trên 4326 — **chỉ thứ tự, không bao giờ khoảng cách**. Hình học tuyến đọc **bỏ query filter** (tuyến `inter_commune` có thể
+  thuộc xã khác, cùng lý lẽ WO-12); bỏ `IgnoreQueryFilters` thì tra cứu trượt và ra 500. Cạnh đầu lấy nhãn **thấp hơn** của hai
+  quan hệ. `verified` của cột nghĩa là "cột thuộc mạch này", **không** phải cạnh đó là dây thật.
+- Chưa làm (ticket riêng): chặn trộn cột `field` với trụ không-`field` (phải kiểm ở ba đường), script đề xuất quan hệ suy luận.
