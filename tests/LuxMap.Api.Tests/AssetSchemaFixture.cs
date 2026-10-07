@@ -104,6 +104,8 @@ public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncL
             await ExecuteAsync(db, "DELETE FROM feeder_control WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM iot_node WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM feeder WHERE commune_id = @commune;", ("commune", CommuneId));
+            // CABINET: feeder and iot_node hold the cabinet with RESTRICT, so it goes after both.
+            await ExecuteAsync(db, "DELETE FROM electrical_cabinet WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM road_segment WHERE commune_id = @commune;", ("commune", CommuneId));
             await ExecuteAsync(db, "DELETE FROM administrative_unit WHERE commune_id = @commune;", ("commune", CommuneId));
 

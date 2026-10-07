@@ -301,14 +301,24 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
             }
         });
 
-    private Task<string> NewNodeAsync(
+    /// <summary>Which cabinet each device of this test sits in — a relay must name it (CAB-4).</summary>
+    private readonly Dictionary<string, string> cabinetOf = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// A device in a cabinet of its own at (<see cref="Lng"/>, <see cref="Lat"/>) — the point the map shows (CAB-3).
+    /// The cabinet is <c>simulated</c> whatever the device is, so the device's own CHECK is the one under test.
+    /// </summary>
+    private async Task<string> NewNodeAsync(
         string communeId, DateTime? lastReportAt = null, DataSource source = DataSource.Simulated, bool remote = false)
-        => AsSystemAsync(async db =>
+    {
+        var cabinet = await NewCabinetAsync(communeId);
+        var nodeId = await AsSystemAsync(async db =>
         {
             var node = new IotNode
             {
                 CommuneId = communeId,
-                Geom = new Point(Lng, Lat) { SRID = 4326 },
+                CabinetId = cabinet,
+                CabinetDataSource = DataSource.Simulated,
                 DataSource = source,
                 SupportsRemoteControl = remote,
                 LastReportAt = lastReportAt,
@@ -316,6 +326,25 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
             db.Add(node);
             await db.SaveChangesAsync();
             return node.NodeId;
+        });
+
+        cabinetOf[nodeId] = cabinet;
+        return nodeId;
+    }
+
+    private Task<string> NewCabinetAsync(string communeId, DataSource source = DataSource.Simulated)
+        => AsSystemAsync(async db =>
+        {
+            var cabinet = new ElectricalCabinet
+            {
+                CabinetName = "iot probe cabinet",
+                CommuneId = communeId,
+                Geom = new Point(Lng, Lat) { SRID = 4326 },
+                DataSource = source,
+            };
+            db.Add(cabinet);
+            await db.SaveChangesAsync();
+            return cabinet.CabinetId;
         });
 
     private Task<string> NewFeederAsync(string communeId)
@@ -360,18 +389,31 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
             return pole.PoleId;
         });
 
+    /// <summary>
+    /// Wires one relay. The feeder joins the device's cabinet first (CAB-4) — unless it is in another commune,
+    /// where the composite key would refuse that move before the relay under test is ever written.
+    /// </summary>
     private Task<int> ControlAsync(
         string feederId, string nodeId, short relay, string? commune = null, FeederControlMode? mode = null)
-        => AsSystemAsync(db =>
+        => AsSystemAsync(async db =>
         {
+            var cabinet = cabinetOf[nodeId];
+            var feeder = await db.Set<Feeder>().IgnoreQueryFilters().SingleAsync(candidate => candidate.FeederId == feederId);
+            if (feeder.CommuneId == (commune ?? fixture.CommuneId) && feeder.CabinetId != cabinet)
+            {
+                feeder.CabinetId = cabinet;
+                await db.SaveChangesAsync();
+            }
+
             db.Add(new FeederControl
             {
                 FeederId = feederId,
                 NodeId = nodeId,
                 CommuneId = commune ?? fixture.CommuneId,
+                CabinetId = cabinet,
                 RelayNo = relay,
                 ControlMode = mode,
             });
-            return db.SaveChangesAsync();
+            return await db.SaveChangesAsync();
         });
 }

@@ -33,6 +33,10 @@ WHAT IT DOES NOT SEED, and why:
                      its segment's demo feeder on relay 1. data_source = simulated (demo rows, not
                      testbed hardware), supports_remote_control = false. The testbed's own device
                      (two feeders, odd/even lamps) is seeded later, once the rig has coordinates.
+  electrical_cabinet Since CABINET (CAB-3) a device has no point of its own: each mock device gets
+                     a demo cabinet at the mock point (CAB-00n for NODE-00n, external_ref
+                     DEMO-CAB-00n, simulated), and the demo feeder it switches is recorded in that
+                     cabinet — the relay row must name the cabinet of both (CAB-4).
   Work orders are linked through work_order_fault (BE-23), with kinds in the companion CSV.
   Their audit history starts empty; existing work order audit prevents re-seeding.
 
@@ -127,7 +131,8 @@ END $$;""".strip())
     # feeder_control holds both feeder and iot_node; feeder is freed only once no pole points at it.
     sql.append("DELETE FROM work_order_fault; DELETE FROM work_order; DELETE FROM fault; DELETE FROM fault_cluster; "
                "DELETE FROM feeder_control; DELETE FROM iot_node; "
-               "DELETE FROM fixture; DELETE FROM pole; DELETE FROM feeder; DELETE FROM road_segment;")
+               "DELETE FROM fixture; DELETE FROM pole; DELETE FROM feeder; DELETE FROM electrical_cabinet; "
+               "DELETE FROM road_segment;")
 
     for feature in segments:
         p = feature["properties"]
@@ -210,15 +215,23 @@ END $$;""".strip())
 
     for node in nodes:
         p = node["properties"]
+        # The point belongs to the cabinet, the device is mounted in it (CAB-3): CAB-00n for NODE-00n.
+        cabinet_id = "CAB-" + p["node_id"].split("-", 1)[1]
         sql.append(
-            "INSERT INTO iot_node (node_id, commune_id, node_role, geom, supports_remote_control, "
-            "data_source, last_report_at) VALUES ("
-            f"{quote(p['node_id'])}, {COMMUNE}, {quote(p['node_role'])}, {geometry(node['geometry'])}, "
+            "INSERT INTO electrical_cabinet (cabinet_id, cabinet_name, external_ref, commune_id, geom, data_source) VALUES ("
+            f"{quote(cabinet_id)}, {quote('Tủ ' + p['node_id'])}, {quote('DEMO-' + cabinet_id)}, {COMMUNE}, "
+            f"{geometry(node['geometry'])}, 'simulated');")
+        sql.append(
+            "INSERT INTO iot_node (node_id, commune_id, node_role, cabinet_id, cabinet_data_source, "
+            "supports_remote_control, data_source, last_report_at) VALUES ("
+            f"{quote(p['node_id'])}, {COMMUNE}, {quote(p['node_role'])}, {quote(cabinet_id)}, 'simulated', "
             f"{str(p['supports_remote_control']).lower()}, 'simulated', {quote(p['last_report_at'])});")
         for relay, feeder_id in enumerate(p["feeder_ids"], start=1):
+            # A relay switches only a feeder of the device's own cabinet (CAB-4).
+            sql.append(f"UPDATE feeder SET cabinet_id = {quote(cabinet_id)} WHERE feeder_id = {quote(feeder_id)};")
             sql.append(
-                "INSERT INTO feeder_control (feeder_id, node_id, commune_id, relay_no) VALUES ("
-                f"{quote(feeder_id)}, {quote(p['node_id'])}, {COMMUNE}, {relay});")
+                "INSERT INTO feeder_control (feeder_id, node_id, commune_id, cabinet_id, relay_no) VALUES ("
+                f"{quote(feeder_id)}, {quote(p['node_id'])}, {COMMUNE}, {quote(cabinet_id)}, {relay});")
 
     for wo in orders:
         assigned = "(SELECT user_id FROM app_user WHERE username = 'crew')" if wo["assigned_to"] else "NULL"
@@ -240,6 +253,7 @@ END $$;""".strip())
         ("work_order_id_seq", "work_order_id", "work_order", 4),
         ("feeder_id_seq", "feeder_id", "feeder", 5),
         ("node_id_seq", "node_id", "iot_node", 6),
+        ("cabinet_id_seq", "cabinet_id", "electrical_cabinet", 5),
         ("segment_id_seq", "segment_id", "road_segment", 5),
         ("pole_id_seq", "pole_id", "pole", 6),
         ("fixture_id_seq", "fixture_id", "fixture", 5),

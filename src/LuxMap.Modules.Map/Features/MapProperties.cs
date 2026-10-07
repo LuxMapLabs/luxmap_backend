@@ -159,3 +159,23 @@ public sealed record IotNodeProperties
 
     public DateTime? LastReportAt { get; init; }
 }
+
+/// <summary>The flat <c>properties</c> block of one cabinet on the map (CAB-8, SELF-SIGNED).</summary>
+/// <remarks>
+/// A cabinet without a device is drawn too — that is the reason the table exists. <c>iot_node_id</c> names the
+/// device and nothing more: its status and last report are <see cref="IotNodeProperties"/>, one answer per question.
+/// </remarks>
+public sealed record CabinetProperties
+{
+    public required string CabinetId { get; init; }
+
+    public required string CabinetName { get; init; }
+
+    public required string CommuneId { get; init; }
+
+    /// <summary>Feeders leaving from this cabinet that the caller can see, in id order; <c>[]</c> when none.</summary>
+    public required IReadOnlyList<string> FeederIds { get; init; }
+
+    /// <summary>The device mounted in the cabinet, or <c>null</c>.</summary>
+    public string? IotNodeId { get; init; }
+}

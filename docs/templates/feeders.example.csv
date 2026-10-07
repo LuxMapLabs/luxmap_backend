@@ -1,2 +1,2 @@
-external_ref,feeder_name,commune_id,geom_wkt
-FDR-A,Tuyen dien FDR-A,COM-070,
+external_ref,feeder_name,commune_id,geom_wkt,cabinet_external_ref
+FDR-A,Tuyen dien FDR-A,COM-070,,TU-A

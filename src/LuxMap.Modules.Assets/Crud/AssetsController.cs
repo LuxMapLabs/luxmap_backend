@@ -76,6 +76,67 @@ public sealed class AssetsController(
     public async Task<ActionResult<FeederDetail>> FeederAsync(string feederId, CancellationToken ct)
         => Ok(await service.FeederAsync(feederId, ct));
 
+    // ── CABINET — main electrical cabinets (drift CAB-1…CAB-8) ──────────────────────────────────
+    //
+    // ⚠️ SELF-SIGNED, not yet in the Contract: stable only once the next FW confirms it. Same rules as the other
+    // three asset kinds — ReadNetwork reads, ManageAssets writes, commune_id from the body on create only, PUT is
+    // a full replacement, DELETE lets the foreign keys decide.
+
+    /// <summary>Cabinets in the caller's communes, paged, with the device mounted in each (CAB-8).</summary>
+    [HttpGet("cabinets")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<PagedResult<CabinetListItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<PagedResult<CabinetListItem>>> ListCabinetsAsync(
+        [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
+        => Ok(await service.ListCabinetsAsync(Narrow(communeId), page.ToPageRequest(), ct));
+
+    /// <summary>One cabinet. Absent and out of scope answer the same 404.</summary>
+    [HttpGet("cabinets/{cabinetId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<CabinetDetail>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CabinetDetail>> CabinetAsync(string cabinetId, CancellationToken ct)
+        => Ok(await service.CabinetAsync(cabinetId, ct));
+
+    [HttpPost("cabinets")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateCabinetAsync(
+        [FromBody] CreateCabinetRequest request, CancellationToken ct)
+        => CreatedAsset("cabinets", await service.CreateCabinetAsync(request, ct));
+
+    /// <summary>Full replacement of a cabinet. <b>409</b> when a cabinet carrying a device would become <c>field</c>.</summary>
+    [HttpPut("cabinets/{cabinetId}")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> UpdateCabinetAsync(
+        string cabinetId, [FromBody] UpdateCabinetRequest request, CancellationToken ct)
+    {
+        await service.UpdateCabinetAsync(cabinetId, request, ct);
+        return NoContent();
+    }
+
+    /// <summary>Deletes a cabinet. <b>409</b> while a feeder or a device still points at it.</summary>
+    [HttpDelete("cabinets/{cabinetId}")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> DeleteCabinetAsync(string cabinetId, CancellationToken ct)
+    {
+        await service.DeleteCabinetAsync(cabinetId, ct);
+        return NoContent();
+    }
+
     /// <summary>
     /// Poles in the caller's communes, paged — the inventory list, NOT the map.
     /// </summary>
@@ -120,6 +181,8 @@ public sealed class AssetsController(
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateFeederAsync(
         [FromBody] CreateFeederRequest request, CancellationToken ct)
         => CreatedAsset("feeders", await service.CreateFeederAsync(request, ct));

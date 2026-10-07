@@ -61,6 +61,16 @@ public class Feeder : ICommuneScoped, IExternallyReferenced, IUpdateStamped
     /// </summary>
     public LineString? Geom { get; set; }
 
+    /// <summary>
+    /// The cabinet this circuit leaves from, or <c>null</c> when nobody has recorded it (CAB-2). Same
+    /// commune as the feeder — a composite foreign key, the O-7 shape.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ While a device in that cabinet switches this feeder, the cabinet cannot change: the relay row
+    /// (<c>feeder_control</c>) carries the cabinet too and its foreign keys refuse the move (CAB-4).
+    /// </remarks>
+    public string? CabinetId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

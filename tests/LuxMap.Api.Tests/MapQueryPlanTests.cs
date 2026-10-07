@@ -97,7 +97,47 @@ public sealed class MapQueryPlanTests(AssetSchemaFixture fixture)
         Assert.DoesNotContain("<> 'calibration_rig'", explicitly, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// CAB-3 — devices and cabinets now ride <c>ix_electrical_cabinet_geom</c>, and nothing still looks for the
+    /// dropped <c>iot_node.geom</c>.
+    /// </summary>
+    /// <remarks>
+    /// The fixture holds a handful of cabinets at most, where a sequential scan is the honest best plan, so the
+    /// plan is taken with <c>enable_seqscan = off</c> and as a SYSTEM-WIDE caller — with a commune predicate the
+    /// planner reaches for <c>ix_*_commune_id</c> on near-empty tables and the plan says nothing about the bbox.
+    /// That still proves what matters: the predicate is the bare column against the envelope. Wrap the column in a
+    /// function and no setting makes the index usable — the planner falls back to a scan anyway.
+    /// </remarks>
+    [Fact]
+    public async Task The_device_and_cabinet_bbox_queries_can_ride_the_cabinet_gist_index()
+    {
+        var service = (LuxMapDbContext db) => new MapQueryService(db, new LuxMap.Modules.Telemetry.IotOptions(), TimeProvider.System);
+
+        var nodes = await fixture.QueryAsync(db => Task.FromResult(
+            service(db).IotNodeQuery(new IotNodeMapQuery { Bbox = Box }).ToQueryString()));
+        var cabinets = await fixture.QueryAsync(db => Task.FromResult(
+            service(db).CabinetQuery(new CabinetMapQuery { Bbox = Box }).ToQueryString()));
+
+        foreach (var sql in new[] { nodes, cabinets })
+        {
+            Assert.DoesNotContain("ST_Transform", sql, StringComparison.Ordinal);
+            var systemWide = Regex.Replace(sql, @"@ef_filter__IsSystemWide\w*", "true");
+            var plan = await ExplainWithoutSeqScanAsync(Literal(systemWide));
+            Assert.True(plan.Contains("ix_electrical_cabinet_geom", StringComparison.Ordinal), plan);
+            Assert.DoesNotContain("Seq Scan on electrical_cabinet", plan, StringComparison.Ordinal);
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────────────────────
+
+    private Task<string> ExplainWithoutSeqScanAsync(string sql)
+        => fixture.QueryAsync(async db =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await db.Database.ExecuteSqlRawAsync("SET LOCAL enable_seqscan = off");
+            var lines = await db.Database.SqlQueryRaw<string>($"EXPLAIN {sql}").ToListAsync();
+            return string.Join(Environment.NewLine, lines);
+        });
 
     /// <summary>A box around the fixture's synthetic poles.</summary>
     private static BoundingBox Box => BoundingBox.Parse("106.20,10.70,106.25,10.75");

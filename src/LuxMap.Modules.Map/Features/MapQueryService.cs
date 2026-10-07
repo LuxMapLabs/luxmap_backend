@@ -262,33 +262,17 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
     public async Task<FeatureCollection<IotNodeProperties>> IotNodesAsync(
         IotNodeMapQuery query, CancellationToken ct)
     {
-        var envelope = Envelope(query.Bbox);
-
-        // ⚠️ Intersects(envelope) on the raw 4326 column — the form that reaches ix_iot_node_geom.
-        var nodes = dbContext.Set<IotNode>().AsNoTracking()
-            .Where(node => node.Geom.Intersects(envelope));
-
-        nodes = WithDataSource(nodes, query.DataSource, node => node.DataSource);
-
-        if (query.CommuneIds is { Count: > 0 } communes)
-        {
-            nodes = nodes.Where(node => communes.Contains(node.CommuneId));
-        }
-
-        var rows = await nodes
-            .OrderBy(node => node.CreatedAt)
-            .ThenBy(node => node.NodeId.Length)
-            .ThenBy(node => node.NodeId)
-            .Select(node => new
+        var rows = await IotNodeQuery(query)
+            .Select(placed => new
             {
-                node.NodeId,
-                node.NodeRole,
-                node.Geom,
-                node.SupportsRemoteControl,
-                node.LastReportAt,
+                placed.Node.NodeId,
+                placed.Node.NodeRole,
+                placed.Geom,
+                placed.Node.SupportsRemoteControl,
+                placed.Node.LastReportAt,
 
                 FeederIds = dbContext.Set<FeederControl>()
-                    .Where(control => control.NodeId == node.NodeId)
+                    .Where(control => control.NodeId == placed.Node.NodeId)
                     .OrderBy(control => control.RelayNo)
                     .Select(control => control.FeederId)
                     .ToList(),
@@ -297,7 +281,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                     .Where(segment => dbContext.Set<Pole>().Any(pole =>
                         pole.SegmentId == segment.SegmentId
                         && dbContext.Set<FeederControl>().Any(control =>
-                            control.NodeId == node.NodeId && control.FeederId == pole.FeederId)))
+                            control.NodeId == placed.Node.NodeId && control.FeederId == pole.FeederId)))
                     .OrderBy(segment => segment.CreatedAt)
                     .ThenBy(segment => segment.SegmentId.Length)
                     .ThenBy(segment => segment.SegmentId)
@@ -328,6 +312,117 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                 },
             })],
         };
+    }
+
+    /// <summary>
+    /// The devices of <c>GET /map/iot-nodes</c>, each with its cabinet's point, in id order.
+    /// </summary>
+    /// <remarks>
+    /// CAB-3: a device has no point of its own — it is where its cabinet is. ⚠️ The bbox is
+    /// <c>Intersects(envelope)</c> on the cabinet's RAW 4326 column, the only form that reaches
+    /// <c>ix_electrical_cabinet_geom</c> (BE-14 trap 2). Exposed for <c>MapQueryPlanTests</c>, which
+    /// explains this SQL rather than a hand-written prediction of it.
+    /// </remarks>
+    public IQueryable<PlacedNode> IotNodeQuery(IotNodeMapQuery query)
+    {
+        var envelope = Envelope(query.Bbox);
+
+        var nodes = WithDataSource(dbContext.Set<IotNode>().AsNoTracking(), query.DataSource, node => node.DataSource);
+
+        if (query.CommuneIds is { Count: > 0 } communes)
+        {
+            nodes = nodes.Where(node => communes.Contains(node.CommuneId));
+        }
+
+        return nodes
+            .Join(
+                dbContext.Set<ElectricalCabinet>().AsNoTracking().Where(cabinet => cabinet.Geom.Intersects(envelope)),
+                node => node.CabinetId,
+                cabinet => cabinet.CabinetId,
+                (node, cabinet) => new PlacedNode { Node = node, Geom = cabinet.Geom })
+            .OrderBy(placed => placed.Node.CreatedAt)
+            .ThenBy(placed => placed.Node.NodeId.Length)
+            .ThenBy(placed => placed.Node.NodeId);
+    }
+
+    /// <summary>A device and the point of the cabinet it is mounted in.</summary>
+    /// <remarks>Init properties, not a positional record: EF composes later operators over a member-init, not a constructor.</remarks>
+    public sealed class PlacedNode
+    {
+        public required IotNode Node { get; init; }
+
+        public required Point Geom { get; init; }
+    }
+
+    /// <summary>
+    /// Cabinets inside a bounding box (CAB-7, CAB-8), as a <c>FeatureCollection</c> of points — with or without a
+    /// device.
+    /// </summary>
+    /// <remarks>
+    /// No size limit, like segments and devices: a commune has a handful of cabinets. <c>feeder_ids</c> through the
+    /// query filter and in id order; <c>iot_node_id</c> is the device's id only — its state stays on
+    /// <c>GET /map/iot-nodes</c>, one answer per question.
+    /// </remarks>
+    public async Task<FeatureCollection<CabinetProperties>> CabinetsAsync(CabinetMapQuery query, CancellationToken ct)
+    {
+        var rows = await CabinetQuery(query)
+            .Select(cabinet => new
+            {
+                cabinet.CabinetId,
+                cabinet.CabinetName,
+                cabinet.CommuneId,
+                cabinet.Geom,
+                FeederIds = dbContext.Set<Feeder>()
+                    .Where(feeder => feeder.CabinetId == cabinet.CabinetId)
+                    .OrderBy(feeder => feeder.CreatedAt)
+                    .ThenBy(feeder => feeder.FeederId.Length)
+                    .ThenBy(feeder => feeder.FeederId)
+                    .Select(feeder => feeder.FeederId)
+                    .ToList(),
+                IotNodeId = dbContext.Set<IotNode>()
+                    .Where(node => node.CabinetId == cabinet.CabinetId)
+                    .Select(node => node.NodeId)
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(ct);
+
+        return new FeatureCollection<CabinetProperties>
+        {
+            Features = [.. rows.Select(row => new Feature<CabinetProperties>
+            {
+                Geometry = GeoJsonGeometry.Point(row.Geom.X, row.Geom.Y),
+                Properties = new CabinetProperties
+                {
+                    CabinetId = row.CabinetId,
+                    CabinetName = row.CabinetName,
+                    CommuneId = row.CommuneId,
+                    FeederIds = row.FeederIds,
+                    IotNodeId = row.IotNodeId,
+                },
+            })],
+        };
+    }
+
+    /// <summary>The cabinets of <c>GET /map/cabinets</c>, in id order. Exposed for <c>MapQueryPlanTests</c>.</summary>
+    /// <remarks>⚠️ <c>Intersects(envelope)</c> on the raw 4326 column — the form that reaches <c>ix_electrical_cabinet_geom</c>.</remarks>
+    public IQueryable<ElectricalCabinet> CabinetQuery(CabinetMapQuery query)
+    {
+        var envelope = Envelope(query.Bbox);
+
+        var cabinets = dbContext.Set<ElectricalCabinet>().AsNoTracking()
+            .Where(cabinet => cabinet.Geom.Intersects(envelope));
+
+        cabinets = WithDataSource(cabinets, query.DataSource, cabinet => cabinet.DataSource);
+
+        if (query.CommuneIds is { Count: > 0 } communes)
+        {
+            cabinets = cabinets.Where(cabinet => communes.Contains(cabinet.CommuneId));
+        }
+
+        return cabinets
+            .OrderBy(cabinet => cabinet.CreatedAt)
+            .ThenBy(cabinet => cabinet.CabinetId.Length)
+            .ThenBy(cabinet => cabinet.CabinetId);
     }
 
     /// <summary>Everything in the box that the caller asked for and is allowed to see.</summary>

@@ -137,6 +137,52 @@ public sealed class FeederConfiguration : IEntityTypeConfiguration<Feeder>
         builder.HasAlternateKey(feeder => new { feeder.FeederId, feeder.CommuneId });
 
         builder.HasCommuneReference(feeder => feeder.CommuneId);
+
+        // CAB-2 — the cabinet a circuit leaves from, in the feeder's own commune (the O-7 shape). Nullable,
+        // and MATCH SIMPLE skips the check while it is null: an unrecorded cabinet is the normal case.
+        builder.Property(feeder => feeder.CabinetId).HasColumnType("text");
+        builder.HasOne<ElectricalCabinet>().WithMany()
+            .HasForeignKey(feeder => new { feeder.CabinetId, feeder.CommuneId })
+            .HasPrincipalKey(cabinet => new { cabinet.CabinetId, cabinet.CommuneId })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ⚠️ ux_feeder_feeder_id_cabinet_id — the target of feeder_control's (feeder_id, cabinet_id) key
+        // (CAB-4) — exists in the DATABASE ONLY, created by raw SQL in migration AddElectricalCabinet. An EF
+        // alternate key would make CabinetId a key property, which EF refuses to change on a tracked entity,
+        // and EF allows no alternate key over a nullable column. See CabinetConstraints.
+    }
+}
+
+public sealed class ElectricalCabinetConfiguration : IEntityTypeConfiguration<ElectricalCabinet>
+{
+    public void Configure(EntityTypeBuilder<ElectricalCabinet> builder)
+    {
+        builder.ToTable("electrical_cabinet");
+        builder.HasKey(cabinet => cabinet.CabinetId);
+
+        builder.Property(cabinet => cabinet.CabinetId).HasPrefixedId(PrefixedIds.ElectricalCabinet);
+        builder.Property(cabinet => cabinet.CabinetName).HasColumnType("text").IsRequired();
+        builder.HasExternalRef("electrical_cabinet");
+        builder.Property(cabinet => cabinet.Geom).HasColumnType(GeometryColumns.Point).IsRequired();
+        builder.Property(cabinet => cabinet.CreatedAt).HasDefaultValueSql("now()");
+        builder.Property(cabinet => cabinet.UpdatedAt).HasDefaultValueSql("now()");
+        builder.HasUpdatedBy();
+
+        builder.HasContractEnum(cabinet => cabinet.DataSource);
+
+        builder.HasCommuneScope();
+
+        // GET /map/cabinets and GET /map/iot-nodes both answer a bbox from this column (CAB-3).
+        builder.HasIndex(cabinet => cabinet.Geom).HasMethod(GeometryColumns.GistMethod);
+
+        // 🔴 REDUNDANT-LOOKING AND LOAD-BEARING, like ak_feeder_feeder_id_commune_id (O-7 trap 2): the
+        // target of the composite keys from feeder and iot_node that keep both in the cabinet's commune.
+        builder.HasAlternateKey(cabinet => new { cabinet.CabinetId, cabinet.CommuneId });
+
+        // ⚠️ ux_electrical_cabinet_cabinet_id_data_source (target of iot_node's provenance key, CAB-5) is
+        // created by raw SQL, not here: as an EF key it would freeze DataSource on a tracked cabinet.
+
+        builder.HasCommuneReference(cabinet => cabinet.CommuneId);
     }
 }
 

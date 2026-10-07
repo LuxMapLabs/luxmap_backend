@@ -1069,6 +1069,46 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-luxmap-capability": "cap:manage_assets",
@@ -1275,6 +1315,452 @@
         "parameters": [
           {
             "name": "feederId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/cabinets": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetListItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetListItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetListItemPagedResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCabinetRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCabinetRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCabinetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/cabinets/{cabinetId}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "cabinetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "put": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "cabinetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCabinetRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCabinetRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCabinetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "delete": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "cabinetId",
             "in": "path",
             "required": true,
             "schema": {
@@ -4301,6 +4787,109 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/map/cabinets": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetPropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetPropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetPropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "tags": [
@@ -7045,6 +7634,183 @@
         },
         "additionalProperties": false
       },
+      "CabinetDetail": {
+        "required": [
+          "cabinet",
+          "created_at",
+          "geom_wkt"
+        ],
+        "type": "object",
+        "properties": {
+          "cabinet": {
+            "$ref": "#/components/schemas/CabinetListItem"
+          },
+          "geom_wkt": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetListItem": {
+        "required": [
+          "cabinet_id",
+          "cabinet_name",
+          "commune_id",
+          "data_source",
+          "feeder_ids",
+          "location",
+          "updated_at"
+        ],
+        "type": "object",
+        "properties": {
+          "cabinet_id": {
+            "type": "string"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_name": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "location": {
+            "$ref": "#/components/schemas/AssetLocation"
+          },
+          "feeder_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "iot_node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by_name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetListItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinetListItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetProperties": {
+        "required": [
+          "cabinet_id",
+          "cabinet_name",
+          "commune_id",
+          "feeder_ids"
+        ],
+        "type": "object",
+        "properties": {
+          "cabinet_id": {
+            "type": "string"
+          },
+          "cabinet_name": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "feeder_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "iot_node_id": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetPropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/CabinetProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetPropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinetPropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ClipManifest": {
         "type": "object",
         "properties": {
@@ -7088,6 +7854,40 @@
         },
         "additionalProperties": false
       },
+      "CreateCabinetRequest": {
+        "required": [
+          "cabinet_name",
+          "commune_id",
+          "data_source",
+          "geom_wkt"
+        ],
+        "type": "object",
+        "properties": {
+          "external_ref": {
+            "maxLength": 64,
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "commune_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "geom_wkt": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateFeederRequest": {
         "required": [
           "commune_id",
@@ -7111,6 +7911,11 @@
             "type": "string"
           },
           "geom_wkt": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
+            "maxLength": 32,
             "type": "string",
             "nullable": true
           }
@@ -7746,6 +8551,26 @@
         ],
         "type": "string"
       },
+      "FeederCabinet": {
+        "required": [
+          "cabinet_id",
+          "cabinet_name",
+          "location"
+        ],
+        "type": "object",
+        "properties": {
+          "cabinet_id": {
+            "type": "string"
+          },
+          "cabinet_name": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/AssetLocation"
+          }
+        },
+        "additionalProperties": false
+      },
       "FeederDetail": {
         "required": [
           "created_at",
@@ -7798,6 +8623,9 @@
           "pole_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "cabinet": {
+            "$ref": "#/components/schemas/FeederCabinet"
           },
           "updated_at": {
             "type": "string",
@@ -10406,6 +11234,34 @@
         },
         "additionalProperties": false
       },
+      "UpdateCabinetRequest": {
+        "required": [
+          "cabinet_name",
+          "data_source",
+          "geom_wkt"
+        ],
+        "type": "object",
+        "properties": {
+          "external_ref": {
+            "maxLength": 64,
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "geom_wkt": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateFeederRequest": {
         "required": [
           "feeder_name"
@@ -10424,6 +11280,11 @@
           },
           "geom_wkt": {
             "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
+            "type": "string",
+            "description": "The cabinet this circuit leaves from (CAB-6). OPTIONAL and KEPT when absent: leave the key out to keep the cabinet, send null to detach the feeder, an id to move it. A feeder a device switches cannot move or be detached (409).",
             "nullable": true
           }
         },

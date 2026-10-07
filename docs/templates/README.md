@@ -1,12 +1,12 @@
 # Mẫu import kiểm kê tài sản (BE-12)
 
-Bốn file CSV để nạp hồ sơ tài sản chiếu sáng. Cột lấy **trực tiếp từ schema thật** trong
-PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy từ entity class.
+Năm file CSV để nạp hồ sơ tài sản chiếu sáng. Cột lấy **trực tiếp từ schema thật** trong
+PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`, `\d electrical_cabinet`), không suy từ entity class.
 
 > **Endpoint import đã có (BE-12a).** Mỗi lần nạp MỘT loại file:
 >
 > ```
-> POST /api/v1/assets/import/{segments|feeders|poles|fixtures}
+> POST /api/v1/assets/import/{segments|cabinets|feeders|poles|fixtures}
 > multipart/form-data, field `file`, tối đa 10 MB
 > ```
 >
@@ -23,7 +23,7 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`), không suy
 
 | File | Nội dung | Dùng khi |
 |---|---|---|
-| `segments.csv` · `feeders.csv` · `poles.csv` · `fixtures.csv` | **Chỉ dòng header** | Phát cho đơn vị điền dữ liệu thật |
+| `segments.csv` · `cabinets.csv` · `feeders.csv` · `poles.csv` · `fixtures.csv` | **Chỉ dòng header** | Phát cho đơn vị điền dữ liệu thật |
 | `segments.example.csv` · … · `fixtures.example.csv` | Header **+ một dòng chạy được** | Chạy thử pipeline trước khi có dữ liệu thật |
 
 **Quy tắc, áp cho cả bốn loại:**
@@ -70,7 +70,7 @@ Cũng ở bản v2: `poles.csv` tham chiếu bằng `segment_external_ref` / `fe
 ## Thứ tự import — bắt buộc theo đúng thứ tự này
 
 ```
-1. segments.csv   →  2. feeders.csv   →  3. poles.csv   →  4. fixtures.csv
+1. segments.csv  →  2. cabinets.csv  →  3. feeders.csv  →  4. poles.csv  →  5. fixtures.csv
 ```
 
 **Mỗi lần gọi nạp đúng một loại file**, nên khi nạp `poles.csv` thì các tuyến đã nằm sẵn trong DB
@@ -82,11 +82,12 @@ Lý do là **khoá ngoại**, không phải sở thích:
 | Bước | Vì sao phải trước | Ràng buộc thật |
 |---|---|---|
 | 1. `segments` | `pole.segment_id` **NOT NULL** — không có tuyến thì không tạo được cột | `fk_pole_road_segment_segment_id` |
-| 2. `feeders` | `pole.feeder_id` **nullable**, nhưng nếu điền thì tủ điện phải tồn tại **và cùng xã với cột** | `fk_pole_feeder_feeder_id_commune_id` |
-| 3. `poles` | `fixture.pole_id` **NOT NULL** | `fk_fixture_pole_pole_id` |
-| 4. `fixtures` | — | — |
+| 2. `cabinets` | `feeder.cabinet_id` **nullable**, nhưng nếu điền thì trụ phải tồn tại **và cùng xã với mạch** (CABINET, CAB-7) | `fk_feeder_electrical_cabinet_cabinet_id_commune_id` |
+| 3. `feeders` | `pole.feeder_id` **nullable**, nhưng nếu điền thì tủ điện phải tồn tại **và cùng xã với cột** | `fk_pole_feeder_feeder_id_commune_id` |
+| 4. `poles` | `fixture.pole_id` **NOT NULL** | `fk_fixture_pole_pole_id` |
+| 5. `fixtures` | — | — |
 
-Cả bốn bảng đều tham chiếu `administrative_unit`, nên **xã phải tồn tại trước bước 1**
+Cả năm bảng đều tham chiếu `administrative_unit`, nên **xã phải tồn tại trước bước 1**
 (`fk_*_administrative_unit_commune_id`, `ON DELETE RESTRICT`).
 
 ---
@@ -224,6 +225,19 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 > `ST_Length` — số đo trên mặt phẳng chiếu ngắn hơn trên ellipsoid khoảng 73 ppm, ghi đè
 > sẽ làm số liệu FE nhảy mà không ai giải thích được.
 
+## `cabinets.csv` — trụ / tủ điện tổng (CABINET, SELF-SIGNED)
+
+Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại; thiết bị chỉ lắp ở trụ theo yêu cầu của xã
+(drift CAB-1…CAB-8). Upsert theo `(commune_id, external_ref)` như `segments.csv`.
+
+| Cột | Bắt buộc | Kiểu | Ràng buộc |
+|---|---|---|---|
+| `external_ref` | **Có** | text | Mã trụ của đơn vị (số sơn trên trụ). `feeders.csv` trỏ về bằng `cabinet_external_ref` |
+| `cabinet_name` | **Có** | text | |
+| `commune_id` | **Có** | mã | FK `administrative_unit` |
+| `geom_wkt` | **Có** | Point | Vị trí trụ — **bắt buộc** (CAB-1): trụ là thứ đứng cạnh chụp được |
+| `data_source` | **Có** | enum | `field` / `public_imagery` / `calibration_rig` / `simulated`. ⚠️ Trụ **đang mang thiết bị IoT** không đổi được sang `field` — lỗi theo dòng (CAB-5) |
+
 ## `feeders.csv`
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc |
@@ -232,6 +246,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | `feeder_name` | **Có** | text | |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | Không | LineString | **Nullable** — nhóm không khảo sát tuyến cáp, để trống thay vì bịa lộ trình |
+| `cabinet_external_ref` | Không | text | Khớp `external_ref` trong `cabinets.csv`, **cùng xã** với mạch. ⚠️ **Ô trống hay thiếu cột = GIỮ trụ đang có** — import không bao giờ tháo mạch khỏi trụ (CAB-6). Mạch đang được thiết bị điều khiển (có rơ-le) **không đổi trụ được** — lỗi theo dòng (CAB-4) |
 
 > ⚠️ **`feeder` KHÔNG có cột `data_source`.** Bốn bảng kia có, bảng này không — kiểm từ
 > `\d feeder`. Đừng thêm cột đó vào file này.
