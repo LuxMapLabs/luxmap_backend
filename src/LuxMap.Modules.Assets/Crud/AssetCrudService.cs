@@ -191,22 +191,11 @@ public sealed class AssetCrudService(
     }
 
     /// <summary>Full replacement of a cabinet. <c>commune_id</c> is not writable.</summary>
-    /// <remarks>
-    /// ⚠️ <b>A cabinet carrying a device cannot become <c>field</c></b> (CAB-5, D-R10). Checked here to answer a
-    /// 409 naming the device; <c>ck_iot_node_cabinet_not_field</c> (reached through the cascading provenance key)
-    /// refuses the same write for every other path, and for a device mounted between this check and the save.
-    /// </remarks>
     public async Task UpdateCabinetAsync(string cabinetId, UpdateCabinetRequest request, CancellationToken ct)
     {
         var cabinet = await RequireAsync<ElectricalCabinet>(candidate => candidate.CabinetId == cabinetId, "cabinet", ct);
 
         await RejectDuplicateRefAsync<ElectricalCabinet>(cabinet.CommuneId, request.ExternalRef, ct, cabinet.ExternalRef);
-
-        if (request.DataSource == DataSource.Field && cabinet.DataSource != DataSource.Field
-            && (await devices.DevicesAsync([cabinetId], ct)).TryGetValue(cabinetId, out var nodeId))
-        {
-            throw DeviceOnFieldCabinet(cabinetId, nodeId);
-        }
 
         cabinet.ExternalRef = request.ExternalRef;
         cabinet.CabinetName = request.CabinetName!;
@@ -214,15 +203,7 @@ public sealed class AssetCrudService(
         cabinet.DataSource = request.DataSource!.Value;
         Touch(cabinet);
 
-        try
-        {
-            await dbContext.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException failure) when (IsConstraint(failure, CabinetConstraints.DeviceNotOnFieldCabinet))
-        {
-            dbContext.ChangeTracker.Clear();
-            throw DeviceOnFieldCabinet(cabinetId, null);
-        }
+        await dbContext.SaveChangesAsync(ct);
     }
 
     /// <summary>Deletes a cabinet. The foreign keys decide: a feeder or a device still holding it refuses.</summary>
@@ -1113,18 +1094,6 @@ public sealed class AssetCrudService(
                 ["feeder_id"] = feederId,
                 ["iot_node_id"] = nodeId,
                 ["constraint"] = CabinetConstraints.RelayFeederSameCabinet,
-            });
-
-    private static LuxMapException DeviceOnFieldCabinet(string cabinetId, string? nodeId)
-        => new(
-            ErrorCodes.AssetInUse,
-            HttpStatusCode.Conflict,
-            "A device is mounted in this cabinet, and the team installs no device in the field: it cannot become field data.",
-            new Dictionary<string, object?>
-            {
-                ["cabinet_id"] = cabinetId,
-                ["iot_node_id"] = nodeId,
-                ["constraint"] = CabinetConstraints.DeviceNotOnFieldCabinet,
             });
 
     /// <summary>The database refused the write through the constraint named <paramref name="name"/>.</summary>

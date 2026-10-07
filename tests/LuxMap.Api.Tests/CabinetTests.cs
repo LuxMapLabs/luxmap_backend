@@ -20,7 +20,7 @@ namespace LuxMap.Api.Tests;
 /// names — so a test cannot agree with whatever the code happens to do.
 /// </para>
 /// <para>
-/// The database rules (CAB-4, CAB-5) are proven with RAW SQL, not through the service: they exist because the only
+/// The database rule (CAB-4) is proven with RAW SQL, not through the service: they exist because the only
 /// writer of <c>iot_node</c> and <c>feeder_control</c> today is a SQL script, and a test through the service would
 /// stay green with the constraints dropped.
 /// </para>
@@ -243,25 +243,21 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
     // ── Cabinet writes ──────────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// CAB-5 was DROPPED (Mỹ, 07/10/2026): a cabinet carrying a device may be <c>field</c> data. Pinned so the rule
+    /// does not quietly come back; the device itself is still never <c>field</c> (<c>IotNodeTests</c>).
+    /// </summary>
     [Fact]
-    public async Task A_cabinet_carrying_a_device_cannot_become_field_data()
+    public async Task A_cabinet_carrying_a_device_may_become_field_data()
     {
         var client = await fixture.ManagerClientAsync();
         var mounted = await NewCabinetAsync(fixture.CommuneId);
-        var node = await NewNodeAsync(mounted);
-        var empty = await NewCabinetAsync(fixture.CommuneId);
+        await NewNodeAsync(mounted);
 
-        var refused = await client.PutAsJsonAsync($"{Cabinets}/{mounted}", CabinetReplacement("field"));
-        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
-        var error = await ErrorAsync(refused);
-        Assert.Equal("ASSET_IN_USE", error.GetProperty("code").GetString());
-        Assert.Equal(node, error.GetProperty("details").GetProperty("iot_node_id").GetString());
+        await PutAsync(client, $"{Cabinets}/{mounted}", CabinetReplacement("field"));
 
-        // Without a device the same edit is ordinary — and a device cabinet may still change between non-field kinds.
-        await PutAsync(client, $"{Cabinets}/{empty}", CabinetReplacement("field"));
-        await PutAsync(client, $"{Cabinets}/{mounted}", CabinetReplacement("calibration_rig"));
-        Assert.Equal(DataSource.CalibrationRig, await fixture.QueryAsync(db => db.Set<IotNode>().IgnoreQueryFilters()
-            .Where(candidate => candidate.NodeId == node).Select(candidate => candidate.CabinetDataSource).SingleAsync()));
+        var cabinet = (await GetAsync(client, $"{Cabinets}/{mounted}")).GetProperty("cabinet");
+        Assert.Equal("field", cabinet.GetProperty("data_source").GetString());
     }
 
     [Fact]
@@ -404,17 +400,12 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(0, feeders.GetProperty("inserted").GetInt32() + feeders.GetProperty("updated").GetInt32());
         Assert.Equal([2, 3], RowNumbers(feeders, "cabinet_external_ref"));
 
-        var cabinets = await AssetImportTests.ImportAsync(client, "cabinets", "c.csv",
-            "external_ref,cabinet_name,commune_id,geom_wkt,data_source"
-            + $"\n{tag}-HOME,Tủ nhà,{fixture.CommuneId},POINT(108.8 12.8),field");
-        Assert.Equal(1, cabinets.GetProperty("failed").GetInt32());
-        Assert.Equal([2], RowNumbers(cabinets, "data_source"));
     }
 
-    // ── Database rules, proven with RAW SQL (CAB-3, CAB-4, CAB-5) ───────────────────────────────
+    // ── Database rules, proven with RAW SQL (CAB-3, CAB-4) ────────────────────────────────────────
 
     /// <summary>
-    /// 🔴 The EF model does not know these six constraints (raw SQL in the migration), so no later migration will
+    /// 🔴 The EF model does not know these four constraints (raw SQL in the migration), so no later migration will
     /// notice one going missing. This is the only thing that would.
     /// </summary>
     [Fact]
@@ -422,9 +413,8 @@ public sealed class CabinetTests(AssetImportFixture fixture)
     {
         string[] names =
         [
-            CabinetConstraints.FeederCabinetKey, CabinetConstraints.NodeCabinetKey, CabinetConstraints.CabinetSourceKey,
+            CabinetConstraints.FeederCabinetKey, CabinetConstraints.NodeCabinetKey,
             CabinetConstraints.RelayFeederSameCabinet, CabinetConstraints.RelayNodeSameCabinet,
-            CabinetConstraints.NodeCabinetSource, CabinetConstraints.DeviceNotOnFieldCabinet,
         ];
 
         var present = await fixture.QueryAsync(db => db.Database
@@ -432,6 +422,15 @@ public sealed class CabinetTests(AssetImportFixture fixture)
             .ToListAsync());
 
         Assert.Equal([.. names.Order(StringComparer.Ordinal)], [.. present.Order(StringComparer.Ordinal)]);
+
+        // CAB-5's three, gone with migration DropFieldCabinetRule — and the column that fed them.
+        string[] dropped = ["fk_iot_node_cabinet_data_source", "ux_electrical_cabinet_cabinet_id_data_source", "ck_iot_node_cabinet_not_field"];
+        Assert.Empty(await fixture.QueryAsync(db => db.Database
+            .SqlQuery<string>($"SELECT conname::text AS \"Value\" FROM pg_constraint WHERE conname = ANY({dropped})")
+            .ToListAsync()));
+        Assert.Empty(await fixture.QueryAsync(db => db.Database
+            .SqlQuery<string>($"SELECT column_name::text AS \"Value\" FROM information_schema.columns WHERE table_name = 'iot_node' AND column_name = 'cabinet_data_source'")
+            .ToListAsync()));
     }
 
     [Fact]
@@ -470,32 +469,6 @@ public sealed class CabinetTests(AssetImportFixture fixture)
             var error = await SqlFailsAsync($"UPDATE feeder SET cabinet_id = {target} WHERE feeder_id = '{feederId}'");
             Assert.Equal(CabinetConstraints.RelayFeederSameCabinet, error.ConstraintName);
         }
-    }
-
-    [Fact]
-    public async Task A_device_never_sits_on_a_field_cabinet_even_in_raw_sql()
-    {
-        var field = await NewCabinetAsync(fixture.CommuneId, DataSource.Field);
-        var testbed = await NewCabinetAsync(fixture.CommuneId, DataSource.CalibrationRig);
-        var node = await NewNodeAsync(testbed, DataSource.CalibrationRig);
-
-        // Mounted on a field cabinet, with the provenance copied honestly: the CHECK refuses it.
-        var mount = await SqlFailsAsync(
-            "INSERT INTO iot_node (commune_id, node_role, cabinet_id, cabinet_data_source, data_source) "
-            + $"VALUES ('{fixture.CommuneId}', 'segment_controller', '{field}', 'field', 'simulated')");
-        Assert.Equal(CabinetConstraints.DeviceNotOnFieldCabinet, mount.ConstraintName);
-
-        // ...or with the copy lying about it: the provenance key refuses that.
-        var lie = await SqlFailsAsync(
-            "INSERT INTO iot_node (commune_id, node_role, cabinet_id, cabinet_data_source, data_source) "
-            + $"VALUES ('{fixture.CommuneId}', 'segment_controller', '{field}', 'simulated', 'simulated')");
-        Assert.Equal(CabinetConstraints.NodeCabinetSource, lie.ConstraintName);
-
-        // Turning the device's cabinet into field data cascades onto the device, where the CHECK refuses it.
-        var turned = await SqlFailsAsync($"UPDATE electrical_cabinet SET data_source = 'field' WHERE cabinet_id = '{testbed}'");
-        Assert.Equal(CabinetConstraints.DeviceNotOnFieldCabinet, turned.ConstraintName);
-        Assert.Equal(DataSource.CalibrationRig, await fixture.QueryAsync(db => db.Set<IotNode>().IgnoreQueryFilters()
-            .Where(candidate => candidate.NodeId == node).Select(candidate => candidate.CabinetDataSource).SingleAsync()));
     }
 
     [Fact]
@@ -673,7 +646,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
             return feeder.FeederId;
         });
 
-    /// <summary>A device in <paramref name="cabinetId"/>, its provenance copy read from the cabinet.</summary>
+    /// <summary>A device in <paramref name="cabinetId"/>, in the cabinet's commune.</summary>
     private Task<string> NewNodeAsync(string cabinetId, DataSource source = DataSource.Simulated)
         => AsSystemAsync(async db =>
         {
@@ -682,7 +655,6 @@ public sealed class CabinetTests(AssetImportFixture fixture)
             {
                 CommuneId = cabinet.CommuneId,
                 CabinetId = cabinetId,
-                CabinetDataSource = cabinet.DataSource,
                 DataSource = source,
             };
             db.Add(node);

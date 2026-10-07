@@ -40,16 +40,6 @@ public class IotNode : ICommuneScoped
     public required string CabinetId { get; set; }
 
     /// <summary>
-    /// A copy of the cabinet's <c>data_source</c>, kept in step by <c>ON UPDATE CASCADE</c> — it exists only so
-    /// the database can refuse a device on a <c>field</c> cabinet (CAB-5, D-R10). Never <c>field</c>.
-    /// </summary>
-    /// <remarks>
-    /// Set it to the cabinet's value on insert; a wrong value is refused by
-    /// <c>fk_iot_node_cabinet_data_source</c>. Not the device's own provenance — that is <see cref="DataSource"/>.
-    /// </remarks>
-    public DataSource CabinetDataSource { get; set; }
-
-    /// <summary>
     /// <c>true</c> only for the self-built testbed (D-R7): the team never operates a commune's grid,
     /// so a device in the field only measures and reports.
     /// </summary>

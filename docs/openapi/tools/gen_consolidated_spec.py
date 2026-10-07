@@ -129,7 +129,7 @@ SUMMARY = {
     ("get", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Danh sách trụ điện tổng — location, feeder_ids[], iot_node_id | null (CAB-8)",
     ("get", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Một trụ + geom_wkt + created_at; ngoài phạm vi xã → 404",
     ("post", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body",
-    ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; trụ mang thiết bị IoT không đổi sang field được (409, CAB-5)",
+    ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được",
     ("delete", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Xoá trụ; còn mạch hay thiết bị trỏ vào thì 409 ASSET_IN_USE",
     ("get", "/api/v1/map/cabinets"): "[TẠM — CABINET] Bản đồ trụ điện tổng theo bbox, kể cả trụ không có IoT; feeder_ids[] tính lúc đọc, iot_node_id | null",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.

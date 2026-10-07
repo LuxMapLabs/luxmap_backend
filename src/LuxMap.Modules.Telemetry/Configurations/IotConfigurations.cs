@@ -12,19 +12,12 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
     public void Configure(EntityTypeBuilder<IotNode> builder)
     {
         builder.ToTable("iot_node", table =>
-        {
             // Stricter than the data_source enum on purpose: the team installs NO device in the field
             // (D-R10), so a device is testbed hardware (calibration_rig) or demo data (simulated),
             // never `field` — mixing a controlled rig into field figures is the error the
             // data_source split exists to prevent (I-5).
             table.HasCheckConstraint("ck_iot_node_data_source_not_field",
-                "data_source IN ('calibration_rig', 'simulated')");
-
-            // CAB-5: nor on a field CABINET. The column mirrors the cabinet's provenance through
-            // fk_iot_node_cabinet_data_source (ON UPDATE CASCADE, raw SQL — see CabinetConstraints), so a
-            // cabinet turned `field` under a device is refused here as well.
-            table.HasCheckConstraint(CabinetConstraints.DeviceNotOnFieldCabinet, "cabinet_data_source <> 'field'");
-        });
+                "data_source IN ('calibration_rig', 'simulated')"));
         builder.HasKey(node => node.NodeId);
 
         builder.Property(node => node.NodeId).HasPrefixedId(PrefixedIds.IotNode);
@@ -35,7 +28,6 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
 
         builder.HasContractEnum(node => node.NodeRole);
         builder.HasContractEnum(node => node.DataSource);
-        builder.HasContractEnum(node => node.CabinetDataSource);
 
         builder.HasCommuneScope();
 

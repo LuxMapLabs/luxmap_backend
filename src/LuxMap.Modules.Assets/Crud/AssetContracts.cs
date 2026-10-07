@@ -276,10 +276,7 @@ public sealed record UpdateCabinetRequest
     [Required]
     public string? GeomWkt { get; init; }
 
-    /// <summary>
-    /// ⚠️ Provenance — see <see cref="UpdateSegmentRequest.DataSource"/>. Turning a cabinet that carries a device
-    /// into <c>field</c> is refused (409, CAB-5): the team installs no device in the field (D-R10).
-    /// </summary>
+    /// <summary>⚠️ Provenance — see <see cref="UpdateSegmentRequest.DataSource"/>.</summary>
     [Required]
     public DataSource? DataSource { get; init; }
 }
@@ -671,8 +668,8 @@ public sealed record FeederCabinet
 /// question is how they start disagreeing (Contract section 5.3.1).
 /// </para>
 /// <para>
-/// <c>data_source</c> IS emitted, unlike on a feeder: a cabinet has real provenance, and telling the testbed
-/// cabinet from a field one is what CAB-5 turns on.
+/// <c>data_source</c> IS emitted, unlike on a feeder: a cabinet has real provenance, and the testbed cabinet
+/// must stay apart from field cabinets all the way to the statistics.
 /// </para>
 /// </remarks>
 public sealed record CabinetListItem
