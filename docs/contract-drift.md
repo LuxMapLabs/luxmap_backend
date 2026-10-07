@@ -1079,3 +1079,24 @@ time base của file (`1/90000`). **Chưa báo** (gộp vào tin phản hồi pa
 theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duyệt chỉ `accept` / `return`.
 
 **Phải báo:** WP6 + FO (quy trình đi–về, `camera_side`, lượt 14), WP4 (D-R23 B→A, N = 3 trung vị). **Chưa báo.**
+
+## BE-28 — thống kê cho dashboard (07/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 07/10/2026 — duyệt D-1…D-14 theo đề xuất ở `.ai/results/BE-28-p1.md` |
+| **Chạm API** | **Có** — nhóm endpoint mới, Contract chưa có đặc tả. **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa lên Contract |
+| **Consumer** | WP5 — **chưa có màn dashboard nào** (khảo sát `luxmap-web` 07/10), phải dựng màn mới. **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| ST-1 | `GET /api/v1/statistics/fixture-status` — đếm cột theo `fixture_status`, mỗi dòng một nhóm. **`data_source` luôn là một chiều nhóm**, không có tổng liên nguồn. Mặc định **loại `calibration_rig`** như bản đồ (§1.6); hỏi đích danh mới có |
+| ST-2 | Cột **chưa có dòng `pole_current_status`** đếm vào `unknown` (khớp bản đồ, `MapQueryService`), **và** báo riêng `never_surveyed` — tập con của `unknown`, không phải bucket thứ năm. `normal + dim + out + unknown = pole_count` |
+| ST-3 | Mẫu số = mọi cột trong phạm vi, không theo bóng (trạng thái thuộc vị trí cột, BE-09). Chỉ ảnh chụp hiện tại; xu hướng theo thời gian là ticket riêng |
+| ST-4 | `GET /api/v1/statistics/repair-timeliness` — chỉ phiếu **`repair`**. "Xong" = `completed_at` (lần `complete` cuối; `return` xoá nó), trạng thái `done` hoặc `verified`. Không đợi `verify` |
+| ST-5 | Đúng hạn ⇔ **đêm** của `completed_at` ≤ `due_date` (`WorkOrderAgendaOptions.NightOf`, 12:00 Asia/Ho_Chi_Minh). `from`/`to` cũng là đêm, phải trong 2000-01-01…2099-12-31 (ngoài dải → 400). Mặc định 30 đêm tới đêm nay. `due_date` hiện tại — không sửa được sau khi phiếu xong (`WorkOrderRules.Allows("edit")`) |
+| ST-6 | Phiếu không hạn → `no_due_date`, ngoài mẫu số. `on_time_rate = on_time / (on_time + late)`, **tính ở backend**, `null` khi mẫu số 0. `open_overdue` = phiếu `repair` chưa xong có `due_date` < đêm nay |
+| ST-7 | Đếm theo **phiếu**, không theo `case_id` (FR-2). **Không tách theo `data_source`** (Mỹ ký): phiếu không mang trường này, thời gian sửa là số vận hành chứ không phải số đo |
+| ST-8 | Capability mới **`ReadStatistics`** = `superior`, `manager`, `system_admin`. Không `field_engineer`: `work_order` lọc theo người được giao nên số của họ sẽ khác số thật |
+| ST-9 | `group_by`: `commune`, `segment` (fixture-status); `commune` (repair-timeliness). Khoá dòng **luôn có mặt**, `null` khi không nhóm theo chiều đó. Chỉ trả nhóm có dữ liệu. BE-30 thêm giá trị `group_by` mà không đổi hình dạng |
+| ST-10 | Xuất CSV để **BE-31**, chung cho mọi báo cáo |
