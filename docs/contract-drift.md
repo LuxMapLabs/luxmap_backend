@@ -10,7 +10,7 @@ thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 > Contract v1.7 §2.
 >
 > 📄 **Nguồn phiếu hiện hành: v1.4 (27/09/2026)** — mục *Registration v1.4* bên dưới. Vai trò không đổi so
-> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23, D-R25…D-R28 **còn chờ quyết**.
+> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R25…D-R28 **còn chờ quyết**.
 
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
 archive: (1) ghi ngay, bốn trường Decision / Decision maker / Date / Scope; (2) policy là một vai trò
@@ -147,10 +147,10 @@ thẳng v1.2 → v1.4. Enum Contract mục 1 **không phải lật** — đó l�
 | Mã | Đề xuất | Chạm API | Trạng thái |
 |---|---|---|---|
 | **D-R19** | Phiếu v1.4 thay v1.2 làm nguồn chuẩn. Vai trò, ma trận capability, Citizen/QR, điều khiển testbed, audit trail (D-R1…D-R18) **giữ nguyên** — v1.4 không đổi actor | Không | ✅ Tầng tài liệu, 27/09 |
-| **D-R20** | `fixture_status` **giữ** `normal \| dim \| out \| unknown`. Quy tắc: CV `OFF` → `out`; CV `ON` + `baseline_ratio` < `dim_threshold_ratio` → `dim`; còn lại `normal`; không có quan sát → `unknown`. `lamp_out` / `lamp_dim` vẫn `source_channel = cv` (kênh = sweep khảo sát) — **cần xác nhận**, vì `lamp_dim` nay do CV **và** cảm biến cùng quyết | Có (ngữ nghĩa, không đổi hình dạng) | Chờ quyết |
+| **D-R20** | `fixture_status` **giữ** `normal \| dim \| out \| unknown`. Quy tắc: CV `OFF` → `out`; CV `ON` + `baseline_ratio` < `dim_threshold_ratio` → `dim`; còn lại `normal`; không có quan sát → `unknown`. `lamp_out` / `lamp_dim` vẫn `source_channel = cv` (kênh = sweep khảo sát) — **cần xác nhận**, vì `lamp_dim` nay do CV **và** cảm biến cùng quyết | Có (ngữ nghĩa, không đổi hình dạng) | **Chốt 07/10 (Mỹ): giữ `cv`**, không thêm giá trị enum — kênh là phiên khảo sát, cảm biến lux là một phần của phiên. Không đổi Contract, mock, FE |
 | **D-R21** | **Mô hình dữ liệu một phiên khảo sát — hướng (B), chốt 27/09.** App quay riêng (WP6) sinh **bốn file thô, không ai nhập tay**: (1) **video**; (2) **log lux** — module ESP32 + BH1750 gửi **từng mẫu** qua **BLE notify** (`seq`, `module_ms`, `lux`), app gắn `phone_elapsed_ns` lúc nhận; (3) **GPS track** theo thời gian (không phải một toạ độ cho cả file); (4) **cấu hình quay** thực tế. **Cả ba luồng video / GPS / lux dùng CHUNG một đồng hồ** `SystemClock.elapsedRealtimeNanos()` — Camera2 gắn `SENSOR_TIMESTAMP` cùng hệ thời gian khi `SENSOR_INFO_TIMESTAMP_SOURCE = REALTIME` (**phải kiểm trên máy quay thật**); quy đổi UTC **một lần** mỗi phiên, nên **không cần mốc flash**. Jitter BLE ~10–50 ms (≈0,4 m ở 30 km/h) — server khớp tuyến tính `(module_ms, phone_elapsed_ns)` trên cả phiên để khử. **Điện thoại không xử lý gì**: server lưu nguyên byte bốn file, parse log lux thành bảng mẫu theo sweep (không gắn cột), tìm đỉnh, ghép cột bằng GPS track + vị trí cột GIS, lấy ON/OFF của CV, rồi ghi **một dòng cho mỗi cột mỗi sweep** (`peak_at, peak_lux, cv_state, baseline_ratio, classified_as, association_confidence`) vào chuỗi luminance. Khoảng `seq` bị hổng trùng lúc ngang cột → `unknown`, không đoán. `LuxReading` (BE-42) **giữ** cho số đo **thủ công** lúc kiểm tra thực địa — ứng viên ground truth của D-R23. Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15 mới, §5.7 diễn đạt lại | **Chốt hướng, SELF-SIGNED** — nền tạm tới FW kế tiếp; **đặc tả BE-15 chưa viết** |
-| **D-R22** | `luminance_history` / `luminance_baseline` **giữ hình dạng** (`baseline_ratio`, `classified_as`, `dim_threshold_ratio` 0.80) nhưng **nguồn đổi**: đỉnh lux theo cột, không phải độ sáng ảnh. `out_threshold_ratio` (0.15) **mất vai trò phân loại** vì Out nay do CV quyết — giữ làm kiểm tra nhất quán (CV nói ON mà lux gần 0), hay bỏ? Tên `luminance_*` giữ dù đại lượng là độ rọi (đổi tên = BREAKING không mua được gì) | **Có** — §5.2 detail, BE-33 | Chờ quyết |
-| **D-R23** | **Lux không còn là ground truth của `dim`** — nó là đầu vào. Quy tắc BE-42 số 1 trong `CLAUDE.md` (*"ghi lux vào chuỗi luminance là để CV tự chấm chính mình"*) **đảo nghĩa**: ở v1.4 chuỗi luminance **chính là** lux. Cần chốt ground truth mới cho `dim` (kiểm tra thực địa bằng gì, ai làm, trên tập con nào) và cho độ lặp lại của phép đo (nhiều lượt qua cùng cột). `out` vẫn = kiểm tra bằng mắt ban đêm | Không (nghiên cứu) — nhưng đổi tiêu chí CV-12 | Chờ quyết, **ưu tiên cao** |
+| **D-R22** | `luminance_history` / `luminance_baseline` **giữ hình dạng** (`baseline_ratio`, `classified_as`, `dim_threshold_ratio` 0.80) nhưng **nguồn đổi**: đỉnh lux theo cột, không phải độ sáng ảnh. `out_threshold_ratio` (0.15) **mất vai trò phân loại** vì Out nay do CV quyết — giữ làm kiểm tra nhất quán (CV nói ON mà lux gần 0), hay bỏ? Tên `luminance_*` giữ dù đại lượng là độ rọi (đổi tên = BREAKING không mua được gì) | **Có** — §5.2 detail, BE-33 | **Chốt 07/10 (Mỹ): giữ trường, luôn `null`, ghi Contract "không còn dùng phân loại"** (hướng b) — xem mục *Quyết định khảo sát 07/10/2026* |
+| **D-R23** | **Lux không còn là ground truth của `dim`** — nó là đầu vào. Quy tắc BE-42 số 1 trong `CLAUDE.md` (*"ghi lux vào chuỗi luminance là để CV tự chấm chính mình"*) **đảo nghĩa**: ở v1.4 chuỗi luminance **chính là** lux. Cần chốt ground truth mới cho `dim` (kiểm tra thực địa bằng gì, ai làm, trên tập con nào) và cho độ lặp lại của phép đo (nhiều lượt qua cùng cột). `out` vẫn = kiểm tra bằng mắt ban đêm | Không (nghiên cứu) — nhưng đổi tiêu chí CV-12 | **Chốt 07/10 (Mỹ): B (tấm lọc ND) trước, A (lux kế tay) sau** — xem mục *Quyết định khảo sát 07/10/2026* |
 | **D-R24** | **Cấu hình quay CỐ ĐỊNH, kiểm ở cấp PHIÊN thay cho kiểm từng JPEG (BE-16).** Camera2 (hoặc CameraX + Camera2Interop): tắt AE, cố định ISO + shutter; lấy nét cố định vô cực; WB cố định; độ phân giải + fps cố định; **tắt EIS / HDR / night mode** (crop, bóp méo, ghép frame). App ghi cấu hình **thực tế** vào file cấu hình phiên; server so với **một profile đã chốt** và **từ chối** phiên lệch, kèm lý do — cùng tinh thần "không nhận, không suy đoán" của BE-16. Con số ISO / shutter chốt sau buổi quay thử. Metadata phiên thêm: làn, chiều đi, tần số lấy mẫu module, phiên bản firmware module (BE-34). Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15/16 chưa đặc tả | **Chốt hướng, SELF-SIGNED**; chờ profile từ buổi quay thử |
 | **D-R25** | Controlled Reference Capture Set **rời deliverable**. Giá trị `calibration_rig` **giữ trong enum** (xoá giá trị enum là BREAKING, và testbed IoT D-R10 vẫn cần một nhãn không-phải-`field` — Contract O-9). Không seed / không dựng thêm dữ liệu cho nó tới khi có quyết định | Không | Chờ quyết |
 | **D-R26** | Trạng thái **đoạn** suy ra từ cột (phiếu 3.2.b: các cột Out/Dim liền nhau). **Tương thích** với CV-15 (`segment_outage`, `has_active_segment_fault`) — không thêm trường | Không | Ghi nhận |
@@ -1057,3 +1057,46 @@ query string phải là ISO), WP5 (lịch của Quản lý: `assigned_to` bắt 
 
 **Phải báo:** WP6 — `*_pts_ns` khai = `(video_pts_us − video_pts_us frame đầu) × 1000`, lệch trong một tick là hợp lệ; `time_base` khai phải đúng
 time base của file (`1/90000`). **Chưa báo** (gộp vào tin phản hồi package đã soạn).
+
+## Quyết định khảo sát 07/10/2026 — sau khi soi mẫu WP6 và mô phỏng khả thi
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 07/10/2026, theo đề xuất của Claude. Bằng chứng: `.ai/results/feasibility/` (Pha 1–2, S1/S2), mẫu `Mobile_Report` |
+| **Chạm API** | Không — trừ D-R22 (câu chữ Contract, không đổi hình dạng) |
+
+| Mã | Quyết định | Việc kéo theo |
+|---|---|---|
+| **D-FS-20** | Firmware module lux: **H-Resolution Mode 2, ~8 mẫu/giây, `module_ms` = `millis()` lúc đo, `seq` từng mẫu** (hướng a). Firmware cũ 1 Hz / `module_ms` theo giây: log thật bị `FitClocks` từ chối `CLOCK_QUALITY`, mô phỏng S1 cho **0 đỉnh** ở mọi kịch bản | **Đã báo nhóm IoT (Đạt) 07/10.** `docs/field/BE-15-pilot-drive.md` v3 |
+| **D-R22** | `out_threshold_ratio` **giữ trường, luôn `null`**; Contract ghi "không còn dùng để phân loại — Out do CV quyết" (hướng b) | Sửa câu Contract §5.2 ở lần lên version kế tiếp |
+| **D-R23** | Ground truth `dim`: **B trước** (tấm lọc ND độ truyền 0,9 / 0,8 / 0,7 trên cột đã có baseline), **A sau** (lux kế tay cùng đêm). B chỉ chứng minh độ nhạy cảm biến + thuật toán, không chứng minh bóng mờ thật — báo cáo phải nói thẳng | **BE phải làm TRƯỚC buổi quay B:** trường khai tấm lọc trong `capture_config` (ví dụ `optical_filter_transmittance`), loại lượt có tấm lọc khỏi baseline, xuất tỉ lệ kỳ vọng. A về sau cần nối `nearest_luminance` (drift 17). A không làm bù được cho đêm đã qua |
+| **D-7 / P2 / D-FS-01** | **Không** thêm trường chiều đi khi giao tuyến. Quy trình: **mỗi đêm đi–về trọn tuyến trong một phiên**, camera cố định một bên; ngoại lệ đi một chiều thì chọn chiều để cột cùng phía camera. Lý do: `camera_side` khai cho cả phiên, cột khác phía camera ra `unknown` (`DetectionAssociation.cs:17`); 11/27 tuyến thực địa có cột hai bên | `docs/field/BE-15-pilot-drive.md` v3 (quy trình + lượt 14 đi–về). Câu Phiếu P2 gợi ý: *"the actual travel direction of each pass is recorded; each night the route is surveyed in both directions so that fixtures on both sides of the road are captured"*. Gợi ý chiều tự tính (phía đa số cột) chỉ làm khi có tuyến buộc đi một chiều |
+| **D-05** | Baseline **N = 3, trung vị**. Mô phỏng: N 3 → 5 chỉ giảm báo nhầm "mờ" 3,9% → 3,3% (sai số mỗi lượt 10%); độ lặp lại của phép đo mới là yếu tố quyết định | Câu Phiếu gợi ý: *"at least three approved surveys on different nights per pole (pilot default, configurable), so Dim is evaluated from the fourth night"*. ⚠️ **Code hiện đếm theo PHIÊN, không theo ĐÊM** (`SurveyPublicationRules.Members` → `GroupBy(RunId)`): ba phiên trong một đêm đủ baseline. **Duyệt 07/10 (Mỹ):** mỗi đêm tối đa một thành viên (mỗi cột / chiều), baseline chỉ từ đêm trước — hiện thực ở ticket BE-15 follow-up |
+| **BE-26** | Hàng đợi job bằng **DB** (khuôn lease của BE-15, D-09), **không** thêm Hangfire | Phase 1 của BE-26 |
+
+**File đề xuất sửa Phiếu** (`docs/registration/FA26SE222_v1.4-change-proposals.md`, untracked) — **ba câu lệch code (D-FS-19) đã sửa
+07/10**: P2 không còn nói BE loại lượt sai chiều (BE chỉ so cùng chiều); P5 ghi đúng cấu hình `SurveyReview:BaselineMinimumMembers` và đếm
+theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duyệt chỉ `accept` / `return`.
+
+**Phải báo:** WP6 + FO (quy trình đi–về, `camera_side`, lượt 14), WP4 (D-R23 B→A, N = 3 trung vị). **Chưa báo.**
+
+## BE-28 — thống kê cho dashboard (07/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 07/10/2026 — duyệt D-1…D-14 theo đề xuất ở `.ai/results/BE-28-p1.md` |
+| **Chạm API** | **Có** — nhóm endpoint mới, Contract chưa có đặc tả. **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa lên Contract |
+| **Consumer** | WP5 — **chưa có màn dashboard nào** (khảo sát `luxmap-web` 07/10), phải dựng màn mới. **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| ST-1 | `GET /api/v1/statistics/fixture-status` — đếm cột theo `fixture_status`, mỗi dòng một nhóm. **`data_source` luôn là một chiều nhóm**, không có tổng liên nguồn. Mặc định **loại `calibration_rig`** như bản đồ (§1.6); hỏi đích danh mới có |
+| ST-2 | Cột **chưa có dòng `pole_current_status`** đếm vào `unknown` (khớp bản đồ, `MapQueryService`), **và** báo riêng `never_surveyed` — tập con của `unknown`, không phải bucket thứ năm. `normal + dim + out + unknown = pole_count` |
+| ST-3 | Mẫu số = mọi cột trong phạm vi, không theo bóng (trạng thái thuộc vị trí cột, BE-09). Chỉ ảnh chụp hiện tại; xu hướng theo thời gian là ticket riêng |
+| ST-4 | `GET /api/v1/statistics/repair-timeliness` — chỉ phiếu **`repair`**. "Xong" = `completed_at` (lần `complete` cuối; `return` xoá nó), trạng thái `done` hoặc `verified`. Không đợi `verify` |
+| ST-5 | Đúng hạn ⇔ **đêm** của `completed_at` ≤ `due_date` (`WorkOrderAgendaOptions.NightOf`, 12:00 Asia/Ho_Chi_Minh). `from`/`to` cũng là đêm, phải trong 2000-01-01…2099-12-31 (ngoài dải → 400). Mặc định 30 đêm tới đêm nay. `due_date` hiện tại — không sửa được sau khi phiếu xong (`WorkOrderRules.Allows("edit")`) |
+| ST-6 | Phiếu không hạn → `no_due_date`, ngoài mẫu số. `on_time_rate = on_time / (on_time + late)`, **tính ở backend**, `null` khi mẫu số 0. `open_overdue` = phiếu `repair` chưa xong có `due_date` < đêm nay |
+| ST-7 | Đếm theo **phiếu**, không theo `case_id` (FR-2). **Không tách theo `data_source`** (Mỹ ký): phiếu không mang trường này, thời gian sửa là số vận hành chứ không phải số đo |
+| ST-8 | Capability mới **`ReadStatistics`** = `superior`, `manager`, `system_admin`. Không `field_engineer`: `work_order` lọc theo người được giao nên số của họ sẽ khác số thật |
+| ST-9 | `group_by`: `commune`, `segment` (fixture-status); `commune` (repair-timeliness). Khoá dòng **luôn có mặt**, `null` khi không nhóm theo chiều đó. Chỉ trả nhóm có dữ liệu. BE-30 thêm giá trị `group_by` mà không đổi hình dạng |
+| ST-10 | Xuất CSV để **BE-31**, chung cho mọi báo cáo |

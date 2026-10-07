@@ -4602,6 +4602,230 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/statistics/fixture-status": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "name": "group_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FixtureStatusStatistics"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FixtureStatusStatistics"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FixtureStatusStatistics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_statistics",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/statistics/repair-timeliness": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "name": "group_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairTimelinessStatistics"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairTimelinessStatistics"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepairTimelinessStatistics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_statistics",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/frames/{frame_id}/thumbnail": {
       "get": {
         "tags": [
@@ -7624,6 +7848,86 @@
         ],
         "type": "string"
       },
+      "FixtureStatusRow": {
+        "required": [
+          "commune_id",
+          "data_source",
+          "dim",
+          "never_surveyed",
+          "normal",
+          "out",
+          "pole_count",
+          "segment_id",
+          "unknown"
+        ],
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "commune_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "normal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dim": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "out": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "never_surveyed": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "FixtureStatusStatistics": {
+        "required": [
+          "as_of",
+          "group_by",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "group_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FixtureStatusRow"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "FixtureType": {
         "enum": [
           "led_road_lamp"
@@ -8818,6 +9122,90 @@
             "maxLength": 1024,
             "minLength": 1,
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepairTimelinessRow": {
+        "required": [
+          "commune_id",
+          "completed",
+          "late",
+          "no_due_date",
+          "on_time",
+          "on_time_rate",
+          "open_overdue"
+        ],
+        "type": "object",
+        "properties": {
+          "commune_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "completed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "on_time": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "late": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "no_due_date": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "on_time_rate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "open_overdue": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepairTimelinessStatistics": {
+        "required": [
+          "as_of",
+          "from",
+          "group_by",
+          "rows",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "as_of": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "group_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepairTimelinessRow"
+            }
           }
         },
         "additionalProperties": false
@@ -10766,7 +11154,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -10816,6 +11204,9 @@
     },
     {
       "name": "Password"
+    },
+    {
+      "name": "Statistics"
     },
     {
       "name": "SurveyFrames"

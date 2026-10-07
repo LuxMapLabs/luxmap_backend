@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <!-- BE-28 sits on top of the graph like Sync: it only READS poles, statuses and work orders.
+         Nothing references this module back. -->
+    <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.WorkOrders\LuxMap.Modules.WorkOrders.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>

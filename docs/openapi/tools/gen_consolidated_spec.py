@@ -39,6 +39,7 @@ d["info"]["description"] = (
     "v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. "
     "v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. "
     "v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. "
+    "BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -76,6 +77,7 @@ TAGS = OrderedDict([
     ("Sweeps", "Phiên khảo sát video — BE-15 P2a đã hiện thực nhận/nộp phiên và đọc (SELF-SIGNED, nền tạm tới FW). Xử lý ở P2b, duyệt ở P2c."),
     ("IotSweeps", "Thumbnail khung hình — Contract §5.6. CHƯA HIỆN THỰC (BE-15 P2b)."),
     ("Sync", "Đồng bộ offline cho Kỹ sư hiện trường — Contract §5.8 (BE-43): gói dữ liệu đầy đủ theo tuyến + hàng chờ thao tác."),
+    ("Statistics", "Thống kê dashboard — BE-28, drift ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW). Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị)."),
 ])
 d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
 
@@ -206,7 +208,13 @@ for suffix, summary in [("thumbnail", "Thumbnail JPEG của ảnh phiếu — pr
                         ("original", "Ảnh gốc nguyên byte của phiếu — proxy qua API; quyền theo phiếu cha")]:
     SUMMARY[("get", "/api/v1/evidence/{evidence_id}/" + suffix)] = "[TẠM — BE-24] " + summary
 
+SUMMARY[("get", "/api/v1/statistics/fixture-status")] = (
+    "[TẠM — BE-28] Số cột theo fixture_status, mỗi nhóm một dòng; data_source luôn là một chiều nhóm, never_surveyed là tập con của unknown")
+SUMMARY[("get", "/api/v1/statistics/repair-timeliness")] = (
+    "[TẠM — BE-28] Phiếu sửa chữa xong trong các đêm from..to: đúng hạn / trễ / không hạn, on_time_rate; open_overdue tính tới hiện tại")
+
 SECTION = {
+    "/api/v1/statistics": "drift BE-28 ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",

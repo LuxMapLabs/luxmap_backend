@@ -51,6 +51,10 @@ public sealed record WorkOrderAgendaOptions
         var date = DateOnly.FromDateTime(local);
         return TimeOnly.FromDateTime(local) < NightStartsAt ? date.AddDays(-1) : date;
     }
+
+    /// <summary>The instant <paramref name="night"/> begins, in UTC: <c>NightOf(t) == night</c> ⇔ <c>NightStartUtc(night) ≤ t &lt; NightStartUtc(night + 1)</c>.</summary>
+    public DateTime NightStartUtc(DateOnly night)
+        => TimeZoneInfo.ConvertTimeToUtc(night.ToDateTime(NightStartsAt, DateTimeKind.Unspecified), Zone());
 }
 
 /// <summary>Why a work order is on tonight's agenda. Several can hold at once, listed in this order; at most one of the three schedule flags.</summary>

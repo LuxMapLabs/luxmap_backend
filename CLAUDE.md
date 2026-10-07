@@ -280,7 +280,7 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 | ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, đã hiện thực ở Contract §5.3.1 (SELF-SIGNED, chờ FW xác nhận) |
 | BE-15, BE-16 | Upload sweep, validate metadata phơi sáng |
 | BE-27 | Notification — **chốt tên bảng/entity cùng FE2 trước W16** |
-| BE-28→31 | Toàn bộ dashboard và thống kê |
+| BE-29→31 | Dashboard còn lại (BE-28 **đã hiện thực** 07/10/2026 — `/statistics/…`, drift BE-28 ST-1…ST-10, SELF-SIGNED; BE-30 thêm `group_by` không đổi hình dạng) |
 | BE-33→35 | Quản trị danh mục, node, model version |
 | ~~BE-41~~ | ~~`POST /faults`~~ → **đã đặc tả ở mục 2.8** |
 | ~~BE-42~~ | ~~endpoint lux~~ → **đã đặc tả ở mục 2.9** |

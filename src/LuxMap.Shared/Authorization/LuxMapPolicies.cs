@@ -84,6 +84,12 @@ public static class LuxMapPolicies
     /// </summary>
     public const string SyncOffline = "cap:sync_offline";
 
+    /// <summary>
+    /// BE-28 — dashboard statistics. Not the Field Engineer: work orders are filtered to the assignee for that role,
+    /// so the same figure would come out different from everyone else's (drift ST-8).
+    /// </summary>
+    public const string ReadStatistics = "cap:read_statistics";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -106,5 +112,6 @@ public static class LuxMapPolicies
             [ManageWorkOrders] = [UserRole.Manager],
             [ExecuteWorkOrders] = [UserRole.FieldEngineer],
             [SyncOffline] = [UserRole.FieldEngineer],
+            [ReadStatistics] = [UserRole.Superior, UserRole.Manager, UserRole.SystemAdmin],
         };
 }
