@@ -1827,3 +1827,16 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
 `PointGeometry`, `LineStringGeometry` đã xoá (mồ côi khi stub đi). `object?` trong C# xuất `nullable` không `type` → lint lỗi; vá ở phần
 "lint fix" của generator như `ApiError.details`.
 
+## Agent skills
+
+### Issue tracker
+
+Ticket là file `.ai/tasks/<mã>.md` theo giao thức `.ai/` (mã từ `docs/tasks-backend.csv`), không dùng GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Vai trò triage ánh xạ vào trường `status:` (và `owner:`) sẵn có của ticket, không thêm label riêng. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: thuật ngữ ở `CONTEXT.md` gốc repo; quyết định vào `docs/contract-drift.md` / `CLAUDE.md`, **không** có `docs/adr/`. See `docs/agents/domain.md`.
