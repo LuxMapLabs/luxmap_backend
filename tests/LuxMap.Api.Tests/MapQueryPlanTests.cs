@@ -135,7 +135,9 @@ public sealed class MapQueryPlanTests(AssetSchemaFixture fixture)
         {
             await using var transaction = await db.Database.BeginTransactionAsync();
             await db.Database.ExecuteSqlRawAsync("SET LOCAL enable_seqscan = off");
-            var lines = await db.Database.SqlQueryRaw<string>($"EXPLAIN {sql}").ToListAsync();
+            // The statement is EF's own SQL with literals substituted — nothing user-supplied reaches it.
+            var explain = "EXPLAIN " + sql;
+            var lines = await db.Database.SqlQueryRaw<string>(explain).ToListAsync();
             return string.Join(Environment.NewLine, lines);
         });
 

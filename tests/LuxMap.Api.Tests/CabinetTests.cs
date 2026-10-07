@@ -123,6 +123,40 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(node, cabinet.GetProperty("iot_node_id").GetString());
     }
 
+    /// <summary>
+    /// 🔴 <c>feeder_ids</c> is in id order, not text order — and the length tiebreaker is what decides it, because
+    /// one batch shares one <c>created_at</c> (CLAUDE.md section 0). The two ids straddle a width boundary and are
+    /// written in ONE statement, so <c>created_at</c> ties; as text <c>FDR-1000000</c> would sort first.
+    /// </summary>
+    [Fact]
+    public async Task Feeder_ids_are_in_id_order_across_a_width_boundary_on_both_surfaces()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var cabinetId = await NewCabinetAsync(fixture.CommuneId);
+        var (shorter, longer) = await FreeStraddlingFeederIdsAsync();
+
+        try
+        {
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"""
+                INSERT INTO feeder (feeder_id, feeder_name, commune_id, cabinet_id) VALUES
+                ({longer}, 'order probe', {fixture.CommuneId}, {cabinetId}),
+                ({shorter}, 'order probe', {fixture.CommuneId}, {cabinetId})
+                """));
+
+            var inventory = (await GetAsync(client, $"{Cabinets}/{cabinetId}")).GetProperty("cabinet");
+            Assert.Equal([shorter, longer], Strings(inventory.GetProperty("feeder_ids")));
+
+            var map = Find(await GetAsync(client, MapCabinets + Box), "cabinet_id", cabinetId);
+            Assert.Equal([shorter, longer], Strings(map.GetProperty("properties").GetProperty("feeder_ids")));
+        }
+        finally
+        {
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"DELETE FROM feeder WHERE feeder_id IN ({shorter}, {longer})"));
+        }
+    }
+
     // ── Feeder ↔ cabinet (CAB-6) ────────────────────────────────────────────────────────────────
 
     /// <summary>The question that started CABINET: where is the feeder's cabinet, from the list alone.</summary>
@@ -580,6 +614,27 @@ public sealed class CabinetTests(AssetImportFixture fixture)
     private Task<string> CabinetByRefAsync(string externalRef)
         => fixture.QueryAsync(db => db.Set<ElectricalCabinet>().IgnoreQueryFilters()
             .Where(cabinet => cabinet.ExternalRef == externalRef).Select(cabinet => cabinet.CabinetId).SingleAsync());
+
+    /// <summary>
+    /// A pair like <c>FDR-999999</c> / <c>FDR-1000000</c> that no row holds, far above where <c>feeder_id_seq</c>
+    /// stands — chosen from the LIVE table, never a literal (CLAUDE.md: the shared sequence).
+    /// </summary>
+    private async Task<(string Shorter, string Longer)> FreeStraddlingFeederIdsAsync()
+    {
+        for (var nines = 6; nines <= 12; nines++)
+        {
+            var shorter = "FDR-" + new string('9', nines);
+            var longer = "FDR-1" + new string('0', nines);
+            var taken = await fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
+                .AnyAsync(feeder => feeder.FeederId == shorter || feeder.FeederId == longer));
+            if (!taken)
+            {
+                return (shorter, longer);
+            }
+        }
+
+        throw new InvalidOperationException("No free straddling pair of feeder ids between 6 and 12 digits.");
+    }
 
     /// <summary>Runs one raw statement that must fail, and returns PostgreSQL's refusal.</summary>
     private async Task<PostgresException> SqlFailsAsync(string sql)

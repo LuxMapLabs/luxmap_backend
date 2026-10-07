@@ -200,6 +200,13 @@ public sealed class AssetImportService(
     /// <remarks>
     /// A cabinet that carries a device cannot become <c>field</c> (CAB-5): a ROW error here, because the database
     /// refusal (<c>ck_iot_node_cabinet_not_field</c>) would arrive at the write and fail the whole batch.
+    /// <para>
+    /// ⚠️ <b>Same known limitation as the upsert (class remarks):</b> the device lookup here and the relay lookup in
+    /// <see cref="PlanFeedersAsync"/> are read BEFORE the write transaction. A device or relay wired in between
+    /// makes the database refuse at the write — the batch rolls back whole and answers 500, nothing is corrupted.
+    /// Accepted while the only writer of <c>iot_node</c> / <c>feeder_control</c> is a seed script (Codex review
+    /// 07/10/2026, P2); the fix is locking the rows inside the transaction, not another pre-check.
+    /// </para>
     /// </remarks>
     private async Task<WritePlan> PlanCabinetsAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
