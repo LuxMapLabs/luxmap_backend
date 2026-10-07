@@ -30,7 +30,7 @@ gọn hơn đề xuất gốc (32 bảng mới → 22). Nguồn phạm vi: [Phi�
 | Q7 | **Tuyến liên xã:** phiếu neo vào **một xã**, nhưng được chứa tuyến/cột của các xã khác **trong phạm vi của người tạo**; kết quả theo cột mang **xã của cột**. Cột ngoài phạm vi → không xử lý, báo rõ trong độ phủ | Dữ liệu thật 28/09: Nguyễn Xiển & Phước Thiện chạy qua cả Long Phước và Long Bình. Claude quyết (Codex nghiêng "một phiếu một xã" — chia tuyến thực tế sẽ cắt ngang các đoạn đường) |
 | Q8 | **Một registry phiên bản chung `artifact_version`** (model CV, thuật toán ghép, gom cụm, firmware module/node, profile) — không hai bảng | BE-34; Codex nghiêng "registry tối thiểu" |
 | Q9 | Cấu hình (ngưỡng dim, ngưỡng offline, …) ở **`system_setting`** key/value có audit; mỗi run **chụp lại** giá trị đã dùng | BE-33, Phiếu dòng 157; đơn giản hơn bảng config có version |
-| Q10 | **Thêm `electrical_cabinet`** (tủ điện): `feeder.cabinet_id`, `iot_node.cabinet_id` nullable | Phiếu dòng 215/239 liệt kê *electrical cabinets* là tài sản được quản lý; Claude quyết |
+| Q10 | **Thêm `electrical_cabinet`** (tủ điện): `feeder.cabinet_id` nullable, `iot_node.cabinet_id` **bắt buộc** (≤ 1 thiết bị / trụ), `iot_node.geom` **bỏ** — toạ độ thuộc trụ. ✅ **Hiện thực 07/10/2026** (migration `AddElectricalCabinet`, drift CAB-1…CAB-8; Mỹ sửa 3 điểm của bản đầu: `cabinet_id` của node bắt buộc, `geom` của trụ bắt buộc, trụ ↔ node `0..1`) | Phiếu dòng 215/239 liệt kê *electrical cabinets* là tài sản được quản lý; Claude quyết, Mỹ chốt 07/10 |
 | Q11 | Nguồn của fault tự động: **cột FK nullable trên `fault`** (`origin_observation_id`, `origin_node_id`) — không bảng `fault_origin` | Codex phương án A. ⚠️ **Đính chính 02/10:** bản đầu ghi "một fault mở / cột / loại đã chặn sinh trùng" — **sai**: `fault` chỉ có unique `client_op_id` (`FaultConfigurations.cs:160–162`). Chống trùng phải làm ở khâu công bố (khoá cột + `FaultStatusSets.Open`), xem BE-15 D-12 |
 | Q12 | **FX-1 (Mỹ chọn):** `fixture_type`, `lamp_watt`, `install_date` **nullable khi chưa xác minh** (114 bóng thực địa về NULL) + enum thêm giá trị cho **đèn cao áp sodium** | Mỹ 01/10/2026; chạm Contract §1/§5.1 → SELF-SIGNED, đưa ra FW |
 | Q13 | **Bỏ `ExternalUnit`/SLA** khỏi domain model; prefix `EXT` để trống | Phiếu v1.4 chỉ giao việc cho Kỹ sư hiện trường; WO-1/5 đã loại ở BE-23 |
@@ -64,10 +64,11 @@ erDiagram
     }
 
     electrical_cabinet {
-        text cabinet_id PK "MỚI (Q10)"
+        text cabinet_id PK "MỚI (Q10) — CAB-001"
+        text cabinet_name
         text commune_id FK
         text external_ref
-        point geom "nullable"
+        point geom "BẮT BUỘC (CAB-1)"
         text data_source
     }
     road_segment {
@@ -94,8 +95,9 @@ erDiagram
         text last_sweep_id FK
     }
     iot_node {
-        text node_id PK "SỬA: + cabinet_id"
-        text cabinet_id FK
+        text node_id PK "SỬA: + cabinet_id, - geom"
+        text cabinet_id FK "BẮT BUỘC, UNIQUE (CAB-3)"
+        text cabinet_data_source "bản sao data_source của trụ, không bao giờ field (CAB-5)"
     }
     feeder_control {
         text feeder_id PK "HIỆN CÓ"
@@ -265,7 +267,7 @@ erDiagram
     }
 
     electrical_cabinet ||--o{ feeder : "cấp"
-    electrical_cabinet ||--o{ iot_node : "đặt tại"
+    electrical_cabinet ||--o| iot_node : "đặt tại (≤ 1)"
     road_segment ||--o{ pole : ""
     feeder ||--o{ pole : ""
     pole ||--o{ fixture : ""

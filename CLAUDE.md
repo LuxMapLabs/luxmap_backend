@@ -302,7 +302,7 @@ tài sản; hết bảo hành **không** xoá / archive gì — chỉ gắn **c�
 
 ## Domain model
 
-`Pole` · `Fixture` · `RoadSegment` · `Feeder` · `IotNode` · `TelemetryReading` ·
+`Pole` · `Fixture` · `RoadSegment` · `Feeder` · `ElectricalCabinet` · `IotNode` · `TelemetryReading` ·
 `SurveySweep` · `SurveyFrame` · `Detection` · `LuminanceBaseline` · `LuxReading` ·
 `Fault` · `FaultCluster` · `WorkOrder` · `RepairEvidence` ·
 `AdministrativeUnit` · `AppUser` · `RefreshToken`
@@ -1840,3 +1840,35 @@ Vai trò triage ánh xạ vào trường `status:` (và `owner:`) sẵn có củ
 ### Domain docs
 
 Single-context: thuật ngữ ở `CONTEXT.md` gốc repo; quyết định vào `docs/contract-drift.md` / `CLAUDE.md`, **không** có `docs/adr/`. See `docs/agents/domain.md`.
+
+### CABINET — trụ điện tổng là tài sản, IoT là thiết bị gắn lên trụ (07/10/2026, drift CAB-1…CAB-8)
+
+**Toạ độ thuộc `electrical_cabinet`, không thuộc `iot_node` nữa** — `iot_node.geom` đã bỏ. Mọi chỗ cần vị trí thiết bị
+(bản đồ, IOT-11 sinh `node_offline` / `runtime_decline` với `location` = toạ độ tủ theo I-9) phải join trụ qua
+`iot_node.cabinet_id`. Lọc bbox thì `ST_Intersects` trên **`electrical_cabinet.geom` trần** (`MapQueryService.IotNodeQuery`),
+canh bằng `MapQueryPlanTests.The_device_and_cabinet_bbox_queries_can_ride_the_cabinet_gist_index`.
+
+🔴 **Sáu ràng buộc chỉ có ở DB, EF không biết** (`CabinetConstraints`, raw SQL trong `AddElectricalCabinet`): ba unique đích
+`(feeder_id, cabinet_id)`, `(node_id, cabinet_id)`, `(cabinet_id, data_source)` và ba FK của CAB-4/CAB-5. Lý do: mỗi đích
+chứa một cột người ta sửa được; khai `HasAlternateKey` là biến cột đó thành key property và EF ném ngay trong
+`DetectChanges` (cùng bẫy `Feeder.CommuneId` của O-7), còn alternate key trên cột nullable thì EF không cho. Hệ quả:
+**snapshot không thấy chúng, migration sau không tự dựng lại, và không ai biết khi một cái mất** — chỉ
+`CabinetTests.Every_database_only_cabinet_constraint_exists` biết. Gộp/squash migration thì phải chép khối SQL đó theo.
+
+- **Viết `iot_node` thì đặt `cabinet_data_source` = `data_source` của trụ.** Nó là bản sao để FK
+  `fk_iot_node_cabinet_data_source` (`ON UPDATE CASCADE`) + CHECK `ck_iot_node_cabinet_not_field` từ chối thiết bị trên trụ
+  `field` (D-R10). Ghi sai giá trị là FK từ chối; đổi `data_source` của trụ thì cascade tự chép xuống. Cascade này chỉ đổi một
+  cột không phải commune trên hàng cùng xã, nên **không** mở vùng mù của guard (mục 1c).
+- **Viết `feeder_control` thì `cabinet_id` phải là trụ của CẢ thiết bị lẫn feeder** — gắn feeder vào trụ trước. Hệ quả ngược:
+  feeder đang có rơ-le **không đổi trụ / tháo trụ được**, thiết bị đang có rơ-le không chuyển trụ được (FK `NO ACTION`).
+  Service trả 409 `ASSET_IN_USE`; import báo lỗi theo dòng — **phải** bắt ở bước kiểm, FK ở bước ghi làm hỏng cả mẻ (500).
+- **Assets không thấy `iot_node` / `feeder_control`** (Telemetry tham chiếu Assets, không ngược lại): hỏi qua port
+  **`ICabinetDeviceLookup`** (Telemetry hiện thực), khuôn `IActiveWorkOrderLookup`. Đừng thêm project reference, đừng
+  `SqlQuery` thẳng bảng của Telemetry từ Assets.
+- **`PUT /assets/feeders/{id}`: `cabinet_id` vắng = GIỮ** — ngoại lệ thứ hai của thay thế toàn phần, cùng khuôn `note` của cột.
+  Import feeder: ô trống / thiếu cột = giữ, import không bao giờ tháo trụ. Đừng "sửa cho nhất quán" với `feeder_id` của cột.
+- **Teardown xoá `feeder_control` → `iot_node` → `feeder` → `electrical_cabinet`** (tất cả `Restrict`). Fixture tài sản đã làm;
+  fixture mới tạo thiết bị phải theo.
+- Trụ có thể `field`; thiết bị thì không bao giờ (`ck_iot_node_data_source_not_field` giữ nguyên). Mở rộng một trong hai là
+  quyết định phạm vi (lắp IoT ngoài xã), không phải sửa lỗi.
+
