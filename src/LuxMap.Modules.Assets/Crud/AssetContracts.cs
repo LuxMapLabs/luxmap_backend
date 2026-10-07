@@ -65,6 +65,32 @@ public sealed record CreateFeederRequest
 
     /// <summary>Optional WKT <c>LINESTRING</c>. Branch C surveyed no cable routes; blank beats invented.</summary>
     public string? GeomWkt { get; init; }
+
+    /// <summary>The cabinet this circuit leaves from (CAB-2), in the feeder's own commune. Optional.</summary>
+    [MaxLength(32)]
+    public string? CabinetId { get; init; }
+}
+
+/// <summary>A main electrical cabinet (CAB-1). <c>commune_id</c> from the body, checked against scope.</summary>
+public sealed record CreateCabinetRequest
+{
+    [MaxLength(64)]
+    public string? ExternalRef { get; init; }
+
+    [Required]
+    [MaxLength(256)]
+    public string? CabinetName { get; init; }
+
+    [Required]
+    [MaxLength(32)]
+    public string? CommuneId { get; init; }
+
+    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first. Required — a cabinet is somewhere.</summary>
+    [Required]
+    public string? GeomWkt { get; init; }
+
+    [Required]
+    public DataSource? DataSource { get; init; }
 }
 
 public sealed record CreatePoleRequest
@@ -210,6 +236,52 @@ public sealed record UpdateFeederRequest
 
     /// <summary>Optional WKT <c>LINESTRING</c>. Branch C surveyed no cable routes; blank beats invented.</summary>
     public string? GeomWkt { get; init; }
+
+    /// <summary>
+    /// The cabinet (CAB-6). The second field of a full replacement that is KEPT when absent, like a pole's
+    /// <c>note</c>: leave the key out to keep it, <c>null</c> to detach the feeder, an id to move it.
+    /// </summary>
+    /// <remarks>
+    /// A feeder form written before cabinets existed must not detach every feeder it renames — and while a
+    /// device switches the feeder, detaching it is refused (409), so "absent = clear" would turn every such
+    /// rename into an error. Read through <see cref="ReadCabinetId"/>.
+    /// </remarks>
+    public JsonElement CabinetId { get; init; }
+
+    /// <summary><c>Present = false</c> when the key was not sent; otherwise the id, or <c>null</c> to detach.</summary>
+    public (bool Present, string? CabinetId) ReadCabinetId() => CabinetId.ValueKind switch
+    {
+        JsonValueKind.Undefined => (false, null),
+        JsonValueKind.Null => (true, null),
+        JsonValueKind.String when CabinetId.GetString() is { Length: > 0 and <= 32 } id => (true, id),
+        _ => throw new LuxMapException(
+            ErrorCodes.ValidationFailed,
+            HttpStatusCode.BadRequest,
+            "cabinet_id must be a cabinet id (at most 32 characters), or null to detach the feeder from its cabinet.",
+            new Dictionary<string, object?> { ["field"] = "cabinet_id" }),
+    };
+}
+
+/// <summary>Full replacement of a cabinet. <c>commune_id</c> is not writable — see <see cref="UpdateSegmentRequest"/>.</summary>
+public sealed record UpdateCabinetRequest
+{
+    [MaxLength(64)]
+    public string? ExternalRef { get; init; }
+
+    [Required]
+    [MaxLength(256)]
+    public string? CabinetName { get; init; }
+
+    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first.</summary>
+    [Required]
+    public string? GeomWkt { get; init; }
+
+    /// <summary>
+    /// ⚠️ Provenance — see <see cref="UpdateSegmentRequest.DataSource"/>. Turning a cabinet that carries a device
+    /// into <c>field</c> is refused (409, CAB-5): the team installs no device in the field (D-R10).
+    /// </summary>
+    [Required]
+    public DataSource? DataSource { get; init; }
 }
 
 /// <summary>Full replacement of a pole. See <see cref="UpdateSegmentRequest"/> for the shared rules.</summary>
@@ -554,6 +626,13 @@ public sealed record FeederListItem
 
     public required int PoleCount { get; init; }
 
+    /// <summary>
+    /// The cabinet this circuit leaves from, with its point (CAB-6) — <c>null</c> when none is recorded. In the
+    /// LIST, like a pole's <c>active_fixture</c>: an inventory row shows where the cabinet is, and a bare id would
+    /// cost one request per row.
+    /// </summary>
+    public FeederCabinet? Cabinet { get; init; }
+
     public required DateTime UpdatedAt { get; init; }
 
     /// <summary>Who last changed the row by form, note or import (e.g. <c>USR-004</c>); <c>null</c> for system-loaded rows.</summary>
@@ -570,6 +649,71 @@ public sealed record FeederDetail
 
     /// <summary>WKT <c>LINESTRING</c>, or <c>null</c> — most feeders have no surveyed route.</summary>
     public string? GeomWkt { get; init; }
+
+    public required DateTime CreatedAt { get; init; }
+}
+
+/// <summary>A feeder's cabinet as a feeder row shows it (CAB-6).</summary>
+public sealed record FeederCabinet
+{
+    public required string CabinetId { get; init; }
+
+    public required string CabinetName { get; init; }
+
+    public required AssetLocation Location { get; init; }
+}
+
+/// <summary>One cabinet in the inventory list (CAB-8).</summary>
+/// <remarks>
+/// <para>
+/// 🔴 <b><c>iot_node_id</c> only — no device state.</b> <c>node_status</c>, <c>last_report_at</c> and
+/// <c>supports_remote_control</c> belong to <c>GET /map/iot-nodes</c>; two endpoints answering the same
+/// question is how they start disagreeing (Contract section 5.3.1).
+/// </para>
+/// <para>
+/// <c>data_source</c> IS emitted, unlike on a feeder: a cabinet has real provenance, and telling the testbed
+/// cabinet from a field one is what CAB-5 turns on.
+/// </para>
+/// </remarks>
+public sealed record CabinetListItem
+{
+    public required string CabinetId { get; init; }
+
+    public string? ExternalRef { get; init; }
+
+    public required string CabinetName { get; init; }
+
+    public required string CommuneId { get; init; }
+
+    public required DataSource DataSource { get; init; }
+
+    public required AssetLocation Location { get; init; }
+
+    /// <summary>
+    /// Feeders leaving from this cabinet, in id order; <c>[]</c> when none. ⚠️ Within the CALLER'S commune
+    /// scope, like every count on this surface.
+    /// </summary>
+    public required IReadOnlyList<string> FeederIds { get; init; }
+
+    /// <summary>The device mounted in the cabinet, or <c>null</c> — most cabinets carry none.</summary>
+    public string? IotNodeId { get; init; }
+
+    public required DateTime UpdatedAt { get; init; }
+
+    /// <summary>Who last changed the row by form or import; <c>null</c> for system-loaded rows.</summary>
+    public string? UpdatedBy { get; init; }
+
+    /// <summary>That account's display name now, so a screen can say who without another call.</summary>
+    public string? UpdatedByName { get; init; }
+}
+
+/// <summary>One cabinet read on its own.</summary>
+public sealed record CabinetDetail
+{
+    public required CabinetListItem Cabinet { get; init; }
+
+    /// <summary>WKT <c>POINT</c> in EPSG:4326 — what a <c>PUT</c> body wants back.</summary>
+    public required string GeomWkt { get; init; }
 
     public required DateTime CreatedAt { get; init; }
 }

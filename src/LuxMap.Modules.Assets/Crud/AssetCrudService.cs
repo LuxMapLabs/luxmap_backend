@@ -24,7 +24,8 @@ namespace LuxMap.Modules.Assets.Crud;
 /// and the foreign keys — <c>fault</c> and <c>lux_reading</c> hold it with <c>Restrict</c> — decide
 /// whether it may go. Retiring a lamp is a real event, which is what <c>fixture.removed_date</c> is for.
 /// </remarks>
-public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor)
+public sealed class AssetCrudService(
+    LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -43,6 +44,23 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     public Task<PagedResult<PoleListItem>> ListPolesAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
         => ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, ct);
+
+    /// <summary>Cabinets, with the device mounted in each (CAB-8).</summary>
+    /// <remarks>
+    /// The device comes from a second query through <see cref="ICabinetDeviceLookup"/>: this module cannot see
+    /// <c>iot_node</c>. One query for the whole page, not one per row.
+    /// </remarks>
+    public async Task<PagedResult<CabinetListItem>> ListCabinetsAsync(
+        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
+    {
+        var result = await ListAsync(communes, page, (ElectricalCabinet cabinet) => cabinet.CabinetId, CabinetRow, ct);
+        var mounted = await devices.DevicesAsync([.. result.Items.Select(item => item.CabinetId)], ct);
+
+        return result with
+        {
+            Items = [.. result.Items.Select(item => item with { IotNodeId = mounted.GetValueOrDefault(item.CabinetId) })],
+        };
+    }
 
     /// <summary>One pole, read for the inventory screen.</summary>
     /// <remarks>
@@ -130,6 +148,91 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
         };
     }
 
+    /// <summary>One cabinet, read for the inventory screen (CAB-8). Out of scope is a 404, like every asset.</summary>
+    public async Task<CabinetDetail> CabinetAsync(string cabinetId, CancellationToken ct)
+    {
+        var cabinets = dbContext.Set<ElectricalCabinet>().AsNoTracking()
+            .Where(cabinet => cabinet.CabinetId == cabinetId);
+
+        var item = await cabinets.Select(CabinetRow).FirstOrDefaultAsync(ct) ?? throw NotFound("cabinet");
+
+        var extra = await cabinets
+            .Select(cabinet => new { cabinet.Geom, cabinet.CreatedAt })
+            .FirstAsync(ct);
+
+        var mounted = await devices.DevicesAsync([cabinetId], ct);
+
+        return new CabinetDetail
+        {
+            Cabinet = item with { IotNodeId = mounted.GetValueOrDefault(cabinetId) },
+            GeomWkt = Wkt(extra.Geom),
+            CreatedAt = extra.CreatedAt,
+        };
+    }
+
+    public async Task<string> CreateCabinetAsync(CreateCabinetRequest request, CancellationToken ct)
+    {
+        var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
+        await RejectDuplicateRefAsync<ElectricalCabinet>(communeId, request.ExternalRef, ct);
+
+        var cabinet = new ElectricalCabinet
+        {
+            ExternalRef = request.ExternalRef,
+            CabinetName = request.CabinetName!,
+            CommuneId = communeId,
+            Geom = Read<Point>(request.GeomWkt),
+            DataSource = request.DataSource!.Value,
+        };
+
+        dbContext.Set<ElectricalCabinet>().Add(cabinet);
+        Touch(cabinet);
+        await dbContext.SaveChangesAsync(ct);
+        return cabinet.CabinetId;
+    }
+
+    /// <summary>Full replacement of a cabinet. <c>commune_id</c> is not writable.</summary>
+    /// <remarks>
+    /// ⚠️ <b>A cabinet carrying a device cannot become <c>field</c></b> (CAB-5, D-R10). Checked here to answer a
+    /// 409 naming the device; <c>ck_iot_node_cabinet_not_field</c> (reached through the cascading provenance key)
+    /// refuses the same write for every other path, and for a device mounted between this check and the save.
+    /// </remarks>
+    public async Task UpdateCabinetAsync(string cabinetId, UpdateCabinetRequest request, CancellationToken ct)
+    {
+        var cabinet = await RequireAsync<ElectricalCabinet>(candidate => candidate.CabinetId == cabinetId, "cabinet", ct);
+
+        await RejectDuplicateRefAsync<ElectricalCabinet>(cabinet.CommuneId, request.ExternalRef, ct, cabinet.ExternalRef);
+
+        if (request.DataSource == DataSource.Field && cabinet.DataSource != DataSource.Field
+            && (await devices.DevicesAsync([cabinetId], ct)).TryGetValue(cabinetId, out var nodeId))
+        {
+            throw DeviceOnFieldCabinet(cabinetId, nodeId);
+        }
+
+        cabinet.ExternalRef = request.ExternalRef;
+        cabinet.CabinetName = request.CabinetName!;
+        cabinet.Geom = Read<Point>(request.GeomWkt);
+        cabinet.DataSource = request.DataSource!.Value;
+        Touch(cabinet);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (IsConstraint(failure, CabinetConstraints.DeviceNotOnFieldCabinet))
+        {
+            dbContext.ChangeTracker.Clear();
+            throw DeviceOnFieldCabinet(cabinetId, null);
+        }
+    }
+
+    /// <summary>Deletes a cabinet. The foreign keys decide: a feeder or a device still holding it refuses.</summary>
+    public Task DeleteCabinetAsync(string cabinetId, CancellationToken ct)
+        => DeleteAsync<ElectricalCabinet>(
+            candidate => candidate.CabinetId == cabinetId,
+            "cabinet",
+            "That cabinet still has feeders or a device pointing at it, so it cannot be deleted.",
+            ct);
+
     public async Task<string> CreateSegmentAsync(CreateSegmentRequest request, CancellationToken ct)
     {
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
@@ -156,6 +259,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     {
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
         await RejectDuplicateRefAsync<Feeder>(communeId, request.ExternalRef, ct);
+        await RequireCabinetInCommuneAsync(request.CabinetId, communeId, ct);
 
         var feeder = new Feeder
         {
@@ -163,6 +267,7 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
             FeederName = request.FeederName!,
             CommuneId = communeId,
             Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt),
+            CabinetId = request.CabinetId,
         };
 
         dbContext.Set<Feeder>().Add(feeder);
@@ -292,19 +397,40 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
     /// never runs when the FEEDER moves. Were the commune writable, a feeder could be walked out from
     /// under poles that are already wired to it and every one of those pairs would quietly become
     /// cross-commune, with no write left to catch it.
+    /// <para>
+    /// <c>cabinet_id</c> is KEPT when the key is absent (CAB-6) — see <see cref="UpdateFeederRequest.CabinetId"/>.
+    /// Moving or detaching a feeder a device switches is a 409 (CAB-4).
+    /// </para>
     /// </remarks>
     public async Task UpdateFeederAsync(string feederId, UpdateFeederRequest request, CancellationToken ct)
     {
+        var (cabinetSent, cabinetId) = request.ReadCabinetId();
         var feeder = await RequireAsync<Feeder>(candidate => candidate.FeederId == feederId, "feeder", ct);
 
         await RejectDuplicateRefAsync<Feeder>(feeder.CommuneId, request.ExternalRef, ct, feeder.ExternalRef);
+
+        if (cabinetSent && !string.Equals(cabinetId, feeder.CabinetId, StringComparison.Ordinal))
+        {
+            await RequireCabinetInCommuneAsync(cabinetId, feeder.CommuneId, ct);
+            await RejectSwitchedFeederMoveAsync(feeder.FeederId, ct);
+            feeder.CabinetId = cabinetId;
+        }
 
         feeder.ExternalRef = request.ExternalRef;
         feeder.FeederName = request.FeederName!;
         feeder.Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt);
         Touch(feeder);
 
-        await dbContext.SaveChangesAsync(ct);
+        try
+        {
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (IsConstraint(failure, CabinetConstraints.RelayFeederSameCabinet))
+        {
+            // A device took this feeder over between the check above and the save; the relay's key settled it.
+            dbContext.ChangeTracker.Clear();
+            throw SwitchedFeeder(feederId, null);
+        }
     }
 
     /// <summary>
@@ -774,9 +900,49 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
             CommuneId = feeder.CommuneId,
             HasGeometry = feeder.Geom != null,
             PoleCount = dbContext.Set<Pole>().Count(pole => pole.FeederId == feeder.FeederId),
+
+            // Same commune as the feeder (composite key), so the query filter never hides it from a caller who
+            // can see the feeder.
+            Cabinet = dbContext.Set<ElectricalCabinet>()
+                .Where(cabinet => cabinet.CabinetId == feeder.CabinetId)
+                .Select(cabinet => new FeederCabinet
+                {
+                    CabinetId = cabinet.CabinetId,
+                    CabinetName = cabinet.CabinetName,
+                    Location = new AssetLocation { Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X },
+                })
+                .FirstOrDefault(),
             UpdatedAt = feeder.UpdatedAt,
             UpdatedBy = feeder.UpdatedBy,
             UpdatedByName = dbContext.Set<AppUser>().Where(user => user.UserId == feeder.UpdatedBy).Select(user => user.FullName).FirstOrDefault(),
+        };
+
+    /// <remarks>
+    /// <c>iot_node_id</c> is left <c>null</c> here and filled by the caller from <see cref="ICabinetDeviceLookup"/>:
+    /// <c>iot_node</c> belongs to Telemetry, which this module does not reference.
+    /// </remarks>
+    private System.Linq.Expressions.Expression<Func<ElectricalCabinet, CabinetListItem>> CabinetRow =>
+        cabinet => new CabinetListItem
+        {
+            CabinetId = cabinet.CabinetId,
+            ExternalRef = cabinet.ExternalRef,
+            CabinetName = cabinet.CabinetName,
+            CommuneId = cabinet.CommuneId,
+            DataSource = cabinet.DataSource,
+            Location = new AssetLocation { Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X },
+
+            // ⚠️ Through the query filter — the feeders THIS caller can see — and in id order, never the bare id
+            // (created_at, length, id: CLAUDE.md section 0).
+            FeederIds = dbContext.Set<Feeder>()
+                .Where(feeder => feeder.CabinetId == cabinet.CabinetId)
+                .OrderBy(feeder => feeder.CreatedAt)
+                .ThenBy(feeder => feeder.FeederId.Length)
+                .ThenBy(feeder => feeder.FeederId)
+                .Select(feeder => feeder.FeederId)
+                .ToList(),
+            UpdatedAt = cabinet.UpdatedAt,
+            UpdatedBy = cabinet.UpdatedBy,
+            UpdatedByName = dbContext.Set<AppUser>().Where(user => user.UserId == cabinet.UpdatedBy).Select(user => user.FullName).FirstOrDefault(),
         };
 
     /// <summary>Geometry as WKT for a detail read.</summary>
@@ -896,6 +1062,74 @@ public sealed class AssetCrudService(LuxMapDbContext dbContext, ICommuneScopeAcc
                 });
         }
     }
+
+    /// <summary>
+    /// The cabinet exists, the caller can see it, and it is in <paramref name="communeId"/> — the feeder's
+    /// commune. <c>null</c> passes: no cabinet recorded.
+    /// </summary>
+    /// <remarks>
+    /// Same two layers as <see cref="RequireFeederInCommuneAsync"/>: this answers a readable 409, the composite
+    /// foreign key <c>(cabinet_id, commune_id)</c> refuses every path that forgets to call it.
+    /// </remarks>
+    private async Task RequireCabinetInCommuneAsync(string? cabinetId, string communeId, CancellationToken ct)
+    {
+        if (cabinetId is null)
+        {
+            return;
+        }
+
+        var cabinet = await RequireAsync<ElectricalCabinet>(candidate => candidate.CabinetId == cabinetId, "cabinet", ct);
+
+        if (!string.Equals(cabinet.CommuneId, communeId, StringComparison.Ordinal))
+        {
+            throw new LuxMapException(
+                ErrorCodes.CrossCommuneReference,
+                HttpStatusCode.Conflict,
+                "That cabinet belongs to a different commune than the feeder.",
+                new Dictionary<string, object?>
+                {
+                    ["feeder_commune_id"] = communeId,
+                    ["cabinet_commune_id"] = cabinet.CommuneId,
+                });
+        }
+    }
+
+    /// <summary>A feeder a device switches stays in that device's cabinet (CAB-4).</summary>
+    private async Task RejectSwitchedFeederMoveAsync(string feederId, CancellationToken ct)
+    {
+        if ((await devices.ControllersAsync([feederId], ct)).TryGetValue(feederId, out var nodeId))
+        {
+            throw SwitchedFeeder(feederId, nodeId);
+        }
+    }
+
+    private static LuxMapException SwitchedFeeder(string feederId, string? nodeId)
+        => new(
+            ErrorCodes.AssetInUse,
+            HttpStatusCode.Conflict,
+            "A device in this feeder's cabinet switches it, so the feeder cannot move to another cabinet or leave it.",
+            new Dictionary<string, object?>
+            {
+                ["feeder_id"] = feederId,
+                ["iot_node_id"] = nodeId,
+                ["constraint"] = CabinetConstraints.RelayFeederSameCabinet,
+            });
+
+    private static LuxMapException DeviceOnFieldCabinet(string cabinetId, string? nodeId)
+        => new(
+            ErrorCodes.AssetInUse,
+            HttpStatusCode.Conflict,
+            "A device is mounted in this cabinet, and the team installs no device in the field: it cannot become field data.",
+            new Dictionary<string, object?>
+            {
+                ["cabinet_id"] = cabinetId,
+                ["iot_node_id"] = nodeId,
+                ["constraint"] = CabinetConstraints.DeviceNotOnFieldCabinet,
+            });
+
+    /// <summary>The database refused the write through the constraint named <paramref name="name"/>.</summary>
+    private static bool IsConstraint(DbUpdateException failure, string name)
+        => failure.InnerException is PostgresException { ConstraintName: var constraint } && constraint == name;
 
     private static void RequireRemovedAfterInstall(DateOnly removedDate, DateOnly installDate)
     {

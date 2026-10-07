@@ -100,11 +100,11 @@ def opid(method, path):
 
 # Summaries for the implemented operations (from the controllers' XML docs / behaviour)
 SUMMARY = {
-    ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
+    ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|cabinets|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
     ("get", "/api/v1/assets/segments"): "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
     ("get", "/api/v1/assets/segments/{segmentId}"): "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
     ("post", "/api/v1/assets/segments"): "Tạo tuyến đường; 201 + Location, không body",
-    ("get", "/api/v1/assets/feeders"): "Danh sách mạch điện — has_geometry + pole_count; KHÔNG có data_source (§1.6)",
+    ("get", "/api/v1/assets/feeders"): "Danh sách mạch điện — has_geometry + pole_count + cabinet{cabinet_id, cabinet_name, location} | null (CAB-6); KHÔNG có data_source (§1.6)",
     ("get", "/api/v1/assets/feeders/{feederId}"): "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
     ("post", "/api/v1/assets/feeders"): "Tạo mạch điện; 201 + Location, không body",
     ("get", "/api/v1/assets/poles"): "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
@@ -113,7 +113,7 @@ SUMMARY = {
     ("post", "/api/v1/assets/fixtures"): "Ghi một lần lắp bóng; commune_id chép từ cột",
     ("put", "/api/v1/assets/segments/{segmentId}"): "Thay thế TOÀN PHẦN một tuyến; commune_id không sửa được",
     ("delete", "/api/v1/assets/segments/{segmentId}"): "Xoá tuyến; khoá ngoại quyết định (409 ASSET_IN_USE)",
-    ("put", "/api/v1/assets/feeders/{feederId}"): "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được",
+    ("put", "/api/v1/assets/feeders/{feederId}"): "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được; cabinet_id VẮNG = GIỮ, null = tháo (CAB-6)",
     ("delete", "/api/v1/assets/feeders/{feederId}"): "Xoá mạch điện; còn cột đang đấu vào thì 409 ASSET_IN_USE",
     ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
@@ -125,12 +125,19 @@ SUMMARY = {
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
+    # CABINET — trụ / tủ điện tổng, drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW).
+    ("get", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Danh sách trụ điện tổng — location, feeder_ids[], iot_node_id | null (CAB-8)",
+    ("get", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Một trụ + geom_wkt + created_at; ngoài phạm vi xã → 404",
+    ("post", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body",
+    ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; trụ mang thiết bị IoT không đổi sang field được (409, CAB-5)",
+    ("delete", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Xoá trụ; còn mạch hay thiết bị trỏ vào thì 409 ASSET_IN_USE",
+    ("get", "/api/v1/map/cabinets"): "[TẠM — CABINET] Bản đồ trụ điện tổng theo bbox, kể cả trụ không có IoT; feeder_ids[] tính lúc đọc, iot_node_id | null",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
     ("get", "/api/v1/map/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
     ("get", "/api/v1/map/poles/{pole_id}"): "[TẠM — BE-20] Chi tiết cột đủ trong MỘT request: bóng đang dùng, trạng thái, baseline theo chiều, 30 điểm lịch sử, sự cố mở, frame gần đây; ngoài phạm vi xã → 404",
     ("get", "/api/v1/map/segments"): "Bản đồ tuyến theo bbox; FeatureCollection của LineString; controller_node_ids[] tính lúc đọc (I-7b)",
     # BE-14b — thiết bị ở tủ điện tổng, drift "BE-14 / IoT".
-    ("get", "/api/v1/map/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT ở tủ điện theo bbox; không battery_pct, segment_ids/feeder_ids tính lúc đọc",
+    ("get", "/api/v1/map/iot-nodes"): "[TẠM — BE-14 / IoT] Thiết bị IoT theo bbox, toạ độ = toạ độ trụ nó gắn (CAB-3); không battery_pct, segment_ids/feeder_ids tính lúc đọc",
     # BE-40 — §5.4; lọc CSV, sort, commune_id và mặc định ẩn calibration_rig là drift F-1…F-6.
     ("get", "/api/v1/faults"): "Danh sách sự cố — phân trang JSON, KHÔNG GeoJSON; mặc định -severity rồi cũ trước (P-3)",
     ("post", "/api/v1/faults"): "[TẠM — BE-41] Kỹ sư hiện trường báo sự cố tại chỗ: detected, field_report; cột cho xã/tuyến/data_source; client_op_id gửi lại → 200 cùng sự cố",
@@ -218,6 +225,7 @@ SECTION = {
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",
+    "/api/v1/assets/cabinets": "drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",
     "/api/v1/auth": "§4.1",

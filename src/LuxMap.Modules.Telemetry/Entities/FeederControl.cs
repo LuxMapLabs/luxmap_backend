@@ -31,6 +31,13 @@ public class FeederControl : ICommuneScoped
     /// </summary>
     public required string CommuneId { get; set; }
 
+    /// <summary>
+    /// The cabinet of BOTH the device and the feeder (CAB-4). Carried so two database-only foreign keys can
+    /// include it — <c>(feeder_id, cabinet_id)</c> and <c>(node_id, cabinet_id)</c> — and refuse a relay that
+    /// crosses cabinets, a feeder never recorded in a cabinet, and moving a switched feeder or device.
+    /// </summary>
+    public required string CabinetId { get; set; }
+
     /// <summary>1-based relay number on the device — what the device itself knows (I-17).</summary>
     public short RelayNo { get; set; }
 

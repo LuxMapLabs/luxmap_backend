@@ -1,10 +1,10 @@
 ---
 ticket: CABINET
 title: Trụ / tủ điện tổng thành tài sản riêng (`electrical_cabinet`); IoT node chỉ là thiết bị gắn ở trụ
-status: draft
-phase: 1
+status: in_progress
+phase: 2
 owner: claude
-branch: (chưa tạo — feat/CABINET-electrical-cabinet)
+branch: feat/CABINET-electrical-cabinet
 contract_refs:
   - "§0.2 — bảng prefix ID (prefix mới)"
   - "§5.3 / §5.3.1 — nhóm /assets (tài nguyên mới, feeder thêm trường)"

@@ -43,7 +43,8 @@ namespace LuxMap.Modules.Assets.Import;
 /// every row with a clear message naming the missing <c>segment_external_ref</c>.
 /// </para>
 /// </remarks>
-public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor)
+public sealed class AssetImportService(
+    LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices)
 {
     public Task<ImportResult> ImportCsvAsync(ImportKind kind, string text, CancellationToken cancellationToken)
     {
@@ -98,6 +99,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
     private static IReadOnlyList<string> RequiredColumns(ImportKind kind) => kind switch
     {
         ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "geom_wkt", "commune_id", "data_source"],
+        ImportKind.Cabinets => ["external_ref", "cabinet_name", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Feeders => ["external_ref", "feeder_name", "commune_id"],
         ImportKind.Poles => ["external_ref", "segment_external_ref", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Fixtures => ["pole_external_ref", "fixture_type", "power_source", "lamp_watt", "install_date", "data_source"],
@@ -114,6 +116,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         var plan = kind switch
         {
             ImportKind.Segments => await PlanSegmentsAsync(readers, cancellationToken),
+            ImportKind.Cabinets => await PlanCabinetsAsync(readers, cancellationToken),
             ImportKind.Feeders => await PlanFeedersAsync(readers, cancellationToken),
             ImportKind.Poles => await PlanPolesAsync(readers, warnings, cancellationToken),
             ImportKind.Fixtures => await PlanFixturesAsync(readers, cancellationToken),
@@ -193,9 +196,86 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
         return new WritePlan(inserted, updated, unchanged);
     }
 
+    /// <summary>Cabinets (CAB-7) — upserted on <c>(commune_id, external_ref)</c> like segments.</summary>
+    /// <remarks>
+    /// A cabinet that carries a device cannot become <c>field</c> (CAB-5): a ROW error here, because the database
+    /// refusal (<c>ck_iot_node_cabinet_not_field</c>) would arrive at the write and fail the whole batch.
+    /// <para>
+    /// ⚠️ <b>Same known limitation as the upsert (class remarks):</b> the device lookup here and the relay lookup in
+    /// <see cref="PlanFeedersAsync"/> are read BEFORE the write transaction. A device or relay wired in between
+    /// makes the database refuse at the write — the batch rolls back whole and answers 500, nothing is corrupted.
+    /// Accepted while the only writer of <c>iot_node</c> / <c>feeder_control</c> is a seed script (Codex review
+    /// 07/10/2026, P2); the fix is locking the rows inside the transaction, not another pre-check.
+    /// </para>
+    /// </remarks>
+    private async Task<WritePlan> PlanCabinetsAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
+    {
+        var existing = await ExistingByRefAsync<ElectricalCabinet>(readers, cabinet => cabinet.ExternalRef, cancellationToken);
+        var mounted = await devices.DevicesAsync([.. existing.Values.Select(cabinet => cabinet.CabinetId)], cancellationToken);
+        int inserted = 0, updated = 0, unchanged = 0;
+
+        foreach (var reader in readers)
+        {
+            var externalRef = reader.Required("external_ref");
+            var communeId = await CommuneAsync(reader, cancellationToken);
+            var name = reader.Required("cabinet_name");
+            var dataSource = reader.RequiredEnum<DataSource>("data_source");
+            var geometry = reader.Geometry<Point>(CsvImportRow.GeometryColumn);
+
+            ElectricalCabinet? cabinet = null;
+            if (communeId is not null && externalRef is not null)
+            {
+                existing.TryGetValue((communeId, externalRef), out cabinet);
+            }
+
+            if (cabinet is not null && dataSource == DataSource.Field && cabinet.DataSource != DataSource.Field
+                && mounted.TryGetValue(cabinet.CabinetId, out var nodeId))
+            {
+                reader.Fail("data_source", $"Device '{nodeId}' is mounted in this cabinet; the team installs no device in the field, so it cannot become 'field'.");
+            }
+
+            if (!reader.IsValid)
+            {
+                continue;
+            }
+
+            if (cabinet is not null)
+            {
+                cabinet.CabinetName = name!;
+                cabinet.Geom = geometry!;
+                cabinet.DataSource = dataSource;
+                Count(cabinet, ref updated, ref unchanged);
+                continue;
+            }
+
+            var created = new ElectricalCabinet
+            {
+                ExternalRef = externalRef,
+                CabinetName = name!,
+                CommuneId = communeId!,
+                Geom = geometry!,
+                DataSource = dataSource,
+            };
+
+            dbContext.Set<ElectricalCabinet>().Add(created);
+            Touch(created);
+            existing[(communeId!, externalRef!)] = created;
+            inserted++;
+        }
+
+        return new WritePlan(inserted, updated, unchanged);
+    }
+
+    /// <remarks>
+    /// <c>cabinet_external_ref</c> is optional, and a blank cell or a missing column KEEPS the feeder's cabinet —
+    /// the import never detaches one, the same rule as a pole's note and as <c>PUT</c> (CAB-6). Moving a feeder a
+    /// device switches is a row error (CAB-4).
+    /// </remarks>
     private async Task<WritePlan> PlanFeedersAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<Feeder>(readers, feeder => feeder.ExternalRef, cancellationToken);
+        var cabinets = await ReferenceIndexAsync<ElectricalCabinet>(readers, "cabinet_external_ref", cancellationToken);
+        var switched = await devices.ControllersAsync([.. existing.Values.Select(feeder => feeder.FeederId)], cancellationToken);
         int inserted = 0, updated = 0, unchanged = 0;
 
         foreach (var reader in readers)
@@ -212,15 +292,46 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 geometry = reader.Geometry<LineString>(CsvImportRow.GeometryColumn);
             }
 
+            var cabinet = Resolve(reader, cabinets, "cabinet_external_ref", required: false);
+
+            // In the feeder's own commune — the composite key would otherwise fail the whole batch at the write.
+            if (cabinet is not null && communeId is not null
+                && !string.Equals(cabinet.CommuneId, communeId, StringComparison.Ordinal))
+            {
+                reader.Fail(
+                    "cabinet_external_ref",
+                    $"'{reader.Optional("cabinet_external_ref")}' belongs to commune '{cabinet.CommuneId}', not to the feeder's commune '{communeId}'.");
+            }
+
+            Feeder? feeder = null;
+            if (communeId is not null && externalRef is not null)
+            {
+                existing.TryGetValue((communeId, externalRef), out feeder);
+            }
+
+            if (feeder is not null && cabinet is not null
+                && !string.Equals(cabinet.Id, feeder.CabinetId, StringComparison.Ordinal)
+                && switched.TryGetValue(feeder.FeederId, out var nodeId))
+            {
+                reader.Fail(
+                    "cabinet_external_ref",
+                    $"Device '{nodeId}' in the feeder's cabinet switches it, so the feeder cannot move to another cabinet.");
+            }
+
             if (!reader.IsValid)
             {
                 continue;
             }
 
-            if (existing.TryGetValue((communeId!, externalRef!), out var feeder))
+            if (feeder is not null)
             {
                 feeder.FeederName = name!;
                 feeder.Geom = geometry;
+                if (cabinet is not null)
+                {
+                    feeder.CabinetId = cabinet.Id;
+                }
+
                 Count(feeder, ref updated, ref unchanged);
                 continue;
             }
@@ -231,6 +342,7 @@ public sealed class AssetImportService(LuxMapDbContext dbContext, ICommuneScopeA
                 FeederName = name!,
                 CommuneId = communeId!,
                 Geom = geometry,
+                CabinetId = cabinet?.Id,
             };
 
             dbContext.Set<Feeder>().Add(created);

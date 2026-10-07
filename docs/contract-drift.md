@@ -1122,5 +1122,16 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | **CAB-7** | Nhóm `/assets/cabinets` (CRUD + `POST /assets/import/cabinets`, nạp trụ **trước** feeder, feeder tham chiếu `cabinet_external_ref`); `GET /map/cabinets` (bbox bắt buộc, trụ không IoT cũng hiện) | Có (endpoint mới) |
 | **CAB-8** | Hình dạng đọc (Mỹ, 07/10/2026). `GET /assets/cabinets` item: `cabinet_id, external_ref, cabinet_name, commune_id, data_source, location{lat,lng}, feeder_ids[], iot_node_id\|null, updated_at, updated_by, updated_by_name`; chi tiết `{cabinet, geom_wkt, created_at}`; `/map/cabinets` properties `cabinet_id, cabinet_name, commune_id, feeder_ids[], iot_node_id\|null`. `iot_node_id` **trần** — trạng thái thiết bị chỉ ở `/map/iot-nodes` (không hai nguồn sự thật). `feeder_ids[]` tính lúc đọc, **trong phạm vi xã của người gọi**, `[]` khi rỗng | Có (§5.3.1, endpoint mới) |
 
-**Phải báo:** WP5 (trả lời câu hỏi `has_geometry`: toạ độ tủ sẽ đến qua `cabinet.location`; màn quản lý trụ mới; lớp bản đồ trụ),
-IOT-09 / Đạt (testbed: tạo trụ trước, thiết bị gắn vào trụ). **Chưa báo.**
+**Hiện thực 07/10/2026** (nhánh `feat/CABINET-electrical-cabinet`, migration `AddElectricalCabinet`; chi tiết + bằng chứng ở
+`.ai/results/CABINET-p2.md`). Chốt thêm lúc hiện thực — đều chạm API, cùng nền SELF-SIGNED:
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **CAB-9** | Lỗi: feeder đang được thiết bị điều khiển mà đổi / tháo trụ, hoặc trụ đang mang thiết bị mà đổi sang `field` → **409 `ASSET_IN_USE`**, `details` gồm `iot_node_id` + `constraint`. Trụ của mạch khác xã với mạch → **409 `CROSS_COMMUNE_REFERENCE`** (`feeder_commune_id`, `cabinet_commune_id`). Không thêm mã lỗi mới | Có (mã lỗi, `details`) |
+| **CAB-10** | `POST /assets/feeders` nhận `cabinet_id?` (404 khi trụ không thấy được, 409 khi khác xã). Import: `kind = cabinets`, thứ tự nạp **segments → cabinets → feeders → poles → fixtures**; cột `cabinet_external_ref` tuỳ chọn ở `feeders.csv` | Có |
+| **CAB-11** | `GET /map/cabinets` theo đúng luật các lớp bản đồ khác: `bbox` bắt buộc, `commune_id` ngoài phạm vi → 403, `data_source` mặc định **loại `calibration_rig`** (§1.6) | Có |
+| **CAB-12** | Migration sinh **một trụ cho mỗi thiết bị đang có** tại đúng toạ độ cũ (`cabinet_name = 'Tủ NODE-00n'`, cùng `data_source`), gắn mạch đang được nó điều khiển vào trụ đó. Bộ mock: `CAB-001…003` ↔ `NODE-001…003` (`external_ref` `DEMO-CAB-00n`). `GET /map/iot-nodes` trả **y hệt** trước | Không (hình dạng giữ) |
+
+**Phải báo:** WP5 (trả lời câu hỏi `has_geometry`: toạ độ tủ đến qua `cabinet.location`; màn quản lý trụ mới; lớp bản đồ trụ;
+`PUT` feeder vắng `cabinet_id` = giữ), IOT-09 / Đạt (testbed: tạo trụ trước, thiết bị gắn vào trụ, rơ-le mang `cabinet_id`).
+**Chưa báo.**

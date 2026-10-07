@@ -66,6 +66,8 @@ PLAN = [
     ("app_user_commune", f"{IN_COMMUNES} AND user_id IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})",
      "user_id, commune_id"),
     ("road_segment", IN_COMMUNES, "segment_id"),
+    # CABINET: feeder and iot_node point at the cabinet, so it comes before both.
+    ("electrical_cabinet", IN_COMMUNES, "cabinet_id"),
     ("feeder", IN_COMMUNES, "feeder_id"),
     ("pole", IN_COMMUNES, "pole_id"),
     ("fixture", IN_COMMUNES, "fixture_id"),

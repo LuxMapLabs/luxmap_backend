@@ -38,6 +38,9 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
         [(typeof(UpdatePoleRequest), "note")] =
             "The engineer's note. OPTIONAL and the one field this full replacement keeps when absent: "
             + "leave the key out to keep the note, send null or blank to clear it, text (at most 1000 characters) to overwrite it.",
+        [(typeof(UpdateFeederRequest), "cabinet_id")] =
+            "The cabinet this circuit leaves from (CAB-6). OPTIONAL and KEPT when absent: leave the key out to keep the cabinet, "
+            + "send null to detach the feeder, an id to move it. A feeder a device switches cannot move or be detached (409).",
     };
 
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)

@@ -4,6 +4,9 @@ namespace LuxMap.Modules.Assets.Import;
 public enum ImportKind
 {
     Segments,
+
+    /// <summary>Main electrical cabinets (CAB-7). Before feeders: a feeder row names its cabinet.</summary>
+    Cabinets,
     Feeders,
     Poles,
     Fixtures,
@@ -12,12 +15,12 @@ public enum ImportKind
 public static class ImportKindExtensions
 {
     /// <summary>
-    /// The order the four files must be loaded in, dictated by foreign keys rather than preference:
-    /// <c>pole.segment_id</c> is NOT NULL, <c>pole.feeder_id</c> must exist if filled, and
-    /// <c>fixture.pole_id</c> is NOT NULL.
+    /// The order the five files must be loaded in, dictated by foreign keys rather than preference:
+    /// <c>feeder.cabinet_id</c> must exist if filled, <c>pole.segment_id</c> is NOT NULL,
+    /// <c>pole.feeder_id</c> must exist if filled, and <c>fixture.pole_id</c> is NOT NULL.
     /// </summary>
     public static IReadOnlyList<ImportKind> LoadOrder { get; } =
-        [ImportKind.Segments, ImportKind.Feeders, ImportKind.Poles, ImportKind.Fixtures];
+        [ImportKind.Segments, ImportKind.Cabinets, ImportKind.Feeders, ImportKind.Poles, ImportKind.Fixtures];
 }
 
 /// <summary>

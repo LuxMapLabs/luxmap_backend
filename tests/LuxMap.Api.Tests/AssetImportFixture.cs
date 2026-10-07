@@ -198,6 +198,8 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
                 "DELETE FROM feeder_control WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM iot_node WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM feeder WHERE commune_id = @c OR commune_id = @f;",
+                // CABINET: feeder and iot_node hold the cabinet with RESTRICT, so it goes after both.
+                "DELETE FROM electrical_cabinet WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM road_segment WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM notification WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR user_id = @e OR token_hash = ANY(@h);",

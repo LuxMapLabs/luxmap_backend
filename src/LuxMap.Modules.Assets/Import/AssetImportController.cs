@@ -14,7 +14,7 @@ namespace LuxMap.Modules.Assets.Import;
 /// Bulk asset import (BE-12a). NOT in Contract v1.1 — registered as drift.
 /// </summary>
 /// <remarks>
-/// Load the four kinds IN ORDER: <c>segments</c>, <c>feeders</c>, <c>poles</c>, <c>fixtures</c>.
+/// Load the five kinds IN ORDER: <c>segments</c>, <c>cabinets</c>, <c>feeders</c>, <c>poles</c>, <c>fixtures</c>.
 /// The order is foreign keys, not preference, and it enforces itself — poles uploaded before their
 /// segments fail every row with a message naming the <c>segment_external_ref</c> that matched nothing.
 /// </remarks>
@@ -37,7 +37,7 @@ public sealed class AssetImportController(AssetImportService service) : Controll
     public const int MaxUploadBytes = 10 * 1024 * 1024;
 
     /// <summary>
-    /// Uploads one file. <paramref name="kind"/> says which of the four it is.
+    /// Uploads one file. <paramref name="kind"/> says which of the five it is.
     /// </summary>
     /// <remarks>
     /// The file arrives as <c>IFormFile</c>, never as a form VALUE: <c>FormOptions.ValueLengthLimit</c>

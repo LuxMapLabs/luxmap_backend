@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,5 +21,6 @@ public sealed class TelemetryModule : ILuxMapModule
         options.Validate();
 
         services.AddSingleton(options);
+        services.AddScoped<ICabinetDeviceLookup, CabinetDeviceLookup>();
     }
 }

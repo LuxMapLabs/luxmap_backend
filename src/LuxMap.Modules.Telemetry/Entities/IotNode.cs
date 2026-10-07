@@ -1,6 +1,5 @@
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
-using NetTopologySuite.Geometries;
 
 namespace LuxMap.Modules.Telemetry.Entities;
 
@@ -11,8 +10,13 @@ namespace LuxMap.Modules.Telemetry.Entities;
 /// <para>
 /// There is NO device on individual poles (I-1): the only role left is
 /// <see cref="NodeRole.SegmentController"/>, kept under that name so the front end does not change
-/// (I-7). The device sits at the cabinet, so it has its own point (I-4) and reaches lamps through
-/// the feeders it switches — <see cref="FeederControl"/> — never through a pole column.
+/// (I-7). The device sits in a cabinet and reaches lamps through the feeders it switches —
+/// <see cref="FeederControl"/> — never through a pole column.
+/// </para>
+/// <para>
+/// <b>It has no location of its own since CAB-3.</b> The cabinet is the asset and carries the point; the
+/// device is equipment mounted on it, fitted only where the commune asks for one. Reads take the point from
+/// <c>electrical_cabinet.geom</c>.
 /// </para>
 /// <para>
 /// <c>node_status</c> is NOT stored (I-3). It is derived on read from <see cref="LastReportAt"/> and
@@ -29,8 +33,21 @@ public class IotNode : ICommuneScoped
 
     public NodeRole NodeRole { get; set; } = NodeRole.SegmentController;
 
-    /// <summary>The cabinet's location, EPSG:4326.</summary>
-    public required Point Geom { get; set; }
+    /// <summary>
+    /// The cabinet the device is mounted in (CAB-3): REQUIRED, and at most one device per cabinet
+    /// (<c>ux_iot_node_cabinet_id</c>). Same commune as the cabinet — composite foreign key.
+    /// </summary>
+    public required string CabinetId { get; set; }
+
+    /// <summary>
+    /// A copy of the cabinet's <c>data_source</c>, kept in step by <c>ON UPDATE CASCADE</c> — it exists only so
+    /// the database can refuse a device on a <c>field</c> cabinet (CAB-5, D-R10). Never <c>field</c>.
+    /// </summary>
+    /// <remarks>
+    /// Set it to the cabinet's value on insert; a wrong value is refused by
+    /// <c>fk_iot_node_cabinet_data_source</c>. Not the device's own provenance — that is <see cref="DataSource"/>.
+    /// </remarks>
+    public DataSource CabinetDataSource { get; set; }
 
     /// <summary>
     /// <c>true</c> only for the self-built testbed (D-R7): the team never operates a commune's grid,

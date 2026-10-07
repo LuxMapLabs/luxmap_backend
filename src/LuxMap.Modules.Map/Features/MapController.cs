@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace LuxMap.Modules.Map.Features;
 
 /// <summary>
-/// The map layers — <c>GET /map/poles</c>, <c>GET /map/segments</c> and <c>GET /map/iot-nodes</c>
+/// The map layers — <c>GET /map/poles</c>, <c>GET /map/segments</c>, <c>GET /map/iot-nodes</c> and <c>GET /map/cabinets</c>
 /// (BE-14, Contract sections 5.1–5.2; moved under <c>/map</c> by drift MAP-1).
 /// </summary>
 /// <remarks>
@@ -141,6 +141,31 @@ public sealed class MapController(
         CancellationToken ct)
         => Ok(await service.IotNodesAsync(
             new IotNodeMapQuery
+            {
+                Bbox = BoundingBox.Parse(bbox),
+                CommuneIds = CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
+                DataSource = WireEnum.ParseCsv<DataSource>(dataSource, "data_source"),
+            },
+            ct));
+
+    /// <summary>Electrical cabinets inside a bounding box, as a <c>FeatureCollection</c> of points (CAB-7).</summary>
+    /// <remarks>
+    /// ⚠️ SELF-SIGNED (drift CABINET), not yet in the Contract. Every cabinet, with or without a device — the
+    /// device layer stays <c>GET /map/iot-nodes</c>. Same <c>bbox</c>, <c>commune_id</c> and <c>data_source</c>
+    /// rules as the other layers: the testbed cabinet appears only when <c>calibration_rig</c> is asked for.
+    /// </remarks>
+    [HttpGet("cabinets")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<FeatureCollection<CabinetProperties>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<FeatureCollection<CabinetProperties>>> CabinetsAsync(
+        [FromQuery] string? bbox,
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "data_source")] string? dataSource,
+        CancellationToken ct)
+        => Ok(await service.CabinetsAsync(
+            new CabinetMapQuery
             {
                 Bbox = BoundingBox.Parse(bbox),
                 CommuneIds = CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
