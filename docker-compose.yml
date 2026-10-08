@@ -71,6 +71,51 @@ services:
       - "127.0.0.1:${SMTP_PORT:-1025}:1025"
       - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
+  # LIGHT-CTRL LC-12 — MQTT broker of the device channel. Profile `mqtt`: `docker compose --profile mqtt up -d emqx`; the
+  # default `docker compose up` does not start it. One node: EMQX >= 5.9 is BSL 1.1, free for a single node in production and
+  # for education. Pinned to the MANIFEST LIST digest (amd64 + arm64), same rule as MinIO.
+  #
+  # Authentication calls BACK the API (the database is the only source of device secrets, M-2) at
+  # host.docker.internal:${MQTT_CALLBACK_PORT}; the API answers with each client's ACL (M-3). No ACL file: `sources = []` and
+  # `no_match = deny`, so a client may do exactly what its answer lists. `$${...}` keeps compose from expanding EMQX's own
+  # placeholders. The dashboard (18083) and MQTT (1883, no TLS — development only, M-11) are bound to 127.0.0.1.
+  emqx:
+    image: emqx/emqx:5.10.5@sha256:9f6d5d45591f2b9fe892833e87c8a589a23ac2518cd1e9b22fee5023e0560bad
+    container_name: luxmap_emqx
+    profiles: ["mqtt"]
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      TZ: UTC
+      # `:-` defaults, never `:?`: compose interpolates EVERY service, so a required variable here would break the default
+      # `docker compose up` of anyone whose .env predates LC-12. A missing callback key sends `Broker ` — the API refuses it, so
+      # the broker then admits NOBODY (fails closed).
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: "${EMQX_DASHBOARD_PASSWORD:-luxmap_local_dev_emqx}"
+      EMQX_MQTT__MAX_PACKET_SIZE: "8KB"
+      EMQX_AUTHORIZATION__SOURCES: "[]"
+      EMQX_AUTHORIZATION__NO_MATCH: "deny"
+      EMQX_AUTHORIZATION__DENY_ACTION: "disconnect"
+      EMQX_AUTHORIZATION__CACHE__ENABLE: "false"
+      EMQX_AUTHENTICATION: >-
+        [{mechanism = password_based, backend = http, enable = true, method = post,
+        url = "http://host.docker.internal:${MQTT_CALLBACK_PORT:-5141}/api/v1/internal/mqtt/auth",
+        headers {"content-type" = "application/json", "authorization" = "Broker ${Mqtt__CallbackKey:-}"},
+        body {clientid = "$${clientid}", username = "$${username}", password = "$${password}"},
+        request_timeout = "5s"}]
+    ports:
+      - "127.0.0.1:${MQTT_PORT:-1883}:1883"
+      - "127.0.0.1:${EMQX_DASHBOARD_PORT:-18083}:18083"
+    volumes:
+      - emqx_data:/opt/emqx/data
+    healthcheck:
+      # `emqx ctl status` answers once the node is started — what `docker compose up --wait` (CI) waits on.
+      test: ["CMD", "emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   # BE-11 — object store for survey frames and repair evidence.
   #
   # Bound to 127.0.0.1 like the other two, and that is load-bearing rather than habitual: BE-11 serves
@@ -143,3 +188,5 @@ volumes:
 
   minio_data:
     name: luxmap_minio_data
+  emqx_data:
+    name: luxmap_emqx_data

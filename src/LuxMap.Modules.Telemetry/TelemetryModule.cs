@@ -27,6 +27,27 @@ public sealed class TelemetryModule : ILuxMapModule
         lighting.Validate();
         services.AddSingleton(lighting);
         services.AddScoped<Lighting.LightingCommandService>();
+
+        // LC-12: the MQTT device channel. Options are always bound (the broker callback reads its key); the transport runs, and
+        // the options must be complete, only when it is THE channel (M-10).
+        var mqtt = configuration.GetSection(Mqtt.MqttOptions.SectionName).Get<Mqtt.MqttOptions>() ?? new Mqtt.MqttOptions();
+        services.AddSingleton(mqtt);
+        services.AddSingleton<Mqtt.LightingScopeFactory>();
+        services.AddSingleton<Mqtt.MqttLightingHandler>();
+        if (lighting.Channel == Lighting.LightingOptions.Mqtt)
+        {
+            mqtt.Validate();
+            services.AddHostedService<Mqtt.MqttLightingChannel>();
+        }
+
+        if (mqtt.AdminUrl is not null)
+        {
+            services.AddHttpClient<Mqtt.IMqttBrokerAdmin, Mqtt.EmqxBrokerAdmin>(client => client.Timeout = TimeSpan.FromSeconds(5));
+        }
+        else
+        {
+            services.AddSingleton<Mqtt.IMqttBrokerAdmin, Mqtt.NoMqttBrokerAdmin>();
+        }
         services.AddScoped<ICabinetDeviceLookup, CabinetDeviceLookup>();
         services.AddScoped<Registry.IotNodeRegistryService>();
     }

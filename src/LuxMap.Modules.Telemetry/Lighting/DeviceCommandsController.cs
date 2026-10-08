@@ -19,7 +19,7 @@ namespace LuxMap.Modules.Telemetry.Lighting;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/device/commands")]
 [Authorize(Policy = DeviceAuth.Policy)]
-public sealed class DeviceCommandsController(LightingCommandService service) : ControllerBase
+public sealed class DeviceCommandsController(LightingCommandService service, LightingOptions options) : ControllerBase
 {
     /// <summary>
     /// This device's open commands, newest per relay — delivered again until acknowledged or expired; drop duplicates by
@@ -29,7 +29,7 @@ public sealed class DeviceCommandsController(LightingCommandService service) : C
     [ProducesResponseType<DeviceCommandBatch>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<DeviceCommandBatch>> PollAsync(CancellationToken ct)
-        => Ok(await service.PollAsync(NodeId, ct));
+        => HttpChannel ? Ok(await service.PollAsync(NodeId, ct)) : NotFound();
 
     /// <summary>Reports the outcome AFTER executing. A repeat of the same report is 200; a closed command is 409 <c>COMMAND_CLOSED</c>.</summary>
     [HttpPost("{commandId}/ack")]
@@ -39,7 +39,10 @@ public sealed class DeviceCommandsController(LightingCommandService service) : C
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<DeviceAckResult>> AckAsync(string commandId, [FromBody] DeviceAckRequest ack, CancellationToken ct)
-        => Ok(await service.AckAsync(NodeId, commandId, ack, ct));
+        => HttpChannel ? Ok(await service.AckAsync(NodeId, commandId, ack, ct)) : NotFound();
+
+    /// <summary>LC-12 M-10: one channel at a time — with <c>Lighting:Channel = mqtt</c> these endpoints do not exist for a device.</summary>
+    private bool HttpChannel => options.Channel == LightingOptions.Http;
 
     private string NodeId => User.FindFirst(DeviceAuth.NodeIdClaim)?.Value
         ?? throw new InvalidOperationException("The DeviceOnly policy admitted a principal without a node id.");

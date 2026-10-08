@@ -33,7 +33,8 @@ namespace LuxMap.Modules.Telemetry.Registry;
 /// (<c>fk_feeder_control_feeder_same_cabinet</c>), never field data (<c>ck_iot_node_data_source_not_field</c>).
 /// </para>
 /// </remarks>
-public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider clock, LightingCommandService lighting)
+public sealed class IotNodeRegistryService(
+    LuxMapDbContext db, TimeProvider clock, LightingCommandService lighting, Mqtt.IMqttBrokerAdmin broker)
 {
     /// <summary>Relays a pilot device may number. The CHECK only asks <c>relay_no &gt; 0</c>; this keeps a typo off the table.</summary>
     public const int MaxRelayNo = 32;
@@ -136,6 +137,9 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
                 "That device still has relays wired or commands recorded, so it cannot be deleted. Unwire its relays first.",
                 new Dictionary<string, object?> { ["constraint"] = postgres.ConstraintName, ["table"] = postgres.TableName });
         }
+
+        // M-15: a deleted device keeps no open session.
+        await broker.DisconnectAsync(nodeId, ct);
     }
 
     /// <summary>
@@ -255,6 +259,9 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
         node.CredentialSetAt = now;
         node.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
+
+        // LC-12 M-15: the broker checks a password only at connect — close the session the OLD secret opened.
+        await broker.DisconnectAsync(node.NodeId, ct);
 
         return new IotNodeCredential(node.NodeId, secret, now);
     }
