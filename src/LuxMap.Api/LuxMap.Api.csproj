@@ -18,6 +18,7 @@
     <ProjectReference Include="..\LuxMap.Modules.Sync\LuxMap.Modules.Sync.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Statistics\LuxMap.Modules.Statistics.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Admin\LuxMap.Modules.Admin.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.AI\LuxMap.Modules.AI.csproj" />
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
     <ProjectReference Include="..\LuxMap.Infrastructure.Storage\LuxMap.Infrastructure.Storage.csproj" />
     <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
