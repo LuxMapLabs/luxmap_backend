@@ -48,4 +48,28 @@
     <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      ⚠️ TEMPORARY — the five SixLabors.ImageSharp 3.1.12 advisories published 07/10/2026. The only fix is 4.1.2, and 4.x
+      refuses a Release build without a SixLaborsLicenseKey (CLAUDE.md, BE-11 — the key has to be obtained FIRST). Until
+      then `dotnet restore -warnaserror` fails every PR, so these five, and ONLY these five, are suppressed by id.
+
+      Why that is acceptable for now — every image this API decodes goes through ThumbnailFactory.JpegOnly, a
+      configuration with the JPEG module alone, after a FF D8 FF magic-byte check:
+        GHSA-j3p4-wp97-rph4  HistogramEqualization            — never called
+        GHSA-jjfr-hcj7-qf5w  TIFF CCITT T6 encoder            — the API only encodes JPEG
+        GHSA-j9gm-c75j-xc9q  TIFF CCITT T4 encoder            — the API only encodes JPEG
+        GHSA-wmxv-xphr-5c9g  BigTIFF decoder loop             — no TIFF decoder is registered
+        GHSA-gwg2-r3hj-4w44  ICC CLUT parsing allocation      — needs IccProfile.Entries, which nothing reads
+
+      🔴 That reasoning holds only while it stays TRUE: any new decode path must use the JPEG-only configuration and never
+      Image.Load with the default one. Remove this block when ImageSharp moves to 4.1.2 or later.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-wmxv-xphr-5c9g" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gwg2-r3hj-4w44" />
+  </ItemGroup>
+
 </Project>

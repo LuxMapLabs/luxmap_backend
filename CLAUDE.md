@@ -591,6 +591,11 @@ Dòng release OSS đứng yên ở `RELEASE.2025-09-07` ⇒ đây là **hoãn, k
   `The_thumbnail_carries_no_gps_so_a_widely_served_object_cannot_leak_capture_locations`; test đó
   **không phải chuyện dọn dẹp metadata**, đừng xoá khi refactor.
 
+- 🔴 **Năm advisory của ImageSharp 3.1.12 đang được TẮT theo mã (08/10/2026, `Directory.Build.props`)** — bản vá chỉ có ở
+  4.1.2, mà 4.x cần license key (gạch dưới). Chấp nhận được **CHỈ VÌ** mọi lần decode đi qua cấu hình chỉ-JPEG
+  (`ThumbnailFactory.JpegOnly`, sau kiểm `FF D8 FF`): TIFF / histogram / ICC không có đường tới. `Image.Load(stream)` không kèm
+  `DecoderOptions` dùng `Configuration.Default` (mọi codec) và **phá đúng tiền đề đó** — `JpegOnlyDecodeTests` đỏ. Lên 4.1.2 thì
+  gỡ khối suppress.
 - **Ghim ImageSharp ở 3.x.** Từ 4.x, task validate lúc build đòi `SixLaborsLicenseKey`, và
   `ContinueOnError="$(Configuration.StartsWith('Debug'))"` nghĩa là Debug chỉ cảnh báo còn
   **Release/CI/deploy GÃY**. Điều khoản Split License không đổi; chỉ khác cái cổng kiểm key. Muốn lên
