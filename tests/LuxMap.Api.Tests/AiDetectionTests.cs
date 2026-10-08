@@ -103,6 +103,48 @@ public sealed class AiDetectionTests(ScopeTestFixture factory)
         Assert.NotEqual(detector.Artifact.Version, stricter.Artifact.Version);
     }
 
+    /// <summary>
+    /// Codex review: a box running to the right / bottom edge must still pass <see cref="DetectorValidation"/> — computed in float,
+    /// x = 128 / 640 plus width 512 / 640 summed above 1 and the whole frame was thrown away.
+    /// </summary>
+    [Theory]
+    [InlineData(128f, 640f, 640)]
+    [InlineData(0.1f, 1919.9f, 1920)]
+    [InlineData(333.3f, 1000f, 1000)]
+    [InlineData(1f, 7f, 7)]
+    public void A_box_touching_the_edge_normalises_into_the_unit_square(float from, float to, int size)
+    {
+        var detection = new DetectionResult
+        {
+            ClassId = 1, ClassName = "out", Confidence = 0.8f,
+            BoundingBox = new BoundingBox { X1 = from, Y1 = from, X2 = to, Y2 = to },
+        };
+
+        var prediction = YoloOnOffDetector.Normalise(0, detection, size, size);
+        var frame = new FrameInput("r", "f", [], size, size, "v");
+        DetectorValidation.Validate(frame, new DetectorOutput("r", "f", "v", size, size, [prediction], "{}"));
+
+        Assert.Equal("off", prediction.Label);
+        Assert.True(prediction.X + prediction.Width <= 1 && prediction.Y + prediction.Height <= 1);
+    }
+
+    [Fact]
+    public async Task A_corrupt_jpeg_is_a_415_too_many_pixels_a_400_and_a_cancelled_call_stops()
+    {
+        var model = factory.Services.GetRequiredService<YoloModel>();
+        var corrupt = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4, 5, 6, 7, 8 };
+
+        var bad = await Assert.ThrowsAsync<LuxMap.Shared.Http.LuxMapException>(() => model.DetectAsync(new MemoryStream(corrupt), CancellationToken.None));
+        Assert.Equal("UNSUPPORTED_IMAGE_FORMAT", bad.Code);
+
+        using var small = new YoloModel(model.Options with { MaxPixels = 100 });
+        var big = await Assert.ThrowsAsync<LuxMap.Shared.Http.LuxMapException>(() => small.DetectAsync(new MemoryStream(NightImage(64, 64)), CancellationToken.None));
+        Assert.Equal("VALIDATION_FAILED", big.Code);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => model.DetectAsync(new MemoryStream(NightImage(64, 64)), new CancellationToken(canceled: true)));
+    }
+
     /// <summary><c>SurveyProcessing:Frames:Detector = yolo</c> makes the pipeline use this model (BE-15 §6).</summary>
     [Fact]
     public void Choosing_yolo_makes_the_survey_pipeline_use_the_model()

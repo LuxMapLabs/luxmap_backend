@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using LuxMap.Modules.AI.DTOs;
 using LuxMap.Modules.Survey.Processing;
 using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Shared.Http;
@@ -55,6 +56,33 @@ public sealed class YoloOnOffDetector : IOnOffDetector
 
     public MediaArtifact Artifact { get; }
 
+    /// <summary>
+    /// Pixel corners → top-left + size in [0, 1], in DOUBLE throughout. Codex review: computed in float, a box from x = 128 to the
+    /// right edge of a 640-wide frame gave x = 0.20000000298 and width 0.8 — a sum above 1, and the pipeline's validation
+    /// threw away the whole frame.
+    /// </summary>
+    public static Prediction Normalise(int itemNo, DetectionResult detection, int width, int height)
+    {
+        var box = detection.BoundingBox;
+        var (x, w) = Span(box.X1, box.X2, width);
+        var (y, h) = Span(box.Y1, box.Y2, height);
+        return new Prediction(itemNo, Labels[detection.ClassName], detection.Confidence, x, y, w, h);
+    }
+
+    private static (double Start, double Length) Span(float from, float to, int size)
+    {
+        var start = Math.Clamp((double)from / size, 0, 1);
+        var length = Math.Min(((double)to - from) / size, 1 - start);
+
+        // start + (1 - start) can still round one ulp above 1.
+        while (start + length > 1)
+        {
+            length = Math.BitDecrement(length);
+        }
+
+        return (start, length);
+    }
+
     public async Task<DetectorOutput> DetectAsync(FrameInput frame, CancellationToken ct)
     {
         YoloResult result;
@@ -68,14 +96,9 @@ public sealed class YoloOnOffDetector : IOnOffDetector
             throw new ProcessingFailure("DETECTOR_ERROR", "detector");
         }
 
-        var predictions = result.Detections.Select((detection, index) =>
-        {
-            var box = detection.BoundingBox;
-            var x = box.X1 / result.Width;
-            var y = box.Y1 / result.Height;
-            return new Prediction(index, Labels[detection.ClassName], detection.Confidence, x, y,
-                Math.Min((double)box.Width / result.Width, 1 - x), Math.Min((double)box.Height / result.Height, 1 - y));
-        }).ToArray();
+        var predictions = result.Detections
+            .Select((detection, index) => Normalise(index, detection, result.Width, result.Height))
+            .ToArray();
 
         return DetectorValidation.Validate(frame, new DetectorOutput(frame.RequestId, frame.FrameId, Artifact.Version,
             result.Width, result.Height, predictions,

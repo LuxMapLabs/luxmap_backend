@@ -92,6 +92,21 @@ public sealed partial class YoloModel : IDisposable
         await JpegMagicBytes.EnsureJpegAsync(jpeg, ct);
         jpeg.Position = 0;
 
+        // The gate covers decoding and resizing too, not only inference: a 40 MP decode is the expensive part of a large upload
+        // (Codex review). The signature check above is cheap and stays outside.
+        await gate.WaitAsync(ct);
+        try
+        {
+            return await DecodeAndRunAsync(jpeg, ct);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<YoloResult> DecodeAndRunAsync(Stream jpeg, CancellationToken ct)
+    {
         var decoder = new DecoderOptions { Configuration = ThumbnailFactory.JpegOnly };
         Image<Rgb24> image;
         try
@@ -119,7 +134,6 @@ public sealed partial class YoloModel : IDisposable
             var box = Letterbox.For(image.Width, image.Height, InputSize);
             var tensor = ToTensor(image, box);
 
-            await gate.WaitAsync(ct);
             try
             {
                 using var run = new RunOptions();
@@ -133,10 +147,6 @@ public sealed partial class YoloModel : IDisposable
             catch (OnnxRuntimeException) when (ct.IsCancellationRequested)
             {
                 throw new OperationCanceledException(ct);
-            }
-            finally
-            {
-                gate.Release();
             }
         }
     }
