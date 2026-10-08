@@ -414,6 +414,9 @@
     </table>
   </div>
 
+  <h2>CI — advisory ImageSharp 3.1.12, 08/10/2026</h2>
+  <div class="card"><p><span class="tag t-next">Tạm — chờ license key để lên 4.1.2</span> 07/10 GitHub công bố 5 advisory (3 high) cho ImageSharp ≤ 4.1.1; <code>dotnet restore -warnaserror</code> làm đỏ MỌI PR. Bản vá chỉ ở 4.1.2, mà 4.x cần <code>SixLaborsLicenseKey</code>. Mỹ chọn tắt đúng 5 mã (<code>Directory.Build.props</code>) — hợp lệ vì mọi decode đi qua cấu hình chỉ-JPEG; <code>JpegOnlyDecodeTests</code> canh tiền đề đó. <strong>Còn:</strong> xin license key Six Labors → lên 4.1.2 → gỡ suppress.</p></div>
+
   <h2>LIGHT-CTRL — điều khiển ON/OFF/AUTO testbed + đăng ký thiết bị, 08/10/2026</h2>
   <div class="card"><p><span class="tag t-next">2a đã merge (PR #116) + sửa review Codex (6 điểm) chờ PR; 2b chưa làm</span> Phiếu cam kết không điều kiện (dòng 101, 264). Phase 1 qua Codex review (10 phát hiện, áp hết) + tham vấn quyết định — Mỹ uỷ quyền, chốt LC-1…LC-10 (SELF-SIGNED): dịch vụ lệnh độc lập kênh, adapter poll HTTPS trước (kênh cuối chờ Đạt); <code>seq</code> do server cấp chống chạy lại lệnh cũ; Phase 2 hai PR. <strong>2a</strong> ở <code>feat/LIGHT-CTRL-2a</code>: scheme <code>Device</code> + policy <code>DeviceOnly</code> (bí mật riêng mỗi thiết bị, chỉ lưu băm, principal đúng một xã, không role), <code>/assets/iot-nodes</code> (đăng ký, nối rơ-le cùng trụ, cấp/xoay bí mật). 1238/1238 xanh, phá thử 3 luật đỏ đúng test. Còn: Codex review code, 2b lệnh, báo Đạt (hợp đồng firmware) + WP5 (thay nút ON/OFF mô phỏng). Chi tiết <code>.ai/results/LIGHT-CTRL-p2a.md</code>.</p></div>
 
