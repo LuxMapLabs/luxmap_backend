@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <!-- JpegMagicBytes + ThumbnailFactory.JpegOnly: the one sanctioned way to decode an upload (BE-11 rule 5). -->
+    <ProjectReference Include="..\LuxMap.Infrastructure.Storage\LuxMap.Infrastructure.Storage.csproj" />
+    <!-- IOnOffDetector lives in the survey pipeline (BE-15 §6); Survey never references AI, so no cycle. -->
+    <ProjectReference Include="..\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Models\best.onnx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

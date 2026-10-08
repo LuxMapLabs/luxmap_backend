@@ -358,6 +358,100 @@
         "x-luxmap-client": "web"
       }
     },
+    "/api/v1/ai/detect": {
+      "post": {
+        "tags": [
+          "Ai"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "image": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDetectResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDetectResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDetectResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_surveys",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/assets/import/{kind}": {
       "post": {
         "tags": [
@@ -8697,6 +8791,40 @@
         },
         "additionalProperties": false
       },
+      "AiDetectResponse": {
+        "required": [
+          "count",
+          "detections",
+          "height",
+          "model_version",
+          "width"
+        ],
+        "type": "object",
+        "properties": {
+          "model_version": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "detections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DetectionResult"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ApiError": {
         "type": "object",
         "properties": {
@@ -8770,6 +8898,38 @@
           "expires_in": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BoundingBox": {
+        "type": "object",
+        "properties": {
+          "x1": {
+            "type": "number",
+            "format": "float"
+          },
+          "y1": {
+            "type": "number",
+            "format": "float"
+          },
+          "x2": {
+            "type": "number",
+            "format": "float"
+          },
+          "y2": {
+            "type": "number",
+            "format": "float"
+          },
+          "width": {
+            "type": "number",
+            "format": "float",
+            "readOnly": true
+          },
+          "height": {
+            "type": "number",
+            "format": "float",
+            "readOnly": true
           }
         },
         "additionalProperties": false
@@ -9583,6 +9743,26 @@
           "simulated"
         ],
         "type": "string"
+      },
+      "DetectionResult": {
+        "type": "object",
+        "properties": {
+          "class_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "class_name": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "bounding_box": {
+            "$ref": "#/components/schemas/BoundingBox"
+          }
+        },
+        "additionalProperties": false
       },
       "DeviceAckRequest": {
         "required": [
@@ -13890,6 +14070,9 @@
   "tags": [
     {
       "name": "AdminUsers"
+    },
+    {
+      "name": "Ai"
     },
     {
       "name": "AssetImport"

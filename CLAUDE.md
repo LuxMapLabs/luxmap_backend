@@ -1944,3 +1944,17 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   (`/api/v1/device/` khai scheme `Device`, không capability). Thêm endpoint thiết bị = sửa cả hai, nhìn thấy trong diff.
 - Teardown: `lighting_command` → `lighting_request` **trước** `feeder_control`, `iot_node`, `feeder` và tài khoản (đều `Restrict`).
   Rollback `AddLightingCommands` gãy khi `audit_event` đã có giá trị mới (`system`, `lighting_*`, …) — cùng họ BE-19.
+
+### AI-1 — model YOLO trong backend (08/10/2026)
+
+- **Một model, hai lối vào:** `YoloModel` (singleton, nạp lúc dùng lần đầu) phục vụ cả `YoloOnOffDetector` (pipeline khảo sát,
+  keyed `IOnOffDetector` khoá `"yolo"` — Survey **không** tham chiếu AI) lẫn `POST /ai/detect`. Đừng viết lối decode / tiền xử lý thứ hai.
+- 🔴 **Decode chỉ qua `JpegMagicBytes` + `ThumbnailFactory.JpegOnly`** — tiền đề để tắt advisory ImageSharp. Bản #118 decode bằng
+  cấu hình mặc định và tin `Content-Type`; `JpegOnlyDecodeTests` giờ đỏ nếu ai viết lại như vậy.
+- **Model được KIỂM lúc nạp:** input `[1,3,640,640]`, output `[1,6,N]`, metadata `names` đúng `normal, out` theo thứ tự, SHA-256
+  khớp `Ai:ModelSha256`. Đổi model = đổi mã ghim trong cùng PR. Tiền xử lý theo Ultralytics: xoay EXIF, letterbox xám 114,
+  resize **bilinear** (`KnownResamplers.Triangle` — mặc định của ImageSharp là bicubic, lệch với `cv2.INTER_LINEAR`).
+- **`artifact_version` của detector băm cả ngưỡng + tiền xử lý + ánh xạ lớp**, không chỉ file model: đổi ngưỡng mà giữ phiên bản
+  là làm mất truy vết BE-34. Test canh: `As_the_survey_detector_its_output_passes_the_pipeline_validation`.
+- Không có ảnh đèn thật trong test ⇒ test **không** khẳng định model phát hiện được gì; chúng canh hợp đồng (nhãn, bbox, phiên bản,
+  validation) và hậu xử lý trên tensor dựng tay. Độ chính xác là việc của WP4.

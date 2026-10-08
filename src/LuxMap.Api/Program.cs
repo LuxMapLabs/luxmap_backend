@@ -1,4 +1,5 @@
 using LuxMap.Modules.Admin;
+using LuxMap.Modules.AI;
 using LuxMap.Modules.Assets;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Identity;
@@ -50,6 +51,7 @@ ILuxMapModule[] modules =
     new NotificationsModule(),
     new SyncModule(),
     new StatisticsModule(),
+    new AIModule(),
 ];
 
 // BE-00 — Contract v1.1 section 0 JSON conventions (snake_case, lowercase string enums, ISO 8601 UTC with Z).
