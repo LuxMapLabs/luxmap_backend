@@ -70,7 +70,8 @@ public sealed class ExceptionHandlingMiddleware(
         string code,
         string message,
         IReadOnlyDictionary<string, object?> details,
-        CorrelationIdHolder correlation)
+        CorrelationIdHolder correlation,
+        string? challenge = null)
     {
         if (context.Response.HasStarted)
         {
@@ -86,6 +87,12 @@ public sealed class ExceptionHandlingMiddleware(
 
         context.Response.Clear();
         context.Response.StatusCode = (int)statusCode;
+        if (challenge is not null)
+        {
+            // Clear() just dropped every header, the challenge with them; a caller that must keep one says so.
+            context.Response.Headers.WWWAuthenticate = challenge;
+        }
+
         await context.Response.WriteAsJsonAsync(ApiErrorResponse.Create(code, message, payload));
     }
 }

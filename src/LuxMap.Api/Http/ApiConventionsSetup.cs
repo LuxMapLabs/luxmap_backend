@@ -1,5 +1,6 @@
 using System.Net;
 using Asp.Versioning;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
@@ -155,6 +156,17 @@ public static class ApiPipelineSetup
             code,
             message,
             ApiError.NoDetails,
-            correlation);
+            correlation,
+            DeviceChallenge(response));
     }
+
+    /// <summary>
+    /// Keeps the device scheme's bare challenge through the rewrite (LIGHT-CTRL, RFC 9110 §11.6.1). ONLY that one: JwtBearer's
+    /// challenge carries <c>error_description</c> ("the token expired", "the signature key was not found"), the very cause that
+    /// <see cref="ErrorCodes.Unauthenticated"/> refuses to split — so a user's 401 stays without it, as before.
+    /// </summary>
+    private static string? DeviceChallenge(HttpResponse response)
+        => response.StatusCode == StatusCodes.Status401Unauthorized && response.Headers.WWWAuthenticate == DeviceAuth.Scheme
+            ? DeviceAuth.Scheme
+            : null;
 }
