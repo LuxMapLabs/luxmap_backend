@@ -192,6 +192,39 @@ public sealed class DeviceRegistryTests(AssetImportFixture fixture, DeviceProbeF
         Assert.DoesNotContain(secret, row.GetRawText(), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// RFC 9110 §11: the scheme word is case-insensitive and 1*SP may follow it — firmware spelling it <c>device</c> must not be
+    /// locked out. Whitespace INSIDE the credential, or a second credential, is still malformed.
+    /// </summary>
+    [Fact]
+    public async Task The_scheme_word_is_case_insensitive_and_extra_spaces_are_allowed_but_not_inside_the_credential()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var node = await CreateNodeAsync(client, await NewCabinetAsync(fixture.CommuneId), "calibration_rig", remote: true);
+        var secret = await IssueAsync(client, node);
+
+        foreach (var header in new[] { $"Device {node}.{secret}", $"device {node}.{secret}", $"DEVICE   {node}.{secret}" })
+        {
+            Assert.True((await RawProbeAsync(header)).StatusCode == HttpStatusCode.OK, header.Split(' ')[0]);
+        }
+
+        foreach (var header in new[] { $"Device {node}. {secret}", $"Device {node}.{secret} {node}.{secret}", $"Device{node}.{secret}", "Device " })
+        {
+            Assert.Equal(HttpStatusCode.Unauthorized, (await RawProbeAsync(header)).StatusCode);
+        }
+    }
+
+    /// <summary>A 401 from a device endpoint names the scheme it wants (RFC 9110 §11.6.1), and still carries the error envelope.</summary>
+    [Fact]
+    public async Task A_refused_device_gets_a_device_challenge_and_the_error_envelope()
+    {
+        var response = await RawProbeAsync("Device NODE-999999.wrong");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(["Device"], response.Headers.WwwAuthenticate.Select(challenge => challenge.Scheme).ToArray());
+        Assert.Equal("UNAUTHENTICATED", (await ErrorAsync(response)).GetProperty("code").GetString());
+    }
+
     [Fact]
     public async Task Every_wrong_credential_is_the_same_401_and_a_rotated_secret_stops_working()
     {
@@ -236,6 +269,14 @@ public sealed class DeviceRegistryTests(AssetImportFixture fixture, DeviceProbeF
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>The header exactly as given — <see cref="AuthenticationHeaderValue"/> would normalise the spacing.</summary>
+    private async Task<HttpResponseMessage> RawProbeAsync(string header)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, Probe);
+        Assert.True(request.Headers.TryAddWithoutValidation("Authorization", header));
+        return await probe.CreateClient().SendAsync(request);
+    }
 
     private Task<HttpResponseMessage> ProbeAsync(string credential)
     {

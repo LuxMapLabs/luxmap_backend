@@ -1904,5 +1904,12 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   bí mật chỉ xuất hiện đúng một lần trong response cấp / xoay.
 - **Nối rơ-le khoá hàng `iot_node`** (`SELECT 1 … FOR UPDATE` rồi mới đọc qua filter); lệnh điều khiển (2b) phải lấy **cùng** khoá.
   Nối lại một rơ-le = xoá dòng `feeder_control` cũ + chèn dòng mới trong một `SaveChanges` (EF xoá trước, chèn sau — canh bằng test).
+- **Header theo RFC 9110:** chữ `Device` không phân biệt hoa thường, sau nó 1+ dấu cách; credential không chứa khoảng trắng.
+- 🔴 **`ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` ⇒ xoá `WWW-Authenticate`.** Trang 401 chỉ giữ lại challenge
+  **trần** của scheme `Device` (`ApiConventionsSetup.DeviceChallenge`). **Đừng "sửa cho đều" thành giữ mọi challenge:** challenge
+  của JwtBearer mang `error_description` (token hết hạn, sai khoá ký…) — đúng nguyên nhân mà `UNAUTHENTICATED` cố ý không tách.
+- **Khoá hàng sau khi đã scope:** đọc thiết bị qua filter xã TRƯỚC, rồi mới `FOR UPDATE` theo `node_id` **và** `commune_id` — khoá
+  trước thì Quản lý xã khác chờ / đo được khoá của thiết bị ngoài phạm vi. Hàng `feeder` không nằm dưới khoá đó, nên đua chuyển trụ
+  được FK DB chặn và service **dịch lại thành 409** (`fk_feeder_control_feeder_same_cabinet`, `pk_feeder_control`), không để 500.
 - **Controller test cần xác thực không được nằm trong `TestEndpointsController`** (`[AllowAnonymous]` cấp class thắng). Khuôn:
   `DeviceProbeController` + `DeviceProbeFactory` (host riêng, cùng DB) — không thêm ApplicationPart vào `AssetImportFixture` dùng chung.

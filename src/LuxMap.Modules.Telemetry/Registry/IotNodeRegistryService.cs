@@ -138,11 +138,18 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
                 $"relay_no must be between 1 and {MaxRelayNo}.", new Dictionary<string, object?> { ["relay_no"] = relayNo });
         }
 
+        // Scope FIRST, through the commune filter: a device of another commune is a 404 before any lock is taken, so a manager
+        // can neither wait on nor time the lock of a device outside their scope (Codex review P2).
+        var commune = await db.Set<IotNode>().AsNoTracking()
+            .Where(candidate => candidate.NodeId == nodeId)
+            .Select(candidate => candidate.CommuneId)
+            .FirstOrDefaultAsync(ct) ?? throw NotFound("device");
+
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        // Lock first, read after: the read below still goes through the commune filter, so a device out of scope is a 404
-        // whether or not this matched a row.
-        await db.Database.ExecuteSqlRawAsync("SELECT 1 FROM iot_node WHERE node_id = {0} FOR UPDATE", [nodeId], ct);
+        // Lock, then read again under the lock (the FaultLocks shape).
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM iot_node WHERE node_id = {0} AND commune_id = {1} FOR UPDATE", [nodeId, commune], ct);
         var node = await RequireAsync(nodeId, ct);
 
         var current = await db.Set<FeederControl>()
@@ -208,7 +215,25 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
 
         // Removal and insert in one SaveChanges: EF deletes before it inserts, so re-wiring relay N keeps
         // ux_feeder_control_node_id_relay_no satisfied.
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (Constraint(failure) is CabinetConstraints.RelayFeederSameCabinet or "pk_feeder_control")
+        {
+            // The feeder was moved to another cabinet, or taken by another device's relay, between the checks above and the
+            // insert — the feeder row is not under this device's lock. The database settled it; answer like the checks would.
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            throw Constraint(failure) == "pk_feeder_control"
+                ? new LuxMapException(ErrorCodes.AssetInUse, HttpStatusCode.Conflict,
+                    "That feeder was just wired to another relay. Unwire it there first.",
+                    new Dictionary<string, object?> { ["feeder_id"] = feederId })
+                : new LuxMapException(ErrorCodes.FeederNotInCabinet, HttpStatusCode.Conflict,
+                    "That feeder no longer leaves from this device's cabinet.",
+                    new Dictionary<string, object?> { ["feeder_id"] = feederId, ["device_cabinet_id"] = node.CabinetId });
+        }
+
         await transaction.CommitAsync(ct);
     }
 
