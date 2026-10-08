@@ -229,16 +229,67 @@ public sealed class LightingCommandService(
     /// expired, so a lost response loses nothing; the firmware drops duplicates by <c>command_id</c>. Only the first delivery
     /// changes the status. Also proves the control channel alive (<c>last_report_at</c>, D-5).
     /// </summary>
-    public async Task<DeviceCommandBatch> PollAsync(string nodeId, CancellationToken ct)
+    public Task<DeviceCommandBatch> PollAsync(string nodeId, CancellationToken ct)
+        => DeliverableAsync(nodeId, markDelivered: true, touch: true, ct);
+
+    /// <summary>
+    /// The MQTT channel's view of the same set (LC-12, M-4/M-5): the device's open commands, newest per relay, to (re)publish.
+    /// Unlike the poll it marks NOTHING delivered — the device's <c>receipt</c> does — and proves nothing about the device being
+    /// alive. Expiry and supersession are stored exactly as in the poll.
+    /// </summary>
+    public async Task<IReadOnlyList<DeviceCommand>> DispatchAsync(string nodeId, CancellationToken ct)
+        => (await DeliverableAsync(nodeId, markDelivered: false, touch: false, ct)).Commands;
+
+    /// <summary>
+    /// M-5: the device says it received a command (MQTT <c>receipt</c>) — <c>pending → delivered</c>, once. A repeat, or a receipt
+    /// for a command already further along, changes nothing. Returns whether this receipt moved it.
+    /// </summary>
+    public async Task<bool> ReceiptAsync(string nodeId, string commandId, long seq, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (!await db.Set<LightingCommand>().AnyAsync(command => command.CommandId == commandId && command.NodeId == nodeId, ct))
+        {
+            throw CommandNotFound();
+        }
+
+        await LockDeviceAsync(nodeId, ct);
+        var now = Now();
+        await ExpireStaleAsync([nodeId], now, ct);
+        var command = await db.Set<LightingCommand>().SingleAsync(row => row.CommandId == commandId, ct);
+        if (seq != command.Seq)
+        {
+            throw Invalid("seq", "seq is not this command's seq.");
+        }
+
+        var moved = command.Status == LightingCommandStatus.Pending;
+        if (moved)
+        {
+            await MarkDeliveredAsync(command, now, ct);
+        }
+
+        await TouchLockedAsync(nodeId, now, ct);
+        await transaction.CommitAsync(ct);
+        return moved;
+    }
+
+    /// <summary>M-8: a heartbeat — the control channel is alive. <c>last_report_at</c> only moves forward.</summary>
+    public async Task TouchAsync(string nodeId, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await LockDeviceAsync(nodeId, ct);
+        await TouchLockedAsync(nodeId, Now(), ct);
+        await transaction.CommitAsync(ct);
+    }
+
+    private async Task<DeviceCommandBatch> DeliverableAsync(string nodeId, bool markDelivered, bool touch, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var node = await LockDeviceAsync(nodeId, ct);
         var now = Now();
 
-        if (node.LastReportAt is not { } last || last < now)
+        if (touch)
         {
-            node.LastReportAt = now;
-            await db.SaveChangesAsync(ct);
+            await TouchLockedAsync(nodeId, now, ct);
         }
 
         await ExpireStaleAsync([nodeId], now, ct);
@@ -270,14 +321,9 @@ public sealed class LightingCommandService(
                 continue;
             }
 
-            if (command.Status == LightingCommandStatus.Pending)
+            if (markDelivered && command.Status == LightingCommandStatus.Pending)
             {
-                command.Status = LightingCommandStatus.Delivered;
-                command.DeliveredAt = now;
-                audit.Record(new AuditChange(now, AuditActorKind.Iot, null, null, command.CommuneId,
-                    AuditEntityType.LightingCommand, command.CommandId, AuditAction.Delivered,
-                    new { status = LightingCommandStatus.Pending }, new { status = command.Status, node_id = nodeId, command.Seq }));
-                await db.SaveChangesAsync(ct);
+                await MarkDeliveredAsync(command, now, ct);
             }
 
             delivered.Add(new DeviceCommand(command.CommandId, command.Seq, command.RelayNo, command.RequestedMode, command.ExpiresAt));
@@ -291,10 +337,21 @@ public sealed class LightingCommandService(
     /// The device's report after executing (3.4). A repeat of the same report is 200 with no change; a different one is 409.
     /// A report on a closed command is 409 <c>COMMAND_CLOSED</c> but is still KEPT, and its mode still written when newer.
     /// </summary>
-    public async Task<DeviceAckResult> AckAsync(string nodeId, string commandId, DeviceAckRequest ack, CancellationToken ct)
+    public async Task<DeviceAckResult> AckAsync(
+        string nodeId, string commandId, DeviceAckRequest ack, CancellationToken ct, bool deliverIfPending = false)
     {
-        var result = ack.Result!.Value;
+        // Checked HERE, not only by the controller's annotations: the MQTT channel calls this with no controller in between.
+        if (ack.Seq is null || ack.Result is not { } result)
+        {
+            throw Invalid(ack.Seq is null ? "seq" : "result", "seq and result are required.");
+        }
+
         var error = string.IsNullOrWhiteSpace(ack.Error) ? null : ack.Error.Trim();
+        if (error is { Length: > 500 })
+        {
+            throw Invalid("error", "error is at most 500 characters.");
+        }
+
         if (result == LightingAckResult.Applied && ack.ReportedMode is null)
         {
             throw Invalid("reported_mode", "An applied command must report the mode the relay is now in.");
@@ -332,6 +389,15 @@ public sealed class LightingCommandService(
         if (result == LightingAckResult.Applied && ack.ReportedMode != command.RequestedMode)
         {
             throw Invalid("reported_mode", "An applied command must report the mode it was asked to set; otherwise report failed.");
+        }
+
+        // M-8: a valid report proves the control channel alive — saved with whatever this report commits (Codex review).
+        await TouchLockedAsync(nodeId, now, ct);
+
+        // M-5: over MQTT the receipt can be lost while the report arrives — a valid report proves the device received it.
+        if (deliverIfPending && command.Status == LightingCommandStatus.Pending)
+        {
+            await MarkDeliveredAsync(command, now, ct);
         }
 
         var control = await db.Set<FeederControl>().SingleOrDefaultAsync(row => row.FeederId == command.FeederId, ct);
@@ -441,6 +507,27 @@ public sealed class LightingCommandService(
     }
 
     // ── Internals ──────────────────────────────────────────────────────────────────────────────
+
+    private async Task MarkDeliveredAsync(LightingCommand command, DateTime now, CancellationToken ct)
+    {
+        command.Status = LightingCommandStatus.Delivered;
+        command.DeliveredAt = now;
+        audit.Record(new AuditChange(now, AuditActorKind.Iot, null, null, command.CommuneId,
+            AuditEntityType.LightingCommand, command.CommandId, AuditAction.Delivered,
+            new { status = LightingCommandStatus.Pending }, new { status = command.Status, node_id = command.NodeId, command.Seq }));
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>D-5: the control channel is alive. Caller holds the device lock. Only forward.</summary>
+    private async Task TouchLockedAsync(string nodeId, DateTime now, CancellationToken ct)
+    {
+        var node = await db.Set<IotNode>().SingleAsync(row => row.NodeId == nodeId, ct);
+        if (node.LastReportAt is not { } last || last < now)
+        {
+            node.LastReportAt = now;
+            await db.SaveChangesAsync(ct);
+        }
+    }
 
     private async Task CloseAsync(LightingCommand command, LightingCommandStatus status, AuditActorKind by, DateTime now, CancellationToken ct)
     {

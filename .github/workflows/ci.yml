@@ -87,10 +87,15 @@ jobs:
               'SMTP_FROM_ADDRESS': 'no-reply@luxmap.local',
               'SMTP_FROM_NAME': 'LuxMap',
               'WEB_APP_BASE_URL': 'http://localhost:5173',
+              # LC-12: the EMQX of the broker end-to-end tests calls the test host back on this port.
+              'MQTT_PORT': '1883',
+              'MQTT_CALLBACK_PORT': '5199',
+              'EMQX_DASHBOARD_PORT': '18083',
           }
           for key in ('POSTGRES_PASSWORD', 'MINIO_SECRET_KEY', 'JWT_SIGNING_KEY',
                       'SEED_ADMIN_PASSWORD', 'SEED_AGENCY_PASSWORD',
-                      'SEED_ENGINEER_PASSWORD', 'SEED_CREW_PASSWORD'):
+                      'SEED_ENGINEER_PASSWORD', 'SEED_CREW_PASSWORD',
+                      'Mqtt__CallbackKey', 'Mqtt__BackendPassword', 'EMQX_DASHBOARD_PASSWORD'):
               values[key] = secrets.token_hex(32)
           Path('.env').write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
           PY
@@ -146,7 +151,10 @@ jobs:
         # minio/* returns 404 (BE-11) and quay.io/minio/* now answers 401 "Requires
         # authentication" (26/09/2026). The first S3 integration test (BE-36) must pick a new
         # image source first; do not re-add minio here until one is chosen.
-        run: docker compose up -d --wait --wait-timeout 180 postgres
+        # LC-12: EMQX (profile `mqtt`) for MqttEndToEndTests — the only tests that need a real broker: it alone enforces the
+        # ACL the API's callback answers. It probes the callback before the test host exists and retries every 15 s; the
+        # tests wait for that themselves.
+        run: docker compose --profile mqtt up -d --wait --wait-timeout 180 postgres emqx
 
       - name: Migrate and seed the fresh database
         id: database
@@ -169,6 +177,9 @@ jobs:
         # Keep the existing xUnit AssetDatabaseCollection serialization intact.
         # Runsettings excludes Category=Benchmark. A CLI --filter is ANDed with that filter,
         # not a replacement; do not add one or switch to luxmap.benchmark.runsettings here.
+        # LUXMAP_MQTT_E2E turns the broker end-to-end tests on (they skip without it, e.g. on a laptop with no EMQX).
+        env:
+          LUXMAP_MQTT_E2E: "1"
         run: dotnet test LuxMap.slnx --no-build --no-restore --settings luxmap.runsettings --logger trx --results-directory .github/test-results -m:1
 
       - name: Preserve test failures
@@ -183,4 +194,4 @@ jobs:
       - name: Stop service containers
         if: ${{ always() && steps.services.outcome != 'skipped' }}
         # The hosted VM discards volumes after the job; no shared volume cleanup is needed.
-        run: docker compose down
+        run: docker compose --profile mqtt down

@@ -32,14 +32,15 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
     ];
 
     /// <summary>
-    /// LIGHT-CTRL 2b: the endpoints a DEVICE calls. They name <see cref="DeviceAuth.Policy"/>, which is outside the matrix on
-    /// purpose — no role is ever a device. Adding one means editing this list, which shows in a diff.
+    /// The endpoints a MACHINE calls, and the one policy each names — outside the matrix on purpose, since no role is ever a device
+    /// or a broker: LIGHT-CTRL 2b (devices) and LC-12 (the MQTT broker's callback). Adding one means editing this list.
     /// </summary>
-    private static readonly string[] DeviceEndpoints =
-    [
-        "GET /api/v1/device/commands",
-        "POST /api/v1/device/commands/{commandId}/ack",
-    ];
+    private static readonly Dictionary<string, string> MachineEndpoints = new(StringComparer.Ordinal)
+    {
+        ["GET /api/v1/device/commands"] = DeviceAuth.Policy,
+        ["POST /api/v1/device/commands/{commandId}/ack"] = DeviceAuth.Policy,
+        ["POST /api/v1/internal/mqtt/auth"] = BrokerAuth.Policy,
+    };
 
     [Fact]
     public void Every_endpoint_that_is_not_anonymous_names_a_capability_policy()
@@ -47,7 +48,7 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
         var bare = ProductionEndpoints.Of(factory.Services)
             .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
             .Where(endpoint => !IdentityOnlyEndpoints.Contains(ProductionEndpoints.Describe(endpoint)))
-            .Where(endpoint => !DeviceEndpoints.Contains(ProductionEndpoints.Describe(endpoint)))
+            .Where(endpoint => !MachineEndpoints.ContainsKey(ProductionEndpoints.Describe(endpoint)))
             .Where(endpoint => !PoliciesOf(endpoint).Any(LuxMapPolicies.Matrix.ContainsKey))
             .Select(ProductionEndpoints.Describe)
             .Order(StringComparer.Ordinal)
@@ -67,7 +68,7 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
         var unknown = ProductionEndpoints.Of(factory.Services)
             .SelectMany(endpoint => PoliciesOf(endpoint)
                 .Where(policy => !LuxMapPolicies.Matrix.ContainsKey(policy))
-                .Where(policy => !(policy == DeviceAuth.Policy && DeviceEndpoints.Contains(ProductionEndpoints.Describe(endpoint))))
+                .Where(policy => !(MachineEndpoints.TryGetValue(ProductionEndpoints.Describe(endpoint), out var machine) && machine == policy))
                 .Select(policy => $"{ProductionEndpoints.Describe(endpoint)} → {policy}"))
             .ToArray();
 
@@ -90,24 +91,26 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
     }
 
     /// <summary>
-    /// Each device endpoint exists, names the device policy and NOTHING else, and is not anonymous — <c>[AllowAnonymous]</c>
+    /// Each machine endpoint exists, names its machine policy and NOTHING else, and is not anonymous — <c>[AllowAnonymous]</c>
     /// would skip authorization altogether, and a capability next to it would let a user's token in.
     /// </summary>
     [Fact]
-    public void Every_device_endpoint_exists_and_names_only_the_device_policy()
+    public void Every_machine_endpoint_exists_and_names_only_its_machine_policy()
     {
         var byRoute = ProductionEndpoints.Of(factory.Services)
             .ToDictionary(ProductionEndpoints.Describe, StringComparer.Ordinal);
 
-        foreach (var route in DeviceEndpoints)
+        foreach (var (route, policy) in MachineEndpoints)
         {
             Assert.True(byRoute.TryGetValue(route, out var endpoint), $"{route} không còn tồn tại");
-            Assert.Equal([DeviceAuth.Policy], PoliciesOf(endpoint!).Distinct(StringComparer.Ordinal).ToArray());
+            Assert.Equal([policy], PoliciesOf(endpoint!).Distinct(StringComparer.Ordinal).ToArray());
             Assert.Null(endpoint!.Metadata.GetMetadata<IAllowAnonymous>());
         }
 
-        // And the device policy appears NOWHERE else.
-        var elsewhere = byRoute.Where(pair => !DeviceEndpoints.Contains(pair.Key) && PoliciesOf(pair.Value).Contains(DeviceAuth.Policy))
+        // And a machine policy appears NOWHERE else.
+        string[] machinePolicies = [DeviceAuth.Policy, BrokerAuth.Policy];
+        var elsewhere = byRoute
+            .Where(pair => !MachineEndpoints.ContainsKey(pair.Key) && PoliciesOf(pair.Value).Intersect(machinePolicies).Any())
             .Select(pair => pair.Key).ToArray();
         Assert.Empty(elsewhere);
     }

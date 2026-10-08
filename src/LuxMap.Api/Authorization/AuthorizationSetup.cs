@@ -32,7 +32,9 @@ public static class AuthorizationSetup
             .AddJwtBearer()
             // LIGHT-CTRL LC-2: an IoT device's own scheme. NOT the default — only endpoints naming DeviceAuth.Policy use it,
             // so a Device header sent to a user endpoint is never read, and a Bearer token never satisfies a device endpoint.
-            .AddScheme<AuthenticationSchemeOptions, DeviceAuthenticationHandler>(DeviceAuth.Scheme, null);
+            .AddScheme<AuthenticationSchemeOptions, DeviceAuthenticationHandler>(DeviceAuth.Scheme, null)
+            // LC-12: the MQTT broker calling back to authenticate a client. Same shape — not the default, own policy only.
+            .AddScheme<AuthenticationSchemeOptions, BrokerAuthenticationHandler>(BrokerAuth.Scheme, null);
 
         // Resolve JwtOptions through DI so validation is configured from the SAME object BE-07 signs
         // with — there is no opportunity for the issuer, audience or key to drift apart.
@@ -57,6 +59,12 @@ public static class AuthorizationSetup
             .AddAuthenticationSchemes(DeviceAuth.Scheme)
             .RequireAuthenticatedUser()
             .RequireClaim(DeviceAuth.NodeIdClaim));
+
+        // The broker policy: the Broker scheme only — outside the matrix for the same reason.
+        authorization.AddPolicy(BrokerAuth.Policy, builder => builder
+            .AddAuthenticationSchemes(BrokerAuth.Scheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(BrokerAuth.Claim));
 
         // One policy per capability, straight from the matrix — no policy exists that is not in it.
         foreach (var (policy, roles) in LuxMapPolicies.Matrix)

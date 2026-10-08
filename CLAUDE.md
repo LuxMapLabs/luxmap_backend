@@ -1958,3 +1958,25 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   là làm mất truy vết BE-34. Test canh: `As_the_survey_detector_its_output_passes_the_pipeline_validation`.
 - Không có ảnh đèn thật trong test ⇒ test **không** khẳng định model phát hiện được gì; chúng canh hợp đồng (nhãn, bbox, phiên bản,
   validation) và hậu xử lý trên tensor dựng tay. Độ chính xác là việc của WP4.
+
+### LC-12 — kênh MQTT cho thiết bị (08/10/2026)
+
+- **Adapter MQTT chỉ chuyển byte.** Mọi quyết định nằm ở `MqttLightingHandler` (test không cần broker) và `LightingCommandService`.
+  Thêm loại bản tin = thêm nhánh ở handler gọi hàm của service; đừng viết logic lệnh trong `MqttLightingChannel`.
+- **Worker không có principal ⇒ `LightingScopeFactory` tạo context phạm vi = xã của thiết bị** (khuôn `JobScope`). Tra thiết bị
+  **không lọc** chỉ để lập danh tính / phạm vi (`CommuneOfAsync`, `NodesWithOpenCommandsAsync`); mọi xử lý nghiệp vụ đi qua context
+  có phạm vi.
+- **Kiểm tra mà controller làm bằng DataAnnotations phải nằm trong service** (`AckAsync`: `seq`, `result` bắt buộc, `error` ≤ 500) —
+  bản tin MQTT không đi qua controller. Cùng luật BE-43.
+- 🔴 **Endpoint của MÁY (thiết bị, broker) là ngoại lệ có tên** ở `CapabilityPolicyCoverageTests.MachineEndpoints` (route → policy).
+  Callback broker dùng scheme `Broker` (khoá `Mqtt:CallbackKey`, so băm thời gian cố định), **không** `[AllowAnonymous]`, ẩn khỏi
+  OpenAPI (`[ApiExplorerSettings(IgnoreApi = true)]`).
+- **ACL nằm trong câu trả lời của callback** (`BrokerAuthController.DeviceAcl`/`BackendAcl`), EMQX `sources = []`, `no_match = deny`,
+  `deny_action = disconnect`: subscribe / publish trái phép làm **ngắt kết nối**, không chỉ trả mã. Test ACL hai lớp: literal
+  (`BrokerAuthTests`) + broker thật (`MqttEndToEndTests`); phá thử nới ACL → cả hai đỏ.
+- **MQTTnet 5 KHÔNG ném lỗi khi broker từ chối CONNECT** — đọc `MqttClientConnectResult.ResultCode`. Test "sai bí mật bị từ chối"
+  viết bằng `Assert.Throws` sẽ xanh giả.
+- **EMQX kiểm callback lúc khởi động; không thấy API thì thử lại sau 15 s**, trong lúc đó từ chối mọi login. Test end-to-end chờ bằng
+  kết nối thử với bí mật đúng (`ReadyDeviceAsync`). Host test phải `ListenAnyIP` — container gọi về qua `host-gateway` trên Linux.
+- **`docker-compose.yml`: biến của service trong profile vẫn bị nội suy khi chạy profile khác** ⇒ dùng `${VAR:-default}`, không
+  `:?` — nếu không, `docker compose up` của người có `.env` cũ sẽ gãy. Thiếu `Mqtt__CallbackKey` thì broker từ chối mọi client.
