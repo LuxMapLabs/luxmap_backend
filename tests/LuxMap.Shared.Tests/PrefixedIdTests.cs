@@ -27,6 +27,7 @@ public class PrefixedIdTests
     [InlineData("CLS", 3, "CLS-001")]
     [InlineData("NTF", 6, "NTF-000001")]
     [InlineData("CAB", 3, "CAB-001")]
+    [InlineData("CMD", 6, "CMD-000001")]
     public void Prefix_table_matches_contract_section_0_2(string prefix, int digits, string firstId)
     {
         var spec = PrefixedIds.All.Single(s => s.Prefix == prefix);
@@ -38,9 +39,9 @@ public class PrefixedIdTests
     [Fact]
     public void All_eighteen_prefixes_are_declared_exactly_once()
     {
-        Assert.Equal(18, PrefixedIds.All.Count);
-        Assert.Equal(18, PrefixedIds.All.Select(s => s.Prefix).Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal(18, PrefixedIds.All.Select(s => s.SequenceName).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(19, PrefixedIds.All.Count);
+        Assert.Equal(19, PrefixedIds.All.Select(s => s.Prefix).Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(19, PrefixedIds.All.Select(s => s.SequenceName).Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]

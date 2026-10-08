@@ -1,6 +1,7 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.Telemetry.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
@@ -31,7 +32,7 @@ namespace LuxMap.Modules.Telemetry.Registry;
 /// (<c>fk_feeder_control_feeder_same_cabinet</c>), never field data (<c>ck_iot_node_data_source_not_field</c>).
 /// </para>
 /// </remarks>
-public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider clock)
+public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider clock, LightingCommandService lighting)
 {
     /// <summary>Relays a pilot device may number. The CHECK only asks <c>relay_no &gt; 0</c>; this keeps a typo off the table.</summary>
     public const int MaxRelayNo = 32;
@@ -193,6 +194,11 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
                     new Dictionary<string, object?> { ["feeder_id"] = feeder.FeederId, ["node_id"] = held.NodeId, ["relay_no"] = held.RelayNo });
             }
         }
+
+        // 3.8: a command still open on this relay must never switch the feeder the relay no longer (or newly) carries.
+        var now = UtcMicrosecondClock.UtcNow(clock);
+        await lighting.ExpireStaleAsync([node.NodeId], now, ct);
+        await lighting.SupersedeRelayAsync(node.NodeId, (short)relayNo, now, ct);
 
         if (current is not null)
         {

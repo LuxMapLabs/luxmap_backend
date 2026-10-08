@@ -35,7 +35,9 @@ public static class SwaggerSetup
 
             AddBearerSecurity(options);
             AddRefreshTokenCookieSecurity(options);
+            DeviceSecurityOperationFilter.AddDefinition(options);
             options.OperationFilter<RefreshTokenCookieOperationFilter>();
+            options.OperationFilter<DeviceSecurityOperationFilter>();
             options.OperationFilter<CapabilityOperationFilter>();
             options.OperationFilter<RawRequestBodyOperationFilter>();
             options.OperationFilter<ClientSurfaceOperationFilter>();

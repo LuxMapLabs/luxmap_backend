@@ -61,6 +61,7 @@ public sealed class FeederControlConfiguration : IEntityTypeConfiguration<Feeder
             table.HasCheckConstraint("ck_feeder_control_relay_no_positive", "relay_no > 0");
             table.HasCheckConstraint("ck_feeder_control_mode_reported",
                 "(control_mode IS NULL) = (mode_reported_at IS NULL)");
+            table.HasCheckConstraint("ck_feeder_control_mode_seq_has_mode", "mode_seq IS NULL OR control_mode IS NOT NULL");
         });
 
         // One device per feeder at most: the feeder IS the key (I-12).

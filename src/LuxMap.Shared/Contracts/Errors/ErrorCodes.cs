@@ -199,4 +199,22 @@ public static class ErrorCodes
     /// cabinets.
     /// </summary>
     public const string FeederNotInCabinet = "FEEDER_NOT_IN_CABINET";
+
+    /// <summary>409 — LIGHT-CTRL: no relay of the target can be switched; <c>details.excluded</c> says why for each feeder.</summary>
+    public const string NoControllableRelay = "NO_CONTROLLABLE_RELAY";
+
+    /// <summary>409 — LIGHT-CTRL: the wiring of the target changed while the request was being placed. Preview and send again.</summary>
+    public const string LightingTargetChanged = "LIGHTING_TARGET_CHANGED";
+
+    /// <summary>404 — LIGHT-CTRL: no such command for THIS device (another device's command is the same 404).</summary>
+    public const string CommandNotFound = "COMMAND_NOT_FOUND";
+
+    /// <summary>
+    /// 409 — LIGHT-CTRL: the command already closed (expired or superseded). The report is still kept in the history, and the
+    /// reported mode is still written when it is newer — <c>details.mode_recorded</c> says whether it was.
+    /// </summary>
+    public const string CommandClosed = "COMMAND_CLOSED";
+
+    /// <summary>409 — LIGHT-CTRL: an acknowledgement for a command the device has not fetched yet.</summary>
+    public const string CommandNotDelivered = "COMMAND_NOT_DELIVERED";
 }

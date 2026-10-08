@@ -21,6 +21,12 @@ public sealed class TelemetryModule : ILuxMapModule
         options.Validate();
 
         services.AddSingleton(options);
+
+        var lighting = configuration.GetSection(Lighting.LightingOptions.SectionName).Get<Lighting.LightingOptions>()
+            ?? new Lighting.LightingOptions();
+        lighting.Validate();
+        services.AddSingleton(lighting);
+        services.AddScoped<Lighting.LightingCommandService>();
         services.AddScoped<ICabinetDeviceLookup, CabinetDeviceLookup>();
         services.AddScoped<Registry.IotNodeRegistryService>();
     }
