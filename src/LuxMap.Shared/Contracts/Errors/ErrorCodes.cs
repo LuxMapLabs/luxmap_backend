@@ -192,4 +192,11 @@ public static class ErrorCodes
     /// work order or pole, was a conflict or was rejected (BE-43 D-7). <c>details.blocked_by</c> names it.
     /// </summary>
     public const string BlockedByEarlierOp = "BLOCKED_BY_EARLIER_OP";
+
+    /// <summary>
+    /// <c>PUT /assets/iot-nodes/{id}/relays/{relay_no}</c> — the feeder does not leave from the device's cabinet, so a relay of that
+    /// device cannot switch it (CAB-4, LIGHT-CTRL). 409: both rows exist, they just may not be joined. <c>details</c> names both
+    /// cabinets.
+    /// </summary>
+    public const string FeederNotInCabinet = "FEEDER_NOT_IN_CABINET";
 }

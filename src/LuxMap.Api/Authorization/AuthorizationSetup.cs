@@ -3,6 +3,7 @@ using LuxMap.Modules.Identity.Auth;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
@@ -28,7 +29,10 @@ public static class AuthorizationSetup
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ForbiddenCodeResultHandler>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer();
+            .AddJwtBearer()
+            // LIGHT-CTRL LC-2: an IoT device's own scheme. NOT the default — only endpoints naming DeviceAuth.Policy use it,
+            // so a Device header sent to a user endpoint is never read, and a Bearer token never satisfies a device endpoint.
+            .AddScheme<AuthenticationSchemeOptions, DeviceAuthenticationHandler>(DeviceAuth.Scheme, null);
 
         // Resolve JwtOptions through DI so validation is configured from the SAME object BE-07 signs
         // with — there is no opportunity for the issuer, audience or key to drift apart.
@@ -46,6 +50,13 @@ public static class AuthorizationSetup
                 .RequireAuthenticatedUser()
                 .AddRequirements(new CommuneScopeConsistencyRequirement())
                 .Build());
+
+        // The device policy: the Device scheme ONLY, authenticated, carrying a node id. It is deliberately outside the
+        // capability matrix — a device has no role, so no capability admits it, and this policy admits nothing else.
+        authorization.AddPolicy(DeviceAuth.Policy, builder => builder
+            .AddAuthenticationSchemes(DeviceAuth.Scheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(DeviceAuth.NodeIdClaim));
 
         // One policy per capability, straight from the matrix — no policy exists that is not in it.
         foreach (var (policy, roles) in LuxMapPolicies.Matrix)

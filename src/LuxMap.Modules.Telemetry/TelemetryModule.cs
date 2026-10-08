@@ -22,5 +22,6 @@ public sealed class TelemetryModule : ILuxMapModule
 
         services.AddSingleton(options);
         services.AddScoped<ICabinetDeviceLookup, CabinetDeviceLookup>();
+        services.AddScoped<Registry.IotNodeRegistryService>();
     }
 }

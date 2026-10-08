@@ -1155,3 +1155,27 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | **TI-7** | **Hiển thị (Mỹ, 08/10/2026):** mọi cạnh vẽ **cùng một kiểu nét** — không phân biệt nét đứt / nét liền. Nhãn `feeder_source` **giữ trong dữ liệu** và FE hiện ở **tooltip** của cạnh (*"Quan hệ suy luận từ khảo sát, chưa xác minh"* / *"Đã xác minh"*), kèm dòng chú giải *"Sơ đồ logic, không phải tuyến cáp"*. Backend không đổi | Không (chỉ cách FE trình bày) |
 
 **Phải báo:** WP5 (vẽ từ `/map/cabinets/{id}/topology`, bỏ chia đều trong `useElectricalCascade`; nhãn trên form cột / mạch). **Chưa báo.**
+
+## LIGHT-CTRL — điều khiển ON / OFF / AUTO trên testbed + đăng ký thiết bị (08/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực D-R7: lệnh theo rơ-le, chỉ thiết bị `supports_remote_control`, mọi lệnh audit; đăng ký thiết bị + rơ-le + bí mật qua API (phần BE-34). Chi tiết `.ai/results/LIGHT-CTRL-p1.md` |
+| **Decision maker** | **Claude + Codex theo uỷ quyền của Mỹ** (08/10/2026: *"tham khảo cùng với codex và đưa ra quyết định"*). D-1…D-10 chốt; Codex đề nghị đổi D-1, D-4, D-10 và tách D-7 — đều nhận · `SELF-SIGNED` |
+| **Chạm API** | **Có** — nhóm endpoint mới + kênh xác thực thiết bị. Nền tạm tới FW; **chưa có code** |
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **LC-1** | **Dịch vụ lệnh không phụ thuộc kênh truyền**; adapter đầu tiên là **poll HTTPS** (2–5 s). Kênh cuối cùng chờ Đạt (HTTP hay MQTT); MQTT QoS không thay ACK nghiệp vụ | Có |
+| **LC-2** | Scheme `Device` + policy `DeviceOnly` (không `[AllowAnonymous]`): bí mật 32 byte base64url, lưu SHA-256, so `FixedTimeEquals`, header `Device <node_id>.<secret>`; principal mang đúng xã của thiết bị, không `role`; lọc thêm theo `node_id`. Không ghi bí mật vào log | Có (kênh mới) |
+| **LC-3** | `lighting_request` (một lần bấm, `client_op_id` + hash) + `lighting_command` (một dòng mỗi rơ-le, prefix `CMD` tối thiểu 6 chữ số, ảnh chụp node / relay / feeder / cabinet / data_source — **không** FK tới `feeder_control`) | Có |
+| **LC-4** | Vòng đời `pending → delivered → applied \| failed`, `expired` (60 s, không retry), `superseded` (lệnh mới / rơ-le nối lại). Khoá hàng `iot_node`; poll giao lại lệnh còn hạn cùng ID | Có |
+| **LC-5** | **`seq` do server cấp**; thiết bị lưu `seq` đã thực thi mỗi rơ-le (flash), bỏ lệnh cũ; server chỉ đổi `feeder_control.control_mode` khi `seq` > `mode_seq` | Có (hợp đồng thiết bị) |
+| **LC-6** | Audit: thêm actor `System`, entity `LightingRequest` / `LightingCommand`, các action; đúng một event mỗi `SaveChanges` (bảng 3.5) | Không |
+| **LC-7** | Quyền: gửi = `ControlLighting` (Quản lý); xem = `ReadNetwork`; đăng ký / rơ-le / bí mật = `ManageAssets` (Quản lý). Theo tuyến: gửi phần điều khiển được, `excluded[]` kèm lý do; 409 chỉ khi không còn rơ-le nào | Có |
+| **LC-8** | Pilot **không** chống replay ở tầng xác thực (HTTPS + bí mật riêng + TTL + dedup + `seq`) — ghi rõ giới hạn khi bảo vệ | — |
+| **LC-9** | Phase 2 **hai PR**: 2a đăng ký thiết bị + rơ-le + bí mật + scheme `Device`; 2b lệnh | — |
+| **LC-10** | **Hình dạng đăng ký (2a, hiện thực 08/10):** `GET /assets/iot-nodes[/{id}]` → `node_id, cabinet_id, commune_id, node_role, data_source, supports_remote_control, has_credential, credential_set_at, last_report_at, relays[]{relay_no, feeder_id, control_mode, mode_reported_at}, updated_at` — **không** bí mật, **không** `node_status` (ở `/map/iot-nodes`). `POST` `{cabinet_id, data_source, supports_remote_control}` (xã lấy từ trụ, 409 khi trụ đã có thiết bị); `PUT` `{data_source, supports_remote_control}`; `PUT …/relays/{relay_no}` `{feeder_id \| null}` khoá bắt buộc, `relay_no` 1…32, mạch khác trụ → **409 `FEEDER_NOT_IN_CABINET`** (mã mới), mạch đã có rơ-le khác → 409 `ASSET_IN_USE`; `POST …/credential` → `{node_id, secret, credential_set_at}` đúng một lần | Có (endpoint mới, mã lỗi mới) |
+
+**Phải báo:** Đạt (hợp đồng firmware: `command_id`, `seq` lưu flash, `expires_at`, ACK sau thực thi; câu hỏi HTTP / MQTT), WP5 (thay
+nút ON/OFF mô phỏng ở `GisDrawerPanel.tsx:740` bằng preview → gửi → chờ ACK; không dùng `fault` cho tắt cưỡng chế). **Chưa báo.**

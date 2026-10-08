@@ -125,6 +125,14 @@ SUMMARY = {
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
+    # LIGHT-CTRL 2a — đăng ký thiết bị IoT + rơ-le + bí mật, drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW).
+    ("get", "/api/v1/assets/iot-nodes"): "[TẠM — LIGHT-CTRL] Danh sách thiết bị IoT kèm rơ-le đang nối; không bao giờ trả bí mật",
+    ("get", "/api/v1/assets/iot-nodes/{nodeId}"): "[TẠM — LIGHT-CTRL] Một thiết bị IoT; ngoài phạm vi xã → 404",
+    ("post", "/api/v1/assets/iot-nodes"): "[TẠM — LIGHT-CTRL] Đăng ký thiết bị vào một trụ (≤ 1 thiết bị / trụ); xã lấy từ trụ; data_source chỉ calibration_rig | simulated",
+    ("put", "/api/v1/assets/iot-nodes/{nodeId}"): "[TẠM — LIGHT-CTRL] Thay thế data_source + supports_remote_control; trụ và xã không sửa được",
+    ("delete", "/api/v1/assets/iot-nodes/{nodeId}"): "[TẠM — LIGHT-CTRL] Xoá thiết bị; còn rơ-le nối thì 409 ASSET_IN_USE",
+    ("put", "/api/v1/assets/iot-nodes/{nodeId}/relays/{relayNo}"): "[TẠM — LIGHT-CTRL] Nối rơ-le với một mạch CÙNG trụ (409 FEEDER_NOT_IN_CABINET) hoặc tháo (feeder_id null); khoá feeder_id bắt buộc",
+    ("post", "/api/v1/assets/iot-nodes/{nodeId}/credential"): "[TẠM — LIGHT-CTRL] Cấp / xoay bí mật thiết bị — trả ĐÚNG MỘT LẦN; bí mật cũ hết hiệu lực ngay",
     # CABINET — trụ / tủ điện tổng, drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW).
     ("get", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Danh sách trụ điện tổng — location, feeder_ids[], iot_node_id | null (CAB-8)",
     ("get", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Một trụ + geom_wkt + created_at; ngoài phạm vi xã → 404",
@@ -227,6 +235,7 @@ SECTION = {
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",
     "/api/v1/assets/cabinets": "drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/assets/iot-nodes": "drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",
     "/api/v1/auth": "§4.1",
