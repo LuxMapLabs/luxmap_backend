@@ -97,6 +97,8 @@ erDiagram
     iot_node {
         text node_id PK "SỬA: + cabinet_id, - geom"
         text cabinet_id FK "BẮT BUỘC, UNIQUE (CAB-3)"
+        text credential_hash "nullable — SHA-256 hex của bí mật thiết bị (LIGHT-CTRL 2a)"
+        timestamptz credential_set_at "nullable — NULL cùng credential_hash (CHECK)"
     }
     feeder_control {
         text feeder_id PK "HIỆN CÓ"

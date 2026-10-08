@@ -35,3 +35,18 @@ Nhánh `feat/LIGHT-CTRL-2a` (mang theo đặc tả + quyết định Phase 1, m�
 - `luxmap_dev` chưa migrate `AddDeviceCredential`.
 - `copy_dev_to_supabase.py` chép nguyên `iot_node.credential_hash` (chỉ là băm; bí mật dev vẫn dùng được với bản chép) — chấp nhận
   cho pilot, xét lại khi có thiết bị thật.
+
+## Sửa sau Codex review code (nhánh `fix/LIGHT-CTRL-2a-review`, sau PR #116)
+
+Codex: 0 P1 · 3 P2 · 3 P3 — đối chiếu code, cả 6 đúng, sửa hết.
+
+| # | Sửa | Canh bằng |
+|---|---|---|
+| P2 | Scheme không phân biệt hoa thường, 1+ dấu cách; khoảng trắng trong credential → 401 | `The_scheme_word_is_case_insensitive…` (phá: `Ordinal` → đỏ) |
+| P2 | Scope trước, khoá sau (`node_id` + `commune_id`) | đọc code (khoá không đo được bằng test HTTP tuần tự) |
+| P2 | Đua chuyển trụ / chiếm mạch → FK DB → 409, không 500 | phá: bỏ kiểm ở app → vẫn xanh (409 từ catch); bỏ cả catch → 500, đỏ |
+| P3 | `WWW-Authenticate: Device` sống qua trang 401 (chỉ challenge Device) | `A_refused_device_gets_a_device_challenge…` (phá → đỏ) |
+| P3 | Chú thích "luôn so thời gian cố định" sửa cho đúng | — |
+| P3 | ERD thêm hai cột bí mật | — |
+
+1240/1240 xanh; Release 0 warning. Không đổi bề mặt API (chỉ header 401 của endpoint thiết bị).
