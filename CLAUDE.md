@@ -1926,8 +1926,14 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - **`seq` là cột identity**, không vẽ trước: DB cấp lúc INSERT, tăng dần qua mọi phiên; hai lần bấm trên một thiết bị đã tuần tự
   nhờ khoá. `command_id` thì **vẽ trước** (khuôn `NextFaultId`) vì audit của lần bấm phải liệt kê nó. Sắp lệnh theo `seq`,
   **không** theo `command_id` (luật độ rộng tối thiểu, mục 0).
-- **`control_mode` chỉ đổi theo báo cáo của thiết bị và chỉ khi `seq` mới hơn `mode_seq`** (D-10, I-6) — kể cả ACK trên lệnh đã
-  đóng (`COMMAND_CLOSED`, vẫn lưu audit `reported`). Không bao giờ đặt `control_mode` từ lệnh đã gửi.
+- **`control_mode` chỉ đổi theo báo cáo của thiết bị, chỉ khi `seq` mới hơn `mode_seq` VÀ chưa có lệnh mới hơn nào được giao cho
+  rơ-le đó** (D-10, I-6) — kể cả ACK trên lệnh đã đóng (`COMMAND_CLOSED`, vẫn lưu audit `reported`). `mode_seq` một mình **không đủ**:
+  nó nằm trên dòng `feeder_control`, mà tháo rơ-le là xoá dòng ⇒ tháo + nối lại sẽ reset nó (Codex review 2b). Lịch sử lệnh thì còn.
+- **Tắt `supports_remote_control` thay mọi lệnh đang mở** (registry, actor Quản lý) và **poll không bao giờ giao** cho thiết bị đã tắt
+  cờ (actor `system` nếu cờ đổi đường khác) — D-R7.
+- 🔴 **Test chứng minh "có lấy khoá" phải giữ khoá bằng `FOR NO KEY UPDATE`, không `FOR UPDATE`.** Chèn hàng có FK tới `iot_node`
+  lấy KEY SHARE, và `UPDATE last_report_at` lấy NO KEY UPDATE — với `FOR UPDATE` cả hai tự chờ, test xanh dù service bỏ khoá
+  (phá thử đã lộ). Khuôn: `LightingCommandTests.HoldingTheDeviceLockAsync`; poll phải đẩy `last_report_at` ra tương lai trước.
 - **Lệnh thiết bị luôn lọc thêm `node_id` = principal** — cùng xã không có nghĩa là được đụng lệnh của thiết bị khác.
 - **Endpoint thiết bị là ngoại lệ có tên** trong `CapabilityPolicyCoverageTests.DeviceEndpoints` và trong `OpenApiSpecTests`
   (`/api/v1/device/` khai scheme `Device`, không capability). Thêm endpoint thiết bị = sửa cả hai, nhìn thấy trong diff.

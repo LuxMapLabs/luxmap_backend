@@ -37,8 +37,19 @@ Nhánh `feat/LIGHT-CTRL-2b` (làm trong bản clone ngoài Documents — repo ch
 `IDEMPOTENCY_CONFLICT` thay `DUPLICATE_OP` cho 409; poll trả object có `server_time`; 5 mã lỗi mới; action audit `reported`;
 bị thay do lần bấm mới ghi trong event của lần bấm.
 
+## Sửa sau Codex review code (0 P1 · 3 P2 · 1 P3 — đối chiếu code, cả 4 đúng)
+
+| # | Sửa | Canh bằng (phá thử → đỏ) |
+|---|---|---|
+| P2 | Tháo + nối lại rơ-le reset `mode_seq` ⇒ ACK trễ của lệnh cũ đè chế độ mới. Nay còn chặn khi **đã có lệnh mới hơn được giao** cho `(node, relay)` — lịch sử lệnh không bị tháo rơ-le xoá | `Rewiring_a_relay_does_not_let_a_late_report…` |
+| P2 | Poll vẫn giao lệnh khi `supports_remote_control = false`. Nay registry tắt cờ ⇒ thay mọi lệnh mở (actor Quản lý); poll của thiết bị đã tắt cờ ⇒ thay (actor `system`), không giao | `A_device_no_longer_remote_controlled…` (2 phá thử) |
+| P2 | CHECK cho `applied` thiếu `reported_mode` (NULL = x là NULL). Thêm `reported_mode IS NOT NULL`; migration sinh lại (chưa merge) | `The_database_refuses_an_applied_command…` |
+| P3 | Test khoá dựa vào may rủi. Thêm test tất định: giữ khoá từ kết nối khác, request phải chờ ≥ 500 ms. Lần đầu dùng `FOR UPDATE` thì test **vẫn xanh khi bỏ khoá** (FK KEY SHARE / UPDATE tự chờ) — đổi sang `FOR NO KEY UPDATE` | `A_press_and_a_poll_wait_for_the_device_lock` (bỏ khoá bấm / poll → đỏ) |
+
+Gộp hai đoạn "đọc qua filter → khoá" (registry + dịch vụ lệnh) thành `LightingCommandService.LockDeviceAsync`.
+Sau sửa: **1269/1269 xanh**, Release 0 lỗi, spec OpenAPI không đổi.
+
 ## Chưa làm / còn lại
 
-- ⚠️ Test "bỏ khoá" dựa vào 4 request đồng thời — về nguyên tắc có thể lọt nếu lịch chạy tình cờ tuần tự.
 - `luxmap_dev` chưa migrate `AddDeviceCredential` + `AddLightingCommands`.
 - Báo Đạt (hợp đồng firmware: `seq` lưu NVS, ACK sau khi thực thi, `server_time`) và WP5 (thay nút ON/OFF mô phỏng bằng preview → bấm → lịch sử).
