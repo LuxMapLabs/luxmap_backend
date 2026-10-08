@@ -1140,7 +1140,7 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 
 | | |
 |---|---|
-| **Decision** | Topology ngoài thực địa được **suy luận công khai, có gắn nhãn** — không giấu, không đoán ngầm. Mỗi quan hệ cột → mạch và mạch → trụ mang `verified \| inferred`; bản đồ vẽ sơ đồ nhánh từ dữ liệu backend, nét đứt cho suy luận. Nền: phương án A của FEEDER-SCOPE |
+| **Decision** | Topology ngoài thực địa được **suy luận công khai, có gắn nhãn** — không giấu, không đoán ngầm. Mỗi quan hệ cột → mạch và mạch → trụ mang `verified \| inferred`; bản đồ vẽ sơ đồ nhánh từ dữ liệu backend; nhãn hiện ở tooltip (TI-7). Nền: phương án A của FEEDER-SCOPE |
 | **Decision maker** | **Mỹ (Dylan)**, 07/10/2026 — đồng ý D-1…D-10 của `.ai/results/TOPO-INFER-p1.md` (đã qua review Codex, 8/8 phát hiện áp) |
 | **Chạm API** | **Có.** SELF-SIGNED, nền tạm tới FW; chưa lên Contract |
 
@@ -1152,5 +1152,6 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | **TI-4** | `GET /api/v1/map/cabinets/{cabinetId}/topology` — `FeatureCollection` của `LineString`, **mỗi feature một cạnh**: `feeder_id, segment_id, branch, order, from_id, to_pole_id, feeder_source`. Nhánh theo (mạch, tuyến) và hai phía trụ, thứ tự dọc đường kiểu WO-12; cạnh đầu lấy nhãn thấp hơn của hai quan hệ. Không phát khoảng cách | Có (endpoint mới) |
 | **TI-5** | Quản lý (`ManageAssets`) đặt nhãn; không lưu "ai xác minh, lúc nào" (`updated_by` không phải dấu xác minh) | Không |
 | **TI-6** | Chặn trộn cột `field` với trụ không-`field` (D-7) và script đề xuất quan hệ suy luận (D-8): **ticket riêng** | — |
+| **TI-7** | **Hiển thị (Mỹ, 08/10/2026):** mọi cạnh vẽ **cùng một kiểu nét** — không phân biệt nét đứt / nét liền. Nhãn `feeder_source` **giữ trong dữ liệu** và FE hiện ở **tooltip** của cạnh (*"Quan hệ suy luận từ khảo sát, chưa xác minh"* / *"Đã xác minh"*), kèm dòng chú giải *"Sơ đồ logic, không phải tuyến cáp"*. Backend không đổi | Không (chỉ cách FE trình bày) |
 
 **Phải báo:** WP5 (vẽ từ `/map/cabinets/{id}/topology`, bỏ chia đều trong `useElectricalCascade`; nhãn trên form cột / mạch). **Chưa báo.**

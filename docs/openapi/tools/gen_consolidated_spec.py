@@ -131,7 +131,7 @@ SUMMARY = {
     ("post", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body",
     ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được",
     ("delete", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Xoá trụ; còn mạch hay thiết bị trỏ vào thì 409 ASSET_IN_USE",
-    ("get", "/api/v1/map/cabinets/{cabinetId}/topology"): "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source để vẽ nét đứt cho quan hệ suy luận. Sơ đồ logic, không phải tuyến cáp",
+    ("get", "/api/v1/map/cabinets/{cabinetId}/topology"): "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source hiện ở tooltip của cạnh (TI-7). Sơ đồ logic, không phải tuyến cáp",
     ("get", "/api/v1/map/cabinets"): "[TẠM — CABINET] Bản đồ trụ điện tổng theo bbox, kể cả trụ không có IoT; feeder_ids[] tính lúc đọc, iot_node_id | null",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
     ("get", "/api/v1/map/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
