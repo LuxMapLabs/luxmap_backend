@@ -3,6 +3,7 @@
     <Project Path="src/LuxMap.Api/LuxMap.Api.csproj" />
     <Project Path="src/LuxMap.Infrastructure.Storage/LuxMap.Infrastructure.Storage.csproj" />
     <Project Path="src/LuxMap.Modules.Admin/LuxMap.Modules.Admin.csproj" />
+    <Project Path="src/LuxMap.Modules.AI/LuxMap.Modules.AI.csproj" />
     <Project Path="src/LuxMap.Modules.Assets/LuxMap.Modules.Assets.csproj" />
     <Project Path="src/LuxMap.Modules.Faults/LuxMap.Modules.Faults.csproj" />
     <Project Path="src/LuxMap.Modules.Identity/LuxMap.Modules.Identity.csproj" />
