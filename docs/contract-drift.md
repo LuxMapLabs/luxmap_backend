@@ -1180,3 +1180,15 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 
 **Phải báo:** Đạt (hợp đồng firmware: `command_id`, `seq` lưu flash, `expires_at`, ACK sau thực thi; câu hỏi HTTP / MQTT), WP5 (thay
 nút ON/OFF mô phỏng ở `GisDrawerPanel.tsx:740` bằng preview → gửi → chờ ACK; không dùng `fault` cho tắt cưỡng chế). **Chưa báo.**
+
+## AI-1 — model YOLO ON / OFF trong backend (08/10/2026, PR #118 làm lại sau review)
+
+Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, model trong git tạm, PR mới thay #118); review cùng Codex. **SELF-SIGNED.**
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **AI-1** | `POST /api/v1/ai/detect` (multipart, trường `image`) → `{model_version, width, height, count, detections[]{class_id, class_name: normal \| out, confidence, bounding_box{x1, y1, x2, y2, width, height}}}` — bbox **pixel** của ảnh đã xoay theo EXIF. Chỉ **Quản lý** (`ReviewSurveys`); JPEG theo magic bytes, khác → **415 `UNSUPPORTED_IMAGE_FORMAT`**; thiếu file → 400; > 40 MP → 400. Route không phiên bản `/api/ai/...` của #118 **bỏ**. Endpoint chỉ để thử model bằng tay — **không ghi gì** | Có (endpoint mới) |
+| **AI-2** | Cùng model là **detector của pipeline khảo sát** khi `SurveyProcessing:Frames:Detector = yolo` (BE-15 §6): `normal → on`, `out → off` (CV chỉ quyết ON/OFF — Phiếu v1.4), bbox chuẩn hoá top-left. `artifact_version` = băm của **file model + ngưỡng + tiền xử lý + ánh xạ lớp** ⇒ đổi ngưỡng là phiên bản mới (BE-34). Mặc định vẫn `unconfigured` | Không |
+| **AI-3** | Model `best.onnx` (10,6 MB) **nằm trong git tạm**, ghim SHA-256 ở `Ai:ModelSha256` — file khác mã ghim ⇒ không khởi động. Chuyển LFS / MinIO khi đổi model lần đầu | Không |
+
+**Phải báo:** người viết #118 (vì sao đổi), WP4 (ánh xạ lớp normal/out → on/off, ngưỡng 0.25 / 0.45, resize bilinear — cần mẫu chuẩn để đối chiếu với Ultralytics), WP5 (endpoint thử model chỉ cho Quản lý).

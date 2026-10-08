@@ -414,6 +414,9 @@
     </table>
   </div>
 
+  <h2>AI-1 — model YOLO ON / OFF (thay PR #118), 08/10/2026</h2>
+  <div class="card"><p><span class="tag t-next">Chờ review / PR</span> PR #118 (module AI của thành viên) chưa merge được: endpoint ẩn danh, decode mọi định dạng (chạm lỗ hổng ImageSharp), không nối pipeline. Làm lại trên commit gốc của họ: <code>YoloOnOffDetector</code> cắm vào pipeline khảo sát (<code>Detector = yolo</code>), <code>POST /ai/detect</code> chỉ Quản lý + JPEG-only, phiên bản model ghi vào <code>artifact_version</code>, model ghim SHA-256. 1279/1279 xanh. Còn: mẫu chuẩn WP4 để đối chiếu độ chính xác, đóng #118. Chi tiết <code>.ai/results/AI-1.md</code>.</p></div>
+
   <h2>CI — advisory ImageSharp 3.1.12, 08/10/2026</h2>
   <div class="card"><p><span class="tag t-next">Tạm — chờ license key để lên 4.1.2</span> 07/10 GitHub công bố 5 advisory (3 high) cho ImageSharp ≤ 4.1.1; <code>dotnet restore -warnaserror</code> làm đỏ MỌI PR. Bản vá chỉ ở 4.1.2, mà 4.x cần <code>SixLaborsLicenseKey</code>. Mỹ chọn tắt đúng 5 mã (<code>Directory.Build.props</code>) — hợp lệ vì mọi decode đi qua cấu hình chỉ-JPEG; <code>JpegOnlyDecodeTests</code> canh tiền đề đó. <strong>Còn:</strong> xin license key Six Labors → lên 4.1.2 → gỡ suppress.</p></div>
 
