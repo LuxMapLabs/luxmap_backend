@@ -5779,7 +5779,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source để vẽ nét đứt cho quan hệ suy luận. Sơ đồ logic, không phải tuyến cáp",
+        "summary": "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source hiện ở tooltip của cạnh (TI-7). Sơ đồ logic, không phải tuyến cáp",
         "operationId": "getMapCabinetsCabinetidTopology",
         "x-luxmap-status": "implemented"
       }

@@ -18,7 +18,8 @@ namespace LuxMap.Modules.Map.Features;
 /// </summary>
 /// <remarks>
 /// ⚠️ A LOGICAL diagram, not a cable route: an edge joins two consecutive points of one branch in the order they stand
-/// along the road. The front end styles it by <see cref="FeederSource"/> (dashed for <c>inferred</c>).
+/// along the road. Every edge is drawn alike; the front end shows <see cref="FeederSource"/> in the edge's TOOLTIP
+/// ("inferred from the survey, not verified" / "verified") — the label must stay visible, not only the line (TI-7).
 /// </remarks>
 public sealed record CabinetTopologyEdgeProperties
 {

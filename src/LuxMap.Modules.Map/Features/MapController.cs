@@ -155,7 +155,7 @@ public sealed class MapController(
     /// </summary>
     /// <remarks>
     /// ⚠️ SELF-SIGNED (drift TOPO-INFER), not yet in the Contract. A logical diagram, NOT a cable route; style by
-    /// <c>feeder_source</c> (dashed for <c>inferred</c>). No relation → <c>features: []</c>. Absent or out of scope → 404.
+    /// <c>feeder_source</c> shown in the edge's tooltip (TI-7). No relation → <c>features: []</c>. Absent or out of scope → 404.
     /// One cabinet, so no <c>bbox</c> — the shape of <c>/map/poles/{id}</c>.
     /// </remarks>
     [HttpGet("cabinets/{cabinetId}/topology")]

@@ -9,8 +9,8 @@ nói công khai** khi bảo vệ. Chạm schema + API ⇒ SELF-SIGNED, ghi drift
 1. Mỗi quan hệ cột → mạch (`pole.feeder_id`) mang **nguồn gốc**: `verified` (xã / EVN xác nhận, hoặc kiểm bằng video chập
    tối — nhóm đèn bật cùng lúc) hay `inferred` (suy từ vị trí trụ / cột ngoài thực địa). Hai loại không bao giờ trộn khi
    hiển thị hay thống kê — cùng nguyên tắc với `data_source`.
-2. FE vẽ được sơ đồ **rẽ nhánh** từ trụ ra các cột bằng **một request**, nối theo thứ tự dọc đường, nét đứt cho quan hệ suy
-   luận — **không tự suy gì phía client** (gỡ `useElectricalCascade` chia đều).
+2. FE vẽ được sơ đồ **rẽ nhánh** từ trụ ra các cột bằng **một request**, nối theo thứ tự dọc đường, nhãn suy luận / xác minh hiện ở tooltip
+   (TI-7, không phân biệt nét) — **không tự suy gì phía client** (gỡ `useElectricalCascade` chia đều).
 
 ## 2. Khảo sát backend (`origin/dev` `8809eb7`)
 
