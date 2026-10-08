@@ -1,7 +1,9 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.Telemetry.Lighting;
 using LuxMap.Persistence;
+using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -31,7 +33,7 @@ namespace LuxMap.Modules.Telemetry.Registry;
 /// (<c>fk_feeder_control_feeder_same_cabinet</c>), never field data (<c>ck_iot_node_data_source_not_field</c>).
 /// </para>
 /// </remarks>
-public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider clock)
+public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider clock, LightingCommandService lighting)
 {
     /// <summary>Relays a pilot device may number. The CHECK only asks <c>relay_no &gt; 0</c>; this keeps a typo off the table.</summary>
     public const int MaxRelayNo = 32;
@@ -97,12 +99,22 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
     public async Task UpdateAsync(string nodeId, UpdateIotNodeRequest request, CancellationToken ct)
     {
         var source = RequireDeviceSource(request.DataSource!.Value);
-        var node = await RequireAsync(nodeId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var node = await lighting.LockDeviceAsync(nodeId, ct);
+
+        if (node.SupportsRemoteControl && !request.SupportsRemoteControl)
+        {
+            // D-R7: no longer remote-controlled — nothing still open may reach it (Codex review P2).
+            var now = UtcMicrosecondClock.UtcNow(clock);
+            await lighting.ExpireStaleAsync([node.NodeId], now, ct);
+            await lighting.SupersedeRelayAsync(node.NodeId, null, AuditActorKind.User, now, ct);
+        }
 
         node.DataSource = source;
         node.SupportsRemoteControl = request.SupportsRemoteControl;
         Stamp(node);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     /// <summary>Removes a device. The foreign keys decide: a wired relay (and, from 2b, a command) refuses it with 409.</summary>
@@ -138,19 +150,9 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
                 $"relay_no must be between 1 and {MaxRelayNo}.", new Dictionary<string, object?> { ["relay_no"] = relayNo });
         }
 
-        // Scope FIRST, through the commune filter: a device of another commune is a 404 before any lock is taken, so a manager
-        // can neither wait on nor time the lock of a device outside their scope (Codex review P2).
-        var commune = await db.Set<IotNode>().AsNoTracking()
-            .Where(candidate => candidate.NodeId == nodeId)
-            .Select(candidate => candidate.CommuneId)
-            .FirstOrDefaultAsync(ct) ?? throw NotFound("device");
-
+        // Scope first, then lock, then read again — one helper for every device write (2a review P2).
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-        // Lock, then read again under the lock (the FaultLocks shape).
-        await db.Database.ExecuteSqlRawAsync(
-            "SELECT 1 FROM iot_node WHERE node_id = {0} AND commune_id = {1} FOR UPDATE", [nodeId, commune], ct);
-        var node = await RequireAsync(nodeId, ct);
+        var node = await lighting.LockDeviceAsync(nodeId, ct);
 
         var current = await db.Set<FeederControl>()
             .FirstOrDefaultAsync(control => control.NodeId == node.NodeId && control.RelayNo == relayNo, ct);
@@ -193,6 +195,11 @@ public sealed class IotNodeRegistryService(LuxMapDbContext db, TimeProvider cloc
                     new Dictionary<string, object?> { ["feeder_id"] = feeder.FeederId, ["node_id"] = held.NodeId, ["relay_no"] = held.RelayNo });
             }
         }
+
+        // 3.8: a command still open on this relay must never switch the feeder the relay no longer (or newly) carries.
+        var now = UtcMicrosecondClock.UtcNow(clock);
+        await lighting.ExpireStaleAsync([node.NodeId], now, ct);
+        await lighting.SupersedeRelayAsync(node.NodeId, (short)relayNo, AuditActorKind.User, now, ct);
 
         if (current is not null)
         {

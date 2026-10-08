@@ -73,6 +73,12 @@ PLAN = [
     ("fixture", IN_COMMUNES, "fixture_id"),
     ("iot_node", IN_COMMUNES, "node_id"),
     ("feeder_control", IN_COMMUNES, "feeder_id"),
+    # LIGHT-CTRL 2b: requested_by is a RESTRICT key to app_user, so only the presses of the accounts copied above; a command
+    # follows its request. Newest-first is a read order — copy by seq so the identity column's order survives.
+    ("lighting_request", f"{IN_COMMUNES} AND requested_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})",
+     "requested_at, request_id"),
+    ("lighting_command", f"{IN_COMMUNES} AND request_id IN (SELECT request_id FROM public.lighting_request WHERE "
+     f"{IN_COMMUNES} AND requested_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS}))", "seq"),
     ("fault_cluster", IN_COMMUNES, "cluster_id"),
     ("lux_reading", IN_COMMUNES, "lux_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.

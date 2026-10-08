@@ -125,6 +125,12 @@ SUMMARY = {
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
+    # LIGHT-CTRL 2b — lệnh ON / OFF / AUTO + kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW).
+    ("get", "/api/v1/lighting/preview"): "[TẠM — LIGHT-CTRL] Xem trước một lần bấm: rơ-le sẽ đổi, mạch bị loại kèm lý do, tuyến bị ảnh hưởng; không ghi",
+    ("post", "/api/v1/lighting/commands"): "[TẠM — LIGHT-CTRL] Bấm ON / OFF / AUTO cho một mạch hoặc một tuyến — 202; cùng client_op_id → 200; không còn rơ-le nào → 409 NO_CONTROLLABLE_RELAY",
+    ("get", "/api/v1/lighting/commands"): "[TẠM — LIGHT-CTRL] Lịch sử lệnh, mới nhất trước; trạng thái tính lúc đọc (quá hạn = expired)",
+    ("get", "/api/v1/device/commands"): "[TẠM — LIGHT-CTRL] [Thiết bị] Lệnh đang mở của chính thiết bị, mới nhất mỗi rơ-le; giao lại tới khi ACK",
+    ("post", "/api/v1/device/commands/{commandId}/ack"): "[TẠM — LIGHT-CTRL] [Thiết bị] Báo kết quả SAU khi thực thi; lệnh đã đóng → 409 COMMAND_CLOSED nhưng vẫn lưu",
     # LIGHT-CTRL 2a — đăng ký thiết bị IoT + rơ-le + bí mật, drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW).
     ("get", "/api/v1/assets/iot-nodes"): "[TẠM — LIGHT-CTRL] Danh sách thiết bị IoT kèm rơ-le đang nối; không bao giờ trả bí mật",
     ("get", "/api/v1/assets/iot-nodes/{nodeId}"): "[TẠM — LIGHT-CTRL] Một thiết bị IoT; ngoài phạm vi xã → 404",
@@ -236,6 +242,8 @@ SECTION = {
     "/api/v1/auth/me": "§4.7",
     "/api/v1/assets/cabinets": "drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets/iot-nodes": "drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/lighting": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/device": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",
     "/api/v1/auth": "§4.1",

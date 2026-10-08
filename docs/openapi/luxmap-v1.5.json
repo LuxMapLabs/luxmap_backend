@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 101 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 106 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.14"
   },
   "paths": {
@@ -3954,6 +3954,213 @@
         "security": []
       }
     },
+    "/api/v1/device/commands": {
+      "get": {
+        "tags": [
+          "DeviceCommands"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCommandBatch"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCommandBatch"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCommandBatch"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Device": []
+          }
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — LIGHT-CTRL] [Thiết bị] Lệnh đang mở của chính thiết bị, mới nhất mỗi rơ-le; giao lại tới khi ACK",
+        "operationId": "getDeviceCommands",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/device/commands/{commandId}/ack": {
+      "post": {
+        "tags": [
+          "DeviceCommands"
+        ],
+        "parameters": [
+          {
+            "name": "commandId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAckRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAckRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAckRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAckResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAckResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAckResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Device": []
+          }
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — LIGHT-CTRL] [Thiết bị] Báo kết quả SAU khi thực thi; lệnh đã đóng → 409 COMMAND_CLOSED nhưng vẫn lưu",
+        "operationId": "postDeviceCommandsCommandidAck",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
     "/api/v1/evidence/{evidence_id}/thumbnail": {
       "get": {
         "tags": [
@@ -5572,6 +5779,387 @@
         "operationId": "postAssetsIotNodesNodeidCredential",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/lighting/preview": {
+      "get": {
+        "tags": [
+          "Lighting"
+        ],
+        "parameters": [
+          {
+            "name": "feeder_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingPreview"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingPreview"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:control_lighting",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — LIGHT-CTRL] Xem trước một lần bấm: rơ-le sẽ đổi, mạch bị loại kèm lý do, tuyến bị ảnh hưởng; không ghi",
+        "operationId": "getLightingPreview",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/lighting/commands": {
+      "post": {
+        "tags": [
+          "Lighting"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLightingRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLightingRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLightingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingRequestResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingRequestResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingRequestResult"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingRequestResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingRequestResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingRequestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:control_lighting",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — LIGHT-CTRL] Bấm ON / OFF / AUTO cho một mạch hoặc một tuyến — 202; cùng client_op_id → 200; không còn rơ-le nào → 409 NO_CONTROLLABLE_RELAY",
+        "operationId": "postLightingCommands",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)"
+      },
+      "get": {
+        "tags": [
+          "Lighting"
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "feeder_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingCommandItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingCommandItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LightingCommandItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — LIGHT-CTRL] Lịch sử lệnh, mới nhất trước; trạng thái tính lúc đọc (quá hạn = expired)",
+        "operationId": "getLightingCommands",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)"
       }
     },
     "/api/v1/lux-readings": {
@@ -10598,6 +11186,33 @@
         },
         "additionalProperties": false
       },
+      "CreateLightingRequest": {
+        "required": [
+          "client_op_id",
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "feeder_id": {
+            "maxLength": 32,
+            "type": "string",
+            "nullable": true
+          },
+          "segment_id": {
+            "maxLength": 32,
+            "type": "string",
+            "nullable": true
+          },
+          "mode": {
+            "$ref": "#/components/schemas/FeederControlMode"
+          },
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateLuxReadingRequest": {
         "required": [
           "client_op_id",
@@ -10934,6 +11549,85 @@
           "simulated"
         ],
         "type": "string"
+      },
+      "DeviceAckRequest": {
+        "required": [
+          "result",
+          "seq"
+        ],
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "result": {
+            "$ref": "#/components/schemas/LightingAckResult"
+          },
+          "reported_mode": {
+            "$ref": "#/components/schemas/FeederControlMode"
+          },
+          "error": {
+            "maxLength": 500,
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeviceAckResult": {
+        "type": "object",
+        "properties": {
+          "command_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LightingCommandStatus"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeviceCommand": {
+        "type": "object",
+        "properties": {
+          "command_id": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "relay_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/FeederControlMode"
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DeviceCommandBatch": {
+        "type": "object",
+        "properties": {
+          "server_time": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceCommand"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "EvidenceItem": {
         "required": [
@@ -11793,6 +12487,303 @@
           }
         },
         "additionalProperties": false
+      },
+      "LightingAckResult": {
+        "enum": [
+          "applied",
+          "failed"
+        ],
+        "type": "string"
+      },
+      "LightingCommandItem": {
+        "required": [
+          "cabinet_id",
+          "command_id",
+          "created_at",
+          "data_source",
+          "expires_at",
+          "feeder_id",
+          "node_id",
+          "relay_no",
+          "request_id",
+          "requested_mode",
+          "seq",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "command_id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seq": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "relay_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeder_id": {
+            "type": "string"
+          },
+          "cabinet_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "requested_mode": {
+            "$ref": "#/components/schemas/FeederControlMode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LightingCommandStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "delivered_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reported_mode": {
+            "$ref": "#/components/schemas/FeederControlMode"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LightingCommandItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LightingCommandItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "LightingCommandStatus": {
+        "enum": [
+          "pending",
+          "delivered",
+          "applied",
+          "failed",
+          "expired",
+          "superseded"
+        ],
+        "type": "string"
+      },
+      "LightingExclusion": {
+        "required": [
+          "feeder_id",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "feeder_id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "relay_no": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "reason": {
+            "$ref": "#/components/schemas/LightingExclusionReason"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LightingExclusionReason": {
+        "enum": [
+          "not_wired",
+          "remote_control_unsupported",
+          "no_credential"
+        ],
+        "type": "string"
+      },
+      "LightingPreview": {
+        "required": [
+          "affected_segment_ids",
+          "excluded",
+          "target_id",
+          "target_kind",
+          "targets",
+          "uncontrollable_pole_count"
+        ],
+        "type": "object",
+        "properties": {
+          "target_kind": {
+            "$ref": "#/components/schemas/LightingTargetKind"
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LightingTarget"
+            }
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LightingExclusion"
+            }
+          },
+          "affected_segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uncontrollable_pole_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LightingRequestResult": {
+        "required": [
+          "affected_segment_ids",
+          "client_op_id",
+          "commands",
+          "excluded",
+          "mode",
+          "request_id",
+          "requested_at",
+          "requested_by",
+          "target_id",
+          "target_kind",
+          "uncontrollable_pole_count"
+        ],
+        "type": "object",
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_kind": {
+            "$ref": "#/components/schemas/LightingTargetKind"
+          },
+          "target_id": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/FeederControlMode"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "requested_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LightingCommandItem"
+            }
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LightingExclusion"
+            }
+          },
+          "affected_segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uncontrollable_pole_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LightingTarget": {
+        "required": [
+          "cabinet_id",
+          "feeder_id",
+          "node_id",
+          "relay_no"
+        ],
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "relay_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "feeder_id": {
+            "type": "string"
+          },
+          "cabinet_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LightingTargetKind": {
+        "enum": [
+          "feeder",
+          "segment"
+        ],
+        "type": "string"
       },
       "LoginRequest": {
         "required": [
@@ -14922,6 +15913,12 @@
         "description": "The web refresh token. HttpOnly: set by /api/v1/auth/web/login and /refresh, sent back by the browser, never readable from JavaScript.",
         "name": "__Secure-luxmap_rt",
         "in": "cookie"
+      },
+      "Device": {
+        "type": "apiKey",
+        "description": "IoT devices only (LIGHT-CTRL, SELF-SIGNED): `Device <node_id>.<secret>`. The secret is issued once by POST /api/v1/assets/iot-nodes/{nodeId}/credential. A user's Bearer token is a 401 on these operations; this header is a 401 on every other one.",
+        "name": "Authorization",
+        "in": "header"
       }
     }
   },

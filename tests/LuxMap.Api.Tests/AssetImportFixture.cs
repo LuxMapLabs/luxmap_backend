@@ -193,6 +193,11 @@ public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncL
 
                 "DELETE FROM pole WHERE commune_id = @c OR commune_id = @f;",
 
+                // LIGHT-CTRL 2b: a command holds its request, device and feeder; a request holds its
+                // Manager's account — all RESTRICT, so both go before any of them.
+                "DELETE FROM lighting_command WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM lighting_request WHERE commune_id = @c OR commune_id = @f;",
+
                 // BE-14b: feeder_control holds both feeder and iot_node with RESTRICT, so it goes
                 // first, then the devices, then the feeders.
                 "DELETE FROM feeder_control WHERE commune_id = @c OR commune_id = @f;",

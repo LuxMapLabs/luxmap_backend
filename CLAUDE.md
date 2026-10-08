@@ -1918,3 +1918,29 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   được FK DB chặn và service **dịch lại thành 409** (`fk_feeder_control_feeder_same_cabinet`, `pk_feeder_control`), không để 500.
 - **Controller test cần xác thực không được nằm trong `TestEndpointsController`** (`[AllowAnonymous]` cấp class thắng). Khuôn:
   `DeviceProbeController` + `DeviceProbeFactory` (host riêng, cùng DB) — không thêm ApplicationPart vào `AssetImportFixture` dùng chung.
+
+### LIGHT-CTRL 2b — lệnh ON / OFF / AUTO (08/10/2026, drift LC-11)
+
+- **Một dịch vụ, mọi kênh:** `LightingCommandService` giữ trọn vòng đời (bấm, giao, ACK, hết hạn, thay). Adapter MQTT sau này
+  **gọi đúng các hàm đó** — không viết luồng lệnh thứ hai, không để QoS của broker thay ACK nghiệp vụ.
+- 🔴 **Mọi lượt ghi chạm lệnh khoá hàng `iot_node` trước** (đọc qua filter → `FOR UPDATE` theo `node_id` + `commune_id` → đọc
+  lại). Lần bấm nhiều thiết bị khoá theo thứ tự `node_id` ordinal; nối rơ-le lấy cùng khoá. Sau khoá phải **lập kế hoạch lại** và so —
+  lệch thì 409 `LIGHTING_TARGET_CHANGED`, không âm thầm gửi theo kế hoạch cũ. Phá thử: bỏ khoá → `Two_presses_at_once…` đỏ.
+- **Audit đúng một event mỗi `SaveChanges`** ⇒ bước chạm nhiều lệnh (hết hạn, giao, thay do nối rơ-le) **lưu từng lệnh một** trong
+  cùng transaction. Nhánh trả lời sớm của ACK vẫn phải **commit** — không thì các lệnh hết hạn vừa lưu bị rollback.
+- **`seq` là cột identity**, không vẽ trước: DB cấp lúc INSERT, tăng dần qua mọi phiên; hai lần bấm trên một thiết bị đã tuần tự
+  nhờ khoá. `command_id` thì **vẽ trước** (khuôn `NextFaultId`) vì audit của lần bấm phải liệt kê nó. Sắp lệnh theo `seq`,
+  **không** theo `command_id` (luật độ rộng tối thiểu, mục 0).
+- **`control_mode` chỉ đổi theo báo cáo của thiết bị, chỉ khi `seq` mới hơn `mode_seq` VÀ chưa có lệnh mới hơn nào được giao cho
+  rơ-le đó** (D-10, I-6) — kể cả ACK trên lệnh đã đóng (`COMMAND_CLOSED`, vẫn lưu audit `reported`). `mode_seq` một mình **không đủ**:
+  nó nằm trên dòng `feeder_control`, mà tháo rơ-le là xoá dòng ⇒ tháo + nối lại sẽ reset nó (Codex review 2b). Lịch sử lệnh thì còn.
+- **Tắt `supports_remote_control` thay mọi lệnh đang mở** (registry, actor Quản lý) và **poll không bao giờ giao** cho thiết bị đã tắt
+  cờ (actor `system` nếu cờ đổi đường khác) — D-R7.
+- 🔴 **Test chứng minh "có lấy khoá" phải giữ khoá bằng `FOR NO KEY UPDATE`, không `FOR UPDATE`.** Chèn hàng có FK tới `iot_node`
+  lấy KEY SHARE, và `UPDATE last_report_at` lấy NO KEY UPDATE — với `FOR UPDATE` cả hai tự chờ, test xanh dù service bỏ khoá
+  (phá thử đã lộ). Khuôn: `LightingCommandTests.HoldingTheDeviceLockAsync`; poll phải đẩy `last_report_at` ra tương lai trước.
+- **Lệnh thiết bị luôn lọc thêm `node_id` = principal** — cùng xã không có nghĩa là được đụng lệnh của thiết bị khác.
+- **Endpoint thiết bị là ngoại lệ có tên** trong `CapabilityPolicyCoverageTests.DeviceEndpoints` và trong `OpenApiSpecTests`
+  (`/api/v1/device/` khai scheme `Device`, không capability). Thêm endpoint thiết bị = sửa cả hai, nhìn thấy trong diff.
+- Teardown: `lighting_command` → `lighting_request` **trước** `feeder_control`, `iot_node`, `feeder` và tài khoản (đều `Restrict`).
+  Rollback `AddLightingCommands` gãy khi `audit_event` đã có giá trị mới (`system`, `lighting_*`, …) — cùng họ BE-19.

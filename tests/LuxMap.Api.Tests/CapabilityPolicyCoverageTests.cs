@@ -31,12 +31,23 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
         "GET /api/v1/auth/me",
     ];
 
+    /// <summary>
+    /// LIGHT-CTRL 2b: the endpoints a DEVICE calls. They name <see cref="DeviceAuth.Policy"/>, which is outside the matrix on
+    /// purpose — no role is ever a device. Adding one means editing this list, which shows in a diff.
+    /// </summary>
+    private static readonly string[] DeviceEndpoints =
+    [
+        "GET /api/v1/device/commands",
+        "POST /api/v1/device/commands/{commandId}/ack",
+    ];
+
     [Fact]
     public void Every_endpoint_that_is_not_anonymous_names_a_capability_policy()
     {
         var bare = ProductionEndpoints.Of(factory.Services)
             .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
             .Where(endpoint => !IdentityOnlyEndpoints.Contains(ProductionEndpoints.Describe(endpoint)))
+            .Where(endpoint => !DeviceEndpoints.Contains(ProductionEndpoints.Describe(endpoint)))
             .Where(endpoint => !PoliciesOf(endpoint).Any(LuxMapPolicies.Matrix.ContainsKey))
             .Select(ProductionEndpoints.Describe)
             .Order(StringComparer.Ordinal)
@@ -56,6 +67,7 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
         var unknown = ProductionEndpoints.Of(factory.Services)
             .SelectMany(endpoint => PoliciesOf(endpoint)
                 .Where(policy => !LuxMapPolicies.Matrix.ContainsKey(policy))
+                .Where(policy => !(policy == DeviceAuth.Policy && DeviceEndpoints.Contains(ProductionEndpoints.Describe(endpoint))))
                 .Select(policy => $"{ProductionEndpoints.Describe(endpoint)} → {policy}"))
             .ToArray();
 
@@ -75,6 +87,29 @@ public class CapabilityPolicyCoverageTests(ScopeTestFixture factory, ITestOutput
             Assert.Empty(PoliciesOf(endpoint!));
             Assert.Null(endpoint!.Metadata.GetMetadata<IAllowAnonymous>());
         }
+    }
+
+    /// <summary>
+    /// Each device endpoint exists, names the device policy and NOTHING else, and is not anonymous — <c>[AllowAnonymous]</c>
+    /// would skip authorization altogether, and a capability next to it would let a user's token in.
+    /// </summary>
+    [Fact]
+    public void Every_device_endpoint_exists_and_names_only_the_device_policy()
+    {
+        var byRoute = ProductionEndpoints.Of(factory.Services)
+            .ToDictionary(ProductionEndpoints.Describe, StringComparer.Ordinal);
+
+        foreach (var route in DeviceEndpoints)
+        {
+            Assert.True(byRoute.TryGetValue(route, out var endpoint), $"{route} không còn tồn tại");
+            Assert.Equal([DeviceAuth.Policy], PoliciesOf(endpoint!).Distinct(StringComparer.Ordinal).ToArray());
+            Assert.Null(endpoint!.Metadata.GetMetadata<IAllowAnonymous>());
+        }
+
+        // And the device policy appears NOWHERE else.
+        var elsewhere = byRoute.Where(pair => !DeviceEndpoints.Contains(pair.Key) && PoliciesOf(pair.Value).Contains(DeviceAuth.Policy))
+            .Select(pair => pair.Key).ToArray();
+        Assert.Empty(elsewhere);
     }
 
     /// <summary>

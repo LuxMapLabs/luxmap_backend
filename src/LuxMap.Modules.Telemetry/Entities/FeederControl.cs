@@ -45,6 +45,13 @@ public class FeederControl : ICommuneScoped
     public FeederControlMode? ControlMode { get; set; }
 
     public DateTime? ModeReportedAt { get; set; }
+
+    /// <summary>
+    /// The <c>seq</c> of the lighting command whose acknowledgement last set <see cref="ControlMode"/> (LIGHT-CTRL D-10). A
+    /// report is written only when its <c>seq</c> is above this, so a late acknowledgement of an old command never overwrites
+    /// a newer mode. NULL until the first acknowledged command.
+    /// </summary>
+    public long? ModeSeq { get; set; }
 }
 
 /// <summary>

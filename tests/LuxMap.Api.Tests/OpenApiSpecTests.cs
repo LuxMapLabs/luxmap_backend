@@ -102,6 +102,17 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
             foreach (var operation in path.Value.EnumerateObject())
             {
                 var where = $"{operation.Name.ToUpperInvariant()} {path.Name}";
+
+                // LIGHT-CTRL 2b: a device endpoint has no capability (no role is a device) and names the Device scheme instead.
+                if (path.Name.StartsWith("/api/v1/device/", StringComparison.Ordinal))
+                {
+                    Assert.False(operation.Value.TryGetProperty("x-luxmap-capability", out _), $"{where}: a device operation names a capability");
+                    var schemes = operation.Value.GetProperty("security").EnumerateArray().SelectMany(requirement => requirement.EnumerateObject())
+                        .Select(scheme => scheme.Name).ToArray();
+                    Assert.Equal(["Device"], schemes);
+                    continue;
+                }
+
                 Assert.True(operation.Value.TryGetProperty("x-luxmap-capability", out var capability), $"{where}: no x-luxmap-capability");
 
                 var roles = operation.Value.GetProperty("x-luxmap-roles").EnumerateArray().Select(role => role.GetString()).ToArray();
