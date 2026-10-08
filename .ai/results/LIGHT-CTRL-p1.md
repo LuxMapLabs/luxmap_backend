@@ -32,7 +32,9 @@ xác nhận hoặc thay; phần còn lại không phụ thuộc kênh.
 
 ### 3.1 Kênh thiết bị (D-1)
 
-**Thiết bị HỎI (poll) qua HTTPS**, không broker.
+**Chốt 08/10: dịch vụ lệnh KHÔNG phụ thuộc kênh truyền** (`LightingCommandService`: tạo, giao, ACK, hết hạn, thay — toàn bộ vòng đời,
+quyền, audit); **adapter đầu tiên là poll HTTPS**. Nếu Đạt đã dùng MQTT, chỉ thêm adapter MQTT gọi đúng các hàm đó — không có luồng lệnh
+thứ hai. QoS của MQTT **không thay** ACK nghiệp vụ.
 
 | | Poll HTTPS (đề xuất) | MQTT | WebSocket |
 |---|---|---|---|
@@ -66,6 +68,9 @@ iot_node
 + credential_hash   text NULL        -- NULL = chưa cấp bí mật
 + credential_set_at timestamptz NULL -- CHECK: cùng null
 
+feeder_control
++ mode_seq          bigint NULL      -- seq của lệnh đã đặt control_mode lần cuối (D-10); NULL khi chưa ACK lần nào
+
 lighting_request                       ← MỚI — một lần bấm của Quản lý (nhóm)
   request_id        uuid PK
   client_op_id      uuid NOT NULL UNIQUE, request_hash text NOT NULL   -- khuôn sync / BE-41
@@ -85,6 +90,7 @@ lighting_command                       ← MỚI — một dòng mỗi rơ-le
   relay_no, cabinet_id   -- ẢNH CHỤP lúc tạo; rơ-le nối lại sau đó không làm hỏng dòng lịch sử
   data_source       ảnh chụp từ thiết bị (calibration_rig | simulated) — OPS S18
   commune_id, requested_mode
+  seq               bigint NOT NULL UNIQUE  -- tăng dần, server cấp (D-10)
   status            pending | delivered | applied | failed | expired | superseded
   expires_at, delivered_at, completed_at
   reported_mode     NULL | on | off | auto ;  error text NULL (≤ 500)
@@ -106,7 +112,7 @@ pending ──(poll)──► delivered ──(ACK applied)──► applied   �
 
 - 🔴 **Khoá theo thiết bị.** Tạo lệnh, poll, ACK, hết hạn, tháo / nối rơ-le đều mở transaction và **khoá hàng `iot_node`**
   (`SELECT 1 … FOR UPDATE`, khuôn `FaultLocks`) **trước** khi đọc lại trạng thái. Một lần bấm chạm nhiều thiết bị → khoá theo
-  thứ tự `node_id` (ordinal). Thứ tự xử lý = thứ tự tới server dưới khoá; không cần số thứ tự từ thiết bị cho pilot (D-10).
+  thứ tự `node_id` (ordinal). Khoá chỉ tuần tự hoá các lượt ghi ở server; **thứ tự thực thi** do `seq` quyết (D-10, ngay dưới).
 - **Poll trả lệnh `pending` VÀ `delivered` còn hạn** — mới nhất mỗi rơ-le, cùng `command_id` — để response bị rơi không làm mất lệnh.
   Firmware khử trùng lặp theo `command_id`. Chỉ lần giao **đầu** đổi trạng thái + ghi audit. Quá hạn thì không giao nữa.
 - **ACK tự kiểm** dưới khoá: đúng thiết bị gọi; trạng thái `delivered`; `now ≤ expires_at`; ánh xạ `(node, relay) → feeder` vẫn như
@@ -118,6 +124,11 @@ pending ──(poll)──► delivered ──(ACK applied)──► applied   �
 - **Hết hạn khi ĐỌC không ghi:** `GET /lighting/commands` hiển thị `expired` cho dòng `pending` / `delivered` đã quá hạn mà không
   sửa DB; trạng thái được **lưu** ở lượt ghi kế tiếp có khoá (poll / ACK / lệnh mới / nối rơ-le).
 - Hạn mặc định **60 s** (`Lighting:CommandTtl`).
+- 🔴 **Thứ tự lệnh (D-10, chốt 08/10).** Thứ tự tới server ≠ thứ tự thực thi (gửi lại, mất response, thiết bị khởi động lại). Mỗi
+  lệnh mang **`seq`** — số nguyên tăng dần do server cấp (`lighting_command_seq`). Thiết bị lưu **`seq` lớn nhất đã thực thi cho mỗi
+  rơ-le vào flash (NVS)** và **bỏ** mọi lệnh có `seq` ≤ giá trị đó — kể cả sau khởi động lại. ACK mang `seq`. Server chỉ ghi
+  `reported_mode` vào `feeder_control` khi `seq` **lớn hơn** `feeder_control.mode_seq` (cột mới) — ACK đến trễ của lệnh cũ không đè
+  chế độ mới. ACK cho lệnh đã đóng (`expired` / `superseded`) → 409, **lưu vào lịch sử**, chỉ đổi chế độ nếu `seq` vẫn mới hơn.
 
 ### 3.5 Audit — sửa sau review (P1)
 
@@ -145,7 +156,7 @@ pending ──(poll)──► delivered ──(ACK applied)──► applied   �
 
 | Endpoint | Ghi chú |
 |---|---|
-| `GET /api/v1/device/commands` | Lệnh `pending` + `delivered` còn hạn của **chính thiết bị**, mới nhất mỗi rơ-le: `[{command_id, relay_no, mode, expires_at}]`. Cập nhật `last_report_at` (D-5, chỉ tiến) |
+| `GET /api/v1/device/commands` | Lệnh `pending` + `delivered` còn hạn của **chính thiết bị**, mới nhất mỗi rơ-le: `[{command_id, seq, relay_no, mode, expires_at}]`. Cập nhật `last_report_at` (D-5, chỉ tiến) |
 | `POST /api/v1/device/commands/{command_id}/ack` | 3.4 |
 
 ### 3.8 Đăng ký thiết bị + rơ-le (phần BE-34, `ManageAssets` — D-7)
@@ -171,17 +182,27 @@ gọi endpoint thiết bị, thiết bị khác cùng xã / khác xã, header De
 vs thay, hai Quản lý cùng gửi, nối rơ-le khi lệnh đã giao; `RoleCapabilityMatrixTests` (chỉ Quản lý gửi); `copy_dev_to_supabase.py`
 `PLAN`; teardown fixture; OpenAPI + generator; ERD (`erd.md:224`); `CLAUDE.md`; drift; báo WP5 (thay nút mock) và Đạt (kênh + ACK).
 
-## 6. D-item — Mỹ chốt
+## 6. D-item — ✅ CHỐT 08/10/2026 (Claude + Codex, theo uỷ quyền của Mỹ · SELF-SIGNED)
 
-| Mã | Câu hỏi | Đề xuất |
-|---|---|---|
-| **D-1** | Kênh truyền lệnh | **Poll HTTPS**, chu kỳ 2–5 s trên testbed. Hỏi Đạt: telemetry đã chọn MQTT thì dùng chung |
-| **D-2** | Xác thực thiết bị | Bí mật riêng mỗi thiết bị, định dạng + so sánh như 3.2, policy `DeviceOnly`, không `[AllowAnonymous]` |
-| **D-3** | ID lệnh | Prefix `CMD`, độ rộng 6. Nhóm lệnh dùng UUID (`request_id`), không ID hiển thị |
-| **D-4** | Vòng đời + đồng thời | 3.4: khoá theo thiết bị, poll giao lại lệnh còn hạn, ACK tự kiểm hạn / ánh xạ, hạn 60 s, không retry |
-| **D-5** | Poll có tính là "thiết bị còn sống" | **Có** — cập nhật `last_report_at` (chỉ tiến), không đồng nghĩa có telemetry |
-| **D-6** | Ai xem trạng thái lệnh | `ReadNetwork` (cả bốn vai trò xem, chỉ Quản lý gửi) |
-| **D-7** | Ai đăng ký thiết bị / nối rơ-le / cấp bí mật | **Quản lý** (`ManageAssets`); Quản trị hệ thống không ghi tài sản (D-R12) |
-| **D-8** | Gửi theo tuyến khi một phần không điều khiển được | Gửi phần được, **`excluded[]`** kèm lý do; 409 chỉ khi không còn rơ-le nào |
-| **D-9** | Chống replay ở tầng xác thực | **Không** cho pilot: HTTPS + ACK idempotent. Chữ ký / timestamp / nonce để sau nếu ra thực địa |
-| **D-10** | Số thứ tự báo cáo từ thiết bị | **Không** cho pilot: thứ tự = thứ tự tới server dưới khoá thiết bị |
+Mỹ uỷ quyền: *"tham khảo cùng với codex và đưa ra quyết định"*. Codex (gpt-6.1-sol, 51k token) đồng ý D-2, D-3, D-5…D-9 (kèm điều
+kiện), đề nghị đổi D-1, D-4, D-10 và tách D-7 — Claude **nhận cả bốn**. Cột "Đề xuất" dưới đây là bản **trước** khi chốt; cột
+"Quyết định" là bản chốt.
+
+| Mã | Câu hỏi | Đề xuất | Quyết định |
+|---|---|---|---|
+| **D-1** | Kênh truyền lệnh | **Poll HTTPS**, chu kỳ 2–5 s trên testbed. Hỏi Đạt: telemetry đã chọn MQTT thì dùng chung | **Dịch vụ lệnh độc lập kênh + adapter poll HTTPS trước** (3.1). Kênh cuối cùng chờ Đạt |
+| **D-2** | Xác thực thiết bị | Bí mật riêng mỗi thiết bị, định dạng + so sánh như 3.2, policy `DeviceOnly`, không `[AllowAnonymous]` | Như đề xuất + TLS kiểm chứng chứng chỉ, **không ghi bí mật vào log** |
+| **D-3** | ID lệnh | Prefix `CMD`, độ rộng 6. Nhóm lệnh dùng UUID (`request_id`), không ID hiển thị | Như đề xuất — `CMD`, **tối thiểu** 6 chữ số (luật 0.3) |
+| **D-4** | Vòng đời + đồng thời | 3.4: khoá theo thiết bị, poll giao lại lệnh còn hạn, ACK tự kiểm hạn / ánh xạ, hạn 60 s, không retry | Như đề xuất + ACK cho lệnh đã đóng chỉ vào lịch sử; chế độ chỉ đổi theo `seq` (D-10) |
+| **D-5** | Poll có tính là "thiết bị còn sống" | **Có** — cập nhật `last_report_at` (chỉ tiến), không đồng nghĩa có telemetry | Như đề xuất; `last_report_at` = kênh điều khiển còn sống, **không** phải telemetry còn mới (IOT-09 có độ mới riêng) |
+| **D-6** | Ai xem trạng thái lệnh | `ReadNetwork` (cả bốn vai trò xem, chỉ Quản lý gửi) | Như đề xuất, vẫn scope xã, không bao giờ trả bí mật |
+| **D-7** | Ai đăng ký thiết bị / nối rơ-le / cấp bí mật | **Quản lý** (`ManageAssets`); Quản trị hệ thống không ghi tài sản (D-R12) | Như đề xuất; **Phase 2 tách hai PR**: 2a đăng ký thiết bị + rơ-le + bí mật + scheme `Device`; 2b lệnh |
+| **D-8** | Gửi theo tuyến khi một phần không điều khiển được | Gửi phần được, **`excluded[]`** kèm lý do; 409 chỉ khi không còn rơ-le nào | Như đề xuất; FE xác nhận qua `preview`, server **kiểm lại** quyền + ánh xạ lúc gửi |
+| **D-9** | Chống replay ở tầng xác thực | **Không** cho pilot: HTTPS + ACK idempotent. Chữ ký / timestamp / nonce để sau nếu ra thực địa | Như đề xuất cho pilot: TLS + bí mật riêng + TTL + dedup + thứ tự D-10. Ghi rõ giới hạn khi bảo vệ |
+| **D-10** | Số thứ tự báo cáo từ thiết bị | **Không** cho pilot: thứ tự = thứ tự tới server dưới khoá thiết bị | **Đổi:** `seq` do server cấp; thiết bị lưu `seq` đã thực thi mỗi rơ-le vào flash, bỏ lệnh cũ; server chỉ đổi chế độ khi `seq` mới hơn `mode_seq` (3.4) |
+
+**Phải báo Đạt (firmware) — hợp đồng không phụ thuộc kênh:** lệnh `{command_id, seq, relay_no, mode, expires_at}`; **khử trùng lặp
+theo `command_id`**; **bỏ lệnh quá `expires_at`**; **bỏ lệnh có `seq` ≤ `seq` đã thực thi** của rơ-le đó, giá trị này lưu flash qua
+khởi động lại; ACK **sau khi** thực thi `{seq, result, reported_mode, error?}`; quy tắc AUTO (về lịch / cảm biến của thiết bị); trạng
+thái lúc khởi động. Hỏi: telemetry đang gửi bằng HTTP hay MQTT.
+
