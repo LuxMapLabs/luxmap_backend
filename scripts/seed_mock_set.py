@@ -154,9 +154,10 @@ END $$;""".strip())
     for feature in poles:
         p = feature["properties"]
         sql.append(
-            "INSERT INTO pole (pole_id, segment_id, feeder_id, commune_id, geom, "
+            # feeder_source: the demo circuit is nobody's verified claim (TOPO-INFER TI-1) — always 'inferred'.
+            "INSERT INTO pole (pole_id, segment_id, feeder_id, feeder_source, commune_id, geom, "
             "near_sensitive_poi, data_source, external_ref) VALUES ("
-            f"{quote(p['pole_id'])}, {quote(p['segment_id'])}, {quote(demo_feeder[p['segment_id']])}, {COMMUNE}, "
+            f"{quote(p['pole_id'])}, {quote(p['segment_id'])}, {quote(demo_feeder[p['segment_id']])}, 'inferred', {COMMUNE}, "
             f"{geometry(feature['geometry'])}, {str(p['near_sensitive_poi']).lower()}, "
             f"{DATA_SOURCE}, {quote(p['pole_id'])});")
 
@@ -228,7 +229,8 @@ END $$;""".strip())
             f"{str(p['supports_remote_control']).lower()}, 'simulated', {quote(p['last_report_at'])});")
         for relay, feeder_id in enumerate(p["feeder_ids"], start=1):
             # A relay switches only a feeder of the device's own cabinet (CAB-4).
-            sql.append(f"UPDATE feeder SET cabinet_id = {quote(cabinet_id)} WHERE feeder_id = {quote(feeder_id)};")
+            sql.append(f"UPDATE feeder SET cabinet_id = {quote(cabinet_id)}, cabinet_source = 'inferred' "
+                       f"WHERE feeder_id = {quote(feeder_id)};")
             sql.append(
                 "INSERT INTO feeder_control (feeder_id, node_id, commune_id, cabinet_id, relay_no) VALUES ("
                 f"{quote(feeder_id)}, {quote(p['node_id'])}, {COMMUNE}, {quote(cabinet_id)}, {relay});")

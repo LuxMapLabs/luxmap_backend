@@ -139,9 +139,9 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         {
             await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
                 $"""
-                INSERT INTO feeder (feeder_id, feeder_name, commune_id, cabinet_id) VALUES
-                ({longer}, 'order probe', {fixture.CommuneId}, {cabinetId}),
-                ({shorter}, 'order probe', {fixture.CommuneId}, {cabinetId})
+                INSERT INTO feeder (feeder_id, feeder_name, commune_id, cabinet_id, cabinet_source) VALUES
+                ({longer}, 'order probe', {fixture.CommuneId}, {cabinetId}, 'inferred'),
+                ({shorter}, 'order probe', {fixture.CommuneId}, {cabinetId}, 'inferred')
                 """));
 
             var inventory = (await GetAsync(client, $"{Cabinets}/{cabinetId}")).GetProperty("cabinet");
@@ -171,7 +171,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         var row = await FindAsync(client, $"{Feeders}?page_size=200", "feeder_id", feederId);
         var cabinet = row.GetProperty("cabinet");
 
-        Assert.Equal(["cabinet_id", "cabinet_name", "location"], Keys(cabinet));
+        Assert.Equal(["cabinet_id", "cabinet_name", "cabinet_source", "location"], Keys(cabinet));
         Assert.Equal(cabinetId, cabinet.GetProperty("cabinet_id").GetString());
         Assert.Equal(Lat, cabinet.GetProperty("location").GetProperty("lat").GetDouble(), 6);
         Assert.Equal(Lng, cabinet.GetProperty("location").GetProperty("lng").GetDouble(), 6);
@@ -464,9 +464,10 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         var feederId = await NewFeederAsync(fixture.CommuneId, cabinetId);
         await ControlAsync(feederId, await NewNodeAsync(cabinetId), cabinetId);
 
-        foreach (var target in new[] { "NULL", $"'{other}'" })
+        // Detaching clears the label too (TOPO-INFER), so the pairing CHECK is satisfied and the relay key is what refuses.
+        foreach (var target in new[] { "cabinet_id = NULL, cabinet_source = NULL", $"cabinet_id = '{other}'" })
         {
-            var error = await SqlFailsAsync($"UPDATE feeder SET cabinet_id = {target} WHERE feeder_id = '{feederId}'");
+            var error = await SqlFailsAsync($"UPDATE feeder SET {target} WHERE feeder_id = '{feederId}'");
             Assert.Equal(CabinetConstraints.RelayFeederSameCabinet, error.ConstraintName);
         }
     }
@@ -640,7 +641,13 @@ public sealed class CabinetTests(AssetImportFixture fixture)
     private Task<string> NewFeederAsync(string communeId, string? cabinetId)
         => AsSystemAsync(async db =>
         {
-            var feeder = new Feeder { FeederName = "cabinet probe feeder", CommuneId = communeId, CabinetId = cabinetId };
+            var feeder = new Feeder
+            {
+                FeederName = "cabinet probe feeder",
+                CommuneId = communeId,
+                CabinetId = cabinetId,
+                CabinetSource = cabinetId is null ? null : TopologySource.Inferred,
+            };
             db.Add(feeder);
             await db.SaveChangesAsync();
             return feeder.FeederId;

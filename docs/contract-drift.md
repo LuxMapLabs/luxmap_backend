@@ -1135,3 +1135,22 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 **Phải báo:** WP5 (trả lời câu hỏi `has_geometry`: toạ độ tủ đến qua `cabinet.location`; màn quản lý trụ mới; lớp bản đồ trụ;
 `PUT` feeder vắng `cabinet_id` = giữ), IOT-09 / Đạt (testbed: tạo trụ trước, thiết bị gắn vào trụ, rơ-le mang `cabinet_id`).
 **Chưa báo.**
+
+## TOPO-INFER — nhãn nguồn gốc cho topology + sơ đồ nhánh của trụ (07/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Topology ngoài thực địa được **suy luận công khai, có gắn nhãn** — không giấu, không đoán ngầm. Mỗi quan hệ cột → mạch và mạch → trụ mang `verified \| inferred`; bản đồ vẽ sơ đồ nhánh từ dữ liệu backend, nét đứt cho suy luận. Nền: phương án A của FEEDER-SCOPE |
+| **Decision maker** | **Mỹ (Dylan)**, 07/10/2026 — đồng ý D-1…D-10 của `.ai/results/TOPO-INFER-p1.md` (đã qua review Codex, 8/8 phát hiện áp) |
+| **Chạm API** | **Có.** SELF-SIGNED, nền tạm tới FW; chưa lên Contract |
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **TI-1** | Enum mới **`topology_source : verified \| inferred`**. `pole.feeder_source` (cặp với `feeder_id`) và `feeder.cabinet_source` (cặp với `cabinet_id`); CHECK: nhãn null ⇔ quan hệ null. Backfill mọi quan hệ đang có → `inferred` | Có (enum mới) |
+| **TI-2** | Luật ghi: nhãn vắng + quan hệ không đổi → **giữ**; quan hệ đổi / gắn mới → **`inferred`**; tháo quan hệ → xoá nhãn (gửi kèm `null` cũng được); `null` **khi quan hệ còn** hay sai kiểu → **400**; nhãn có giá trị kèm quan hệ null → **400**. Không đường nào tự nhận `verified`. Ghi **theo cặp** (cả hai cột trong cùng UPDATE) | Có |
+| **TI-3** | `feeder_source` trên `POST/PUT /assets/poles`, `PUT /assets/poles/{id}/feeder`, import cột; `cabinet_source` trên `POST/PUT /assets/feeders`, import feeder. Đọc: `PoleListItem`, `TopologyPole` (+`feeder_source`), `FeederListItem.cabinet` (+`cabinet_source`). **Không** thêm vào `/map/poles` | Có |
+| **TI-4** | `GET /api/v1/map/cabinets/{cabinetId}/topology` — `FeatureCollection` của `LineString`, **mỗi feature một cạnh**: `feeder_id, segment_id, branch, order, from_id, to_pole_id, feeder_source`. Nhánh theo (mạch, tuyến) và hai phía trụ, thứ tự dọc đường kiểu WO-12; cạnh đầu lấy nhãn thấp hơn của hai quan hệ. Không phát khoảng cách | Có (endpoint mới) |
+| **TI-5** | Quản lý (`ManageAssets`) đặt nhãn; không lưu "ai xác minh, lúc nào" (`updated_by` không phải dấu xác minh) | Không |
+| **TI-6** | Chặn trộn cột `field` với trụ không-`field` (D-7) và script đề xuất quan hệ suy luận (D-8): **ticket riêng** | — |
+
+**Phải báo:** WP5 (vẽ từ `/map/cabinets/{id}/topology`, bỏ chia đều trong `useElectricalCascade`; nhãn trên form cột / mạch). **Chưa báo.**

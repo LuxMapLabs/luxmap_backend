@@ -268,7 +268,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
         var item = (await ReadPageAsync(client, $"{Feeders}/{feederId}/poles")).GetProperty("items")[0];
         var keys = item.EnumerateObject().Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
 
-        string[] expected = ["pole_id", "segment_id", "feeder_id", "lat", "lng"];
+        string[] expected = ["pole_id", "segment_id", "feeder_id", "feeder_source", "lat", "lng"];
 
         Assert.Equal(
             [.. expected.Order(StringComparer.Ordinal)],
@@ -371,6 +371,7 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
                     SegmentId = segmentId,
                     CommuneId = communeId,
                     FeederId = feederId,
+                    FeederSource = feederId is null ? null : TopologySource.Inferred,
                     Geom = new Point(lng, lat) { SRID = 4326 },
                     DataSource = DataSource.PublicImagery,
                 };

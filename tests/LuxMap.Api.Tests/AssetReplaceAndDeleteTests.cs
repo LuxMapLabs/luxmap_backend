@@ -530,6 +530,7 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
                 {
                     SegmentId = segmentId,
                     FeederId = feederId,
+                    FeederSource = feederId is null ? null : TopologySource.Inferred,
                     CommuneId = communeId,
                     Geom = new Point(106.49, 10.97) { SRID = 4326 },
                     DataSource = DataSource.PublicImagery,

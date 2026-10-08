@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 93 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 94 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.14"
   },
   "paths": {
@@ -5694,6 +5694,96 @@
         "x-luxmap-status": "implemented"
       }
     },
+    "/api/v1/map/cabinets/{cabinetId}/topology": {
+      "get": {
+        "tags": [
+          "Map"
+        ],
+        "parameters": [
+          {
+            "name": "cabinetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeatureCollection"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeatureCollection"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeatureCollection"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source để vẽ nét đứt cho quan hệ suy luận. Sơ đồ logic, không phải tuyến cáp",
+        "operationId": "getMapCabinetsCabinetidTopology",
+        "x-luxmap-status": "implemented"
+      }
+    },
     "/api/v1/map/cabinets": {
       "get": {
         "tags": [
@@ -9516,6 +9606,87 @@
         },
         "additionalProperties": false
       },
+      "CabinetTopologyEdgeProperties": {
+        "required": [
+          "branch",
+          "feeder_id",
+          "feeder_source",
+          "from_id",
+          "order",
+          "segment_id",
+          "to_pole_id"
+        ],
+        "type": "object",
+        "properties": {
+          "feeder_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from_id": {
+            "type": "string"
+          },
+          "to_pole_id": {
+            "type": "string"
+          },
+          "feeder_source": {
+            "$ref": "#/components/schemas/TopologySource"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetTopologyEdgePropertiesFeature": {
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/CabinetTopologyEdgeProperties"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetTopologyEdgePropertiesFeatureCollection": {
+        "required": [
+          "features"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "ClipManifest": {
         "type": "object",
         "properties": {
@@ -9622,6 +9793,11 @@
           "cabinet_id": {
             "maxLength": 32,
             "type": "string",
+            "nullable": true
+          },
+          "cabinet_source": {
+            "type": "string",
+            "description": "Provenance of the feeder → cabinet relation (TOPO-INFER D-10): verified | inferred. OPTIONAL: absent = inferred for a new or moved cabinet, KEPT when the cabinet stays. null while a cabinet is set, or a label with no cabinet, is 400.",
             "nullable": true
           }
         },
@@ -9774,6 +9950,11 @@
           },
           "note": {
             "type": "string",
+            "nullable": true
+          },
+          "feeder_source": {
+            "type": "string",
+            "description": "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.",
             "nullable": true
           }
         },
@@ -10260,6 +10441,7 @@
         "required": [
           "cabinet_id",
           "cabinet_name",
+          "cabinet_source",
           "location"
         ],
         "type": "object",
@@ -10272,6 +10454,9 @@
           },
           "location": {
             "$ref": "#/components/schemas/AssetLocation"
+          },
+          "cabinet_source": {
+            "$ref": "#/components/schemas/TopologySource"
           }
         },
         "additionalProperties": false
@@ -11104,6 +11289,9 @@
           "feeder_id": {
             "type": "string",
             "nullable": true
+          },
+          "feeder_source": {
+            "$ref": "#/components/schemas/TopologySource"
           },
           "commune_id": {
             "type": "string"
@@ -12215,6 +12403,11 @@
             "type": "string",
             "description": "The feeder this pole hangs off, or null when it is on no circuit at all. The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.",
             "nullable": true
+          },
+          "feeder_source": {
+            "type": "string",
+            "description": "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -12906,6 +13099,9 @@
             "type": "string",
             "nullable": true
           },
+          "feeder_source": {
+            "$ref": "#/components/schemas/TopologySource"
+          },
           "lat": {
             "type": "number",
             "format": "double"
@@ -12940,6 +13136,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "TopologySource": {
+        "enum": [
+          "verified",
+          "inferred"
+        ],
+        "type": "string"
       },
       "UnreadCountResponse": {
         "type": "object",
@@ -13003,6 +13206,11 @@
             "type": "string",
             "description": "The cabinet this circuit leaves from (CAB-6). OPTIONAL and KEPT when absent: leave the key out to keep the cabinet, send null to detach the feeder, an id to move it. A feeder a device switches cannot move or be detached (409).",
             "nullable": true
+          },
+          "cabinet_source": {
+            "type": "string",
+            "description": "Provenance of the feeder → cabinet relation (TOPO-INFER D-10): verified | inferred. OPTIONAL: absent = inferred for a new or moved cabinet, KEPT when the cabinet stays. null while a cabinet is set, or a label with no cabinet, is 400.",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -13043,6 +13251,11 @@
           "note": {
             "type": "string",
             "description": "The engineer's note. OPTIONAL and the one field this full replacement keeps when absent: leave the key out to keep the note, send null or blank to clear it, text (at most 1000 characters) to overwrite it.",
+            "nullable": true
+          },
+          "feeder_source": {
+            "type": "string",
+            "description": "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.",
             "nullable": true
           }
         },

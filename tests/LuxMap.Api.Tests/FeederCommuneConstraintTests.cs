@@ -148,6 +148,7 @@ public sealed class FeederCommuneConstraintTests(AssetImportFixture fixture)
         {
             var pole = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.PoleId == poleId);
             pole.FeederId = null;
+            pole.FeederSource = null;
             return await db.SaveChangesAsync();
         });
 
@@ -355,6 +356,7 @@ public sealed class FeederCommuneConstraintTests(AssetImportFixture fixture)
         SegmentId = segmentId,
         CommuneId = communeId,
         FeederId = feederId,
+        FeederSource = feederId is null ? null : TopologySource.Inferred,
         Geom = new Point(106.49, 10.97) { SRID = 4326 },
         DataSource = DataSource.PublicImagery,
     };

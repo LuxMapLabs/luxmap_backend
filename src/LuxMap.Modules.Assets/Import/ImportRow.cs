@@ -21,6 +21,13 @@ internal interface IImportRow
 
     string? this[string column] { get; }
 
+    /// <summary>
+    /// The cell holds something that is not a scalar (a GeoJSON object or array). The indexer reads those as <c>null</c>,
+    /// i.e. "empty" — a column whose empty cell MEANS something (keep) must check this first, or a malformed value is
+    /// silently taken for a decision (TOPO-INFER).
+    /// </summary>
+    bool IsNonScalar(string column);
+
     bool TryGeometry(out Geometry? geometry, out string? error);
 }
 
@@ -31,6 +38,8 @@ internal sealed class CsvImportRow(CsvRow row) : IImportRow
     public int Row => row.LineNumber;
 
     public string? this[string column] => row[column];
+
+    public bool IsNonScalar(string column) => false;
 
     public bool TryGeometry(out Geometry? geometry, out string? error)
         => AssetGeometry.TryReadWkt(row[GeometryColumn], out geometry, out error);
@@ -62,6 +71,11 @@ internal sealed class GeoJsonImportRow(int index, JsonElement properties, JsonEl
             return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
         }
     }
+
+    public bool IsNonScalar(string column)
+        => properties.ValueKind == JsonValueKind.Object
+            && properties.TryGetProperty(column, out var value)
+            && value.ValueKind is JsonValueKind.Object or JsonValueKind.Array;
 
     public bool TryGeometry(out Geometry? result, out string? error)
     {
@@ -190,6 +204,33 @@ internal sealed class ImportRowReader(IImportRow row, List<ImportRowError> error
 
         Fail(column, $"'{text}' is not one of: {string.Join(", ", ContractEnum.AllDbValues<TEnum>())}.");
         return default;
+    }
+
+    /// <summary>
+    /// An optional provenance label (TOPO-INFER): empty cell = not sent; anything else must be <c>verified</c> /
+    /// <c>inferred</c>, or the row fails. There is no "null" in a file — an empty cell is the only way to leave it out.
+    /// </summary>
+    public Crud.TopologyLink.Label Label(string column)
+    {
+        if (row.IsNonScalar(column))
+        {
+            Fail(column, $"Expected one of: {Crud.TopologyLink.Allowed}; got an object or an array.");
+            return Crud.TopologyLink.Label.Absent;
+        }
+
+        var text = row[column];
+        if (text is null)
+        {
+            return Crud.TopologyLink.Label.Absent;
+        }
+
+        if (Crud.TopologyLink.Parse(text) is { } value)
+        {
+            return new Crud.TopologyLink.Label(true, value);
+        }
+
+        Fail(column, $"'{text}' is not one of: {Crud.TopologyLink.Allowed}.");
+        return Crud.TopologyLink.Label.Absent;
     }
 
     public TGeometry? Geometry<TGeometry>(string column)

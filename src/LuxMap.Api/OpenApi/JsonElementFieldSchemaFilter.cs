@@ -41,7 +41,20 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
         [(typeof(UpdateFeederRequest), "cabinet_id")] =
             "The cabinet this circuit leaves from (CAB-6). OPTIONAL and KEPT when absent: leave the key out to keep the cabinet, "
             + "send null to detach the feeder, an id to move it. A feeder a device switches cannot move or be detached (409).",
+        [(typeof(CreatePoleRequest), "feeder_source")] = FeederSource,
+        [(typeof(UpdatePoleRequest), "feeder_source")] = FeederSource,
+        [(typeof(SetPoleFeederRequest), "feeder_source")] = FeederSource,
+        [(typeof(CreateFeederRequest), "cabinet_source")] = CabinetSource,
+        [(typeof(UpdateFeederRequest), "cabinet_source")] = CabinetSource,
     };
+
+    private const string FeederSource =
+        "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved "
+            + "feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.";
+
+    private const string CabinetSource =
+        "Provenance of the feeder → cabinet relation (TOPO-INFER D-10): verified | inferred. OPTIONAL: absent = inferred for a new or "
+            + "moved cabinet, KEPT when the cabinet stays. null while a cabinet is set, or a label with no cabinet, is 400.";
 
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {

@@ -108,6 +108,12 @@ public class DomainEnumSerializationTests
     public void RoadClass_matches_contract(RoadClass value, string expected)
         => Assert.Equal(expected, Wire(value));
 
+    [Theory]
+    [InlineData(TopologySource.Verified, "verified")]
+    [InlineData(TopologySource.Inferred, "inferred")]
+    public void TopologySource_matches_drift_TI_1(TopologySource value, string expected)
+        => Assert.Equal(expected, Wire(value));
+
     [Fact]
     public void Enum_never_serializes_as_number()
     {
@@ -131,6 +137,8 @@ public class DomainEnumSerializationTests
             (typeof(FaultType), 5), (typeof(FaultStatus), 6), (typeof(Severity), 4),
             (typeof(SourceChannel), 3), (typeof(DataSource), 4), (typeof(WorkOrderStatus), 6),
             (typeof(NodeRole), 1), (typeof(NodeStatus), 3), (typeof(RoadClass), 2),
+            // TOPO-INFER TI-1, 07/10/2026 — SELF-SIGNED, not yet in Contract section 1.
+            (typeof(TopologySource), 2),
         ];
 
         foreach (var (type, expected) in enums)

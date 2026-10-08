@@ -69,6 +69,12 @@ public sealed record CreateFeederRequest
     /// <summary>The cabinet this circuit leaves from (CAB-2), in the feeder's own commune. Optional.</summary>
     [MaxLength(32)]
     public string? CabinetId { get; init; }
+
+    /// <summary>
+    /// Provenance of the feeder → cabinet relation (TOPO-INFER D-10): <c>verified</c> | <c>inferred</c>. Same rule as a pole's
+    /// <c>feeder_source</c>: absent = <c>inferred</c> for a new or moved cabinet, KEEP when it stays.
+    /// </summary>
+    public JsonElement CabinetSource { get; init; }
 }
 
 /// <summary>A main electrical cabinet (CAB-1). <c>commune_id</c> from the body, checked against scope.</summary>
@@ -130,6 +136,12 @@ public sealed record CreatePoleRequest
 
     /// <summary>Optional engineer's note on the spot (POLE-NOTE); blank means none, at most 1000 characters.</summary>
     public string? Note { get; init; }
+
+    /// <summary>
+    /// Provenance of the pole → feeder relation (TOPO-INFER TI-2): <c>verified</c> | <c>inferred</c>. Optional: absent means
+    /// <c>inferred</c> for a new or moved relation and KEEP when the feeder stays; <c>null</c> while a feeder is set, or a label without a feeder, is 400.
+    /// </summary>
+    public JsonElement FeederSource { get; init; }
 }
 
 /// <summary>
@@ -260,6 +272,12 @@ public sealed record UpdateFeederRequest
             "cabinet_id must be a cabinet id (at most 32 characters), or null to detach the feeder from its cabinet.",
             new Dictionary<string, object?> { ["field"] = "cabinet_id" }),
     };
+
+    /// <summary>
+    /// Provenance of the feeder → cabinet relation (TOPO-INFER D-10): <c>verified</c> | <c>inferred</c>. Same rule as a pole's
+    /// <c>feeder_source</c>: absent = <c>inferred</c> for a new or moved cabinet, KEEP when it stays.
+    /// </summary>
+    public JsonElement CabinetSource { get; init; }
 }
 
 /// <summary>Full replacement of a cabinet. <c>commune_id</c> is not writable — see <see cref="UpdateSegmentRequest"/>.</summary>
@@ -317,6 +335,12 @@ public sealed record UpdatePoleRequest
     /// <see cref="PoleNoteInput.Read"/>.
     /// </remarks>
     public JsonElement Note { get; init; }
+
+    /// <summary>
+    /// Provenance of the pole → feeder relation (TOPO-INFER TI-2): <c>verified</c> | <c>inferred</c>. Optional: absent means
+    /// <c>inferred</c> for a new or moved relation and KEEP when the feeder stays; <c>null</c> while a feeder is set, or a label without a feeder, is 400.
+    /// </summary>
+    public JsonElement FeederSource { get; init; }
 }
 
 /// <summary>
@@ -361,6 +385,9 @@ public sealed record TopologyPole
 
     /// <summary>Null for a pole on no circuit — a fact, not a missing value.</summary>
     public string? FeederId { get; init; }
+
+    /// <summary>Provenance of <see cref="FeederId"/> (TOPO-INFER): <c>verified</c> | <c>inferred</c>; <c>null</c> with no feeder.</summary>
+    public TopologySource? FeederSource { get; init; }
 
     public required double Lat { get; init; }
 
@@ -452,6 +479,12 @@ public sealed record PoleListItem
 
     /// <summary><c>null</c> when the pole is not wired to a circuit yet.</summary>
     public string? FeederId { get; init; }
+
+    /// <summary>
+    /// Provenance of <see cref="FeederId"/> (TOPO-INFER): <c>verified</c> | <c>inferred</c>; <c>null</c> with no feeder. A screen
+    /// must show an inferred relation as inferred — it is deduced from the field, not confirmed.
+    /// </summary>
+    public TopologySource? FeederSource { get; init; }
 
     public required string CommuneId { get; init; }
 
@@ -658,6 +691,9 @@ public sealed record FeederCabinet
     public required string CabinetName { get; init; }
 
     public required AssetLocation Location { get; init; }
+
+    /// <summary>Provenance of the feeder → cabinet relation (TOPO-INFER D-10): <c>verified</c> | <c>inferred</c>.</summary>
+    public required TopologySource CabinetSource { get; init; }
 }
 
 /// <summary>One cabinet in the inventory list (CAB-8).</summary>

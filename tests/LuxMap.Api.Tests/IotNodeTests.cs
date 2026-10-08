@@ -378,6 +378,7 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
             {
                 SegmentId = segmentId,
                 FeederId = feederId,
+                FeederSource = feederId is null ? null : TopologySource.Inferred,
                 CommuneId = fixture.CommuneId,
                 Geom = new Point(Lng, Lat) { SRID = 4326 },
                 DataSource = DataSource.PublicImagery,
@@ -400,6 +401,7 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
             if (feeder.CommuneId == (commune ?? fixture.CommuneId) && feeder.CabinetId != cabinet)
             {
                 feeder.CabinetId = cabinet;
+                feeder.CabinetSource = TopologySource.Inferred;
                 await db.SaveChangesAsync();
             }
 

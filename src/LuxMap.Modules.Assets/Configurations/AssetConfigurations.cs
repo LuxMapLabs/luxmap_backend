@@ -141,6 +141,10 @@ public sealed class FeederConfiguration : IEntityTypeConfiguration<Feeder>
         // CAB-2 — the cabinet a circuit leaves from, in the feeder's own commune (the O-7 shape). Nullable,
         // and MATCH SIMPLE skips the check while it is null: an unrecorded cabinet is the normal case.
         builder.Property(feeder => feeder.CabinetId).HasColumnType("text");
+        // D-10: where that relation came from — null exactly when there is no cabinet.
+        builder.HasContractEnum(feeder => feeder.CabinetSource);
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_feeder_cabinet_source_matches_cabinet", "(cabinet_id IS NULL) = (cabinet_source IS NULL)"));
         builder.HasOne<ElectricalCabinet>().WithMany()
             .HasForeignKey(feeder => new { feeder.CabinetId, feeder.CommuneId })
             .HasPrincipalKey(cabinet => new { cabinet.CabinetId, cabinet.CommuneId })
@@ -202,6 +206,11 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
         builder.HasUpdatedBy();
 
         builder.HasContractEnum(pole => pole.DataSource);
+
+        // TOPO-INFER TI-1: where the pole → feeder relation came from — null exactly when there is no feeder.
+        builder.HasContractEnum(pole => pole.FeederSource);
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_pole_feeder_source_matches_feeder", "(feeder_id IS NULL) = (feeder_source IS NULL)"));
 
         // The API trims and checks the same limit and answers 400; this stops every other writer.
         builder.ToTable(table => table.HasCheckConstraint("ck_pole_note_length", "char_length(note) <= 1000"));

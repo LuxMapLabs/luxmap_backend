@@ -130,6 +130,20 @@ của xã mình biết rõ mình đang ở xã nào; thêm cột tên vào cả 
 hội lệch dữ liệu**. `segment_name` vẫn là cột **thật** trong `segments.csv` vì nó được LƯU vào
 `road_segment.segment_name`; điều vừa bỏ là bản sao chỉ-để-đọc của nó trong `poles.csv`.
 
+### Nhãn nguồn gốc `feeder_source` / `cabinet_source` — tuỳ chọn (TOPO-INFER, SELF-SIGNED)
+
+Mỗi quan hệ điện (cột → mạch, mạch → trụ) mang nhãn **`verified`** (xã / EVN xác nhận, hoặc kiểm bằng video chập tối — nhóm
+đèn bật cùng lúc) hoặc **`inferred`** (suy từ vị trí trụ và cột ngoài thực địa). Không có quan hệ thì không có nhãn.
+
+| Ô nhãn | Quan hệ trong file giống DB | Quan hệ đổi / mới | Không có quan hệ |
+|---|---|---|---|
+| trống (hoặc thiếu cột) | **giữ** nhãn đang có | **`inferred`** | không nhãn |
+| `verified` / `inferred` | đặt theo ô | đặt theo ô | **lỗi dòng** (nhãn không có quan hệ) |
+| giá trị khác, hay object / mảng trong GeoJSON | **lỗi dòng** | **lỗi dòng** | **lỗi dòng** |
+
+Không bao giờ tự thành `verified` — phải ghi rõ trong file. ⚠️ Ô `feeder_external_ref` trống vẫn **tháo** mạch của cột (thay thế
+toàn phần) và xoá nhãn theo; ô `cabinet_external_ref` trống thì **giữ** trụ (CAB-6) và giữ nhãn.
+
 ### `note` trong `poles.csv` — tuỳ chọn; ô có chữ ghi đè, ô trống giữ nguyên
 
 Ghi chú tự do về **vị trí / tài sản**, tối đa 1000 ký tự: *"Cạnh cổng trường TH Long Phước, tan học 17h"*.
@@ -246,6 +260,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `feeder_name` | **Có** | text | |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | Không | LineString | **Nullable** — nhóm không khảo sát tuyến cáp, để trống thay vì bịa lộ trình |
+| `cabinet_source` | Không | `verified` / `inferred` | Nguồn gốc của quan hệ mạch → trụ (TOPO-INFER). Xem mục "Nhãn nguồn gốc" bên dưới |
 | `cabinet_external_ref` | Không | text | Khớp `external_ref` trong `cabinets.csv`, **cùng xã** với mạch. ⚠️ **Ô trống hay thiếu cột = GIỮ trụ đang có** — import không bao giờ tháo mạch khỏi trụ (CAB-6). Mạch đang được thiết bị điều khiển (có rơ-le) **không đổi trụ được** — lỗi theo dòng (CAB-4) |
 
 > ⚠️ **`feeder` KHÔNG có cột `data_source`.** Bốn bảng kia có, bảng này không — kiểm từ
@@ -257,6 +272,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 |---|---|---|---|
 | `external_ref` | **Có** | text | Mã cột của đơn vị quản lý. `fixtures.csv` trỏ về bằng `pole_external_ref`. Trùng trong cùng xã → **UPDATE** |
 | `segment_external_ref` | **Có** | text | Khớp `external_ref` trong `segments.csv`. Không khớp → lỗi theo dòng |
+| `feeder_source` | Không | `verified` / `inferred` | Nguồn gốc của quan hệ cột → mạch (TOPO-INFER). Xem mục "Nhãn nguồn gốc" bên dưới |
 | `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. Để trống = cột chưa gán mạch. ⚠️ Trước Contract v1.6 ô này để trống với cột solar; đèn solar nay đã hết nên **mọi cột đều nên có tủ điện** |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `geom_wkt` | **Có** | Point | `geometry(Point,4326)`, NOT NULL |
