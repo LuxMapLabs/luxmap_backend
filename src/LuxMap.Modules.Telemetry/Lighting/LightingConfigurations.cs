@@ -52,12 +52,14 @@ public sealed class LightingCommandConfiguration : IEntityTypeConfiguration<Ligh
                 + " AND (delivered_at IS NULL OR delivered_at >= created_at)"
                 + " AND (completed_at IS NULL OR completed_at >= COALESCE(delivered_at, created_at))");
 
-            // Each status says exactly which columns it carries (3.3).
+            // Each status says exactly which columns it carries (3.3). `reported_mode IS NOT NULL` is spelled out: NULL = x is
+            // NULL, and a CHECK lets NULL through (Codex review P2).
             table.HasCheckConstraint("ck_lighting_command_status_columns",
                 "CASE status"
                 + " WHEN 'pending' THEN delivered_at IS NULL AND completed_at IS NULL AND reported_mode IS NULL AND error IS NULL"
                 + " WHEN 'delivered' THEN delivered_at IS NOT NULL AND completed_at IS NULL AND reported_mode IS NULL AND error IS NULL"
-                + " WHEN 'applied' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND reported_mode = requested_mode AND error IS NULL"
+                + " WHEN 'applied' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND reported_mode IS NOT NULL"
+                + " AND reported_mode = requested_mode AND error IS NULL"
                 + " WHEN 'failed' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND error IS NOT NULL"
                 + " ELSE completed_at IS NOT NULL AND reported_mode IS NULL AND error IS NULL"
                 + " END");

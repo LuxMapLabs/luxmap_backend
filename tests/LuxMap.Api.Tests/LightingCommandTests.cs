@@ -9,6 +9,7 @@ using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
 
 namespace LuxMap.Api.Tests;
@@ -363,7 +364,97 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
         Assert.Equal("ASSET_IN_USE", (await JsonAsync(delete)).GetProperty("error").GetProperty("code").GetString());
     }
 
+    /// <summary>
+    /// Codex review P2: <c>mode_seq</c> lives on the wiring row, which unwiring deletes. Unwire + rewire the same feeder, and a
+    /// late report of an OLD command must still not overwrite the newer mode — the command history remembers what came after.
+    /// </summary>
+    [Fact]
+    public async Task Rewiring_a_relay_does_not_let_a_late_report_of_an_old_command_set_the_mode()
+    {
+        var rig = await RigAsync();
+        var manager = await fixture.ManagerClientAsync();
+        var device = DeviceClient(rig);
+        var off = await PressAsync(manager, rig.Feeders[0], "off");
+        var offSeq = Assert.Single(await PollAsync(device)).Seq;
+        var auto = await PressAsync(manager, rig.Feeders[0], "auto");
+        var autoSeq = Assert.Single(await PollAsync(device)).Seq;
+        await device.PostAsJsonAsync($"{Device}/{auto}/ack", new { seq = autoSeq, result = "applied", reported_mode = "auto" });
+
+        var relay = $"/api/v1/assets/iot-nodes/{rig.Node}/relays/1";
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync(relay, new { feeder_id = (string?)null })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync(relay, new { feeder_id = rig.Feeders[0] })).StatusCode);
+        Assert.Null(await ModeSeqAsync(rig.Feeders[0]));
+
+        var late = await device.PostAsJsonAsync($"{Device}/{off}/ack", new { seq = offSeq, result = "applied", reported_mode = "off" });
+
+        Assert.Equal(HttpStatusCode.Conflict, late.StatusCode);
+        Assert.False((await JsonAsync(late)).GetProperty("error").GetProperty("details").GetProperty("mode_recorded").GetBoolean());
+        Assert.Null(await ModeAsync(rig.Feeders[0]));
+    }
+
+    /// <summary>
+    /// Codex review P2 (D-R7): a device switched off for remote control is never handed a command — whether the flag went
+    /// through the registry (which supersedes as the Manager) or changed some other way (the poll supersedes as system).
+    /// </summary>
+    [Fact]
+    public async Task A_device_no_longer_remote_controlled_is_never_handed_a_command()
+    {
+        var rig = await RigAsync();
+        var manager = await fixture.ManagerClientAsync();
+        var viaRegistry = await PressAsync(manager, rig.Feeders[0], "off");
+
+        var update = await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Node}",
+            new { data_source = "calibration_rig", supports_remote_control = false });
+        Assert.Equal(HttpStatusCode.NoContent, update.StatusCode);
+        Assert.Equal("superseded", await StatusAsync(viaRegistry));
+        Assert.Equal(AuditActorKind.User, await ActorOfAsync(viaRegistry, AuditAction.Superseded));
+        Assert.Empty(await PollAsync(DeviceClient(rig)));
+
+        // Remote again, press, then the flag flips WITHOUT the registry: the poll itself refuses to deliver.
+        await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Node}", new { data_source = "calibration_rig", supports_remote_control = true });
+        var direct = await PressAsync(manager, rig.Feeders[1], "off");
+        await AsSystemAsync(db => db.Database.ExecuteSqlAsync($"UPDATE iot_node SET supports_remote_control = false WHERE node_id = {rig.Node}"));
+
+        Assert.Empty(await PollAsync(DeviceClient(rig)));
+        Assert.Equal("superseded", await StatusAsync(direct));
+        Assert.Equal(AuditActorKind.System, await ActorOfAsync(direct, AuditAction.Superseded));
+    }
+
+    /// <summary>Codex review P2: the database itself refuses an `applied` command without the mode it reports (NULL = x is NULL).</summary>
+    [Fact]
+    public async Task The_database_refuses_an_applied_command_without_a_reported_mode()
+    {
+        var rig = await RigAsync();
+        var commandId = await PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+
+        var refused = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => AsSystemAsync(db => db.Database.ExecuteSqlAsync(
+            $"UPDATE lighting_command SET status = 'applied', delivered_at = created_at, completed_at = created_at WHERE command_id = {commandId}")));
+
+        Assert.Equal("23514", refused.SqlState);
+        Assert.Equal("ck_lighting_command_status_columns", refused.ConstraintName);
+    }
+
     // ── Concurrency ────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Codex review P3: the press and the poll TAKE the device lock — proven deterministically by holding that lock from another
+    /// connection and watching each request wait, instead of hoping concurrent requests happen to overlap.
+    /// </summary>
+    [Fact]
+    public async Task A_press_and_a_poll_wait_for_the_device_lock()
+    {
+        var rig = await RigAsync();
+        var manager = await fixture.ManagerClientAsync();
+
+        await HoldingTheDeviceLockAsync(rig.Node, () => manager.PostAsJsonAsync(Commands,
+            new { feeder_id = rig.Feeders[0], mode = "off", client_op_id = Guid.NewGuid() }), HttpStatusCode.Accepted);
+
+        // A poll also UPDATEs last_report_at, which would wait on its own; a report time in the future makes it skip that, so
+        // only the explicit lock is left to make it wait.
+        await AsSystemAsync(db => db.Database.ExecuteSqlAsync(
+            $"UPDATE iot_node SET last_report_at = now() + interval '1 day' WHERE node_id = {rig.Node}"));
+        await HoldingTheDeviceLockAsync(rig.Node, () => DeviceClient(rig).GetAsync(Device), HttpStatusCode.OK);
+    }
 
     /// <summary>Two presses on one relay at once: the device lock serialises them, so exactly one stays open — the later seq.</summary>
     [Fact]
@@ -398,6 +489,32 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Holds the device row lock from a separate transaction; the request must still be waiting 500 ms in, then finish.</summary>
+    /// <remarks>
+    /// <c>FOR NO KEY UPDATE</c>, not <c>FOR UPDATE</c>: inserting a command checks its foreign key to <c>iot_node</c> with a
+    /// KEY SHARE lock, which <c>FOR UPDATE</c> would block too — the test would then pass with the service's own lock removed
+    /// (found by sabotage). <c>FOR NO KEY UPDATE</c> blocks the service's <c>FOR UPDATE</c> and nothing else.
+    /// </remarks>
+    private async Task HoldingTheDeviceLockAsync(string node, Func<Task<HttpResponseMessage>> send, HttpStatusCode expected)
+    {
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM iot_node WHERE node_id = {node} FOR NO KEY UPDATE");
+
+        var request = send();
+        await Task.WhenAny(request, Task.Delay(TimeSpan.FromMilliseconds(500)));
+        Assert.False(request.IsCompleted, "the request finished while the device row was locked — it never took the lock");
+
+        await transaction.RollbackAsync();
+        var response = await request;
+        Assert.True(response.StatusCode == expected, await response.Content.ReadAsStringAsync());
+    }
+
+    private Task<AuditActorKind> ActorOfAsync(string commandId, AuditAction action)
+        => fixture.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters()
+            .Where(e => e.EntityId == commandId && e.Action == action).Select(e => e.ActorKind).SingleAsync());
 
     private sealed record Rig(string Cabinet, string Node, string Secret, string[] Feeders, string Segment);
 

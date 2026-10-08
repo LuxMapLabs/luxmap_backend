@@ -243,6 +243,14 @@ public sealed class LightingCommandService(
 
         await ExpireStaleAsync([nodeId], now, ct);
 
+        if (!node.SupportsRemoteControl)
+        {
+            // D-R7: switched off for remote control — anything still open is never handed over (Codex review P2).
+            await SupersedeRelayAsync(nodeId, null, AuditActorKind.System, now, ct);
+            await transaction.CommitAsync(ct);
+            return new DeviceCommandBatch(now, []);
+        }
+
         var wiring = await db.Set<FeederControl>().AsNoTracking()
             .Where(control => control.NodeId == nodeId)
             .ToDictionaryAsync(control => control.RelayNo, control => control.FeederId, ct);
@@ -348,7 +356,7 @@ public sealed class LightingCommandService(
                 command.CompletedAt = now;
                 command.ReportedMode = ack.ReportedMode;
                 command.Error = error;
-                var recorded = Record(control!, ack.ReportedMode, command.Seq, now);
+                var recorded = await RecordAsync(control!, command, ack.ReportedMode, now, ct);
                 audit.Record(new AuditChange(now, AuditActorKind.Iot, null, null, command.CommuneId,
                     AuditEntityType.LightingCommand, command.CommandId,
                     result == LightingAckResult.Applied ? AuditAction.Applied : AuditAction.Failed,
@@ -369,7 +377,7 @@ public sealed class LightingCommandService(
             default:
             {
                 // Expired or superseded: the device's report is still the truth about the relay (I-6).
-                var recorded = wired && Record(control!, ack.ReportedMode, command.Seq, now);
+                var recorded = wired && await RecordAsync(control!, command, ack.ReportedMode, now, ct);
                 audit.Record(new AuditChange(now, AuditActorKind.Iot, null, null, command.CommuneId,
                     AuditEntityType.LightingCommand, command.CommandId, AuditAction.Reported, null,
                     new { status = command.Status, result, reported_mode = ack.ReportedMode, error, command.Seq, mode_recorded = recorded }));
@@ -401,21 +409,35 @@ public sealed class LightingCommandService(
     }
 
     /// <summary>
-    /// Supersedes the open commands of one relay before it is unwired or rewired (3.8) — one save + one audit each, actor the
-    /// Manager doing the wiring. Caller holds the lock and has stored expiry first.
+    /// Supersedes the open commands of one relay (<paramref name="relayNo"/>) or of the whole device (<c>null</c>) — before a
+    /// relay is unwired or rewired (3.8), or when the device stops being remote-controlled (D-R7). One save + one audit each.
+    /// Caller holds the lock and has stored expiry first.
     /// </summary>
-    public async Task SupersedeRelayAsync(string nodeId, short relayNo, DateTime now, CancellationToken ct)
+    public async Task SupersedeRelayAsync(string nodeId, short? relayNo, AuditActorKind by, DateTime now, CancellationToken ct)
     {
         var open = await db.Set<LightingCommand>()
-            .Where(command => command.NodeId == nodeId && command.RelayNo == relayNo
+            .Where(command => command.NodeId == nodeId && (relayNo == null || command.RelayNo == relayNo)
                 && (command.Status == LightingCommandStatus.Pending || command.Status == LightingCommandStatus.Delivered))
             .OrderBy(command => command.Seq)
             .ToListAsync(ct);
 
         foreach (var command in open)
         {
-            await CloseAsync(command, LightingCommandStatus.Superseded, AuditActorKind.User, now, ct);
+            await CloseAsync(command, LightingCommandStatus.Superseded, by, now, ct);
         }
+    }
+
+    /// <summary>
+    /// Locks a device for a write: read through the commune filter FIRST (out of scope is a 404 before any lock — the 2a review
+    /// order), then <c>FOR UPDATE</c>, then read again, tracked. Every write that touches the device's commands or relays uses it.
+    /// Call inside a transaction.
+    /// </summary>
+    public async Task<IotNode> LockDeviceAsync(string nodeId, CancellationToken ct)
+    {
+        var communeId = await db.Set<IotNode>().Where(node => node.NodeId == nodeId)
+            .Select(node => node.CommuneId).FirstOrDefaultAsync(ct) ?? throw NotFound("device");
+        await LockAsync(nodeId, communeId, ct);
+        return await db.Set<IotNode>().SingleAsync(node => node.NodeId == nodeId, ct);
     }
 
     // ── Internals ──────────────────────────────────────────────────────────────────────────────
@@ -433,17 +455,30 @@ public sealed class LightingCommandService(
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>D-10: a reported mode is written only when its seq is newer than the one that last set the relay.</summary>
-    private static bool Record(FeederControl control, FeederControlMode? mode, long seq, DateTime now)
+    /// <summary>
+    /// D-10: a reported mode is written only when its seq is newer than the one that last set the relay, AND no newer command
+    /// was already handed to this relay — the device may have executed that one after this.
+    /// </summary>
+    /// <remarks>
+    /// <c>mode_seq</c> alone is not enough: it lives on the wiring row, which unwiring deletes, so unwire + rewire would reset it
+    /// and let a late report of an old command overwrite a newer mode (Codex review P2). The command history survives rewiring.
+    /// </remarks>
+    private async Task<bool> RecordAsync(FeederControl control, LightingCommand command, FeederControlMode? mode, DateTime now, CancellationToken ct)
     {
-        if (mode is not { } reported || control.ModeSeq is { } last && last >= seq)
+        if (mode is not { } reported || control.ModeSeq is { } last && last >= command.Seq)
+        {
+            return false;
+        }
+
+        if (await db.Set<LightingCommand>().AnyAsync(newer => newer.NodeId == command.NodeId && newer.RelayNo == command.RelayNo
+                && newer.Seq > command.Seq && newer.DeliveredAt != null, ct))
         {
             return false;
         }
 
         control.ControlMode = reported;
         control.ModeReportedAt = now;
-        control.ModeSeq = seq;
+        control.ModeSeq = command.Seq;
         return true;
     }
 
@@ -582,15 +617,6 @@ public sealed class LightingCommandService(
         ReportedMode = command.ReportedMode,
         Error = command.Error,
     };
-
-    /// <summary>The device reads ITSELF through the filter (its scope is its commune), then locks, then reads again tracked.</summary>
-    private async Task<IotNode> LockDeviceAsync(string nodeId, CancellationToken ct)
-    {
-        var communeId = await db.Set<IotNode>().Where(node => node.NodeId == nodeId)
-            .Select(node => node.CommuneId).FirstOrDefaultAsync(ct) ?? throw NotFound("device");
-        await LockAsync(nodeId, communeId, ct);
-        return await db.Set<IotNode>().SingleAsync(node => node.NodeId == nodeId, ct);
-    }
 
     private Task LockAsync(string nodeId, string communeId, CancellationToken ct)
         => db.Database.ExecuteSqlRawAsync(
