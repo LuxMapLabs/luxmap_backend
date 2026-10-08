@@ -102,6 +102,7 @@ erDiagram
     }
     feeder_control {
         text feeder_id PK "HIỆN CÓ"
+        bigint mode_seq "nullable — seq của lệnh đã đặt control_mode lần cuối (LIGHT-CTRL D-10)"
     }
 
     capture_profile {
@@ -222,12 +223,28 @@ erDiagram
         jsonb relays
         text data_source
     }
-    lighting_command {
-        bigint command_id PK "MỚI (D-R7)"
-        text node_id FK
-        int relay_no
+    lighting_request {
+        uuid request_id PK "LIGHT-CTRL 2b — một lần bấm của Quản lý"
+        uuid client_op_id "UNIQUE"
+        text commune_id FK
+        text target_kind "feeder / segment"
+        text target_id "ảnh chụp, không FK"
         text requested_mode "on / off / auto"
-        text status
+        text requested_by FK "app_user, RESTRICT"
+        text_arr affected_segment_ids "ảnh chụp (I-14)"
+        jsonb excluded "ảnh chụp (D-8)"
+    }
+    lighting_command {
+        text command_id PK "CMD-000001 (LC-3)"
+        uuid request_id FK
+        text node_id FK "ghép (node_id, commune_id)"
+        text feeder_id FK "ghép (feeder_id, commune_id) — KHÔNG FK tới feeder_control"
+        smallint relay_no "ảnh chụp"
+        text cabinet_id "ảnh chụp"
+        bigint seq "identity, UNIQUE — thứ tự thực thi (D-10)"
+        text status "pending / delivered / applied / failed / expired / superseded"
+        timestamptz expires_at
+        text reported_mode "nullable — thiết bị báo"
     }
     fault {
         text fault_id PK "SỬA: + nguồn (Q11)"
@@ -296,6 +313,8 @@ erDiagram
     artifact_version ||--o{ survey_processing_run : ""
     iot_node ||--o{ telemetry_reading : ""
     iot_node ||--o{ lighting_command : ""
+    lighting_request ||--o{ lighting_command : ""
+    feeder ||--o{ lighting_command : ""
     pole ||--o{ fault : ""
     pole_observation ||--o{ fault : "nguồn CV"
     iot_node ||--o{ fault : "nguồn IoT"
