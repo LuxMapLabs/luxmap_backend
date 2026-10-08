@@ -125,6 +125,8 @@ SUMMARY = {
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
+    # AI-1 — model YOLO ON / OFF (PR #118 làm lại sau review), SELF-SIGNED.
+    ("post", "/api/v1/ai/detect"): "[TẠM — AI-1] Chạy model YOLO trên một ảnh JPEG (Quản lý): normal = sáng, out = tắt, bbox theo pixel; không ghi gì",
     # LIGHT-CTRL 2b — lệnh ON / OFF / AUTO + kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW).
     ("get", "/api/v1/lighting/preview"): "[TẠM — LIGHT-CTRL] Xem trước một lần bấm: rơ-le sẽ đổi, mạch bị loại kèm lý do, tuyến bị ảnh hưởng; không ghi",
     ("post", "/api/v1/lighting/commands"): "[TẠM — LIGHT-CTRL] Bấm ON / OFF / AUTO cho một mạch hoặc một tuyến — 202; cùng client_op_id → 200; không còn rơ-le nào → 409 NO_CONTROLLABLE_RELAY",
@@ -243,6 +245,7 @@ SECTION = {
     "/api/v1/assets/cabinets": "drift CAB-1…CAB-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets/iot-nodes": "drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/lighting": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/ai": "drift AI-1 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/device": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets": "§5.3",
     "/api/v1/auth/web": "§4.2",

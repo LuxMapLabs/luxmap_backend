@@ -2,6 +2,12 @@ namespace LuxMap.Modules.Survey.Processing.Frames;
 
 public sealed class SurveyFrameOptions
 {
+    /// <summary>
+    /// The keyed <see cref="IOnOffDetector"/> the AI module registers (AI-1). Survey does not reference AI: it asks the container
+    /// for this key, so choosing <c>yolo</c> without the AI module loaded fails at startup, loudly.
+    /// </summary>
+    public const string YoloDetectorKey = "yolo";
+
     public string Detector { get; set; } = "unconfigured";
     public string? FakeManifestPath { get; set; }
     public string FfmpegPath { get; set; } = "ffmpeg";
@@ -23,7 +29,7 @@ public sealed class SurveyFrameOptions
         && MaximumConcurrentClips > 0 && MaximumConcurrentClips <= 8 && TemporaryBytesPerClip > MaximumFrameBytes
         && MaximumFrameBytes > 0 && MinimumConfidence <= 1 && MinimumBoxArea <= 1
         && DimThresholdRatio <= 1 && FramesPerSecond <= 30 && BeforeSeconds + AfterSeconds <= 30
-        && Detector is "fake" or "unconfigured";
+        && Detector is "fake" or "unconfigured" or YoloDetectorKey;
     public void ValidateEnvironment(string environment)
     {
         if (Detector == "fake" && environment != "Development" && environment != "Test")

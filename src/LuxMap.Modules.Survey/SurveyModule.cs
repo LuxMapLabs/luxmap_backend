@@ -40,9 +40,12 @@ public sealed class SurveyModule : ILuxMapModule
         {
             var options = sp.GetRequiredService<SurveyFrameOptions>();
             options.ValidateEnvironment(sp.GetRequiredService<IHostEnvironment>().EnvironmentName);
-            return options.Detector == "fake"
-                ? new ManifestOnOffDetector(File.ReadAllText(options.FakeManifestPath ?? throw new InvalidOperationException("FakeManifestPath is required.")))
-                : new UnconfiguredOnOffDetector();
+            return options.Detector switch
+            {
+                "fake" => new ManifestOnOffDetector(File.ReadAllText(options.FakeManifestPath ?? throw new InvalidOperationException("FakeManifestPath is required."))),
+                SurveyFrameOptions.YoloDetectorKey => sp.GetRequiredKeyedService<IOnOffDetector>(SurveyFrameOptions.YoloDetectorKey),
+                _ => new UnconfiguredOnOffDetector(),
+            };
         });
         services.AddSingleton<SurveyFramePipeline>();
         services.AddSingleton<Processing.SurveyProcessor>();
