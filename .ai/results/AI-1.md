@@ -19,9 +19,17 @@ Drift AI-1…AI-3. ⚠️ SELF-SIGNED.
 Giữ nguyên từ #118: đọc output `[1,6,8400]`, tính ngược letterbox, NMS theo lớp — Codex xác nhận đúng; tách thành
 `YoloPostprocess` (hàm thuần) để test bằng tensor dựng tay. Bỏ route không phiên bản `/api/ai`.
 
+## Codex review lần 2 (sau sửa) — 0 P1 · 2 P2 · 1 P3, đều đúng, sửa hết
+
+| # | Sửa | Canh bằng |
+|---|---|---|
+| P2 | Chuẩn hoá bbox tính bằng float ⇒ bbox 128→640 trên ảnh rộng 640 cho x + w > 1, `DetectorValidation` loại cả frame. Nay tính bằng double, kẹp, hạ 1 ulp nếu còn vượt | `A_box_touching_the_edge…` (4 ca; về float → 2 ca đỏ) |
+| P2 | Semaphore chỉ bọc inference, decode 40 MP chạy song song không giới hạn | Gate bọc decode + resize + inference (đọc code) |
+| P3 | Thiếu ca JPEG hỏng, vượt pixel, huỷ | `A_corrupt_jpeg_is_a_415_too_many_pixels_a_400_and_a_cancelled_call_stops` |
+
 ## Bằng chứng
 
-- **1279/1279 xanh** (+9 `AiDetectionTests`); OpenAPI chỉ thêm 1 path + 3 schema.
+- **1284/1284 xanh** (+14 `AiDetectionTests`); OpenAPI chỉ thêm 1 path + 3 schema.
 - Phá thử → đỏ đúng test: decode mặc định + bỏ magic bytes (`JpegOnlyDecodeTests`, test 415); `[AllowAnonymous]`; bỏ padding letterbox;
   bỏ ngưỡng khỏi artifact.
 
