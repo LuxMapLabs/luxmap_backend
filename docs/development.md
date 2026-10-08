@@ -102,6 +102,8 @@ Nạp xong chạy lại `docker compose up -d`; compose khớp theo digest nên 
 | MinIO — web console | **9001** | 9001 |
 | Mailpit — SMTP (thư mời / đặt lại mật khẩu) | **1025** | 1025 |
 | Mailpit — hộp thư web | **8025** | 8025 |
+| EMQX — MQTT (profile `mqtt`, chỉ dev, không TLS) | **1883** | 1883 |
+| EMQX — dashboard (profile `mqtt`) | **18083** | 18083 |
 
 Postgres và Redis cố ý KHÔNG dùng 5432/6379: máy dev thường đã có bản cài native chiếm sẵn. MinIO giữ nguyên 9000/9001 vì hiếm khi đụng thứ gì.
 
@@ -567,6 +569,27 @@ app từ chối khởi động:
 ```bash
 Iot__OfflineAfter=00:30:00 dotnet run --project src/LuxMap.Api
 ```
+
+### Kênh MQTT cho thiết bị — LC-12
+
+Thiết bị nhận lệnh ON / OFF / AUTO qua **một** kênh, chọn bằng `Lighting__Channel` trong `.env`: `http` (poll, mặc định) hoặc
+`mqtt`. Với `mqtt`, API kết nối broker lúc khởi động và hai endpoint `/api/v1/device/commands` trả 404. Quyết định và hợp đồng
+bản tin: [`.ai/results/LIGHT-CTRL-MQTT-p1.md`](../.ai/results/LIGHT-CTRL-MQTT-p1.md), drift LC-12.
+
+```bash
+docker compose --profile mqtt up -d emqx      # broker; KHÔNG chạy với `docker compose up` mặc định
+# .env: Lighting__Channel=mqtt, Mqtt__Host, Mqtt__BackendPassword, Mqtt__CallbackKey (≥ 32 ký tự), MQTT_CALLBACK_PORT = cổng API
+dotnet run --project src/LuxMap.Api
+```
+
+- EMQX **gọi ngược API** để xác thực mọi client (`POST /api/v1/internal/mqtt/auth`, header `Authorization: Broker <Mqtt__CallbackKey>`),
+  trên `host.docker.internal:${MQTT_CALLBACK_PORT}` — **API phải chạy** thì thiết bị mới đăng nhập được. Lúc EMQX khởi động mà API
+  chưa có, nó đánh dấu callback hỏng và chỉ thử lại sau **15 giây**: khởi động API trước, hoặc chờ.
+- Bí mật thiết bị là bí mật đã cấp qua `POST /api/v1/assets/iot-nodes/{id}/credential`; `client_id = username = node_id`.
+- Dashboard: `http://localhost:18083`, `admin` / `EMQX_DASHBOARD_PASSWORD` (chỉ áp lần khởi tạo volume đầu tiên).
+- Test end-to-end với broker thật (`MqttEndToEndTests`) bỏ qua nếu không có `LUXMAP_MQTT_E2E=1`. Chạy:
+  `docker compose --profile mqtt up -d emqx`, rồi `LUXMAP_MQTT_E2E=1 MQTT_CALLBACK_PORT=<cổng EMQX gọi về> dotnet test` — giá trị
+  `MQTT_CALLBACK_PORT` và `Mqtt__CallbackKey` lúc test phải **trùng** lúc khởi động EMQX. CI làm đúng như vậy.
 
 ## Nhận phiên khảo sát — BE-15 P2a
 
