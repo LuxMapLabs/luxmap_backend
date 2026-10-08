@@ -171,6 +171,22 @@ public sealed class BrokerAuthTests(AssetImportFixture fixture, MqttHostFactory 
         Assert.Equal(before + 1, mqtt.Disconnected.Count(id => id == rig.Node));
     }
 
+    /// <summary>Codex review: a configuration the broker callback would refuse must stop startup, not retry forever.</summary>
+    [Theory]
+    [InlineData("luxmap backend", "pw")]
+    [InlineData("luxmap-backend", "")]
+    [InlineData("luxmap/backend", "pw")]
+    public void A_backend_identity_the_callback_would_refuse_stops_startup(string username, string password)
+    {
+        var options = new MqttOptions
+        {
+            Host = "broker", BackendUsername = username, BackendPassword = password, CallbackKey = MqttHostFactory.CallbackKey,
+        };
+        Assert.Throws<InvalidOperationException>(options.Validate);
+        Assert.Throws<InvalidOperationException>((options with { BackendUsername = "luxmap-backend", BackendPassword = new string('p', 129) }).Validate);
+        (options with { BackendUsername = "luxmap-backend", BackendPassword = "pw" }).Validate();
+    }
+
     private HttpClient Broker(string header = "Broker " + MqttHostFactory.CallbackKey)
     {
         var client = mqtt.CreateClient();

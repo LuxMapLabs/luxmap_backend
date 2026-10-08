@@ -40,11 +40,11 @@ public sealed class MqttLightingHandler(LightingScopeFactory scopes, ILogger<Mqt
         {
             switch (target.Kind)
             {
-                case MqttTopics.Receipt when Read<MqttReceiptMessage>(payload) is { CommandId: { } id, Seq: { } seq }:
+                case MqttTopics.Receipt when Read<MqttReceiptMessage>(payload) is { CommandId: { } id, Seq: { } seq } && MqttTopics.IsCommandId(id):
                     await scope.Service.ReceiptAsync(target.NodeId, id, seq, ct);
                     return null;
 
-                case MqttTopics.Ack when Read<MqttAckMessage>(payload) is { CommandId: { } id } ack:
+                case MqttTopics.Ack when Read<MqttAckMessage>(payload) is { CommandId: { } id } ack && MqttTopics.IsCommandId(id):
                     return await AckAsync(scope.Service, target.NodeId, id, ack, ct);
 
                 case MqttTopics.Heartbeat when Read<MqttHeartbeatMessage>(payload) is not null:
@@ -69,9 +69,16 @@ public sealed class MqttLightingHandler(LightingScopeFactory scopes, ILogger<Mqt
     /// (M-4). Expiry and supersession are stored on the way, exactly as the poll does.
     /// </summary>
     public async Task<IReadOnlyList<MqttOutbound>> DispatchAsync(CancellationToken ct)
+        => await DispatchAsync(await scopes.NodesWithOpenCommandsAsync(ct), ct);
+
+    /// <summary>
+    /// The same round for the given devices only. Production dispatches every device; a test on a shared database dispatches its
+    /// own, so that storing expiry and supersession never reaches another test's rows (Codex review).
+    /// </summary>
+    public async Task<IReadOnlyList<MqttOutbound>> DispatchAsync(IEnumerable<(string NodeId, string CommuneId)> nodes, CancellationToken ct)
     {
         var messages = new List<MqttOutbound>();
-        foreach (var (nodeId, communeId) in await scopes.NodesWithOpenCommandsAsync(ct))
+        foreach (var (nodeId, communeId) in nodes)
         {
             try
             {

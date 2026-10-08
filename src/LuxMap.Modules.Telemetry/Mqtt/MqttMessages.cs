@@ -30,6 +30,13 @@ public static class MqttTopics
     public const string Status = "status";
     public const string Telemetry = "telemetry";
 
+    /// <summary>
+    /// A command id as the server issues it (<c>CMD-</c> + 6 to 20 digits). Anything else is dropped before it is looked up or echoed
+    /// in a reply — an arbitrary id escaped into JSON could outgrow the broker's packet limit (Codex review).
+    /// </summary>
+    public static bool IsCommandId(string? id)
+        => id is { Length: >= 10 and <= 24 } && id.StartsWith("CMD-", StringComparison.Ordinal) && id.AsSpan(4).IndexOfAnyExceptInRange('0', '9') < 0;
+
     public static bool IsSafeNodeId(string? nodeId)
         => nodeId is { Length: > 0 and <= 64 } && !nodeId.AsSpan().ContainsAny("/+#\0 ") && !nodeId.StartsWith('$');
 

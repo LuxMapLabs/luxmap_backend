@@ -101,8 +101,9 @@ public sealed class MqttEndToEndTests(AssetImportFixture fixture)
         host.StartServer();
         await (await ReadyDeviceAsync(mine.Node, mine.Secret)).DisposeAsync();
 
-        Assert.NotEqual(MqttClientConnectResultCode.Success, await ConnectCodeAsync(mine.Node, "not-the-secret"));
-        Assert.NotEqual(MqttClientConnectResultCode.Success, await ConnectCodeAsync(theirs.Node, mine.Secret));
+        Assert.NotEqual(MqttClientConnectResultCode.Success, await ConnectCodeAsync(mine.Node, mine.Node, "not-the-secret"));
+        Assert.NotEqual(MqttClientConnectResultCode.Success, await ConnectCodeAsync(theirs.Node, mine.Node, mine.Secret)); // borrowed client id
+        Assert.NotEqual(MqttClientConnectResultCode.Success, await ConnectCodeAsync(theirs.Node, theirs.Node, mine.Secret));
 
         await RefusedAsync(mine, device => device.SubscribeAsync($"luxmap/v1/nodes/{theirs.Node}/relays/+/command"));
         await RefusedAsync(mine, device => device.SubscribeAsync("luxmap/v1/nodes/#"));
@@ -163,12 +164,12 @@ public sealed class MqttEndToEndTests(AssetImportFixture fixture)
     }
 
     /// <summary>MQTTnet 5 does not throw on a refused CONNECT — it returns the broker's code.</summary>
-    private static async Task<MqttClientConnectResultCode> ConnectCodeAsync(string nodeId, string secret)
+    private static async Task<MqttClientConnectResultCode> ConnectCodeAsync(string clientId, string username, string secret)
     {
         using var client = new MqttClientFactory().CreateMqttClient();
         try
         {
-            return (await client.ConnectAsync(Options(nodeId, secret))).ResultCode;
+            return (await client.ConnectAsync(Options(clientId, secret, username))).ResultCode;
         }
         catch (MQTTnet.Exceptions.MqttCommunicationException)
         {
@@ -176,10 +177,10 @@ public sealed class MqttEndToEndTests(AssetImportFixture fixture)
         }
     }
 
-    private static MqttClientOptions Options(string nodeId, string secret) => new MqttClientOptionsBuilder()
+    private static MqttClientOptions Options(string clientId, string secret, string? username = null) => new MqttClientOptionsBuilder()
         .WithTcpServer("127.0.0.1", MqttEndToEndHost.BrokerPort)
-        .WithClientId(nodeId)
-        .WithCredentials(nodeId, secret)
+        .WithClientId(clientId)
+        .WithCredentials(username ?? clientId, secret)
         .WithCleanSession(true)
         .WithProtocolVersion(MqttProtocolVersion.V311)
         .WithTimeout(TimeSpan.FromSeconds(10))

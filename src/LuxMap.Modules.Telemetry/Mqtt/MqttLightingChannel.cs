@@ -13,7 +13,7 @@ namespace LuxMap.Modules.Telemetry.Mqtt;
 /// </summary>
 /// <remarks>
 /// <para>
-/// One client, id <c>Mqtt:BackendClientId</c>, MQTT 3.1.1, clean session. On (re)connect it subscribes to every device's
+/// One client, id = <c>Mqtt:BackendUsername</c>, MQTT 3.1.1, clean session. On (re)connect it subscribes to every device's
 /// receipt / ack / heartbeat (QoS 1) BEFORE it dispatches anything, so a report can never arrive unheard (Codex, M-6).
 /// </para>
 /// <para>
@@ -24,6 +24,9 @@ namespace LuxMap.Modules.Telemetry.Mqtt;
 public sealed class MqttLightingChannel(MqttOptions mqtt, MqttLightingHandler handler, ILogger<MqttLightingChannel> log) : BackgroundService
 {
     private static readonly string[] Inbound = [MqttTopics.Receipt, MqttTopics.Ack, MqttTopics.Heartbeat];
+
+    /// <summary>Per operation: a cancellation token alone does not bound connect / subscribe / publish in MQTTnet 5.</summary>
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromSeconds(10);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -52,14 +55,34 @@ public sealed class MqttLightingChannel(MqttOptions mqtt, MqttLightingHandler ha
             {
                 if (!client.IsConnected)
                 {
-                    await client.ConnectAsync(ClientOptions(), stoppingToken);
+                    using (var connect = Bounded(stoppingToken))
+                    {
+                        var connected = await client.ConnectAsync(ClientOptions(), connect.Token);
+                        if (connected.ResultCode != MqttClientConnectResultCode.Success)
+                        {
+                            // MQTTnet 5 returns a refused CONNECT instead of throwing.
+                            throw new InvalidOperationException($"The broker refused the backend client: {connected.ResultCode}.");
+                        }
+                    }
+
                     var subscribe = new MqttClientSubscribeOptionsBuilder();
                     foreach (var kind in Inbound)
                     {
                         subscribe.WithTopicFilter($"{MqttTopics.Root}/+/{kind}", MqttQualityOfServiceLevel.AtLeastOnce);
                     }
 
-                    await client.SubscribeAsync(subscribe.Build(), stoppingToken);
+                    using (var subscribing = Bounded(stoppingToken))
+                    {
+                        var granted = await client.SubscribeAsync(subscribe.Build(), subscribing.Token);
+
+                        // Not listening means reports would vanish: dispatch nothing until every filter is granted (Codex review).
+                        if (granted.Items.Any(item => item.ResultCode > MqttClientSubscribeResultCode.GrantedQoS2))
+                        {
+                            await client.DisconnectAsync(cancellationToken: CancellationToken.None);
+                            throw new InvalidOperationException("The broker refused a subscription of the backend client.");
+                        }
+                    }
+
                     log.LogInformation("MQTT lighting channel connected to {Host}:{Port}.", mqtt.Host, mqtt.Port);
                     backoff = TimeSpan.FromSeconds(1);
                 }
@@ -93,7 +116,7 @@ public sealed class MqttLightingChannel(MqttOptions mqtt, MqttLightingHandler ha
     {
         var builder = new MqttClientOptionsBuilder()
             .WithTcpServer(mqtt.Host, mqtt.Port)
-            .WithClientId(mqtt.BackendClientId)
+            .WithClientId(mqtt.BackendUsername)
             .WithCredentials(mqtt.BackendUsername, mqtt.BackendPassword)
             .WithCleanSession(true)
             .WithKeepAlivePeriod(TimeSpan.FromSeconds(30))
@@ -107,11 +130,21 @@ public sealed class MqttLightingChannel(MqttOptions mqtt, MqttLightingHandler ha
         return builder.Build();
     }
 
-    private static Task PublishAsync(IMqttClient client, MqttOutbound message, CancellationToken ct)
-        => client.PublishAsync(new MqttApplicationMessageBuilder()
+    private static async Task PublishAsync(IMqttClient client, MqttOutbound message, CancellationToken ct)
+    {
+        using var bounded = Bounded(ct);
+        await client.PublishAsync(new MqttApplicationMessageBuilder()
             .WithTopic(message.Topic)
             .WithPayload(message.Payload)
             .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
             .WithRetainFlag(false)
-            .Build(), ct);
+            .Build(), bounded.Token);
+    }
+
+    private static CancellationTokenSource Bounded(CancellationToken ct)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        source.CancelAfter(OperationTimeout);
+        return source;
+    }
 }

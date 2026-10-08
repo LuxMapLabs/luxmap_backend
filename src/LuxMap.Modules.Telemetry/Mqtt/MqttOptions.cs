@@ -12,8 +12,7 @@ public sealed record MqttOptions
     /// <summary>M-11: TLS (8883) in any deployment; plain 1883 only for a broker bound to loopback in development.</summary>
     public bool UseTls { get; init; }
 
-    public string BackendClientId { get; init; } = "luxmap-backend";
-
+    /// <summary>Also the backend's MQTT client id: the broker callback demands <c>client_id = username</c> for every client.</summary>
     public string BackendUsername { get; init; } = "luxmap-backend";
 
     public string? BackendPassword { get; init; }
@@ -33,12 +32,14 @@ public sealed record MqttOptions
 
     public void Validate()
     {
-        if (string.IsNullOrWhiteSpace(Host) || Port is < 1 or > 65535 || string.IsNullOrWhiteSpace(BackendPassword)
+        // The same limits the broker callback applies — a configuration the callback would refuse must not start (Codex review).
+        if (string.IsNullOrWhiteSpace(Host) || Port is < 1 or > 65535 || BackendPassword is not { Length: > 0 and <= 128 }
             || string.IsNullOrWhiteSpace(CallbackKey) || CallbackKey.Length < 32 || ResendInterval <= TimeSpan.Zero
-            || string.IsNullOrWhiteSpace(BackendClientId) || string.IsNullOrWhiteSpace(BackendUsername))
+            || string.IsNullOrWhiteSpace(BackendUsername) || MqttTopics.IsSafeNodeId(BackendUsername) is false)
         {
             throw new InvalidOperationException(
-                $"Lighting:Channel = mqtt needs {SectionName}:Host, :BackendPassword and a :CallbackKey of at least 32 characters.");
+                $"Lighting:Channel = mqtt needs {SectionName}:Host, a :BackendPassword of 1–128 characters, a :BackendUsername without "
+                + "'/', '+', '#' or spaces, and a :CallbackKey of at least 32 characters.");
         }
 
         if ((AdminUrl is null) != (AdminApiKey is null) || (AdminApiKey is null) != (AdminApiSecret is null))

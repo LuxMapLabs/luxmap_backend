@@ -391,6 +391,9 @@ public sealed class LightingCommandService(
             throw Invalid("reported_mode", "An applied command must report the mode it was asked to set; otherwise report failed.");
         }
 
+        // M-8: a valid report proves the control channel alive — saved with whatever this report commits (Codex review).
+        await TouchLockedAsync(nodeId, now, ct);
+
         // M-5: over MQTT the receipt can be lost while the report arrives — a valid report proves the device received it.
         if (deliverIfPending && command.Status == LightingCommandStatus.Pending)
         {

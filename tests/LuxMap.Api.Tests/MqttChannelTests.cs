@@ -27,8 +27,8 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
         var rig = await Rigs.RigAsync();
         var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
 
-        var first = Mine(await Handler.DispatchAsync(CancellationToken.None), rig.Node);
-        var second = Mine(await Handler.DispatchAsync(CancellationToken.None), rig.Node);
+        var first = await Handler.DispatchAsync([(rig.Node, fixture.CommuneId)], CancellationToken.None);
+        var second = await Handler.DispatchAsync([(rig.Node, fixture.CommuneId)], CancellationToken.None);
 
         var message = Assert.Single(first);
         Assert.Equal($"luxmap/v1/nodes/{rig.Node}/relays/1/command", message.Topic);
@@ -100,6 +100,19 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
         Assert.True(closed.GetProperty("mode_recorded").GetBoolean());
     }
 
+    /// <summary>M-8: a valid report proves the channel alive too — a device whose receipts are lost must not read offline.</summary>
+    [Fact]
+    public async Task An_ack_marks_the_channel_alive()
+    {
+        var rig = await Rigs.RigAsync();
+        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        Assert.Null(await LastReportAsync(rig.Node));
+
+        await Send(rig.Node, "ack", new { schema_version = 1, command_id = commandId, seq = await SeqAsync(commandId), result = "applied", reported_mode = "off" });
+
+        Assert.NotNull(await LastReportAsync(rig.Node));
+    }
+
     [Fact]
     public async Task A_heartbeat_marks_the_channel_alive()
     {
@@ -118,6 +131,8 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     [InlineData("ack", """not json""")]
     [InlineData("receipt", """{"command_id":"__ID__","seq":__SEQ__}""")]
     [InlineData("telemetry", """{"schema_version":1}""")]
+    [InlineData("ack", """{"schema_version":1,"command_id":"<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<","seq":__SEQ__,"result":"applied","reported_mode":"off"}""")]
+    [InlineData("receipt", """{"schema_version":1,"command_id":"__ID__x","seq":__SEQ__}""")]
     [InlineData("relays/1/command", """{"schema_version":1}""")]
     public async Task Junk_is_dropped_without_a_reply_or_a_change(string kind, string payload)
     {
@@ -139,9 +154,6 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     private static ReadOnlySequence<byte> Bytes(string text) => new(Encoding.UTF8.GetBytes(text));
 
     private static JsonElement Json(MqttOutbound message) => JsonDocument.Parse(message.Payload).RootElement.Clone();
-
-    private static MqttOutbound[] Mine(IEnumerable<MqttOutbound> messages, string node)
-        => [.. messages.Where(m => m.Topic.StartsWith($"luxmap/v1/nodes/{node}/", StringComparison.Ordinal))];
 
     private Task<long> SeqAsync(string commandId)
         => fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().Where(c => c.CommandId == commandId).Select(c => c.Seq).SingleAsync());
