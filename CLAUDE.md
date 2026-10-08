@@ -1889,3 +1889,20 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   thuộc xã khác, cùng lý lẽ WO-12); bỏ `IgnoreQueryFilters` thì tra cứu trượt và ra 500. Cạnh đầu lấy nhãn **thấp hơn** của hai
   quan hệ. `verified` của cột nghĩa là "cột thuộc mạch này", **không** phải cạnh đó là dây thật.
 - Chưa làm (ticket riêng): chặn trộn cột `field` với trụ không-`field` (phải kiểm ở ba đường), script đề xuất quan hệ suy luận.
+
+### LIGHT-CTRL 2a — scheme `Device` + đăng ký thiết bị (08/10/2026, drift LC-1…LC-10)
+
+- 🔴 **Scheme `Device` KHÔNG phải mặc định; endpoint thiết bị gắn `[Authorize(Policy = DeviceAuth.Policy)]`, KHÔNG BAO GIỜ
+  `[AllowAnonymous]`** (nó bỏ toàn bộ authorization). Policy `DeviceOnly` ghim `AddAuthenticationSchemes(Device)` — gỡ dòng đó thì
+  Bearer của người dùng chạm được endpoint thiết bị (phá thử: 3 test đỏ). Endpoint thiết bị thật (2b) phải là **ngoại lệ có tên** trong
+  `CapabilityPolicyCoverageTests` (policy ngoài ma trận), không nới luật chung.
+- **Principal thiết bị:** `commune_ids` = đúng một xã của thiết bị (không bao giờ `*`), `device_node_id`, **không** `role` ⇒
+  `CommuneScopeAccessor` có sẵn cho ra phạm vi một xã, query filter + guard áp như mọi request; không capability nào nhận nó. Mọi truy
+  vấn lệnh (2b) còn phải lọc `node_id = device_node_id` — cùng xã không có nghĩa là được đụng thiết bị khác.
+- **Bí mật:** `DeviceSecret` (`LuxMap.Shared`): 32 byte → base64url; chỉ lưu SHA-256 hex (`iot_node.credential_hash`, CHECK cặp với
+  `credential_set_at`); so `FixedTimeEquals`; mọi kiểu sai đều cùng một 401. **Không bao giờ log bí mật hay header `Authorization`**;
+  bí mật chỉ xuất hiện đúng một lần trong response cấp / xoay.
+- **Nối rơ-le khoá hàng `iot_node`** (`SELECT 1 … FOR UPDATE` rồi mới đọc qua filter); lệnh điều khiển (2b) phải lấy **cùng** khoá.
+  Nối lại một rơ-le = xoá dòng `feeder_control` cũ + chèn dòng mới trong một `SaveChanges` (EF xoá trước, chèn sau — canh bằng test).
+- **Controller test cần xác thực không được nằm trong `TestEndpointsController`** (`[AllowAnonymous]` cấp class thắng). Khuôn:
+  `DeviceProbeController` + `DeviceProbeFactory` (host riêng, cùng DB) — không thêm ApplicationPart vào `AssetImportFixture` dùng chung.
