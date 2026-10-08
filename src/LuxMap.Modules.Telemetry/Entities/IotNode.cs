@@ -51,6 +51,15 @@ public class IotNode : ICommuneScoped
     /// </summary>
     public DataSource DataSource { get; set; }
 
+    /// <summary>
+    /// SHA-256 (hex) of the device's secret (LIGHT-CTRL LC-2) — never the secret itself. <c>NULL</c> = no secret issued yet, so
+    /// the device cannot authenticate. Set only through <c>POST /assets/iot-nodes/{id}/credential</c>.
+    /// </summary>
+    public string? CredentialHash { get; set; }
+
+    /// <summary>When the current secret was issued; <c>NULL</c> exactly when <see cref="CredentialHash"/> is.</summary>
+    public DateTime? CredentialSetAt { get; set; }
+
     /// <summary>Written by telemetry ingest (IOT-09). NULL means the device has never reported.</summary>
     public DateTime? LastReportAt { get; set; }
 

@@ -22,6 +22,11 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
 
         builder.Property(node => node.NodeId).HasPrefixedId(PrefixedIds.IotNode);
         builder.Property(node => node.CabinetId).HasColumnType("text").IsRequired();
+        builder.Property(node => node.CredentialHash).HasColumnType("text");
+
+        // LC-2: a secret and its issue time come and go together.
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_iot_node_credential_set_together", "(credential_hash IS NULL) = (credential_set_at IS NULL)"));
         builder.Property(node => node.SupportsRemoteControl).HasDefaultValue(false);
         builder.Property(node => node.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(node => node.UpdatedAt).HasDefaultValueSql("now()");

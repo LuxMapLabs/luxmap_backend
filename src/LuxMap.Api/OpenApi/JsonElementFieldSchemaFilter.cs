@@ -46,6 +46,9 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
         [(typeof(SetPoleFeederRequest), "feeder_source")] = FeederSource,
         [(typeof(CreateFeederRequest), "cabinet_source")] = CabinetSource,
         [(typeof(UpdateFeederRequest), "cabinet_source")] = CabinetSource,
+        [(typeof(LuxMap.Modules.Telemetry.Registry.SetRelayRequest), "feeder_id")] =
+            "The feeder this relay switches — it must leave from the device's own cabinet (CAB-4) — or null to unwire the relay. "
+            + "The key is REQUIRED: omitting it is a 400, so an empty body cannot silently unwire a relay.",
     };
 
     private const string FeederSource =
