@@ -486,6 +486,20 @@ public sealed record PoleListItem
     /// </summary>
     public TopologySource? FeederSource { get; init; }
 
+    /// <summary>
+    /// The cabinet the pole's feeder leaves from (CAB-1), read through the feeder — <c>null</c> when the pole has no feeder or the
+    /// feeder no cabinet. Derived at read time: the pole itself stores no cabinet.
+    /// </summary>
+    public string? CabinetId { get; init; }
+
+    public string? CabinetName { get; init; }
+
+    /// <summary>
+    /// Provenance of the feeder → cabinet link (TOPO-INFER), separate from <see cref="FeederSource"/>: the pole → cabinet chain is
+    /// only as confirmed as BOTH labels. <c>null</c> with no cabinet.
+    /// </summary>
+    public TopologySource? CabinetSource { get; init; }
+
     public required string CommuneId { get; init; }
 
     public required DataSource DataSource { get; init; }

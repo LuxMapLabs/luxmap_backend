@@ -50,6 +50,38 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         Assert.Equal("verified", row.GetProperty("feeder_source").GetString());
     }
 
+    /// <summary>
+    /// The inventory row names the pole's cabinet — read through its feeder, with the feeder → cabinet label beside the pole → feeder
+    /// one — and says nothing when either link is missing.
+    /// </summary>
+    [Fact]
+    public async Task A_pole_row_names_the_cabinet_of_its_feeder_with_that_links_own_label()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var segment = await NewSegmentAsync(fixture.CommuneId);
+        var cabinet = await NewCabinetAsync();
+        var cabinetName = await fixture.QueryAsync(db => db.Set<ElectricalCabinet>().IgnoreQueryFilters()
+            .Where(c => c.CabinetId == cabinet).Select(c => c.CabinetName).SingleAsync());
+        var wired = await CreatePoleAsync(client, segment, new { feeder_id = await NewFeederAsync(cabinet, TopologySource.Verified), feeder_source = "verified" });
+        var looseFeeder = await CreatePoleAsync(client, segment, new { feeder_id = await NewFeederAsync(null) });
+        var bare = await CreatePoleAsync(client, segment, new { });
+
+        var row = (await GetAsync(client, $"{Poles}/{wired}")).GetProperty("pole");
+        Assert.Equal(cabinet, row.GetProperty("cabinet_id").GetString());
+        Assert.Equal(cabinetName, row.GetProperty("cabinet_name").GetString());
+        Assert.Equal("verified", row.GetProperty("cabinet_source").GetString());
+
+        foreach (var pole in new[] { looseFeeder, bare })
+        {
+            var none = (await GetAsync(client, $"{Poles}/{pole}")).GetProperty("pole");
+            Assert.Equal(JsonValueKind.Null, none.GetProperty("cabinet_id").ValueKind);
+            Assert.Equal(JsonValueKind.Null, none.GetProperty("cabinet_name").ValueKind);
+            Assert.Equal(JsonValueKind.Null, none.GetProperty("cabinet_source").ValueKind);
+        }
+
+        // The list uses the same projection (PoleRow); AssetReadShapeTests pins that its rows carry these keys.
+    }
+
     [Theory]
     [InlineData("""{ "feeder_source": "verified" }""")]                  // a label with no relation
     [InlineData("""{ "feeder_id": "FEEDER", "feeder_source": null }""")]  // null while the relation stays
