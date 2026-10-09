@@ -856,6 +856,14 @@ public sealed class AssetCrudService(
             SegmentId = pole.SegmentId,
             FeederId = pole.FeederId,
             FeederSource = pole.FeederSource,
+
+            // Through the feeder, as correlated sub-queries — both keys carry commune_id (O-7, CAB-2), so the filter never hides
+            // the cabinet of a pole the caller can see.
+            CabinetId = dbContext.Set<Feeder>().Where(feeder => feeder.FeederId == pole.FeederId).Select(feeder => feeder.CabinetId).FirstOrDefault(),
+            CabinetName = dbContext.Set<Feeder>().Where(feeder => feeder.FeederId == pole.FeederId)
+                .Join(dbContext.Set<ElectricalCabinet>(), feeder => feeder.CabinetId, cabinet => cabinet.CabinetId, (feeder, cabinet) => cabinet.CabinetName)
+                .FirstOrDefault(),
+            CabinetSource = dbContext.Set<Feeder>().Where(feeder => feeder.FeederId == pole.FeederId).Select(feeder => feeder.CabinetSource).FirstOrDefault(),
             CommuneId = pole.CommuneId,
             DataSource = pole.DataSource,
             NearSensitivePoi = pole.NearSensitivePoi,

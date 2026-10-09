@@ -11378,6 +11378,17 @@
           "feeder_source": {
             "$ref": "#/components/schemas/TopologySource"
           },
+          "cabinet_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_source": {
+            "$ref": "#/components/schemas/TopologySource"
+          },
           "commune_id": {
             "type": "string"
           },
