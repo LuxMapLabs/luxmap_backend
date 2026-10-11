@@ -1799,6 +1799,10 @@ migration, Contract 5.9.
 `imresamu/postgis:17-3.5` mỗi lượt, migrate → seed → SQL của `seed_mock_set.py`) rồi kiểm data source của
 host trỏ đúng container. Factory kế thừa thẳng thì đọc DB từ `.env` — **`luxmap_dev`** — và test vẫn xanh.
 Canh bằng `TestHostCoverageTests` (phá thử: `DeviceProbeFactory` kế thừa thẳng → đỏ nêu đúng tên).
+Ngoại lệ có tên: **`NoDatabaseTestHost`** cho test không chạm DB (CORS, correlation id, phân trang, lỗi khởi động) — chạy
+không cần Docker. Nó **không** được đổi `ConnectionStrings__LuxMap` (biến toàn tiến trình, host container đọc song song) mà
+thay chính `NpgsqlDataSource` bằng địa chỉ không ai nghe: test lỡ chạm DB thì đỏ "connection refused", không lặng lẽ dùng
+`.env` (`NoDatabaseHostTests`).
 
 **Chỉ đặt `ConnectionStrings__LuxMap` (chuỗi nguyên khối), không đặt `POSTGRES_*`.** `Program` nạp `.env` bằng
 DotNetEnv với mặc định **ghi đè** biến đã có, ở **mỗi lần** dựng host — các biến thành phần sẽ bị giá trị dev

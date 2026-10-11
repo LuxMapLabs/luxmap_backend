@@ -23,8 +23,9 @@ dotnet test
 `scripts/seed_mock_set.py` (không `--apply`) qua chính kết nối đó. Khoảng 5 s trước test đầu tiên. Ba project test còn lại
 không cần Docker. Điều kiện: Docker đang chạy, `python3`, và `.env` **không** chứa `ConnectionStrings__LuxMap`
 (`Program` nạp lại `.env` mỗi lần dựng host và sẽ trỏ test sang DB đó — test từ chối chạy). Mọi factory phải kế thừa
-`LuxMapTestHost`, không kế thừa thẳng `WebApplicationFactory<Program>` (`TestHostCoverageTests` canh); host nào resolve ra DB
-khác container thì bị từ chối trước khi test chạy.
+`LuxMapTestHost` — hoặc `NoDatabaseTestHost` cho vài test không chạm DB (CORS, correlation id, phân trang, lỗi khởi động),
+chạy được không cần Docker — không kế thừa thẳng `WebApplicationFactory<Program>` (`TestHostCoverageTests` canh); host nào
+resolve ra DB khác container thì bị từ chối trước khi test chạy.
 
 Benchmark bị **loại khỏi lượt chạy mặc định** (`luxmap.runsettings`, lọc `Category!=Benchmark`) —
 chúng đo số cho người đọc, không phải test hồi quy, và một phép đo thời gian trên máy dùng chung là
@@ -48,10 +49,10 @@ dotnet run --project src/LuxMap.Api
 
 [Workflow CI](../.github/workflows/ci.yml) build **merge commit** của PR với `dev` bằng .NET 10,
 coi warning là lỗi, xuất lại cả hai spec và so với bản commit, lint bằng Redocly rồi chạy toàn bộ
-regression test (không benchmark). Mỗi job dùng service containers từ Compose trên VM riêng;
-CI tạo `.env` tạm, migrate, seed tài khoản rồi nạp FO-26 trước khi test. Chỉ dựng container rỗng
-hoặc chỉ truyền biến môi trường **không đủ**: fixture không tự bootstrap DB, còn
-`AuthTestExtensions.SeedPassword` đọc trực tiếp file `.env`. Không dùng DB dev chung cho CI.
+regression test (không benchmark). CI tạo `.env` tạm và dựng EMQX từ Compose (cho test MQTT end-to-end);
+**database thì test tự dựng** — `LuxMap.Api.Tests` khởi động container PostGIS riêng, migrate, seed tài khoản và
+nạp FO-26 (BE-36, `TestDatabase`), giống hệt trên máy dev. Mật khẩu seed đọc từ biến môi trường sau khi nạp `.env`.
+Không dùng DB dev chung cho CI.
 
 **Cần cấu hình trên GitHub:** đặt `Merge result / build, tests, OpenAPI` làm required check của
 `dev` và bật **Require branches to be up to date before merging**, hoặc dùng merge queue
