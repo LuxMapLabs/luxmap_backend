@@ -88,21 +88,15 @@ Mở **http://localhost:5141/swagger**. Gọi `POST /api/v1/auth/login` với m�
 
 ### 7. Chạy test
 
-Test tích hợp chạy trên PostGIS thật và **ghi vào database**; chúng cần database đã migrate, đã seed tài khoản và đã nạp
-bộ mẫu (đúng như CI). Đừng chạy trên `luxmap_dev` — tạo một database riêng một lần:
-
 ```bash
-docker compose exec postgres psql -U luxmap -d luxmap_dev -c "CREATE DATABASE luxmap_test"
-docker compose exec postgres psql -U luxmap -d luxmap_test -c "CREATE EXTENSION postgis"
-export ConnectionStrings__LuxMap="Host=localhost;Port=5433;Database=luxmap_test;Username=luxmap;Password=<POSTGRES_PASSWORD trong .env>"
-dotnet ef database update -p src/LuxMap.Persistence -s src/LuxMap.Api
-dotnet run --project src/LuxMap.Api -- --seed
-python3 scripts/seed_mock_set.py --apply --database luxmap_test
 dotnet test
 ```
 
-Biến `ConnectionStrings__LuxMap` chỉ sống trong cửa sổ terminal đó (PowerShell: `$env:ConnectionStrings__LuxMap="…"`).
-Mở terminal mới thì lệnh `dotnet run` lại trỏ về `luxmap_dev` theo `.env`.
+Test tích hợp (`LuxMap.Api.Tests`) **tự dựng một container PostGIS dùng một lần** (Testcontainers, BE-36): migrate, seed
+bốn tài khoản và nạp bộ mẫu FO-26 ngay trong lượt chạy, rồi bỏ container khi xong. Chúng **không bao giờ chạm `luxmap_dev`**
+và không cần `docker compose up`. Cần: Docker Desktop đang chạy, `python3`, và `.env` (vẫn là nguồn mật khẩu seed, khoá JWT,
+cấu hình SMTP). `.env` **không được** chứa `ConnectionStrings__LuxMap` — test từ chối chạy nếu có. Biến cùng tên đặt trong
+terminal bị bỏ qua: không có chế độ chạy test trên database có sẵn.
 
 ## Khi gặp lỗi
 

@@ -18,6 +18,14 @@ dotnet build
 dotnet test
 ```
 
+`LuxMap.Api.Tests` tự dựng **một container PostGIS cho mỗi lượt chạy** (BE-36, `tests/LuxMap.Api.Tests/TestDatabase.cs`):
+`imresamu/postgis:17-3.5` như compose, database tên ngẫu nhiên, rồi migrate → seed tài khoản → chạy SQL của
+`scripts/seed_mock_set.py` (không `--apply`) qua chính kết nối đó. Khoảng 5 s trước test đầu tiên. Ba project test còn lại
+không cần Docker. Điều kiện: Docker đang chạy, `python3`, và `.env` **không** chứa `ConnectionStrings__LuxMap`
+(`Program` nạp lại `.env` mỗi lần dựng host và sẽ trỏ test sang DB đó — test từ chối chạy). Mọi factory phải kế thừa
+`LuxMapTestHost`, không kế thừa thẳng `WebApplicationFactory<Program>` (`TestHostCoverageTests` canh); host nào resolve ra DB
+khác container thì bị từ chối trước khi test chạy.
+
 Benchmark bị **loại khỏi lượt chạy mặc định** (`luxmap.runsettings`, lọc `Category!=Benchmark`) —
 chúng đo số cho người đọc, không phải test hồi quy, và một phép đo thời gian trên máy dùng chung là
 chỗ sinh flake tự nhiên. Chạy có chủ đích:
@@ -546,10 +554,10 @@ sửa title/ngày, giao người dùng PUT `/assignee`. Không có evidence tron
 Seed mock thêm ba WO từ `mocks/mock-work-orders.json` và `mocks/mock-work-order-kinds.csv`,
 tra xã bằng `seed_key=study_site`, user theo username. Script từ chối khi có audit work_order;
 không xoá audit để nạp lại. Seed thay toàn bộ tài sản/fault/WO trên DB đích khi guard cho qua.
-Chạy trên DB test được chỉ định:
+Test không cần lệnh này — `TestDatabase` tự nạp vào container của lượt chạy. Nạp tay vào một DB được chỉ định:
 
 ```bash
-python3 scripts/seed_mock_set.py --database luxmap_test --apply
+python3 scripts/seed_mock_set.py --database <db> --apply
 ```
 
 WO-0001/0003 là inspection; WO-0002 repair in_progress, nên ba fault của nó cũng in_progress.
