@@ -1194,3 +1194,27 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | **AI-3** | Model `best.onnx` (10,6 MB) **nằm trong git tạm**, ghim SHA-256 ở `Ai:ModelSha256` — file khác mã ghim ⇒ không khởi động. Chuyển LFS / MinIO khi đổi model lần đầu | Không |
 
 **Phải báo:** người viết #118 (vì sao đổi), WP4 (ánh xạ lớp normal/out → on/off, ngưỡng 0.25 / 0.45, resize bilinear — cần mẫu chuẩn để đối chiếu với Ultralytics), WP5 (endpoint thử model chỉ cho Quản lý).
+
+## BE-31 — cảnh báo bảo hành + xuất CSV báo cáo (12/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 11/10/2026 — duyệt D-1…D-11 theo đề xuất ở `.ai/results/BE-31-p1.md` |
+| **Chạm API** | **Có** — enum mới, trường mới trên bốn bề mặt đọc, endpoint mới, tham số `format`. **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa lên Contract. Chỉ THÊM, không đổi trường nào đã có |
+| **Consumer** | WP5 (bản đồ, kiểm kê, dashboard), WP6 (chi tiết cột, gói offline). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| W-1 | Enum mới **`warranty_status : active \| expiring \| expired \| unknown`**. Thêm vào `properties` của `GET /map/poles` (và vì vậy cả `GET /sync/bundle`), `fixture.warranty_status` của `GET /map/poles/{id}`, `active_fixture.warranty_status` của `GET /assets/poles[/{id}]`. **Tính lúc đọc, không lưu cột** (D-R16, §3.3) |
+| W-2 | Luật (một chỗ: `WarrantyWindow`): so `warranty_expiry` của **bóng đang dùng** với **ngày lịch hôm nay ở Asia/Ho_Chi_Minh** (múi giờ lấy từ chính khoá `WorkOrders:Agenda:TimeZone`, không khai lần hai). `expired` ⇔ hết hạn **trước** hôm nay; `expiring` ⇔ từ hôm nay tới hôm nay + N, **cả hai đầu**; `active` ⇔ sau đó; `unknown` ⇔ không có hạn **hoặc** không có bóng đang dùng — không bao giờ đọc thành "còn bảo hành". Ngày lịch, không phải "đêm" (khác ST-5) |
+| W-3 | N mặc định **90 ngày**, cấu hình `Assets:Warranty:ExpiringWithinDays` (không hard-code). Từng request ghi đè bằng `within_days` ∈ 0…3650 (ngoài dải → 400) |
+| W-4 | **`GET /api/v1/statistics/warranty`** — capability `ReadStatistics` (như ST-8). Phân trang §0 cộng `today`, `expiring_within_days`. Item phẳng: `pole_id, segment_id, commune_id, data_source` (của **cột**), `fixture_id, fixture_type, lamp_watt, install_date, warranty_expiry` (bóng đang dùng, `null` khi không có), `warranty_status`, `days_remaining` (0 = hết hôm nay, âm = đã hết, `null` khi `unknown`). Lọc `status` (CSV), `commune_id` (lặp), `segment_id`, `data_source` — mặc định **loại `calibration_rig`** như ST-1 —, `within_days`. Thứ tự: hạn sớm nhất trước, `unknown` cuối, hoà theo `created_at, length(id), id`. Cột không có bóng đang dùng **vẫn liệt kê** (`unknown`) |
+| W-5 | **`format=csv`** trên cả ba endpoint `/statistics/…` (nợ ST-10 của BE-28). `json` mặc định; giá trị khác → 400 `VALIDATION_FAILED`, `details.field = format`. Mỗi item / dòng một hàng; **tên cột và cách viết giá trị đúng như JSON** (enum chuỗi thường, ngày ISO, `null` = ô trống). UTF-8 **có BOM**, CRLF, quote RFC 4180; ô chữ bắt đầu bằng `= + - @` / tab / CR được thêm `'` (chống chạy công thức). `fixture-status` / `repair-timeliness` xuất `rows[]`, không kèm `as_of` / `group_by` |
+| W-6 | Xuất CSV **bỏ phân trang**, tối đa **10 000 hàng**; quá thì **413 `EXPORT_TOO_LARGE`** (`details.rows`, `details.max_rows`) — mã lỗi mới |
+| W-7 | Tên file `Content-Disposition`: `<endpoint>-<yyyy-MM-dd>.csv` (ngày `today` cho bảo hành, ngày của `as_of` cho hai endpoint kia). Chỉ CSV, **không** Excel / PDF (D-9) |
+| W-8 | `GET /faults` và chi tiết phiếu **chưa** mang bảo hành (D-4) — không consumer nào cần (khảo sát 11/10); thêm khi WP5/WP6 hỏi |
+
+**Ở phía consumer (khảo sát 11/10, `.ai/results/BE-31-p1a-by-codex.md`) — cần báo, chưa báo:**
+
+- WP5 `GisDrawerPanel.tsx:405` hiện ngày giả **`2026-12-31`** khi `warranty_expiry` null; `assetImport.schema.ts:732` cũng fallback `2026-12-31` và theo đọc tĩnh còn gửi ngày đó lên API. Trái §3.3: "không biết hạn" phải hiện khác "còn bảo hành". Nay có `warranty_status = unknown` để hiện đúng.
+- WP6 `PoleDetailDto.kt:39`, `PoleFeatureDto.kt:38` khai `warranty_expiry: String` **không null** — API thật trả `null` được, giải mã sẽ hỏng cả màn khi bỏ repository giả.
