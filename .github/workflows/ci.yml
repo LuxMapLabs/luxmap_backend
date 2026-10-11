@@ -139,41 +139,23 @@ jobs:
         # the raw exporter output would miss that surface. Pin rules to avoid surprise CI changes.
         run: npx --yes @redocly/cli@2.0.0 lint docs/openapi/luxmap-v1.5.json
 
-      - name: Start isolated service containers
+      - name: Start the MQTT broker
         id: services
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        # Reuse Compose so CI cannot silently drift from its PostGIS/init SQL:
-        # imresamu/postgis:17-3.5 supplies real ST_* functions and GIST; plain postgres does not.
-        # PostGIS ONLY. The suite needs nothing else, verified 26/09/2026: 606/606 green with
-        # MinIO and Redis stopped. Storage tests use InMemoryObjectStore, the S3 client is built
-        # lazily (no call at startup), and no code references Redis.
+        # BE-36: the database is no longer a service here. LuxMap.Api.Tests starts its own PostGIS
+        # container (Testcontainers, tests/LuxMap.Api.Tests/TestDatabase.cs) and migrates and seeds it,
+        # so CI and a laptop prepare the database the same way, in the same code.
         # MinIO is NOT started because it can no longer be pulled anonymously: Docker Hub
-        # minio/* returns 404 (BE-11) and quay.io/minio/* now answers 401 "Requires
-        # authentication" (26/09/2026). The first S3 integration test (BE-36) must pick a new
-        # image source first; do not re-add minio here until one is chosen.
+        # minio/* returns 404 (BE-11) and quay.io/minio/* answers 401 "Requires authentication"
+        # (26/09/2026, still 401 on 11/10/2026). An S3 integration test must pick a new image source first.
         # LC-12: EMQX (profile `mqtt`) for MqttEndToEndTests — the only tests that need a real broker: it alone enforces the
         # ACL the API's callback answers. It probes the callback before the test host exists and retries every 15 s; the
         # tests wait for that themselves.
-        run: docker compose --profile mqtt up -d --wait --wait-timeout 180 postgres emqx
-
-      - name: Migrate and seed the fresh database
-        id: database
-        env:
-          Cors__AllowedOrigins__0: https://localhost:3000
-        if: ${{ !cancelled() && steps.services.outcome == 'success' }}
-        # Fixtures assume migrated tables, study_site, seeded users and the FO-26 baseline;
-        # they do NOT bootstrap an empty service DB. Match EF's version in Persistence.csproj.
-        # The mock loader deletes whole tables: ONLY use this on this job's disposable DB.
-        # Never redirect it to a shared dev database, even to troubleshoot a failed CI run.
-        run: |
-          dotnet tool install dotnet-ef --tool-path "$RUNNER_TEMP/ef" --version 10.0.11
-          "$RUNNER_TEMP/ef/dotnet-ef" database update --no-build -p src/LuxMap.Persistence -s src/LuxMap.Api
-          dotnet run --no-build --no-launch-profile --project src/LuxMap.Api -- --seed
-          python3 scripts/seed_mock_set.py --apply
+        run: docker compose --profile mqtt up -d --wait --wait-timeout 180 emqx
 
       - name: Run full regression suite
-        if: ${{ !cancelled() && steps.database.outcome == 'success' }}
-        # One invocation, no shards/matrix against this DB: fixtures reset global sequences.
+        if: ${{ !cancelled() && steps.services.outcome == 'success' }}
+        # One invocation, no shards/matrix: the run shares one database and fixtures reset global sequences.
         # Keep the existing xUnit AssetDatabaseCollection serialization intact.
         # Runsettings excludes Category=Benchmark. A CLI --filter is ANDed with that filter,
         # not a replacement; do not add one or switch to luxmap.benchmark.runsettings here.
