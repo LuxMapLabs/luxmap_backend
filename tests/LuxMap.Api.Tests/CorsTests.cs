@@ -6,7 +6,7 @@ namespace LuxMap.Api.Tests;
 /// <summary>
 /// Credentialed CORS (Contract section 2.10.2) and the startup check on its allowlist.
 /// </summary>
-public class CorsTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApiFactory>
+public class CorsTests(NoDatabaseApiFactory factory) : IClassFixture<NoDatabaseApiFactory>
 {
     private const string WebRefreshPath = "/api/v1/auth/web/refresh";
 
@@ -93,9 +93,9 @@ public class CorsTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApiFactor
         return string.Join(" | ", messages);
     }
 
-    private sealed class SettingsFactory(IReadOnlyDictionary<string, string> settings) : LuxMapTestHost
+    private sealed class SettingsFactory(IReadOnlyDictionary<string, string> settings) : NoDatabaseTestHost
     {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        protected override void ConfigureHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Production");
             foreach (var (key, value) in settings)

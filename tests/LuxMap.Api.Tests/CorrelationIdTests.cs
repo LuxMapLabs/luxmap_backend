@@ -3,7 +3,7 @@ using LuxMap.Shared.Contracts;
 
 namespace LuxMap.Api.Tests;
 
-public class CorrelationIdTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApiFactory>
+public class CorrelationIdTests(NoDatabaseApiFactory factory) : IClassFixture<NoDatabaseApiFactory>
 {
     private HttpClient Client => factory.CreateClient();
 

@@ -6,6 +6,8 @@ namespace LuxMap.Api.Tests;
 /// BE-36 — a factory that derives from <c>WebApplicationFactory&lt;Program&gt;</c> directly never waits for
 /// the test container and never checks where its data source points, so it resolves its database from
 /// <c>.env</c> — <c>luxmap_dev</c> on a developer machine. Nothing else would notice: the tests still pass.
+/// A host either waits for the container (<see cref="LuxMapTestHost"/>) or has no database at all
+/// (<see cref="NoDatabaseTestHost"/>).
 /// </summary>
 public sealed class TestHostCoverageTests
 {
@@ -18,7 +20,8 @@ public sealed class TestHostCoverageTests
 
         Assert.NotEmpty(hosts);
         var bypassing = hosts
-            .Where(type => !type.IsSubclassOf(typeof(LuxMapTestHost)) && type.DeclaringType != typeof(TestDatabase))
+            .Where(type => !type.IsSubclassOf(typeof(LuxMapTestHost)) && !type.IsSubclassOf(typeof(NoDatabaseTestHost))
+                && type.DeclaringType != typeof(TestDatabase))
             .Select(type => type.FullName)
             .ToArray();
 

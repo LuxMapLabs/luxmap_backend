@@ -123,9 +123,22 @@ public static class TestDatabase
                 + "the Shared, Persistence and Storage test projects do not.", exception);
         }
 
-        // Testcontainers' resource reaper removes the container when the test process exits; this is
-        // the polite path for a normal exit.
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => container.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        // Testcontainers' resource reaper removes the container when the test process exits; this is the polite path
+        // for a normal exit. Bounded and never thrown: a Docker daemon gone by then must not turn a green run red.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                if (!container.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(10)))
+                {
+                    Console.Error.WriteLine("BE-36: the test container was not removed within 10 s; the resource reaper will remove it.");
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.Error.WriteLine($"BE-36: could not remove the test container ({exception.GetBaseException().Message}); the resource reaper will.");
+            }
+        };
 
         var target = new NpgsqlConnectionStringBuilder(container.GetConnectionString());
         await ExecuteAsync(target, "CREATE EXTENSION IF NOT EXISTS postgis;");
