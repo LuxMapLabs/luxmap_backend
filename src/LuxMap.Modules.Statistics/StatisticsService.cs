@@ -1,10 +1,14 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
+using LuxMap.Shared.Contracts.Paging;
+using LuxMap.Shared.Contracts.Warranty;
+using LuxMap.Shared.Csv;
 using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +20,13 @@ public sealed record FixtureStatusQuery(
     string? SegmentId,
     IReadOnlyList<DataSource>? DataSources);
 
+public sealed record WarrantyQuery(
+    IReadOnlyList<WarrantyStatus>? Statuses,
+    IReadOnlyList<string>? CommuneIds,
+    string? SegmentId,
+    IReadOnlyList<DataSource>? DataSources,
+    int? ExpiringWithinDays);
+
 public sealed record RepairTimelinessQuery(
     IReadOnlyList<StatisticsDimension> GroupBy,
     IReadOnlyList<string>? CommuneIds,
@@ -26,7 +37,7 @@ public sealed record RepairTimelinessQuery(
 /// BE-28. Every query starts from a commune-scoped root (<c>pole</c>, <c>work_order</c>), so the BE-08 query
 /// filter limits the figures to the caller's communes without anything here remembering to.
 /// </summary>
-public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions nights, TimeProvider clock)
+public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions nights, TimeProvider clock, WarrantyCalendar warranty)
 {
     /// <summary>Default window of <c>repair-timeliness</c>: the last 30 nights, tonight included.</summary>
     public const int DefaultNights = 30;
@@ -42,13 +53,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
         var byCommune = query.GroupBy.Contains(StatisticsDimension.Commune);
         var bySegment = query.GroupBy.Contains(StatisticsDimension.Segment);
 
-        var poles = db.Set<Pole>().AsQueryable();
-        // Contract 1.6, as on the map: the calibration rig only when asked for by name.
-        poles = query.DataSources is { Count: > 0 } sources
-            ? poles.Where(p => sources.Contains(p.DataSource))
-            : poles.Where(p => p.DataSource != DataSource.CalibrationRig);
-        if (query.CommuneIds is { } communes) poles = poles.Where(p => communes.Contains(p.CommuneId));
-        if (query.SegmentId is { } segment) poles = poles.Where(p => p.SegmentId == segment);
+        var poles = Poles(query.CommuneIds, query.SegmentId, query.DataSources);
 
         // No status row means no sweep ever covered the pole; the map shows it as unknown (drift ST-2).
         var groups = await (
@@ -160,6 +165,80 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
             GroupBy = Dimensions(query.GroupBy, withDataSource: false),
             Rows = rows.OrderBy(r => r.CommuneId?.Length).ThenBy(r => r.CommuneId, StringComparer.Ordinal).ToArray(),
         };
+    }
+
+    /// <summary>
+    /// BE-31 — poles and the warranty of their lamp in service. A pole with no lamp in service is listed too, as
+    /// <c>unknown</c>: "nothing on record" must show up, not drop out of the list.
+    /// </summary>
+    /// <param name="page"><c>null</c> = every matching row, for the CSV export (capped by <see cref="CsvExport.MaxRows"/>).</param>
+    public async Task<WarrantyList> WarrantyAsync(WarrantyQuery query, PageRequest? page, CancellationToken ct)
+    {
+        if (query.ExpiringWithinDays is { } days && days is < 0 or > WarrantyWindow.MaxExpiringWithinDays)
+            throw Invalid("within_days", $"within_days must be between 0 and {WarrantyWindow.MaxExpiringWithinDays}.");
+        var window = warranty.Window(query.ExpiringWithinDays);
+
+        var rows =
+            from p in Poles(query.CommuneIds, query.SegmentId, query.DataSources)
+            join f in db.Set<Fixture>().Where(f => f.RemovedDate == null) on p.PoleId equals f.PoleId into lamps
+            from f in lamps.DefaultIfEmpty()
+            select new
+            {
+                p.PoleId, p.SegmentId, p.CommuneId, p.DataSource, p.CreatedAt,
+                FixtureId = (string?)f.FixtureId,
+                FixtureType = (FixtureType?)f.FixtureType,
+                LampWatt = (int?)f.LampWatt,
+                InstallDate = (DateOnly?)f.InstallDate,
+                Expiry = (DateOnly?)f.WarrantyExpiry,
+            };
+
+        // The status filter in SQL, on the window's OWN bounds — never on dates worked out here. Its tests check every
+        // returned row against WarrantyWindow.Classify, the one definition (drift W-2).
+        if (query.Statuses is { Count: > 0 } statuses)
+        {
+            DateOnly today = window.Today, last = window.LastExpiringDay;
+            bool unknown = statuses.Contains(WarrantyStatus.Unknown), expired = statuses.Contains(WarrantyStatus.Expired),
+                expiring = statuses.Contains(WarrantyStatus.Expiring), active = statuses.Contains(WarrantyStatus.Active);
+            rows = rows.Where(r => (unknown && r.Expiry == null) || (expired && r.Expiry < today)
+                || (expiring && r.Expiry >= today && r.Expiry <= last) || (active && r.Expiry > last));
+        }
+
+        var total = await rows.CountAsync(ct);
+        if (page is null) CsvExport.EnsureWithinLimit(total);
+
+        // Soonest expiry first, unknown last; ties by the ID rule of section 0 (created_at, length(id), id).
+        var ordered = rows.OrderBy(r => r.Expiry == null).ThenBy(r => r.Expiry)
+            .ThenBy(r => r.CreatedAt).ThenBy(r => r.PoleId.Length).ThenBy(r => r.PoleId);
+        var found = await (page is null ? ordered : ordered.Skip(page.Skip).Take(page.PageSize)).ToListAsync(ct);
+
+        return new WarrantyList
+        {
+            Today = window.Today,
+            ExpiringWithinDays = window.ExpiringWithinDays,
+            Page = page?.Page ?? PageRequest.FirstPage,
+            PageSize = page?.PageSize ?? found.Count,
+            Total = total,
+            Items = [.. found.Select(r => new WarrantyItem
+            {
+                PoleId = r.PoleId, SegmentId = r.SegmentId, CommuneId = r.CommuneId, DataSource = r.DataSource,
+                FixtureId = r.FixtureId, FixtureType = r.FixtureType, LampWatt = r.LampWatt, InstallDate = r.InstallDate,
+                WarrantyExpiry = r.Expiry,
+                WarrantyStatus = window.Classify(r.Expiry),
+                DaysRemaining = window.DaysRemaining(r.Expiry),
+            })],
+        };
+    }
+
+    /// <summary>The poles a pole statistic counts. Contract 1.6, as on the map: the calibration rig only when asked for by name.</summary>
+    private IQueryable<Pole> Poles(IReadOnlyList<string>? communes, string? segmentId, IReadOnlyList<DataSource>? dataSources)
+    {
+        var poles = db.Set<Pole>().AsQueryable();
+        poles = dataSources is { Count: > 0 } sources
+            ? poles.Where(p => sources.Contains(p.DataSource))
+            : poles.Where(p => p.DataSource != DataSource.CalibrationRig);
+        if (communes is not null) poles = poles.Where(p => communes.Contains(p.CommuneId));
+        if (segmentId is not null) poles = poles.Where(p => p.SegmentId == segmentId);
+        return poles;
     }
 
     private static string[] Dimensions(IReadOnlyList<StatisticsDimension> groupBy, bool withDataSource)

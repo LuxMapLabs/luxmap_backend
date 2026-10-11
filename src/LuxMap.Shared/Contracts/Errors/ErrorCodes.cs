@@ -217,4 +217,7 @@ public static class ErrorCodes
 
     /// <summary>409 — LIGHT-CTRL: an acknowledgement for a command the device has not fetched yet.</summary>
     public const string CommandNotDelivered = "COMMAND_NOT_DELIVERED";
+
+    /// <summary>413 — BE-31 W-6: a <c>format=csv</c> export would exceed <c>CsvExport.MaxRows</c>; narrow the filter.</summary>
+    public const string ExportTooLarge = "EXPORT_TOO_LARGE";
 }

@@ -78,3 +78,47 @@ public sealed record RepairTimelinessRow
     /// <summary>Repair work orders not finished whose due date is already behind tonight — as of now, whatever the window.</summary>
     public required int OpenOverdue { get; init; }
 }
+
+/// <summary>
+/// <c>GET /statistics/warranty</c> (BE-31): poles with their lamp in service and its warranty, soonest expiry first.
+/// The pagination keys of Contract section 0, plus the day and window the statuses were worked out against.
+/// </summary>
+public sealed record WarrantyList
+{
+    /// <summary>Today in the communes' zone — what <c>days_remaining</c> counts from.</summary>
+    public required DateOnly Today { get; init; }
+
+    /// <summary>A warranty ending within this many days of today is <c>expiring</c> (both ends included).</summary>
+    public required int ExpiringWithinDays { get; init; }
+
+    public required int Page { get; init; }
+    public required int PageSize { get; init; }
+    public required int Total { get; init; }
+    public required IReadOnlyList<WarrantyItem> Items { get; init; }
+}
+
+/// <summary>One pole. Flat on purpose: the same record is a CSV row.</summary>
+public sealed record WarrantyItem
+{
+    public required string PoleId { get; init; }
+    public required string SegmentId { get; init; }
+    public required string CommuneId { get; init; }
+
+    /// <summary>The POLE's provenance — the dimension every statistic splits by (drift ST-1).</summary>
+    public required DataSource DataSource { get; init; }
+
+    /// <summary><c>null</c> when the pole carries no lamp in service.</summary>
+    public required string? FixtureId { get; init; }
+
+    public required FixtureType? FixtureType { get; init; }
+    public required int? LampWatt { get; init; }
+    public required DateOnly? InstallDate { get; init; }
+
+    /// <summary><c>null</c> = not on record (or no lamp) — <see cref="WarrantyStatus"/> is then <c>unknown</c>.</summary>
+    public required DateOnly? WarrantyExpiry { get; init; }
+
+    public required WarrantyStatus WarrantyStatus { get; init; }
+
+    /// <summary>Days from today to the expiry: 0 = ends today, negative = expired; <c>null</c> when unknown.</summary>
+    public required int? DaysRemaining { get; init; }
+}
