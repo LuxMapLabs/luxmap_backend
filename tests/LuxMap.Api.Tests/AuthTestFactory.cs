@@ -1,7 +1,6 @@
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +12,7 @@ namespace LuxMap.Api.Tests;
 /// A real host for the BE-07 tests, with <see cref="FakeTimeProvider"/> replacing the system clock so
 /// time can be wound past the 30-second grace window without actually waiting.
 /// </summary>
-public sealed class AuthTestFactory : WebApplicationFactory<Program>
+public sealed class AuthTestFactory : LuxMapTestHost
 {
     public FakeTimeProvider Clock { get; } = new(DateTimeOffset.UtcNow);
 

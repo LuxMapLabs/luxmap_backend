@@ -5,7 +5,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Telemetry.Mqtt;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,7 +13,7 @@ using Microsoft.Extensions.Hosting;
 namespace LuxMap.Api.Tests;
 
 /// <summary>A host running the MQTT channel's HTTP side (no broker): callback key set, channel = mqtt, transport removed.</summary>
-public sealed class MqttHostFactory : WebApplicationFactory<Program>
+public sealed class MqttHostFactory : LuxMapTestHost
 {
     public const string CallbackKey = "test-callback-key-0123456789abcdef0123456789";
     public const string BackendPassword = "test-backend-password";

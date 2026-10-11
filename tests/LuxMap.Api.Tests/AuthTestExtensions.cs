@@ -7,24 +7,17 @@ public sealed record TokenPair(string AccessToken, string RefreshToken, int Expi
 
 public static class AuthTestExtensions
 {
-    /// <summary>Seed passwords come from .env exactly as BE-06 reads them — never hardcoded in tests.</summary>
+    /// <summary>
+    /// Seed passwords come from .env exactly as BE-06 reads them — never hardcoded in tests. Read from the
+    /// process environment, the same source <c>SeedCredentials</c> seeds from, so the two cannot disagree.
+    /// </summary>
     public static string SeedPassword(string variable)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, ".env")))
-        {
-            dir = dir.Parent;
-        }
-
-        foreach (var line in File.ReadAllLines(Path.Combine(dir!.FullName, ".env")))
-        {
-            if (line.StartsWith(variable + "=", StringComparison.Ordinal))
-            {
-                return line[(variable.Length + 1)..].Trim();
-            }
-        }
-
-        throw new InvalidOperationException($"{variable} is missing from .env");
+        TestDatabase.LoadEnvironment();
+        var value = Environment.GetEnvironmentVariable(variable);
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new InvalidOperationException($"{variable} is missing from .env")
+            : value;
     }
 
     public static async Task<HttpResponseMessage> PostLoginAsync(this HttpClient client, string user, string password)

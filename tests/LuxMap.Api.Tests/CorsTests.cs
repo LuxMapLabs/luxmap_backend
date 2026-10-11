@@ -1,6 +1,5 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace LuxMap.Api.Tests;
 
@@ -94,7 +93,7 @@ public class CorsTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApiFactor
         return string.Join(" | ", messages);
     }
 
-    private sealed class SettingsFactory(IReadOnlyDictionary<string, string> settings) : WebApplicationFactory<Program>
+    private sealed class SettingsFactory(IReadOnlyDictionary<string, string> settings) : LuxMapTestHost
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {

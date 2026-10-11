@@ -1,7 +1,6 @@
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +12,7 @@ namespace LuxMap.Api.Tests;
 /// so <see cref="ScopeProbe"/> joins the model — reusing the existing BE-03 seam without touching the
 /// application. The table is created and dropped with raw SQL, so NO migration is left in the project.
 /// </summary>
-public sealed class ScopeTestFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class ScopeTestFixture : LuxMapTestHost, IAsyncLifetime
 {
     /// <summary>
     /// The commune the BE-06 seeder puts the seeded users in, looked up through its
