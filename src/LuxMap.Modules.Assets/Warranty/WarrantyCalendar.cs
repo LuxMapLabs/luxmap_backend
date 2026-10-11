@@ -1,4 +1,5 @@
 using LuxMap.Shared.Contracts.Warranty;
+using Microsoft.Extensions.Configuration;
 
 namespace LuxMap.Modules.Assets.Warranty;
 
@@ -15,10 +16,22 @@ public sealed record WarrantyOptions
     /// </summary>
     public const string TimeZoneKey = "WorkOrders:Agenda:TimeZone";
 
+    public const string DefaultTimeZone = "Asia/Ho_Chi_Minh";
+
     public int ExpiringWithinDays { get; init; } = 90;
 
     /// <summary>IANA zone whose calendar date is "today". Every pilot commune is in Vietnam.</summary>
-    public string TimeZone { get; init; } = "Asia/Ho_Chi_Minh";
+    public string TimeZone { get; init; } = DefaultTimeZone;
+
+    /// <summary>
+    /// Reads ONLY the window from <see cref="SectionName"/>; the zone always comes from <see cref="TimeZoneKey"/> (or the default)
+    /// — never from <c>Assets:Warranty:TimeZone</c>, which a plain bind would quietly accept as a second zone.
+    /// </summary>
+    public static WarrantyOptions From(IConfiguration configuration) => new()
+    {
+        ExpiringWithinDays = configuration.GetValue<int?>($"{SectionName}:{nameof(ExpiringWithinDays)}") ?? 90,
+        TimeZone = configuration[TimeZoneKey] ?? DefaultTimeZone,
+    };
 
     /// <summary>An unknown zone or an out-of-range window would mislabel every lamp, so startup STOPS.</summary>
     public void Validate()

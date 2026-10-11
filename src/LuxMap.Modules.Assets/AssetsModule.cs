@@ -25,8 +25,7 @@ public sealed class AssetsModule : ILuxMapModule
         services.AddScoped<AssetImportService>();
 
         // BE-31 — the zone comes from the agenda's key so "today" and "tonight" cannot disagree (WarrantyOptions.TimeZoneKey).
-        var warranty = configuration.GetSection(WarrantyOptions.SectionName).Get<WarrantyOptions>() ?? new WarrantyOptions();
-        warranty = warranty with { TimeZone = configuration[WarrantyOptions.TimeZoneKey] ?? warranty.TimeZone };
+        var warranty = WarrantyOptions.From(configuration);
         warranty.Validate();
         services.AddSingleton(warranty);
         services.AddSingleton<WarrantyCalendar>();

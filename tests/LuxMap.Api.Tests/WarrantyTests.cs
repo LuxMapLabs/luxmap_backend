@@ -25,6 +25,8 @@ namespace LuxMap.Api.Tests;
 public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
 {
     private static readonly TimeZoneInfo Zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+    // Now, frozen: the JWTs this host issues must still validate. The zone/calendar edges themselves are pinned to fixed
+    // instants in WarrantyCalendarTests, which needs no host.
     private readonly FakeTimeProvider clock = new(DateTimeOffset.UtcNow);
     private readonly Dictionary<string, AppUser> users = [];
     private readonly Dictionary<string, HttpClient> clients = [];
@@ -154,6 +156,66 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
 
         var two = await Get("manager", $"warranty?commune_id={home}&status=expired,unknown");
         Assert.Equal(2, two.GetProperty("total").GetInt32());
+    }
+
+    [Fact]
+    public async Task With_a_zero_day_window_the_filter_still_agrees_and_a_retired_lamp_is_no_lamp()
+    {
+        var offsets = new int?[] { -1, 0, 1, null };
+        foreach (var offset in offsets) await Plant(home, road, DataSource.Field, offset);
+        var retired = await Plant(home, road, DataSource.Field, 300);
+        await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            (await db.Set<Fixture>().IgnoreQueryFilters().SingleAsync(f => f.PoleId == retired)).RemovedDate = Today;
+            await db.SaveChangesAsync();
+            return 0;
+        });
+        var window = new WarrantyWindow(Today, 0);
+
+        foreach (var status in Enum.GetValues<WarrantyStatus>())
+        {
+            var items = (await Get("manager", $"warranty?commune_id={home}&within_days=0&status={Wire(status)}"))
+                .GetProperty("items").EnumerateArray().ToArray();
+
+            var expected = offsets.Count(o => window.Classify(o is { } d ? Today.AddDays(d) : null) == status)
+                + (status == WarrantyStatus.Unknown ? 1 : 0);
+            Assert.Equal(expected, items.Length);
+            Assert.All(items, item => Assert.Equal(Wire(status), item.GetProperty("warranty_status").GetString()));
+        }
+
+        var bare = (await Get("manager", $"warranty?commune_id={home}&within_days=0")).GetProperty("items").EnumerateArray()
+            .Single(i => i.GetProperty("pole_id").GetString() == retired);
+        Assert.Equal(JsonValueKind.Null, bare.GetProperty("fixture_id").ValueKind);
+    }
+
+    /// <summary>
+    /// Two poles written in ONE transaction share <c>created_at</c>, so the id decides — and by length first: as text
+    /// <c>POLE-100000</c> sorts before <c>POLE-99999</c> (section 0).
+    /// </summary>
+    [Fact]
+    public async Task Ties_are_broken_by_id_length_then_id_and_paging_neither_repeats_nor_drops()
+    {
+        // 9xxxx vs 1xxxxx: compared as text the longer one comes FIRST, so only the length rule puts it second.
+        var number = Random.Shared.Next(90_000, 100_000);
+        string shorter = $"POLE-{number}", longer = $"POLE-{number + 10_000}";
+        await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            foreach (var id in new[] { longer, shorter })
+            {
+                db.Add(new Pole { PoleId = id, CommuneId = home, SegmentId = road, DataSource = DataSource.Field, Geom = new Point(107.315, 11.275) { SRID = 4326 } });
+                db.Add(Lamp(id, home, Today.AddDays(42)));
+            }
+            await db.SaveChangesAsync();
+            return 0;
+        });
+
+        var first = Ids(await Get("manager", $"warranty?commune_id={home}&page_size=1&page=1"));
+        var second = Ids(await Get("manager", $"warranty?commune_id={home}&page_size=1&page=2"));
+
+        Assert.Equal([shorter], first);
+        Assert.Equal([longer], second);
     }
 
     [Fact]

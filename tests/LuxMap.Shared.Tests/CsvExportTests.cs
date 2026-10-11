@@ -55,6 +55,16 @@ public sealed class CsvExportTests
     }
 
     [Fact]
+    public void A_cell_starting_with_a_tab_or_a_carriage_return_is_defused_and_the_cr_quoted()
+    {
+        var tab = Text(CsvExport.Write([new Row("POLE-0004", DataSource.Field, null, null, "\tx")], LuxMapJsonOptions.Default));
+        var cr = Text(CsvExport.Write([new Row("POLE-0005", DataSource.Field, null, null, "\rx")], LuxMapJsonOptions.Default));
+
+        Assert.EndsWith(",'\tx\r\n", tab);
+        Assert.EndsWith(",\"'\rx\"\r\n", cr);
+    }
+
+    [Fact]
     public void More_rows_than_the_cap_is_a_413_not_a_file()
     {
         var error = Assert.Throws<LuxMapException>(() => CsvExport.EnsureWithinLimit(CsvExport.MaxRows + 1));
