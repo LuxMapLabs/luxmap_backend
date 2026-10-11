@@ -42,13 +42,22 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-31 — cảnh báo bảo hành + xuất CSV báo cáo, 12/10/2026</strong>
+    <p><span class="tag t-next">PR #129 · CI xanh · chờ code owner (OpenAPI) + báo WP5/WP6</span> Nhánh <code>feat/BE-31-warranty</code> (đã rebase lên <code>dev</code> sau #128). Drift W-1…W-8
+    (SELF-SIGNED, chỉ thêm): <code>warranty_status</code> (<code>active | expiring | expired | unknown</code>) tính lúc đọc trên bản đồ, chi tiết cột,
+    kiểm kê và gói offline; <code>GET /statistics/warranty</code>; <code>format=csv</code> cho cả ba báo cáo thống kê (nợ ST-10). Hôm nay theo ngày
+    lịch giờ Việt Nam, cửa sổ "sắp hết" 90 ngày cấu hình được. Không migration. 884/46/45/379 xanh, 2 skip MQTT; phá thử mép lọc và thứ tự
+    đều đỏ đúng chỗ. Codex review: 0 P1 / 3 P2 / 4 P3 — sửa 5, giữ 2 có lý do. Còn: báo WP5 (ngày giả <code>2026-12-31</code> khi hạn null) và
+    WP6 (DTO <code>warranty_expiry</code> không null). Chi tiết <code>.ai/results/BE-31-p2.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>BE-36 — test chạy trên container PostGIS của chính lượt chạy, 12/10/2026</strong>
-    <p><span class="tag t-next">Code xong · chờ push / PR</span> Nhánh <code>feat/BE-36-testcontainers</code>.
+    <p><span class="tag t-done">Đã merge (PR #128, <code>f3baff2</code>, 12/10/2026)</span> CI: 869/46/45/352 xanh, 0 skip (MQTT E2E chạy thật), compose chỉ kéo EMQX.
     <code>dotnet test</code> tự dựng một container PostGIS mỗi lượt (Testcontainers 4.15.0), migrate, seed, nạp FO-26 —
     <strong>không bao giờ chạm <code>luxmap_dev</code></strong>, không cần <code>ConnectionStrings__LuxMap</code>. Mọi factory kế thừa
     <code>LuxMapTestHost</code> (kiểm data source trỏ đúng container); test CORS / correlation / phân trang dùng
     <code>NoDatabaseTestHost</code>, chạy không cần Docker. CI bỏ Postgres compose và bước migrate/seed. 867/46/45/352 xanh, 2 skip MQTT;
-    phá thử hai chốt chặn đều đỏ đúng chỗ. Codex review P1 + P2, đã sửa hết. Còn: CI chạy thật trên PR; test MinIO thật (việc riêng);
+    phá thử hai chốt chặn đều đỏ đúng chỗ. Codex review P1 + P2, đã sửa hết. Còn: test MinIO thật (việc riêng);
     dọn 14 tài khoản cặn trên <code>luxmap_dev</code> (việc riêng, cần duyệt). Chi tiết <code>.ai/results/BE-36-p2.md</code>.</p>
   </div>
   <div class="card">
@@ -544,6 +553,10 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>⚠️ Phân trang trong OpenAPI là một tham số object <code>page</code> (12/10/2026, phát hiện ở review BE-31).</strong> Mọi endpoint nhận
+      <code>PageQuery</code> (<code>/assets/*</code>, <code>/faults</code>, <code>/work-orders</code>, <code>/statistics/warranty</code>…) xuất <code>page</code> kiểu
+      <code>$ref PageQuery</code> thay vì hai tham số <code>page</code> / <code>page_size</code>. Theo OAS (form, explode) vẫn đúng trên dây, nhưng client sinh từ spec
+      (FM-04) có thể ra kiểu lạ. Sửa một lần cho mọi endpoint bằng operation filter; kiểm với WP6 trước.</li>
       <li><strong>⚠️ Test chập chờn:</strong> <code>SurveyIngestTests.Concurrent_create_returns_one_id_and_one_audit_and_conflicting_body_is_409</code>
       đỏ 1 trong 3 lượt chạy toàn bộ bộ API ngày 04/10 (đỏ sau 5 ms), xanh 5/5 khi chạy riêng và 2/2 lượt toàn bộ sau đó. Có sẵn từ P2a,
       không liên quan BE-41. Cần bắt lại thông điệp lỗi lần tới rồi mới sửa — đừng thêm retry để che.</li>
