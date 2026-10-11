@@ -145,3 +145,17 @@ public enum TopologySource
     Verified,
     Inferred,
 }
+
+/// <summary>warranty_status : active | expiring | expired | unknown — drift BE-31 W-1 (SELF-SIGNED, not yet in Contract section 1).</summary>
+/// <remarks>
+/// Worked out when read, from the <c>warranty_expiry</c> of the lamp IN SERVICE against today's date in the communes' zone —
+/// never stored (D-R16). <c>unknown</c> = no expiry on record, or no lamp in service: it must never read as "still covered".
+/// The rule itself lives in ONE place, <see cref="LuxMap.Shared.Contracts.Warranty.WarrantyWindow"/>.
+/// </remarks>
+public enum WarrantyStatus
+{
+    Active,
+    Expiring,
+    Expired,
+    Unknown,
+}

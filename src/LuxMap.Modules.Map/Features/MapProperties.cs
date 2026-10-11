@@ -56,6 +56,12 @@ public record PoleProperties
 
     public DateOnly? WarrantyExpiry { get; init; }
 
+    /// <summary>
+    /// From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1); <c>unknown</c> when there is no
+    /// lamp in service or its expiry is not on record.
+    /// </summary>
+    public required WarrantyStatus WarrantyStatus { get; init; }
+
     public required string CommuneId { get; init; }
 
     public DateTime? LastSeenAt { get; init; }

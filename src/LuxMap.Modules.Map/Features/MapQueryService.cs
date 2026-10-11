@@ -1,5 +1,6 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.Telemetry.Entities;
@@ -35,7 +36,7 @@ namespace LuxMap.Modules.Map.Features;
 /// survives — never the other way round.
 /// </para>
 /// </remarks>
-public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, TimeProvider clock)
+public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, TimeProvider clock, WarrantyCalendar warranty)
 {
     /// <summary>Past this many poles the client is told to zoom in rather than served (section 5.1).</summary>
     public const int MaxPoles = 2000;
@@ -140,6 +141,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
             })
             .ToListAsync(ct);
 
+        var window = warranty.Window();
         return new FeatureCollection<PoleProperties>
         {
             Features = [.. rows.Select(row => new Feature<PoleProperties>
@@ -163,6 +165,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                     LampWatt = row.Lamp?.LampWatt,
                     InstallDate = row.Lamp?.InstallDate,
                     WarrantyExpiry = row.Lamp?.WarrantyExpiry,
+                    WarrantyStatus = window.Classify(row.Lamp?.WarrantyExpiry),
                     CommuneId = row.CommuneId,
                     LastSeenAt = row.Status?.LastSeenAt,
                     LastSweepId = row.Status?.LastSweepId,
