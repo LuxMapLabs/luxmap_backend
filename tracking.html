@@ -42,6 +42,16 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-36 — test chạy trên container PostGIS của chính lượt chạy, 12/10/2026</strong>
+    <p><span class="tag t-next">Code xong · chờ push / PR</span> Nhánh <code>feat/BE-36-testcontainers</code>.
+    <code>dotnet test</code> tự dựng một container PostGIS mỗi lượt (Testcontainers 4.15.0), migrate, seed, nạp FO-26 —
+    <strong>không bao giờ chạm <code>luxmap_dev</code></strong>, không cần <code>ConnectionStrings__LuxMap</code>. Mọi factory kế thừa
+    <code>LuxMapTestHost</code> (kiểm data source trỏ đúng container); test CORS / correlation / phân trang dùng
+    <code>NoDatabaseTestHost</code>, chạy không cần Docker. CI bỏ Postgres compose và bước migrate/seed. 867/46/45/352 xanh, 2 skip MQTT;
+    phá thử hai chốt chặn đều đỏ đúng chỗ. Codex review P1 + P2, đã sửa hết. Còn: CI chạy thật trên PR; test MinIO thật (việc riêng);
+    dọn 14 tài khoản cặn trên <code>luxmap_dev</code> (việc riêng, cần duyệt). Chi tiết <code>.ai/results/BE-36-p2.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>BE-36 + BE-31 — Phase 1, 11/10/2026</strong>
     <p><span class="tag t-block">Phase 1 xong · chờ Mỹ chốt D-item</span> Kéo sớm cả hai (CSV: BE-31 W14, BE-36 W17–W18).
     <strong>BE-36</strong> (Testcontainers, Claude khảo sát, Codex review 3 P1 / 4 P2 — đã kiểm và gộp): DB sạch dựng trong ~5 s
