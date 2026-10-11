@@ -42,6 +42,19 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-36 + BE-31 — Phase 1, 11/10/2026</strong>
+    <p><span class="tag t-block">Phase 1 xong · chờ Mỹ chốt D-item</span> Kéo sớm cả hai (CSV: BE-31 W14, BE-36 W17–W18).
+    <strong>BE-36</strong> (Testcontainers, Claude khảo sát, Codex review 3 P1 / 4 P2 — đã kiểm và gộp): DB sạch dựng trong ~5 s
+    (migrate 2,0 s, seed 1,8 s, mock 0,2 s; clone template 0,09 s); bộ test đầy đủ trên DB đó 1308 xanh / 2 skip (MQTT), 82 s, lượt hai
+    trên cùng DB vẫn xanh và số hàng giữ nguyên. CI đã có DB sạch mỗi lượt — rủi ro thật nằm ở máy dev: <code>dotnet test</code> trần
+    rơi về <code>luxmap_dev</code> qua <code>.env</code>. D-1…D-11 ở <code>.ai/results/BE-36-p1.md</code>.
+    <strong>BE-31</strong> (bảo hành, Codex khảo sát WP5/WP6, Claude khảo sát backend): đề xuất <code>warranty_status</code> tính lúc đọc +
+    <code>GET /statistics/warranty</code> + xuất CSV chung (nợ ST-10 của BE-28); 66/103 bóng mock đã hết hạn. Phát hiện ở consumer:
+    web điền ngày giả <code>2026-12-31</code> khi hạn null, mobile khai <code>warranty_expiry</code> không null — cần báo WP5/WP6.
+    D-1…D-11 ở <code>.ai/results/BE-31-p1.md</code>. Files: <code>.ai/tasks/BE-3{1,6}.md</code>, <code>.ai/results/BE-3{1,6}-p1*.md</code>,
+    <code>.ai/reviews/BE-36-p1-by-codex.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>JSON-ENUM — enum JSON chỉ nhận chuỗi — 05/10/2026</strong>
     <p><span class="tag t-done">Xong</span> Đã chặn số và chuỗi chữ số ở converter chung;
     build 0 warning, 0 error; Shared 336/336 xanh bằng runner xUnit trong tiến trình (VSTest bị sandbox chặn socket).
