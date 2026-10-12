@@ -489,7 +489,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     private PoleDetailService Detail(LuxMapDbContext db, string[]? ids = null)
-        => new(db, new SurveyFrameOptions(), new SurveyMediaAccess(db, new Scope(ids ?? [a, b])));
+        => new(db, new SurveyFrameOptions(), new SurveyMediaAccess(db, new Scope(ids ?? [a, b])),
+            new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System));
 
     [Fact]
     public async Task Pole_detail_shows_published_history_baseline_status_faults_and_frames()

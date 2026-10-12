@@ -40,6 +40,7 @@ public static class SwaggerSetup
             options.OperationFilter<DeviceSecurityOperationFilter>();
             options.OperationFilter<CapabilityOperationFilter>();
             options.OperationFilter<RawRequestBodyOperationFilter>();
+            options.OperationFilter<CsvExportOperationFilter>();
             options.OperationFilter<ClientSurfaceOperationFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than

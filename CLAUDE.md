@@ -280,7 +280,7 @@ Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc ch
 | ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, đã hiện thực ở Contract §5.3.1 (SELF-SIGNED, chờ FW xác nhận) |
 | BE-15, BE-16 | Upload sweep, validate metadata phơi sáng |
 | BE-27 | Notification — **chốt tên bảng/entity cùng FE2 trước W16** |
-| BE-29→31 | Dashboard còn lại (BE-28 **đã hiện thực** 07/10/2026 — `/statistics/…`, drift BE-28 ST-1…ST-10, SELF-SIGNED; BE-30 thêm `group_by` không đổi hình dạng) |
+| BE-29, BE-30 | Dashboard còn lại (BE-28 **đã hiện thực** 07/10/2026 — `/statistics/…`, drift BE-28 ST-1…ST-10, SELF-SIGNED; BE-30 thêm `group_by` không đổi hình dạng; **BE-31 đã hiện thực** 12/10/2026 — `warranty_status`, `/statistics/warranty`, `format=csv`, drift W-1…W-8) |
 | BE-33→35 | Quản trị danh mục, node, model version |
 | ~~BE-41~~ | ~~`POST /faults`~~ → **đã đặc tả ở mục 2.8** |
 | ~~BE-42~~ | ~~endpoint lux~~ → **đã đặc tả ở mục 2.9** |
@@ -296,7 +296,7 @@ Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (g
 tài sản; hết bảo hành **không** xoá / archive gì — chỉ gắn **cảnh báo "hết bảo hành"**, tính từ
 `fixture.warranty_expiry` của bóng đang dùng so với hôm nay, **không lưu thành cột trạng thái** (hiện ở bản
 đồ, danh sách tài sản, fault / work order). ⚠️ Ngày bảo hành nằm trên **`fixture`**, không trên `pole`, và
-**nullable** — "không biết hạn bảo hành" phải hiện khác "còn bảo hành". Hiện thực: BE-31 / BE-35.
+**nullable** — "không biết hạn bảo hành" phải hiện khác "còn bảo hành". Hiện thực: **BE-31 xong** (`warranty_status`, drift W-1…W-8); retention còn BE-35.
 
 ---
 
@@ -1822,6 +1822,32 @@ cùng nguồn với `SeedCredentials` — trước đây hai bên đọc hai nơ
 ⚠️ **`dotnet test --no-build` sau khi đổi branch chạy bin CŨ.** Gặp thật ở P1: bin build trước khi pull
 TOPO-INFER làm hàng loạt test đỏ `23514 ck_pole_feeder_source_matches_feeder` — trông như lỗi DB, thực ra
 là thiếu code. Build lại trước khi kết luận.
+
+### BE-31 — bảo hành và xuất CSV (12/10/2026)
+
+**`warranty_status` có ĐÚNG MỘT định nghĩa: `WarrantyWindow` (`LuxMap.Shared/Contracts/Warranty`).** Mọi bề mặt đọc tính
+bằng `WarrantyWindow.Classify` **sau** truy vấn (`AssetCrudService.WithWarranty`, `MapQueryService`, `PoleDetailService`),
+không viết lại luật trong projection SQL. Chỗ duy nhất luật phải nằm trong SQL là **lọc** của `/statistics/warranty`: nó lọc
+trên `window.Today` / `window.LastExpiringDay`, không tự tính ngày, và `WarrantyTests.The_status_filter_agrees_with_the_one_definition_on_every_edge`
+đối chiếu từng dòng trả về với `Classify` trên cả năm mép. Lấy "hôm nay" qua `WarrantyCalendar` — múi giờ đọc từ chính
+`WorkOrders:Agenda:TimeZone`, đừng khai khoá múi giờ thứ hai.
+
+`ActiveFixture.WarrantyStatus` và `PoleMapFixture.WarrantyStatus` **mặc định `unknown`**, vì chúng được gán sau truy vấn: đường
+đọc mới nào quên gán thì ra `unknown` — sai nhưng an toàn — chứ không ra `active`. Đừng đổi mặc định.
+
+🔴 **Hai `ProducesResponseType` cùng một mã trạng thái: cái SAU THAY cái trước, không gộp.** Khai
+`[ProducesResponseType<T>(200, "application/json")]` rồi `[ProducesResponseType<string>(200, "text/csv")]` làm schema `T` **biến
+khỏi spec** (gặp thật: `FixtureStatusStatistics` và ba schema nữa mất), mà build, test và lint đều xanh. Action trả thêm CSV
+gắn `[CsvExport]`; `CsvExportOperationFilter` thêm `text/csv` bên cạnh JSON. So spec theo **ngữ nghĩa** (path/schema đổi gì),
+đừng chỉ đọc số dòng diff.
+
+**CSV đi qua đúng một đường: `CsvExport.Write`**, tuần tự hoá từng dòng bằng chính `LuxMapJsonOptions` rồi đọc ô ra — nên tên
+cột, enum, ngày, `null` viết y như JSON. Dòng phải **phẳng** (ô object/array → ném lỗi). Báo cáo mới cần CSV thì trả record
+phẳng và gọi nó, đừng tự format. `GetTypeInfo` cần options đã có resolver: `Write` khoá options trước (`MakeReadOnly`) — gặp
+thật ở test đơn vị, đỏ hay xanh tuỳ test nào chạy trước.
+
+Generator spec có `S["PoleProperties"]` viết tay với `additionalProperties: false` — trường mới trên `properties` bản đồ phải
+thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất từ chối chính response thật.
 
 ### BE-43 — đồng bộ offline (06/10/2026)
 

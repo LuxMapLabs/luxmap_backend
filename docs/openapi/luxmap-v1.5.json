@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 107 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 108 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.14"
   },
   "paths": {
@@ -7768,25 +7768,28 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/FixtureStatusStatistics"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FixtureStatusStatistics"
                 }
               },
-              "text/json": {
+              "text/csv": {
                 "schema": {
-                  "$ref": "#/components/schemas/FixtureStatusStatistics"
+                  "type": "string",
+                  "description": "format=csv: UTF-8 with BOM, CRLF, one row per item, columns spelled as in the JSON body; at most 10 000 rows (else 413 EXPORT_TOO_LARGE)."
                 }
               }
             }
@@ -7831,6 +7834,26 @@
               }
             }
           },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -7852,7 +7875,7 @@
         "summary": "[TẠM — BE-28] Số cột theo fixture_status, mỗi nhóm một dòng; data_source luôn là một chiều nhóm, never_surveyed là tập con của unknown",
         "operationId": "getStatisticsFixtureStatus",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift BE-28 ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW)"
+        "x-luxmap-contract": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)"
       }
     },
     "/api/v1/statistics/repair-timeliness": {
@@ -7897,25 +7920,28 @@
               "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
               "format": "date"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/RepairTimelinessStatistics"
-                }
-              },
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RepairTimelinessStatistics"
                 }
               },
-              "text/json": {
+              "text/csv": {
                 "schema": {
-                  "$ref": "#/components/schemas/RepairTimelinessStatistics"
+                  "type": "string",
+                  "description": "format=csv: UTF-8 with BOM, CRLF, one row per item, columns spelled as in the JSON body; at most 10 000 rows (else 413 EXPORT_TOO_LARGE)."
                 }
               }
             }
@@ -7960,6 +7986,26 @@
               }
             }
           },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -7981,7 +8027,168 @@
         "summary": "[TẠM — BE-28] Phiếu sửa chữa xong trong các đêm from..to: đúng hạn / trễ / không hạn, on_time_rate; open_overdue tính tới hiện tại",
         "operationId": "getStatisticsRepairTimeliness",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift BE-28 ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW)"
+        "x-luxmap-contract": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/statistics/warranty": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "within_days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarrantyList"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "format=csv: UTF-8 with BOM, CRLF, one row per item, columns spelled as in the JSON body; at most 10 000 rows (else 413 EXPORT_TOO_LARGE)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_statistics",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv",
+        "operationId": "getStatisticsWarranty",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)"
       }
     },
     "/api/v1/frames/{frame_id}/thumbnail": {
@@ -10670,6 +10877,9 @@
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             "format": "date",
             "nullable": true
+          },
+          "warranty_status": {
+            "$ref": "#/components/schemas/WarrantyStatus"
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
@@ -13575,6 +13785,9 @@
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             "format": "date",
             "nullable": true
+          },
+          "warranty_status": {
+            "$ref": "#/components/schemas/WarrantyStatus"
           }
         },
         "additionalProperties": false
@@ -13798,7 +14011,7 @@
       "PoleProperties": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §5.1 — 15 thuộc tính phẳng. Không có data_source / external_ref / feeder_id (không emit).",
+        "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1). Không có data_source / external_ref / feeder_id (không emit).",
         "required": [
           "pole_id",
           "segment_id",
@@ -13807,6 +14020,7 @@
           "fixture_type",
           "lamp_watt",
           "install_date",
+          "warranty_status",
           "commune_id",
           "open_fault_count",
           "has_iot_node",
@@ -13848,6 +14062,10 @@
             "type": "string",
             "format": "date",
             "nullable": true
+          },
+          "warranty_status": {
+            "$ref": "#/components/schemas/WarrantyStatus",
+            "description": "BE-31 W-1: tính lúc đọc từ warranty_expiry của bóng đang dùng so với hôm nay (Asia/Ho_Chi_Minh); unknown khi không có hạn hoặc không có bóng"
           },
           "commune_id": {
             "$ref": "#/components/schemas/CommuneId"
@@ -14996,7 +15214,8 @@
           "near_sensitive_poi",
           "open_fault_count",
           "pole_id",
-          "segment_id"
+          "segment_id",
+          "warranty_status"
         ],
         "type": "object",
         "properties": {
@@ -15036,6 +15255,9 @@
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             "format": "date",
             "nullable": true
+          },
+          "warranty_status": {
+            "$ref": "#/components/schemas/WarrantyStatus"
           },
           "commune_id": {
             "type": "string"
@@ -15511,6 +15733,119 @@
           "manager",
           "field_engineer",
           "system_admin"
+        ],
+        "type": "string"
+      },
+      "WarrantyItem": {
+        "required": [
+          "commune_id",
+          "data_source",
+          "days_remaining",
+          "fixture_id",
+          "fixture_type",
+          "install_date",
+          "lamp_watt",
+          "pole_id",
+          "segment_id",
+          "warranty_expiry",
+          "warranty_status"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "fixture_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fixture_type": {
+            "$ref": "#/components/schemas/FixtureType"
+          },
+          "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "install_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "warranty_status": {
+            "$ref": "#/components/schemas/WarrantyStatus"
+          },
+          "days_remaining": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WarrantyList": {
+        "required": [
+          "expiring_within_days",
+          "items",
+          "page",
+          "page_size",
+          "today",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "today": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "expiring_within_days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WarrantyItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WarrantyStatus": {
+        "enum": [
+          "active",
+          "expiring",
+          "expired",
+          "unknown"
         ],
         "type": "string"
       },
@@ -16193,7 +16528,7 @@
     },
     {
       "name": "Statistics",
-      "description": "Thống kê dashboard — BE-28, drift ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW). Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị)."
+      "description": "Thống kê dashboard — BE-28 (drift ST-1…ST-10) và bảo hành BE-31 (drift W-1…W-8), SELF-SIGNED, nền tạm tới FW. Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị). format=csv xuất UTF-8 có BOM, tối đa 10 000 dòng (413 EXPORT_TOO_LARGE)."
     }
   ],
   "servers": [

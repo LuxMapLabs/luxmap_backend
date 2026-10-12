@@ -1,6 +1,7 @@
 using System.Net;
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.Processing.Frames;
@@ -31,7 +32,7 @@ namespace LuxMap.Modules.Map.Features;
 /// </para>
 /// </remarks>
 public sealed class PoleDetailService(
-    LuxMapDbContext db, SurveyFrameOptions surveyOptions, SurveyMediaAccess mediaAccess)
+    LuxMapDbContext db, SurveyFrameOptions surveyOptions, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty)
 {
     public const int HistoryPoints = 30;
     public const int RecentFrameCount = 10;
@@ -77,7 +78,9 @@ public sealed class PoleDetailService(
             SegmentName = pole.SegmentName ?? string.Empty,
             CommuneId = pole.CommuneId,
             Location = new PoleMapLocation(pole.Geom.Y, pole.Geom.X),
-            Fixture = fixture?.Detail,
+            Fixture = fixture?.Detail is { } lamp
+                ? lamp with { WarrantyStatus = warranty.Window().Classify(lamp.WarrantyExpiry) }
+                : null,
             CurrentStatus = new PoleMapStatus
             {
                 // No row = no published sweep ever covered the pole = `unknown` (Contract 3.1).

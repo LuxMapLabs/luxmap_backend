@@ -114,6 +114,14 @@ public class DomainEnumSerializationTests
     public void TopologySource_matches_drift_TI_1(TopologySource value, string expected)
         => Assert.Equal(expected, Wire(value));
 
+    [Theory]
+    [InlineData(WarrantyStatus.Active, "active")]
+    [InlineData(WarrantyStatus.Expiring, "expiring")]
+    [InlineData(WarrantyStatus.Expired, "expired")]
+    [InlineData(WarrantyStatus.Unknown, "unknown")]
+    public void WarrantyStatus_matches_drift_BE_31_W_1(WarrantyStatus value, string expected)
+        => Assert.Equal(expected, Wire(value));
+
     [Fact]
     public void Enum_never_serializes_as_number()
     {

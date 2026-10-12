@@ -40,6 +40,7 @@ d["info"]["description"] = (
     "v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. "
     "v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. "
     "BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. "
+    "BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -77,7 +78,7 @@ TAGS = OrderedDict([
     ("Sweeps", "Phiên khảo sát video — BE-15 P2a đã hiện thực nhận/nộp phiên và đọc (SELF-SIGNED, nền tạm tới FW). Xử lý ở P2b, duyệt ở P2c."),
     ("IotSweeps", "Thumbnail khung hình — Contract §5.6. CHƯA HIỆN THỰC (BE-15 P2b)."),
     ("Sync", "Đồng bộ offline cho Kỹ sư hiện trường — Contract §5.8 (BE-43): gói dữ liệu đầy đủ theo tuyến + hàng chờ thao tác."),
-    ("Statistics", "Thống kê dashboard — BE-28, drift ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW). Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị)."),
+    ("Statistics", "Thống kê dashboard — BE-28 (drift ST-1…ST-10) và bảo hành BE-31 (drift W-1…W-8), SELF-SIGNED, nền tạm tới FW. Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị). format=csv xuất UTF-8 có BOM, tối đa 10 000 dòng (413 EXPORT_TOO_LARGE)."),
 ])
 d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
 
@@ -236,9 +237,11 @@ SUMMARY[("get", "/api/v1/statistics/fixture-status")] = (
     "[TẠM — BE-28] Số cột theo fixture_status, mỗi nhóm một dòng; data_source luôn là một chiều nhóm, never_surveyed là tập con của unknown")
 SUMMARY[("get", "/api/v1/statistics/repair-timeliness")] = (
     "[TẠM — BE-28] Phiếu sửa chữa xong trong các đêm from..to: đúng hạn / trễ / không hạn, on_time_rate; open_overdue tính tới hiện tại")
+SUMMARY[("get", "/api/v1/statistics/warranty")] = (
+    "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
-    "/api/v1/statistics": "drift BE-28 ST-1…ST-10 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/statistics": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",
@@ -307,9 +310,9 @@ S["LatLng"] = {"type": "object", "required": ["lat", "lng"], "additionalProperti
 
 S["PoleProperties"] = {
     "type": "object", "additionalProperties": False,
-    "description": "Contract §5.1 — 15 thuộc tính phẳng. Không có data_source / external_ref / feeder_id (không emit).",
+    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1). Không có data_source / external_ref / feeder_id (không emit).",
     "required": ["pole_id", "segment_id", "fixture_status", "power_source", "fixture_type", "lamp_watt",
-                 "install_date", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
+                 "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
     "properties": OrderedDict([
         ("pole_id", {"$ref": "#/components/schemas/PoleId"}),
         ("segment_id", {"$ref": "#/components/schemas/SegmentId"}),
@@ -321,6 +324,8 @@ S["PoleProperties"] = {
         ("lamp_watt", {"type": "integer", "format": "int32"}),
         ("install_date", {"type": "string", "format": "date"}),
         ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),
+        ("warranty_status", {"$ref": "#/components/schemas/WarrantyStatus",
+                             "description": "BE-31 W-1: tính lúc đọc từ warranty_expiry của bóng đang dùng so với hôm nay (Asia/Ho_Chi_Minh); unknown khi không có hạn hoặc không có bóng"}),
         ("commune_id", {"$ref": "#/components/schemas/CommuneId"}),
         ("last_seen_at", {"type": "string", "format": "date-time", "nullable": True}),
         ("last_sweep_id", {"type": "string", "nullable": True, "pattern": "^SWP-[0-9]{3,}$"}),

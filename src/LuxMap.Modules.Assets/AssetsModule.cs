@@ -1,5 +1,6 @@
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Import;
+using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,5 +23,11 @@ public sealed class AssetsModule : ILuxMapModule
     {
         services.AddScoped<AssetCrudService>();
         services.AddScoped<AssetImportService>();
+
+        // BE-31 — the zone comes from the agenda's key so "today" and "tonight" cannot disagree (WarrantyOptions.TimeZoneKey).
+        var warranty = WarrantyOptions.From(configuration);
+        warranty.Validate();
+        services.AddSingleton(warranty);
+        services.AddSingleton<WarrantyCalendar>();
     }
 }

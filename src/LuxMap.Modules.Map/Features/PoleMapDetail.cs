@@ -70,6 +70,9 @@ public sealed record PoleMapFixture
 
     /// <summary><c>null</c> = warranty expiry unknown, which must read differently from "still covered" (D-R16).</summary>
     public DateOnly? WarrantyExpiry { get; init; }
+
+    /// <summary>From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1).</summary>
+    public WarrantyStatus WarrantyStatus { get; init; } = WarrantyStatus.Unknown;
 }
 
 /// <summary>

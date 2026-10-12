@@ -433,6 +433,12 @@ public sealed record ActiveFixture
 
     public DateOnly? WarrantyExpiry { get; init; }
 
+    /// <summary>
+    /// From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1). <c>unknown</c> when the expiry is
+    /// not on record — never read as "still covered".
+    /// </summary>
+    public WarrantyStatus WarrantyStatus { get; init; } = WarrantyStatus.Unknown;
+
     public required DataSource DataSource { get; init; }
 }
 

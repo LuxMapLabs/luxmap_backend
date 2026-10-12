@@ -1,12 +1,14 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Import;
+using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
+using LuxMap.Shared.Contracts.Warranty;
 using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -25,7 +27,8 @@ namespace LuxMap.Modules.Assets.Crud;
 /// whether it may go. Retiring a lamp is a real event, which is what <c>fixture.removed_date</c> is for.
 /// </remarks>
 public sealed class AssetCrudService(
-    LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices)
+    LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
+    WarrantyCalendar warranty)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -41,9 +44,13 @@ public sealed class AssetCrudService(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
         => ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, ct);
 
-    public Task<PagedResult<PoleListItem>> ListPolesAsync(
+    public async Task<PagedResult<PoleListItem>> ListPolesAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, ct);
+    {
+        var result = await ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, ct);
+        var window = warranty.Window();
+        return result with { Items = [.. result.Items.Select(item => WithWarranty(item, window))] };
+    }
 
     /// <summary>Cabinets, with the device mounted in each (CAB-8).</summary>
     /// <remarks>
@@ -81,7 +88,7 @@ public sealed class AssetCrudService(
     {
         var poles = dbContext.Set<Pole>().AsNoTracking().Where(pole => pole.PoleId == poleId);
 
-        var item = await poles.Select(PoleRow).FirstOrDefaultAsync(ct) ?? throw NotFound("pole");
+        var item = WithWarranty(await poles.Select(PoleRow).FirstOrDefaultAsync(ct) ?? throw NotFound("pole"), warranty.Window());
 
         var extra = await poles
             .Select(pole => new
@@ -848,6 +855,15 @@ public sealed class AssetCrudService(
     /// An instance member, not static, because the last editor's name is a sub-query on this context.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// BE-31: the status is worked out here, after the query, through <see cref="WarrantyWindow.Classify"/> — the one
+    /// definition — rather than as a second copy of the rule inside the SQL projection. Every pole read goes through it.
+    /// </summary>
+    private static PoleListItem WithWarranty(PoleListItem item, WarrantyWindow window)
+        => item.ActiveFixture is { } lamp
+            ? item with { ActiveFixture = lamp with { WarrantyStatus = window.Classify(lamp.WarrantyExpiry) } }
+            : item;
+
     private System.Linq.Expressions.Expression<Func<Pole, PoleListItem>> PoleRow =>
         pole => new PoleListItem
         {
