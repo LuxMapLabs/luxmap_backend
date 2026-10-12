@@ -1223,7 +1223,7 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 
 | | |
 |---|---|
-| **Decision maker** | Mỹ (Dylan), 12/10/2026 — **chốt CQ-1** (cách A). CQ-2…CQ-10 là **ĐỀ XUẤT**, chốt ở Phase 1 của ticket `CITIZEN-QR` |
+| **Decision maker** | Mỹ (Dylan), 12/10/2026 — chốt CQ-1 (cách A) và CQ-10; **chốt CQ-2…CQ-9 cùng D-1…D-19 của Phase 1** (`.ai/results/CITIZEN-QR-p1.md`, bảng sau review Codex). **SELF-SIGNED** — chạm API, nền tạm tới FW kế tiếp |
 | **Chạm API** | **Có** — endpoint ẩn danh đầu tiên không phát token (`AnonymousEndpointTests` phải nêu đích danh), bảng mới, endpoint duyệt cho Quản lý. **Chưa có code** |
 | **Nguồn** | Phiếu v1.4 mục 3.2.c (*"The Citizen can directly report lighting issues through the QR code attached to each registered light pole"*); D-R1 (không tài khoản, hàng chờ riêng, Quản lý duyệt, không thêm `source_channel`). Ý tưởng ban đầu của Mỹ (QR chứa toạ độ, dân gửi ảnh + video, AI kiểm tra) → thảo luận 11–12/10 ra các mục dưới |
 | **Consumer** | WP5 (trang công khai + màn duyệt của Quản lý). WP6 không liên quan (app chỉ cho Kỹ sư hiện trường) |
@@ -1231,12 +1231,26 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | Mã | Nội dung | Trạng thái |
 |---|---|---|
 | CQ-1 | **QR chứa mã ngẫu nhiên lưu trong DB, KHÔNG chứa toạ độ, KHÔNG chứa `pole_id` trần.** URL dạng `https://<web>/r/<code>`; bảng `qr_code (code → pole_id, active, created_at)`. Lý do: toạ độ in cứng sai khi vị trí cột được sửa và không chỉ ra một cột (cặp cột cách 2,4 m, GPS lệch 5–15 m); `POLE-xxxx` đoán được ⇒ báo cáo hàng loạt cho mọi cột từ xa. Mã ngẫu nhiên thu hồi được từng cái (bóc, vẽ bậy, lan truyền) và không cần giữ khoá bí mật (khác cách B — HMAC: không thu hồi lẻ được, lộ khoá là in lại toàn bộ). **Không phải bảo mật tuyệt đối**: ai chụp QR vẫn dùng lại được — chỉ nâng rào từ "gõ số" lên "phải tới cột" | **Chốt** (Mỹ, 12/10) |
-| CQ-2 | Báo cáo vào **bảng riêng `citizen_report`**, không vào `fault` (giữ D-R1). Quản lý: duyệt → tạo `fault` mới **hoặc gộp** vào sự cố đang mở của cột; bác bỏ có lý do. Mọi quyết định ghi audit (D-R13) | Đề xuất |
-| CQ-3 | Fault sinh từ báo cáo dân mang **`source_channel = field_report`** (không thêm giá trị — D-R1) **kèm liên kết tới `citizen_report` gốc**, để thống kê vẫn tách được dân / Kỹ sư hiện trường | Đề xuất |
-| CQ-4 | **Đợt đầu chỉ ảnh JPEG** (1–3 ảnh, quy tắc BE-11: magic bytes, giới hạn dung lượng, thumbnail không EXIF/GPS) + loại sự cố + mô tả tuỳ chọn. **Video để sau** — upload video cho chính Kỹ sư còn chưa chốt (D-R14/D-R28), endpoint ẩn danh nhận 100 MB là cửa lạm dụng | Đề xuất |
-| CQ-5 | **AI chỉ gắn nhãn gợi ý** (ảnh đêm → ON/OFF + độ tin cậy, model AI-1), **không** tự tạo sự cố, **không** bác bỏ. Ảnh ban ngày → không kết luận. Kèm đối chiếu sẵn có: trạng thái lần khảo sát công bố gần nhất, sự cố đang mở của cột | Đề xuất |
-| CQ-6 | **Gộp trùng**: nhiều báo cáo cùng cột trong một cửa sổ (đề xuất: cùng đêm, `NightOf`) thành một mục hàng chờ có đếm số lượt | Đề xuất |
-| CQ-7 | **Giới hạn tần suất** theo IP **và** theo mã QR (bộ giới hạn sẵn có, `RateLimitSetup`). ⚠️ Sau reverse proxy mọi client chung một IP — phải cấu hình forwarded headers trước khi triển khai | Đề xuất |
-| CQ-8 | GPS điện thoại **tuỳ chọn**; nếu có và cách cột > ngưỡng (đề xuất 200 m) thì **gắn cờ đáng ngờ**, không từ chối | Đề xuất |
-| CQ-9 | **Riêng tư**: không bắt buộc số điện thoại / email; ảnh gốc chỉ Quản lý xem (proxy, BE-11 quy tắc 1); thời hạn giữ ảnh của dân phải chốt riêng (D-R16 chỉ nói về dữ liệu tài sản) | Đề xuất |
-| CQ-10 | Phát hành và thu hồi QR: Quản lý tạo / in / thu hồi mã theo cột; một cột có tối đa một mã đang hiệu lực. **Backend sinh mã** (CSPRNG phía server, unique ở DB, kèm audit — client không bao giờ sinh mã, cùng nguyên tắc ID hiển thị); **frontend vẽ ảnh QR** từ URL backend trả về (ảnh không chứa bí mật). In hàng loạt (PDF cả xã) có thể do backend sinh — chốt ở Phase 1 (Q-6) | **Chốt** phần "backend sinh mã, frontend vẽ ảnh" (Mỹ, 12/10); phần in hàng loạt đề xuất |
+| CQ-2 | Báo cáo vào **bảng riêng `citizen_report`**, không vào `fault` (giữ D-R1). Quản lý: duyệt → tạo `fault` mới **hoặc gộp** vào sự cố đang mở của cột; bác bỏ có lý do. Mọi quyết định ghi audit (D-R13) | **Chốt** (12/10, theo D-item P1) |
+| CQ-3 | Fault sinh từ báo cáo dân mang **`source_channel = field_report`** (không thêm giá trị — D-R1) **kèm liên kết tới `citizen_report` gốc**, để thống kê vẫn tách được dân / Kỹ sư hiện trường | **Chốt** (12/10, theo D-item P1) |
+| CQ-4 | **Đợt đầu chỉ ảnh JPEG** (1–3 ảnh, quy tắc BE-11: magic bytes, giới hạn dung lượng, thumbnail không EXIF/GPS) + loại sự cố + mô tả tuỳ chọn. **Video để sau** — upload video cho chính Kỹ sư còn chưa chốt (D-R14/D-R28), endpoint ẩn danh nhận 100 MB là cửa lạm dụng | **Chốt** (12/10, theo D-item P1) |
+| CQ-5 | **AI chỉ gắn nhãn gợi ý** (ảnh đêm → ON/OFF + độ tin cậy, model AI-1), **không** tự tạo sự cố, **không** bác bỏ. Ảnh ban ngày → không kết luận. Kèm đối chiếu sẵn có: trạng thái lần khảo sát công bố gần nhất, sự cố đang mở của cột | **Chốt** (12/10, theo D-item P1) |
+| CQ-6 | **Gộp trùng**: nhiều báo cáo cùng cột trong một cửa sổ (đề xuất: cùng đêm, `NightOf`) thành một mục hàng chờ có đếm số lượt | **Chốt** (12/10, theo D-item P1) |
+| CQ-7 | **Giới hạn tần suất** theo IP **và** theo mã QR (bộ giới hạn sẵn có, `RateLimitSetup`). ⚠️ Sau reverse proxy mọi client chung một IP — phải cấu hình forwarded headers trước khi triển khai | **Chốt** (12/10, theo D-item P1) |
+| CQ-8 | GPS điện thoại **tuỳ chọn**; nếu có và cách cột > ngưỡng (đề xuất 200 m) thì **gắn cờ đáng ngờ**, không từ chối | **Chốt** (12/10, theo D-item P1) |
+| CQ-9 | **Riêng tư**: không bắt buộc số điện thoại / email; ảnh gốc chỉ Quản lý xem (proxy, BE-11 quy tắc 1); thời hạn giữ ảnh của dân phải chốt riêng (D-R16 chỉ nói về dữ liệu tài sản) | **Chốt** (12/10, theo D-item P1) |
+| CQ-10 | Phát hành và thu hồi QR: Quản lý tạo / in / thu hồi mã theo cột; một cột có tối đa một mã đang hiệu lực. **Backend sinh mã** (CSPRNG phía server, unique ở DB, kèm audit — client không bao giờ sinh mã, cùng nguyên tắc ID hiển thị); **frontend vẽ ảnh QR** từ URL backend trả về (ảnh không chứa bí mật). In hàng loạt (PDF cả xã) có thể do backend sinh — chốt ở Phase 1 (Q-6) | **Chốt** (12/10): backend sinh mã, web vẽ ảnh; in hàng loạt do WP5 ghép từ danh sách |
+
+**Điều chỉnh sau Phase 1 (12/10, review Codex — chi tiết ở D-item):**
+
+- CQ-2 / CQ-6: mỗi lượt gửi là một hàng `citizen_submission`; `citizen_report` là mục hàng chờ gom các lượt cùng cột trong một đêm
+  (`NightOf`). Không lượt nào mất nội dung / ảnh khi gộp. Gửi lại đúng khoá + đúng nội dung → kết quả cũ; khoá trùng khác mã / nội dung → 409.
+- CQ-3: Quản lý nhận báo cáo → sự cố `field_report`, **`confirmed` ngay** (D-18), `reported_by` = Quản lý duyệt. Chỉ hai loại: đèn tắt →
+  `lamp_out`, đèn mờ / chập chờn → `lamp_dim`; "cột hỏng / khác" chỉ bác bỏ hoặc mở phiếu kiểm tra (D-17).
+- CQ-4 / CQ-7: decode chỉ sau `Identify` + giới hạn pixel; hạn mức theo IP cho cả GET lẫn POST; quá hạn mức theo mã thì nhận chữ, bỏ ảnh;
+  ngân sách byte ảnh theo ngày. **Bật endpoint công khai chỉ sau khi cấu hình forwarded headers.**
+- CQ-5: nhãn AI có giá trị "không kết luận"; giờ nhận không chứng minh ảnh chụp đêm.
+- CQ-9: ảnh lưu đã bỏ EXIF/XMP/IPTC (ngoại lệ BE-11 quy tắc 4, chỉ cho ảnh công dân); byte ảnh chỉ Quản lý xem; tự xoá ảnh là nợ (cổng lưu
+  chưa có delete, job nền BE-26).
+- Mới: actor audit `public` cho lượt nhận (không user, không role); mã QR được che trong log request; trang công khai **không** trả
+  `has_open_report`.

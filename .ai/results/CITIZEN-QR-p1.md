@@ -172,3 +172,7 @@ ghi nguyên `RequestPath` (`SerilogSetup.cs:57`) ⇒ mã QR vào log. Phương �
 | D-19 *(mới)* | Chia Phase 2 | P2a mã QR + quản lý mã · P2b nhận công khai (sau forwarded headers) · P2c duyệt / tạo sự cố / AI |
 
 Phase 1 dừng ở đây. Chờ Mỹ chốt D-item.
+
+## Quyết định — Mỹ, 12/10/2026
+
+Chốt **toàn bộ D-1…D-19 theo cột "Đề xuất" của bảng sau review** (các mục ghi *đổi* / *mới* thay bảng đầu). Phase 2 chia P2a / P2b / P2c (D-19); P2b chỉ bật endpoint công khai sau khi cấu hình forwarded headers.
