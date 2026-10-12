@@ -43,7 +43,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
     <strong>BE-31 — cảnh báo bảo hành + xuất CSV báo cáo, 12/10/2026</strong>
-    <p><span class="tag t-next">PR #129 · CI xanh · chờ code owner (OpenAPI) + báo WP5/WP6</span> Nhánh <code>feat/BE-31-warranty</code> (đã rebase lên <code>dev</code> sau #128). Drift W-1…W-8
+    <p><span class="tag t-done">Đã merge (PR #129, <code>b114973</code>, 12/10/2026)</span> Merge bằng quyền admin, vượt review code owner của OpenAPI (Mỹ quyết; cùng cách #91, #93, #102, #107) — Ngọc/Thịnh xác nhận ở FW kế tiếp. CI 888/46/45/379 xanh, 0 skip. Không migration, <code>luxmap_dev</code> không cần cập nhật. Drift W-1…W-8
     (SELF-SIGNED, chỉ thêm): <code>warranty_status</code> (<code>active | expiring | expired | unknown</code>) tính lúc đọc trên bản đồ, chi tiết cột,
     kiểm kê và gói offline; <code>GET /statistics/warranty</code>; <code>format=csv</code> cho cả ba báo cáo thống kê (nợ ST-10). Hôm nay theo ngày
     lịch giờ Việt Nam, cửa sổ "sắp hết" 90 ngày cấu hình được. Không migration. 884/46/45/379 xanh, 2 skip MQTT; phá thử mép lọc và thứ tự
@@ -150,7 +150,7 @@
     <p><span class="tag t-done">Đã merge</span> Nhãn Swagger <code>x-luxmap-client</code> = <code>mobile</code> / <code>web</code> /
     <code>shared</code> trên mọi operation. <a href=".ai/results/API-CLIENT-LABELS.md">results</a>.</p>
   </div>
-  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 11/10/2026</p>
+  <p class="sub">Capstone FA26SE222 · BE1 – Mỹ · W1–W21: 07/09/2026 – 31/01/2027 · cập nhật 12/10/2026</p>
 
   <div class="card">
     <strong>Tiến độ — nền tảng W1 xong, GIS tài sản (W2–W3) đang chạy, BE-REVIEW-02 xong 18/09, Registration v1.2 xong 25/09</strong>
