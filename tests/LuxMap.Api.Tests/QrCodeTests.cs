@@ -7,6 +7,7 @@ using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
 
 namespace LuxMap.Api.Tests;
@@ -64,7 +65,7 @@ public sealed class QrCodeTests(AssetImportFixture factory)
             events.Select(e => (e.EntityId, e.Action)));
         foreach (var code in new[] { first, second }.Select(c => c.GetProperty("code").GetString()!))
         {
-            Assert.All(events, e => Assert.DoesNotContain(code, e.AfterState ?? "", StringComparison.Ordinal));
+            Assert.All(events, e => Assert.DoesNotContain(code, $"{e.BeforeState}|{e.AfterState}|{e.Note}", StringComparison.Ordinal));
         }
     }
 
@@ -100,6 +101,73 @@ public sealed class QrCodeTests(AssetImportFixture factory)
         var all = await Get(manager, $"{Codes}?pole_id={pole}");
         Assert.Equal(5, all.GetProperty("total").GetInt32());
         Assert.Equal(1, all.GetProperty("items").EnumerateArray().Count(i => i.GetProperty("active").GetBoolean()));
+    }
+
+    /// <summary>
+    /// Issue and revoke both serialise on the POLE row (Codex review P2a): a revoke that locked only the code row let an issue
+    /// read the code as in use, then overwrite who revoked it. Proven by holding the pole lock and watching each request wait.
+    /// </summary>
+    [Fact]
+    public async Task Issue_and_revoke_both_wait_for_the_pole_lock()
+    {
+        var pole = await PlantPoleAsync(factory.CommuneId);
+        var manager = await factory.ManagerClientAsync();
+        var issued = await Read(await manager.PostAsJsonAsync(Codes, new { pole_id = pole }));
+
+        await HoldingThePoleLockAsync(pole, () => manager.PostAsJsonAsync(Codes, new { pole_id = pole }), HttpStatusCode.Created);
+        var current = (await Get(manager, $"{Codes}?pole_id={pole}&active=true")).GetProperty("items")[0];
+        await HoldingThePoleLockAsync(pole, () => manager.PostAsync($"{Codes}/{Id(current)}/revoke", null), HttpStatusCode.OK);
+
+        var revokedEvents = await factory.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters().AsNoTracking()
+            .CountAsync(e => e.EntityType == AuditEntityType.QrCode && e.Action == AuditAction.Revoked
+                && (e.EntityId == Id(issued) || e.EntityId == Id(current))));
+        Assert.Equal(2, revokedEvents);
+    }
+
+    /// <summary>
+    /// Two codes written in ONE transaction share <c>created_at</c>, so the id decides — by length first: as text
+    /// <c>QR-100000</c> sorts before <c>QR-99999</c> (section 0).
+    /// </summary>
+    [Fact]
+    public async Task The_list_breaks_ties_by_id_length_then_id()
+    {
+        var pole = await PlantPoleAsync(factory.CommuneId);
+        var number = Random.Shared.Next(90_000, 100_000);
+        string shorter = $"QR-{number}", longer = $"QR-{number + 10_000}";
+        await factory.QueryAsync(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var manager = await db.Set<LuxMap.Modules.Identity.Entities.AppUser>().IgnoreQueryFilters()
+                .Where(u => u.Username == factory.ManagerUsername).Select(u => u.UserId).SingleAsync();
+            var now = DateTime.UtcNow;
+            db.Add(Planted(longer, pole, factory.CommuneId, manager, now, revoked: true));
+            db.Add(Planted(shorter, pole, factory.CommuneId, manager, now, revoked: false));
+            await db.SaveChangesAsync();
+            return 0;
+        });
+
+        var listed = (await Get(await factory.ManagerClientAsync(), $"{Codes}?pole_id={pole}")).GetProperty("items").EnumerateArray();
+        Assert.Equal([shorter, longer], listed.Select(Id));
+    }
+
+    /// <summary>The constraints that hold even if the service is wrong — none of them shows in a test that only writes valid data.</summary>
+    [Fact]
+    public async Task The_schema_enforces_one_active_code_per_pole_and_never_cascades()
+    {
+        var facts = await factory.QueryAsync(db => db.Database.SqlQueryRaw<string>("""
+            SELECT conname || ':' || contype::text || ':' || confdeltype::text AS "Value" FROM pg_constraint WHERE conrelid = 'qr_code'::regclass
+            UNION ALL SELECT indexname || ':' || indexdef FROM pg_indexes WHERE tablename = 'qr_code'
+            """).ToListAsync());
+
+        Assert.Contains(facts, f => f.StartsWith("ux_qr_code_pole_id_active:CREATE UNIQUE INDEX", StringComparison.Ordinal)
+            && f.EndsWith("WHERE (revoked_at IS NULL)", StringComparison.Ordinal));
+        Assert.Contains(facts, f => f.StartsWith("ix_qr_code_pole_id:CREATE INDEX", StringComparison.Ordinal) && !f.Contains("WHERE", StringComparison.Ordinal));
+        Assert.Contains(facts, f => f.StartsWith("ux_qr_code_code:CREATE UNIQUE INDEX", StringComparison.Ordinal));
+        foreach (var check in new[] { "ck_qr_code_code_format", "ck_qr_code_revoked_together", "ck_qr_code_revoked_after_created" })
+            Assert.Contains($"{check}:c: ", facts);
+        var foreignKeys = facts.Where(f => f.StartsWith("fk_qr_code_", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(4, foreignKeys.Length);
+        Assert.All(foreignKeys, fk => Assert.EndsWith(":f:r", fk));
     }
 
     [Fact]
@@ -148,6 +216,35 @@ public sealed class QrCodeTests(AssetImportFixture factory)
     }
 
     private static string Id(JsonElement item) => item.GetProperty("qr_id").GetString()!;
+
+    private static LuxMap.Modules.Citizen.Entities.QrCode Planted(string id, string pole, string commune, string by, DateTime at, bool revoked) => new()
+    {
+        QrId = id, Code = RandomCode(), PoleId = pole, CommuneId = commune, CreatedBy = by, CreatedAt = at,
+        RevokedBy = revoked ? by : null, RevokedAt = revoked ? at : null,
+    };
+
+    private static string RandomCode()
+        => System.Security.Cryptography.RandomNumberGenerator.GetString("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 16);
+
+    /// <summary>
+    /// <c>FOR NO KEY UPDATE</c>, not <c>FOR UPDATE</c>: issuing inserts a row whose foreign key to <c>pole</c> takes KEY SHARE,
+    /// which <c>FOR UPDATE</c> would block too — the test would pass with the service's lock removed (LIGHT-CTRL 2b lesson).
+    /// </summary>
+    private async Task HoldingThePoleLockAsync(string pole, Func<Task<HttpResponseMessage>> send, HttpStatusCode expected)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {pole} FOR NO KEY UPDATE");
+
+        var request = send();
+        await Task.WhenAny(request, Task.Delay(TimeSpan.FromMilliseconds(500)));
+        Assert.False(request.IsCompleted, "the request finished while the pole row was locked — it never took the lock");
+
+        await transaction.RollbackAsync();
+        var response = await request;
+        Assert.True(response.StatusCode == expected, await response.Content.ReadAsStringAsync());
+    }
 
     private static async Task<JsonElement> Read(HttpResponseMessage response)
         => JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.Clone();

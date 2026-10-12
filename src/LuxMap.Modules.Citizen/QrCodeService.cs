@@ -73,12 +73,19 @@ public sealed class QrCodeService(
     }
 
     /// <summary>Takes a code out of use. A revoked code is history and never comes back (409 on a second revoke).</summary>
+    /// <remarks>
+    /// Takes the SAME pole lock as <see cref="IssueAsync"/>, in the same order (pole, then code). Locking only the code row is
+    /// not enough: an issue that read the code as in use before this revoke committed would then overwrite who revoked it and
+    /// when, with a second <c>revoked</c> audit event (Codex review P2a).
+    /// </remarks>
     public async Task<QrCodeItem> RevokeAsync(string qrId, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var scoped = await db.Set<QrCode>().AsNoTracking()
-            .Where(qr => qr.QrId == qrId).Select(qr => new { qr.QrId, qr.CommuneId }).SingleOrDefaultAsync(ct)
+            .Where(qr => qr.QrId == qrId).Select(qr => new { qr.QrId, qr.PoleId, qr.CommuneId }).SingleOrDefaultAsync(ct)
             ?? throw NotFound();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM pole WHERE pole_id = {scoped.PoleId} AND commune_id = {scoped.CommuneId} FOR UPDATE", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT 1 FROM qr_code WHERE qr_id = {scoped.QrId} AND commune_id = {scoped.CommuneId} FOR UPDATE", ct);
 
