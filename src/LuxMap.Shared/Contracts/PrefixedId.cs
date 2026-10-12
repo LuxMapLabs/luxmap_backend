@@ -76,10 +76,16 @@ public static class PrefixedIds
     /// <summary>Lighting command (LIGHT-CTRL LC-3, SELF-SIGNED) — at LEAST 6 digits, like every width (section 0.3).</summary>
     public static readonly PrefixedIdSpec LightingCommand = new("CMD", 6, "command_id_seq");
 
+    /// <summary>
+    /// A QR code on a pole (CITIZEN-QR P2a, SELF-SIGNED). The id is what Managers and logs see; the code printed on the
+    /// pole is a separate random value that never appears in a URL path, a log line or an audit row (D-16).
+    /// </summary>
+    public static readonly PrefixedIdSpec QrCode = new("QR", 4, "qr_id_seq");
+
     public static IReadOnlyList<PrefixedIdSpec> All { get; } =
     [
         Pole, Fault, RoadSegment, AdministrativeUnit, Fixture, Feeder, IotNode, SurveySweep,
         SurveyFrame, Detection, LuxReading, WorkOrder, RepairEvidence, ExternalUnit, AppUser, FaultCluster,
-        Notification, ElectricalCabinet, LightingCommand,
+        Notification, ElectricalCabinet, LightingCommand, QrCode,
     ];
 }

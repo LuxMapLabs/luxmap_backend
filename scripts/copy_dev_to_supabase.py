@@ -79,6 +79,11 @@ PLAN = [
      "requested_at, request_id"),
     ("lighting_command", f"{IN_COMMUNES} AND request_id IN (SELECT request_id FROM public.lighting_request WHERE "
      f"{IN_COMMUNES} AND requested_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS}))", "seq"),
+    # CITIZEN-QR P2a: created_by / revoked_by are RESTRICT keys to app_user, so only codes the copied accounts issued (and,
+    # when revoked, revoked). The code column carries what is printed on the pole — the target must be as trusted as the source.
+    ("qr_code", f"{IN_COMMUNES} AND created_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})"
+     f" AND (revoked_by IS NULL OR revoked_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS}))",
+     "created_at, length(qr_id), qr_id"),
     ("fault_cluster", IN_COMMUNES, "cluster_id"),
     ("lux_reading", IN_COMMUNES, "lux_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.
