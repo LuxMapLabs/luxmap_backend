@@ -9,14 +9,14 @@ DB) và **CQ-10** (backend sinh mã, frontend vẽ ảnh QR). Phase 1 trả lờ
 |---|---|---|
 | Lược đồ đích | `erd.md` đã dự kiến `citizen_report {report_id, pole_id FK, status chờ/nhận/bác, fault_id FK}`, có `commune_id` + `ICommuneScoped`, `data_source`, FK `Restrict`, `IAudited` cho thao tác duyệt | `docs/database/erd.md:267,339,342,347,357` |
 | Ảnh hiện có | `repair_evidence` thuộc module **WorkOrders**; cha là phiếu **hoặc** sự cố (`ck_repair_evidence_one_parent`); `uploaded_by` **bắt buộc** (người dùng), `lat`/`lng` **bắt buộc** | `RepairEvidence.cs:23-48`, `WorkOrderConfigurations.cs:101-107` |
-| Kho ảnh | `StorageBucket` chỉ có `Survey`, `Evidence` | `Shared/Storage/ObjectStorage.cs:12-18` |
+| Kho ảnh | `StorageBucket` có `Survey`, `Evidence`, `Video`; cổng lưu **không có thao tác xoá** | `Shared/Storage/ObjectStorage.cs:12-18,129` |
 | Đường tạo `field_report` | `FaultReportService`: `SourceChannel.FieldReport`, `ReportedBy = actor`, `data_source` lấy từ cột, `client_op_id`, audit + thông báo Quản lý trong cùng `SaveChanges`. Service **không** tự kiểm vai trò (controller kiểm `ReportFaults` = chỉ Kỹ sư hiện trường) | `FaultReportService.cs:79-160` |
 | Endpoint ẩn danh | Đúng 8, đều phát / thu hồi token hoặc link mật khẩu. Thêm cái thứ 9 phải sửa danh sách literal | `AnonymousEndpointTests.cs:40-50` |
 | Giới hạn tần suất | Chỉ một policy (`AccountMail`, 5 lần / 15 phút), chia theo `RemoteIpAddress` | `Api/Http/RateLimitSetup.cs` |
 | Proxy | **Không có** `UseForwardedHeaders` / `ForwardedHeadersOptions` ở đâu trong `src/` ⇒ sau reverse proxy mọi client chung một IP | `grep` rỗng |
 | AI | `YoloModel.DetectAsync(Stream jpeg)` → `YoloResult(Width, Height, Detections)`; có `SemaphoreSlim` giới hạn đồng thời (`Ai:MaxConcurrency`); `POST /ai/detect` chỉ `ReviewSurveys` (Quản lý), 16 MB | `YoloModel.cs:18,49,80,89`, `AiController.cs:27-41` |
 | Giới hạn upload sẵn có | import 10 MB, ảnh phiếu 16 MB, AI 16 MB | 3 hằng `MaxUploadBytes` |
-| Ma trận quyền | 20 capability; chưa có gì cho công dân / QR | `LuxMapPolicies.cs:97-115` |
+| Ma trận quyền | 19 capability; chưa có gì cho công dân / QR | `LuxMapPolicies.cs:94-115` |
 
 ## Trả lời Q-1…Q-8 (đề xuất)
 
@@ -107,4 +107,68 @@ cần job nền (BE-26), tạm ghi nợ. Không thu thông tin liên lạc.
 | D-12 | Trang công khai ở đâu | WP5 thêm route công khai `/r/:code` trong SPA (không đăng nhập); backend chỉ cấp API — cần báo WP5 |
 | D-13 | Phạm vi đợt đầu | Chỉ ảnh; **không video** (CQ-4); không CAPTCHA (xét lại nếu thấy spam thật) |
 
-Phase 1 dừng ở đây. Chờ Codex review và Mỹ chốt D-item.
+## Sau review Codex (`.ai/reviews/CITIZEN-QR-p1-by-codex.md`, ~148k token) — đã kiểm lại từng P1
+
+Đã xác minh bằng đọc file: request chưa đăng nhập ⇒ `CommuneScope.Empty` (`CommuneScopeAccessor.cs:29`), nên lookup qua filter không
+thấy gì và guard từ chối mọi lượt ghi; `AuditActorKind` chỉ `User | Cv | Iot | System` (`AuditEvent.cs:25`), `User` bắt buộc tài khoản;
+`ThumbnailFactory` `LoadAsync` toàn ảnh trước khi resize, không `Identify` / giới hạn pixel (AI thì có, `YoloModel.cs:95-116`); log request
+ghi nguyên `RequestPath` (`SerilogSetup.cs:57`) ⇒ mã QR vào log. Phương án sửa theo đó:
+
+1. **Phạm vi khi nhận (P1).** Tra `qr_code` **không lọc**, chỉ để biết mã còn hiệu lực + cột + xã; rồi mở context **đúng một xã đó**
+   (khuôn `LightingScopeFactory`) cho mọi đọc / ghi tiếp theo. Không nới scope rỗng, không backdoor, không `*`, không lấy xã từ client.
+2. **Actor audit khi nhận (P1).** Thêm `AuditActorKind.Public` — "người không có tài khoản, qua mã QR", **không** user, **không** role
+   (CHECK cặp như `System`). Không giả Quản lý, không dùng backdoor để bỏ audit.
+3. **Bom decode (P1).** Trước mọi decode: `IdentifyAsync` bằng cấu hình chỉ-JPEG, chặn số pixel (khuôn AI), giới hạn đồng thời; cả bước
+   bỏ EXIF lẫn thumbnail đi qua cùng cổng đó.
+4. **Mỗi lượt gửi là một hàng (P1, đổi D-6).** `citizen_submission` = từng lượt gửi (nội dung + ảnh + `client_op_id` gắn với **mã +
+   băm nội dung**); `citizen_report` = **mục hàng chờ** gom các lượt cùng cột trong cửa sổ. Gửi lại đúng khoá + đúng nội dung → trả kết
+   quả cũ; khoá trùng nhưng khác mã / nội dung → 409. Gộp không bao giờ làm mất nội dung hay ảnh của lượt nào; lượt có `kind` khác lượt
+   đầu được đánh dấu "có thông tin mới" cho Quản lý.
+5. **Chặn "chiếm quota" (P1).** Quá hạn mức theo mã thì vẫn **nhận nội dung chữ**, chỉ bỏ ảnh (cờ `over_quota`) — người giữ QR không
+   chặn được dân thật báo cáo. Theo IP thì 429 như cũ.
+6. **Ngân sách tài nguyên (P2).** Giới hạn body trước khi đọc; kiểm mã + hạn mức **trước** decode / ghi object; ngân sách byte ảnh
+   công dân theo ngày cho cả hệ thống (vượt thì nhận chữ, bỏ ảnh). Hạn mức đếm trong DB (nguyên tử), không phải bộ nhớ một instance.
+7. **GET và log (P2).** Giới hạn tần suất cả `GET /public/qr/{code}`; chuẩn hoá mã (độ dài, bảng chữ) trước khi chạm DB; mã sai và mã
+   thu hồi cùng một nhánh, cùng 404. **Bỏ `has_open_report`.** Che mã trong log request (thay bằng `***`), không đưa mã vào audit.
+8. **Duyệt và tạo sự cố (P2).** Một transaction ngoài; mỗi `SaveChanges` đúng một audit. `FaultReportService` đòi `client_op_id`,
+   ghi chú ≥ 10 ký tự, chỉ `lamp_out | lamp_dim`, luôn `detected` ⇒ accept phải tự cấp khoá nội bộ, ghi chú mặc định, và **chỉ** cho
+   chọn hai loại đó; loại "cột hỏng / khác" chỉ bác bỏ hoặc chuyển phiếu kiểm tra (D-17). Merge: đọc sự cố qua filter, khoá
+   (`FaultLocks`), kiểm còn mở + cùng cột, rồi mới gắn.
+9. **Quyền ảnh (P2).** Byte ảnh **chỉ Quản lý** (policy riêng); Cấp giám sát / Quản trị thấy metadata. Tra báo cáo qua filter rồi mới
+   kiểm ảnh thuộc báo cáo đó.
+10. **Lược đồ (P2).** FK ghép giữ báo cáo / mã / cột cùng xã (khuôn O-7); CHECK trạng thái ↔ `fault_id` / người quyết; `lat`/`lng`
+    cùng có hoặc cùng vắng, hữu hạn; `ai_confidence` hữu hạn 0..1; `HasCommuneReference`; literal `kind`; giới hạn độ dài chữ. WP5 hiển
+    thị nội dung của dân dạng chữ thuần (chống XSS lưu trữ).
+11. **AI (P2, đổi D-9).** Giờ nhận **không** chứng minh ảnh chụp đêm. Nhãn chỉ là gợi ý, có giá trị "không kết luận" (không phát hiện
+    gì / nhiều bóng / có thể là ảnh ngày); chạy lười khi Quản lý mở, có khoá chống chạy lặp; lưu kèm `artifact_version`.
+12. **Thông báo, PLAN, dọn ảnh (P2).** Loại thông báo mới `citizen_report_received` (enum + CHECK + câu chữ ở module Citizen, Contract §5.9),
+    stage trên **context đúng xã** khi tạo mục hàng chờ mới. Ba–bốn bảng vào `PLAN`. **Tự xoá ảnh sau 90 ngày chưa làm được**: cổng
+    lưu không có delete, job nền là BE-26 ⇒ ghi nợ, không hứa.
+13. **Test (P2).** Cả hai phép kiểm của `AnonymousEndpointTests` thêm đúng hai route; `[AllowAnonymous]` từng action. Kế hoạch test:
+    không token, token kèm theo không mở rộng phạm vi, mã thu hồi / đua, gửi lại đổi mã / nội dung, spam gộp, bom pixel.
+
+## D-item sau review (thay bảng trên ở các mục ghi "đổi")
+
+| # | Câu hỏi | Đề xuất |
+|---|---|---|
+| D-1 | Module | `LuxMap.Modules.Citizen` |
+| D-2 | Ảnh | Bảng riêng + bucket `luxmap-citizen`; decode sau `Identify` + giới hạn pixel |
+| D-3 | Mã QR | 16 ký tự base62 (CSPRNG), một mã hiệu lực / cột, mã cũ giữ lại cho lịch sử |
+| D-4 *(đổi)* | Trang công khai trả gì | `pole_label`, `commune_name`; **bỏ** `has_open_report`; GET cũng giới hạn tần suất |
+| D-5 | Sự cố từ báo cáo | `field_report`, `reported_by` = Quản lý duyệt, liên kết `fault_id`; một transaction ngoài |
+| D-6 *(đổi)* | Gộp | `citizen_submission` mỗi lượt + `citizen_report` là mục hàng chờ; không mất nội dung lượt nào |
+| D-7 | "Đêm" | `NightOf` chung (12:00 Asia/Ho_Chi_Minh) chỉ để **chia cửa sổ gộp** |
+| D-8 *(đổi)* | Giới hạn | 10/giờ/IP (POST + GET), hạn mức theo mã (vượt → nhận chữ, bỏ ảnh), ngân sách byte/ngày, 3 ảnh × 8 MB; **forwarded headers trước khi bật** |
+| D-9 *(đổi)* | AI | Gợi ý có "không kết luận"; chạy lười, chống chạy lặp |
+| D-10 *(đổi)* | Riêng tư | Bỏ EXIF/XMP/IPTC ở ảnh lưu (ngoại lệ BE-11 cho ảnh công dân); byte ảnh chỉ Quản lý; tự xoá là **nợ** chờ BE-26 + thao tác delete |
+| D-11 *(đổi)* | Capability | `ReadCitizenReports` (superior, manager, system_admin — metadata), `ReviewCitizenReports` (manager, gồm xem ảnh), `ManageQrCodes` (manager) |
+| D-12 | Trang công khai | WP5 route `/r/:code`, chữ thuần, `Referrer-Policy: no-referrer` |
+| D-13 | Phạm vi đợt đầu | Chỉ ảnh, không video, chưa CAPTCHA |
+| D-14 *(mới)* | Phạm vi khi nhận | Tra mã không lọc → context đúng một xã (khuôn `LightingScopeFactory`) |
+| D-15 *(mới)* | Actor audit khi nhận | `AuditActorKind.Public` (không user, không role) |
+| D-16 *(mới)* | Mã trong log | Che mã trong log request; không ghi mã vào audit |
+| D-17 *(mới)* | Loại báo cáo | `đèn tắt` → `lamp_out`, `đèn mờ / chập chờn` → `lamp_dim`; `cột hỏng / khác` chỉ bác bỏ hoặc mở phiếu kiểm tra |
+| D-18 *(mới)* | Sự cố sau duyệt | Tạo `detected` (đi tiếp luồng duyệt sự cố thường) hay `confirmed` ngay (Quản lý đã xem) — đề xuất **`confirmed`**, cùng audit |
+| D-19 *(mới)* | Chia Phase 2 | P2a mã QR + quản lý mã · P2b nhận công khai (sau forwarded headers) · P2c duyệt / tạo sự cố / AI |
+
+Phase 1 dừng ở đây. Chờ Mỹ chốt D-item.
