@@ -52,6 +52,8 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.HasSequence("pole_id_seq");
 
+            modelBuilder.HasSequence("qr_id_seq");
+
             modelBuilder.HasSequence("segment_id_seq");
 
             modelBuilder.HasSequence("sweep_id_seq");
@@ -573,6 +575,83 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_road_segment_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
 
                             t.HasCheckConstraint("ck_road_segment_road_class", "\"road_class\" IN ('inter_commune', 'inter_village')");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.QrCode", b =>
+                {
+                    b.Property<string>("QrId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("qr_id")
+                        .HasDefaultValueSql("luxmap_format_id('QR', nextval('qr_id_seq'), 4)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "qr_id_seq");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("RevokedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("revoked_by");
+
+                    b.HasKey("QrId")
+                        .HasName("pk_qr_code");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ux_qr_code_code");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_qr_code_commune_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_qr_code_created_by");
+
+                    b.HasIndex("RevokedBy")
+                        .HasDatabaseName("ix_qr_code_revoked_by");
+
+                    b.HasIndex(new[] { "PoleId" }, "ix_qr_code_pole_id")
+                        .HasDatabaseName("ix_qr_code_pole_id");
+
+                    b.HasIndex(new[] { "PoleId" }, "ux_qr_code_pole_id_active")
+                        .IsUnique()
+                        .HasDatabaseName("ux_qr_code_pole_id_active")
+                        .HasFilter("revoked_at IS NULL");
+
+                    b.ToTable("qr_code", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_qr_code_code_format", "code ~ '^[0-9A-Za-z]{16}$'");
+
+                            t.HasCheckConstraint("ck_qr_code_revoked_after_created", "revoked_at IS NULL OR revoked_at >= created_at");
+
+                            t.HasCheckConstraint("ck_qr_code_revoked_together", "(revoked_at IS NULL) = (revoked_by IS NULL)");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -3442,7 +3521,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("audit_event", null, t =>
                         {
-                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported')");
+                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked')");
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 
@@ -3454,7 +3533,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_audit_event_before_state_object", "before_state IS NULL OR jsonb_typeof(before_state) = 'object'");
 
-                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command')");
+                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code')");
 
                             t.HasCheckConstraint("ck_audit_event_has_state", "before_state IS NOT NULL OR after_state IS NOT NULL");
                         });
@@ -3606,6 +3685,36 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_road_segment_app_user_updated_by");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.QrCode", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_qr_code_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_qr_code_app_user_created_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_qr_code_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_qr_code_app_user_revoked_by");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Faults.Entities.Fault", b =>

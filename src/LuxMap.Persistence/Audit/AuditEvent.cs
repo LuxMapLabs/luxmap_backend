@@ -29,7 +29,7 @@ public enum AuditActorKind
     /// <summary>The server itself, acting on time alone — a lighting command that expired (LIGHT-CTRL 3.5).</summary>
     System,
 }
-public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand }
+public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode }
 public enum AuditAction
 {
     Created, Assigned, Reassigned, Unassigned, Started, Completed, Verified,
@@ -40,6 +40,9 @@ public enum AuditAction
 
     /// <summary>LIGHT-CTRL 3.5: a Manager's press, then each command's life — and a device report on an already closed command.</summary>
     Requested, Delivered, Applied, Failed, Expired, Superseded, Reported,
+
+    /// <summary>CITIZEN-QR: a Manager withdrew a QR code — replaced by a new one, or taken out of use.</summary>
+    Revoked,
 }
 
 /// <summary>Marks business entities whose writes require one audit event per SaveChanges.</summary>

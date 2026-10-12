@@ -220,4 +220,10 @@ public static class ErrorCodes
 
     /// <summary>413 — BE-31 W-6: a <c>format=csv</c> export would exceed <c>CsvExport.MaxRows</c>; narrow the filter.</summary>
     public const string ExportTooLarge = "EXPORT_TOO_LARGE";
+
+    /// <summary>404 — CITIZEN-QR: no QR code with that id in the caller's communes.</summary>
+    public const string QrCodeNotFound = "QR_CODE_NOT_FOUND";
+
+    /// <summary>409 — CITIZEN-QR: the QR code was already revoked; a revoked code never comes back.</summary>
+    public const string QrCodeAlreadyRevoked = "QR_CODE_ALREADY_REVOKED";
 }

@@ -90,6 +90,9 @@ public static class LuxMapPolicies
     /// </summary>
     public const string ReadStatistics = "cap:read_statistics";
 
+    /// <summary>CITIZEN-QR (D-11) — issue, revoke and list the QR codes on poles. The Manager, who also reviews what citizens send.</summary>
+    public const string ManageQrCodes = "cap:manage_qr_codes";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -113,5 +116,6 @@ public static class LuxMapPolicies
             [ExecuteWorkOrders] = [UserRole.FieldEngineer],
             [SyncOffline] = [UserRole.FieldEngineer],
             [ReadStatistics] = [UserRole.Superior, UserRole.Manager, UserRole.SystemAdmin],
+            [ManageQrCodes] = [UserRole.Manager],
         };
 }

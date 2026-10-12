@@ -1254,3 +1254,19 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
   chưa có delete, job nền BE-26).
 - Mới: actor audit `public` cho lượt nhận (không user, không role); mã QR được che trong log request; trang công khai **không** trả
   `has_open_report`.
+
+### CITIZEN-QR P2a — quản lý mã QR (12/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 12/10/2026 — theo D-1, D-3, D-11, D-16 của Phase 1. **SELF-SIGNED**, chạm API, nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (màn Quản lý: cấp / thu hồi / in QR). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| QR-1 | `POST /api/v1/qr-codes {pole_id}` → **201** `QrCodeItem`; mã đang dùng của cột (nếu có) bị thu hồi trong cùng giao dịch. Cột ngoài phạm vi / không tồn tại → 404 `POLE_NOT_FOUND` |
+| QR-2 | `POST /api/v1/qr-codes/{qr_id}/revoke` → 200; thu hồi lần hai → 409 **`QR_CODE_ALREADY_REVOKED`**; ngoài phạm vi → 404 **`QR_CODE_NOT_FOUND`** (mã lỗi mới) |
+| QR-3 | `GET /api/v1/qr-codes?commune_id=&pole_id=&active=` — phân trang §0, thứ tự `created_at, length(id), id` |
+| QR-4 | `QrCodeItem`: `qr_id` (`QR-0001`, tiền tố mới), `code` (16 ký tự base62), `url` = `{WEB_APP_BASE_URL}/r/{code}`, `pole_id`, `commune_id`, `active`, `created_at/by`, `revoked_at/by`. Web vẽ ảnh QR từ `url` (CQ-10) |
+| QR-5 | **Hai định danh** — điều chỉnh so với khảo sát P1 (ở đó `code` là khoá chính): `qr_id` là thứ Quản lý thao tác (đường dẫn, log, audit); `code` **không bao giờ** nằm trong đường dẫn, log hay audit (D-16), chỉ trong response của Quản lý |
+| QR-6 | Capability **`ManageQrCodes`** = Quản lý (D-11), cả đọc lẫn ghi. Nhãn client `web` |

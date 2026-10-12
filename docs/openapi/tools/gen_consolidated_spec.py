@@ -41,6 +41,7 @@ d["info"]["description"] = (
     "v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. "
     "BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. "
     "BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. "
+    "CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -79,6 +80,7 @@ TAGS = OrderedDict([
     ("IotSweeps", "Thumbnail khung hình — Contract §5.6. CHƯA HIỆN THỰC (BE-15 P2b)."),
     ("Sync", "Đồng bộ offline cho Kỹ sư hiện trường — Contract §5.8 (BE-43): gói dữ liệu đầy đủ theo tuyến + hàng chờ thao tác."),
     ("Statistics", "Thống kê dashboard — BE-28 (drift ST-1…ST-10) và bảo hành BE-31 (drift W-1…W-8), SELF-SIGNED, nền tạm tới FW. Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị). format=csv xuất UTF-8 có BOM, tối đa 10 000 dòng (413 EXPORT_TOO_LARGE)."),
+    ("QrCodes", "Mã QR trên cột cho công dân báo sự cố — CITIZEN-QR P2a (drift CITIZEN-QR, SELF-SIGNED, nền tạm tới FW). Chỉ Quản lý (cap:manage_qr_codes). Mã in trên cột chỉ có trong response, không bao giờ trong đường dẫn hay audit; phía công khai là P2b."),
 ])
 d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
 
@@ -237,11 +239,16 @@ SUMMARY[("get", "/api/v1/statistics/fixture-status")] = (
     "[TẠM — BE-28] Số cột theo fixture_status, mỗi nhóm một dòng; data_source luôn là một chiều nhóm, never_surveyed là tập con của unknown")
 SUMMARY[("get", "/api/v1/statistics/repair-timeliness")] = (
     "[TẠM — BE-28] Phiếu sửa chữa xong trong các đêm from..to: đúng hạn / trễ / không hạn, on_time_rate; open_overdue tính tới hiện tại")
+SUMMARY[("post", "/api/v1/qr-codes")] = (
+    "[TẠM — CITIZEN-QR] Cấp mã QR cho cột (thu hồi mã đang dùng nếu có); url là trang công khai web vẽ thành ảnh QR")
+SUMMARY[("post", "/api/v1/qr-codes/{qrId}/revoke")] = "[TẠM — CITIZEN-QR] Thu hồi mã QR; mã đã thu hồi không dùng lại được (409)"
+SUMMARY[("get", "/api/v1/qr-codes")] = "[TẠM — CITIZEN-QR] Danh sách mã QR trong xã của người gọi; lọc pole_id, active, commune_id"
 SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
     "/api/v1/statistics": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/qr-codes": "drift CITIZEN-QR CQ-1, CQ-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",
