@@ -1819,6 +1819,10 @@ bảng; SQL chạy qua kết nối của `TestDatabase` thì đích không thể
 **Mật khẩu seed đọc từ biến môi trường** (`AuthTestExtensions.SeedPassword` gọi `TestDatabase.LoadEnvironment`),
 cùng nguồn với `SeedCredentials` — trước đây hai bên đọc hai nơi (file và env).
 
+⚠️ **Khôi phục file sau phá thử bằng `cp` hoặc `touch`, KHÔNG bằng `mv` bản sao lưu.** `mv` giữ thời điểm sửa CŨ của bản
+sao, cũ hơn DLL vừa build từ bản đã phá ⇒ MSBuild coi module là chưa đổi và giữ DLL bản phá; test đỏ ở lượt chạy toàn bộ trong khi
+mã nguồn đã đúng (gặp thật ở CITIZEN-QR P2a). `git checkout` cũng không cứu được file chưa được track.
+
 ⚠️ **`dotnet test --no-build` sau khi đổi branch chạy bin CŨ.** Gặp thật ở P1: bin build trước khi pull
 TOPO-INFER làm hàng loạt test đỏ `23514 ck_pole_feeder_source_matches_feeder` — trông như lỗi DB, thực ra
 là thiếu code. Build lại trước khi kết luận.
@@ -1861,6 +1865,9 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 - **Hai `HasIndex` trên CÙNG cột phải có tên model** (`HasIndex(x => x.PoleId, "tên")`) — không thì EF coi lần gọi thứ hai là lần đầu
   và **đè** nó. Ở đây cần cả unique partial `ux_qr_code_pole_id_active` lẫn `ix_qr_code_pole_id` đầy đủ (partial không phục vụ hàng
   đã thu hồi — quy tắc partial index).
+- **Thu hồi khoá CÙNG hàng `pole`, cùng thứ tự (pole → mã), như cấp mới** (review Codex P2a). Chỉ khoá hàng `qr_code` thì một lượt
+  cấp mới đọc mã là "đang dùng" trước khi thu hồi commit, rồi ghi đè người / thời điểm thu hồi kèm audit `revoked` thứ hai (bảng
+  không có row version). Canh bằng `Issue_and_revoke_both_wait_for_the_pole_lock` (giữ khoá `FOR NO KEY UPDATE`; phá thử → đỏ).
 - `commune_id` của mã **chép từ cột** ở server, như `fixture`; client không gửi được.
 - Teardown xoá `qr_code` **trước** `pole` và tài khoản (FK `Restrict` tới cả hai). Rollback `AddQrCodes` gãy khi `audit_event` đã có
   `entity_type = 'qr_code'` hoặc `action = 'revoked'` (cùng họ BE-19).
