@@ -1,8 +1,8 @@
 ---
 ticket: CITIZEN-QR
 title: Công dân báo sự cố qua QR trên cột — hàng chờ riêng, Quản lý duyệt (D-R1)
-status: ready
-phase: 1
+status: in_progress
+phase: 2
 owner: claude (P1, P2) · codex (review)
 branch: docs/citizen-qr-p1 (P1) · feat/CITIZEN-QR (P2)
 contract_refs:
