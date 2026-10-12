@@ -1218,3 +1218,25 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 
 - WP5 `GisDrawerPanel.tsx:405` hiện ngày giả **`2026-12-31`** khi `warranty_expiry` null; `assetImport.schema.ts:732` cũng fallback `2026-12-31` và theo đọc tĩnh còn gửi ngày đó lên API. Trái §3.3: "không biết hạn" phải hiện khác "còn bảo hành". Nay có `warranty_status = unknown` để hiện đúng.
 - WP6 `PoleDetailDto.kt:39`, `PoleFeatureDto.kt:38` khai `warranty_expiry: String` **không null** — API thật trả `null` được, giải mã sẽ hỏng cả màn khi bỏ repository giả.
+
+## CITIZEN-QR — đề xuất cập nhật D-R1: báo sự cố của công dân qua QR (12/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 12/10/2026 — **chốt CQ-1** (cách A). CQ-2…CQ-10 là **ĐỀ XUẤT**, chốt ở Phase 1 của ticket `CITIZEN-QR` |
+| **Chạm API** | **Có** — endpoint ẩn danh đầu tiên không phát token (`AnonymousEndpointTests` phải nêu đích danh), bảng mới, endpoint duyệt cho Quản lý. **Chưa có code** |
+| **Nguồn** | Phiếu v1.4 mục 3.2.c (*"The Citizen can directly report lighting issues through the QR code attached to each registered light pole"*); D-R1 (không tài khoản, hàng chờ riêng, Quản lý duyệt, không thêm `source_channel`). Ý tưởng ban đầu của Mỹ (QR chứa toạ độ, dân gửi ảnh + video, AI kiểm tra) → thảo luận 11–12/10 ra các mục dưới |
+| **Consumer** | WP5 (trang công khai + màn duyệt của Quản lý). WP6 không liên quan (app chỉ cho Kỹ sư hiện trường) |
+
+| Mã | Nội dung | Trạng thái |
+|---|---|---|
+| CQ-1 | **QR chứa mã ngẫu nhiên lưu trong DB, KHÔNG chứa toạ độ, KHÔNG chứa `pole_id` trần.** URL dạng `https://<web>/r/<code>`; bảng `qr_code (code → pole_id, active, created_at)`. Lý do: toạ độ in cứng sai khi vị trí cột được sửa và không chỉ ra một cột (cặp cột cách 2,4 m, GPS lệch 5–15 m); `POLE-xxxx` đoán được ⇒ báo cáo hàng loạt cho mọi cột từ xa. Mã ngẫu nhiên thu hồi được từng cái (bóc, vẽ bậy, lan truyền) và không cần giữ khoá bí mật (khác cách B — HMAC: không thu hồi lẻ được, lộ khoá là in lại toàn bộ). **Không phải bảo mật tuyệt đối**: ai chụp QR vẫn dùng lại được — chỉ nâng rào từ "gõ số" lên "phải tới cột" | **Chốt** (Mỹ, 12/10) |
+| CQ-2 | Báo cáo vào **bảng riêng `citizen_report`**, không vào `fault` (giữ D-R1). Quản lý: duyệt → tạo `fault` mới **hoặc gộp** vào sự cố đang mở của cột; bác bỏ có lý do. Mọi quyết định ghi audit (D-R13) | Đề xuất |
+| CQ-3 | Fault sinh từ báo cáo dân mang **`source_channel = field_report`** (không thêm giá trị — D-R1) **kèm liên kết tới `citizen_report` gốc**, để thống kê vẫn tách được dân / Kỹ sư hiện trường | Đề xuất |
+| CQ-4 | **Đợt đầu chỉ ảnh JPEG** (1–3 ảnh, quy tắc BE-11: magic bytes, giới hạn dung lượng, thumbnail không EXIF/GPS) + loại sự cố + mô tả tuỳ chọn. **Video để sau** — upload video cho chính Kỹ sư còn chưa chốt (D-R14/D-R28), endpoint ẩn danh nhận 100 MB là cửa lạm dụng | Đề xuất |
+| CQ-5 | **AI chỉ gắn nhãn gợi ý** (ảnh đêm → ON/OFF + độ tin cậy, model AI-1), **không** tự tạo sự cố, **không** bác bỏ. Ảnh ban ngày → không kết luận. Kèm đối chiếu sẵn có: trạng thái lần khảo sát công bố gần nhất, sự cố đang mở của cột | Đề xuất |
+| CQ-6 | **Gộp trùng**: nhiều báo cáo cùng cột trong một cửa sổ (đề xuất: cùng đêm, `NightOf`) thành một mục hàng chờ có đếm số lượt | Đề xuất |
+| CQ-7 | **Giới hạn tần suất** theo IP **và** theo mã QR (bộ giới hạn sẵn có, `RateLimitSetup`). ⚠️ Sau reverse proxy mọi client chung một IP — phải cấu hình forwarded headers trước khi triển khai | Đề xuất |
+| CQ-8 | GPS điện thoại **tuỳ chọn**; nếu có và cách cột > ngưỡng (đề xuất 200 m) thì **gắn cờ đáng ngờ**, không từ chối | Đề xuất |
+| CQ-9 | **Riêng tư**: không bắt buộc số điện thoại / email; ảnh gốc chỉ Quản lý xem (proxy, BE-11 quy tắc 1); thời hạn giữ ảnh của dân phải chốt riêng (D-R16 chỉ nói về dữ liệu tài sản) | Đề xuất |
+| CQ-10 | Phát hành và thu hồi QR: Quản lý tạo / in / thu hồi mã theo cột; một cột có tối đa một mã đang hiệu lực | Đề xuất |
