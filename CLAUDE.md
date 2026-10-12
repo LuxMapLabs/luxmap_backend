@@ -1849,6 +1849,22 @@ thật ở test đơn vị, đỏ hay xanh tuỳ test nào chạy trước.
 Generator spec có `S["PoleProperties"]` viết tay với `additionalProperties: false` — trường mới trên `properties` bản đồ phải
 thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất từ chối chính response thật.
 
+### CITIZEN-QR P2a — mã QR trên cột (12/10/2026, drift QR-1…QR-6)
+
+- 🔴 **`code` là chìa khoá gửi báo cáo, không phải định danh.** Mọi thao tác của Quản lý đi theo **`qr_id`** (`QR-0001`); `code`
+  không bao giờ nằm trong đường dẫn (log request ghi nguyên `RequestPath`), trong audit hay trong log (D-16). Audit `qr_code` chỉ ghi
+  `qr_id`, `pole_id`, `replaces` / `replaced_by`. Canh bằng `Issuing_again_revokes_the_code_in_use_and_the_audit_never_holds_a_code`.
+- **Một mã đang dùng mỗi cột**: `IssueAsync` đọc cột qua filter TRƯỚC (ngoài phạm vi là 404, Quản lý xã khác không chờ khoá), rồi
+  `FOR UPDATE` hàng `pole`, rồi mới tìm mã đang dùng; `ux_qr_code_pole_id_active` là lớp chặn cuối. Phá thử bỏ khoá →
+  `Simultaneous_presses_leave_exactly_one_code_in_use` đỏ 3/3. Thu hồi + cấp mới là **hai** `SaveChanges` trong một giao dịch (mỗi lần
+  đúng một audit, BE-23a).
+- **Hai `HasIndex` trên CÙNG cột phải có tên model** (`HasIndex(x => x.PoleId, "tên")`) — không thì EF coi lần gọi thứ hai là lần đầu
+  và **đè** nó. Ở đây cần cả unique partial `ux_qr_code_pole_id_active` lẫn `ix_qr_code_pole_id` đầy đủ (partial không phục vụ hàng
+  đã thu hồi — quy tắc partial index).
+- `commune_id` của mã **chép từ cột** ở server, như `fixture`; client không gửi được.
+- Teardown xoá `qr_code` **trước** `pole` và tài khoản (FK `Restrict` tới cả hai). Rollback `AddQrCodes` gãy khi `audit_event` đã có
+  `entity_type = 'qr_code'` hoặc `action = 'revoked'` (cùng họ BE-19).
+
 ### BE-43 — đồng bộ offline (06/10/2026)
 
 **Module `LuxMap.Modules.Sync` đứng trên đỉnh đồ thị phụ thuộc** (tham chiếu Map, Faults, WorkOrders, Survey, Assets) và
