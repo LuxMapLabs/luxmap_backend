@@ -4,7 +4,6 @@ using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,7 +15,7 @@ namespace LuxMap.Api.Tests;
 /// A real host for the BE-33a tests: account mail goes to <see cref="Mail"/> instead of an SMTP server,
 /// and <see cref="Clock"/> can be wound past a link's expiry without waiting.
 /// </summary>
-public class AccountTestFactory : WebApplicationFactory<Program>
+public class AccountTestFactory : LuxMapTestHost
 {
     /// <summary>Every username a test creates starts with this, so teardown finds exactly its own rows.</summary>
     public const string UsernamePrefix = "acct-";

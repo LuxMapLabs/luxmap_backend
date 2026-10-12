@@ -578,8 +578,9 @@ bytes — digest manifest list ở quay trùng khít digest của image Docker H
 giờ trên máy vừa sửa. Lấy bằng `docker buildx imagetools inspect <ref>`, đọc dòng `Digest:` cấp cao
 nhất — `docker manifest inspect` **không** in số đó.
 
-Dòng release OSS đứng yên ở `RELEASE.2025-09-07` ⇒ đây là **hoãn, không phải giải**. **BE-36**
-(Testcontainers, W17–W18) thừa hưởng ràng buộc này: container MinIO nó thêm phải trỏ `quay.io`.
+Dòng release OSS đứng yên ở `RELEASE.2025-09-07` ⇒ đây là **hoãn, không phải giải**. ⚠️ **quay.io nay
+cũng trả 401** cho kéo ẩn danh (26/09, kiểm lại 11/10/2026) — chỉ máy còn image trong cache mới chạy được
+MinIO. Test S3 thật (tách khỏi BE-36, quyết định D-7) phải chọn nguồn image mới trước.
 
 **Hai ràng buộc về ImageSharp — kiểm chứng bằng test, không phải giả định:**
 
@@ -601,11 +602,12 @@ Dòng release OSS đứng yên ở `RELEASE.2025-09-07` ⇒ đây là **hoãn, k
   **Release/CI/deploy GÃY**. Điều khoản Split License không đổi; chỉ khác cái cổng kiểm key. Muốn lên
   4.x phải **xin key TRƯỚC**. Đã đưa vào FW-00.
 
-**Nợ có tên người đòi:** `S3ObjectStore` **chưa có test tự động** — bộ test BE-11 cố ý không cần
-MinIO, nên adapter là mảnh duy nhất không được phủ. Đã kiểm end-to-end thủ công một lần lúc làm
-BE-11 (8.2 KiB gốc + 1.8 KiB thumbnail vào `luxmap-survey`, SHA-256 vòng tròn khớp) nhưng **không có
-gì canh nó từ đó trở đi**. Chủ nợ là **BE-36** (Testcontainers, W17–W18) — thêm MinIO container bên
-cạnh PostGIS. Đừng để nợ này chỉ nằm trong báo cáo một phiên làm việc.
+**Nợ có tên người đòi:** `S3ObjectStore` chỉ được test trên **client S3 giả** (`MissingObjectTests`
+dựng nó trên `FakeS3`; `SurveyIngestTests` cũng vậy) — **chưa có test nào với MinIO thật**. Đã kiểm
+end-to-end thủ công một lần lúc làm BE-11 (8.2 KiB gốc + 1.8 KiB thumbnail vào `luxmap-survey`, SHA-256
+vòng tròn khớp) nhưng **không có gì canh đường thật từ đó trở đi**. BE-36 (11/10/2026) **tách** món này
+thành ticket riêng (D-7) vì chưa có nguồn image MinIO kéo được. Đừng để nợ này chỉ nằm trong báo cáo
+một phiên làm việc.
 
 ### Bốn quy tắc chốt ở BE-42 — số đo lux
 
@@ -952,7 +954,7 @@ Hai nhóm ngoại lệ đang tồn tại, đều chính đáng và đều đã p
 | Chỗ | Lý do |
 |---|---|
 | `AuthService` (4 chỗ) | `RefreshToken` **không** `ICommuneScoped` — guard chưa bao giờ áp. Và luồng xoay token của BE-07 **phụ thuộc** vào số dòng mà `UPDATE` có điều kiện trả về để phân xử refresh đồng thời; nạp-rồi-sửa không diễn đạt được điều đó mà không tái tạo race. |
-| Teardown của test (13 chỗ) | Xoá hàng loạt là cách duy nhất dọn được dưới scope rỗng. **BE-36 xoá luôn nhu cầu** — mỗi lần chạy một DB sạch. |
+| Teardown của test (13 chỗ) | Xoá hàng loạt là cách duy nhất dọn được dưới scope rỗng. **BE-36 KHÔNG xoá nhu cầu**: cả lượt chạy dùng chung một DB, class sau vẫn thấy dữ liệu class trước. Chỉ gỡ được khi mỗi collection có DB riêng. |
 
 ⚠️ **BannedApiAnalyzers có lỗ, đã đo ở BE-10:** nó chỉ khớp khi **mọi tham số được truyền tường
 minh**, mà cả hai API bulk đều có `CancellationToken` tuỳ chọn. Nên có thêm `BannedBulkWriteApiTests`
@@ -1036,8 +1038,9 @@ thành assert có thông điệp (`RequireFreeAsync`) thay vì để nó lộ ra
 ⚠️ Ngưỡng **9999 → 10000** là ngoại lệ: nó do chính độ rộng đệm quy định nên **không dời đi đâu
 được**. Vì vậy thập niên `1000` bị loại khỏi danh sách ứng viên — bội mười của nó đúng là 10000.
 
-**BE-36 (Testcontainers, W17–W18) xoá bỏ toàn bộ lớp lỗi này** — mỗi lượt chạy một DB sạch, sequence
-bắt đầu từ 0, không còn dải nào bị chiếm trước. Tới lúc đó có thể xét tách lại collection.
+**BE-36 (11/10/2026) chỉ xoá NỬA giữa các lượt của lớp lỗi này** — mỗi lượt một DB sạch, nên cặn và
+sequence trôi từ lượt trước không còn. **Nửa trong một lượt vẫn còn nguyên:** mọi class vẫn chung một DB
+và chung `pole_id_seq`, nên hai quy tắc trên vẫn bắt buộc và **đừng tách collection**.
 
 ### Hai bẫy test chốt ở REG-v1.2 — culture và tài khoản seed
 
@@ -1209,7 +1212,7 @@ sequence qua vùng đã dùng, đúng quyết định D-6.
 cột thật đầu tiên trên DB này là `POLE-396626`. Hệ quả cho **BE-39**: seed bộ mock phải INSERT ID tường
 minh (`POLE-0001…`) rồi `setval` sequence lên trên giá trị lớn nhất — ngoại lệ hệ thống đã chốt (D-6),
 ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản seed nó đăng nhập (N-5);
-`AuthTestFactory` chưa — BE-36 (Testcontainers) là bản sửa gốc.
+`AuthTestFactory` chưa — từ BE-36 token đó chết cùng container cuối lượt, nhưng trong một lượt vẫn tích lại.
 
 **8. Spec hợp nhất `docs/openapi/luxmap-v1.5.json` là file SINH.** Sinh bằng
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
@@ -1788,6 +1791,37 @@ hai thiết bị cùng bấm không ghi đè `read_at` đầu tiên.
 **Câu chữ thuộc module sở hữu sự kiện** (`WorkOrderNotices`, `SurveyNotices`, `FaultNotices`) — Notifications không
 tham chiếu ngược WorkOrders / Survey / Faults. Thêm `type` mới: thêm enum, câu chữ ở module đó, CHECK sinh lại qua
 migration, Contract 5.9.
+
+### BE-36 — test chạy trên container PostGIS của chính lượt chạy (11/10/2026)
+
+**Mọi factory trong `LuxMap.Api.Tests` kế thừa `LuxMapTestHost`, không bao giờ kế thừa thẳng
+`WebApplicationFactory<Program>`.** `LuxMapTestHost.CreateHost` chờ `TestDatabase` (một container
+`imresamu/postgis:17-3.5` mỗi lượt, migrate → seed → SQL của `seed_mock_set.py`) rồi kiểm data source của
+host trỏ đúng container. Factory kế thừa thẳng thì đọc DB từ `.env` — **`luxmap_dev`** — và test vẫn xanh.
+Canh bằng `TestHostCoverageTests` (phá thử: `DeviceProbeFactory` kế thừa thẳng → đỏ nêu đúng tên).
+Ngoại lệ có tên: **`NoDatabaseTestHost`** cho test không chạm DB (CORS, correlation id, phân trang, lỗi khởi động) — chạy
+không cần Docker. Nó **không** được đổi `ConnectionStrings__LuxMap` (biến toàn tiến trình, host container đọc song song) mà
+thay chính `NpgsqlDataSource` bằng địa chỉ không ai nghe: test lỡ chạm DB thì đỏ "connection refused", không lặng lẽ dùng
+`.env` (`NoDatabaseHostTests`).
+
+**Chỉ đặt `ConnectionStrings__LuxMap` (chuỗi nguyên khối), không đặt `POSTGRES_*`.** `Program` nạp `.env` bằng
+DotNetEnv với mặc định **ghi đè** biến đã có, ở **mỗi lần** dựng host — các biến thành phần sẽ bị giá trị dev
+đè. Vì vậy `.env` **không được** chứa `ConnectionStrings__LuxMap`: `TestDatabase.LoadEnvironment` từ chối chạy.
+⚠️ Kiểm "host trỏ đúng container" chạy **sau** khi host đã dựng và khởi động — nó bắt được lỗi, nhưng thứ
+**ngăn** ghi nhầm là lượt kiểm `.env` phía trước. Đừng gỡ lượt kiểm đó vì tưởng `AssertTargets` đã đủ.
+
+**Không có chế độ "chạy test trên DB có sẵn"** (D-5): biến `ConnectionStrings__LuxMap` đặt trong terminal bị
+container ghi đè. Thêm chế độ đó phải kèm một guard riêng cấm DB dev — guard hiện tại chỉ biết container.
+
+**Nạp mock bằng SQL stdout của script, không bằng `--apply`.** `--apply` mặc định `luxmap_dev` và xoá toàn
+bảng; SQL chạy qua kết nối của `TestDatabase` thì đích không thể lạc.
+
+**Mật khẩu seed đọc từ biến môi trường** (`AuthTestExtensions.SeedPassword` gọi `TestDatabase.LoadEnvironment`),
+cùng nguồn với `SeedCredentials` — trước đây hai bên đọc hai nơi (file và env).
+
+⚠️ **`dotnet test --no-build` sau khi đổi branch chạy bin CŨ.** Gặp thật ở P1: bin build trước khi pull
+TOPO-INFER làm hàng loạt test đỏ `23514 ck_pole_feeder_source_matches_feeder` — trông như lỗi DB, thực ra
+là thiếu code. Build lại trước khi kết luận.
 
 ### BE-43 — đồng bộ offline (06/10/2026)
 

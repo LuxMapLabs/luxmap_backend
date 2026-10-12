@@ -1,7 +1,6 @@
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +16,7 @@ namespace LuxMap.Api.Tests;
 /// bar is 2000 poles (section 5.4), so the fixture builds past it.
 /// </para>
 /// </summary>
-public sealed class AssetSchemaFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class AssetSchemaFixture : LuxMapTestHost, IAsyncLifetime
 {
     /// <summary>Above the 2000 of Contract section 5.4, so the measurement clears the bar it is about.</summary>
     public const int SyntheticPoleCount = 2500;

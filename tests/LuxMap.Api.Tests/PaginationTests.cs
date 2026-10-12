@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace LuxMap.Api.Tests;
 
 /// <summary>Contract section 0 — <c>{page, page_size, total, items[]}</c>, <c>page_size</c> caps at 200.</summary>
-public class PaginationTests(LuxMapApiFactory factory) : IClassFixture<LuxMapApiFactory>
+public class PaginationTests(NoDatabaseApiFactory factory) : IClassFixture<NoDatabaseApiFactory>
 {
     private HttpClient Client => factory.CreateClient();
 

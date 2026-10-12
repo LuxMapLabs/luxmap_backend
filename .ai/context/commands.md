@@ -11,6 +11,9 @@ dotnet build
 dotnet test
 ```
 
+`LuxMap.Api.Tests` tự dựng container PostGIS cho lượt chạy (BE-36) — cần Docker + `python3`, không cần
+`ConnectionStrings__LuxMap`, không chạm `luxmap_dev`. Chi tiết: `docs/development.md` → "Build và test".
+
 Benchmark bị loại khỏi lượt mặc định (`luxmap.runsettings` lọc `Category!=Benchmark`). Chạy riêng:
 
 ```bash

@@ -5,7 +5,6 @@ using System.Text.Json;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Modules.Telemetry.Lighting;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using MQTTnet;
 using MQTTnet.Formatter;
@@ -30,7 +29,7 @@ public sealed class BrokerFactAttribute : FactAttribute
 }
 
 /// <summary>The real API on a real port, with the MQTT channel running — the broker calls it back to authenticate.</summary>
-public sealed class MqttEndToEndHost : WebApplicationFactory<Program>
+public sealed class MqttEndToEndHost : LuxMapTestHost
 {
     public static int CallbackPort => int.Parse(Environment.GetEnvironmentVariable("MQTT_CALLBACK_PORT") ?? "5141");
 

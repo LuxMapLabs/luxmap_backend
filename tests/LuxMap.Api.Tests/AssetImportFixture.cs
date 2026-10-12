@@ -4,7 +4,6 @@ using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -19,7 +18,7 @@ namespace LuxMap.Api.Tests;
 /// is what exercises the territorial rules on those writes. The seeded <c>admin</c> account is
 /// system-wide and may no longer write assets at all (D-R12).
 /// </remarks>
-public sealed class AssetImportFixture : WebApplicationFactory<Program>, IAsyncLifetime
+public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
 {
     /// <summary>The commune the test manager may write to.</summary>
     public string CommuneId { get; private set; } = null!;
