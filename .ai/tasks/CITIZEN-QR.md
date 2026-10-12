@@ -38,7 +38,8 @@ là đề xuất — Phase 1 phải trả lời chúng thành D-item. Consumer: 
 - Q-4. Luồng duyệt của Quản lý: danh sách hàng chờ (phân trang, lọc theo xã/trạng thái), duyệt → tạo fault mới hoặc gộp vào
   fault đang mở (CQ-2, CQ-3), bác bỏ; audit; khoá hàng như `FaultLocks`.
 - Q-5. AI (CQ-5): chạy đồng bộ lúc nhận hay nền; ảnh ngày/đêm phân biệt bằng gì (EXIF giờ chụp? độ sáng?); lưu nhãn ở đâu.
-- Q-6. Phát hành QR (CQ-10): ai tạo / in / thu hồi, xuất file in hàng loạt (PNG/PDF?) — backend sinh ảnh QR hay WP5.
+- Q-6. Phát hành QR (CQ-10): **đã chốt backend sinh mã, frontend vẽ ảnh QR**. Còn trả lời: endpoint tạo / thu hồi, ai được làm
+  (capability), in hàng loạt cả xã (PDF do backend sinh hay WP5 tự ghép).
 - Q-7. Riêng tư (CQ-9): thời hạn giữ ảnh; ai xem ảnh gốc.
 - Q-8. Capability mới (vd. `ReviewCitizenReports`, `ManageQrCodes`) và ma trận vai trò — thêm literal vào hai test ma trận.
 
@@ -47,7 +48,7 @@ là đề xuất — Phase 1 phải trả lời chúng thành D-item. Consumer: 
 - Phase 1 không sửa code, không tạo migration, không sửa Contract / OpenAPI.
 - **Không** để báo cáo của dân đi thẳng vào `fault`; **không** tạo tài khoản / vai trò cho công dân; **không** thêm giá trị vào
   `source_channel` (D-R1).
-- **Không** đưa toạ độ hoặc `pole_id` trần vào QR (CQ-1 đã chốt).
+- **Không** đưa toạ độ hoặc `pole_id` trần vào QR (CQ-1 đã chốt); **không** để client sinh mã (CQ-10).
 - **Không** nhận video ở đợt đầu (CQ-4) trừ khi Mỹ đổi quyết định.
 - **Không** để AI tự tạo hoặc tự bác bỏ báo cáo (CQ-5).
 - **Không** presigned URL cho ảnh (BE-11 quy tắc 1); **không** để EXIF/GPS trong thumbnail.
