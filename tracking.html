@@ -42,6 +42,16 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>CITIZEN-QR — công dân báo sự cố qua QR, Phase 1, 12/10/2026</strong>
+    <p><span class="tag t-block">Phase 1 xong · chờ Mỹ chốt D-1…D-19</span> Nhánh <code>docs/citizen-qr-p1</code>. Đã chốt trước:
+    CQ-1 (mã ngẫu nhiên lưu DB) và CQ-10 (backend sinh mã, web vẽ QR). Khảo sát đề xuất module <code>LuxMap.Modules.Citizen</code>, hai
+    endpoint công khai, hàng chờ <code>citizen_report</code> + từng lượt gửi <code>citizen_submission</code>, Quản lý duyệt / gộp / bác.
+    Codex review: 5 P1 / 10 P2 / 1 P3, đều đúng và đã gộp vào phương án — đáng kể nhất: request ẩn danh có phạm vi xã rỗng (phải tra mã
+    rồi mở context đúng một xã), audit chưa có actor cho người không tài khoản (<code>Public</code>), decode ảnh chưa chặn bom pixel, gộp
+    trùng có thể bị lợi dụng để giấu báo cáo thật, mã QR sẽ vào log. 🔴 Chặn trước khi bật endpoint công khai: chưa cấu hình forwarded
+    headers. Chi tiết <code>.ai/results/CITIZEN-QR-p1.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>BE-31 — cảnh báo bảo hành + xuất CSV báo cáo, 12/10/2026</strong>
     <p><span class="tag t-done">Đã merge (PR #129, <code>b114973</code>, 12/10/2026)</span> Merge bằng quyền admin, vượt review code owner của OpenAPI (Mỹ quyết; cùng cách #91, #93, #102, #107) — Ngọc/Thịnh xác nhận ở FW kế tiếp. CI 888/46/45/379 xanh, 0 skip. Không migration, <code>luxmap_dev</code> không cần cập nhật. Drift W-1…W-8
     (SELF-SIGNED, chỉ thêm): <code>warranty_status</code> (<code>active | expiring | expired | unknown</code>) tính lúc đọc trên bản đồ, chi tiết cột,
