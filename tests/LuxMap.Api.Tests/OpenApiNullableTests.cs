@@ -45,8 +45,9 @@ public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<
     };
 
     /// <summary>
-    /// Request properties C# declares nullable only so the server can answer "missing" with a 400 that names the field (D-1). A client
-    /// must never read that it may SEND null.
+    /// Request properties stay bare references — only the response side was decided (D-1). Four answer <c>null</c> with a 400
+    /// (<c>fault_type</c> ×2, <c>data_source</c>, <c>outcome</c>); five give it a meaning (<c>role</c> keeps, <c>severity</c> ×2 defaults,
+    /// <c>location</c> with a pole, <c>reported_mode</c> on failure) — spec debt that predates this ticket, a follow-up.
     /// </summary>
     public static TheoryData<string, string> RequestProperties => new()
     {
@@ -161,6 +162,15 @@ public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<
             .Where(t => t is { IsClass: true, IsGenericType: false, IsPublic: true } || t.IsNestedPublic)
             .GroupBy(t => t.Name).Where(g => g.Count() == 1).ToDictionary(g => g.Key, g => g.Single());
 
+        // A schema with properties that matches no single C# type is only acceptable for the closed generics Swashbuckle names
+        // <T>PagedResult / <T>Feature / <T>FeatureCollection; anything else would be skipped silently, so it fails here by name.
+        string[] generics = ["PagedResult", "Feature", "FeatureCollection"];
+        var unmapped = responseOnly
+            .Where(id => schemas.GetProperty(id).TryGetProperty("properties", out _) && !types.ContainsKey(id))
+            .Where(id => !generics.Any(suffix => id.EndsWith(suffix, StringComparison.Ordinal)))
+            .Order(StringComparer.Ordinal).ToArray();
+        Assert.True(unmapped.Length == 0, "response schemas matched to no C# type: " + string.Join(", ", unmapped));
+
         var checkedProperties = 0;
         var bare = new List<string>();
         foreach (var id in responseOnly.Where(types.ContainsKey))
@@ -200,20 +210,26 @@ public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<
         var lost = new List<string>();
         foreach (var schema in code.EnumerateObject())
         {
-            if (!schema.Value.TryGetProperty("properties", out var properties)
-                || !consolidated.TryGetProperty(schema.Name, out var other) || !other.TryGetProperty("properties", out var otherProperties)) continue;
-            foreach (var property in properties.EnumerateObject())
+            if (!schema.Value.TryGetProperty("properties", out var properties)) continue;
+            foreach (var property in properties.EnumerateObject().Where(p => Nullable(p.Value)))
             {
-                if (Nullable(property.Value) && otherProperties.TryGetProperty(property.Name, out var kept) && !Nullable(kept))
-                    lost.Add($"{schema.Name}.{property.Name}");
+                // A nullable property must survive in the consolidated spec, and still say null — a deleted one counts as lost too.
+                var kept = consolidated.TryGetProperty(schema.Name, out var other) && other.TryGetProperty("properties", out var otherProperties)
+                    && otherProperties.TryGetProperty(property.Name, out var node) && Nullable(node);
+                if (!kept) lost.Add($"{schema.Name}.{property.Name}");
             }
         }
 
         Assert.Empty(lost);
 
-        // nullable beside a type, or the anyOf form whose null branch carries it
-        static bool Nullable(JsonElement node) => (node.TryGetProperty("nullable", out var flag) && flag.GetBoolean())
-            || (node.TryGetProperty("anyOf", out var branches) && branches.EnumerateArray().Any(Nullable));
+        // OAS 3.0: nullable beside a TYPE (a "nullable" next to a $ref is ignored), or the anyOf form whose second branch is exactly null.
+        static bool Nullable(JsonElement node)
+            => (!node.TryGetProperty("$ref", out _) && node.TryGetProperty("type", out _)
+                    && node.TryGetProperty("nullable", out var flag) && flag.GetBoolean())
+               || (node.TryGetProperty("anyOf", out var branches) && branches.GetArrayLength() == 2
+                   && branches[0].TryGetProperty("$ref", out _) && Nullable(branches[1])
+                   && branches[1].TryGetProperty("enum", out var values) && values.GetArrayLength() == 1
+                   && values[0].ValueKind == JsonValueKind.Null);
     }
 
     /// <summary>Component schemas reachable from every <paramref name="part"/> of every operation (responses / requestBody / parameters).</summary>
