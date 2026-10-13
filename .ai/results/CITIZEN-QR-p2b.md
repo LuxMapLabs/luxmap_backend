@@ -21,7 +21,7 @@ Drift **PB-1…PB-8** (SELF-SIGNED). Duyệt / tạo sự cố / AI là P2c.
 ## Bằng chứng
 
 ```
-dotnet build LuxMap.slnx -warnaserror      Build succeeded
+dotnet build LuxMap.slnx -warnaserror      Build succeeded (sau khi sửa EF1002 ở NextIdAsync — bản đầu của P2b vỡ ở đây)
 Api 920 ✓ · 2 skip (MQTT E2E) · Storage 46 ✓ · Persistence 45 ✓ · Shared 383 ✓   (container BE-36, sau review)
 Redocly: valid, 8 warnings (như trước)
 ```

@@ -311,7 +311,11 @@ public sealed partial class PublicReportService(
     }
 
     private static async Task<string> NextIdAsync(LuxMapDbContext db, PrefixedIdSpec spec, CancellationToken ct)
-        => await db.Database.SqlQueryRaw<string>($"SELECT {spec.DefaultValueSql} AS \"Value\"").SingleAsync(ct);
+    {
+        // The same draw the column DEFAULT makes (FaultReportService.NextFaultId); the SQL is a constant of PrefixedIds, never input.
+        var sql = $"SELECT {spec.DefaultValueSql} AS \"Value\"";
+        return await db.Database.SqlQueryRaw<string>(sql).SingleAsync(ct);
+    }
 
     private static LuxMapException NotFound()
         => new(ErrorCodes.PublicQrNotFound, HttpStatusCode.NotFound, "This QR code is not in use.");
