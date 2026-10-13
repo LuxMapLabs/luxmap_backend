@@ -74,7 +74,7 @@ GET  /citizen-reports?status=&commune_id=&pole_id=&page=&page_size=   Read · st
                                                                        last_submitted_at DESC, length(report_id) DESC, report_id DESC
 GET  /citizen-reports/{id}                                             Read · chi tiết + bối cảnh cột + lượt gửi + allowed_actions
 GET  /citizen-reports/{id}/photos/{photo_id}/thumbnail|original        Review · proxy JPEG, ảnh phải thuộc báo cáo (tra qua filter)
-POST /citizen-reports/{id}/accept   {fault_type, severity?, note?}     Review → sự cố mới, 201
+POST /citizen-reports/{id}/accept   {fault_type, severity?, note?}     Review → sự cố mới; 200 + chi tiết báo cáo (hiện thực, PC-6)
 POST /citizen-reports/{id}/merge    {fault_id, note?}                  Review → gắn vào sự cố đang mở của CÙNG cột
 POST /citizen-reports/{id}/reject   {reason}                           Review
 ```
