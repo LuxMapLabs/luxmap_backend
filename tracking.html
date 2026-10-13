@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-17 — tiến độ xử lý sweep + độ phủ tuyến, Phase 1, 13/10/2026</strong>
+    <p><span class="tag t-next">Phase 1 xong — chờ Mỹ chốt D-1…D-7</span> Nhánh <code>docs/BE-17-p1</code>. Codex (P1a) đọc web + mobile:
+    chưa consumer nào gọi GET sweep thật; nhu cầu độ phủ rõ nhất ở F05 của WP6, chưa có hình dạng. Claude (P1b): BE-15 đã có
+    <code>processing_status</code>, <code>coverage_pct</code>, dòng <code>not_observed</code>; còn thiếu lý do lỗi xử lý (có trong thông báo, không có
+    trong API) và khoảng tuyến chưa đi qua (tính được từ <code>survey_pass</code>). Đề xuất: <code>latest_run</code> trên chi tiết sweep +
+    <code>GET /sweeps/{id}/coverage</code> (khoảng trống kèm LineString 4326) + đóng O-4. Không làm: bước trong lúc chạy, độ phủ qua nhiều sweep.
+    Chi tiết <code>.ai/results/BE-17-p1.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>CITIZEN-QR — công dân báo sự cố qua QR, Phase 1 → P2c, 13/10/2026 — backend xong</strong>
     <p><span class="tag t-done">P2c đã merge (PR #136, <code>ef3380b</code>, 13/10 — admin merge, vượt review code owner OpenAPI; Ngọc/Thịnh xác nhận ở FW kế tiếp) · <code>luxmap_dev</code> đã migrate <code>AddCitizenReview</code> (13/10, dump trước; 276 cột, 276 bóng, 30 sự cố nguyên) · chưa báo WP5</span>
     <span class="tag t-next">P2c: hàng chờ duyệt <code>/citizen-reports</code>
