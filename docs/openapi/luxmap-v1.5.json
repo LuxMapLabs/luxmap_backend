@@ -12574,13 +12574,18 @@
             }
           },
           "location": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/WorkOrderLocation"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -13045,13 +13050,18 @@
             "type": "string"
           },
           "ai_hint": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/CitizenPhotoAiHint"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -13400,13 +13410,18 @@
             "type": "boolean"
           },
           "photos_dropped": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PhotosDroppedReason"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "received_at": {
             "type": "string",
@@ -13483,13 +13498,18 @@
             "nullable": true
           },
           "geometry": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/Geometry"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -14434,13 +14454,18 @@
             "format": "int32"
           },
           "cabinet": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FeederCabinet"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "updated_at": {
             "type": "string",
@@ -14956,13 +14981,18 @@
             "type": "string"
           },
           "control_mode": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FeederControlMode"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "mode_reported_at": {
             "type": "string",
@@ -15066,13 +15096,18 @@
             "nullable": true
           },
           "reported_mode": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FeederControlMode"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "error": {
             "type": "string",
@@ -15415,13 +15450,18 @@
             "nullable": true
           },
           "nearest_luminance": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/NearestLuminance"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -15723,13 +15763,18 @@
             "nullable": true
           },
           "feeder_source": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/TopologySource"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "cabinet_id": {
             "type": "string",
@@ -15740,13 +15785,18 @@
             "nullable": true
           },
           "cabinet_source": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/TopologySource"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "commune_id": {
             "type": "string"
@@ -15761,13 +15811,18 @@
             "$ref": "#/components/schemas/AssetLocation"
           },
           "active_fixture": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/ActiveFixture"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "note": {
             "type": "string",
@@ -15879,34 +15934,49 @@
             "$ref": "#/components/schemas/PoleMapLocation"
           },
           "fixture": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PoleMapFixture"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "current_status": {
             "$ref": "#/components/schemas/PoleMapStatus"
           },
           "iot_node": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PoleMapIotNode"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "luminance_baseline": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PoleMapBaseline"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "luminance_baselines": {
             "type": "array",
@@ -16160,13 +16230,18 @@
             "nullable": true
           },
           "source_channel": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/SourceChannel"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -16234,20 +16309,30 @@
             "description": "null khi và chỉ khi fixture_status = unknown (CHECK ck_pole_current_status_confidence_matches_status)"
           },
           "power_source": {
-            "type": "string",
-            "nullable": true,
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PowerSource"
+              },
+              {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  null
+                ]
               }
             ]
           },
           "fixture_type": {
-            "type": "string",
-            "nullable": true,
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FixtureType"
+              },
+              {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  null
+                ]
               }
             ]
           },
@@ -17445,13 +17530,18 @@
             "format": "int32"
           },
           "latest_run": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/SweepRunSummary"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -17794,22 +17884,32 @@
             "nullable": true
           },
           "power_source": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PowerSource"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "fixture_type": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FixtureType"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "lamp_watt": {
             "type": "integer",
@@ -17991,13 +18091,18 @@
             "nullable": true
           },
           "feeder_source": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/TopologySource"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "lat": {
             "type": "number",
@@ -18347,13 +18452,18 @@
             "nullable": true
           },
           "fixture_type": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FixtureType"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "lamp_watt": {
             "type": "integer",
@@ -18519,13 +18629,18 @@
             "type": "string"
           },
           "location": {
-            "type": "object",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/WorkOrderLocation"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "object",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "distance_m": {
             "type": "number",
@@ -18756,13 +18871,18 @@
             "$ref": "#/components/schemas/Severity"
           },
           "inspection_outcome": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/InspectionOutcome"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           }
         },
         "additionalProperties": false
@@ -18929,13 +19049,18 @@
             "type": "boolean"
           },
           "fixture_type": {
-            "type": "string",
-            "allOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/FixtureType"
+              },
+              {
+                "enum": [
+                  null
+                ],
+                "type": "string",
+                "nullable": true
               }
-            ],
-            "nullable": true
+            ]
           },
           "lamp_watt": {
             "type": "integer",

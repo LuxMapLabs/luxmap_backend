@@ -13,8 +13,14 @@ namespace LuxMap.Api.OpenApi;
 /// <para>
 /// Swashbuckle writes such a property as a bare <c>$ref</c>, and in OpenAPI 3.0 nothing can sit beside a <c>$ref</c>: the spec then
 /// claims the field is never null (<c>PoleMapDetail.fixture</c> on a pole without a lamp, <c>SweepDetailResponse.latest_run</c> before the
-/// first run…). The fix is the 3.0.4 form, where <c>nullable</c> only counts next to a <c>type</c>:
-/// <c>{ "type": "object" | "string", "nullable": true, "allOf": [ { "$ref": … } ] }</c>.
+/// first run…). The fix, valid OpenAPI 3.0.4 that a strict validator also accepts:
+/// <c>{ "anyOf": [ { "$ref": … }, { "type": "object" | "string", "nullable": true, "enum": [null] } ] }</c> — the reference, OR null.
+/// </para>
+/// <para>
+/// Not <c>{ type, nullable, allOf: [$ref] }</c> (the first decision, D-2, revised 13/10 after Codex review P1): <c>nullable</c> widens only
+/// the wrapper; the referenced schema inside <c>allOf</c> is still checked on its own and refuses <c>null</c>, so a strict validator rejects
+/// the very responses the change was meant to describe. The null branch is <c>enum: [null]</c> next to a <c>type</c> and <c>nullable</c> —
+/// the 3.0.4 way to say "exactly null".
 /// </para>
 /// <para>
 /// Not Swashbuckle's <c>UseAllOfToExtendReferenceSchemas</c>: it wraps EVERY reference, never-null ones too (88 schemas changed when
@@ -42,12 +48,18 @@ public sealed class NullableReferenceSchemaFilter : ISchemaFilter
             var target = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
             concrete.Properties[name] = new OpenApiSchema
             {
-                Type = (target.IsEnum ? JsonSchemaType.String : JsonSchemaType.Object) | JsonSchemaType.Null,
-                AllOf = [reference],
+                AnyOf = [reference, NullBranch(target.IsEnum ? JsonSchemaType.String : JsonSchemaType.Object)],
                 Description = reference.Description,
             };
         }
     }
+
+    /// <summary>Accepts exactly <c>null</c>: a type, <c>nullable</c> beside it, and an enum whose only member is null (OAS 3.0.4).</summary>
+    public static OpenApiSchema NullBranch(JsonSchemaType type) => new() { Type = type | JsonSchemaType.Null, Enum = [null!] };
+
+    /// <summary>True for the shape <see cref="NullBranch"/> builds.</summary>
+    public static bool IsNullBranch(IOpenApiSchema schema)
+        => schema is OpenApiSchema { Enum: [null] } branch && branch.Type is { } type && type.HasFlag(JsonSchemaType.Null);
 
     /// <summary>
     /// <c>Feature&lt;TProperties&gt;.Properties</c>: the annotations call an unconstrained type parameter nullable, but a feature always
@@ -67,7 +79,7 @@ public sealed class NullableReferenceSchemaFilter : ISchemaFilter
 /// </summary>
 /// <remarks>
 /// A schema reachable from a request AND a response stays bare (conservative: the request reading wins); none exists today. The only
-/// <c>allOf</c> of one reference with <c>null</c> in its type in this document is the filter's own, which is what is undone.
+/// <c>anyOf</c> of a reference and a null branch in this document is the filter's own, which is what is undone.
 /// </remarks>
 public sealed class NullableReferenceDocumentFilter : IDocumentFilter
 {
@@ -90,8 +102,8 @@ public sealed class NullableReferenceDocumentFilter : IDocumentFilter
             if (schemas[id] is not OpenApiSchema request || request.Properties is null) continue;
             foreach (var (name, property) in request.Properties.ToArray())
             {
-                if (property is OpenApiSchema { AllOf: [OpenApiSchemaReference reference] } wrapped
-                    && wrapped.Type is { } type && type.HasFlag(JsonSchemaType.Null))
+                if (property is OpenApiSchema { AnyOf: [OpenApiSchemaReference reference, var branch] }
+                    && NullableReferenceSchemaFilter.IsNullBranch(branch))
                 {
                     request.Properties[name] = reference;
                 }

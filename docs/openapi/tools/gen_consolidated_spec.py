@@ -354,8 +354,8 @@ S["PoleProperties"] = {
         ("status_confidence", {"type": "number", "format": "double", "minimum": 0, "maximum": 1, "nullable": True,
                                "description": "null khi và chỉ khi fixture_status = unknown (CHECK ck_pole_current_status_confidence_matches_status)"}),
         # SPEC-NULLABLE: null for a pole with no lamp in use — the code-exported schema says so, this copy must too.
-        ("power_source", {"type": "string", "nullable": True, "allOf": [{"$ref": "#/components/schemas/PowerSource"}]}),
-        ("fixture_type", {"type": "string", "nullable": True, "allOf": [{"$ref": "#/components/schemas/FixtureType"}]}),
+        ("power_source", {"anyOf": [{"$ref": "#/components/schemas/PowerSource"}, {"type": "string", "nullable": True, "enum": [None]}]}),
+        ("fixture_type", {"anyOf": [{"$ref": "#/components/schemas/FixtureType"}, {"type": "string", "nullable": True, "enum": [None]}]}),
         ("lamp_watt", {"type": "integer", "format": "int32", "nullable": True}),
         ("install_date", {"type": "string", "format": "date", "nullable": True}),
         ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),

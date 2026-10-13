@@ -5,8 +5,8 @@ using System.Text.Json.Serialization;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// SPEC-NULLABLE (D-1…D-3): every object / enum property a RESPONSE may send as <c>null</c> says so — <c>type</c> + <c>nullable</c> +
-/// <c>allOf: [$ref]</c> — and nothing else changed shape. Expectations are LITERAL (the matrix-test rule): a test that read them from
+/// SPEC-NULLABLE (D-1…D-3, D-2 revised to <c>anyOf</c>): every object / enum property a RESPONSE may send as <c>null</c> says so —
+/// <c>anyOf: [ {$ref}, {type, nullable, enum: [null]} ]</c> — and nothing else changed shape. Expectations are LITERAL (the matrix-test rule): a test that read them from
 /// the filter would agree with any filter.
 /// </summary>
 public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxMapSwaggerFactory>
@@ -91,10 +91,11 @@ public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<
         var node = Property(schema, property);
 
         Assert.False(node.TryGetProperty("$ref", out _), $"{schema}.{property} is still a bare $ref — the spec says it is never null");
-        Assert.Equal(type, node.GetProperty("type").GetString());
-        Assert.True(node.GetProperty("nullable").GetBoolean());
-        var reference = Assert.Single(node.GetProperty("allOf").EnumerateArray());
-        Assert.Equal($"#/components/schemas/{target}", reference.GetProperty("$ref").GetString());
+        Assert.False(node.TryGetProperty("allOf", out _), "allOf + nullable is refused by a strict validator: the referenced schema still rejects null");
+        var branches = node.GetProperty("anyOf").EnumerateArray().ToArray();
+        Assert.Equal(2, branches.Length);
+        Assert.Equal($"#/components/schemas/{target}", branches[0].GetProperty("$ref").GetString());
+        AssertNullBranch(branches[1], type);
     }
 
     [Theory]
@@ -117,24 +118,32 @@ public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<
         Assert.False(node.TryGetProperty("nullable", out _));
     }
 
-    /// <summary>Whatever the filter wraps, anywhere in the document: one reference, a type that matches what it points at, and null allowed.</summary>
+    /// <summary>Whatever the filter wraps, anywhere in the document: a reference, then exactly-null of the type it points at.</summary>
     [Fact]
-    public void Every_wrapped_reference_points_at_one_schema_of_the_declared_type()
+    public void Every_wrapped_reference_is_the_reference_or_null_of_its_own_type()
     {
         var schemas = Spec.GetProperty("components").GetProperty("schemas");
         var wrapped = schemas.EnumerateObject()
             .SelectMany(s => s.Value.TryGetProperty("properties", out var properties) ? properties.EnumerateObject() : [])
-            .Where(p => p.Value.TryGetProperty("allOf", out _))
+            .Where(p => p.Value.TryGetProperty("anyOf", out _) || p.Value.TryGetProperty("allOf", out _))
             .ToArray();
 
         Assert.Equal(25, wrapped.Length);
         Assert.All(wrapped, p =>
         {
-            var target = Assert.Single(p.Value.GetProperty("allOf").EnumerateArray()).GetProperty("$ref").GetString()!.Split('/')[^1];
-            var isEnum = schemas.GetProperty(target).TryGetProperty("enum", out _);
-            Assert.Equal(isEnum ? "string" : "object", p.Value.GetProperty("type").GetString());
-            Assert.True(p.Value.GetProperty("nullable").GetBoolean());
+            var branches = p.Value.GetProperty("anyOf").EnumerateArray().ToArray();
+            Assert.Equal(2, branches.Length);
+            var target = branches[0].GetProperty("$ref").GetString()!.Split('/')[^1];
+            AssertNullBranch(branches[1], schemas.GetProperty(target).TryGetProperty("enum", out _) ? "string" : "object");
         });
+    }
+
+    /// <summary>The OAS 3.0.4 "exactly null": a type, nullable beside it, and an enum whose only member is null.</summary>
+    private static void AssertNullBranch(JsonElement branch, string type)
+    {
+        Assert.Equal(type, branch.GetProperty("type").GetString());
+        Assert.True(branch.GetProperty("nullable").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, Assert.Single(branch.GetProperty("enum").EnumerateArray()).ValueKind);
     }
 
     /// <summary>
@@ -202,7 +211,9 @@ public class OpenApiNullableTests(LuxMapSwaggerFactory factory) : IClassFixture<
 
         Assert.Empty(lost);
 
-        static bool Nullable(JsonElement node) => node.TryGetProperty("nullable", out var flag) && flag.GetBoolean();
+        // nullable beside a type, or the anyOf form whose null branch carries it
+        static bool Nullable(JsonElement node) => (node.TryGetProperty("nullable", out var flag) && flag.GetBoolean())
+            || (node.TryGetProperty("anyOf", out var branches) && branches.EnumerateArray().Any(Nullable));
     }
 
     /// <summary>Component schemas reachable from every <paramref name="part"/> of every operation (responses / requestBody / parameters).</summary>
