@@ -20,7 +20,7 @@ Capstone FA26SE222 · W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2
 
 Backend phục vụ 3 consumer: **Web SPA** (WP5), **Android native** (WP6), **engine CV** (WP4).
 Không có consumer nào khác. **Công dân (Citizen) không có tài khoản**: họ báo sự cố qua mã QR trên cột
-(chưa có endpoint — D-R1, xem mục "Vai trò").
+— `/public/…` không token, Quản lý duyệt ở `/citizen-reports` (D-R1, CITIZEN-QR P2a–P2c; xem mục "Vai trò").
 
 ## Nguồn sự thật
 
@@ -1907,6 +1907,31 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 - Gửi lại: khoá `client_op_id` gắn với **mã + băm nội dung** (kể cả ảnh), tra ở cả bước sớm lẫn khi bắt trùng `ux_citizen_submission_client_op_id`.
 - Teardown: `citizen_photo` (theo submission) → `citizen_submission` → `citizen_report` → `qr_code` → `pole`. Rollback `AddCitizenReports` gãy
   khi `audit_event` đã có actor `public` hoặc entity `citizen_report` (cùng họ BE-19).
+
+### CITIZEN-QR P2c — hàng chờ duyệt (13/10/2026, drift PC-1…PC-10)
+
+- 🔴 **Mọi quyết định (accept / merge / reject) khoá hàng `pole` TRƯỚC, rồi `citizen_report`, rồi (merge) `fault`** — cùng khoá pole mà
+  lượt gửi công khai giữ khi nộp vào báo cáo. Bỏ khoá pole thì một lượt gửi đang chạy có thể gắn vào báo cáo vừa được quyết và không bao
+  giờ tới tay Quản lý. Đọc lần đầu là **projection không tracking**, sau khoá mới nạp entity — đọc tracking trước khoá thì lần đọc sau trả
+  lại chính entity cũ. Canh bằng `A_decision_waits_for_the_pole_lock_a_public_send_holds` (giữ khoá `FOR NO KEY UPDATE`). **Đừng** thêm
+  khoá pole vào `PATCH /faults` hay tạo phiếu để "chặn trùng cho chặt": các đường đó khoá fault trước, sẽ thành vòng fault → pole.
+- **`submission_count` là phiên bản của báo cáo** vì lượt gửi **chỉ được thêm**. Tính năng nào xoá / gộp lượt gửi sau này phải thay bằng
+  dấu phiên bản thật, nếu không 409 `CITIZEN_REPORT_CHANGED` sẽ để lọt quyết định trên nội dung chưa đọc.
+- **Citizen không bao giờ `new Fault`.** Chấp nhận đi qua `FaultReportService.StageReviewedReportAsync` (Faults): đọc cột qua filter, lấy
+  xã / tuyến / `data_source` của cột, xác nhận qua `FaultTransitions.Apply`, stage đúng một audit `created` — **không** save. Người gọi
+  save trong transaction của mình rồi mới đổi báo cáo (save thứ hai, audit `accepted`).
+- 🔴 **`CitizenPhoto` là `IAudited` từ P2c** (gợi ý AI là phát hiện tự động, D-R13). Mọi đường ghi ảnh phải có đúng một audit trong cùng
+  `SaveChanges`: lượt gửi công khai (`submitted`, actor `public`) và gợi ý (`analyzed`, actor `cv`, entity `citizen_report`).
+- **Không inject `YoloModel` vào service trên đường request.** Constructor của nó ném khi thiếu file model ⇒ DI làm cả màn chi tiết 500.
+  `YoloCitizenPhotoHinter` resolve lười trong vùng bắt lỗi; gợi ý là tuỳ chọn, hàng chờ thì không. Model chạy **ngoài** transaction và
+  khoá; chỉ lượt ghi khoá hàng ảnh và chỉ ghi ảnh **còn `ai_hint` null** — hai lượt mở cùng lúc có thể cùng chạy model nhưng chỉ một
+  ghi, một event (`The_hint_is_an_audited_automated_finding_written_once`, phá thử đỏ 3/3).
+- `artifact_version` của gợi ý = phiên bản detector **+** băm luật gợi ý (một bóng, ngưỡng ảnh ban ngày). Đổi `Citizen:DaylightMeanLuma`
+  là đổi phiên bản — đừng tách luật ra khỏi chuỗi đó.
+- Test model thật **không** khẳng định model thấy gì: nó gọi khung đen có một điểm sáng là một bóng `out`. Chỉ canh hợp đồng (nhãn hợp lệ,
+  confidence đúng khi kết luận, dạng phiên bản) — cùng quy ước AI-1.
+- Teardown: `citizen_photo` → `citizen_submission` → `citizen_report` **trước `fault`** — báo cáo đã chấp nhận / gộp giữ sự cố bằng
+  `Restrict`. Rollback `AddCitizenReview` gãy khi audit đã có `accepted` / `merged` / `analyzed` (cùng họ BE-19).
 
 ### BE-43 — đồng bộ offline (06/10/2026)
 

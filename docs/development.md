@@ -712,7 +712,7 @@ Review P2c vòng 2: member baseline chỉ nhận normal, lọc từ ngày lắp 
 fixture_id; thay bóng phải tích luỹ member mới. Results thêm `published_as`/`is_representative`
 để xem trước công bố qua mọi lượt. Thumbnail thiếu object trả 503 `STORAGE_OBJECT_MISSING`.
 
-## Công dân báo sự cố qua QR — CITIZEN-QR P2a / P2b
+## Công dân báo sự cố qua QR — CITIZEN-QR P2a / P2b / P2c
 
 **P2a (Quản lý):** `POST /api/v1/qr-codes {pole_id}` cấp mã (thu hồi mã đang dùng của cột), `POST /api/v1/qr-codes/{qr_id}/revoke`,
 `GET /api/v1/qr-codes`. `url` trả về là `{WEB_APP_BASE_URL}/r/{code}` — web vẽ ảnh QR từ đó.
@@ -731,6 +731,12 @@ Cấu hình (mặc định trong code, đổi qua appsettings / biến môi trư
 | `Citizen:PhotosPerCodePerNight` | 20 | Quá thì nhận chữ, bỏ ảnh |
 | `Citizen:PhotoBudgetBytesPerNight` | 512 MiB | Tổng byte ảnh công dân mỗi đêm cho cả hệ thống; quá thì nhận chữ, bỏ ảnh |
 | `Citizen:FarFromPoleMeters` | 200 | Vị trí người gửi xa cột hơn ⇒ gắn cờ (không từ chối) |
+| `Citizen:DaylightMeanLuma` | 0.45 | P2c: thumbnail sáng trung bình hơn mức này ⇒ coi như ảnh ban ngày, gợi ý AI `inconclusive`. Đổi giá trị = đổi `artifact_version` của gợi ý |
+| `Citizen:HintsPerRequest` | 6 | P2c: số ảnh model xem mỗi lượt Quản lý mở một báo cáo; phần còn lại có gợi ý ở lượt mở sau |
 
 Ảnh lưu ở bucket `luxmap-citizen` (sidecar `minio-mc` tạo) **đã bỏ EXIF/XMP/IPTC/ICC** — ngoại lệ của BE-11 quy tắc 4, chỉ cho ảnh công dân.
-Endpoint ảnh cho Quản lý và luồng duyệt là P2c.
+
+**P2c (Quản lý duyệt):** `GET /api/v1/citizen-reports`, `GET /api/v1/citizen-reports/{report_id}`, ảnh qua
+`…/photos/{photo_id}/thumbnail|original`, và `accept` / `merge` / `reject` (mỗi quyết định gửi kèm `submission_count` đã xem). Chấp nhận
+tạo sự cố `field_report` `confirmed`. Gợi ý AI dùng model YOLO của AI-1 (`Ai:ModelPath`); không có model thì báo cáo vẫn mở được, chỉ không
+có gợi ý. Drift PC-1…PC-10.
