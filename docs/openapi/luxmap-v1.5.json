@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 120 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 121 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.14"
   },
   "paths": {
@@ -9818,6 +9818,85 @@
         "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
       }
     },
+    "/api/v1/sweeps/{id}/coverage": {
+      "get": {
+        "tags": [
+          "SurveyReview"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepCoverageResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepCoverageResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepCoverageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — BE-17] Độ phủ của run theo từng tuyến: lượt đi qua, khoảng chưa đi qua (mét dọc tuyến + LineString 4326), cột chưa quan sát",
+        "operationId": "getSweepsIdCoverage",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
     "/api/v1/sweeps/{id}/review": {
       "post": {
         "tags": [
@@ -10375,17 +10454,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/SweepResponse"
+                  "$ref": "#/components/schemas/SweepDetailResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SweepResponse"
+                  "$ref": "#/components/schemas/SweepDetailResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SweepResponse"
+                  "$ref": "#/components/schemas/SweepDetailResponse"
                 }
               }
             }
@@ -10419,7 +10498,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — BE-15 P2a] Chi tiết phiên kèm clip và file thô đã nhận",
+        "summary": "[TẠM — BE-15 P2a] Chi tiết phiên kèm clip và file thô đã nhận; latest_run (BE-17) — lần xử lý xong gần nhất, mã lỗi nếu hỏng",
         "operationId": "getSweepsId",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.6 + BE-15 P2a (SELF-SIGNED, nền tạm tới FW)"
@@ -13372,6 +13451,25 @@
         },
         "additionalProperties": false
       },
+      "CoverageGap": {
+        "type": "object",
+        "properties": {
+          "from_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "to_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateCabinetRequest": {
         "required": [
           "cabinet_name",
@@ -15460,6 +15558,29 @@
         },
         "additionalProperties": false
       },
+      "PassCoverage": {
+        "type": "object",
+        "properties": {
+          "pass_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "from_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "to_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PatchFaultRequest": {
         "type": "object",
         "properties": {
@@ -16624,6 +16745,50 @@
         ],
         "type": "string"
       },
+      "SegmentCoverage": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "string"
+          },
+          "length_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "covered_ratio": {
+            "type": "number",
+            "format": "double"
+          },
+          "passes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PassCoverage"
+            }
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageGap"
+            }
+          },
+          "poles_expected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "poles_observed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "not_observed_pole_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SegmentDetail": {
         "required": [
           "created_at",
@@ -17084,6 +17249,103 @@
         },
         "additionalProperties": false
       },
+      "SweepCoverageResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentCoverage"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepDetailResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "work_order_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ended_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frame_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "processing_status": {
+            "$ref": "#/components/schemas/SweepProcessingStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SweepStatus"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "submitted_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyClipResponse"
+            }
+          },
+          "raw_files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyRawResponse"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latest_run": {
+            "$ref": "#/components/schemas/SweepRunSummary"
+          }
+        },
+        "additionalProperties": false
+      },
       "SweepManifest": {
         "type": "object",
         "properties": {
@@ -17205,6 +17467,59 @@
             "items": {
               "$ref": "#/components/schemas/SweepResponse"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepRunSummary": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "result_state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "detection_coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "dim_coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "coverage_reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

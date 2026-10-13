@@ -8263,6 +8263,61 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/sweeps/{id}/coverage": {
+      "get": {
+        "tags": [
+          "SurveyReview"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepCoverageResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepCoverageResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepCoverageResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_surveys",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/sweeps/{id}/review": {
       "post": {
         "tags": [
@@ -8676,17 +8731,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/SweepResponse"
+                  "$ref": "#/components/schemas/SweepDetailResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SweepResponse"
+                  "$ref": "#/components/schemas/SweepDetailResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SweepResponse"
+                  "$ref": "#/components/schemas/SweepDetailResponse"
                 }
               }
             }
@@ -11210,6 +11265,25 @@
         },
         "additionalProperties": false
       },
+      "CoverageGap": {
+        "type": "object",
+        "properties": {
+          "from_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "to_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateCabinetRequest": {
         "required": [
           "cabinet_name",
@@ -13298,6 +13372,29 @@
         },
         "additionalProperties": false
       },
+      "PassCoverage": {
+        "type": "object",
+        "properties": {
+          "pass_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "from_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "to_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PatchFaultRequest": {
         "type": "object",
         "properties": {
@@ -14455,6 +14552,50 @@
         ],
         "type": "string"
       },
+      "SegmentCoverage": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "string"
+          },
+          "length_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "covered_ratio": {
+            "type": "number",
+            "format": "double"
+          },
+          "passes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PassCoverage"
+            }
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CoverageGap"
+            }
+          },
+          "poles_expected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "poles_observed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "not_observed_pole_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SegmentDetail": {
         "required": [
           "created_at",
@@ -14910,6 +15051,103 @@
         },
         "additionalProperties": false
       },
+      "SweepCoverageResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SegmentCoverage"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepDetailResponse": {
+        "type": "object",
+        "properties": {
+          "sweep_id": {
+            "type": "string"
+          },
+          "work_order_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ended_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "segment_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "frame_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "processing_status": {
+            "$ref": "#/components/schemas/SweepProcessingStatus"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SweepStatus"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "submitted_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyClipResponse"
+            }
+          },
+          "raw_files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SurveyRawResponse"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latest_run": {
+            "$ref": "#/components/schemas/SweepRunSummary"
+          }
+        },
+        "additionalProperties": false
+      },
       "SweepManifest": {
         "type": "object",
         "properties": {
@@ -15031,6 +15269,59 @@
             "items": {
               "$ref": "#/components/schemas/SweepResponse"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SweepRunSummary": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "result_state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "detection_coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "dim_coverage_pct": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "coverage_reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

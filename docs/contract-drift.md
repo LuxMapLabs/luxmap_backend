@@ -1308,3 +1308,19 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | PC-8 | **Gợi ý AI theo từng ảnh** (D-9): chạy khi người có quyền duyệt mở chi tiết, tối đa 6 ảnh mỗi lượt mở (`Citizen:HintsPerRequest`), lưu lại. `label`: `lamp_on` / `lamp_off` **chỉ khi** model thấy đúng một bóng **và** ảnh không sáng như ban ngày (`Citizen:DaylightMeanLuma`, 0.45); còn lại `inconclusive` (không `confidence`). `artifact_version` = phiên bản detector + băm luật gợi ý. Model không chạy được → `ai_hint = null`, chi tiết vẫn 200; ảnh lỗi chờ 10 phút mới thử lại để không chiếm suất của ảnh khác. **Chỉ là gợi ý**, không bao giờ tự quyết (CQ-5) |
 | PC-9 | Audit: `citizen_report` thêm action **`accepted`**, **`merged`**, **`analyzed`** (gợi ý AI, actor `cv`); `rejected` dùng giá trị sẵn có. Chấp nhận = hai event trong một giao dịch (`fault` `created`, `citizen_report` `accepted`). Không thông báo khi quyết định |
 | PC-10 | **Chưa làm:** mở phiếu kiểm tra thẳng từ báo cáo "cột hỏng / khác" (D-17 vế sau — Quản lý dùng luồng phiếu thường), tự xoá ảnh cũ (chờ BE-26 + thao tác delete), báo cho người dân kết quả. Rollback migration `AddCitizenReview` gãy khi `audit_event` đã có `accepted` / `merged` / `analyzed` (cùng họ BE-19) |
+
+### BE-17 — tiến độ xử lý sweep + độ phủ tuyến (13/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 13/10/2026 — D-1…D-7 của Phase 1 (`.ai/results/BE-17-p1.md`). **SELF-SIGNED**, chạm API (chỉ thêm), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (màn khảo sát / duyệt / bản đồ), WP6 (F05 — độ phủ). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| SC-1 | `GET /api/v1/sweeps/{id}` thêm **`latest_run`** (chỉ ở chi tiết, danh sách không có): `{run_id, attempt, result_state (succeeded \| failed), stage, error_code, started_at, finished_at, coverage_pct, detection_coverage_pct, dim_coverage_pct, coverage_reason}` — lần xử lý **đã xong** gần nhất; `null` khi chưa lần nào xong. Đang xử lý thì vẫn là lần trước; tiến độ sống là `processing_status` (polling) |
+| SC-2 | `stage` và `error_code` là **danh sách mở** (pipeline còn thêm mã): `stage` = `complete` khi thành công, còn lại bước hỏng (`clock`, `video_clock`, `extractor`, `detector`, `association`, `chainage`, `media`, `lease`, `claim`, `scope`, `artifact`, `processing`); `error_code` cùng mã thông báo `survey_processing_failed` đang ghi |
+| SC-3 | `GET /api/v1/sweeps/{id}/coverage?run_id=` (`ReadSurveys`; vắng `run_id` = run thành công mới nhất, như `results`) → `{sweep_id, run_id, coverage_pct, segments[]}`; mỗi tuyến của phiếu: `segment_id, length_m, covered_ratio, passes[] {pass_no, direction, from_m, to_m}, gaps[] {from_m, to_m, geometry}, poles_expected, poles_observed, not_observed_pole_ids[]`. Không phân trang. Không có run thành công → 404 `RUN_NOT_FOUND` |
+| SC-4 | "Chưa có ảnh" = **chưa được đi qua** theo vết GPS đã ghép tuyến (D-2). `from_m` / `to_m` = phân số dọc tuyến × **`length_m` khai báo** (D-3) — vị trí dọc tuyến tính từ đỉnh đầu, **không** phải khoảng cách giữa hai điểm; lượt `reverse` có `from_m > to_m`. Khoảng trống < 1 m bị bỏ (nhiễu GPS giữa hai lượt chạm nhau). `geometry` = `LineString` **EPSG:4326** của khoảng trống (D-4) |
+| SC-5 | Quyền xem độ phủ: phải giữ **mọi** xã của cột trong run **và** mọi xã của phiếu (tuyến liên xã) — thiếu một xã ⇒ 404 `SWEEP_NOT_FOUND`, như ảnh khảo sát |
+| SC-6 | Đóng **O-4**: `processing_status` = `not_started \| queued \| processing \| succeeded \| failed` (tách khỏi `status`). Contract §5.6 sửa ở version sau |

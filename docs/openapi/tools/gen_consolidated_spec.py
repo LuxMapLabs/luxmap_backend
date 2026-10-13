@@ -44,6 +44,7 @@ d["info"]["description"] = (
     "CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. "
     "CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. "
     "CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). "
+    "BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -220,7 +221,7 @@ for method, suffix, summary in [
 for method, suffix, summary in [
     ("post", "", "Tạo phiên khảo sát cho phiếu survey đang làm; idempotent theo client_op_id (201 mới, 200 lặp lại)"),
     ("get", "", "Danh sách phiên; lọc work_order_id, segment_id, processing_status, data_source"),
-    ("get", "/{id}", "Chi tiết phiên kèm clip và file thô đã nhận"),
+    ("get", "/{id}", "Chi tiết phiên kèm clip và file thô đã nhận; latest_run (BE-17) — lần xử lý xong gần nhất, mã lỗi nếu hỏng"),
     ("put", "/{id}/clips/{clipNo}", "Tải một clip MP4 (stream, tối đa 300 MiB, X-Content-SHA256 bắt buộc)"),
     ("put", "/{id}/raw/{kind}", "Tải file thô gps_track | lux_log (JSONL) hoặc capture_config (JSON); kiểm toàn file trước khi ghi"),
     ("post", "/{id}/submit", "Nộp phiên khi đủ clip + 3 file thô và manifest khớp hash; 202 vào hàng chờ xử lý"),
@@ -234,6 +235,10 @@ for method, path, summary in [
     ("get", "/api/v1/frames/{frame_id}/thumbnail", "Thumbnail JPEG của khung hình khảo sát — proxy qua API, không presigned; 503 khi object thiếu"),
 ]:
     SUMMARY[(method, path)] = "[TẠM — BE-15 P2c] " + summary
+
+# BE-17 provisional coverage (SELF-SIGNED, temporary until FW).
+SUMMARY[("get", "/api/v1/sweeps/{id}/coverage")] = (
+    "[TẠM — BE-17] Độ phủ của run theo từng tuyến: lượt đi qua, khoảng chưa đi qua (mét dọc tuyến + LineString 4326), cột chưa quan sát")
 
 for suffix, summary in [("thumbnail", "Thumbnail JPEG của ảnh phiếu — proxy qua API; quyền theo phiếu cha"),
                         ("original", "Ảnh gốc nguyên byte của phiếu — proxy qua API; quyền theo phiếu cha")]:

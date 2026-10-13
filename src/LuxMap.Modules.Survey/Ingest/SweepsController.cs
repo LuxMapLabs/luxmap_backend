@@ -62,7 +62,7 @@ public sealed class SweepsController(SurveyIngestService service) : ControllerBa
 
     [HttpGet("{id}")]
     [Authorize(Policy = LuxMapPolicies.ReadSurveys)]
-    public async Task<ActionResult<SweepResponse>> Detail(string id, CancellationToken ct) => Ok(await service.Detail(id, ct));
+    public async Task<ActionResult<SweepDetailResponse>> Detail(string id, CancellationToken ct) => Ok(await service.Detail(id, ct));
 
     [HttpGet]
     [Authorize(Policy = LuxMapPolicies.ReadSurveys)]
