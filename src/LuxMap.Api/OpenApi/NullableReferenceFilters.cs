@@ -17,9 +17,10 @@ namespace LuxMap.Api.OpenApi;
 /// <c>{ "type": "object" | "string", "nullable": true, "allOf": [ { "$ref": … } ] }</c>.
 /// </para>
 /// <para>
-/// Not Swashbuckle's <c>UseAllOfToExtendReferenceSchemas</c>: it wraps EVERY reference, never-null ones too (88 schemas and all 121
-/// operations changed when measured). Only what C# declares nullable is touched, read from the nullable annotations — no hand-kept list,
-/// so a new DTO is covered the day it is written.
+/// Not Swashbuckle's <c>UseAllOfToExtendReferenceSchemas</c>: it wraps EVERY reference, never-null ones too (88 schemas changed when
+/// measured). Only what C# declares nullable is touched, read from the nullable annotations — no hand-kept list, so a new DTO is covered
+/// the day it is written. Not covered (none exists in a response today): nullable elements INSIDE a list or map, and a nullable property
+/// whose declared type is a generic parameter (<c>Feature&lt;T&gt;.Properties</c> and any future <c>Wrapper&lt;T&gt;.Value</c>).
 /// </para>
 /// </remarks>
 public sealed class NullableReferenceSchemaFilter : ISchemaFilter
@@ -58,8 +59,11 @@ public sealed class NullableReferenceSchemaFilter : ISchemaFilter
 }
 
 /// <summary>
-/// Undoes <see cref="NullableReferenceSchemaFilter"/> on schemas that reach a REQUEST body (D-1): there a C# <c>null</c> means "not sent"
-/// — the server answers a missing value with a 400 that names the field — and a client must never be told it may send <c>null</c>.
+/// Undoes <see cref="NullableReferenceSchemaFilter"/> on schemas that reach a REQUEST body (D-1): only the response side was decided.
+/// Of the nine request properties this leaves bare today, four reject <c>null</c> with a 400 (<c>fault_type</c> ×2, <c>data_source</c>,
+/// <c>outcome</c>); five DO give <c>null</c> a meaning — keep / default / not applicable (<c>UpdateUserRequest.role</c>,
+/// <c>ReportFaultRequest.location</c> / <c>.severity</c>, <c>AcceptCitizenReportRequest.severity</c>, <c>DeviceAckRequest.reported_mode</c>).
+/// That is spec debt that predates this ticket, recorded for a follow-up (Codex review SPEC-NULLABLE P2 #5), not something decided here.
 /// </summary>
 /// <remarks>
 /// A schema reachable from a request AND a response stays bare (conservative: the request reading wins); none exists today. The only
