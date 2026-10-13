@@ -1270,3 +1270,21 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | QR-4 | `QrCodeItem`: `qr_id` (`QR-0001`, tiền tố mới), `code` (16 ký tự base62), `url` = `{WEB_APP_BASE_URL}/r/{code}`, `pole_id`, `commune_id`, `active`, `created_at/by`, `revoked_at/by`. Web vẽ ảnh QR từ `url` (CQ-10) |
 | QR-5 | **Hai định danh** — điều chỉnh so với khảo sát P1 (ở đó `code` là khoá chính): `qr_id` là thứ Quản lý thao tác (đường dẫn, log, audit); `code` **không bao giờ** nằm trong đường dẫn, log hay audit (D-16), chỉ trong response của Quản lý |
 | QR-6 | Capability **`ManageQrCodes`** = Quản lý (D-11), cả đọc lẫn ghi. Nhãn client `web` |
+
+### CITIZEN-QR P2b — công dân gửi báo cáo qua mã QR (13/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 12/10/2026 — D-1…D-19 của Phase 1 (`.ai/results/CITIZEN-QR-p1.md`). **SELF-SIGNED**, chạm API (hai endpoint **ẩn danh** đầu tiên ngoài `/auth/`), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (trang công khai `/r/:code`, D-12). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| PB-1 | `POST /api/v1/public/qr/lookup {code}` → 200 `{segment_name, commune_name}` — **không** `pole_id`, toạ độ hay trạng thái (D-4). Mã sai dạng / không tồn tại / đã thu hồi → **cùng một** 404 **`PUBLIC_QR_NOT_FOUND`** (mã lỗi mới). ⚠️ Điều chỉnh so với khảo sát P1 (`GET /public/qr/{code}`): mã đi trong **body** để không vào log request (D-16) |
+| PB-2 | `POST /api/v1/public/reports` multipart `code`, `kind` (`lamp_out \| lamp_dim \| pole_damaged \| other`), `description?` (≤ 1000), `lat?`+`lng?` (cùng có), `client_op_id` (UUID), `photos` (0–3 JPEG) → **202** `{client_op_id, received_at, photos_kept}` — không trả ID nội bộ, không trả trạng thái hàng chờ |
+| PB-3 | Cùng `client_op_id` + cùng mã + cùng nội dung (kể cả ảnh) → biên nhận cũ; khoá đó với mã / nội dung khác → 409 **`IDEMPOTENCY_CONFLICT`** |
+| PB-4 | Mỗi lượt gửi là một hàng `citizen_submission`; các lượt cùng cột trong cùng **đêm** (`NightOf`, 12:00 Asia/Ho_Chi_Minh) gom vào **một** `citizen_report` `pending` (mã mới `CRP-`, `CSB-`, `CPH-`). Thông báo mới **`citizen_report_received`** (entity `citizen_report`) cho Quản lý của xã — **chỉ** khi mở mục hàng chờ mới. Contract §5.9 cần thêm loại này |
+| PB-5 | Ảnh: ≤ 3, ≤ 8 MiB (413), ≤ 40 MP kiểm từ header **trước** decode (400 `details.max_pixels`), không phải JPEG → 415. Ảnh lưu **đã bỏ mọi metadata** và mã hoá lại (ngoại lệ BE-11 quy tắc 4) |
+| PB-6 | Hạn mức ảnh: 20 / mã / đêm và 512 MiB / đêm toàn hệ thống — **quá thì vẫn nhận chữ, bỏ ảnh** (`photos_kept` nhỏ hơn số gửi) |
+| PB-7 | Giới hạn tần suất theo địa chỉ client: tra mã 30 / 10 phút, gửi 10 / giờ → 429 `RATE_LIMITED`. `X-Forwarded-For` **chỉ** được tin từ proxy khai ở `ForwardedHeaders:*` |
+| PB-8 | Audit actor **`public`** (không user, không role); audit **không bao giờ** chứa mã hay mô tả. Vị trí người gửi cách cột > 200 m → cờ `far_from_pole`, không từ chối |
