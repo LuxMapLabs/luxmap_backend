@@ -64,13 +64,13 @@ Nguồn chuẩn cho từng dòng: `docs/contract-drift.md` (QR-1…QR-6, PB-1…
   công → 404 `RUN_NOT_FOUND`; không giữ đủ mọi xã của run và của phiếu → 404 `SWEEP_NOT_FOUND`.
 - `processing_status` chốt 5 giá trị: `not_started | queued | processing | succeeded | failed` (types của web đã đúng).
 
-**⚠️ Spec khai thiếu `null` (ticket SPEC-NULLABLE, đang chờ chốt):** 25 thuộc tính response **dạng `$ref`** (11 object, 14 enum) có thể `null`
+**⚠️ Spec khai thiếu `null` (ticket SPEC-NULLABLE, đã chốt 13/10):** 25 thuộc tính response **dạng `$ref`** (11 object, 14 enum) có thể `null`
 nhưng đang xuất thành `$ref` trần — danh sách ở `.ai/results/SPEC-NULLABLE-p1.md` §1 (vd. `PoleMapDetail.fixture`, `latest_run`,
 `gaps[].geometry`, `PoleProperties.power_source`); thêm `PoleProperties.lamp_watt` / `install_date` ở bản hợp nhất. Đây **không** phải toàn
-bộ trường nullable — đối chiếu thêm trường scalar trong spec. Đề xuất (chờ Mỹ chốt) là khai lại dạng `{"type": …, "nullable": true,
+bộ trường nullable — đối chiếu thêm trường scalar trong spec. Backend sẽ khai lại dạng `{"type": …, "nullable": true,
 "allOf": [{"$ref": …}]}`. **`scripts/generate-types.js` hiện chưa hiểu `allOf`** (mẫu `type: object` ra `Record<string, any>`, mẫu `type:
-string` ra `string | null` và mất kiểu enum) — nếu chốt cách này, nhờ WP5 sửa script đọc `$ref` trong `allOf`, áp `nullable`, giữ `?` theo
-`required`, **trước** khi backend merge. Trong lúc chờ: coi các trường trong danh sách là nullable; `GisDrawerPanel` nên hiện "chưa có bóng"
+string` ra `string | null` và mất kiểu enum) — nhờ WP5 sửa script đọc `$ref` trong `allOf`, áp `nullable`, giữ `?` theo
+`required`, **trước** khi backend merge (backend chờ WP5 báo xong mới merge). Trong lúc chờ: coi các trường trong danh sách là nullable; `GisDrawerPanel` nên hiện "chưa có bóng"
 thay vì điền giá trị mặc định.
 
 ---

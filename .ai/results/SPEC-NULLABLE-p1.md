@@ -74,3 +74,9 @@ Không lên OpenAPI 3.1 chỉ vì việc này: script WP5 cũng ra `any` với `
 | D-6 | Báo cáo FE | Gửi danh sách 25 trường + mẫu mã hoá ở §3 cho WP5 / WP6 cùng bản tin |
 
 **Phase 1 dừng ở đây. Chờ Mỹ chốt D-1…D-6.**
+
+## Quyết định — Mỹ, 13/10/2026
+
+Chốt **D-1…D-6 theo cột "Đề xuất"**: 25 thuộc tính response + 2 scalar của `PoleProperties` viết tay; mã hoá `type` + `nullable: true` +
+`allOf: [$ref]` (OAS 3.0.4, không lên 3.1); filter đọc NRT, không danh sách tay; Phase 2 **chỉ merge sau khi WP5 sửa `generate-types.js`**;
+báo WP6 lỗi DTO ngay qua bản tin; gửi danh sách 25 trường + mẫu mã hoá cho WP5 / WP6. Phase 2 sẵn sàng (chạm spec — nền tạm tới FW).
