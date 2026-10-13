@@ -1885,12 +1885,25 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
   magic bytes → `IdentifyAsync` + giới hạn pixel (chỉ đọc header) → decode trong cổng `SemaphoreSlim` → `AutoOrient` → bỏ EXIF/XMP/IPTC/ICC →
   mã hoá lại. Decode luôn qua `ThumbnailFactory.JpegOnly` (tiền đề tắt advisory ImageSharp). Phá thử: bỏ giới hạn pixel → test bom pixel đỏ;
   giữ EXIF → test GPS đỏ.
-- **Hạn mức ảnh kiểm HAI lần**: trước khi decode / ghi object (rẻ, không khoá) và lại dưới khoá hàng `pole` trước khi ghi dòng. Quá hạn mức thì
-  **vẫn nhận chữ**, bỏ ảnh — người giữ QR không chặn được dân thật. Ngân sách byte toàn hệ thống **không** tuần tự hoá giữa các xã (đọc
-  `IgnoreQueryFilters` chỉ để cộng byte): hai lượt cùng lúc có thể vượt bằng ảnh của chính chúng — biên chấp nhận được, đừng mô tả là chặt.
-- 🔴 **Forwarded headers: `KnownProxies` / `KnownIPNetworks` bị XOÁ trước khi nạp cấu hình** — mặc định ASP.NET Core tin loopback. Không cấu
-  hình gì = không tin `X-Forwarded-For` của ai. Middleware đứng **đầu** pipeline. Triển khai sau reverse proxy phải khai proxy, nếu không
-  cả xã chung một xô giới hạn. Canh bằng `Forwarded_addresses_count_only_from_a_trusted_proxy` (giả địa chỉ peer bằng `IStartupFilter`).
+- **Thứ tự của `SubmitAsync` là thiết kế, đừng đảo** (review P2b #2, #4–#7): kiểm → tra mã → băm nội dung (ảnh đọc dạng luồng) → gửi lại
+  sớm → hạn mức sớm (không khoá) → **làm sạch MỌI ảnh** → khoá `pole` → **đọc lại mã còn hiệu lực** (thu hồi giữa chừng thắng) → **gửi lại
+  lần nữa** → **hạn mức lần nữa, cộng byte thật của ảnh sắp ghi** → ghi object → ghi dòng. Object ghi **dưới khoá** để lượt thua hạn mức hay
+  thua đua gửi lại không để lại ảnh mồ côi; sau làm sạch mỗi ảnh vài trăm KB nên khoá chỉ giữ vài giây (khác clip BE-15). Quá hạn mức thì
+  **vẫn nhận chữ**, bỏ ảnh. `last_submitted_at` lấy **max** (lượt chậm đến sau lượt nhanh không được ghi lùi — CHECK sẽ ra 500). Ngân sách byte
+  toàn hệ thống **không** tuần tự hoá giữa các xã: hai lượt cùng lúc ở hai xã có thể vượt bằng ảnh của chính chúng — đừng mô tả là chặt.
+- **Cổng làm sạch lấy chỗ TRƯỚC khi đọc ảnh vào RAM**, hàng chờ có hạn (quá → 503 `SERVER_BUSY`), ảnh sạch thu nhỏ về `PhotoMaxLongEdge`
+  (2560) — nên bước tạo thumbnail (decode lần hai, ngoài cổng) chỉ gặp ảnh nhỏ. `MaxPhotos` tối đa **3** cũng vì CHECK của `citizen_photo`.
+- **Khoá ngoại ghép giữ một lượt gửi cùng cột + xã với báo cáo và mã của nó** (`ak_citizen_report_…`, `ak_qr_code_qr_id_pole_id_commune_id` —
+  trông thừa, là đích FK). `report → pole` vẫn là FK đơn (pole không có khoá `(pole_id, commune_id)`; server chép xã từ mã).
+- ⚠️ **Postgres cắt tên định danh ở 63 ký tự, im lặng.** Tên FK ghép EF sinh ra có thể dài hơn (`fk_citizen_submission_citizen_report_report_id_pole_id_commune_id`
+  = 66) và trên DB thành tên khác — code nhận diện lỗi theo `ConstraintName` hay test so tên đầy đủ sẽ trượt. Đặt `HasConstraintName` ngắn
+  nếu cần bắt theo tên.
+- 🔴 **Forwarded headers: danh sách RỖNG = TIN MỌI PEER, không phải "không tin ai".** ASP.NET Core bỏ hẳn bước kiểm IP khi cả
+  `KnownProxies` lẫn `KnownIPNetworks` trống (bản đầu của P2b xoá mặc định loopback rồi để trống — Codex review bắt, P1). Nên **không
+  cấu hình proxy ⇒ middleware KHÔNG nằm trong pipeline** (`TrustedProxies.Any`); có cấu hình ⇒ đúng các proxy đó, loopback mặc định bị
+  xoá, middleware đứng **đầu** pipeline. Triển khai sau reverse proxy phải khai proxy, nếu không cả xã chung một xô giới hạn. Canh bằng
+  `With_no_proxy_configured_a_forwarded_address_is_ignored_from_every_peer` và `Forwarded_addresses_count_only_from_a_trusted_proxy`
+  (giả địa chỉ peer bằng `IStartupFilter`).
 - Gửi lại: khoá `client_op_id` gắn với **mã + băm nội dung** (kể cả ảnh), tra ở cả bước sớm lẫn khi bắt trùng `ux_citizen_submission_client_op_id`.
 - Teardown: `citizen_photo` (theo submission) → `citizen_submission` → `citizen_report` → `qr_code` → `pole`. Rollback `AddCitizenReports` gãy
   khi `audit_event` đã có actor `public` hoặc entity `citizen_report` (cùng họ BE-19).

@@ -724,10 +724,10 @@ Cấu hình (mặc định trong code, đổi qua appsettings / biến môi trư
 
 | Khoá | Mặc định | Nghĩa |
 |---|---|---|
-| `ForwardedHeaders:KnownProxies:0…`, `ForwardedHeaders:KnownNetworks:0…` | (rỗng) | Proxy được tin `X-Forwarded-For`. **Rỗng = không tin ai** (kể cả loopback). Triển khai sau reverse proxy **phải** khai, nếu không mọi người dân chung một xô giới hạn |
+| `ForwardedHeaders:KnownProxies:0…`, `ForwardedHeaders:KnownNetworks:0…` | (rỗng) | Proxy được tin `X-Forwarded-For`. **Rỗng = middleware tắt hẳn**, không đọc header đó từ ai (để trống danh sách mà vẫn bật thì ASP.NET Core tin MỌI peer). Triển khai sau reverse proxy **phải** khai, nếu không mọi người dân chung một xô giới hạn |
 | `RateLimits:PublicLookup:PermitLimit` / `:WindowMinutes` | 30 / 10 | Tra mã, theo địa chỉ client |
 | `RateLimits:PublicReport:PermitLimit` / `:WindowMinutes` | 10 / 60 | Gửi báo cáo, theo địa chỉ client |
-| `Citizen:MaxPhotos`, `Citizen:PhotoMaxBytes`, `Citizen:PhotoMaxPixels` | 3, 8 MiB, 40 000 000 | Giới hạn ảnh; số pixel kiểm từ header trước khi decode |
+| `Citizen:MaxPhotos`, `Citizen:PhotoMaxBytes`, `Citizen:PhotoMaxPixels`, `Citizen:PhotoMaxLongEdge` | 3 (tối đa 3), 8 MiB, 40 000 000, 2560 | Giới hạn ảnh; số pixel kiểm từ header trước khi decode; ảnh lưu thu nhỏ về cạnh dài này |
 | `Citizen:PhotosPerCodePerNight` | 20 | Quá thì nhận chữ, bỏ ảnh |
 | `Citizen:PhotoBudgetBytesPerNight` | 512 MiB | Tổng byte ảnh công dân mỗi đêm cho cả hệ thống; quá thì nhận chữ, bỏ ảnh |
 | `Citizen:FarFromPoleMeters` | 200 | Vị trí người gửi xa cột hơn ⇒ gắn cờ (không từ chối) |
