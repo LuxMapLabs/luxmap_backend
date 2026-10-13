@@ -1324,3 +1324,17 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | SC-4 | "Chưa có ảnh" = **chưa được đi qua** theo vết GPS đã ghép tuyến (D-2). `from_m` / `to_m` = phân số dọc tuyến × **`length_m` khai báo** (D-3) — vị trí dọc tuyến tính từ đỉnh đầu, **không** phải khoảng cách giữa hai điểm; lượt `reverse` có `from_m > to_m`. Khoảng trống < 1 m bị bỏ (nhiễu GPS giữa hai lượt chạm nhau). `geometry` = `LineString` **EPSG:4326** của khoảng trống (D-4) |
 | SC-5 | Quyền xem độ phủ: phải giữ **mọi** xã của cột trong run **và** mọi xã của phiếu (tuyến liên xã) — thiếu một xã ⇒ 404 `SWEEP_NOT_FOUND`, như ảnh khảo sát |
 | SC-6 | Đóng **O-4**: `processing_status` = `not_started \| queued \| processing \| succeeded \| failed` (tách khỏi `status`). Contract §5.6 sửa ở version sau |
+
+### SPEC-NULLABLE — object / enum có thể null khai đúng trong OpenAPI (13/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 13/10/2026 — D-1…D-6 (`.ai/results/SPEC-NULLABLE-p1.md`). Chỉ đổi **spec** (hình dạng JSON trên dây không đổi); nền tạm tới FW |
+| **Consumer** | WP5 (`scripts/generate-types.js`), WP6 (DTO viết tay). **Merge chỉ sau khi WP5 sửa script (D-4)** |
+
+| Mã | Quyết định |
+|---|---|
+| SN-1 | 25 thuộc tính **response** kiểu object / enum mà server có thể trả `null` nay khai `{"type": "object" \| "string", "nullable": true, "allOf": [{"$ref": …}]}` (OAS 3.0.4: `nullable` chỉ có tác dụng bên cạnh `type`). Danh sách: `.ai/results/SPEC-NULLABLE-p1.md` §1. Bản hợp nhất thêm `PoleProperties.lamp_watt` / `install_date` `nullable` (schema viết tay trong generator từng làm mất) |
+| SN-2 | **Request giữ `$ref` trần**: `null` ở request nghĩa là "không gửi" và server trả 400 nêu tên trường — client không được gửi `null` |
+| SN-3 | `*Feature.properties` giữ `$ref` trần — luôn có trên dây |
+| SN-4 | **Không đổi gì trên dây** — chỉ spec nói đúng điều server vốn đã làm. Không operation nào đổi |

@@ -4,8 +4,9 @@ P1a (Codex, WP5/WP6 tiêu thụ thế nào): `.ai/results/SPEC-NULLABLE-p1a-by-c
 
 ## 1. Đo trên spec (Claude, worktree tạm — đã xoá)
 
-- Tuỳ chọn toàn cục `UseAllOfToExtendReferenceSchemas()` của Swashbuckle 10.2.3: **88 schema + 121 operation đổi** — bọc mọi `$ref`, kể cả
-  ref không bao giờ null. **Loại.**
+- Tuỳ chọn toàn cục `UseAllOfToExtendReferenceSchemas()` của Swashbuckle 10.2.3: **88 schema đổi** — bọc mọi `$ref`, kể cả ref không bao
+  giờ null. **Loại.** ⚠️ *Đính chính (Phase 2, 13/10):* bản đầu ghi thêm "121 operation đổi" — sai, do script so sánh của Claude so một
+  operation với cả path item; con số 88 schema vẫn đúng.
 - Thuộc tính `$ref` mà C# khai nullable: **40**, chia theo nơi xuất hiện (tính bằng bao đóng `$ref` từ `requestBody` / `responses`):
 
 | Nhóm | Số | Xử lý đề xuất |
