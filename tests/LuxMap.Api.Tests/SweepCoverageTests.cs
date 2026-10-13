@@ -24,7 +24,7 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
 {
     private NpgsqlDataSource source = null!;
     private ModuleAssemblyCatalog catalog = null!;
-    private string a = null!, b = null!, road = null!, bare = null!, order = null!, user = null!;
+    private string a = null!, b = null!, road = null!, bare = null!, bent = null!, order = null!, user = null!;
     private string[] poles = [];
     private long algorithm, clock;
 
@@ -62,10 +62,14 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
                 LengthM = 100, Geom = new LineString([new(108, 16), new(108.001, 16)]) { SRID = 4326 } },
             new RoadSegment { CommuneId = a, SegmentName = "Coverage bare", RoadClass = RoadClass.InterVillage, DataSource = DataSource.Simulated,
                 LengthM = 50, Geom = new LineString([new(108, 16.001), new(108.0005, 16.001)]) { SRID = 4326 } },
+            // An L: 0.001° north (~110.6 m), then 0.001° east (~107 m). In degrees the legs are equal, so half way is the corner; in
+            // metres (3405, where pass fractions are measured) half way is still on the north leg, below the corner.
+            new RoadSegment { CommuneId = a, SegmentName = "Coverage bent", RoadClass = RoadClass.InterVillage, DataSource = DataSource.Simulated,
+                LengthM = 218, Geom = new LineString([new(107.9, 16.0), new(107.9, 16.001), new(107.901, 16.001)]) { SRID = 4326 } },
         };
         db.AddRange(segments);
         await db.SaveChangesAsync();
-        (road, bare) = (segments[0].SegmentId, segments[1].SegmentId);
+        (road, bare, bent) = (segments[0].SegmentId, segments[1].SegmentId, segments[2].SegmentId);
 
         var assets = new[]
         {
@@ -85,7 +89,8 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
         await db.SaveChangesAsync();
         order = wo.WorkOrderId;
         db.AddRange(new WorkOrderSegment { WorkOrderId = order, CommuneId = a, SegmentId = road, Position = 0 },
-            new WorkOrderSegment { WorkOrderId = order, CommuneId = a, SegmentId = bare, Position = 1 });
+            new WorkOrderSegment { WorkOrderId = order, CommuneId = a, SegmentId = bare, Position = 1 },
+            new WorkOrderSegment { WorkOrderId = order, CommuneId = a, SegmentId = bent, Position = 2 });
         var versions = new[] { "association_algorithm", "clock_algorithm" }.Select(c => new ArtifactVersion
             { Component = c, Version = Guid.NewGuid().ToString("N"), ArtifactHash = new('a', 64), CreatedAt = DateTime.UtcNow }).ToArray();
         db.AddRange(versions);
@@ -117,6 +122,15 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
         Assert.Equal([(0.0, 1.0)], SweepCoverage.Gaps([], lengthM: 100));
     }
 
+    [Fact]
+    public void A_gap_of_exactly_one_metre_is_kept_only_shorter_ones_are_dropped()
+    {
+        Assert.Equal([(0.0, 0.25)], SweepCoverage.Gaps([(0.25, 1.0)], lengthM: 4));   // 1 m at the start
+        Assert.Equal([(0.75, 1.0)], SweepCoverage.Gaps([(0.0, 0.75)], lengthM: 4));   // 1 m at the end
+        Assert.Equal([(0.4, 0.5)], SweepCoverage.Gaps([(0.0, 0.4), (0.5, 1.0)], lengthM: 10)); // 1 m in the middle
+        Assert.Empty(SweepCoverage.Gaps([(0.0, 0.4), (0.49, 1.0)], lengthM: 10));      // 0.9 m
+    }
+
     // ---- GET /sweeps/{id}/coverage ---------------------------------------------------------------------
 
     [Fact]
@@ -128,7 +142,7 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
         var coverage = await Review(db).Coverage(sweep.Id, null, default);
 
         Assert.Equal(sweep.Run, coverage.RunId);
-        Assert.Equal([road, bare], coverage.Segments.Select(s => s.SegmentId));
+        Assert.Equal([road, bare, bent], coverage.Segments.Select(s => s.SegmentId));
         var driven = coverage.Segments[0];
         Assert.Equal(100, driven.LengthM);
         Assert.Equal([(0, "forward", 0.0, 40.0), (1, "reverse", 90.0, 60.0)],
@@ -148,6 +162,50 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
         Assert.Empty(untouched.Passes);
         Assert.Equal([(0.0, 50.0)], untouched.Gaps.Select(g => (g.FromM!.Value, g.ToM!.Value)));
         Assert.Equal(0, untouched.CoveredRatio);
+    }
+
+    /// <summary>
+    /// Pass fractions are measured in 3405; the gap must be cut there and only then turned into 4326. Cut in 4326, half way along the L
+    /// is its corner; cut in 3405, it is ~1.7 m below the corner on the north leg.
+    /// </summary>
+    [Fact]
+    public async Task A_gap_is_cut_on_the_projection_the_pass_was_measured_on()
+    {
+        var sweep = await PlantAsync(passes: [("forward", 0.0, 0.5)], observed: [], segment: bent);
+        await using var db = Db();
+
+        var gap = (await Review(db).Coverage(sweep.Id, null, default)).Segments.Single(s => s.SegmentId == bent).Gaps.Single();
+
+        var line = Assert.IsType<double[][]>(gap.Geometry!.Coordinates);
+        Assert.Equal(107.9, line[0][0], 7);                     // [lng, lat]: still on the north leg…
+        Assert.InRange(line[0][1], 16.00095, 16.000995);       // …below the corner at 16.001
+        Assert.Equal([107.901, 16.001], line[^1].Select(c => Math.Round(c, 7)));
+        Assert.Contains(line, p => Math.Abs(p[0] - 107.9) < 1e-7 && Math.Abs(p[1] - 16.001) < 1e-7); // the corner is in the gap
+        Assert.Equal((109.0, 218.0), (gap.FromM!.Value, gap.ToM!.Value));
+    }
+
+    [Fact]
+    public async Task Coverage_reads_the_latest_succeeded_run_or_the_one_asked_for()
+    {
+        var sweep = await PlantAsync(passes: [("forward", 0.0, 0.4)], observed: []);
+        var second = await AddRunAsync(sweep.Id, attempt: 2, state: "succeeded", stage: "complete", error: null, passes: [("forward", 0.0, 1.0)]);
+        var failed = await AddRunAsync(sweep.Id, attempt: 3, state: "failed", stage: "clock", error: "CLOCK_RESIDUAL");
+        var other = await PlantAsync(passes: [("forward", 0.0, 1.0)], observed: []);
+        await using var db = Db();
+        var service = Review(db);
+
+        var latest = await service.Coverage(sweep.Id, null, default);
+        var asked = await service.Coverage(sweep.Id, sweep.Run, default);
+
+        Assert.Equal(second, latest.RunId);
+        Assert.Equal(1.0, latest.Segments[0].CoveredRatio, 6);
+        Assert.Equal(sweep.Run, asked.RunId);
+        Assert.Equal(0.4, asked.Segments[0].CoveredRatio, 6);
+        foreach (var run in new[] { failed, other.Run })
+        {
+            var error = await Assert.ThrowsAsync<LuxMapException>(() => service.Coverage(sweep.Id, run, default));
+            Assert.Equal("RUN_NOT_FOUND", error.Code);
+        }
     }
 
     [Fact]
@@ -216,7 +274,7 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
 
     private async Task<Planted> PlantAsync(
         (string Direction, double From, double To)[] passes, int[] observed, string state = "succeeded", string? extraCommune = null,
-        bool withRun = true)
+        bool withRun = true, string? segment = null)
     {
         await using var db = Db();
         using var seed = db.EnterUnscopedSystemWriteBackdoor();
@@ -235,11 +293,7 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
             extraCommune is null ? [a, b] : [a, b, extraCommune]);
         db.Add(run);
         await db.SaveChangesAsync();
-        var made = passes.Select((p, i) => new SurveyPass
-        {
-            Run = run, SegmentId = road, PassNo = i, Direction = p.Direction, FromFraction = p.From, ToFraction = p.To,
-            StartElapsedNs = i * 1_000_000_000L, EndElapsedNs = (i + 1) * 1_000_000_000L, QualityFlags = "{}",
-        }).ToArray();
+        var made = Passes(run, passes, segment ?? road);
         db.AddRange(made);
         await db.SaveChangesAsync();
         foreach (var i in observed)
@@ -258,13 +312,24 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
         return new(sweep.SweepId, run.RunId);
     }
 
-    private async Task AddRunAsync(string sweepId, int attempt, string state, string stage, string? error)
+    private async Task<long> AddRunAsync(
+        string sweepId, int attempt, string state, string stage, string? error, (string Direction, double From, double To)[]? passes = null)
     {
         await using var db = Db();
         using var seed = db.EnterUnscopedSystemWriteBackdoor();
-        db.Add(NewRun(sweepId, attempt, state, stage, error, [a, b]));
+        var run = NewRun(sweepId, attempt, state, stage, error, [a, b]);
+        db.Add(run);
+        db.AddRange(Passes(run, passes ?? [], road));
         await db.SaveChangesAsync();
+        return run.RunId;
     }
+
+    private static SurveyPass[] Passes(SurveyProcessingRun run, (string Direction, double From, double To)[] passes, string segment)
+        => [.. passes.Select((p, i) => new SurveyPass
+        {
+            Run = run, SegmentId = segment, PassNo = i, Direction = p.Direction, FromFraction = p.From, ToFraction = p.To,
+            StartElapsedNs = i * 1_000_000_000L, EndElapsedNs = (i + 1) * 1_000_000_000L, QualityFlags = "{}",
+        })];
 
     private SurveyProcessingRun NewRun(string sweepId, int attempt, string state, string stage, string? error, string[] communes)
     {
@@ -277,7 +342,7 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
             CoveragePct = state == "succeeded" ? 50 : null,
             GisSnapshot = JsonSerializer.Serialize(new
             {
-                segments = new[] { road, bare }, communes,
+                segments = new[] { road, bare, bent }, communes,
                 poles = poles.Select((id, i) => new { segment_id = road, pole_id = id, commune_id = i == 0 ? a : b }),
             }),
         };

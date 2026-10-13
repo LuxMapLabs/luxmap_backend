@@ -22,7 +22,7 @@ public sealed record CoverageGap(double? FromM, double? ToM, Geometry? Geometry)
 /// <summary>The interval arithmetic behind the coverage, kept pure so it is tested without a database.</summary>
 public static class SweepCoverage
 {
-    /// <summary>A gap shorter than this is GPS noise between two passes that met, not a stretch nobody drove.</summary>
+    /// <summary>A gap SHORTER than this is GPS noise between two passes that met, not a stretch nobody drove; one this long is kept (SC-4).</summary>
     public const double MinimumGapM = 1.0;
 
     /// <summary>The union of the passes as sorted, disjoint <c>[from, to]</c> fractions — direction dropped, clamped to [0, 1].</summary>
@@ -51,13 +51,16 @@ public static class SweepCoverage
         var cursor = 0d;
         foreach (var (from, to) in covered)
         {
-            if (from - cursor > minimum) gaps.Add((cursor, from));
+            if (Keeps(from - cursor, minimum)) gaps.Add((cursor, from));
             cursor = Math.Max(cursor, to);
         }
 
-        if (1 - cursor > minimum) gaps.Add((cursor, 1));
+        if (Keeps(1 - cursor, minimum)) gaps.Add((cursor, 1));
         return [.. gaps];
     }
+
+    // Positive, and at least the minimum — with a hair of tolerance, since fraction × length rarely lands exactly on 1 m.
+    private static bool Keeps(double width, double minimum) => width > 0 && width >= minimum - 1e-9;
 
     /// <summary>Covered share of the segment: the gaps that were kept are what is missing.</summary>
     public static double CoveredRatio(IReadOnlyList<(double From, double To)> gaps)
