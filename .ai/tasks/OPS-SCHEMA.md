@@ -1,7 +1,7 @@
 ---
 ticket: OPS-SCHEMA
 title: Rà lược đồ DB đích trước khi lên Supabase — bảng nào thêm / sửa / xoá, ERD đích, theo Phiếu v1.4
-status: ready
+status: done
 phase: 1
 owner: codex
 branch: docs/db-schema-review

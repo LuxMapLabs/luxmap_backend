@@ -1,7 +1,7 @@
 ---
 ticket: CABINET
 title: Trụ / tủ điện tổng thành tài sản riêng (`electrical_cabinet`); IoT node chỉ là thiết bị gắn ở trụ
-status: in_progress
+status: done
 phase: 2
 owner: claude
 branch: feat/CABINET-electrical-cabinet

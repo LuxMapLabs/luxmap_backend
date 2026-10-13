@@ -1,7 +1,7 @@
 ---
 ticket: JSON-ENUM
 title: Enum trong body JSON chỉ nhận CHUỖI — chặn số nguyên trên toàn API
-status: ready
+status: done
 phase: 2
 owner: codex
 branch: fix/json-enum-strings-only

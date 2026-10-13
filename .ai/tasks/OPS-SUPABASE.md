@@ -1,7 +1,7 @@
 ---
 ticket: OPS-SUPABASE
 title: Đưa database lên Supabase (PostgreSQL + PostGIS) — khảo sát tương thích, checklist, kế hoạch chuyển dữ liệu
-status: in_progress
+status: blocked
 phase: 2
 owner: claude
 branch: chore/supabase-deploy
@@ -10,6 +10,7 @@ contract_refs:
   - "mục 1.2 — ID hiển thị do DB sinh; ngoại lệ hệ thống D-6"
 depends_on:
   - "Phần A (Mỹ làm trên dashboard) — Phase 2 mới cần, Phase 1 KHÔNG cần"
+  - "BLOCKED 13/10: script copy + runbook đã merge (#68, #88); chờ Mỹ tạo project, tắt Data API, bật PostGIS rồi chạy runbook mục 2–5"
 ---
 
 ## Bối cảnh
