@@ -42,10 +42,11 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
-    <strong>BE-17 — tiến độ xử lý sweep + độ phủ tuyến, Phase 1 → 2, 13/10/2026</strong>
-    <p><span class="tag t-next">Phase 2 xong trên nhánh <code>feat/BE-17-sweep-coverage</code> (13/10, chưa push): <code>latest_run</code> trên
+    <strong>BE-17 — tiến độ xử lý sweep + độ phủ tuyến, 13/10/2026 — xong</strong>
+    <p><span class="tag t-done">Đã merge (PR #140, <code>6f9118f</code>, 13/10 — admin merge, vượt review code owner OpenAPI; Ngọc/Thịnh xác nhận ở FW kế tiếp) · không migration · chưa báo WP5/WP6</span>
+    <span class="tag t-next">P2: <code>latest_run</code> trên
     <code>GET /sweeps/{id}</code>, <code>GET /sweeps/{id}/coverage</code>; drift SC-1…SC-6 (O-4 đóng). Không migration. 966/46/45/383 xanh, 7 chốt phá thử
-    đều đỏ. Codex review 0 P1 / 3 P2 / 2 P3 — sửa 3, ghi 2. Chi tiết <code>.ai/results/BE-17-p2.md</code></span>
+    đều đỏ. Codex review 0 P1 / 3 P2 / 2 P3 — sửa 3, ghi 2. CI lần đầu đỏ vì teardown (phiếu test giữ tài khoản fixture), đã sửa. Chi tiết <code>.ai/results/BE-17-p2.md</code></span>
     <span class="tag t-done">P1 đã merge (#139) · D-1…D-7 chốt (Mỹ, 13/10)</span> Nhánh <code>docs/BE-17-p1</code>. Codex (P1a) đọc web + mobile:
     chưa consumer nào gọi GET sweep thật; nhu cầu độ phủ rõ nhất ở F05 của WP6, chưa có hình dạng. Claude (P1b): BE-15 đã có
     <code>processing_status</code>, <code>coverage_pct</code>, dòng <code>not_observed</code>; còn thiếu lý do lỗi xử lý (có trong thông báo, không có
