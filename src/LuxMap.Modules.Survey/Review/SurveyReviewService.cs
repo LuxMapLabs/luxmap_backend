@@ -67,6 +67,104 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
         return PagedResult<SurveyResultItem>.From(page, count + unobserved.Length, Preview(rows, allPasses).Concat(missingPage).ToArray());
     }
 
+    /// <summary>
+    /// BE-17 (D-1…D-4): which stretches of each segment of the job a run drove, which it did not, and which expected poles it never
+    /// observed. The run is chosen as <see cref="Results"/> chooses it; the segments and expected poles are the run's GIS snapshot,
+    /// so the answer describes what the run saw, not today's assets.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Access is the media rule (<see cref="SurveyMediaAccess.CanReadMedia"/>) for this one run: every commune of its poles AND every
+    /// commune of its job. The coverage draws the job's segments, and an inter-commune road can belong to a commune whose poles the
+    /// run never touched. Short of either: the same 404 as an unknown sweep.
+    /// </para>
+    /// <para>
+    /// Gap geometry is cut in SQL on the projection the fractions were measured on (3405) and transformed back to 4326 before it
+    /// leaves the database — no 3405 coordinate ever reaches .NET (BE-10 rule 3). Raw SQL skips the query filter, so it is bounded
+    /// to the snapshot's communes, all of which the caller was just checked to hold.
+    /// </para>
+    /// </remarks>
+    public async Task<SweepCoverageResponse> Coverage(string id, long? runId, CancellationToken ct)
+    {
+        var sweep = await Find(id, ct);
+        var runs = db.Set<SurveyProcessingRun>().AsNoTracking().Where(r => r.SweepId == id && r.ResultState == "succeeded");
+        var run = await (runId.HasValue ? runs.Where(r => r.RunId == runId) : runs.OrderByDescending(r => r.Attempt))
+            .FirstOrDefaultAsync(ct) ?? throw Error("RUN_NOT_FOUND", HttpStatusCode.NotFound);
+        await RequireWholeRun(run, false, ct);
+
+        using var snapshot = JsonDocument.Parse(run.GisSnapshot);
+        var root = snapshot.RootElement;
+        string[] Strings(string name) => root.TryGetProperty(name, out var array)
+            ? [.. array.EnumerateArray().Select(x => x.GetString()!)] : [];
+        var segmentIds = Strings("segments");
+        var communes = Strings("communes");
+        if (communes.Any(c => !scope.Scope.Allows(c))) throw Error("SWEEP_NOT_FOUND", HttpStatusCode.NotFound);
+
+        var expected = root.TryGetProperty("poles", out var poles)
+            ? poles.EnumerateArray().Select(p => (Segment: p.GetProperty("segment_id").GetString()!, Pole: p.GetProperty("pole_id").GetString()!))
+                .Distinct().ToArray()
+            : [];
+        var observed = (await db.Set<PoleObservation>().AsNoTracking().Where(o => o.RunId == run.RunId)
+            .Select(o => o.PoleId).Distinct().ToArrayAsync(ct)).ToHashSet(StringComparer.Ordinal);
+        var passes = await db.Set<SurveyPass>().AsNoTracking().Where(p => p.RunId == run.RunId).OrderBy(p => p.PassNo).ToArrayAsync(ct);
+        var lengths = await db.Set<RoadSegment>().AsNoTracking().Where(r => segmentIds.Contains(r.SegmentId))
+            .ToDictionaryAsync(r => r.SegmentId, r => (double?)r.LengthM, ct);
+
+        var plans = segmentIds.Select(segment =>
+        {
+            var length = lengths.GetValueOrDefault(segment);
+            var driven = passes.Where(p => p.SegmentId == segment).ToArray();
+            var gaps = SweepCoverage.Gaps(SweepCoverage.Union(driven.Select(p => (p.FromFraction, p.ToFraction))), length);
+            return (Segment: segment, Length: length, Passes: driven, Gaps: gaps);
+        }).ToArray();
+        var geometries = await GapGeometriesAsync(plans.SelectMany(p => p.Gaps.Select(g => (p.Segment, g.From, g.To))).ToArray(), communes, ct);
+
+        double? Metres(double fraction, double? length) => length is { } l ? Math.Round(fraction * l, 1) : null;
+        var segments = plans.Select(plan =>
+        {
+            var mine = expected.Where(e => e.Segment == plan.Segment).Select(e => e.Pole).Distinct().ToArray();
+            var missing = mine.Where(p => !observed.Contains(p)).OrderBy(p => p.Length).ThenBy(p => p, StringComparer.Ordinal).ToArray();
+            return new SegmentCoverage(plan.Segment, plan.Length, Math.Round(SweepCoverage.CoveredRatio(plan.Gaps), 4),
+                [.. plan.Passes.Select(p => new PassCoverage(p.PassNo, p.Direction, Metres(p.FromFraction, plan.Length), Metres(p.ToFraction, plan.Length)))],
+                [.. plan.Gaps.Select(g => new CoverageGap(Metres(g.From, plan.Length), Metres(g.To, plan.Length),
+                    geometries.GetValueOrDefault((plan.Segment, g.From, g.To))))],
+                mine.Length, mine.Length - missing.Length, missing);
+        }).ToArray();
+        return new SweepCoverageResponse(sweep.SweepId, run.RunId, run.CoveragePct, segments);
+    }
+
+    private async Task<Dictionary<(string Segment, double From, double To), LuxMap.Shared.Contracts.GeoJson.Geometry>> GapGeometriesAsync(
+        (string Segment, double From, double To)[] gaps, string[] communes, CancellationToken ct)
+    {
+        if (gaps.Length == 0) return [];
+        var segments = gaps.Select(g => g.Segment).ToArray();
+        var froms = gaps.Select(g => g.From).ToArray();
+        var tos = gaps.Select(g => g.To).ToArray();
+        var rows = await db.Database.SqlQuery<GapGeometryRow>($"""
+            SELECT g.ordinal AS ordinal,
+                ST_AsGeoJSON(ST_Transform(ST_LineSubstring(ST_Transform(r.geom, 3405), g.from_fraction, g.to_fraction), 4326)) AS geo_json
+            FROM unnest({segments}::text[], {froms}::float8[], {tos}::float8[]) WITH ORDINALITY AS g(segment_id, from_fraction, to_fraction, ordinal)
+            JOIN road_segment r ON r.segment_id = g.segment_id AND r.commune_id = ANY({communes})
+            """).ToArrayAsync(ct);
+        var result = new Dictionary<(string, double, double), LuxMap.Shared.Contracts.GeoJson.Geometry>();
+        foreach (var row in rows)
+        {
+            using var json = JsonDocument.Parse(row.GeoJson);
+            var coordinates = json.RootElement.GetProperty("coordinates");
+            if (json.RootElement.GetProperty("type").GetString() != "LineString") continue;
+            result[gaps[row.Ordinal - 1]] = LuxMap.Shared.Contracts.GeoJson.Geometry.LineString(
+                coordinates.EnumerateArray().Select(c => (c[0].GetDouble(), c[1].GetDouble())));
+        }
+
+        return result;
+    }
+
+    private sealed class GapGeometryRow
+    {
+        public long Ordinal { get; set; }
+        public string GeoJson { get; set; } = "";
+    }
+
     public static SurveyResultItem[] Preview(PoleObservation[] page, PoleObservation[] allPasses)
     {
         var choices = allPasses.GroupBy(o => o.PoleId).ToDictionary(g => g.Key, SurveyPublicationRules.Choose);

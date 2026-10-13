@@ -19,6 +19,15 @@ public sealed class SurveyReviewController(SurveyReviewService service) : Contro
         [FromQuery(Name = "run_id")] long? runId, PageQuery page, CancellationToken ct)
         => Ok(await service.Results(id, runId, page.ToPageRequest(), ct));
 
+    /// <summary>
+    /// BE-17 — what the run drove on each segment of the job: passes, the stretches not driven (with 4326 geometry), expected poles
+    /// not observed. <c>run_id</c> absent: the latest succeeded run, as <c>results</c>. SELF-SIGNED.
+    /// </summary>
+    [HttpGet("{id}/coverage")]
+    [Authorize(Policy = LuxMapPolicies.ReadSurveys)]
+    public async Task<ActionResult<SweepCoverageResponse>> Coverage(string id, [FromQuery(Name = "run_id")] long? runId, CancellationToken ct)
+        => Ok(await service.Coverage(id, runId, ct));
+
     [HttpPost("{id}/review")]
     [Authorize(Policy = LuxMapPolicies.ReviewSurveys)]
     public async Task<ActionResult<ReviewSweepResponse>> Review(string id, ReviewSweepRequest request, CancellationToken ct)

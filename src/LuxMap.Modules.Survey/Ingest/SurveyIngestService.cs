@@ -225,7 +225,18 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
         return (true, await Response(sweep, ct));
     }
 
-    public async Task<SweepResponse> Detail(string id, CancellationToken ct) => await Response(await Find(id, ct), ct);
+    public async Task<SweepDetailResponse> Detail(string id, CancellationToken ct)
+    {
+        var sweep = await Find(id, ct);
+        var s = await Response(sweep, ct);
+        var latest = await db.Set<SurveyProcessingRun>().AsNoTracking().Where(r => r.SweepId == sweep.SweepId)
+            .OrderByDescending(r => r.Attempt).ThenByDescending(r => r.RunId)
+            .Select(r => new SweepRunSummary(r.RunId, r.Attempt, r.ResultState, r.Stage, r.ErrorCode, r.StartedAt, r.FinishedAt,
+                r.CoveragePct, r.DetectionCoveragePct, r.DimCoveragePct, r.CoverageReason))
+            .FirstOrDefaultAsync(ct);
+        return new SweepDetailResponse(s.SweepId, s.WorkOrderId, s.StartedAt, s.EndedAt, s.SegmentIds, s.FrameCount, s.CoveragePct,
+            s.ProcessingStatus, s.Status, s.DataSource, s.SubmittedAt, s.Clips, s.RawFiles, s.Version, latest);
+    }
 
     public async Task<PagedResult<SweepResponse>> List(string? workOrder, string? segment, SweepProcessingStatus? processing,
         DataSource? source, PageRequest page, CancellationToken ct)
