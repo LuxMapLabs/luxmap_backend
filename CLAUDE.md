@@ -1964,7 +1964,8 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 
 - **`NullableReferenceSchemaFilter` đọc nullable annotation của C#** và bọc đúng thuộc tính `$ref` nullable thành `anyOf: [{$ref},
   {type, nullable: true, enum: [null]}]`. 🔴 **Đừng "đơn giản hoá" thành `{type, nullable, allOf: [$ref]}`** — `nullable` chỉ nới lớp ngoài,
-  schema trong `allOf` vẫn bị kiểm riêng và từ chối `null` (đo bằng `openapi-schema-validator`: dạng `allOf` reject `null`, dạng `anyOf` accept); **`NullableReferenceDocumentFilter`** gỡ lại ở mọi schema chạm tới từ **request** (`null` ở request = "không gửi", 400). DTO
+  schema trong `allOf` vẫn bị kiểm riêng và từ chối `null` (đo bằng `openapi-schema-validator`: dạng `allOf` reject `null`, dạng `anyOf` accept); **`NullableReferenceDocumentFilter`** gỡ lại ở mọi schema chạm tới từ **request** (D-1 chỉ quyết phía response; 4 trường request `null` → 400,
+  5 trường `null` có nghĩa — giữ / mặc định — là nợ spec có từ trước, drift SN-2). DTO
   response mới tự được phủ — **đừng** chép danh sách tay. Muốn một trường KHÔNG null thì sửa **kiểu C#** cho đúng, đừng vá spec.
 - 🔴 **`NullabilityInfoContext` KHÔNG an toàn đa luồng** — để static dùng chung làm `/swagger/v1/swagger.json` trả **500** khi các test class
   sinh spec song song, trong khi `dotnet swagger tofile` (một luồng) vẫn chạy. Tạo mới mỗi lần gọi filter.

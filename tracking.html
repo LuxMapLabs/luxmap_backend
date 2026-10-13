@@ -583,7 +583,7 @@
   <div class="card">
     <ul>
       <li><strong>⚠️ Object nullable trong OpenAPI xuất <code>$ref</code> trần, không <code>nullable</code> (13/10/2026, phát hiện ở review BE-17) —
-      ticket SPEC-NULLABLE, Phase 1 xong, D-1…D-6 chốt theo đề xuất (13/10) — Phase 2 làm được, merge chờ WP5 sửa script: 25 thuộc tính response + 2 scalar của <code>PoleProperties</code> viết tay; script
+      ticket SPEC-NULLABLE: Phase 2 xong trên nhánh <code>feat/SPEC-NULLABLE</code> (13/10) — dạng <code>anyOf: [$ref, null]</code> (D-2 sửa sau review Codex P1, đã thử bằng validator); <b>merge chờ WP5 sửa script</b>: 25 thuộc tính response + 2 scalar của <code>PoleProperties</code> viết tay; script
       sinh types của WP5 chưa hiểu <code>allOf</code> nên phải sửa trước khi backend merge. Kèm: DTO chi tiết cột của WP6 sẽ hỏng khi nối API thật
       (5 trường thiếu <code>?</code>, bắt buộc <code>supplier</code> mà API không trả) — đã ghi trong bản tin.</strong>
       Ví dụ <code>PoleMapDetail.fixture</code> (null khi cột không có bóng), <code>SweepDetailResponse.latest_run</code>,
