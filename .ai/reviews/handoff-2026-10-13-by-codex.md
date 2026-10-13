@@ -1,0 +1,45 @@
+# Review bản tin WP5/WP6 — Codex, 13/10/2026
+
+Đã đối chiếu toàn bộ 75 dòng; số dòng dưới đây thuộc bản tin gốc. Chỉ ghi file review này, không build/test, không checkout/fetch/commit.
+
+Nguồn: spec v1.14 trong `docs/openapi/luxmap-v1.5.json` (khớp blob trên `dev`), drift QR/PB/PC/SC, `src/`; WP5 `origin/dev` = `b05d74e9`, WP6 = `0b46b7e3`. Các merge #133/#135/#136/#140 có trong lịch sử backend `origin/dev`.
+
+1. **Sai — dòng 49–50:** Không phải mẫu đề xuất nào cũng sinh `any`. **Sửa:** “Script chưa hiểu `allOf`: mẫu có `type: object` sinh `Record<string, any>`, mẫu có `type: string` sinh `string | null`, làm mất kiểu enum. Cần đọc `$ref` trong `allOf`, áp `nullable`, giữ `?` theo `required`.” Nguồn: WP5 `scripts/generate-types.js:55–110` trên ref.
+
+2. **Sai — dòng 57–58:** F05 hiện không kiểm độ phủ trên máy. **Sửa:** “F05 trên `origin/dev` chỉ xem lại video trước khi nộp; kiểm độ phủ/chất lượng trước nộp còn là khoảng trống. BE-17 cung cấp độ phủ sau xử lý.” Nguồn: WP6 `CoverageScreen.kt:41–43`, `docs/contract-drift.md`, mục F05.
+
+3. **Sai — dòng 71–72:** Tên lớp sở hữu trường bị ghi sai. **Sửa:** “`PoleDetailCurrentStatusDto.sourceChannel` (`PoleDetailDto.currentStatus`); `PolePropertiesDto.powerSource/fixtureType` (`PoleFeatureDto.properties`).” Nguồn: WP6 `dto/PoleDetailDto.kt:44–49`, `dto/PoleFeatureDto.kt:15–35`.
+
+4. **Thiếu — dòng 68–75:** Năm trường chỉ là nhóm `$ref` đang sai nullable; còn nhiều trường khiến deserialize hỏng. **Sửa:** “Ngoài năm trường trên, thêm nullable cho `PolePropertiesDto.{lampWatt, installDate, warrantyExpiry, lastSeenAt, lastSweepId}`, `PoleDetailFixtureDto.warrantyExpiry`, `PoleDetailCurrentStatusDto.{statusConfidence, determinedAt}`, `PoleDetailLuminanceBaselineDto.outThresholdRatio`, `PoleDetailLuminancePointDto.{normalizedLuminance, baselineRatio}`.” Nguồn: DTO WP6; schema tương ứng; BE `MapProperties.cs:49–69`, `PoleMapDetail.cs:72–125`. Riêng spec `PoleProperties.lamp_watt/install_date` cũng thiếu nullable dù C# có `?`.
+
+5. **Thiếu — dòng 74:** Chỉ thêm `?` vào DTO chưa đủ; mapper còn dereference fixture và model còn không-null. DTO còn bắt buộc `supplier`, nhưng response không có trường đó. **Sửa:** “Cập nhật cả `toPoleDetail()`, `toPoleMarker()` và model/UI nhận null; bỏ yêu cầu `PoleDetailFixtureDto.supplier` vì API không trả.” Nguồn: WP6 `PoleDetail.kt:69–77`, `PoleMarker.kt:29`, `PoleDetailDto.kt:40`; schema/BE `PoleMapFixture`.
+
+6. **Mơ hồ — dòng 70–71:** Ba lần quét bất kỳ không bảo đảm có baseline; `unknown` vẫn có thể có `source_channel = cv`. **Sửa:** “Baseline null khi chưa có baseline cho bóng đang dùng; cần các mẫu hợp lệ từ sweep đã duyệt theo chiều đi (mặc định ≥3). `source_channel` null khi chưa có hàng trạng thái, không phải mọi trạng thái `unknown`.” Nguồn: BE `SurveyReviewService.cs:326–348`, `SurveyReviewOptions`, `PoleDetailService.cs:84–94`.
+
+7. **Thiếu — dòng 30–31:** Chưa nêu vị trí mảng ảnh, hình dạng object và null. **Sửa:** “Ảnh ở `submissions[].photos[]`; `ai_hint = null` khi chưa chạy/không chạy được; nếu có: `{label, confidence, artifact_version, checked_at}`. `label` là `lamp_on | lamp_off | inconclusive`; `confidence = null` với `inconclusive`. Không coi thiếu gợi ý là lỗi tải chi tiết.” Nguồn: schema `CitizenReportDetail`, `CitizenSubmissionItem`, `CitizenPhotoAiHint`, `CitizenPhotoItem`; PC-8; `CitizenReviewContracts.cs:121–132`.
+
+8. **Thiếu — dòng 20–24:** Thiếu giới hạn pixel và mã lỗi để form xử lý. **Sửa:** “≤3 ảnh, mỗi ảnh ≤8 MiB và ≤40 MP; quá số ảnh/pixel → 400 `VALIDATION_FAILED` (pixel: `details.max_pixels`), quá byte mỗi ảnh → 413 `VALIDATION_FAILED` (`details.max_bytes`), JPEG sai/không decode được → 415 `UNSUPPORTED_IMAGE_FORMAT`. Gửi báo cáo cũng có thể trả 404 `PUBLIC_QR_NOT_FOUND`, kể cả mã bị thu hồi giữa lượt gửi.” Nguồn: PB-5; `PublicReportService.cs:212–248`, `JpegSanitizer.cs:78–82,142–145`, `JpegMagicBytes.cs:49–55`.
+
+9. **Thiếu — dòng 21, 23–24:** Giữ UUID mà thay ảnh/nội dung vẫn 409; chưa nói cách đọc header. **Sửa:** “Thử lại cùng UUID phải giữ cùng mã, nội dung và bytes/thứ tự ảnh; sửa nội dung thì dùng UUID mới. 429: chờ số giây trong `Retry-After`; mặc định lookup 30/10 phút, submit 10/giờ theo địa chỉ client.” Nguồn: PB-3/PB-7; `PublicReportService.cs:292–303`, `RateLimitSetup.cs:35–46`.
+
+10. **Thiếu — dòng 11–13, 28–37:** Thiếu các 404 thường gặp và response revoke. **Sửa:** “Cấp QR: 404 `POLE_NOT_FOUND`; revoke: 200 `QrCodeItem`, 404 `QR_CODE_NOT_FOUND`. Báo cáo/ảnh không tồn tại hoặc ngoài phạm vi: 404 `CITIZEN_REPORT_NOT_FOUND` / `CITIZEN_PHOTO_NOT_FOUND`; merge với sự cố không tồn tại/ngoài phạm vi: 404 `FAULT_NOT_FOUND`. Lọc xã ngoài phạm vi: 403 `COMMUNE_FORBIDDEN`.” Nguồn: QR-1/QR-2, PC-1/PC-5; spec revoke; `CitizenReviewService.cs:112,198,477`.
+
+11. **Thiếu / mơ hồ — dòng 27–30:** Tiêu đề dễ khiến WP5 khóa cả đọc cho Quản lý; câu gộp hai GET dễ khiến hiểu listing có mọi trường chi tiết. **Sửa:** “Cấp giám sát/Quản lý/Quản trị đọc metadata; chỉ Quản lý duyệt/mở ảnh. Listing trả `CitizenReportItem` phân trang, lọc `commune_id/pole_id`, `status` CSV `pending | accepted | merged | rejected` (vắng = pending), sắp `last_submitted_at` giảm dần. Chỉ GET chi tiết có `pole/open_faults/submissions/allowed_actions/acceptable_fault_types`.” Nguồn: PC-1…PC-3; spec `CitizenReportStatus`, hai endpoint GET.
+
+12. **Thiếu — dòng 32–37:** Chưa đủ ràng buộc form và kết quả quyết định. **Sửa:** “`submission_count ≥1`; chọn `fault_type` từ `acceptable_fault_types` (chỉ `lamp_out/lamp_dim`); severity `low/medium/high/critical`, vắng = medium; `note ≤1000`, `reason` sau trim dài 1–1000. Cả ba POST trả 200 chi tiết báo cáo, không trả object Fault; nhập sai →400 `VALIDATION_FAILED`. `pole_damaged/other` không tạo Fault bằng accept; dùng luồng phiếu kiểm tra thường.” Nguồn: PC-6/PC-7/PC-10; spec ba response; `CitizenReviewService.cs:130–140,275–276,467–474`.
+
+13. **Thiếu — dòng 38, 63–64:** WP5 cần cập nhật cả hai enum; thời điểm thông báo chưa rõ. **Sửa:** “WP5 thêm `citizen_report_received` vào `NotificationType`, `citizen_report` vào `NotificationEntityType`, mở báo cáo qua `entity_id`. Chỉ Quản lý của xã nhận khi mở mục pending mới; lượt gửi thêm vào mục đó không phát thông báo mới.” Nguồn: PB-4; spec hai enum; WP5 `src/types/common/enums.ts:36–38`; `PublicReportService.cs:185–189`. WP6 chưa có DTO/enum notification API trên ref đã đọc; lời nhắc enum Kotlin hiện là dự phòng.
+
+14. **Thiếu / mơ hồ — dòng 41–42, 61:** `…coverage` bỏ mất tên trường; chưa nói run cũ và danh sách mở. **Sửa:** “`latest_run` có `run_id`, `coverage_pct`, `detection_coverage_pct`, `dim_coverage_pct`, `coverage_reason`; `result_state = succeeded | failed`. Đây là lần đã xong gần nhất, vẫn giữ lần trước khi đang xử lý lại; polling `processing_status`. `stage/error_code` là chuỗi mở, không khóa enum; thành công: `stage = complete`, `error_code = null`.” Nguồn: SC-1/SC-2; schema `SweepRunSummary`.
+
+15. **Thiếu — dòng 43–44, 59–60:** Không nêu chọn run, nên có thể vẽ độ phủ cũ dưới lý do lỗi mới. **Sửa:** “`coverage?run_id=` chỉ đọc run thành công; bỏ run_id lấy lần thành công mới nhất, có thể khác `latest_run` đang failed. Chưa có/không tìm thấy run thành công →404 `RUN_NOT_FOUND`; không đủ mọi xã của run và phiếu →404 `SWEEP_NOT_FOUND`.” Nguồn: SC-3/SC-5; `SurveyReviewService.cs:87–101`. Spec chưa khai hai 404 này, nhưng drift/code có.
+
+16. **Thiếu / mơ hồ — dòng 43–44, 59:** Thiếu wrapper/vị trí mảng và guard null; lượt reverse dễ bị sắp sai. **Sửa:** “Response `{sweep_id, run_id, coverage_pct, segments[]}`; mỗi segment có `segment_id, length_m, covered_ratio, passes[], gaps[], poles_expected, poles_observed, not_observed_pole_ids[]`. Vẽ `segments[].gaps[].geometry` khi khác null (LineString 4326); `from_m/to_m` là vị trí tính từ đỉnh đầu × length khai báo, nullable; pass reverse có `from_m > to_m`.” Nguồn: SC-3/SC-4; schema `SegmentCoverage/PassCoverage/CoverageGap`; BE `SweepCoverage.cs:9–20`.
+
+17. **Mơ hồ — dòng 47–48, 74–75:** “Danh sách đầy đủ 25 trường response nullable” dễ bị hiểu là chỉ 25 trường có thể null. **Sửa:** “25 là các thuộc tính response tham chiếu `$ref` bị thiếu nullable (11 object, 14 enum), không phải toàn bộ trường nullable hay toàn bộ lỗi DTO WP6; đối chiếu thêm trường scalar trong spec và code.” Nguồn: 25 `$ref` đã kiểm trên spec và khai báo C#; các ví dụ scalar ở điểm 4.
+
+18. **Mơ hồ — dòng 49–50:** “Backend sẽ khai lại” trình bày đề xuất như quyết định đã chốt. **Sửa:** “SPEC-NULLABLE P1 đề xuất `type + nullable:true + allOf:[$ref]`, đang chờ Mỹ chốt D-1…D-6. Nếu chọn cách này, cần phối hợp sửa generator WP5 trước khi merge backend.” Nguồn: `.ai/results/SPEC-NULLABLE-p1.md` §5, dòng cuối “Chờ Mỹ chốt D-1…D-6”.
+
+✅ Đã kiểm tĩnh các đường dẫn, tên trường, HTTP/error/enum và khẳng định FE bằng các nguồn trên. Các khẳng định còn lại không thấy lệch; `GisDrawerPanel` có fallback LED/100W/ngày giả đúng như cảnh báo; `iotNode` và `inspectionOutcome` của WP6 đã nullable.
+
+⚠️ Không kiểm runtime theo yêu cầu; không chạy dotnet/docker/npm. Không sửa bản tin, tracking hay file nguồn.
