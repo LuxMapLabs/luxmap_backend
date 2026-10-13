@@ -12,6 +12,9 @@ public sealed record CitizenOptions
     /// <summary>Checked from the JPEG header before any decode (review P1 #3).</summary>
     public long PhotoMaxPixels { get; init; } = 40_000_000;
 
+    /// <summary>The cleaned photo is scaled down to this longest edge before it is stored.</summary>
+    public int PhotoMaxLongEdge { get; init; } = 2560;
+
     /// <summary>Photos kept per code per night; beyond it the text is still taken and the photos dropped (review P1 #5).</summary>
     public int PhotosPerCodePerNight { get; init; } = 20;
 
@@ -26,7 +29,10 @@ public sealed record CitizenOptions
 
     public void Validate()
     {
-        if (MaxPhotos is < 0 or > 10 || PhotoMaxBytes <= 0 || PhotoMaxPixels <= 0 || PhotosPerCodePerNight < 0
+        // MaxPhotos is capped at 3 by the schema too (ck_citizen_photo_position): a larger value here would pass the form and
+        // then fail the row with a 500 (Codex review P2b #3).
+        if (MaxPhotos is < 0 or > 3 || PhotoMaxBytes <= 0 || PhotoMaxPixels <= 0 || PhotoMaxLongEdge is < 320 or > 8192
+            || PhotosPerCodePerNight < 0
             || PhotoBudgetBytesPerNight < 0 || !double.IsFinite(FarFromPoleMeters) || FarFromPoleMeters <= 0)
         {
             throw new InvalidOperationException($"{SectionName} has an out-of-range limit.");

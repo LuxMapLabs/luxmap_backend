@@ -20,9 +20,12 @@ using Npgsql;
 
 namespace LuxMap.Modules.Citizen;
 
+/// <summary>One uploaded photo, not yet read: its declared length and a way to open it (as often as needed).</summary>
+public sealed record PhotoUpload(long Length, Func<Stream> Open);
+
 /// <summary>A send from the public form, as the controller read it. Strings are raw; this service validates.</summary>
 public sealed record PublicReportInput(
-    string? Code, string? Kind, string? Description, double? Lat, double? Lng, Guid? ClientOpId, IReadOnlyList<Stream> Photos);
+    string? Code, string? Kind, string? Description, double? Lat, double? Lng, Guid? ClientOpId, IReadOnlyList<PhotoUpload> Photos);
 
 /// <summary>What the public page learns about a code: enough to show the citizen they scanned the right pole, nothing more (D-4).</summary>
 public sealed record PublicQrInfo
@@ -73,12 +76,18 @@ public sealed partial class PublicReportService(
             .SingleOrDefaultAsync(ct) ?? throw NotFound();
     }
 
+    /// <remarks>
+    /// Order (Codex review P2b #2, #4–#7): validate → code → content hash (photos streamed, never held) → early replay → photo allowance
+    /// (cheap, unlocked) → clean EVERY photo before any is stored → pole lock → the code re-read (a revoke during the upload wins) →
+    /// replay re-checked → allowance re-checked against the real cleaned bytes → objects stored → rows. Objects are stored under the
+    /// lock so a send that loses the allowance or a replay race never leaves photos behind; they are a few hundred KB each after
+    /// cleaning, so the lock is held for seconds, not for an upload.
+    /// </remarks>
     public async Task<PublicReportReceipt> SubmitAsync(PublicReportInput input, CancellationToken ct)
     {
         var send = Validate(input);
         var target = await ResolveAsync(input.Code, ct);
-        var photos = await ReadPhotosAsync(input.Photos, ct);
-        var hash = RequestHash(input.Code!.Trim(), send, photos);
+        var hash = await RequestHashAsync(input.Code!.Trim(), send, input.Photos, ct);
 
         if (await ReplayAsync(send.ClientOpId, target.QrId, hash, ct) is { } replay) return replay;
 
@@ -89,28 +98,43 @@ public sealed partial class PublicReportService(
         await using var db = scopes.Open(target.CommuneId);
         var farFromPole = send.Position is { } here && await DistanceAsync(db, target.PoleId, here, ct) > options.FarFromPoleMeters;
 
-        // Allowance checked BEFORE any decode or object write (review P1 #3, P2 #6) — and again under the pole lock below.
-        var dropped = photos.Count == 0 ? null : await AllowanceAsync(db, target.QrId, photos.Count, from, to, ct);
-        var kept = new List<(string PhotoId, StoredImage Stored)>();
+        // Early allowance (no lock): spares the decode when the night is already used up. Declared lengths stand in for bytes here.
+        var dropped = input.Photos.Count == 0 ? null
+            : await AllowanceAsync(db, target.QrId, input.Photos.Count, input.Photos.Sum(p => p.Length), from, to, ct);
+        var cleaned = new List<byte[]>();
         if (dropped is null)
         {
-            foreach (var photo in photos)
+            var limits = new ImageLimits(options.PhotoMaxBytes, options.PhotoMaxPixels, options.PhotoMaxLongEdge);
+            foreach (var photo in input.Photos)
             {
-                var clean = await sanitizer.SanitizeJpegAsync(new MemoryStream(photo, false),
-                    new ImageLimits(options.PhotoMaxBytes, options.PhotoMaxPixels), ct);
-                var photoId = await NextIdAsync(db, PrefixedIds.CitizenPhoto, ct);
-                // Object first, row second (BE-11 rule 3): a send that loses below leaves an object, never a broken row.
-                kept.Add((photoId, await store.StoreImageAsync(StorageBucket.Citizen, photoId, new MemoryStream(clean, false), ct)));
+                await using var stream = photo.Open();
+                cleaned.Add(await sanitizer.SanitizeJpegAsync(stream, limits, ct));
             }
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT 1 FROM pole WHERE pole_id = {target.PoleId} AND commune_id = {target.CommuneId} FOR UPDATE", ct);
-        if (kept.Count > 0 && await AllowanceAsync(db, target.QrId, kept.Count, from, to, ct) is { } late)
+
+        // Revoking takes this same pole lock (P2a), so this read cannot race it: a code withdrawn while the photos were being cleaned
+        // no longer files anything (Codex review P2b #4).
+        if (!await db.Set<QrCode>().AnyAsync(qr => qr.QrId == target.QrId && qr.RevokedAt == null, ct)) throw NotFound();
+
+        // The same send may have won the lock first; answer its receipt rather than store a second set of photos.
+        if (await ReplayAsync(send.ClientOpId, target.QrId, hash, ct) is { } raced) return raced;
+
+        if (cleaned.Count > 0 && await AllowanceAsync(db, target.QrId, cleaned.Count, cleaned.Sum(c => (long)c.Length), from, to, ct) is { } late)
         {
             dropped = late;
-            kept.Clear();
+            cleaned.Clear();
+        }
+
+        var kept = new List<(string PhotoId, StoredImage Stored)>();
+        foreach (var clean in cleaned)
+        {
+            var photoId = await NextIdAsync(db, PrefixedIds.CitizenPhoto, ct);
+            // Object first, row second (BE-11 rule 3) — an object is orphaned only if the row write below fails.
+            kept.Add((photoId, await store.StoreImageAsync(StorageBucket.Citizen, photoId, new MemoryStream(clean, false), ct)));
         }
 
         var report = await db.Set<CitizenReport>().SingleOrDefaultAsync(
@@ -126,8 +150,9 @@ public sealed partial class PublicReportService(
             };
             db.Add(report);
         }
-        else
+        else if (now > report.LastSubmittedAt)
         {
+            // A slower send can arrive after a faster one opened the item: the newest time wins, never an older one (review #5).
             report.LastSubmittedAt = now;
         }
 
@@ -136,7 +161,7 @@ public sealed partial class PublicReportService(
             SubmissionId = await NextIdAsync(db, PrefixedIds.CitizenSubmission, ct), ReportId = report.ReportId, QrId = target.QrId,
             PoleId = target.PoleId, CommuneId = target.CommuneId, ClientOpId = send.ClientOpId, RequestHash = hash, Kind = send.Kind,
             Description = send.Description, ReporterLat = send.Position?.Lat, ReporterLng = send.Position?.Lng,
-            FarFromPole = farFromPole, PhotosDropped = photos.Count > 0 ? dropped : null, ReceivedAt = now,
+            FarFromPole = farFromPole, PhotosDropped = input.Photos.Count > 0 ? dropped : null, ReceivedAt = now,
         };
         db.Add(submission);
         foreach (var ((photoId, stored), position) in kept.Select((photo, index) => (photo, index + 1)))
@@ -172,10 +197,9 @@ public sealed partial class PublicReportService(
         catch (DbUpdateException error) when (error.InnerException is PostgresException
             { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: CitizenSubmissionConfiguration.ClientOpIdIndex })
         {
-            // The same send raced its first copy past the replay check: answer what the first one stored.
+            // Only reachable if the same key raced past both replay checks under different poles — answer what was stored.
             await transaction.RollbackAsync(ct);
-            return await ReplayAsync(send.ClientOpId, target.QrId, hash, ct)
-                ?? throw Conflict();
+            return await ReplayAsync(send.ClientOpId, target.QrId, hash, ct) ?? throw Conflict();
         }
 
         return new PublicReportReceipt { ClientOpId = send.ClientOpId, ReceivedAt = now, PhotosKept = kept.Count };
@@ -200,6 +224,12 @@ public sealed partial class PublicReportService(
             _ => throw Invalid("lat", "lat and lng come together, as finite WGS 84 degrees."),
         };
         if (input.Photos.Count > options.MaxPhotos) throw Invalid("photos", $"At most {options.MaxPhotos} photos.");
+        if (input.Photos.Any(photo => photo.Length > options.PhotoMaxBytes))
+        {
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.RequestEntityTooLarge,
+                $"A photo may be at most {options.PhotoMaxBytes} bytes.",
+                new Dictionary<string, object?> { ["field"] = "photos", ["max_bytes"] = options.PhotoMaxBytes });
+        }
         return new Send(key, kind, description, position);
     }
 
@@ -235,9 +265,12 @@ public sealed partial class PublicReportService(
         return new PublicReportReceipt { ClientOpId = key, ReceivedAt = earlier.ReceivedAt, PhotosKept = earlier.Photos };
     }
 
-    /// <summary>Null when <paramref name="count"/> more photos fit this code's night and the system's night; otherwise why not.</summary>
+    /// <summary>
+    /// Null when <paramref name="count"/> more photos of <paramref name="incomingBytes"/> fit this code's night and the system's night;
+    /// otherwise why not. The incoming bytes count against the budget (Codex review P2b #6).
+    /// </summary>
     private async Task<PhotosDroppedReason?> AllowanceAsync(
-        LuxMapDbContext db, string qrId, int count, DateTime from, DateTime to, CancellationToken ct)
+        LuxMapDbContext db, string qrId, int count, long incomingBytes, DateTime from, DateTime to, CancellationToken ct)
     {
         var used = await db.Set<CitizenPhoto>()
             .Join(db.Set<CitizenSubmission>(), p => p.SubmissionId, s => s.SubmissionId, (p, s) => new { s.QrId, p.ReceivedAt })
@@ -245,46 +278,28 @@ public sealed partial class PublicReportService(
         if (used + count > options.PhotosPerCodePerNight) return PhotosDroppedReason.OverQuota;
 
         // System-wide, so it reads past this commune's filter on purpose — a sum of bytes, no row leaves this method. Not serialised
-        // across communes: two sends at once may overshoot the budget by their own photos, which is the accepted margin.
+        // across communes: two sends at once in different communes may overshoot by their own photos, the accepted margin.
         var bytes = await db.Set<CitizenPhoto>().IgnoreQueryFilters()
             .Where(p => p.ReceivedAt >= from && p.ReceivedAt < to)
             .SumAsync(p => (long?)(p.ByteCount + p.ThumbnailBytes), ct) ?? 0;
-        return bytes >= options.PhotoBudgetBytesPerNight ? PhotosDroppedReason.OverBudget : null;
+        return bytes + incomingBytes > options.PhotoBudgetBytesPerNight ? PhotosDroppedReason.OverBudget : null;
     }
 
-    private async Task<List<byte[]>> ReadPhotosAsync(IReadOnlyList<Stream> photos, CancellationToken ct)
-    {
-        var read = new List<byte[]>(photos.Count);
-        foreach (var photo in photos)
-        {
-            using var buffer = new MemoryStream();
-            var chunk = new byte[81920];
-            int n;
-            while ((n = await photo.ReadAsync(chunk, ct)) > 0)
-            {
-                if (buffer.Length + n > options.PhotoMaxBytes)
-                {
-                    throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.RequestEntityTooLarge,
-                        $"A photo may be at most {options.PhotoMaxBytes} bytes.",
-                        new Dictionary<string, object?> { ["field"] = "photos", ["max_bytes"] = options.PhotoMaxBytes });
-                }
-
-                buffer.Write(chunk, 0, n);
-            }
-
-            read.Add(buffer.ToArray());
-        }
-
-        return read;
-    }
-
-    /// <summary>SHA-256 over the code and the send's content, photos included: what makes a retry "the same send".</summary>
-    private static string RequestHash(string code, Send send, IReadOnlyList<byte[]> photos)
+    /// <summary>
+    /// SHA-256 over the code and the send's content, photos included: what makes a retry "the same send". Photos are hashed as
+    /// streams — nothing is held in memory before a sanitizer slot is taken.
+    /// </summary>
+    private static async Task<string> RequestHashAsync(string code, Send send, IReadOnlyList<PhotoUpload> photos, CancellationToken ct)
     {
         var text = new StringBuilder()
             .Append(code).Append('\n').Append(send.Kind).Append('\n').Append(send.Description).Append('\n')
             .Append(send.Position is { } p ? FormattableString.Invariant($"{p.Lat:R},{p.Lng:R}") : "").Append('\n');
-        foreach (var photo in photos) text.Append(Convert.ToHexStringLower(SHA256.HashData(photo))).Append('\n');
+        foreach (var photo in photos)
+        {
+            await using var stream = photo.Open();
+            text.Append(Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, ct))).Append('\n');
+        }
+
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())));
     }
 

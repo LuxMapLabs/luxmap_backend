@@ -51,7 +51,8 @@ public sealed class PublicController(PublicReportService service) : ControllerBa
     /// multipart: <c>code</c>, <c>kind</c> (<c>lamp_out | lamp_dim | pole_damaged | other</c>), <c>description?</c> (≤ 1000),
     /// <c>lat?</c> + <c>lng?</c> together, <c>client_op_id</c> (UUID), <c>photos</c> (0–3 JPEG). The same <c>client_op_id</c> with the
     /// same code and content answers the first receipt; under different content it is 409 <c>IDEMPOTENCY_CONFLICT</c>. Photos over
-    /// the night's allowance are dropped and the text kept (<c>photos_kept</c> says how many stayed).
+    /// the night's allowance are dropped and the text kept (<c>photos_kept</c> says how many stayed). Too many photos being cleaned
+    /// at once → 503 <c>SERVER_BUSY</c>.
     /// </remarks>
     [HttpPost("reports")]
     [AllowAnonymous]
@@ -66,6 +67,7 @@ public sealed class PublicController(PublicReportService service) : ControllerBa
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status413PayloadTooLarge)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status415UnsupportedMediaType)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<ActionResult<PublicReportReceipt>> SubmitAsync(
         [FromForm] string? code,
         [FromForm] string? kind,
@@ -76,17 +78,9 @@ public sealed class PublicController(PublicReportService service) : ControllerBa
         [FromForm] IFormFileCollection? photos,
         CancellationToken ct)
     {
-        var files = photos ?? new FormFileCollection();
-        var streams = files.Select(file => file.OpenReadStream()).ToArray();
-        try
-        {
-            var receipt = await service.SubmitAsync(
-                new PublicReportInput(code, kind, description, lat, lng, clientOpId, streams), ct);
-            return StatusCode(StatusCodes.Status202Accepted, receipt);
-        }
-        finally
-        {
-            foreach (var stream in streams) await stream.DisposeAsync();
-        }
+        // The form reader has already buffered the files (to disk past 64 KB); each is opened, hashed and cleaned as a stream.
+        var uploads = (photos ?? new FormFileCollection()).Select(file => new PhotoUpload(file.Length, file.OpenReadStream)).ToArray();
+        var receipt = await service.SubmitAsync(new PublicReportInput(code, kind, description, lat, lng, clientOpId, uploads), ct);
+        return StatusCode(StatusCodes.Status202Accepted, receipt);
     }
 }

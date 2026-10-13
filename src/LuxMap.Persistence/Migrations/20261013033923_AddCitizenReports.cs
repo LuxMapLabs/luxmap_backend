@@ -36,6 +36,11 @@ namespace LuxMap.Persistence.Migrations
             migrationBuilder.CreateSequence(
                 name: "citizen_submission_id_seq");
 
+            migrationBuilder.AddUniqueConstraint(
+                name: "ak_qr_code_qr_id_pole_id_commune_id",
+                table: "qr_code",
+                columns: new[] { "qr_id", "pole_id", "commune_id" });
+
             migrationBuilder.CreateTable(
                 name: "citizen_report",
                 columns: table => new
@@ -56,6 +61,7 @@ namespace LuxMap.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_citizen_report", x => x.report_id);
+                    table.UniqueConstraint("ak_citizen_report_report_id_pole_id_commune_id", x => new { x.report_id, x.pole_id, x.commune_id });
                     table.CheckConstraint("ck_citizen_report_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
                     table.CheckConstraint("ck_citizen_report_decision_columns", "CASE status WHEN 'pending' THEN fault_id IS NULL AND decided_by IS NULL AND decided_at IS NULL AND decision_note IS NULL WHEN 'rejected' THEN fault_id IS NULL AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND decision_note IS NOT NULL ELSE fault_id IS NOT NULL AND decided_by IS NOT NULL AND decided_at IS NOT NULL END");
                     table.CheckConstraint("ck_citizen_report_decision_note_length", "decision_note IS NULL OR char_length(decision_note) BETWEEN 1 AND 1000");
@@ -122,10 +128,10 @@ namespace LuxMap.Persistence.Migrations
                         principalColumn: "commune_id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "fk_citizen_submission_citizen_report_report_id",
-                        column: x => x.report_id,
+                        name: "fk_citizen_submission_citizen_report_report_id_pole_id_commune",
+                        columns: x => new { x.report_id, x.pole_id, x.commune_id },
                         principalTable: "citizen_report",
-                        principalColumn: "report_id",
+                        principalColumns: new[] { "report_id", "pole_id", "commune_id" },
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "fk_citizen_submission_pole_pole_id",
@@ -134,10 +140,10 @@ namespace LuxMap.Persistence.Migrations
                         principalColumn: "pole_id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "fk_citizen_submission_qr_code_qr_id",
-                        column: x => x.qr_id,
+                        name: "fk_citizen_submission_qr_code_qr_id_pole_id_commune_id",
+                        columns: x => new { x.qr_id, x.pole_id, x.commune_id },
                         principalTable: "qr_code",
-                        principalColumn: "qr_id",
+                        principalColumns: new[] { "qr_id", "pole_id", "commune_id" },
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -237,14 +243,19 @@ namespace LuxMap.Persistence.Migrations
                 column: "pole_id");
 
             migrationBuilder.CreateIndex(
+                name: "ix_citizen_submission_qr_id_pole_id_commune_id",
+                table: "citizen_submission",
+                columns: new[] { "qr_id", "pole_id", "commune_id" });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_citizen_submission_qr_id_received_at",
                 table: "citizen_submission",
                 columns: new[] { "qr_id", "received_at" });
 
             migrationBuilder.CreateIndex(
-                name: "ix_citizen_submission_report_id",
+                name: "ix_citizen_submission_report_id_pole_id_commune_id",
                 table: "citizen_submission",
-                column: "report_id");
+                columns: new[] { "report_id", "pole_id", "commune_id" });
 
             migrationBuilder.CreateIndex(
                 name: "ux_citizen_submission_client_op_id",
@@ -264,6 +275,10 @@ namespace LuxMap.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "citizen_report");
+
+            migrationBuilder.DropUniqueConstraint(
+                name: "ak_qr_code_qr_id_pole_id_commune_id",
+                table: "qr_code");
 
             migrationBuilder.DropCheckConstraint(
                 name: "ck_notification_entity_type",

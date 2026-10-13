@@ -56,6 +56,9 @@ public sealed class CitizenReportConfiguration : IEntityTypeConfiguration<Citize
             .HasPrincipalKey(fault => new { fault.FaultId, fault.CommuneId })
             .OnDelete(DeleteBehavior.Restrict);
 
+        // The target of citizen_submission's composite key: a send joins only an item of its own pole and commune (review P2b #8).
+        builder.HasAlternateKey(report => new { report.ReportId, report.PoleId, report.CommuneId });
+
         builder.HasCommuneScope();
         builder.HasCommuneReference(report => report.CommuneId);
     }
@@ -90,13 +93,23 @@ public sealed class CitizenSubmissionConfiguration : IEntityTypeConfiguration<Ci
         builder.HasContractEnum(submission => submission.PhotosDropped);
 
         builder.HasIndex(submission => submission.ClientOpId).IsUnique().HasDatabaseName(ClientOpIdIndex);
-        builder.HasIndex(submission => submission.ReportId);
+        builder.HasIndex(submission => new { submission.ReportId, submission.PoleId, submission.CommuneId });
+        builder.HasIndex(submission => new { submission.QrId, submission.PoleId, submission.CommuneId });
         builder.HasIndex(submission => new { submission.QrId, submission.ReceivedAt });
         builder.HasIndex(submission => submission.PoleId);
         builder.HasIndex(submission => submission.CommuneId);
 
-        builder.HasOne<CitizenReport>().WithMany().HasForeignKey(submission => submission.ReportId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<QrCode>().WithMany().HasForeignKey(submission => submission.QrId).OnDelete(DeleteBehavior.Restrict);
+        // Composite (review P2b #8): the report and the code of a send are on the SAME pole and commune as the send — a write in one
+        // commune's scope cannot attach to a parent of another, which the commune guard alone would not see (it checks this row only).
+        // report → pole stays a single key: pole has no (pole_id, commune_id) key, and the server copies the commune from the code.
+        builder.HasOne<CitizenReport>().WithMany()
+            .HasForeignKey(submission => new { submission.ReportId, submission.PoleId, submission.CommuneId })
+            .HasPrincipalKey(report => new { report.ReportId, report.PoleId, report.CommuneId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<QrCode>().WithMany()
+            .HasForeignKey(submission => new { submission.QrId, submission.PoleId, submission.CommuneId })
+            .HasPrincipalKey(qr => new { qr.QrId, qr.PoleId, qr.CommuneId })
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Pole>().WithMany().HasForeignKey(submission => submission.PoleId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasCommuneScope();

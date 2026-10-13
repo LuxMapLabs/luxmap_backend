@@ -46,6 +46,11 @@ public sealed class QrCodeConfiguration : IEntityTypeConfiguration<QrCode>
         builder.HasOne<AppUser>().WithMany().HasForeignKey(qr => qr.CreatedBy).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<AppUser>().WithMany().HasForeignKey(qr => qr.RevokedBy).OnDelete(DeleteBehavior.Restrict);
 
+        // 🔴 Looks redundant and is load-bearing (the ak_feeder_feeder_id_commune_id pattern, O-7): the target of the composite key
+        // from citizen_submission that keeps a send on the SAME pole and commune as the code it used (Codex review P2b #8). A code
+        // never changes pole or commune, so making them key properties costs nothing.
+        builder.HasAlternateKey(qr => new { qr.QrId, qr.PoleId, qr.CommuneId });
+
         builder.HasCommuneScope();
         builder.HasIndex(qr => qr.CommuneId);
         builder.HasCommuneReference(qr => qr.CommuneId);

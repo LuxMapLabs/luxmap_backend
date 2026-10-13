@@ -706,6 +706,9 @@ namespace LuxMap.Persistence.Migrations
                     b.HasKey("ReportId")
                         .HasName("pk_citizen_report");
 
+                    b.HasAlternateKey("ReportId", "PoleId", "CommuneId")
+                        .HasName("ak_citizen_report_report_id_pole_id_commune_id");
+
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_citizen_report_commune_id");
 
@@ -819,11 +822,14 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("PoleId")
                         .HasDatabaseName("ix_citizen_submission_pole_id");
 
-                    b.HasIndex("ReportId")
-                        .HasDatabaseName("ix_citizen_submission_report_id");
-
                     b.HasIndex("QrId", "ReceivedAt")
                         .HasDatabaseName("ix_citizen_submission_qr_id_received_at");
+
+                    b.HasIndex("QrId", "PoleId", "CommuneId")
+                        .HasDatabaseName("ix_citizen_submission_qr_id_pole_id_commune_id");
+
+                    b.HasIndex("ReportId", "PoleId", "CommuneId")
+                        .HasDatabaseName("ix_citizen_submission_report_id_pole_id_commune_id");
 
                     b.ToTable("citizen_submission", null, t =>
                         {
@@ -886,6 +892,9 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasKey("QrId")
                         .HasName("pk_qr_code");
+
+                    b.HasAlternateKey("QrId", "PoleId", "CommuneId")
+                        .HasName("ak_qr_code_qr_id_pole_id_commune_id");
 
                     b.HasIndex("Code")
                         .IsUnique()
@@ -4008,17 +4017,19 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasOne("LuxMap.Modules.Citizen.Entities.QrCode", null)
                         .WithMany()
-                        .HasForeignKey("QrId")
+                        .HasForeignKey("QrId", "PoleId", "CommuneId")
+                        .HasPrincipalKey("QrId", "PoleId", "CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_citizen_submission_qr_code_qr_id");
+                        .HasConstraintName("fk_citizen_submission_qr_code_qr_id_pole_id_commune_id");
 
                     b.HasOne("LuxMap.Modules.Citizen.Entities.CitizenReport", null)
                         .WithMany()
-                        .HasForeignKey("ReportId")
+                        .HasForeignKey("ReportId", "PoleId", "CommuneId")
+                        .HasPrincipalKey("ReportId", "PoleId", "CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_citizen_submission_citizen_report_report_id");
+                        .HasConstraintName("fk_citizen_submission_citizen_report_report_id_pole_id_commune");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.QrCode", b =>

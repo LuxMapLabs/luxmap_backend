@@ -235,4 +235,7 @@ public static class ErrorCodes
 
     /// <summary>409 — a <c>client_op_id</c> reused for a different send (CITIZEN-QR P2b); the same send again is a replay, not this.</summary>
     public const string IdempotencyConflict = "IDEMPOTENCY_CONFLICT";
+
+    /// <summary>503 — CITIZEN-QR P2b: too many photos waiting to be cleaned at once; try again shortly (Codex review P2b #2).</summary>
+    public const string ServerBusy = "SERVER_BUSY";
 }

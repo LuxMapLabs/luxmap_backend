@@ -263,9 +263,153 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
         Assert.Equal([HttpStatusCode.NotFound, HttpStatusCode.NotFound, HttpStatusCode.NotFound], trusted);
     }
 
+    /// <summary>
+    /// With NO proxy configured, ASP.NET Core would trust every peer if the middleware ran (empty lists = no check) — so it must not
+    /// run at all: a changing <c>X-Forwarded-For</c> buys no fresh bucket, from loopback or anywhere (Codex review P2b, P1).
+    /// </summary>
+    [Fact]
+    public async Task With_no_proxy_configured_a_forwarded_address_is_ignored_from_every_peer()
+    {
+        await using var limited = Host(("RateLimits:PublicLookup:PermitLimit", "2"));
+
+        foreach (var peer in new[] { "127.0.0.1", "10.0.0.9" })
+        {
+            var codes = await LookupsFrom(limited, peer, forwarded: ["7.7.7.1", "7.7.7.2", "7.7.7.3"]);
+            Assert.Equal([HttpStatusCode.NotFound, HttpStatusCode.NotFound, HttpStatusCode.TooManyRequests], codes);
+        }
+    }
+
+    /// <summary>A code revoked while a send is cleaning its photos files nothing — revoke and file share the pole lock (review P2b #4).</summary>
+    [Fact]
+    public async Task A_code_revoked_while_the_photos_are_being_cleaned_files_nothing()
+    {
+        var gate = new GatedSanitizer();
+        await using var gated = Host(services => services.Replace(ServiceDescriptor.Singleton<IImageSanitizer>(gate)));
+        var (pole, code) = await PoleWithCodeAsync();
+
+        var send = Submit(gated.CreateClient(), code, "lamp_out", photos: [PhotoStore.Jpeg()]);
+        await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var manager = await factory.ManagerClientAsync();
+        var qrId = (await Read(await manager.GetAsync($"/api/v1/qr-codes?pole_id={pole}&active=true"))).GetProperty("items")[0].GetProperty("qr_id").GetString();
+        Assert.Equal(HttpStatusCode.OK, (await manager.PostAsync($"/api/v1/qr-codes/{qrId}/revoke", null)).StatusCode);
+        gate.Release.SetResult();
+
+        var response = await send;
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(0, await factory.QueryAsync(db => db.Set<CitizenSubmission>().IgnoreQueryFilters().CountAsync(s => s.PoleId == pole)));
+        Assert.DoesNotContain(photos.Objects.Keys, key => key.Item1 == StorageBucket.Citizen);
+    }
+
+    /// <summary>A slow send (photos) can land after a fast one (text) opened the item: it joins it, never a 500 (review P2b #5).</summary>
+    [Fact]
+    public async Task A_slow_send_that_lands_after_a_fast_one_joins_the_item()
+    {
+        var gate = new GatedSanitizer();
+        await using var gated = Host(services => services.Replace(ServiceDescriptor.Singleton<IImageSanitizer>(gate)));
+        var (pole, code) = await PoleWithCodeAsync();
+        var client = gated.CreateClient();
+
+        var slow = Submit(client, code, "lamp_out", photos: [PhotoStore.Jpeg()]);
+        await gate.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(HttpStatusCode.Accepted, (await Submit(client, code, "lamp_dim", description: "fast")).StatusCode);
+        gate.Release.SetResult();
+
+        Assert.Equal(HttpStatusCode.Accepted, (await slow).StatusCode);
+        var report = await factory.QueryAsync(db => db.Set<CitizenReport>().IgnoreQueryFilters().AsNoTracking().SingleAsync(r => r.PoleId == pole));
+        Assert.True(report.LastSubmittedAt >= report.CreatedAt);
+        Assert.Equal(2, await factory.QueryAsync(db => db.Set<CitizenSubmission>().IgnoreQueryFilters().CountAsync(s => s.ReportId == report.ReportId)));
+    }
+
+    [Fact]
+    public async Task Past_the_nights_byte_budget_the_text_is_kept_and_no_object_is_written()
+    {
+        await using var broke = Host(("Citizen:PhotoBudgetBytesPerNight", "1"));
+        var (pole, code) = await PoleWithCodeAsync();
+
+        var response = await Submit(broke.CreateClient(), code, "lamp_out", description: "no room", photos: [PhotoStore.Jpeg()]);
+
+        Assert.Equal(0, (await Read(response)).GetProperty("photos_kept").GetInt32());
+        Assert.Equal(PhotosDroppedReason.OverBudget, await factory.QueryAsync(db => db.Set<CitizenSubmission>().IgnoreQueryFilters()
+            .Where(s => s.PoleId == pole).Select(s => s.PhotosDropped).SingleAsync()));
+        Assert.DoesNotContain(photos.Objects.Keys, key => key.Item1 == StorageBucket.Citizen);
+    }
+
+    /// <summary>Two sends racing for the last photo slot: one keeps it, the other keeps its text — and leaves no stored object (review P2b #7).</summary>
+    [Fact]
+    public async Task Racing_sends_for_the_last_photo_slot_leave_no_orphaned_object()
+    {
+        await using var tight = Host(("Citizen:PhotosPerCodePerNight", "1"));
+        var (pole, code) = await PoleWithCodeAsync();
+        var client = tight.CreateClient();
+
+        var responses = await Task.WhenAll(
+            Submit(client, code, "lamp_out", photos: [PhotoStore.Jpeg(30)]),
+            Submit(client, code, "lamp_out", photos: [PhotoStore.Jpeg(40)]));
+
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.Accepted, r.StatusCode));
+        var rows = await factory.QueryAsync(db => db.Set<CitizenPhoto>().AsNoTracking()
+            .Join(db.Set<CitizenSubmission>().IgnoreQueryFilters(), p => p.SubmissionId, s => s.SubmissionId, (p, s) => s.PoleId)
+            .CountAsync(id => id == pole));
+        Assert.Equal(1, rows);
+        Assert.Equal(2, photos.Objects.Keys.Count(key => key.Item1 == StorageBucket.Citizen));
+    }
+
+    [Fact]
+    public async Task A_resend_with_a_different_photo_is_409()
+    {
+        var (_, code) = await PoleWithCodeAsync();
+        var client = host.CreateClient();
+        var key = Guid.NewGuid();
+
+        Assert.Equal(HttpStatusCode.Accepted, (await Submit(client, code, "lamp_out", key: key, photos: [PhotoStore.Jpeg(50)])).StatusCode);
+        var changed = await Submit(client, code, "lamp_out", key: key, photos: [PhotoStore.Jpeg(60)]);
+
+        Assert.Equal(HttpStatusCode.Conflict, changed.StatusCode);
+    }
+
+    [Fact]
+    public void More_than_three_photos_is_refused_at_startup_because_the_schema_holds_three()
+    {
+        new LuxMap.Modules.Citizen.CitizenOptions { MaxPhotos = 3 }.Validate();
+        Assert.Throws<InvalidOperationException>(() => new LuxMap.Modules.Citizen.CitizenOptions { MaxPhotos = 4 }.Validate());
+    }
+
+    /// <summary>A send's report and code are on its own pole and commune — enforced by the database, not only by the service (review P2b #8).</summary>
+    [Fact]
+    public async Task A_sends_report_and_code_are_held_to_its_pole_and_commune_by_composite_keys()
+    {
+        var keys = await factory.QueryAsync(db => db.Database.SqlQueryRaw<string>("""
+            SELECT conname || ':' || array_length(conkey, 1)::text || ':' || confdeltype::text AS "Value"
+            FROM pg_constraint WHERE conrelid = 'citizen_submission'::regclass AND contype = 'f'
+            """).ToListAsync());
+
+        // Postgres cuts identifiers at 63 characters, so the report key's full EF name does not survive: match its start.
+        Assert.Contains(keys, key => key.StartsWith("fk_citizen_submission_citizen_report_report_id_pole_id", StringComparison.Ordinal) && key.EndsWith(":3:r", StringComparison.Ordinal));
+        Assert.Contains("fk_citizen_submission_qr_code_qr_id_pole_id_commune_id:3:r", keys);
+    }
+
     // ---- helpers ----------------------------------------------------------------------------------------
 
-    private WebApplicationFactory<Program> Host(params (string Key, string Value)[] settings)
+    /// <summary>The real sanitizer, held at its door until the test says go — where a send is slow.</summary>
+    private sealed class GatedSanitizer : IImageSanitizer
+    {
+        private readonly LuxMap.Infrastructure.Storage.JpegSanitizer inner = new(2, 8);
+
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async Task<byte[]> SanitizeJpegAsync(Stream content, ImageLimits limits, CancellationToken cancellationToken = default)
+        {
+            Entered.TrySetResult();
+            await Release.Task;
+            return await inner.SanitizeJpegAsync(content, limits, cancellationToken);
+        }
+    }
+
+    private WebApplicationFactory<Program> Host(params (string Key, string Value)[] settings) => Host(null, settings);
+
+    private WebApplicationFactory<Program> Host(Action<IServiceCollection>? configure, params (string Key, string Value)[] settings)
         => factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("RateLimits:PublicLookup:PermitLimit", "10000");
@@ -275,6 +419,7 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
             {
                 services.Replace(ServiceDescriptor.Singleton<IObjectStore>(photos));
                 services.AddSingleton<IStartupFilter, TestPeerAddress>();
+                configure?.Invoke(services);
             });
         });
 

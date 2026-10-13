@@ -9,13 +9,14 @@ namespace LuxMap.Api.Http;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Only proxies named in configuration are trusted</b> (<c>ForwardedHeaders:KnownProxies</c>,
-/// <c>ForwardedHeaders:KnownNetworks</c>). ASP.NET Core's defaults trust loopback; those are CLEARED, so with nothing
-/// configured an <c>X-Forwarded-For</c> header is ignored entirely. Trusting it from anyone would let a client pick its own
-/// address — and its own rate-limit bucket — with one header.
+/// 🔴 <b>Nothing configured ⇒ the middleware is NOT in the pipeline at all.</b> ASP.NET Core reads EMPTY
+/// <c>KnownProxies</c> and <c>KnownIPNetworks</c> as "skip the check" — it would then honour <c>X-Forwarded-For</c> from
+/// ANY peer, letting a client pick its own address and its own rate-limit bucket with one header (Codex review P2b, P1).
+/// Clearing the loopback defaults without adding anything is that trap, so an unconfigured host simply never forwards.
 /// </para>
 /// <para>
-/// <c>ForwardLimit = 1</c>: one proxy in front of the API. A deployment with a chain must name every hop.
+/// Configured (<c>ForwardedHeaders:KnownProxies</c>, <c>ForwardedHeaders:KnownNetworks</c>): exactly those, the loopback defaults
+/// removed. <c>ForwardLimit = 1</c> — one proxy in front of the API; a chain must name every hop.
 /// </para>
 /// </remarks>
 public static class ForwardedHeadersSetup
@@ -33,6 +34,7 @@ public static class ForwardedHeadersSetup
                 : throw new InvalidOperationException($"{SectionName}:KnownNetworks has '{value}', which is not a CIDR network."))
             .ToArray();
 
+        services.AddSingleton(new TrustedProxies(proxies.Length + networks.Length > 0));
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -46,11 +48,18 @@ public static class ForwardedHeadersSetup
         return services;
     }
 
-    /// <summary>First in the pipeline, so the correlation log line, the rate limiters and everything else see the real client.</summary>
+    /// <summary>First in the pipeline when a proxy is configured, so the log line and the rate limiters see the real client.</summary>
     public static WebApplication UseLuxMapForwardedHeaders(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
-        app.UseForwardedHeaders();
+        if (app.Services.GetRequiredService<TrustedProxies>().Any)
+        {
+            app.UseForwardedHeaders();
+        }
+
         return app;
     }
+
+    /// <summary>Whether any proxy or network is trusted — without one, forwarding stays off (see the remarks).</summary>
+    public sealed record TrustedProxies(bool Any);
 }
