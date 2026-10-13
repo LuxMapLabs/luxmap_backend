@@ -1951,9 +1951,14 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
   đừng vá riêng từng endpoint.
 - Khoảng trống **đúng 1 m được giữ**, chỉ khoảng **ngắn hơn** bị bỏ (SC-4); so sánh có dung sai `1e-9` vì phân số × chiều dài hiếm khi rơi
   đúng 1 m.
-- Test ghi run / quan sát tay: `classified_as = unknown` là cách duy nhất không cần frame (`ck_pole_observation_classification`). Test
-  class có `IAsyncLifetime` thì `InitializeAsync` chạy **mỗi test**: đừng tạo tài khoản ở đó (dùng tài khoản của fixture), tên xã phải
-  kèm GUID (`ix_administrative_unit_name` unique).
+- Test ghi run / quan sát tay: `classified_as = unknown` là cách duy nhất không cần frame (`ck_pole_observation_classification`).
+- 🔴 **Dữ liệu khảo sát dựng trong test KHÔNG xoá được** (run / lượt / quan sát bất biến), nên phiếu và sweep của nó **ở lại** — đừng gắn
+  chúng vào tài khoản của fixture: `work_order.assigned_to` / `created_by` giữ tài khoản bằng `Restrict`, teardown của
+  `AssetDatabaseCollection` gãy (`23503 fk_work_order_app_user_assigned_to`) dù mọi test xanh. Tạo tài khoản riêng **một lần cho cả class**
+  (`InitializeAsync` của `IAsyncLifetime` chạy **mỗi test** — khuôn seed tĩnh có khoá ở `SweepCoverageTests`), tên xã kèm GUID
+  (`ix_administrative_unit_name` unique).
+- 🔴 **Đọc mã thoát của `dotnet test`, không chỉ dòng `Passed!`.** Lỗi teardown collection in `[Test Collection Cleanup Failure …]` và trả
+  mã 1, trong khi dòng tổng vẫn ghi `Failed: 0` — CI đỏ ở #140 vì đúng chỗ này, lượt chạy local bỏ sót vì chỉ lọc dòng tổng.
 
 ### BE-43 — đồng bộ offline (06/10/2026)
 
