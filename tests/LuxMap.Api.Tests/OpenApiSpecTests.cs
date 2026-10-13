@@ -113,6 +113,16 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
                     continue;
                 }
 
+                // CITIZEN-QR P2b: the citizen's form is anonymous by design (D-R1) — no capability, no role, no scheme. Which routes
+                // may be anonymous at all is pinned by AnonymousEndpointTests; this only keeps the spec from claiming otherwise.
+                if (path.Name.StartsWith("/api/v1/public/", StringComparison.Ordinal))
+                {
+                    Assert.False(operation.Value.TryGetProperty("x-luxmap-capability", out _), $"{where}: a public operation names a capability");
+                    Assert.False(operation.Value.TryGetProperty("security", out var requirements)
+                        && requirements.EnumerateArray().Any(requirement => requirement.EnumerateObject().Any()), $"{where}: a public operation requires a scheme");
+                    continue;
+                }
+
                 Assert.True(operation.Value.TryGetProperty("x-luxmap-capability", out var capability), $"{where}: no x-luxmap-capability");
 
                 var roles = operation.Value.GetProperty("x-luxmap-roles").EnumerateArray().Select(role => role.GetString()).ToArray();

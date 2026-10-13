@@ -26,6 +26,12 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.HasSequence("cabinet_id_seq");
 
+            modelBuilder.HasSequence("citizen_photo_id_seq");
+
+            modelBuilder.HasSequence("citizen_report_id_seq");
+
+            modelBuilder.HasSequence("citizen_submission_id_seq");
+
             modelBuilder.HasSequence("cluster_id_seq");
 
             modelBuilder.HasSequence("command_id_seq");
@@ -575,6 +581,263 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_road_segment_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
 
                             t.HasCheckConstraint("ck_road_segment_road_class", "\"road_class\" IN ('inter_commune', 'inter_village')");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.CitizenPhoto", b =>
+                {
+                    b.Property<string>("PhotoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id")
+                        .HasDefaultValueSql("luxmap_format_id('CPH', nextval('citizen_photo_id_seq'), 6)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "citizen_photo_id_seq");
+
+                    b.Property<long>("ByteCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_count");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("SubmissionId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("submission_id");
+
+                    b.Property<long>("ThumbnailBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("thumbnail_bytes");
+
+                    b.Property<string>("ThumbnailKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("thumbnail_key");
+
+                    b.HasKey("PhotoId")
+                        .HasName("pk_citizen_photo");
+
+                    b.HasIndex("ReceivedAt")
+                        .HasDatabaseName("ix_citizen_photo_received_at");
+
+                    b.HasIndex("SubmissionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_citizen_photo_submission_id_position");
+
+                    b.ToTable("citizen_photo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_citizen_photo_bytes", "byte_count > 0 AND thumbnail_bytes > 0");
+
+                            t.HasCheckConstraint("ck_citizen_photo_keys_not_blank", "btrim(object_key) <> '' AND btrim(thumbnail_key) <> ''");
+
+                            t.HasCheckConstraint("ck_citizen_photo_position", "position BETWEEN 1 AND 3");
+                        });
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.CitizenReport", b =>
+                {
+                    b.Property<string>("ReportId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("report_id")
+                        .HasDefaultValueSql("luxmap_format_id('CRP', nextval('citizen_report_id_seq'), 4)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "citizen_report_id_seq");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("DecisionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("decision_note");
+
+                    b.Property<string>("FaultId")
+                        .HasColumnType("text")
+                        .HasColumnName("fault_id");
+
+                    b.Property<DateTime>("LastSubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_submitted_at");
+
+                    b.Property<DateOnly>("NightOf")
+                        .HasColumnType("date")
+                        .HasColumnName("night_of");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.HasKey("ReportId")
+                        .HasName("pk_citizen_report");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_citizen_report_commune_id");
+
+                    b.HasIndex("DecidedBy")
+                        .HasDatabaseName("ix_citizen_report_decided_by");
+
+                    b.HasIndex("FaultId", "CommuneId")
+                        .HasDatabaseName("ix_citizen_report_fault_id_commune_id");
+
+                    b.HasIndex(new[] { "PoleId" }, "ix_citizen_report_pole_id")
+                        .HasDatabaseName("ix_citizen_report_pole_id");
+
+                    b.HasIndex(new[] { "PoleId", "NightOf" }, "ux_citizen_report_pole_id_night_of_pending")
+                        .IsUnique()
+                        .HasDatabaseName("ux_citizen_report_pole_id_night_of_pending")
+                        .HasFilter("status = 'pending'");
+
+                    b.ToTable("citizen_report", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_citizen_report_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_citizen_report_decision_columns", "CASE status WHEN 'pending' THEN fault_id IS NULL AND decided_by IS NULL AND decided_at IS NULL AND decision_note IS NULL WHEN 'rejected' THEN fault_id IS NULL AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND decision_note IS NOT NULL ELSE fault_id IS NOT NULL AND decided_by IS NOT NULL AND decided_at IS NOT NULL END");
+
+                            t.HasCheckConstraint("ck_citizen_report_decision_note_length", "decision_note IS NULL OR char_length(decision_note) BETWEEN 1 AND 1000");
+
+                            t.HasCheckConstraint("ck_citizen_report_status", "\"status\" IN ('pending', 'accepted', 'merged', 'rejected')");
+
+                            t.HasCheckConstraint("ck_citizen_report_times_ordered", "last_submitted_at >= created_at AND (decided_at IS NULL OR decided_at >= created_at)");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.CitizenSubmission", b =>
+                {
+                    b.Property<string>("SubmissionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("submission_id")
+                        .HasDefaultValueSql("luxmap_format_id('CSB', nextval('citizen_submission_id_seq'), 6)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "citizen_submission_id_seq");
+
+                    b.Property<Guid>("ClientOpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_op_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("FarFromPole")
+                        .HasColumnType("boolean")
+                        .HasColumnName("far_from_pole");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("PhotosDropped")
+                        .HasColumnType("text")
+                        .HasColumnName("photos_dropped");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("QrId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("qr_id");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<string>("ReportId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("report_id");
+
+                    b.Property<double?>("ReporterLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("reporter_lat");
+
+                    b.Property<double?>("ReporterLng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("reporter_lng");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.HasKey("SubmissionId")
+                        .HasName("pk_citizen_submission");
+
+                    b.HasIndex("ClientOpId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_citizen_submission_client_op_id");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_citizen_submission_commune_id");
+
+                    b.HasIndex("PoleId")
+                        .HasDatabaseName("ix_citizen_submission_pole_id");
+
+                    b.HasIndex("ReportId")
+                        .HasDatabaseName("ix_citizen_submission_report_id");
+
+                    b.HasIndex("QrId", "ReceivedAt")
+                        .HasDatabaseName("ix_citizen_submission_qr_id_received_at");
+
+                    b.ToTable("citizen_submission", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_citizen_submission_description_length", "description IS NULL OR char_length(description) BETWEEN 1 AND 1000");
+
+                            t.HasCheckConstraint("ck_citizen_submission_far_needs_position", "NOT far_from_pole OR reporter_lat IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_citizen_submission_kind", "\"kind\" IN ('lamp_out', 'lamp_dim', 'pole_damaged', 'other')");
+
+                            t.HasCheckConstraint("ck_citizen_submission_photos_dropped", "\"photos_dropped\" IS NULL OR \"photos_dropped\" IN ('over_quota', 'over_budget')");
+
+                            t.HasCheckConstraint("ck_citizen_submission_position", "(reporter_lat IS NULL) = (reporter_lng IS NULL) AND (reporter_lat IS NULL OR (reporter_lat >= -90 AND reporter_lat <= 90 AND reporter_lng >= -180 AND reporter_lng <= 180))");
+
+                            t.HasCheckConstraint("ck_citizen_submission_request_hash", "request_hash ~ '^[0-9a-f]{64}$'");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -1235,11 +1498,11 @@ namespace LuxMap.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_notification_body_length", "char_length(body) BETWEEN 1 AND 1000");
 
-                            t.HasCheckConstraint("ck_notification_entity_type", "\"entity_type\" IN ('work_order', 'survey_sweep', 'fault')");
+                            t.HasCheckConstraint("ck_notification_entity_type", "\"entity_type\" IN ('work_order', 'survey_sweep', 'fault', 'citizen_report')");
 
                             t.HasCheckConstraint("ck_notification_title_length", "char_length(title) BETWEEN 1 AND 200");
 
-                            t.HasCheckConstraint("ck_notification_type", "\"type\" IN ('work_order_assigned', 'work_order_unassigned', 'work_order_rescheduled', 'work_order_returned', 'work_order_cancelled', 'work_order_completed', 'work_order_verified', 'survey_returned', 'survey_ready_for_review', 'survey_processing_failed', 'fault_reported')");
+                            t.HasCheckConstraint("ck_notification_type", "\"type\" IN ('work_order_assigned', 'work_order_unassigned', 'work_order_rescheduled', 'work_order_returned', 'work_order_cancelled', 'work_order_completed', 'work_order_verified', 'survey_returned', 'survey_ready_for_review', 'survey_processing_failed', 'fault_reported', 'citizen_report_received')");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -3525,7 +3788,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 
-                            t.HasCheckConstraint("ck_audit_event_actor_kind", "\"actor_kind\" IN ('user', 'cv', 'iot', 'system')");
+                            t.HasCheckConstraint("ck_audit_event_actor_kind", "\"actor_kind\" IN ('user', 'cv', 'iot', 'system', 'public')");
 
                             t.HasCheckConstraint("ck_audit_event_actor_role", "\"actor_role\" IS NULL OR \"actor_role\" IN ('superior', 'manager', 'field_engineer', 'system_admin')");
 
@@ -3533,7 +3796,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_audit_event_before_state_object", "before_state IS NULL OR jsonb_typeof(before_state) = 'object'");
 
-                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code')");
+                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report')");
 
                             t.HasCheckConstraint("ck_audit_event_has_state", "before_state IS NOT NULL OR after_state IS NOT NULL");
                         });
@@ -3685,6 +3948,77 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("UpdatedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_road_segment_app_user_updated_by");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.CitizenPhoto", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Citizen.Entities.CitizenSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_photo_citizen_submission_submission_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.CitizenReport", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_report_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_citizen_report_app_user_decided_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_report_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.Faults.Entities.Fault", null)
+                        .WithMany()
+                        .HasForeignKey("FaultId", "CommuneId")
+                        .HasPrincipalKey("FaultId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_citizen_report_fault_fault_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.CitizenSubmission", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_submission_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_submission_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.Citizen.Entities.QrCode", null)
+                        .WithMany()
+                        .HasForeignKey("QrId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_submission_qr_code_qr_id");
+
+                    b.HasOne("LuxMap.Modules.Citizen.Entities.CitizenReport", null)
+                        .WithMany()
+                        .HasForeignKey("ReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_citizen_submission_citizen_report_report_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Citizen.Entities.QrCode", b =>

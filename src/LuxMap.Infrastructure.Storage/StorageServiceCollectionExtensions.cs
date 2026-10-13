@@ -15,6 +15,8 @@ namespace LuxMap.Infrastructure.Storage;
 /// </remarks>
 public static class StorageServiceCollectionExtensions
 {
+    public const int SanitizerConcurrency = 2;
+
     public static IServiceCollection AddLuxMapObjectStorage(
         this IServiceCollection services, StorageOptions options)
     {
@@ -39,6 +41,9 @@ public static class StorageServiceCollectionExtensions
             }));
 
         services.AddSingleton<IObjectStore, S3ObjectStore>();
+
+        // CITIZEN-QR P2b: two decodes of untrusted photos at once, at most — the public form must not be able to eat the server.
+        services.AddSingleton<IImageSanitizer>(new JpegSanitizer(SanitizerConcurrency));
 
         return services;
     }
