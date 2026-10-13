@@ -1933,6 +1933,23 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 - Teardown: `citizen_photo` → `citizen_submission` → `citizen_report` **trước `fault`** — báo cáo đã chấp nhận / gộp giữ sự cố bằng
   `Restrict`. Rollback `AddCitizenReview` gãy khi audit đã có `accepted` / `merged` / `analyzed` (cùng họ BE-19).
 
+### BE-17 — độ phủ sweep (13/10/2026, drift SC-1…SC-6)
+
+- **Độ phủ đọc từ ẢNH CHỤP GIS của run** (`survey_processing_run.gis_snapshot`: `segments`, `communes`, `poles` kèm `segment_id`), không từ tài
+  sản hôm nay — câu trả lời phải là cái run đã thấy, như `results` / `UnobservedPoles`. Chỉ `length_m` (khai báo) và hình học lấy từ
+  `road_segment` hiện tại.
+- 🔴 **Phân số của `survey_pass` đo trên 3405** (`ST_LineLocatePoint` × `ST_Length` của tuyến chiếu). Cắt khoảng trống phải cắt **trên cùng
+  phép chiếu đó** rồi chuyển về 4326 **trong SQL**: `ST_Transform(ST_LineSubstring(ST_Transform(geom,3405), f, t), 4326)`. Cắt thẳng trên
+  4326 bằng phân số 3405 lệch trên tuyến cong (hai trục lệch tỉ lệ ~cos(vĩ độ)); để toạ độ 3405 rời SQL là phạm BE-10 quy tắc 3.
+- **`SqlQuery<T>` đi qua quy ước snake_case**: alias cột phải là `geo_json`, `ordinal` — alias `"GeoJson"` ném `required column 'geo_json'
+  was not present` lúc chạy, build vẫn xanh.
+- **Quyền độ phủ = luật ảnh khảo sát cho một run:** `CoversWholeRun` (xã của cột) **và** mọi xã trong `gis_snapshot.communes` (xã của
+  phiếu). Độ phủ vẽ tuyến; tuyến liên xã có thể thuộc xã mà run không có cột nào.
+- `SweepResponse` không còn `sealed` — chỉ để `SweepDetailResponse` thêm `latest_run`; danh sách vẫn trả kiểu gốc, không mang run.
+- Test ghi run / quan sát tay: `classified_as = unknown` là cách duy nhất không cần frame (`ck_pole_observation_classification`). Test
+  class có `IAsyncLifetime` thì `InitializeAsync` chạy **mỗi test**: đừng tạo tài khoản ở đó (dùng tài khoản của fixture), tên xã phải
+  kèm GUID (`ix_administrative_unit_name` unique).
+
 ### BE-43 — đồng bộ offline (06/10/2026)
 
 **Module `LuxMap.Modules.Sync` đứng trên đỉnh đồ thị phụ thuộc** (tham chiếu Map, Faults, WorkOrders, Survey, Assets) và
