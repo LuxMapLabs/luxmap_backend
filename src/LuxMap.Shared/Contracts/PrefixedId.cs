@@ -82,10 +82,19 @@ public static class PrefixedIds
     /// </summary>
     public static readonly PrefixedIdSpec QrCode = new("QR", 4, "qr_id_seq");
 
+    /// <summary>A citizen report — the queue item a Manager reviews, grouping what was sent for one pole in one night (CITIZEN-QR P2b).</summary>
+    public static readonly PrefixedIdSpec CitizenReport = new("CRP", 4, "citizen_report_id_seq");
+
+    /// <summary>One send through the public form (CITIZEN-QR P2b, D-6) — every send is its own row, never merged away.</summary>
+    public static readonly PrefixedIdSpec CitizenSubmission = new("CSB", 6, "citizen_submission_id_seq");
+
+    /// <summary>One photo of a citizen submission (CITIZEN-QR P2b).</summary>
+    public static readonly PrefixedIdSpec CitizenPhoto = new("CPH", 6, "citizen_photo_id_seq");
+
     public static IReadOnlyList<PrefixedIdSpec> All { get; } =
     [
         Pole, Fault, RoadSegment, AdministrativeUnit, Fixture, Feeder, IotNode, SurveySweep,
         SurveyFrame, Detection, LuxReading, WorkOrder, RepairEvidence, ExternalUnit, AppUser, FaultCluster,
-        Notification, ElectricalCabinet, LightingCommand, QrCode,
+        Notification, ElectricalCabinet, LightingCommand, QrCode, CitizenReport, CitizenSubmission, CitizenPhoto,
     ];
 }

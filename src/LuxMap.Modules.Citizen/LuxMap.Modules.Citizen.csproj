@@ -7,6 +7,11 @@
          come from Identity (EmailOptions.WebAppBaseUrl). Nothing references this module back. -->
     <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
     <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
+    <!-- P2b: a report may point at a fault (composite FK), a new queue item notifies the commune's Managers, and the grouping
+         window is the agenda's night (D-7) — the same NightOf, not a second definition. -->
+    <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Notifications\LuxMap.Modules.Notifications.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.WorkOrders\LuxMap.Modules.WorkOrders.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1872,6 +1872,42 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 - Teardown xoá `qr_code` **trước** `pole` và tài khoản (FK `Restrict` tới cả hai). Rollback `AddQrCodes` gãy khi `audit_event` đã có
   `entity_type = 'qr_code'` hoặc `action = 'revoked'` (cùng họ BE-19).
 
+### CITIZEN-QR P2b — form công khai, không token (13/10/2026, drift PB-1…PB-8)
+
+- 🔴 **Endpoint công khai KHÔNG dùng `LuxMapDbContext` của request.** Request ẩn danh có phạm vi xã **rỗng**: thấy không hàng nào,
+  ghi không được gì. `CitizenScopeFactory.Unscoped()` chỉ cho hai việc — mã → cột / xã, và tra gửi lại theo `client_op_id`; mọi đọc / ghi
+  còn lại qua `CitizenScopeFactory.Open(<xã của cột>)`, nơi query filter, `CommuneWriteGuard` và guard audit chạy bình thường. Không
+  backdoor, không `*`, không lấy xã từ client hay từ token tình cờ gửi kèm.
+- **`[AllowAnonymous]` trên TỪNG action của `PublicController`**, không cấp class. Ba nơi nêu đích danh hai route và phải sửa cùng diff
+  khi đổi: `AnonymousEndpointTests` (cả hai phép kiểm), `OpenApiSpecTests` (ngoại lệ `/api/v1/public/`), generator spec (`is_anonymous`).
+- **Mã đi trong BODY, không bao giờ trong đường dẫn** — log request ghi `RequestPath` (D-16). Endpoint mới của phía công khai giữ luật này.
+- **Ảnh công dân qua `IImageSanitizer` TRƯỚC `StoreImageAsync`** (ngoại lệ BE-11 quy tắc 4, chỉ cho ảnh công dân): đọc có giới hạn byte →
+  magic bytes → `IdentifyAsync` + giới hạn pixel (chỉ đọc header) → decode trong cổng `SemaphoreSlim` → `AutoOrient` → bỏ EXIF/XMP/IPTC/ICC →
+  mã hoá lại. Decode luôn qua `ThumbnailFactory.JpegOnly` (tiền đề tắt advisory ImageSharp). Phá thử: bỏ giới hạn pixel → test bom pixel đỏ;
+  giữ EXIF → test GPS đỏ.
+- **Thứ tự của `SubmitAsync` là thiết kế, đừng đảo** (review P2b #2, #4–#7): kiểm → tra mã → băm nội dung (ảnh đọc dạng luồng) → gửi lại
+  sớm → hạn mức sớm (không khoá) → **làm sạch MỌI ảnh** → khoá `pole` → **đọc lại mã còn hiệu lực** (thu hồi giữa chừng thắng) → **gửi lại
+  lần nữa** → **hạn mức lần nữa, cộng byte thật của ảnh sắp ghi** → ghi object → ghi dòng. Object ghi **dưới khoá** để lượt thua hạn mức hay
+  thua đua gửi lại không để lại ảnh mồ côi; sau làm sạch mỗi ảnh vài trăm KB nên khoá chỉ giữ vài giây (khác clip BE-15). Quá hạn mức thì
+  **vẫn nhận chữ**, bỏ ảnh. `last_submitted_at` lấy **max** (lượt chậm đến sau lượt nhanh không được ghi lùi — CHECK sẽ ra 500). Ngân sách byte
+  toàn hệ thống **không** tuần tự hoá giữa các xã: hai lượt cùng lúc ở hai xã có thể vượt bằng ảnh của chính chúng — đừng mô tả là chặt.
+- **Cổng làm sạch lấy chỗ TRƯỚC khi đọc ảnh vào RAM**, hàng chờ có hạn (quá → 503 `SERVER_BUSY`), ảnh sạch thu nhỏ về `PhotoMaxLongEdge`
+  (2560) — nên bước tạo thumbnail (decode lần hai, ngoài cổng) chỉ gặp ảnh nhỏ. `MaxPhotos` tối đa **3** cũng vì CHECK của `citizen_photo`.
+- **Khoá ngoại ghép giữ một lượt gửi cùng cột + xã với báo cáo và mã của nó** (`ak_citizen_report_…`, `ak_qr_code_qr_id_pole_id_commune_id` —
+  trông thừa, là đích FK). `report → pole` vẫn là FK đơn (pole không có khoá `(pole_id, commune_id)`; server chép xã từ mã).
+- ⚠️ **Postgres cắt tên định danh ở 63 ký tự, im lặng.** Tên FK ghép EF sinh ra có thể dài hơn (`fk_citizen_submission_citizen_report_report_id_pole_id_commune_id`
+  = 66) và trên DB thành tên khác — code nhận diện lỗi theo `ConstraintName` hay test so tên đầy đủ sẽ trượt. Đặt `HasConstraintName` ngắn
+  nếu cần bắt theo tên.
+- 🔴 **Forwarded headers: danh sách RỖNG = TIN MỌI PEER, không phải "không tin ai".** ASP.NET Core bỏ hẳn bước kiểm IP khi cả
+  `KnownProxies` lẫn `KnownIPNetworks` trống (bản đầu của P2b xoá mặc định loopback rồi để trống — Codex review bắt, P1). Nên **không
+  cấu hình proxy ⇒ middleware KHÔNG nằm trong pipeline** (`TrustedProxies.Any`); có cấu hình ⇒ đúng các proxy đó, loopback mặc định bị
+  xoá, middleware đứng **đầu** pipeline. Triển khai sau reverse proxy phải khai proxy, nếu không cả xã chung một xô giới hạn. Canh bằng
+  `With_no_proxy_configured_a_forwarded_address_is_ignored_from_every_peer` và `Forwarded_addresses_count_only_from_a_trusted_proxy`
+  (giả địa chỉ peer bằng `IStartupFilter`).
+- Gửi lại: khoá `client_op_id` gắn với **mã + băm nội dung** (kể cả ảnh), tra ở cả bước sớm lẫn khi bắt trùng `ux_citizen_submission_client_op_id`.
+- Teardown: `citizen_photo` (theo submission) → `citizen_submission` → `citizen_report` → `qr_code` → `pole`. Rollback `AddCitizenReports` gãy
+  khi `audit_event` đã có actor `public` hoặc entity `citizen_report` (cùng họ BE-19).
+
 ### BE-43 — đồng bộ offline (06/10/2026)
 
 **Module `LuxMap.Modules.Sync` đứng trên đỉnh đồ thị phụ thuộc** (tham chiếu Map, Faults, WorkOrders, Survey, Assets) và

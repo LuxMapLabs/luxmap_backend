@@ -711,3 +711,26 @@ API SELF-SIGNED chờ FW; xử lý dữ liệu thật vẫn chờ D-06/D-07, pro
 Review P2c vòng 2: member baseline chỉ nhận normal, lọc từ ngày lắp bóng đang dùng và lookup cùng
 fixture_id; thay bóng phải tích luỹ member mới. Results thêm `published_as`/`is_representative`
 để xem trước công bố qua mọi lượt. Thumbnail thiếu object trả 503 `STORAGE_OBJECT_MISSING`.
+
+## Công dân báo sự cố qua QR — CITIZEN-QR P2a / P2b
+
+**P2a (Quản lý):** `POST /api/v1/qr-codes {pole_id}` cấp mã (thu hồi mã đang dùng của cột), `POST /api/v1/qr-codes/{qr_id}/revoke`,
+`GET /api/v1/qr-codes`. `url` trả về là `{WEB_APP_BASE_URL}/r/{code}` — web vẽ ảnh QR từ đó.
+
+**P2b (công khai, không token):** `POST /api/v1/public/qr/lookup {code}` và `POST /api/v1/public/reports` (multipart). Mã đi trong
+**body**, không bao giờ trong đường dẫn — log request ghi đường dẫn. Báo cáo vào hàng chờ `citizen_report`, **không** thành `fault`.
+
+Cấu hình (mặc định trong code, đổi qua appsettings / biến môi trường; khởi động lại để áp):
+
+| Khoá | Mặc định | Nghĩa |
+|---|---|---|
+| `ForwardedHeaders:KnownProxies:0…`, `ForwardedHeaders:KnownNetworks:0…` | (rỗng) | Proxy được tin `X-Forwarded-For`. **Rỗng = middleware tắt hẳn**, không đọc header đó từ ai (để trống danh sách mà vẫn bật thì ASP.NET Core tin MỌI peer). Triển khai sau reverse proxy **phải** khai, nếu không mọi người dân chung một xô giới hạn |
+| `RateLimits:PublicLookup:PermitLimit` / `:WindowMinutes` | 30 / 10 | Tra mã, theo địa chỉ client |
+| `RateLimits:PublicReport:PermitLimit` / `:WindowMinutes` | 10 / 60 | Gửi báo cáo, theo địa chỉ client |
+| `Citizen:MaxPhotos`, `Citizen:PhotoMaxBytes`, `Citizen:PhotoMaxPixels`, `Citizen:PhotoMaxLongEdge` | 3 (tối đa 3), 8 MiB, 40 000 000, 2560 | Giới hạn ảnh; số pixel kiểm từ header trước khi decode; ảnh lưu thu nhỏ về cạnh dài này |
+| `Citizen:PhotosPerCodePerNight` | 20 | Quá thì nhận chữ, bỏ ảnh |
+| `Citizen:PhotoBudgetBytesPerNight` | 512 MiB | Tổng byte ảnh công dân mỗi đêm cho cả hệ thống; quá thì nhận chữ, bỏ ảnh |
+| `Citizen:FarFromPoleMeters` | 200 | Vị trí người gửi xa cột hơn ⇒ gắn cờ (không từ chối) |
+
+Ảnh lưu ở bucket `luxmap-citizen` (sidecar `minio-mc` tạo) **đã bỏ EXIF/XMP/IPTC/ICC** — ngoại lệ của BE-11 quy tắc 4, chỉ cho ảnh công dân.
+Endpoint ảnh cho Quản lý và luồng duyệt là P2c.

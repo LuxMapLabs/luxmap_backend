@@ -57,6 +57,13 @@ IN_USERS = f"username IN ({', '.join(repr(u) for u in SEED_USERS)})"
 KEPT_SWEEPS = f"sweep_id IN (SELECT sweep_id FROM public.survey_sweep WHERE {IN_COMMUNES})"
 KEPT_RUNS = f"run_id IN (SELECT run_id FROM public.survey_processing_run WHERE {IN_COMMUNES})"
 
+# CITIZEN-QR: ONE definition of each kept set, so a child never copies rows whose parent was left out (Codex review P2b #9).
+COPIED_USERS = f"(SELECT user_id FROM public.app_user WHERE {IN_USERS})"
+QR_KEPT = (f"{IN_COMMUNES} AND created_by IN {COPIED_USERS} AND (revoked_by IS NULL OR revoked_by IN {COPIED_USERS})")
+REPORT_KEPT = f"{IN_COMMUNES} AND (decided_by IS NULL OR decided_by IN {COPIED_USERS})"
+SUBMISSION_KEPT = (f"{IN_COMMUNES} AND report_id IN (SELECT report_id FROM public.citizen_report WHERE {REPORT_KEPT})"
+                   f" AND qr_id IN (SELECT qr_id FROM public.qr_code WHERE {QR_KEPT})")
+
 # (table, row filter, ORDER BY). Order = foreign-key order; checked against the catalogue at runtime.
 # Survey tables (BE-15, added 04/10/2026) follow the chain sweep -> run -> pass/frame -> observation -> history;
 # pole_current_status and fault now point INTO that chain, so they come after it.
@@ -81,9 +88,7 @@ PLAN = [
      f"{IN_COMMUNES} AND requested_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS}))", "seq"),
     # CITIZEN-QR P2a: created_by / revoked_by are RESTRICT keys to app_user, so only codes the copied accounts issued (and,
     # when revoked, revoked). The code column carries what is printed on the pole — the target must be as trusted as the source.
-    ("qr_code", f"{IN_COMMUNES} AND created_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})"
-     f" AND (revoked_by IS NULL OR revoked_by IN (SELECT user_id FROM public.app_user WHERE {IN_USERS}))",
-     "created_at, length(qr_id), qr_id"),
+    ("qr_code", QR_KEPT, "created_at, length(qr_id), qr_id"),
     ("fault_cluster", IN_COMMUNES, "cluster_id"),
     ("lux_reading", IN_COMMUNES, "lux_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.
@@ -110,6 +115,12 @@ PLAN = [
     ("fault", IN_COMMUNES, "fault_id"),
     ("work_order_fault", IN_COMMUNES, "work_order_id, fault_id"),
     ("repair_evidence", IN_COMMUNES, "evidence_id"),
+    # CITIZEN-QR P2b: report → submission → photo (all RESTRICT). A report may point at a fault and its decider, so it follows
+    # fault and the copied accounts; submissions follow their report and code; photos have no commune and go by their submission.
+    ("citizen_report", REPORT_KEPT, "created_at, length(report_id), report_id"),
+    ("citizen_submission", SUBMISSION_KEPT, "received_at, length(submission_id), submission_id"),
+    ("citizen_photo", f"submission_id IN (SELECT submission_id FROM public.citizen_submission WHERE {SUBMISSION_KEPT})",
+     "received_at, length(photo_id), photo_id"),
     ("audit_event", IN_COMMUNES, "audit_id"),
     # BE-27: only the notices of the accounts copied above — recipient_user_id is a RESTRICT key to app_user.
     ("notification", f"{IN_COMMUNES} AND recipient_user_id IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})",

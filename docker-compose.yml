@@ -180,7 +180,8 @@ services:
         mc mb --ignore-existing luxmap/luxmap-survey
         mc mb --ignore-existing luxmap/luxmap-evidence
         mc mb --ignore-existing luxmap/luxmap-video
-        echo "luxmap-survey, luxmap-evidence and luxmap-video are ready"
+        mc mb --ignore-existing luxmap/luxmap-citizen
+        echo "luxmap-survey, luxmap-evidence, luxmap-video and luxmap-citizen are ready"
 
 volumes:
   postgres_data:

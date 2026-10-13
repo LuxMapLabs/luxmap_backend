@@ -190,6 +190,12 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 // later suite dies on pk_pole for reasons that point nowhere near the cause.
                 "DELETE FROM lux_reading WHERE commune_id = @c OR commune_id = @f;",
 
+                // CITIZEN-QR P2b: photo → submission → report, all RESTRICT; submissions and reports hold the code and the pole.
+                // Photos have no commune of their own, so they go by their submission.
+                "DELETE FROM citizen_photo WHERE submission_id IN (SELECT submission_id FROM citizen_submission WHERE commune_id = @c OR commune_id = @f);",
+                "DELETE FROM citizen_submission WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM citizen_report WHERE commune_id = @c OR commune_id = @f;",
+
                 // CITIZEN-QR: a code holds its pole and its issuer with RESTRICT.
                 "DELETE FROM qr_code WHERE commune_id = @c OR commune_id = @f;",
 

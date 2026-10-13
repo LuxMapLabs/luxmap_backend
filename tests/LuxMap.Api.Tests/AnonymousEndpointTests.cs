@@ -49,8 +49,18 @@ public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper 
         "POST /api/v1/auth/web/refresh",
     ];
 
+    /// <summary>
+    /// The citizen's form (CITIZEN-QR P2b, D-R1): the ONLY data endpoints anyone may reach without an account. Each one is named
+    /// here, so opening a third shows up in a diff and needs a reason.
+    /// </summary>
+    private static readonly string[] CitizenEndpoints =
+    [
+        "POST /api/v1/public/qr/lookup",
+        "POST /api/v1/public/reports",
+    ];
+
     [Fact]
-    public void Only_the_token_issuing_endpoints_may_be_reached_without_signing_in()
+    public void Only_the_token_issuing_and_citizen_endpoints_may_be_reached_without_signing_in()
     {
         var production = ProductionEndpoints();
 
@@ -66,7 +76,7 @@ public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper 
             output.WriteLine($"    {route}");
         }
 
-        Assert.Equal(TokenIssuingEndpoints, anonymous);
+        Assert.Equal([.. TokenIssuingEndpoints.Concat(CitizenEndpoints).Order(StringComparer.Ordinal)], anonymous);
     }
 
     /// <summary>
@@ -85,9 +95,11 @@ public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper 
             .Where(endpoint => !Describe(endpoint).Contains("/auth/", StringComparison.Ordinal))
             .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null)
             .Select(Describe)
+            .Order(StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Empty(open);
+        // Exactly the citizen's two, and nothing else outside /auth/.
+        Assert.Equal(CitizenEndpoints, open);
 
         // …and there really is a surface here: assets, imports and lux readings.
         var dataEndpoints = production.Count(endpoint =>

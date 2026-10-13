@@ -28,8 +28,14 @@ public enum AuditActorKind
 
     /// <summary>The server itself, acting on time alone — a lighting command that expired (LIGHT-CTRL 3.5).</summary>
     System,
+
+    /// <summary>
+    /// Someone without an account, through a pole's QR code (CITIZEN-QR D-15). Never a user, never a role — a citizen has neither
+    /// (D-R1); what identifies the send is the submission row the event names.
+    /// </summary>
+    Public,
 }
-public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode }
+public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport }
 public enum AuditAction
 {
     Created, Assigned, Reassigned, Unassigned, Started, Completed, Verified,

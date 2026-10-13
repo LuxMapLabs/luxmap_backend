@@ -16,10 +16,13 @@ public enum NotificationType
     SurveyReadyForReview,
     SurveyProcessingFailed,
     FaultReported,
+
+    /// <summary>CITIZEN-QR P2b: a citizen report opened a new item in the Manager's queue (a repeat for the same pole and night does not).</summary>
+    CitizenReportReceived,
 }
 
 /// <summary>Which resource <see cref="Notification.EntityId"/> names, so a client knows where to navigate.</summary>
-public enum NotificationEntityType { WorkOrder, SurveySweep, Fault }
+public enum NotificationEntityType { WorkOrder, SurveySweep, Fault, CitizenReport }
 
 /// <summary>
 /// One notice for ONE person (BE-27). Staged in the same <c>SaveChanges</c> as the change it reports,

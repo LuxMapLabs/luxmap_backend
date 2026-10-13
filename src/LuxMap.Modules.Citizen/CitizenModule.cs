@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LuxMap.Modules.Citizen;
 
-/// <summary>CITIZEN-QR — QR codes on poles (P2a); citizen reports and their review come in P2b / P2c (D-19).</summary>
+/// <summary>CITIZEN-QR — QR codes on poles (P2a), the public report form (P2b); the Manager's review comes in P2c (D-19).</summary>
 public sealed class CitizenModule : ILuxMapModule
 {
     public string Name => "Citizen";
@@ -12,5 +12,12 @@ public sealed class CitizenModule : ILuxMapModule
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<QrCodeService>();
+
+        // P2b — the public form.
+        var options = configuration.GetSection(CitizenOptions.SectionName).Get<CitizenOptions>() ?? new CitizenOptions();
+        options.Validate();
+        services.AddSingleton(options);
+        services.AddSingleton<CitizenScopeFactory>();
+        services.AddScoped<PublicReportService>();
     }
 }

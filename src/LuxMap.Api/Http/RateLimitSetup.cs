@@ -30,6 +30,11 @@ public static class RateLimitSetup
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = permits, Window = window, QueueLimit = 0 }));
 
+            // CITIZEN-QR P2b (D-8). Partitioned by the address the forwarded-headers middleware settled on — the proxy's own
+            // address unless that proxy is configured as trusted (ForwardedHeadersSetup).
+            AddPerAddress(options, configuration, LuxMapRateLimits.PublicLookup, "RateLimits:PublicLookup", 30, 10);
+            AddPerAddress(options, configuration, LuxMapRateLimits.PublicReport, "RateLimits:PublicReport", 10, 60);
+
             // The Contract's error shape, not the middleware's bare 503 default. Written here rather than
             // through ExceptionHandlingMiddleware.WriteAsync: that clears the response, Retry-After included.
             options.OnRejected = async (rejected, ct) =>
@@ -51,5 +56,15 @@ public static class RateLimitSetup
         });
 
         return services;
+    }
+
+    private static void AddPerAddress(
+        RateLimiterOptions options, IConfiguration configuration, string policy, string section, int permits, int windowMinutes)
+    {
+        var limit = configuration.GetValue($"{section}:PermitLimit", permits);
+        var window = TimeSpan.FromMinutes(configuration.GetValue($"{section}:WindowMinutes", windowMinutes));
+        options.AddPolicy(policy, context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = limit, Window = window, QueueLimit = 0 }));
     }
 }

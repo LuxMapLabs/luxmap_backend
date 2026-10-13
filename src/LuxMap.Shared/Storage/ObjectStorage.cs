@@ -18,6 +18,9 @@ public enum StorageBucket
     Evidence,
     /// <summary>Survey video clips and original JSON/JSONL inputs (BE-15).</summary>
     Video,
+
+    /// <summary>Photos citizens send through a pole's QR code (CITIZEN-QR P2b) — metadata stripped before storing.</summary>
+    Citizen,
 }
 
 /// <summary>Which of the two objects a stored image produces.</summary>
@@ -53,6 +56,9 @@ public static class StorageKeys
 
     public const string VideoBucketName = "luxmap-video";
 
+    /// <summary>Photos citizens send through a pole's QR code (CITIZEN-QR P2b, D-2) — kept apart so their retention can differ.</summary>
+    public const string CitizenBucketName = "luxmap-citizen";
+
     public const string OriginalPrefix = "original";
 
     public const string ThumbnailPrefix = "thumb";
@@ -67,6 +73,7 @@ public static class StorageKeys
         StorageBucket.Survey => SurveyBucketName,
         StorageBucket.Evidence => EvidenceBucketName,
         StorageBucket.Video => VideoBucketName,
+        StorageBucket.Citizen => CitizenBucketName,
         _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket, "Unknown storage bucket."),
     };
 
