@@ -46,14 +46,55 @@ public sealed class SweepCoverageTests(AssetImportFixture factory) : IAsyncLifet
     {
         catalog = factory.Services.GetRequiredService<ModuleAssemblyCatalog>();
         source = factory.Services.GetRequiredService<NpgsqlDataSource>();
+
+        // xUnit runs InitializeAsync for EVERY test: plant the communes, account, roads and work order ONCE for the class, so ten tests
+        // leave one account behind, not ten (the BE-27 note on accounts piling up).
+        await Gate.WaitAsync();
+        try
+        {
+            if (shared is null)
+            {
+                await SeedAsync();
+                shared = new(a, b, road, bare, bent, order, user, poles, algorithm, clock);
+            }
+        }
+        finally
+        {
+            Gate.Release();
+        }
+
+        (a, b, road, bare, bent, order, user, poles, algorithm, clock) = shared;
+    }
+
+    private static readonly SemaphoreSlim Gate = new(1, 1);
+
+    private static Seed? shared;
+
+    private sealed record Seed(string A, string B, string Road, string Bare, string Bent, string Order, string User, string[] Poles, long Algorithm, long Clock)
+    {
+        public void Deconstruct(out string a, out string b, out string road, out string bare, out string bent, out string order,
+            out string user, out string[] poles, out long algorithm, out long clock)
+            => (a, b, road, bare, bent, order, user, poles, algorithm, clock) = (A, B, Road, Bare, Bent, Order, User, Poles, Algorithm, Clock);
+    }
+
+    private async Task SeedAsync()
+    {
         await using var db = Db([]);
         using var seed = db.EnterUnscopedSystemWriteBackdoor();
         var communes = new[] { new AdministrativeUnit { Name = "coverage A " + Guid.NewGuid().ToString("N") }, new AdministrativeUnit { Name = "coverage B " + Guid.NewGuid().ToString("N") } };
         db.AddRange(communes);
         await db.SaveChangesAsync();
         (a, b) = (communes[0].CommuneId, communes[1].CommuneId);
-        // The fixture's manager, not a new account per test: InitializeAsync runs for EVERY test, and accounts pile up (BE-27 note).
-        user = await db.Database.SqlQuery<string>($"SELECT user_id AS \"Value\" FROM app_user WHERE username = {factory.ManagerUsername}").SingleAsync();
+        // An account of this class, never the fixture's: the immutable runs and observations planted here cannot be deleted, so the
+        // work order stays — and it would hold the fixture's manager (RESTRICT) and break the collection's teardown.
+        var person = new LuxMap.Modules.Identity.Entities.AppUser
+        {
+            Username = "coverage" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = "Coverage manager",
+            PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.Manager,
+        };
+        db.Add(person);
+        await db.SaveChangesAsync();
+        user = person.UserId;
 
         // Declared 100 m; the line itself is ~107 m — the metres reported are the DECLARED ones (D-3).
         var segments = new[]
