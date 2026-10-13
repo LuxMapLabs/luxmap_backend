@@ -582,7 +582,10 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
-      <li><strong>⚠️ Object nullable trong OpenAPI xuất <code>$ref</code> trần, không <code>nullable</code> (13/10/2026, phát hiện ở review BE-17).</strong>
+      <li><strong>⚠️ Object nullable trong OpenAPI xuất <code>$ref</code> trần, không <code>nullable</code> (13/10/2026, phát hiện ở review BE-17) —
+      ticket SPEC-NULLABLE, Phase 1 xong, chờ chốt D-1…D-6: 25 thuộc tính response + 2 scalar của <code>PoleProperties</code> viết tay; script
+      sinh types của WP5 chưa hiểu <code>allOf</code> nên phải sửa trước khi backend merge. Kèm: DTO chi tiết cột của WP6 sẽ hỏng khi nối API thật
+      (5 trường thiếu <code>?</code>, bắt buộc <code>supplier</code> mà API không trả) — đã ghi trong bản tin.</strong>
       Ví dụ <code>PoleMapDetail.fixture</code> (null khi cột không có bóng), <code>SweepDetailResponse.latest_run</code>,
       <code>CoverageGap.geometry</code>. Client sinh từ spec (FM-04, WP5) có thể từ chối response hợp lệ có <code>null</code>. Sửa một lần ở tầng sinh
       Swagger cho mọi schema (đổi hình dạng nhiều endpoint ⇒ báo WP5/WP6 trước), không vá từng endpoint.</li>

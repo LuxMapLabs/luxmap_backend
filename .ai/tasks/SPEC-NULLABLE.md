@@ -1,14 +1,15 @@
 ---
 ticket: SPEC-NULLABLE
 title: OpenAPI khai đúng object / enum có thể null — `$ref` trần đang nói "không bao giờ null"
-status: in_progress
+status: blocked
 phase: 1
 owner: claude (P1b) · codex (P1a, review)
 branch: docs/SPEC-NULLABLE-p1
 contract_refs:
   - "docs/openapi/luxmap-v1.json (xuất từ code) + luxmap-v1.5.json (sinh) — OpenAPI 3.0.4"
   - "tracking.html 'Vấn đề đang mở' — phát hiện ở review BE-17 (13/10/2026)"
-depends_on: []
+depends_on:
+  - "BLOCKED 13/10: Phase 1 xong (.ai/results/SPEC-NULLABLE-p1.md) — chờ Mỹ chốt D-1…D-6; merge Phase 2 cần WP5 sửa generate-types.js trước (D-4)"
 ---
 
 ## Bối cảnh
