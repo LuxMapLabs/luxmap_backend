@@ -67,10 +67,11 @@ Nguồn chuẩn cho từng dòng: `docs/contract-drift.md` (QR-1…QR-6, PB-1…
 **⚠️ Spec khai thiếu `null` (ticket SPEC-NULLABLE, đã chốt 13/10):** 25 thuộc tính response **dạng `$ref`** (11 object, 14 enum) có thể `null`
 nhưng đang xuất thành `$ref` trần — danh sách ở `.ai/results/SPEC-NULLABLE-p1.md` §1 (vd. `PoleMapDetail.fixture`, `latest_run`,
 `gaps[].geometry`, `PoleProperties.power_source`); thêm `PoleProperties.lamp_watt` / `install_date` ở bản hợp nhất. Đây **không** phải toàn
-bộ trường nullable — đối chiếu thêm trường scalar trong spec. Backend sẽ khai lại dạng `{"type": …, "nullable": true,
-"allOf": [{"$ref": …}]}`. **`scripts/generate-types.js` hiện chưa hiểu `allOf`** (mẫu `type: object` ra `Record<string, any>`, mẫu `type:
-string` ra `string | null` và mất kiểu enum) — nhờ WP5 sửa script đọc `$ref` trong `allOf`, áp `nullable`, giữ `?` theo
-`required`, **trước** khi backend merge (backend chờ WP5 báo xong mới merge). Trong lúc chờ: coi các trường trong danh sách là nullable; `GisDrawerPanel` nên hiện "chưa có bóng"
+bộ trường nullable — đối chiếu thêm trường scalar trong spec. Backend sẽ khai lại dạng
+`{"anyOf": [{"$ref": "…/PoleMapFixture"}, {"type": "object", "nullable": true, "enum": [null]}]}` (enum: `"type": "string"`) — "tham chiếu
+HOẶC đúng `null`", đúng OAS 3.0.4 và validator chặt chấp nhận. **`scripts/generate-types.js` hiện chưa hiểu `anyOf`** — nhờ WP5 thêm một nhánh
+**trước** nhánh `type`: `anyOf` gồm một `$ref` và một nhánh `enum: [null]` ⇒ sinh `<Tên> | null` (vd. `PoleMapFixture | null`, `SourceChannel
+| null`); giữ dấu `?` theo `required` như cũ, không suy `?` từ nullable. Backend **chờ WP5 báo xong mới merge**. Trong lúc chờ: coi các trường trong danh sách là nullable; `GisDrawerPanel` nên hiện "chưa có bóng"
 thay vì điền giá trị mặc định.
 
 ---

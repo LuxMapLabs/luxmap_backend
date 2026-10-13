@@ -81,3 +81,13 @@ Không lên OpenAPI 3.1 chỉ vì việc này: script WP5 cũng ra `any` với `
 Chốt **D-1…D-6 theo cột "Đề xuất"**: 25 thuộc tính response + 2 scalar của `PoleProperties` viết tay; mã hoá `type` + `nullable: true` +
 `allOf: [$ref]` (OAS 3.0.4, không lên 3.1); filter đọc NRT, không danh sách tay; Phase 2 **chỉ merge sau khi WP5 sửa `generate-types.js`**;
 báo WP6 lỗi DTO ngay qua bản tin; gửi danh sách 25 trường + mẫu mã hoá cho WP5 / WP6. Phase 2 sẵn sàng (chạm spec — nền tạm tới FW).
+
+## Sửa quyết định D-2 — Mỹ, 13/10/2026 (sau review Codex Phase 2, P1)
+
+`{type, nullable: true, allOf: [$ref]}` vẫn bị validator chặt **từ chối `null`**: `nullable` chỉ nới schema bọc ngoài, còn schema tham chiếu
+trong `allOf` được kiểm riêng và không nhận `null` (đã đo bằng `openapi-schema-validator` 0.6.3, OAS30). **D-2 đổi thành**
+`anyOf: [{$ref}, {type: <object|string>, nullable: true, enum: [null]}]` — vẫn OAS 3.0.4, không lên 3.1. Các D-item khác giữ nguyên.
+
+⚠️ *Đính chính §2 (Codex review Phase 2, P2 #3):* script WP5 **không** biến cả 25 trường thành `any`. Với dạng `allOf` có `type`, object ra
+`Record<string, any>`, enum ra `string | null` (mất union giá trị) — đã chạy đúng hai hàm thuần của script trên mẫu. Kết luận "WP5 phải sửa
+script trước khi backend merge" giữ nguyên; với dạng `anyOf` mới, script cần nhánh riêng cho `anyOf` (bản tin đã ghi).

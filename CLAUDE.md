@@ -1962,15 +1962,16 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 
 ### SPEC-NULLABLE — object / enum có thể null trong OpenAPI (13/10/2026, drift SN-1…SN-4)
 
-- **`NullableReferenceSchemaFilter` đọc nullable annotation của C#** và bọc đúng thuộc tính `$ref` nullable thành `{type, nullable, allOf:
-  [$ref]}`; **`NullableReferenceDocumentFilter`** gỡ lại ở mọi schema chạm tới từ **request** (`null` ở request = "không gửi", 400). DTO
+- **`NullableReferenceSchemaFilter` đọc nullable annotation của C#** và bọc đúng thuộc tính `$ref` nullable thành `anyOf: [{$ref},
+  {type, nullable: true, enum: [null]}]`. 🔴 **Đừng "đơn giản hoá" thành `{type, nullable, allOf: [$ref]}`** — `nullable` chỉ nới lớp ngoài,
+  schema trong `allOf` vẫn bị kiểm riêng và từ chối `null` (đo bằng `openapi-schema-validator`: dạng `allOf` reject `null`, dạng `anyOf` accept); **`NullableReferenceDocumentFilter`** gỡ lại ở mọi schema chạm tới từ **request** (`null` ở request = "không gửi", 400). DTO
   response mới tự được phủ — **đừng** chép danh sách tay. Muốn một trường KHÔNG null thì sửa **kiểu C#** cho đúng, đừng vá spec.
 - 🔴 **`NullabilityInfoContext` KHÔNG an toàn đa luồng** — để static dùng chung làm `/swagger/v1/swagger.json` trả **500** khi các test class
   sinh spec song song, trong khi `dotnet swagger tofile` (một luồng) vẫn chạy. Tạo mới mỗi lần gọi filter.
 - `Feature<TProperties>.Properties` bị annotation coi là nullable (tham số generic không ràng buộc) — luật loại theo **định nghĩa generic**,
   không theo tên. Kiểu generic mới có tham số kiểu như vậy cũng tự được loại.
-- Trong spec, `allOf` một phần tử + `type` có `null` **chỉ do filter này sinh** — document filter dựa vào đó để gỡ ở request. Thêm `allOf` ở
-  chỗ khác thì phải xét lại luật đó.
+- Trong spec, `anyOf` gồm một `$ref` + một nhánh `enum: [null]` **chỉ do filter này sinh** (`IsNullBranch`) — document filter dựa vào đó để
+  gỡ ở request. Thêm `anyOf` dạng đó ở chỗ khác thì phải xét lại luật này.
 - **Schema viết tay trong `gen_consolidated_spec.py` đè schema xuất từ code** (bẫy BE-14b): `S["PoleProperties"]` từng làm mất `nullable` của
   `power_source`, `fixture_type`, `lamp_watt`, `install_date`. Trường mới trên schema viết tay phải chép đúng nullable.
 - Test kỳ vọng **literal** (`OpenApiNullableTests`: 25 response, 9 request, 6 feature) — đổi một DTO làm đổi số đếm là cố ý phải sửa test.
