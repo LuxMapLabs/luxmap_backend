@@ -1946,6 +1946,11 @@ thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất t
 - **Quyền độ phủ = luật ảnh khảo sát cho một run:** `CoversWholeRun` (xã của cột) **và** mọi xã trong `gis_snapshot.communes` (xã của
   phiếu). Độ phủ vẽ tuyến; tuyến liên xã có thể thuộc xã mà run không có cột nào.
 - `SweepResponse` không còn `sealed` — chỉ để `SweepDetailResponse` thêm `latest_run`; danh sách vẫn trả kiểu gốc, không mang run.
+- ⚠️ **Object nullable xuất ra spec là `$ref` TRẦN, không `nullable`** (`latest_run`, `CoverageGap.geometry`, và sẵn có từ trước:
+  `PoleMapDetail.fixture`). Đó là hạn chế chung của tầng sinh Swagger, ghi ở "Vấn đề đang mở" của tracking — sửa một lần cho mọi schema,
+  đừng vá riêng từng endpoint.
+- Khoảng trống **đúng 1 m được giữ**, chỉ khoảng **ngắn hơn** bị bỏ (SC-4); so sánh có dung sai `1e-9` vì phân số × chiều dài hiếm khi rơi
+  đúng 1 m.
 - Test ghi run / quan sát tay: `classified_as = unknown` là cách duy nhất không cần frame (`ck_pole_observation_classification`). Test
   class có `IAsyncLifetime` thì `InitializeAsync` chạy **mỗi test**: đừng tạo tài khoản ở đó (dùng tài khoản của fixture), tên xã phải
   kèm GUID (`ix_administrative_unit_name` unique).

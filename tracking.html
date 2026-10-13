@@ -42,8 +42,11 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
-    <strong>BE-17 — tiến độ xử lý sweep + độ phủ tuyến, Phase 1, 13/10/2026</strong>
-    <p><span class="tag t-next">Phase 1 xong · D-1…D-7 chốt theo đề xuất (Mỹ, 13/10) · Phase 2 sẵn sàng</span> Nhánh <code>docs/BE-17-p1</code>. Codex (P1a) đọc web + mobile:
+    <strong>BE-17 — tiến độ xử lý sweep + độ phủ tuyến, Phase 1 → 2, 13/10/2026</strong>
+    <p><span class="tag t-next">Phase 2 xong trên nhánh <code>feat/BE-17-sweep-coverage</code> (13/10, chưa push): <code>latest_run</code> trên
+    <code>GET /sweeps/{id}</code>, <code>GET /sweeps/{id}/coverage</code>; drift SC-1…SC-6 (O-4 đóng). Không migration. 966/46/45/383 xanh, 7 chốt phá thử
+    đều đỏ. Codex review 0 P1 / 3 P2 / 2 P3 — sửa 3, ghi 2. Chi tiết <code>.ai/results/BE-17-p2.md</code></span>
+    <span class="tag t-done">P1 đã merge (#139) · D-1…D-7 chốt (Mỹ, 13/10)</span> Nhánh <code>docs/BE-17-p1</code>. Codex (P1a) đọc web + mobile:
     chưa consumer nào gọi GET sweep thật; nhu cầu độ phủ rõ nhất ở F05 của WP6, chưa có hình dạng. Claude (P1b): BE-15 đã có
     <code>processing_status</code>, <code>coverage_pct</code>, dòng <code>not_observed</code>; còn thiếu lý do lỗi xử lý (có trong thông báo, không có
     trong API) và khoảng tuyến chưa đi qua (tính được từ <code>survey_pass</code>). Đề xuất: <code>latest_run</code> trên chi tiết sweep +
@@ -578,6 +581,10 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>⚠️ Object nullable trong OpenAPI xuất <code>$ref</code> trần, không <code>nullable</code> (13/10/2026, phát hiện ở review BE-17).</strong>
+      Ví dụ <code>PoleMapDetail.fixture</code> (null khi cột không có bóng), <code>SweepDetailResponse.latest_run</code>,
+      <code>CoverageGap.geometry</code>. Client sinh từ spec (FM-04, WP5) có thể từ chối response hợp lệ có <code>null</code>. Sửa một lần ở tầng sinh
+      Swagger cho mọi schema (đổi hình dạng nhiều endpoint ⇒ báo WP5/WP6 trước), không vá từng endpoint.</li>
       <li><strong>⚠️ Phân trang trong OpenAPI là một tham số object <code>page</code> (12/10/2026, phát hiện ở review BE-31).</strong> Mọi endpoint nhận
       <code>PageQuery</code> (<code>/assets/*</code>, <code>/faults</code>, <code>/work-orders</code>, <code>/statistics/warranty</code>…) xuất <code>page</code> kiểu
       <code>$ref PageQuery</code> thay vì hai tham số <code>page</code> / <code>page_size</code>. Theo OAS (form, explode) vẫn đúng trên dây, nhưng client sinh từ spec
