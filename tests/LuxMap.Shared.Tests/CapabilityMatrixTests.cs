@@ -37,6 +37,8 @@ public class CapabilityMatrixTests
         ["cap:sync_offline"] = ["field_engineer"],
         ["cap:read_statistics"] = ["manager", "superior", "system_admin"],
         ["cap:manage_qr_codes"] = ["manager"],
+        ["cap:read_citizen_reports"] = ["manager", "superior", "system_admin"],
+        ["cap:review_citizen_reports"] = ["manager"],
     };
 
     [Fact]

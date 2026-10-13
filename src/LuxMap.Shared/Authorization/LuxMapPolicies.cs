@@ -93,6 +93,15 @@ public static class LuxMapPolicies
     /// <summary>CITIZEN-QR (D-11) — issue, revoke and list the QR codes on poles. The Manager, who also reviews what citizens send.</summary>
     public const string ManageQrCodes = "cap:manage_qr_codes";
 
+    /// <summary>
+    /// CITIZEN-QR P2c (D-11) — read the citizen report queue: what was reported, where, when, how it was decided. Metadata only:
+    /// the photos themselves are <see cref="ReviewCitizenReports"/>.
+    /// </summary>
+    public const string ReadCitizenReports = "cap:read_citizen_reports";
+
+    /// <summary>CITIZEN-QR P2c (D-11) — decide a citizen report (accept as a fault, merge into one, reject) and open its photos.</summary>
+    public const string ReviewCitizenReports = "cap:review_citizen_reports";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -117,5 +126,7 @@ public static class LuxMapPolicies
             [SyncOffline] = [UserRole.FieldEngineer],
             [ReadStatistics] = [UserRole.Superior, UserRole.Manager, UserRole.SystemAdmin],
             [ManageQrCodes] = [UserRole.Manager],
+            [ReadCitizenReports] = [UserRole.Superior, UserRole.Manager, UserRole.SystemAdmin],
+            [ReviewCitizenReports] = [UserRole.Manager],
         };
 }

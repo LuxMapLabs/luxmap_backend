@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 113 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 120 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.14"
   },
   "paths": {
@@ -4070,6 +4070,818 @@
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§4.1",
         "security": []
+      }
+    },
+    "/api/v1/citizen-reports": {
+      "get": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Hàng chờ báo cáo của công dân, lượt gửi mới nhất trước; status (CSV, vắng = pending), pole_id, commune_id",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "pole_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_citizen_reports",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "getCitizenReports",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/citizen-reports/{reportId}": {
+      "get": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Một báo cáo: cột, sự cố mở trên cột, mọi lượt gửi; ảnh + gợi ý AI chỉ cho người mở được ảnh; allowed_actions",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_citizen_reports",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "getCitizenReportsReportid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/citizen-reports/{reportId}/photos/{photoId}/thumbnail": {
+      "get": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Thumbnail ảnh của báo cáo (JPEG, chỉ Quản lý)",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_citizen_reports",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "getCitizenReportsReportidPhotosPhotoidThumbnail",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/citizen-reports/{reportId}/photos/{photoId}/original": {
+      "get": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Ảnh của báo cáo (JPEG đã bỏ EXIF/GPS lúc nhận, chỉ Quản lý)",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_citizen_reports",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "getCitizenReportsReportidPhotosPhotoidOriginal",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/citizen-reports/{reportId}/accept": {
+      "post": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Thành sự cố field_report mới, confirmed bởi Quản lý; loại phải khớp loại dân báo; 409 nếu cột đã có sự cố mở cùng loại",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptCitizenReportRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptCitizenReportRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptCitizenReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_citizen_reports",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "postCitizenReportsReportidAccept",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/citizen-reports/{reportId}/merge": {
+      "post": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Gắn vào sự cố đang mở của cùng cột; sự cố không đổi",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeCitizenReportRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeCitizenReportRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeCitizenReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_citizen_reports",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "postCitizenReportsReportidMerge",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
+      }
+    },
+    "/api/v1/citizen-reports/{reportId}/reject": {
+      "post": {
+        "tags": [
+          "CitizenReports"
+        ],
+        "summary": "[Web] [TẠM — CITIZEN-QR] Bác bỏ, bắt buộc lý do",
+        "parameters": [
+          {
+            "name": "reportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCitizenReportRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCitizenReportRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCitizenReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenReportDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:review_citizen_reports",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "web",
+        "operationId": "postCitizenReportsReportidReject",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)"
       }
     },
     "/api/v1/device/commands": {
@@ -11518,6 +12330,27 @@
   },
   "components": {
     "schemas": {
+      "AcceptCitizenReportRequest": {
+        "type": "object",
+        "properties": {
+          "submission_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ActiveFixture": {
         "required": [
           "data_source",
@@ -12062,6 +12895,435 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenPhotoAiHint": {
+        "required": [
+          "artifact_version",
+          "checked_at",
+          "confidence",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "label": {
+            "$ref": "#/components/schemas/CitizenPhotoHint"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "artifact_version": {
+            "type": "string"
+          },
+          "checked_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenPhotoHint": {
+        "enum": [
+          "lamp_on",
+          "lamp_off",
+          "inconclusive"
+        ],
+        "type": "string"
+      },
+      "CitizenPhotoItem": {
+        "required": [
+          "ai_hint",
+          "original_url",
+          "photo_id",
+          "position",
+          "thumbnail_url"
+        ],
+        "type": "object",
+        "properties": {
+          "photo_id": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          },
+          "original_url": {
+            "type": "string"
+          },
+          "ai_hint": {
+            "$ref": "#/components/schemas/CitizenPhotoAiHint"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenReportDetail": {
+        "required": [
+          "acceptable_fault_types",
+          "allowed_actions",
+          "commune_id",
+          "created_at",
+          "data_source",
+          "decided_at",
+          "decided_by",
+          "decision_note",
+          "far_from_pole",
+          "fault_id",
+          "kinds",
+          "last_submitted_at",
+          "night_of",
+          "open_faults",
+          "photo_count",
+          "pole",
+          "pole_id",
+          "report_id",
+          "status",
+          "submission_count",
+          "submissions"
+        ],
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "string"
+          },
+          "pole_id": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CitizenReportStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "last_submitted_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "submission_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "photo_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenReportKind"
+            }
+          },
+          "far_from_pole": {
+            "type": "boolean"
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "decided_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "decided_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decision_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "pole": {
+            "$ref": "#/components/schemas/CitizenReportPole"
+          },
+          "open_faults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenReportOpenFault"
+            }
+          },
+          "submissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenSubmissionItem"
+            }
+          },
+          "allowed_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "acceptable_fault_types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FaultType"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenReportItem": {
+        "required": [
+          "commune_id",
+          "created_at",
+          "data_source",
+          "decided_at",
+          "decided_by",
+          "decision_note",
+          "far_from_pole",
+          "fault_id",
+          "kinds",
+          "last_submitted_at",
+          "night_of",
+          "photo_count",
+          "pole_id",
+          "report_id",
+          "status",
+          "submission_count"
+        ],
+        "type": "object",
+        "properties": {
+          "report_id": {
+            "type": "string"
+          },
+          "pole_id": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CitizenReportStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "last_submitted_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "submission_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "photo_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenReportKind"
+            }
+          },
+          "far_from_pole": {
+            "type": "boolean"
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "decided_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "decided_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decision_note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenReportItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenReportItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenReportKind": {
+        "enum": [
+          "lamp_out",
+          "lamp_dim",
+          "pole_damaged",
+          "other"
+        ],
+        "type": "string"
+      },
+      "CitizenReportOpenFault": {
+        "required": [
+          "detected_at",
+          "fault_id",
+          "fault_status",
+          "fault_type",
+          "severity",
+          "source_channel"
+        ],
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "fault_status": {
+            "$ref": "#/components/schemas/FaultStatus"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "source_channel": {
+            "$ref": "#/components/schemas/SourceChannel"
+          },
+          "detected_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenReportPole": {
+        "required": [
+          "fixture_status",
+          "last_seen_at",
+          "location",
+          "pole_id",
+          "segment_id"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "location": {
+            "$ref": "#/components/schemas/ReportPoint"
+          },
+          "fixture_status": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenReportStatus": {
+        "enum": [
+          "pending",
+          "accepted",
+          "merged",
+          "rejected"
+        ],
+        "type": "string"
+      },
+      "CitizenSubmissionItem": {
+        "required": [
+          "description",
+          "far_from_pole",
+          "kind",
+          "photo_count",
+          "photos",
+          "photos_dropped",
+          "received_at",
+          "submission_id"
+        ],
+        "type": "object",
+        "properties": {
+          "submission_id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CitizenReportKind"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "far_from_pole": {
+            "type": "boolean"
+          },
+          "photos_dropped": {
+            "$ref": "#/components/schemas/PhotosDroppedReason"
+          },
+          "received_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "photo_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenPhotoItem"
             }
           }
         },
@@ -14042,6 +15304,25 @@
         },
         "additionalProperties": false
       },
+      "MergeCitizenReportRequest": {
+        "type": "object",
+        "properties": {
+          "submission_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "NearestLuminance": {
         "type": "object",
         "properties": {
@@ -14212,6 +15493,13 @@
           "materials_note": {}
         },
         "additionalProperties": false
+      },
+      "PhotosDroppedReason": {
+        "enum": [
+          "over_quota",
+          "over_budget"
+        ],
+        "type": "string"
       },
       "PoleDetail": {
         "required": [
@@ -14975,6 +16263,21 @@
         },
         "additionalProperties": false
       },
+      "RejectCitizenReportRequest": {
+        "type": "object",
+        "properties": {
+          "submission_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RepairTimelinessRow": {
         "required": [
           "commune_id",
@@ -15117,6 +16420,20 @@
             "type": "number",
             "format": "double",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReportPoint": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -17272,7 +18589,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -17351,6 +18668,10 @@
     {
       "name": "QrCodes",
       "description": "Mã QR trên cột cho công dân báo sự cố — CITIZEN-QR P2a (drift CITIZEN-QR, SELF-SIGNED, nền tạm tới FW). Chỉ Quản lý (cap:manage_qr_codes). Mã in trên cột chỉ có trong response, không bao giờ trong đường dẫn hay audit; phía công khai là P2b."
+    },
+    {
+      "name": "CitizenReports",
+      "description": "Hàng chờ báo cáo của công dân — CITIZEN-QR P2c (drift PC-1…PC-10, SELF-SIGNED, nền tạm tới FW). Đọc = cap:read_citizen_reports (Cấp giám sát, Quản lý, Quản trị — chỉ metadata); quyết định và mở ảnh = cap:review_citizen_reports (Quản lý). Mỗi quyết định gửi kèm submission_count đã xem; báo cáo được quyết một lần. Gợi ý AI chỉ là gợi ý."
     },
     {
       "name": "Public",

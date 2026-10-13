@@ -33,6 +33,21 @@ public enum PhotosDroppedReason
 }
 
 /// <summary>
+/// What the ON / OFF model suggests about one photo (CITIZEN-QR P2c, D-9). A HINT for the Manager, never a decision (CQ-5).
+/// </summary>
+public enum CitizenPhotoHint
+{
+    /// <summary>At least one lamp found, every one lit.</summary>
+    LampOn,
+
+    /// <summary>At least one lamp found, every one dark.</summary>
+    LampOff,
+
+    /// <summary>No lamp found, or lit and dark lamps both — which includes most daytime photos. Says nothing either way.</summary>
+    Inconclusive,
+}
+
+/// <summary>
 /// One item of the Manager's queue (CITIZEN-QR P2b, D-6): everything citizens sent about ONE pole in ONE night, while still
 /// pending. Each send is its own <see cref="CitizenSubmission"/> — grouping never merges their content away.
 /// </summary>
@@ -116,7 +131,11 @@ public sealed class CitizenSubmission : ICommuneScoped, IAudited
 }
 
 /// <summary>A photo kept from a submission — metadata already stripped (D-10). Reached only through its submission.</summary>
-public sealed class CitizenPhoto
+/// <remarks>
+/// <see cref="IAudited"/> since P2c: the model's hint is an automated finding, and every automated finding is in the audit trail
+/// (D-R13). A photo is written with its send (one <c>submitted</c> event) or with its hint (one <c>analyzed</c> event).
+/// </remarks>
+public sealed class CitizenPhoto : IAudited
 {
     public string PhotoId { get; set; } = null!;
 
@@ -134,4 +153,16 @@ public sealed class CitizenPhoto
     public long ThumbnailBytes { get; set; }
 
     public DateTime ReceivedAt { get; set; }
+
+    // P2c (D-9): the model's hint, computed the first time a Manager opens the report. All four set together, or none.
+
+    public CitizenPhotoHint? AiHint { get; set; }
+
+    /// <summary>The highest confidence among the lamps behind the hint; null when <see cref="CitizenPhotoHint.Inconclusive"/>.</summary>
+    public double? AiConfidence { get; set; }
+
+    /// <summary>The detector's <c>artifact_version</c> (BE-34): model file, thresholds and preprocessing.</summary>
+    public string? AiArtifactVersion { get; set; }
+
+    public DateTime? AiCheckedAt { get; set; }
 }

@@ -49,6 +49,12 @@ public enum AuditAction
 
     /// <summary>CITIZEN-QR: a Manager withdrew a QR code — replaced by a new one, or taken out of use.</summary>
     Revoked,
+
+    /// <summary>CITIZEN-QR P2c: a Manager turned a citizen report into a new fault, or attached it to an open one.</summary>
+    Accepted, Merged,
+
+    /// <summary>CITIZEN-QR P2c: the ON / OFF model gave its hint on a citizen report's photos (actor <c>cv</c>) — a suggestion, not a decision.</summary>
+    Analyzed,
 }
 
 /// <summary>Marks business entities whose writes require one audit event per SaveChanges.</summary>

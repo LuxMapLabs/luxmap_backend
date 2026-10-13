@@ -126,6 +126,15 @@ public sealed class CitizenPhotoConfiguration : IEntityTypeConfiguration<Citizen
             table.HasCheckConstraint("ck_citizen_photo_position", "position BETWEEN 1 AND 3");
             table.HasCheckConstraint("ck_citizen_photo_bytes", "byte_count > 0 AND thumbnail_bytes > 0");
             table.HasCheckConstraint("ck_citizen_photo_keys_not_blank", "btrim(object_key) <> '' AND btrim(thumbnail_key) <> ''");
+            // P2c (D-9): the hint, its version and its time come together; a confidence only behind a lamp_on / lamp_off hint,
+            // finite and within 0..1 (Postgres reads 'NaN' >= 0 as true — the double precision rule).
+            table.HasCheckConstraint("ck_citizen_photo_ai_together",
+                "(ai_hint IS NULL) = (ai_artifact_version IS NULL) AND (ai_hint IS NULL) = (ai_checked_at IS NULL)");
+            table.HasCheckConstraint("ck_citizen_photo_ai_confidence",
+                "(ai_confidence IS NULL) = (ai_hint IS NULL OR ai_hint = 'inconclusive') AND (ai_confidence IS NULL OR "
+                + "(ai_confidence >= 0 AND ai_confidence <= 1 AND ai_confidence <> 'NaN'::float8))");
+            table.HasCheckConstraint("ck_citizen_photo_ai_version_not_blank",
+                "ai_artifact_version IS NULL OR btrim(ai_artifact_version) <> ''");
         });
 
         builder.HasKey(photo => photo.PhotoId);
@@ -133,6 +142,8 @@ public sealed class CitizenPhotoConfiguration : IEntityTypeConfiguration<Citizen
         builder.Property(photo => photo.SubmissionId).HasColumnType("text").IsRequired();
         builder.Property(photo => photo.ObjectKey).HasColumnType("text").IsRequired();
         builder.Property(photo => photo.ThumbnailKey).HasColumnType("text").IsRequired();
+        builder.HasContractEnum(photo => photo.AiHint);
+        builder.Property(photo => photo.AiArtifactVersion).HasColumnType("text");
 
         builder.HasIndex(photo => new { photo.SubmissionId, photo.Position }).IsUnique();
         // The day's storage budget sums photo bytes by arrival time.

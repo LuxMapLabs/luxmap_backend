@@ -24,6 +24,15 @@ public sealed record CitizenOptions
     /// <summary>A shared position further than this from the pole is flagged (D-8) — never refused.</summary>
     public double FarFromPoleMeters { get; init; } = 200;
 
+    /// <summary>
+    /// P2c (D-9): a photo whose thumbnail averages brighter than this (0..1 luma) is read as a daytime photo and gets an
+    /// <c>inconclusive</c> hint — a dark lamp by day is normal, not a fault. Part of the hint's <c>artifact_version</c>.
+    /// </summary>
+    public double DaylightMeanLuma { get; init; } = 0.45;
+
+    /// <summary>P2c (D-9): photos the model looks at per opening of a report; the rest get their hint on a later opening.</summary>
+    public int HintsPerRequest { get; init; } = 6;
+
     /// <summary>The whole multipart body the report endpoint will read: every photo at its cap, plus room for the text fields.</summary>
     public long MaxRequestBytes => MaxPhotos * PhotoMaxBytes + 1024 * 1024;
 
@@ -33,7 +42,8 @@ public sealed record CitizenOptions
         // then fail the row with a 500 (Codex review P2b #3).
         if (MaxPhotos is < 0 or > 3 || PhotoMaxBytes <= 0 || PhotoMaxPixels <= 0 || PhotoMaxLongEdge is < 320 or > 8192
             || PhotosPerCodePerNight < 0
-            || PhotoBudgetBytesPerNight < 0 || !double.IsFinite(FarFromPoleMeters) || FarFromPoleMeters <= 0)
+            || PhotoBudgetBytesPerNight < 0 || !double.IsFinite(FarFromPoleMeters) || FarFromPoleMeters <= 0
+            || !double.IsFinite(DaylightMeanLuma) || DaylightMeanLuma is <= 0 or > 1 || HintsPerRequest is < 1 or > 50)
         {
             throw new InvalidOperationException($"{SectionName} has an out-of-range limit.");
         }

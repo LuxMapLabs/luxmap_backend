@@ -55,6 +55,15 @@ public sealed class ReportFaultRequest
     public string? PhotoFrameId { get; init; }
 }
 
+/// <summary>
+/// A fault a Manager has already reviewed before it exists — CITIZEN-QR P2c (D-5, D-18): a citizen report accepted from the queue.
+/// </summary>
+/// <param name="Origin">What it came from, for the audit trail (e.g. <c>citizen_report:CRP-0001</c>). Never the citizen's text.</param>
+/// <param name="Note">What was reported, written by the server — the observation, like <c>note</c> of a field report.</param>
+/// <param name="ReviewNote">The Manager's own words, if any.</param>
+public sealed record ReviewedReport(
+    string PoleId, FaultType FaultType, Severity Severity, DateTime DetectedAt, string Note, string? ReviewNote, string Origin);
+
 /// <summary><c>location</c> of a report. Nullable members so an omitted coordinate is seen as missing, not as 0.</summary>
 public sealed record ReportLocation(double? Lat, double? Lng);
 
@@ -76,7 +85,8 @@ public sealed record ReportLocation(double? Lat, double? Lng);
 /// </para>
 /// </remarks>
 public sealed class FaultReportService(
-    LuxMapDbContext db, ICurrentActorAccessor actor, IAuditTrail audit, FaultQueryService query, TimeProvider clock)
+    LuxMapDbContext db, ICurrentActorAccessor actor, IAuditTrail audit, FaultQueryService query, FaultTransitions transitions,
+    TimeProvider clock)
 {
     /// <summary>A phone clock a little ahead of the server is normal; more than this is a wrong clock.</summary>
     public static readonly TimeSpan FutureTolerance = TimeSpan.FromMinutes(5);
@@ -171,6 +181,41 @@ public sealed class FaultReportService(
                 "This client_op_id was already used for a report you cannot see."), false);
         }
         return (await Item(faultId, key, ct), true);
+    }
+
+    /// <summary>
+    /// Stages a <c>field_report</c> fault that the calling Manager reviewed as it was made (CITIZEN-QR P2c, D-18): created and
+    /// <c>confirmed</c> by them, with its one <c>created</c> audit event. NOT saved — the caller saves, inside its own transaction.
+    /// </summary>
+    /// <remarks>
+    /// Kept here so every fault is still built in Faults. The pole is read through the commune filter (404 outside scope); commune,
+    /// segment and <c>data_source</c> are the pole's (BE-18 rule 2, drift BE-41). The confirmation goes through
+    /// <see cref="FaultTransitions.Apply"/>, so <c>confirmed_by / confirmed_at</c> follow the one rule. No client key, no notice:
+    /// the decision is the Manager's own, and the caller guards against a second decision.
+    /// </remarks>
+    public async Task<Fault> StageReviewedReportAsync(ReviewedReport report, DateTime now, CancellationToken ct)
+    {
+        if (!Reportable.Contains(report.FaultType))
+            throw new LuxMapException(ErrorCodes.FaultTypeNotReportable, HttpStatusCode.BadRequest,
+                "Only lamp_out and lamp_dim can be reported; cluster and IoT faults come from the engines.");
+
+        var pole = await db.Set<Pole>().AsNoTracking().SingleOrDefaultAsync(p => p.PoleId == report.PoleId, ct)
+            ?? throw new LuxMapException(ErrorCodes.PoleNotFound, HttpStatusCode.NotFound,
+                "That pole does not exist, or it is outside your permitted commune scope.");
+        var fault = new Fault
+        {
+            FaultId = await NextFaultId(ct), PoleId = pole.PoleId, SegmentId = pole.SegmentId, CommuneId = pole.CommuneId,
+            FaultType = report.FaultType, FaultStatus = FaultStatus.Detected, Severity = report.Severity,
+            SourceChannel = SourceChannel.FieldReport, DataSource = pole.DataSource, DetectedAt = report.DetectedAt,
+            Note = report.Note, ReviewNote = report.ReviewNote, ReportedBy = ActorId, CreatedAt = now, UpdatedAt = now,
+        };
+        transitions.Apply(fault, FaultStatus.Confirmed, now, ActorId);
+        db.Add(fault);
+        audit.Record(new(now, AuditActorKind.User, ActorId, actor.Role, fault.CommuneId, AuditEntityType.Fault, fault.FaultId,
+            AuditAction.Created, null, new { fault.FaultId, fault.PoleId, fault.FaultType, fault.FaultStatus, fault.Severity,
+                fault.SourceChannel, fault.DataSource, fault.DetectedAt, fault.Note, fault.ReviewNote, fault.ConfirmedBy,
+                origin = report.Origin }));
+        return fault;
     }
 
     /// <summary>The fault this reporter already sent with this key; someone else's key is a conflict, not a replay.</summary>
