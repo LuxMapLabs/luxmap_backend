@@ -238,4 +238,27 @@ public static class ErrorCodes
 
     /// <summary>503 — CITIZEN-QR P2b: too many photos waiting to be cleaned at once; try again shortly (Codex review P2b #2).</summary>
     public const string ServerBusy = "SERVER_BUSY";
+
+    /// <summary>404 — CITIZEN-QR P2c: no such citizen report in the caller's communes.</summary>
+    public const string CitizenReportNotFound = "CITIZEN_REPORT_NOT_FOUND";
+
+    /// <summary>404 — CITIZEN-QR P2c: no such photo on that report.</summary>
+    public const string CitizenPhotoNotFound = "CITIZEN_PHOTO_NOT_FOUND";
+
+    /// <summary>409 — CITIZEN-QR P2c: the report was already accepted, merged or rejected; a decision is made once.</summary>
+    public const string CitizenReportAlreadyDecided = "CITIZEN_REPORT_ALREADY_DECIDED";
+
+    /// <summary>
+    /// 409 — CITIZEN-QR P2c: a citizen sent more since the Manager opened the report (<c>submission_count</c> differs). Reload, then decide.
+    /// </summary>
+    public const string CitizenReportChanged = "CITIZEN_REPORT_CHANGED";
+
+    /// <summary>409 — CITIZEN-QR P2c (D-17): no send in the report says what the chosen fault type says (out → lamp_out, dim → lamp_dim).</summary>
+    public const string CitizenReportNotAcceptable = "CITIZEN_REPORT_NOT_ACCEPTABLE";
+
+    /// <summary>409 — CITIZEN-QR P2c: the pole already has an open fault of that type; merge into it instead of opening a second.</summary>
+    public const string OpenFaultExists = "OPEN_FAULT_EXISTS";
+
+    /// <summary>409 — CITIZEN-QR P2c: the fault is closed or on another pole, so the report cannot be merged into it.</summary>
+    public const string FaultNotMergeable = "FAULT_NOT_MERGEABLE";
 }

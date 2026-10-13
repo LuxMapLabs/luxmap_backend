@@ -43,6 +43,7 @@ d["info"]["description"] = (
     "BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. "
     "CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. "
     "CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. "
+    "CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -82,6 +83,7 @@ TAGS = OrderedDict([
     ("Sync", "Đồng bộ offline cho Kỹ sư hiện trường — Contract §5.8 (BE-43): gói dữ liệu đầy đủ theo tuyến + hàng chờ thao tác."),
     ("Statistics", "Thống kê dashboard — BE-28 (drift ST-1…ST-10) và bảo hành BE-31 (drift W-1…W-8), SELF-SIGNED, nền tạm tới FW. Đọc = cap:read_statistics (Cấp giám sát, Quản lý, Quản trị). format=csv xuất UTF-8 có BOM, tối đa 10 000 dòng (413 EXPORT_TOO_LARGE)."),
     ("QrCodes", "Mã QR trên cột cho công dân báo sự cố — CITIZEN-QR P2a (drift CITIZEN-QR, SELF-SIGNED, nền tạm tới FW). Chỉ Quản lý (cap:manage_qr_codes). Mã in trên cột chỉ có trong response, không bao giờ trong đường dẫn hay audit; phía công khai là P2b."),
+    ("CitizenReports", "Hàng chờ báo cáo của công dân — CITIZEN-QR P2c (drift PC-1…PC-10, SELF-SIGNED, nền tạm tới FW). Đọc = cap:read_citizen_reports (Cấp giám sát, Quản lý, Quản trị — chỉ metadata); quyết định và mở ảnh = cap:review_citizen_reports (Quản lý). Mỗi quyết định gửi kèm submission_count đã xem; báo cáo được quyết một lần. Gợi ý AI chỉ là gợi ý."),
     ("Public", "Công dân báo sự cố qua mã QR trên cột — CITIZEN-QR P2b (SELF-SIGNED, nền tạm tới FW). KHÔNG cần token (D-R1); giới hạn tần suất theo địa chỉ client; mã gửi trong body, không bao giờ trong đường dẫn. Báo cáo vào hàng chờ của Quản lý, không thành fault."),
 ])
 d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
@@ -249,6 +251,17 @@ SUMMARY[("post", "/api/v1/public/qr/lookup")] = (
     "[TẠM — CITIZEN-QR] (ẩn danh) Mã QR trỏ tới đâu: tên tuyến + tên xã; mã sai / không tồn tại / đã thu hồi cùng một 404")
 SUMMARY[("post", "/api/v1/public/reports")] = (
     "[TẠM — CITIZEN-QR] (ẩn danh) Gửi báo cáo về cột của mã: loại, mô tả, vị trí tuỳ chọn, 0–3 ảnh JPEG; vào hàng chờ Quản lý duyệt")
+SUMMARY[("get", "/api/v1/citizen-reports")] = (
+    "[TẠM — CITIZEN-QR] Hàng chờ báo cáo của công dân, lượt gửi mới nhất trước; status (CSV, vắng = pending), pole_id, commune_id")
+SUMMARY[("get", "/api/v1/citizen-reports/{reportId}")] = (
+    "[TẠM — CITIZEN-QR] Một báo cáo: cột, sự cố mở trên cột, mọi lượt gửi; ảnh + gợi ý AI chỉ cho người mở được ảnh; allowed_actions")
+SUMMARY[("get", "/api/v1/citizen-reports/{reportId}/photos/{photoId}/thumbnail")] = "[TẠM — CITIZEN-QR] Thumbnail ảnh của báo cáo (JPEG, chỉ Quản lý)"
+SUMMARY[("get", "/api/v1/citizen-reports/{reportId}/photos/{photoId}/original")] = (
+    "[TẠM — CITIZEN-QR] Ảnh của báo cáo (JPEG đã bỏ EXIF/GPS lúc nhận, chỉ Quản lý)")
+SUMMARY[("post", "/api/v1/citizen-reports/{reportId}/accept")] = (
+    "[TẠM — CITIZEN-QR] Thành sự cố field_report mới, confirmed bởi Quản lý; loại phải khớp loại dân báo; 409 nếu cột đã có sự cố mở cùng loại")
+SUMMARY[("post", "/api/v1/citizen-reports/{reportId}/merge")] = "[TẠM — CITIZEN-QR] Gắn vào sự cố đang mở của cùng cột; sự cố không đổi"
+SUMMARY[("post", "/api/v1/citizen-reports/{reportId}/reject")] = "[TẠM — CITIZEN-QR] Bác bỏ, bắt buộc lý do"
 SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
@@ -256,6 +269,7 @@ SECTION = {
     "/api/v1/statistics": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/qr-codes": "drift CITIZEN-QR CQ-1, CQ-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/public": "drift CITIZEN-QR P2b PB-1…PB-8 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/citizen-reports": "drift CITIZEN-QR P2c PC-1…PC-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/work-orders": "§5.5 + drift WO-1…WO-11",
     "/api/v1/faults": "§5.4 + drift F-1…F-6",
     "/api/v1/auth/me": "§4.7",

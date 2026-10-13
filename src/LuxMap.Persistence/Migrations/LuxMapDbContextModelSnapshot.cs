@@ -595,6 +595,22 @@ namespace LuxMap.Persistence.Migrations
                         .HasDefaultValueSql("luxmap_format_id('CPH', nextval('citizen_photo_id_seq'), 6)")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "citizen_photo_id_seq");
 
+                    b.Property<string>("AiArtifactVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("ai_artifact_version");
+
+                    b.Property<DateTime?>("AiCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ai_checked_at");
+
+                    b.Property<double?>("AiConfidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("ai_confidence");
+
+                    b.Property<string>("AiHint")
+                        .HasColumnType("text")
+                        .HasColumnName("ai_hint");
+
                     b.Property<long>("ByteCount")
                         .HasColumnType("bigint")
                         .HasColumnName("byte_count");
@@ -638,6 +654,14 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("citizen_photo", null, t =>
                         {
+                            t.HasCheckConstraint("ck_citizen_photo_ai_confidence", "(ai_confidence IS NULL) = (ai_hint IS NULL OR ai_hint = 'inconclusive') AND (ai_confidence IS NULL OR (ai_confidence >= 0 AND ai_confidence <= 1 AND ai_confidence <> 'NaN'::float8))");
+
+                            t.HasCheckConstraint("ck_citizen_photo_ai_hint", "\"ai_hint\" IS NULL OR \"ai_hint\" IN ('lamp_on', 'lamp_off', 'inconclusive')");
+
+                            t.HasCheckConstraint("ck_citizen_photo_ai_together", "(ai_hint IS NULL) = (ai_artifact_version IS NULL) AND (ai_hint IS NULL) = (ai_checked_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_citizen_photo_ai_version_not_blank", "ai_artifact_version IS NULL OR btrim(ai_artifact_version) <> ''");
+
                             t.HasCheckConstraint("ck_citizen_photo_bytes", "byte_count > 0 AND thumbnail_bytes > 0");
 
                             t.HasCheckConstraint("ck_citizen_photo_keys_not_blank", "btrim(object_key) <> '' AND btrim(thumbnail_key) <> ''");
@@ -3793,7 +3817,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("audit_event", null, t =>
                         {
-                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked')");
+                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed')");
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 

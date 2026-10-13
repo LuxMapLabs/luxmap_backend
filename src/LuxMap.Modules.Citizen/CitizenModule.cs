@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace LuxMap.Modules.Citizen;
 
-/// <summary>CITIZEN-QR — QR codes on poles (P2a), the public report form (P2b); the Manager's review comes in P2c (D-19).</summary>
+/// <summary>CITIZEN-QR — QR codes on poles (P2a), the public report form (P2b), the Manager's review (P2c) (D-19).</summary>
 public sealed class CitizenModule : ILuxMapModule
 {
     public string Name => "Citizen";
@@ -19,5 +19,10 @@ public sealed class CitizenModule : ILuxMapModule
         services.AddSingleton(options);
         services.AddSingleton<CitizenScopeFactory>();
         services.AddScoped<PublicReportService>();
+
+        // P2c — the Manager's review.
+        services.AddScoped<CitizenReviewService>();
+        services.AddSingleton<ICitizenPhotoHinter, YoloCitizenPhotoHinter>();
+        services.AddSingleton<CitizenHintBackoff>();
     }
 }

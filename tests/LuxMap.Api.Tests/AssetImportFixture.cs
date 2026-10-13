@@ -177,6 +177,12 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
             {
                 "DELETE FROM fixture WHERE commune_id = @c OR commune_id = @f;",
 
+                // CITIZEN-QR: photo → submission → report, all RESTRICT; submissions and reports hold the code and the pole, and an
+                // accepted or merged report holds its FAULT (P2c) — so they go before the faults. Photos go by their submission.
+                "DELETE FROM citizen_photo WHERE submission_id IN (SELECT submission_id FROM citizen_submission WHERE commune_id = @c OR commune_id = @f);",
+                "DELETE FROM citizen_submission WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM citizen_report WHERE commune_id = @c OR commune_id = @f;",
+
                 // 🔴 BEFORE the poles, and it was MISSING until BE-14 traced a broken suite to it.
                 // fault.pole_id holds a pole with RESTRICT, so one fault left behind makes the pole
                 // DELETE below fail — and with it the whole teardown, so the commune's poles survive
@@ -189,12 +195,6 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 // with a known hole in it is not much of a net — and the hole is invisible until a
                 // later suite dies on pk_pole for reasons that point nowhere near the cause.
                 "DELETE FROM lux_reading WHERE commune_id = @c OR commune_id = @f;",
-
-                // CITIZEN-QR P2b: photo → submission → report, all RESTRICT; submissions and reports hold the code and the pole.
-                // Photos have no commune of their own, so they go by their submission.
-                "DELETE FROM citizen_photo WHERE submission_id IN (SELECT submission_id FROM citizen_submission WHERE commune_id = @c OR commune_id = @f);",
-                "DELETE FROM citizen_submission WHERE commune_id = @c OR commune_id = @f;",
-                "DELETE FROM citizen_report WHERE commune_id = @c OR commune_id = @f;",
 
                 // CITIZEN-QR: a code holds its pole and its issuer with RESTRICT.
                 "DELETE FROM qr_code WHERE commune_id = @c OR commune_id = @f;",

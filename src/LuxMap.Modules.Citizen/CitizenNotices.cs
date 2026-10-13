@@ -9,10 +9,11 @@ internal static class CitizenNotices
 {
     public static NotificationMessage Received(CitizenReport report, CitizenReportKind kind) => new(
         NotificationType.CitizenReportReceived, report.CommuneId, NotificationEntityType.CitizenReport, report.ReportId,
-        $"Báo cáo mới từ người dân: {Kind(kind)}",
-        $"Người dân báo {Kind(kind).ToLowerInvariant()} tại cột {report.PoleId} qua mã QR. Báo cáo đang chờ Quản lý duyệt.");
+        $"Báo cáo mới từ người dân: {KindText(kind)}",
+        $"Người dân báo {KindText(kind).ToLowerInvariant()} tại cột {report.PoleId} qua mã QR. Báo cáo đang chờ Quản lý duyệt.");
 
-    private static string Kind(CitizenReportKind kind) => kind switch
+    /// <summary>The form's wording of a kind — also used in the fault note an accepted report produces.</summary>
+    public static string KindText(CitizenReportKind kind) => kind switch
     {
         CitizenReportKind.LampOut => "Đèn tắt",
         CitizenReportKind.LampDim => "Đèn mờ / chập chờn",
