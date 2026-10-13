@@ -122,7 +122,9 @@ public sealed class CitizenReviewTests(AssetImportFixture factory) : IAsyncLifet
 
         var detail = await Read(await manager.GetAsync($"{Queue}/{report}"));
         Assert.Equal([open], detail.GetProperty("open_faults").EnumerateArray().Select(f => f.GetProperty("fault_id").GetString()));
-        Assert.Equal(["accept", "merge", "reject"], detail.GetProperty("allowed_actions").EnumerateArray().Select(a => a.GetString()));
+        // accept is certain to be refused, so it is not offered (Codex review P2c #1).
+        Assert.Equal(["merge", "reject"], detail.GetProperty("allowed_actions").EnumerateArray().Select(a => a.GetString()));
+        Assert.Empty(detail.GetProperty("acceptable_fault_types").EnumerateArray());
 
         var accept = await manager.PostAsJsonAsync($"{Queue}/{report}/accept", new { submission_count = 1, fault_type = "lamp_out" });
         Assert.Equal(HttpStatusCode.Conflict, accept.StatusCode);
@@ -417,6 +419,81 @@ public sealed class CitizenReviewTests(AssetImportFixture factory) : IAsyncLifet
         Assert.Equal(HttpStatusCode.OK, (await decision).StatusCode);
     }
 
+    [Fact]
+    public async Task A_mixed_report_offers_only_the_type_not_already_open_on_the_pole()
+    {
+        var (pole, report, code) = await FiledWithCodeAsync("lamp_out", 0, host);
+        await SendAsync(host, code, "lamp_dim");
+        await PlantFaultAsync(pole, FaultStatus.Confirmed);
+        var manager = await ManagerAsync();
+
+        var detail = await Read(await manager.GetAsync($"{Queue}/{report}"));
+
+        Assert.Equal(["lamp_dim"], detail.GetProperty("acceptable_fault_types").EnumerateArray().Select(t => t.GetString()));
+        Assert.Equal(["accept", "merge", "reject"], detail.GetProperty("allowed_actions").EnumerateArray().Select(a => a.GetString()));
+        Assert.Equal(HttpStatusCode.OK,
+            (await manager.PostAsJsonAsync($"{Queue}/{report}/accept", new { submission_count = 2, fault_type = "lamp_dim" })).StatusCode);
+    }
+
+    /// <summary>A slow send can be received before the one that opened the report: the fault is detected at the EARLIEST send.</summary>
+    [Fact]
+    public async Task The_fault_is_detected_at_the_earliest_send_not_when_the_report_opened()
+    {
+        var (_, report) = await FiledAsync("lamp_out");
+        var earlier = await factory.QueryAsync(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var first = await db.Set<CitizenSubmission>().IgnoreQueryFilters().AsNoTracking().SingleAsync(s => s.ReportId == report);
+            var received = first.ReceivedAt.AddMinutes(-7);
+            db.Add(new CitizenSubmission
+            {
+                ReportId = first.ReportId, QrId = first.QrId, PoleId = first.PoleId, CommuneId = first.CommuneId, ClientOpId = Guid.NewGuid(),
+                RequestHash = new string('a', 64), Kind = CitizenReportKind.LampOut, ReceivedAt = received,
+            });
+            await db.SaveChangesAsync();
+            return received;
+        });
+        var manager = await ManagerAsync();
+
+        var accepted = await Read(await manager.PostAsJsonAsync($"{Queue}/{report}/accept", new { submission_count = 2, fault_type = "lamp_out" }));
+
+        var faultId = accepted.GetProperty("fault_id").GetString();
+        Assert.Equal(earlier, await factory.QueryAsync(db => db.Set<Fault>().IgnoreQueryFilters()
+            .Where(f => f.FaultId == faultId).Select(f => f.DetectedAt).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task One_opening_runs_the_model_on_at_most_HintsPerRequest_photos()
+    {
+        await using var capped = Host(services => services.Replace(ServiceDescriptor.Singleton<ICitizenPhotoHinter>(hinter)), ("Citizen:HintsPerRequest", "2"));
+        var (_, report) = await FiledAsync("lamp_out", photos: 3, through: capped);
+        var manager = await ManagerAsync(capped);
+
+        await manager.GetAsync($"{Queue}/{report}");
+        Assert.Equal(2, hinter.Calls);
+        var detail = await Read(await manager.GetAsync($"{Queue}/{report}"));
+        Assert.Equal(3, hinter.Calls);
+        Assert.All(detail.GetProperty("submissions")[0].GetProperty("photos").EnumerateArray(),
+            p => Assert.NotEqual(JsonValueKind.Null, p.GetProperty("ai_hint").ValueKind));
+    }
+
+    /// <summary>A photo the model could not read waits out a cooldown, so it does not take the next opening's slot (Codex review P2c #3).</summary>
+    [Fact]
+    public async Task A_photo_that_could_not_be_hinted_does_not_starve_the_photos_after_it()
+    {
+        hinter.ByCall = call => call == 1 ? null : new PhotoHint(CitizenPhotoHint.LampOn, 0.9, CountingHinter.Version);
+        await using var capped = Host(services => services.Replace(ServiceDescriptor.Singleton<ICitizenPhotoHinter>(hinter)), ("Citizen:HintsPerRequest", "1"));
+        var (_, report) = await FiledAsync("lamp_out", photos: 2, through: capped);
+        var manager = await ManagerAsync(capped);
+
+        await manager.GetAsync($"{Queue}/{report}");
+        var detail = await Read(await manager.GetAsync($"{Queue}/{report}"));
+
+        var hints = detail.GetProperty("submissions")[0].GetProperty("photos").EnumerateArray()
+            .Select(p => p.GetProperty("ai_hint").ValueKind).ToList();
+        Assert.Equal([JsonValueKind.Null, JsonValueKind.Object], hints);
+    }
+
     // ---- helpers ----------------------------------------------------------------------------------------
 
     private sealed class CountingHinter : ICitizenPhotoHinter
@@ -429,18 +506,22 @@ public sealed class CitizenReviewTests(AssetImportFixture factory) : IAsyncLifet
 
         public PhotoHint? Answer { get; set; } = new(CitizenPhotoHint.LampOff, 0.8, Version);
 
+        /// <summary>When set, the answer by call number (1-based) — to fail one call and not the next.</summary>
+        public Func<int, PhotoHint?>? ByCall { get; set; }
+
         public Task<PhotoHint?> HintAsync(Stream photo, Stream thumbnail, CancellationToken ct)
         {
-            Interlocked.Increment(ref calls);
-            return Task.FromResult(Answer);
+            var call = Interlocked.Increment(ref calls);
+            return Task.FromResult(ByCall is { } byCall ? byCall(call) : Answer);
         }
     }
 
-    private WebApplicationFactory<Program> Host(Action<IServiceCollection>? configure)
+    private WebApplicationFactory<Program> Host(Action<IServiceCollection>? configure, params (string Key, string Value)[] settings)
         => factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("RateLimits:PublicLookup:PermitLimit", "10000");
             builder.UseSetting("RateLimits:PublicReport:PermitLimit", "10000");
+            foreach (var (key, value) in settings) builder.UseSetting(key, value);
             builder.ConfigureServices(services =>
             {
                 services.Replace(ServiceDescriptor.Singleton<IObjectStore>(photos));
@@ -458,24 +539,36 @@ public sealed class CitizenReviewTests(AssetImportFixture factory) : IAsyncLifet
     }
 
     /// <summary>A fresh pole with a code, and one public send about it — the report that send opened.</summary>
-    private async Task<(string Pole, string Report)> FiledAsync(string kind, bool photo = false, WebApplicationFactory<Program>? through = null)
+    private async Task<(string Pole, string Report)> FiledAsync(
+        string kind, bool photo = false, WebApplicationFactory<Program>? through = null, int photos = 0)
     {
-        var server = through ?? host;
+        var (pole, report, _) = await FiledWithCodeAsync(kind, photo ? Math.Max(photos, 1) : photos, through ?? host);
+        return (pole, report);
+    }
+
+    private async Task<(string Pole, string Report, string Code)> FiledWithCodeAsync(string kind, int photos, WebApplicationFactory<Program> server)
+    {
         var pole = await PlantPoleAsync(factory.CommuneId);
         var issued = await Read(await (await ManagerAsync(server)).PostAsJsonAsync("/api/v1/qr-codes", new { pole_id = pole }));
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(issued.GetProperty("code").GetString()!), "code" },
-            { new StringContent(kind), "kind" },
-            { new StringContent(Guid.NewGuid().ToString()), "client_op_id" },
-        };
-        if (photo) form.Add(new ByteArrayContent(PhotoStore.Jpeg()), "photos", "photo.jpg");
-        var sent = await server.CreateClient().PostAsync("/api/v1/public/reports", form);
-        Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
+        var code = issued.GetProperty("code").GetString()!;
+        await SendAsync(server, code, kind, photos);
 
         var report = await factory.QueryAsync(db => db.Set<CitizenReport>().IgnoreQueryFilters()
             .Where(r => r.PoleId == pole).Select(r => r.ReportId).SingleAsync());
-        return (pole, report);
+        return (pole, report, code);
+    }
+
+    private static async Task SendAsync(WebApplicationFactory<Program> server, string code, string kind, int photos = 0)
+    {
+        using var form = new MultipartFormDataContent
+        {
+            { new StringContent(code), "code" },
+            { new StringContent(kind), "kind" },
+            { new StringContent(Guid.NewGuid().ToString()), "client_op_id" },
+        };
+        for (var i = 0; i < photos; i++) form.Add(new ByteArrayContent(PhotoStore.Jpeg((byte)(40 + i))), "photos", $"photo{i}.jpg");
+        var sent = await server.CreateClient().PostAsync("/api/v1/public/reports", form);
+        Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
     }
 
     private Task<string> PlantPoleAsync(string commune) => factory.QueryAsync(async db =>

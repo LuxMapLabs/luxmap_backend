@@ -38,6 +38,7 @@ public sealed class CitizenReviewService(
     IAuditTrail audit,
     FaultReportService faults,
     ICitizenPhotoHinter hinter,
+    CitizenHintBackoff backoff,
     IObjectStore store,
     CitizenOptions options,
     TimeProvider clock,
@@ -305,7 +306,9 @@ public sealed class CitizenReviewService(
             .Where(x => x.ReportId == reportId && x.Photo.AiHint == null)
             .OrderBy(x => x.Photo.ReceivedAt).ThenBy(x => x.Photo.PhotoId.Length).ThenBy(x => x.Photo.PhotoId)
             .Select(x => new { x.Photo.PhotoId, x.Photo.ObjectKey, x.Photo.ThumbnailKey })
-            .Take(options.HintsPerRequest).ToListAsync(ct);
+            .ToListAsync(ct);
+        // A report holds at most a night's photo allowance, so reading every candidate is cheap; the cap is on the model runs.
+        todo = [.. todo.Where(p => !backoff.IsCooling(p.PhotoId)).Take(options.HintsPerRequest)];
 
         var hints = new Dictionary<string, PhotoHint>(StringComparer.Ordinal);
         foreach (var photo in todo)
@@ -321,10 +324,12 @@ public sealed class CitizenReviewService(
             {
                 // A missing object or an unreachable store: no hint this time. The report still opens; the photo endpoint reports it.
                 log.LogWarning(error, "Citizen photo {PhotoId} could not be read for an AI hint", photo.PhotoId);
+                backoff.Failed(photo.PhotoId);
                 continue;
             }
 
             if (await hinter.HintAsync(original, thumbnail, ct) is { } hint) hints[photo.PhotoId] = hint;
+            else backoff.Failed(photo.PhotoId);
         }
 
         if (hints.Count == 0) return;
@@ -389,6 +394,10 @@ public sealed class CitizenReviewService(
         }).ToList();
 
         var kinds = sends.Select(s => s.Kind).ToList();
+        // What accept would take right now: backed by a send (D-17) and not already open on the pole (OPEN_FAULT_EXISTS).
+        List<FaultType> acceptable = report.Status == CitizenReportStatus.Pending
+            ? [.. LampTypes.Where(t => kinds.Contains(Backing[t]) && openFaults.All(f => f.FaultType != t))]
+            : [];
         var item = Item(report, sends.Count, photos.Count, kinds, sends.Any(s => s.FarFromPole));
         return new CitizenReportDetail
         {
@@ -403,17 +412,20 @@ public sealed class CitizenReviewService(
             },
             OpenFaults = openFaults,
             Submissions = submissions,
-            AllowedActions = AllowedActions(report, canReview, kinds, openFaults.Count),
-            AcceptableFaultTypes = [.. LampTypes.Where(t => kinds.Contains(Backing[t]))],
+            AllowedActions = AllowedActions(report, canReview, acceptable.Count > 0, openFaults.Count),
+            AcceptableFaultTypes = acceptable,
         };
     }
 
-    /// <summary>What the caller may press. <c>accept</c> needs a lamp send (D-17); <c>merge</c> needs an open fault on the pole.</summary>
-    private static List<string> AllowedActions(CitizenReport report, bool canReview, IReadOnlyCollection<CitizenReportKind> kinds, int openFaults)
+    /// <summary>
+    /// What the caller may press now — never an action certain to be refused. <c>accept</c> needs a type it would take
+    /// (<see cref="CitizenReportDetail.AcceptableFaultTypes"/>); <c>merge</c> needs an open fault on the pole.
+    /// </summary>
+    private static List<string> AllowedActions(CitizenReport report, bool canReview, bool acceptable, int openFaults)
     {
         if (!canReview || report.Status != CitizenReportStatus.Pending) return [];
         var actions = new List<string>();
-        if (kinds.Any(k => k is CitizenReportKind.LampOut or CitizenReportKind.LampDim)) actions.Add("accept");
+        if (acceptable) actions.Add("accept");
         if (openFaults > 0) actions.Add("merge");
         actions.Add("reject");
         return actions;

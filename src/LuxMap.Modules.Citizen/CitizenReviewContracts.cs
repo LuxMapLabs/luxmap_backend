@@ -59,8 +59,8 @@ public sealed record CitizenReportDetail : CitizenReportItem
     public required IReadOnlyList<string> AllowedActions { get; init; }
 
     /// <summary>
-    /// The fault types <c>accept</c> takes for this report (D-17): <c>lamp_out</c> when a send said the lamp is out, <c>lamp_dim</c> when
-    /// one said it is dim. Empty when no send said either.
+    /// The fault types <c>accept</c> would take now (D-17): <c>lamp_out</c> when a send said the lamp is out, <c>lamp_dim</c> when one said
+    /// it is dim — minus any type the pole already has an open fault of (merge into that one). Empty for a decided report.
     /// </summary>
     public required IReadOnlyList<FaultType> AcceptableFaultTypes { get; init; }
 }

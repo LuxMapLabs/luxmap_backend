@@ -23,5 +23,6 @@ public sealed class CitizenModule : ILuxMapModule
         // P2c — the Manager's review.
         services.AddScoped<CitizenReviewService>();
         services.AddSingleton<ICitizenPhotoHinter, YoloCitizenPhotoHinter>();
+        services.AddSingleton<CitizenHintBackoff>();
     }
 }
