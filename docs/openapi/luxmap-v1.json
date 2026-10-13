@@ -10387,7 +10387,13 @@
             }
           },
           "location": {
-            "$ref": "#/components/schemas/WorkOrderLocation"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkOrderLocation"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -10853,7 +10859,13 @@
             "type": "string"
           },
           "ai_hint": {
-            "$ref": "#/components/schemas/CitizenPhotoAiHint"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CitizenPhotoAiHint"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -11202,7 +11214,13 @@
             "type": "boolean"
           },
           "photos_dropped": {
-            "$ref": "#/components/schemas/PhotosDroppedReason"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PhotosDroppedReason"
+              }
+            ],
+            "nullable": true
           },
           "received_at": {
             "type": "string",
@@ -11279,7 +11297,13 @@
             "nullable": true
           },
           "geometry": {
-            "$ref": "#/components/schemas/Geometry"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Geometry"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -12224,7 +12248,13 @@
             "format": "int32"
           },
           "cabinet": {
-            "$ref": "#/components/schemas/FeederCabinet"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeederCabinet"
+              }
+            ],
+            "nullable": true
           },
           "updated_at": {
             "type": "string",
@@ -12740,7 +12770,13 @@
             "type": "string"
           },
           "control_mode": {
-            "$ref": "#/components/schemas/FeederControlMode"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeederControlMode"
+              }
+            ],
+            "nullable": true
           },
           "mode_reported_at": {
             "type": "string",
@@ -12844,7 +12880,13 @@
             "nullable": true
           },
           "reported_mode": {
-            "$ref": "#/components/schemas/FeederControlMode"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FeederControlMode"
+              }
+            ],
+            "nullable": true
           },
           "error": {
             "type": "string",
@@ -13187,7 +13229,13 @@
             "nullable": true
           },
           "nearest_luminance": {
-            "$ref": "#/components/schemas/NearestLuminance"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NearestLuminance"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -13489,7 +13537,13 @@
             "nullable": true
           },
           "feeder_source": {
-            "$ref": "#/components/schemas/TopologySource"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TopologySource"
+              }
+            ],
+            "nullable": true
           },
           "cabinet_id": {
             "type": "string",
@@ -13500,7 +13554,13 @@
             "nullable": true
           },
           "cabinet_source": {
-            "$ref": "#/components/schemas/TopologySource"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TopologySource"
+              }
+            ],
+            "nullable": true
           },
           "commune_id": {
             "type": "string"
@@ -13515,7 +13575,13 @@
             "$ref": "#/components/schemas/AssetLocation"
           },
           "active_fixture": {
-            "$ref": "#/components/schemas/ActiveFixture"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ActiveFixture"
+              }
+            ],
+            "nullable": true
           },
           "note": {
             "type": "string",
@@ -13627,16 +13693,34 @@
             "$ref": "#/components/schemas/PoleMapLocation"
           },
           "fixture": {
-            "$ref": "#/components/schemas/PoleMapFixture"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PoleMapFixture"
+              }
+            ],
+            "nullable": true
           },
           "current_status": {
             "$ref": "#/components/schemas/PoleMapStatus"
           },
           "iot_node": {
-            "$ref": "#/components/schemas/PoleMapIotNode"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PoleMapIotNode"
+              }
+            ],
+            "nullable": true
           },
           "luminance_baseline": {
-            "$ref": "#/components/schemas/PoleMapBaseline"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PoleMapBaseline"
+              }
+            ],
+            "nullable": true
           },
           "luminance_baselines": {
             "type": "array",
@@ -13890,7 +13974,13 @@
             "nullable": true
           },
           "source_channel": {
-            "$ref": "#/components/schemas/SourceChannel"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SourceChannel"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -13949,10 +14039,22 @@
             "nullable": true
           },
           "power_source": {
-            "$ref": "#/components/schemas/PowerSource"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PowerSource"
+              }
+            ],
+            "nullable": true
           },
           "fixture_type": {
-            "$ref": "#/components/schemas/FixtureType"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FixtureType"
+              }
+            ],
+            "nullable": true
           },
           "lamp_watt": {
             "type": "integer",
@@ -15143,7 +15245,13 @@
             "format": "int32"
           },
           "latest_run": {
-            "$ref": "#/components/schemas/SweepRunSummary"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SweepRunSummary"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -15485,10 +15593,22 @@
             "nullable": true
           },
           "power_source": {
-            "$ref": "#/components/schemas/PowerSource"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PowerSource"
+              }
+            ],
+            "nullable": true
           },
           "fixture_type": {
-            "$ref": "#/components/schemas/FixtureType"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FixtureType"
+              }
+            ],
+            "nullable": true
           },
           "lamp_watt": {
             "type": "integer",
@@ -15670,7 +15790,13 @@
             "nullable": true
           },
           "feeder_source": {
-            "$ref": "#/components/schemas/TopologySource"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TopologySource"
+              }
+            ],
+            "nullable": true
           },
           "lat": {
             "type": "number",
@@ -16020,7 +16146,13 @@
             "nullable": true
           },
           "fixture_type": {
-            "$ref": "#/components/schemas/FixtureType"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FixtureType"
+              }
+            ],
+            "nullable": true
           },
           "lamp_watt": {
             "type": "integer",
@@ -16186,7 +16318,13 @@
             "type": "string"
           },
           "location": {
-            "$ref": "#/components/schemas/WorkOrderLocation"
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkOrderLocation"
+              }
+            ],
+            "nullable": true
           },
           "distance_m": {
             "type": "number",
@@ -16417,7 +16555,13 @@
             "$ref": "#/components/schemas/Severity"
           },
           "inspection_outcome": {
-            "$ref": "#/components/schemas/InspectionOutcome"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InspectionOutcome"
+              }
+            ],
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -16584,7 +16728,13 @@
             "type": "boolean"
           },
           "fixture_type": {
-            "$ref": "#/components/schemas/FixtureType"
+            "type": "string",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FixtureType"
+              }
+            ],
+            "nullable": true
           },
           "lamp_watt": {
             "type": "integer",
