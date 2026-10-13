@@ -72,8 +72,11 @@ builder.Services.AddLuxMapSwagger();
 // BE-08 — token validation, role policies, and the commune scoping of Contract section 7.
 builder.Services.AddLuxMapAuthorization();
 
-// BE-33a — per-endpoint rate limits; only the anonymous endpoint that sends mail uses one so far.
+// BE-33a — per-endpoint rate limits, partitioned by client address.
 builder.Services.AddLuxMapRateLimiting(builder.Configuration);
+
+// CITIZEN-QR P2b — the client address behind a trusted reverse proxy; nothing is trusted unless configured.
+builder.Services.AddLuxMapForwardedHeaders(builder.Configuration);
 
 // BE-03 — EF Core + Npgsql + NetTopologySuite, one shared DbContext.
 builder.Services.AddLuxMapPersistence(
@@ -101,6 +104,8 @@ if (SeedCommand.IsRequested(args))
 //   2. Serilog's request logging runs INSIDE that scope, so the summary line carries the id
 //   3. the exception handler sits inside both, turning failures into a 500 response so Serilog
 //      records the real status instead of logging the exception a second time
+// 0. Forwarded headers first: everything after it — log line, rate limiters — must see the real client address.
+app.UseLuxMapForwardedHeaders();
 app.UseLuxMapCorrelationId();
 app.UseLuxMapRequestLogging();
 app.UseLuxMapErrorHandling();
