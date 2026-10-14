@@ -45,6 +45,7 @@ d["info"]["description"] = (
     "CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. "
     "CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). "
     "BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). "
+    "COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -187,6 +188,10 @@ SUMMARY = {
     ("post", "/api/v1/admin/users/{id}/lock"): "[BE-33a] Khoá và thu hồi mọi phiên; không tự khoá, không khoá Quản trị cuối",
     ("post", "/api/v1/admin/users/{id}/unlock"): "[BE-33a] Mở khoá",
     ("post", "/api/v1/admin/users/{id}/invite"): "[BE-33a] Gửi lại email mời; link cũ hết hiệu lực",
+    ("get", "/api/v1/admin/communes"): "[COMMUNE-BBOX] Quản trị: danh sách xã kèm khung bản đồ (bbox) và tâm",
+    ("post", "/api/v1/admin/communes"): "[COMMUNE-BBOX] Quản trị tạo xã; bbox {min_lng, min_lat, max_lng, max_lat} tuỳ chọn",
+    ("get", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Chi tiết một xã",
+    ("put", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Thay tên + khung bản đồ; cả hai khoá bắt buộc, bbox null = xoá khung",
     ("post", "/api/v1/auth/refresh"): "Xoay vòng refresh token (mobile)",
     ("post", "/api/v1/auth/logout"): "Thu hồi refresh token (mobile); luôn 204",
     ("post", "/api/v1/lux-readings"): "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",

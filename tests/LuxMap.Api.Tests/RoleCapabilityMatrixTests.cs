@@ -53,6 +53,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["RecordLuxReading"] = ("POST", "/api/v1/lux-readings", ["field_engineer"]),
         ["ControlLighting"] = ("POST", "/api/v1/lighting/commands", ["manager"]),
         ["ManageUsers"] = ("POST", "/api/v1/admin/users", ["system_admin"]),
+        ["ManageCommunes"] = ("POST", "/api/v1/admin/communes", ["system_admin"]),
         ["ReadFaults"] = ("GET", "/api/v1/faults", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReadNotifications"] = ("GET", "/api/v1/notifications/unread-count", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReviewFaults"] = ("PATCH", "/api/v1/faults/FAULT-0", ["manager"]),

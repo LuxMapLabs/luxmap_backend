@@ -3750,6 +3750,22 @@ namespace LuxMap.Persistence.Migrations
                         .HasDefaultValueSql("luxmap_format_id('COM', nextval('commune_id_seq'), 3)")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "commune_id_seq");
 
+                    b.Property<double?>("BboxMaxLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("bbox_max_lat");
+
+                    b.Property<double?>("BboxMaxLng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("bbox_max_lng");
+
+                    b.Property<double?>("BboxMinLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("bbox_min_lat");
+
+                    b.Property<double?>("BboxMinLng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("bbox_min_lng");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -3782,7 +3798,12 @@ namespace LuxMap.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_administrative_unit_seed_key");
 
-                    b.ToTable("administrative_unit", (string)null);
+                    b.ToTable("administrative_unit", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_administrative_unit_bbox_together", "(bbox_min_lng IS NULL) = (bbox_min_lat IS NULL) AND (bbox_min_lng IS NULL) = (bbox_max_lng IS NULL) AND (bbox_min_lng IS NULL) = (bbox_max_lat IS NULL)");
+
+                            t.HasCheckConstraint("ck_administrative_unit_bbox_valid", "bbox_min_lng IS NULL OR (bbox_min_lng <> 'NaN'::float8 AND bbox_min_lat <> 'NaN'::float8 AND bbox_max_lng <> 'NaN'::float8 AND bbox_max_lat <> 'NaN'::float8 AND bbox_min_lng >= -180 AND bbox_max_lng <= 180 AND bbox_min_lat >= -90 AND bbox_max_lat <= 90 AND bbox_min_lng < bbox_max_lng AND bbox_min_lat < bbox_max_lat)");
+                        });
                 });
 
             modelBuilder.Entity("LuxMap.Persistence.Audit.AuditEvent", b =>

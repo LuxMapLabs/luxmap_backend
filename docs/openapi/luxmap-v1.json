@@ -6,6 +6,329 @@
     "version": "v1"
   },
   "paths": {
+    "/api/v1/admin/communes": {
+      "get": {
+        "tags": [
+          "AdminCommunes"
+        ],
+        "summary": "[Web] List",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItemPagedResult"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_communes",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      },
+      "post": {
+        "tags": [
+          "AdminCommunes"
+        ],
+        "summary": "[Web] Create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommuneRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommuneRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommuneRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_communes",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      }
+    },
+    "/api/v1/admin/communes/{id}": {
+      "get": {
+        "tags": [
+          "AdminCommunes"
+        ],
+        "summary": "[Web] Detail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_communes",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      },
+      "put": {
+        "tags": [
+          "AdminCommunes"
+        ],
+        "summary": "[Web] Update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommuneRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommuneRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommuneRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommuneItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_communes",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      }
+    },
     "/api/v1/admin/users": {
       "post": {
         "tags": [
@@ -11235,6 +11558,98 @@
         },
         "additionalProperties": false
       },
+      "CommuneBbox": {
+        "type": "object",
+        "properties": {
+          "min_lng": {
+            "type": "number",
+            "format": "double"
+          },
+          "min_lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "max_lng": {
+            "type": "number",
+            "format": "double"
+          },
+          "max_lat": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommuneItem": {
+        "type": "object",
+        "properties": {
+          "commune_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/CommuneBbox"
+          },
+          "center": {
+            "$ref": "#/components/schemas/MapCenter"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommuneItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommuneItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CommuneSummary": {
+        "type": "object",
+        "properties": {
+          "commune_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/CommuneBbox"
+          },
+          "center": {
+            "$ref": "#/components/schemas/MapCenter"
+          }
+        },
+        "additionalProperties": false
+      },
       "CompleteWorkOrderRequest": {
         "required": [
           "report_note"
@@ -11314,6 +11729,19 @@
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateCommuneRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/CommuneBbox"
           }
         },
         "additionalProperties": false
@@ -11780,6 +12208,15 @@
             "items": {
               "type": "string"
             }
+          },
+          "communes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommuneSummary"
+            }
+          },
+          "map_bounds": {
+            "$ref": "#/components/schemas/MapBounds"
           }
         },
         "additionalProperties": false
@@ -13212,6 +13649,32 @@
             "items": {
               "$ref": "#/components/schemas/LuxReadingWithLuminanceResponse"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "MapBounds": {
+        "type": "object",
+        "properties": {
+          "bbox": {
+            "$ref": "#/components/schemas/CommuneBbox"
+          },
+          "center": {
+            "$ref": "#/components/schemas/MapCenter"
+          }
+        },
+        "additionalProperties": false
+      },
+      "MapCenter": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -15753,6 +16216,23 @@
         },
         "additionalProperties": false
       },
+      "UpdateCommuneRequest": {
+        "required": [
+          "bbox",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "bbox": {
+            "$ref": "#/components/schemas/CommuneBbox"
+          }
+        },
+        "additionalProperties": false
+      },
       "UpdateFeederRequest": {
         "required": [
           "feeder_name"
@@ -16644,7 +17124,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:manage_communes = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -16668,6 +17148,9 @@
     }
   ],
   "tags": [
+    {
+      "name": "AdminCommunes"
+    },
     {
       "name": "AdminUsers"
     },

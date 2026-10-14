@@ -187,6 +187,9 @@ public static class ErrorCodes
     /// </summary>
     public const string NoteChanged = "NOTE_CHANGED";
 
+    /// <summary>404 — no commune has that id (COMMUNE-BBOX, <c>/admin/communes/{id}</c>).</summary>
+    public const string CommuneNotFound = "COMMUNE_NOT_FOUND";
+
     /// <summary>
     /// <c>POST /sync/push</c> — an operation skipped because an earlier operation of the same batch, on the same
     /// work order or pole, was a conflict or was rejected (BE-43 D-7). <c>details.blocked_by</c> names it.

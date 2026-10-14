@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using LuxMap.Shared.Contracts.Communes;
 
 namespace LuxMap.Modules.Identity.Auth;
 
@@ -60,10 +61,20 @@ public sealed record AuthTokenResponse(
 /// </remarks>
 /// <param name="Role">A Contract section 3.1 <c>user_role</c> string, e.g. <c>manager</c>.</param>
 /// <param name="CommuneIds">The communes the account may reach, or <c>["*"]</c> for an administrator. May be empty.</param>
+/// <param name="Communes">
+/// COMMUNE-BBOX: the same communes spelled out — name and map frame — and for an administrator every commune. A frame is
+/// <c>null</c> until an administrator sets one.
+/// </param>
+/// <param name="MapBounds">
+/// COMMUNE-BBOX: the box around every frame in <paramref name="Communes"/> and its centre — hold the map there
+/// (<c>maxBounds</c>) and open it on the centre. <c>null</c> when none of them has a frame.
+/// </param>
 public sealed record CurrentUserResponse(
     string UserId,
     string Username,
     string Email,
     string FullName,
     string Role,
-    IReadOnlyList<string> CommuneIds);
+    IReadOnlyList<string> CommuneIds,
+    IReadOnlyList<CommuneSummary> Communes,
+    MapBounds? MapBounds);
