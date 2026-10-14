@@ -42,6 +42,16 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-26 — job nền theo lịch, Phase 2, 14/10/2026</strong>
+    <p><span class="tag t-next">Phase 2 xong trên nhánh, chờ push / PR</span> Nhánh <code>feat/BE-26-scheduled-jobs</code>. Khung lịch ở
+    <code>LuxMap.Persistence/Jobs</code> (bảng <code>scheduled_job</code>, claim một câu SQL theo giờ DB, fence bằng token); job
+    <code>work_order_overdue</code> (15 phút, thông báo mới <code>work_order_overdue</code>, một lần mỗi (phiếu, hạn)) và <code>node_offline</code>
+    (1 phút, sự cố mỗi đợt im lặng, <code>fault.origin_node_id</code>). Migration <code>AddScheduledJobs</code> chỉ thêm; apply → rollback → apply lại
+    sạch. 14 test mới, phá thử 15 chỗ đều đỏ; toàn bộ test xanh. Drift JB-1…JB-8. 🔴 Lượt chạy đầu trên <code>luxmap_dev</code> sẽ tạo 3 sự cố
+    <code>node_offline</code> (thiết bị mock im từ 20/08) và báo 3 phiếu quá hạn. PR chờ <code>fix/deps-pkcs-advisory</code> merge trước (advisory
+    NuGet mới làm build <code>-warnaserror</code> đỏ trên cả <code>dev</code>). Chi tiết <code>.ai/results/BE-26-p2.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>BE-26 — job nền theo lịch, Phase 1, 13/10/2026</strong>
     <p><span class="tag t-next">Phase 1 xong · D-1…D-9 chốt theo đề xuất (Mỹ, 13/10) · Phase 2 sẵn sàng</span> Nhánh <code>docs/BE-26-p1</code>. Nền đã chốt 07/10: DB + lease, không
     Hangfire. Codex (P1a) gom đủ nợ trỏ về BE-26 (thêm dọn refresh token) và mọi luật liên quan. Đề xuất: bảng <code>scheduled_job</code> +
