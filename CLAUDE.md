@@ -2184,3 +2184,15 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   sớm sẽ hủy chính lượt ghi đó (F-2).
 - Job dùng `UtcMicrosecondClock` một lần mỗi lượt; một lượt quá hạn xử lý tối đa `Batch` (500) phiếu mỗi vòng, lặp tới khi hết.
 
+
+### POLE-LOCATION — dời cột (14/10/2026, drift PL-1…PL-5)
+
+- **Ngưỡng hành lang có ĐÚNG MỘT nguồn: `SurveyProcessing:RouteCorridorM`.** Assets hỏi qua port **`ISurveyCorridor`** (Survey hiện thực,
+  khuôn `ICabinetDeviceLookup`) — đừng khai hằng 25 hay option thứ hai ở Assets: cột dời quá ngưỡng của khảo sát sẽ **âm thầm** rơi khỏi
+  mọi sweep sau (`SurveyChainageQuery.Poles` lọc theo đúng ngưỡng đó), không lỗi nào báo.
+- **Khoảng cách tới tuyến đọc `RoadSegment` BỎ query filter** — tuyến `inter_commune` có thể thuộc xã người gọi không thấy (cùng lý lẽ
+  WO-12, TOPO-INFER). Chỉ một `double` rời truy vấn. Bỏ `IgnoreQueryFilters` → 500 (`The_corridor_is_measured_from_a_segment_owned_by_another_commune`).
+- **`Pole` KHÔNG phải `IAudited`**: audit `relocated` do service ghi chủ động, guard không ép. Làm `Pole` thành `IAudited` sẽ bắt **mọi**
+  đường ghi cột (form, import, ghi chú, sync, seeder, fixture) kèm audit — quyết định riêng. Hệ quả: sửa `geom` qua form đầy đủ / import chưa có vết.
+- Thứ tự: kiểm có cột **qua filter** (404) → `FOR UPDATE` → đọc lại → đo → `AssetStamp.Touch` (không đổi ⇒ không audit). Rollback
+  `AuditPoleRelocation` gãy khi đã có audit `pole` / `relocated` (cùng họ BE-19).

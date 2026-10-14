@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>POLE-LOCATION — kỹ sư hiện trường dời cột tới vị trí thật, 14/10/2026</strong>
+    <p><span class="tag t-next">Xong trên nhánh <code>feat/POLE-LOCATION</code>, chờ PR</span> <code>PUT /assets/poles/{id}/location</code> body
+    <code>{lat, lng}</code>, capability mới <code>EditPoleLocation</code> (Quản lý + Kỹ sư). Không giới hạn khoảng dời; chặn 409 <code>POLE_OFF_SEGMENT</code>
+    khi cách tuyến của cột &gt; 25 m — cùng ngưỡng <code>SurveyProcessing:RouteCorridorM</code> qua port <code>ISurveyCorridor</code>. Mỗi lần dời một audit
+    <code>pole / relocated</code> (toạ độ cũ → mới). Migration <code>AuditPoleRelocation</code> chỉ dựng lại 2 CHECK của audit. 7 test mới, 3 chốt phá thử
+    đều đỏ. Drift PL-1…PL-5. ⚠️ WP5 phải đổi kéo thả sang endpoint này (không dùng <code>PUT /assets/poles/{id}</code>, sẽ xoá <code>feeder_id</code>).
+    Chưa làm: dời offline qua <code>/sync/push</code>; audit khi sửa <code>geom</code> bằng form đầy đủ / import.</p>
+  </div>
+  <div class="card">
     <strong>BE-26 — job nền theo lịch, Phase 2, 14/10/2026</strong>
     <p><span class="tag t-next">Phase 2 xong trên nhánh, chờ push / PR</span> Nhánh <code>feat/BE-26-scheduled-jobs</code>. Khung lịch ở
     <code>LuxMap.Persistence/Jobs</code> (bảng <code>scheduled_job</code>, claim một câu SQL theo giờ DB, fence bằng token); job
