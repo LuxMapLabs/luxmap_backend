@@ -42,6 +42,19 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>Góp ý của thầy, 14/10/2026 — sơ đồ State Machine xong, còn lại chờ chốt</strong>
+    <p><span class="tag t-next">Sơ đồ trạng thái xong trên nhánh <code>docs/state-machines</code>, chờ push / PR</span>
+    <code>docs/state-machines.md</code>: 10 sơ đồ Mermaid vẽ từ code trên <code>dev</code> — toàn cảnh, sự cố, phiếu công việc, phiên khảo sát,
+    báo cáo công dân, mã QR, lệnh ON/OFF/AUTO, <code>node_status</code>, tài khoản, <code>fixture_status</code>. Cả 10 render được bằng
+    mermaid-cli 11.4.2. Không đổi code.</p>
+    <p><span class="tag t-todo">Làm được ngay</span> Kỹ sư hiện trường cập nhật vị trí cột (endpoint + capability mới, chỉ thêm);
+    bbox của xã do Quản trị cấu hình, trả qua <code>/auth/me</code> để bản đồ khoá và mở ở tâm.
+    <span class="tag t-done">Backend đã có</span> Quản lý quản lý IoT (<code>/assets/iot-nodes</code>, <code>ManageAssets</code>); AI chạy YOLO offline,
+    không tốn token; số liệu dashboard (<code>/statistics/…</code>) — còn việc của FE.
+    <span class="tag t-block">Chờ chốt</span> Nhiều bóng / cột (phá API, cần version Contract); "ngày nhập" của bóng nghĩa là gì;
+    mã trụ + OTP SMS cho công dân (nhà cung cấp SMS, chống spam thay mã QR bí mật); nơi host API / MinIO / EMQX để deploy.</p>
+  </div>
+  <div class="card">
     <strong>BE-26 — job nền theo lịch, Phase 2, 14/10/2026</strong>
     <p><span class="tag t-next">Phase 2 xong trên nhánh, chờ push / PR</span> Nhánh <code>feat/BE-26-scheduled-jobs</code>. Khung lịch ở
     <code>LuxMap.Persistence/Jobs</code> (bảng <code>scheduled_job</code>, claim một câu SQL theo giờ DB, fence bằng token); job
