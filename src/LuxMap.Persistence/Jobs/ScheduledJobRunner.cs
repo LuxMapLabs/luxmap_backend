@@ -100,12 +100,20 @@ public sealed class ScheduledJobWorker(
         if (!options.Enabled) return;
         var byName = jobs.ToDictionary(job => job.Name, StringComparer.Ordinal);
         if (byName.Count == 0) return;
-        await runner.EnsureAsync(byName.Keys, stoppingToken);
 
+        // Inside the retry loop: a database down at startup must not end the worker — or, with the default
+        // BackgroundServiceExceptionBehavior.StopHost, the whole API. Claims wait until the rows exist.
+        var ensured = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                if (!ensured)
+                {
+                    await runner.EnsureAsync(byName.Keys, stoppingToken);
+                    ensured = true;
+                }
+
                 while (await runner.ClaimAsync(byName.Keys, stoppingToken) is { } claim)
                 {
                     await RunOneAsync(byName[claim.Name], claim.Token, stoppingToken);

@@ -165,6 +165,8 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
         try
         {
             await job.SecondRun.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            // The job signalled; the runner's own completion is a later statement. Stopping now could cancel it (review F-2).
+            await UntilAsync(async () => await RowAsync(job.Name) is { RunCount: 1, LeaseToken: null, LastError: null });
         }
         finally
         {
@@ -175,9 +177,41 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.NotEqual(job.Correlations[0], job.Correlations[1]); // a new lease, a new correlation
         Assert.Equal(DateTimeKind.Utc, job.Clocks[0].Kind);
         Assert.Equal(0, job.Clocks[0].Ticks % 10); // microseconds, as stored
-        var row = await RowAsync(job.Name);
-        Assert.Equal(1, row.RunCount);
-        Assert.Null(row.LastError);
+    }
+
+    [Fact]
+    public async Task A_database_unavailable_at_startup_does_not_end_the_worker()
+    {
+        var job = new FlakyJob("test_" + Guid.NewGuid().ToString("N")[..20], failFirst: false);
+        jobNames.Add(job.Name);
+        var options = new ScheduledJobOptions { PollSeconds = 1 };
+        // A 1-second command timeout, and the table held under an exclusive lock: the first ensure fails like a database that is down.
+        var connection = new NpgsqlConnectionStringBuilder(TestDatabase.EnsureReady().ConnectionString) { CommandTimeout = 1 };
+        await using var impatient = NpgsqlDataSource.Create(connection.ConnectionString);
+        var worker = new ScheduledJobWorker(new ScheduledJobRunner(impatient, options), [job], options, TimeProvider.System,
+            NullLogger<ScheduledJobWorker>.Instance);
+
+        await using (var holder = await Npgsql().OpenConnectionAsync())
+        {
+            await using var transaction = await holder.BeginTransactionAsync();
+            await using (var lockTable = new NpgsqlCommand("LOCK TABLE scheduled_job IN ACCESS EXCLUSIVE MODE", holder, transaction))
+                await lockTable.ExecuteNonQueryAsync();
+            await worker.StartAsync(CancellationToken.None);
+            await Task.Delay(TimeSpan.FromSeconds(2.5)); // at least one ensure has timed out
+            Assert.False(worker.ExecuteTask!.IsCompleted);
+            Assert.Empty(job.Correlations);
+            await transaction.RollbackAsync();
+        }
+
+        try
+        {
+            await job.SecondRun.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await UntilAsync(async () => await RowAsync(job.Name) is { RunCount: 1, LeaseToken: null });
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
     }
 
     // ---- overdue work orders ------------------------------------------------------------------------------------------------------
@@ -391,6 +425,16 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
     private Task<ScheduledJob> RowAsync(string name)
         => Db(db => db.Set<ScheduledJob>().AsNoTracking().SingleAsync(j => j.JobName == name));
 
+    private static async Task UntilAsync(Func<Task<bool>> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (!await condition())
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException("The condition did not hold within 30 seconds.");
+            await Task.Delay(100);
+        }
+    }
+
     private Task SqlAsync(string sql, params object[] args) => Db(db => db.Database.ExecuteSqlRawAsync(sql, args));
 
     private T Job<T>() where T : IScheduledJob => factory.Services.GetServices<IScheduledJob>().OfType<T>().Single();
@@ -464,8 +508,8 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
         => [.. notices.Where(n => n.EntityId == entityId)
             .Select(n => users.Single(u => u.Value.UserId == n.RecipientUserId).Key).Order(StringComparer.Ordinal)];
 
-    /// <summary>Fails its first run, succeeds on the second.</summary>
-    private sealed class FlakyJob(string name) : IScheduledJob
+    /// <summary>Fails its first run and signals the second; or, with <paramref name="failFirst"/> false, signals the first.</summary>
+    private sealed class FlakyJob(string name, bool failFirst = true) : IScheduledJob
     {
         public List<string> Correlations { get; } = [];
         public List<DateTime> Clocks { get; } = [];
@@ -477,7 +521,7 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
         {
             Correlations.Add(correlationId);
             Clocks.Add(now);
-            if (Correlations.Count == 1) throw new InvalidOperationException("first run fails");
+            if (failFirst && Correlations.Count == 1) throw new InvalidOperationException("first run fails");
             SecondRun.TrySetResult();
             return Task.CompletedTask;
         }
