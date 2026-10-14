@@ -42,6 +42,14 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-26 — job nền theo lịch, Phase 1, 13/10/2026</strong>
+    <p><span class="tag t-next">Phase 1 xong · D-1…D-9 chốt theo đề xuất (Mỹ, 13/10) · Phase 2 sẵn sàng</span> Nhánh <code>docs/BE-26-p1</code>. Nền đã chốt 07/10: DB + lease, không
+    Hangfire. Codex (P1a) gom đủ nợ trỏ về BE-26 (thêm dọn refresh token) và mọi luật liên quan. Đề xuất: bảng <code>scheduled_job</code> +
+    worker lease theo giờ DB; job quét theo trạng thái (tự bù sau khi tắt máy), chống trùng bằng unique DB. Quá hạn: <code>due_date &lt;
+    NightOf</code>, báo một lần mỗi (phiếu, hạn). Thiết bị im lặng: sự cố <code>node_offline</code> mỗi đợt, khoá
+    <code>(origin_node_id, detected_at = last_report_at + OfflineAfter)</code>, không tự đóng. Chi tiết <code>.ai/results/BE-26-p1.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>BE-17 — tiến độ xử lý sweep + độ phủ tuyến, 13/10/2026 — xong</strong>
     <p><span class="tag t-done">Đã merge (PR #140, <code>6f9118f</code>, 13/10 — admin merge, vượt review code owner OpenAPI; Ngọc/Thịnh xác nhận ở FW kế tiếp) · không migration · chưa báo WP5/WP6</span>
     <span class="tag t-next">P2: <code>latest_run</code> trên
