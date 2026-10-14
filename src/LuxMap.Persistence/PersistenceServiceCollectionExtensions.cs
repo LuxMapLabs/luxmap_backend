@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using System.Reflection;
 using LuxMap.Persistence.Audit;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,22 @@ public static class PersistenceServiceCollectionExtensions
     /// NetTopologySuite has to be enabled at the data source level before Npgsql can read and write
     /// <c>geometry</c> as <c>Point</c> / <c>LineString</c>.
     /// </summary>
+    /// <summary>
+    /// BE-26 — the background job runner (<c>Jobs</c> section). Modules register their <see cref="Jobs.IScheduledJob"/>s; this adds the
+    /// runner, the job context factory and the worker that claims due jobs under a database lease.
+    /// </summary>
+    public static IServiceCollection AddLuxMapScheduledJobs(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        var options = configuration.GetSection(Jobs.ScheduledJobOptions.SectionName).Get<Jobs.ScheduledJobOptions>() ?? new Jobs.ScheduledJobOptions();
+        options.Validate();
+        services.AddSingleton(options);
+        services.AddSingleton<Jobs.ScheduledJobRunner>();
+        services.AddSingleton<Jobs.JobContextFactory>();
+        services.AddHostedService<Jobs.ScheduledJobWorker>();
+        return services;
+    }
+
     public static NpgsqlDataSource BuildDataSource(string connectionString)
     {
         var builder = new NpgsqlDataSourceBuilder(connectionString);

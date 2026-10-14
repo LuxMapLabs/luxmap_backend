@@ -174,6 +174,13 @@ public class Fault : ICommuneScoped, IAudited
 
     public string? DetectionModelVersion { get; set; }
 
+    /// <summary>
+    /// BE-26 (ERD Q11): the device behind an IoT finding — set on <c>node_offline</c>, null otherwise. Its foreign key and the
+    /// one-fault-per-silence index are configured by Telemetry (<c>FaultOriginNodeConfiguration</c>), the way Survey configures
+    /// <see cref="OriginObservationId"/>: Faults does not reference Telemetry.
+    /// </summary>
+    public string? OriginNodeId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public uint Version { get; set; }

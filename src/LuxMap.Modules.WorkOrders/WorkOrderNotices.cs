@@ -29,6 +29,10 @@ internal static class WorkOrderNotices
     public static NotificationMessage Verified(WorkOrder wo) => Message(NotificationType.WorkOrderVerified, wo,
         $"Phiếu {wo.WorkOrderId} đã được nghiệm thu", $"{Line(wo)}.");
 
+    /// <summary>BE-26: told once per (order, due date) to the assignee and the commune's Managers.</summary>
+    public static NotificationMessage Overdue(WorkOrder wo) => Message(NotificationType.WorkOrderOverdue, wo,
+        $"Phiếu {Kind(wo.TaskKind)} {wo.WorkOrderId} đã quá hạn", $"{Line(wo)}. Hạn {Day(wo.DueDate)} đã qua mà phiếu chưa xong.");
+
     private static NotificationMessage Message(NotificationType type, WorkOrder wo, string title, string body)
         => new(type, wo.CommuneId, NotificationEntityType.WorkOrder, wo.WorkOrderId, title, body);
 

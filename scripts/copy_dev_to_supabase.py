@@ -94,6 +94,8 @@ PLAN = [
     # A follow-up work order points at its parent and root: roots first, then by creation time.
     ("work_order", IN_COMMUNES, "root_work_order_id IS NOT NULL, created_at, work_order_id"),
     ("work_order_segment", IN_COMMUNES, "work_order_id, position"),
+    # BE-26: "already reported overdue for this due date" — copied so the target does not tell everyone again.
+    ("work_order_overdue_notice", IN_COMMUNES, "work_order_id, due_date"),
     # A global registry of algorithm / model versions, no commune: kept whole, every run cites it.
     ("artifact_version", "TRUE", "version_id"),
     # survey_sweep <-> survey_processing_run is a CYCLE (accepted_run_id one way, sweep_id the other); see TWO_PASS.
@@ -144,6 +146,7 @@ TWO_PASS = {
 SKIPPED = {
     "refresh_token": "phiên đăng nhập — mọi người đăng nhập lại (D-5)",
     "account_token": "link mời / đặt lại mật khẩu trong email (BE-33a) — gắn với WEB_APP_BASE_URL của nguồn; gửi lại ở đích",
+    "scheduled_job": "lịch và lease của job nền (BE-26) — đích tự tạo dòng lúc khởi động; chép sang sẽ mang theo lease của nguồn",
     "sync_operation": "bộ nhớ gửi lại của hàng chờ offline (BE-43) — điện thoại trỏ vào máy chủ nguồn không đẩy hàng chờ sang đích",
     "__ef_migrations_history": "đích có lịch sử riêng do migration ghi",
     "spatial_ref_sys": "bảng của PostGIS, extension ở đích tự có",

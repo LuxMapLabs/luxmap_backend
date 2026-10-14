@@ -13352,7 +13352,8 @@
           "survey_ready_for_review",
           "survey_processing_failed",
           "fault_reported",
-          "citizen_report_received"
+          "citizen_report_received",
+          "work_order_overdue"
         ],
         "type": "string"
       },

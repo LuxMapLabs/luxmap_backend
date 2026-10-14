@@ -1028,6 +1028,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
+                    b.Property<string>("OriginNodeId")
+                        .HasColumnType("text")
+                        .HasColumnName("origin_node_id");
+
                     b.Property<long?>("OriginObservationId")
                         .HasColumnType("bigint")
                         .HasColumnName("origin_observation_id");
@@ -1135,6 +1139,14 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("OriginObservationId", "PoleId", "CommuneId")
                         .HasDatabaseName("ix_fault_origin_observation_id_pole_id_commune_id");
 
+                    b.HasIndex(new[] { "OriginNodeId", "CommuneId" }, "ix_fault_origin_node_id_commune_id")
+                        .HasDatabaseName("ix_fault_origin_node_id_commune_id");
+
+                    b.HasIndex(new[] { "OriginNodeId", "DetectedAt" }, "ux_fault_origin_node_id_detected_at")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fault_origin_node_id_detected_at")
+                        .HasFilter("fault_type = 'node_offline'");
+
                     b.ToTable("fault", null, t =>
                         {
                             t.HasCheckConstraint("ck_fault_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
@@ -1144,6 +1156,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_fault_fault_type", "\"fault_type\" IN ('lamp_out', 'lamp_dim', 'segment_outage', 'node_offline', 'runtime_decline')");
 
                             t.HasCheckConstraint("ck_fault_location_finite", "(lat IS NULL OR (lat <> 'NaN'::float8 AND lat <> 'Infinity'::float8 AND lat <> '-Infinity'::float8 AND lat BETWEEN -90 AND 90)) AND (lng IS NULL OR (lng <> 'NaN'::float8 AND lng <> 'Infinity'::float8 AND lng <> '-Infinity'::float8 AND lng BETWEEN -180 AND 180))");
+
+                            t.HasCheckConstraint("ck_fault_node_source", "origin_node_id IS NULL OR (source_channel = 'iot' AND pole_id IS NULL)");
 
                             t.HasCheckConstraint("ck_fault_observation_source", "origin_observation_id IS NULL OR (source_channel = 'cv' AND pole_id IS NOT NULL)");
 
@@ -1535,7 +1549,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_notification_title_length", "char_length(title) BETWEEN 1 AND 200");
 
-                            t.HasCheckConstraint("ck_notification_type", "\"type\" IN ('work_order_assigned', 'work_order_unassigned', 'work_order_rescheduled', 'work_order_returned', 'work_order_cancelled', 'work_order_completed', 'work_order_verified', 'survey_returned', 'survey_ready_for_review', 'survey_processing_failed', 'fault_reported', 'citizen_report_received')");
+                            t.HasCheckConstraint("ck_notification_type", "\"type\" IN ('work_order_assigned', 'work_order_unassigned', 'work_order_rescheduled', 'work_order_returned', 'work_order_cancelled', 'work_order_completed', 'work_order_verified', 'survey_returned', 'survey_ready_for_review', 'survey_processing_failed', 'fault_reported', 'citizen_report_received', 'work_order_overdue')");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -3650,6 +3664,39 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderOverdueNotice", b =>
+                {
+                    b.Property<string>("WorkOrderId")
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("NotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notified_at");
+
+                    b.HasKey("WorkOrderId", "DueDate")
+                        .HasName("pk_work_order_overdue_notice");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_work_order_overdue_notice_commune_id");
+
+                    b.HasIndex("WorkOrderId", "CommuneId")
+                        .HasDatabaseName("ix_work_order_overdue_notice_work_order_id_commune_id");
+
+                    b.ToTable("work_order_overdue_notice", (string)null);
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderSegment", b =>
                 {
                     b.Property<string>("WorkOrderId")
@@ -3835,6 +3882,55 @@ namespace LuxMap.Persistence.Migrations
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.Jobs.ScheduledJob", b =>
+                {
+                    b.Property<string>("JobName")
+                        .HasColumnType("text")
+                        .HasColumnName("job_name");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTime?>("LastFinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_finished_at");
+
+                    b.Property<DateTime?>("LastStartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_started_at");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_token");
+
+                    b.Property<DateTime>("NextRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_run_at");
+
+                    b.Property<long>("RunCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("run_count");
+
+                    b.HasKey("JobName")
+                        .HasName("pk_scheduled_job");
+
+                    b.ToTable("scheduled_job", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_scheduled_job_last_error_length", "last_error IS NULL OR char_length(last_error) <= 1000");
+
+                            t.HasCheckConstraint("ck_scheduled_job_lease_together", "(lease_token IS NULL) = (lease_expires_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_scheduled_job_name", "job_name ~ '^[a-z][a-z0-9_]{1,62}$'");
+
+                            t.HasCheckConstraint("ck_scheduled_job_run_count", "run_count >= 0");
+                        });
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.ElectricalCabinet", b =>
@@ -4136,6 +4232,13 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("SegmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_fault_road_segment_segment_id");
+
+                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
+                        .WithMany()
+                        .HasForeignKey("OriginNodeId", "CommuneId")
+                        .HasPrincipalKey("NodeId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fault_iot_node_origin_node_id_commune_id");
 
                     b.HasOne("LuxMap.Modules.Survey.Entities.PoleObservation", null)
                         .WithMany()
@@ -4816,6 +4919,24 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_work_order_fault_work_order_work_order_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderOverdueNotice", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_overdue_notice_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId", "CommuneId")
+                        .HasPrincipalKey("WorkOrderId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_overdue_notice_work_order");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderSegment", b =>

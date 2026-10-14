@@ -1,4 +1,7 @@
+using LuxMap.Persistence.Jobs;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace LuxMap.Api.Tests;
@@ -18,8 +21,13 @@ public abstract class LuxMapTestHost : WebApplicationFactory<Program>
     protected override IHost CreateHost(IHostBuilder builder)
     {
         TestDatabase.EnsureReady();
+        // BE-26: a background job scans EVERY commune of the shared run database with the real clock — it would write notices for
+        // other classes' work orders and break their teardown (Restrict). Forced off here, not only in UseTestCorsOrigin.
+        builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection([new("Jobs:Enabled", "false")]));
         var host = base.CreateHost(builder);
         TestDatabase.AssertTargets(host.Services);
+        if (host.Services.GetRequiredService<ScheduledJobOptions>().Enabled)
+            throw new InvalidOperationException("A test host started with background jobs enabled.");
         return host;
     }
 }

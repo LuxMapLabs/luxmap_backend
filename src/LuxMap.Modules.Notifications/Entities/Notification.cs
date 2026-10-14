@@ -19,6 +19,9 @@ public enum NotificationType
 
     /// <summary>CITIZEN-QR P2b: a citizen report opened a new item in the Manager's queue (a repeat for the same pole and night does not).</summary>
     CitizenReportReceived,
+
+    /// <summary>BE-26 (D-4): a work order passed its due date while still open / assigned / in progress — once per (order, due date).</summary>
+    WorkOrderOverdue,
 }
 
 /// <summary>Which resource <see cref="Notification.EntityId"/> names, so a client knows where to navigate.</summary>

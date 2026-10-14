@@ -22,6 +22,9 @@ public sealed class TelemetryModule : ILuxMapModule
 
         services.AddSingleton(options);
 
+        // BE-26 — a silent device raises node_offline under the scheduled job runner (LuxMap.Persistence.Jobs).
+        services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.NodeOfflineJob>();
+
         var lighting = configuration.GetSection(Lighting.LightingOptions.SectionName).Get<Lighting.LightingOptions>()
             ?? new Lighting.LightingOptions();
         lighting.Validate();

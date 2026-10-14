@@ -16,5 +16,7 @@ public static class TestHostSettings
     /// </summary>
     public static IWebHostBuilder UseTestCorsOrigin(this IWebHostBuilder builder)
         => builder.UseSetting("Cors:AllowedOrigins:0", WebOrigin)
-            .UseSetting("SurveyProcessing:Enabled", "false");
+            .UseSetting("SurveyProcessing:Enabled", "false")
+            // BE-26: no background job runs under a test — a test runs a job directly, with the clock it chooses.
+            .UseSetting("Jobs:Enabled", "false");
 }

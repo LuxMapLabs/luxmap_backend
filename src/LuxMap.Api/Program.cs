@@ -83,6 +83,9 @@ builder.Services.AddLuxMapPersistence(
     LuxMapConnectionString.FromEnvironment(),
     modules.Select(module => module.GetType().Assembly));
 
+// BE-26 — background jobs on a database lease (no Hangfire, decided 07/10); modules register the jobs.
+builder.Services.AddLuxMapScheduledJobs(builder.Configuration);
+
 // BE-11 — MinIO object storage. Registered by the host beside persistence rather than through a
 // module: Survey (BE-15) and WorkOrders (BE-24) both use it, so it belongs to neither.
 // Fails fast on missing configuration only; it does not contact MinIO at startup.
