@@ -2177,5 +2177,10 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   cạnh unique partial (quy tắc partial index). CHECK `ck_fault_node_source`: có thiết bị ⇒ `iot` và không cột.
 - Teardown xoá `fault` (giữ `iot_node`) và `work_order_overdue_notice` (giữ `work_order`) **trước** cha. Rollback `AddScheduledJobs` gãy
   khi `notification` đã có `work_order_overdue` (CHECK dựng lại không nhận) — cùng họ BE-19.
+- 🔴 **Mọi lời gọi DB của worker nằm TRONG vòng retry, kể cả bước tạo dòng lúc khởi động.** Exception thoát khỏi
+  `BackgroundService.ExecuteAsync` với mặc định `StopHost` **dừng cả API** — DB khởi động chậm hơn API là đủ (review Codex F-1). Canh bằng
+  `A_database_unavailable_at_startup_does_not_end_the_worker` (khoá bảng + `Command Timeout` 1 s; phá thử → đỏ).
+- Test worker đợi **dòng `scheduled_job`** đạt trạng thái cuối rồi mới `StopAsync`: tín hiệu từ job đến TRƯỚC lượt `CompleteAsync`, và dừng
+  sớm sẽ hủy chính lượt ghi đó (F-2).
 - Job dùng `UtcMicrosecondClock` một lần mỗi lượt; một lượt quá hạn xử lý tối đa `Batch` (500) phiếu mỗi vòng, lặp tới khi hết.
 
