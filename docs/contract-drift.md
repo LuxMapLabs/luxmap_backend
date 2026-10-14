@@ -1324,3 +1324,22 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | SC-4 | "Chưa có ảnh" = **chưa được đi qua** theo vết GPS đã ghép tuyến (D-2). `from_m` / `to_m` = phân số dọc tuyến × **`length_m` khai báo** (D-3) — vị trí dọc tuyến tính từ đỉnh đầu, **không** phải khoảng cách giữa hai điểm; lượt `reverse` có `from_m > to_m`. Khoảng trống < 1 m bị bỏ (nhiễu GPS giữa hai lượt chạm nhau). `geometry` = `LineString` **EPSG:4326** của khoảng trống (D-4) |
 | SC-5 | Quyền xem độ phủ: phải giữ **mọi** xã của cột trong run **và** mọi xã của phiếu (tuyến liên xã) — thiếu một xã ⇒ 404 `SWEEP_NOT_FOUND`, như ảnh khảo sát |
 | SC-6 | Đóng **O-4**: `processing_status` = `not_started \| queued \| processing \| succeeded \| failed` (tách khỏi `status`). Contract §5.6 sửa ở version sau |
+
+### BE-26 — job nền: phiếu quá hạn + thiết bị ngừng báo cáo (14/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 13/10/2026 — D-1…D-9 của Phase 1 (`.ai/results/BE-26-p1.md`). **SELF-SIGNED**, chạm API (chỉ thêm một giá trị enum), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (chuông thông báo, danh sách sự cố), WP6 (thông báo, F04 sự cố). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| JB-1 | `notification.type` thêm **`work_order_overdue`** (entity `work_order`). Client hiển thị loại lạ bằng `title` / `body` thì không phải đổi gì; client `switch` đóng trên `type` phải thêm nhánh |
+| JB-2 | **Quá hạn** = `due_date < đêm hiện tại` (đêm cắt lúc **12:00 Asia/Ho_Chi_Minh**, `WorkOrders:Agenda:*` — đúng cờ `overdue` của `GET /work-orders/agenda` và `open_overdue` của thống kê), trạng thái `open \| assigned \| in_progress`, mọi `task_kind`. `due_date` null không bao giờ quá hạn; `done` (chờ nghiệm thu) không báo |
+| JB-3 | Báo **người được giao** (nếu có) **và mọi Quản lý của xã** (đang hoạt động, giữ đủ xã), **một lần cho mỗi (phiếu, hạn)**: đổi `due_date` rồi trễ lần nữa thì báo lại; giao lại / trả về **không** báo lại. Job chạy 15 phút một lần — thông báo đến chậm nhất ~15 phút sau mốc 12:00. Dòng phiếu **không** đổi (`updated_at`, `version`, không audit) |
+| JB-4 | **Thiết bị ngừng báo cáo** (`node_status = offline`, cùng `Iot:OfflineAfter` với bản đồ) ⇒ một sự cố `node_offline` **cho mỗi đợt im lặng**: `detected_at = last_report_at + OfflineAfter` (lúc vượt ngưỡng, **không** phải lúc job chạy), `source_channel = iot`, `data_source` của thiết bị, `severity = medium`, `fault_status = detected`, `pole_id` / `segment_id` null, `location` = toạ độ **tủ** của thiết bị, `note` nêu mã thiết bị, tủ và lần báo cuối. `never_reported` **không** sinh sự cố |
+| JB-5 | Sự cố bị bác / đã đóng trong cùng đợt **không** sinh lại; thiết bị báo lại rồi im lần nữa là đợt mới ⇒ sự cố mới. Thiết bị báo lại **không tự đóng** sự cố — Quản lý xử lý theo luồng thường (`PATCH /faults`) |
+| JB-6 | Quản lý của xã nhận thông báo **`fault_reported`** sẵn có (entity `fault`), câu chữ riêng: *"Sự cố mới FAULT-…: Thiết bị mất kết nối"* |
+| JB-7 | `origin_node_id` (thiết bị gây ra sự cố) **lưu nội bộ, không emit** ra `GET /faults` — chưa có consumer cần. Thêm vào response là quyết định riêng |
+| JB-9 | **Giới hạn đã biết (review Codex):** sự cố `node_offline` không có cột / tuyến, nên phiếu **chỉ** gồm sự cố như vậy **không** vào `GET /sync/bundle` (gói chọn theo tuyến, §5.8) và không lọc được theo tuyến ở `GET /faults`. Đọc / tạo phiếu online vẫn đúng. Cho kỹ sư xử lý tại tủ khi offline là quyết định riêng (phạm vi gói theo tủ / thiết bị) — không tự gán tuyến cho sự cố (trái D-7) |
+| JB-8 | **Báo WP6 (D-9):** app đang tính quá hạn theo **ngày lịch của máy**; backend theo **đêm 12:00 Asia/Ho_Chi_Minh**. Từ 00:00 tới 11:59 hai bên lệch một ngày — nên đọc cờ `overdue` của `GET /work-orders/agenda` thay vì tự tính |

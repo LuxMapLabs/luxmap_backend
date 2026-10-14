@@ -2151,3 +2151,36 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   kết nối thử với bí mật đúng (`ReadyDeviceAsync`). Host test phải `ListenAnyIP` — container gọi về qua `host-gateway` trên Linux.
 - **`docker-compose.yml`: biến của service trong profile vẫn bị nội suy khi chạy profile khác** ⇒ dùng `${VAR:-default}`, không
   `:?` — nếu không, `docker compose up` của người có `.env` cũ sẽ gãy. Thiếu `Mqtt__CallbackKey` thì broker từ chối mọi client.
+
+### BE-26 — job nền theo lịch trên lease của DB (14/10/2026, drift JB-1…JB-8)
+
+- **Không Hangfire.** `LuxMap.Persistence/Jobs`: bảng `scheduled_job` (một dòng mỗi job, runner tự `INSERT … ON CONFLICT DO NOTHING`
+  lúc khởi động), `ScheduledJobRunner` (claim = **một** câu `UPDATE … WHERE job_name = (SELECT … FOR UPDATE SKIP LOCKED)`; mọi so sánh
+  giờ dùng **`now()` của DB**), `ScheduledJobWorker` (`Jobs:Enabled`, `Jobs:PollSeconds`, `Jobs:LeaseSeconds`, `Jobs:RetrySeconds`).
+  Job mới = một `IScheduledJob` đăng ký singleton trong module sở hữu việc đó; không sửa runner.
+- 🔴 **Lease KHÔNG phải thứ chống trùng.** Một lượt có thể chạy quá lease, hai instance có thể cùng chạy: mọi thứ job ghi phải có
+  **khoá tự nhiên + unique ở DB** (`pk_work_order_overdue_notice` = (phiếu, hạn); `ux_fault_origin_node_id_detected_at` = (thiết bị,
+  lúc vượt ngưỡng)) và bắt đúng tên ràng buộc đó khi đua. Phá thử bỏ lượt bắt ⇒ test đồng thời đỏ. "Kiểm rồi chèn" một mình là sai.
+- **Job quét theo TRẠNG THÁI, không theo khe giờ**: một lượt xử lý mọi thứ đang đến hạn, nên server tắt vài giờ thì lượt đầu bù hết.
+  Mốc của sự kiện lấy từ **dữ liệu** (`last_report_at + OfflineAfter`), không từ lúc job chạy — mọi instance tính ra cùng giá trị.
+- **Không principal ⇒ `JobContextFactory`**: `Unscoped()` (scope rỗng, chỉ đọc với `IgnoreQueryFilters` để tìm ứng viên — guard
+  từ chối mọi lượt ghi ở đó) và `Open(xã)` cho mọi lượt ghi, đọc lại ứng viên **qua filter** trước khi ghi. Không backdoor, không `*`.
+  Audit qua `JobContextFactory.AuditFor(db, correlation)`; correlation `job:<tên>:<lease token>`.
+- **Một luật, một biểu thức.** Điều kiện của job dùng cho cả lượt quét lẫn lượt đọc lại (`WorkOrderOverdueJob.OverdueOn`). Bản đầu đọc
+  lại bằng một bản sao viết tay — phá thử luật quét thì **không test nào đỏ** vì bản sao che đi. Luật im lặng của thiết bị phải viết
+  lại trong SQL (EF không dịch `IotOptions.StatusAt`), nên test đối chiếu thẳng với `StatusAt` ở **hai phía** ngưỡng.
+- 🔴 **Test chạy job với đồng hồ năm 2001 và trồng dữ liệu 2000–2001.** Job quét MỌI xã của DB dùng chung: chạy với giờ thật sẽ ghi dấu
+  quá hạn cho phiếu của class khác, và teardown của class đó vấp FK `Restrict`. `LuxMapTestHost.CreateHost` **ép** `Jobs:Enabled=false`
+  và từ chối host nào vẫn bật — đừng gỡ để "test worker thật"; test worker dựng `ScheduledJobWorker` trực tiếp với job giả.
+- `fault.origin_node_id` cấu hình ở **Telemetry** (`FaultOriginNodeConfiguration`), như `origin_observation_id` ở Survey: Faults không
+  tham chiếu Telemetry; Telemetry nay tham chiếu Faults. FK ghép `(origin_node_id, commune_id)` → `iot_node`; index FK khai tường minh
+  cạnh unique partial (quy tắc partial index). CHECK `ck_fault_node_source`: có thiết bị ⇒ `iot` và không cột.
+- Teardown xoá `fault` (giữ `iot_node`) và `work_order_overdue_notice` (giữ `work_order`) **trước** cha. Rollback `AddScheduledJobs` gãy
+  khi `notification` đã có `work_order_overdue` (CHECK dựng lại không nhận) — cùng họ BE-19.
+- 🔴 **Mọi lời gọi DB của worker nằm TRONG vòng retry, kể cả bước tạo dòng lúc khởi động.** Exception thoát khỏi
+  `BackgroundService.ExecuteAsync` với mặc định `StopHost` **dừng cả API** — DB khởi động chậm hơn API là đủ (review Codex F-1). Canh bằng
+  `A_database_unavailable_at_startup_does_not_end_the_worker` (khoá bảng + `Command Timeout` 1 s; phá thử → đỏ).
+- Test worker đợi **dòng `scheduled_job`** đạt trạng thái cuối rồi mới `StopAsync`: tín hiệu từ job đến TRƯỚC lượt `CompleteAsync`, và dừng
+  sớm sẽ hủy chính lượt ghi đó (F-2).
+- Job dùng `UtcMicrosecondClock` một lần mỗi lượt; một lượt quá hạn xử lý tối đa `Batch` (500) phiếu mỗi vòng, lặp tới khi hết.
+

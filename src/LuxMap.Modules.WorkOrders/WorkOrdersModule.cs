@@ -24,5 +24,8 @@ public sealed class WorkOrdersModule : ILuxMapModule
         services.AddScoped<WorkOrderAgendaService>();
         services.AddScoped<WorkOrderEvidenceService>();
         services.AddScoped<IActiveWorkOrderLookup, ActiveWorkOrderLookup>();
+
+        // BE-26 — runs under the scheduled job runner (LuxMap.Persistence.Jobs).
+        services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.WorkOrderOverdueJob>();
     }
 }
