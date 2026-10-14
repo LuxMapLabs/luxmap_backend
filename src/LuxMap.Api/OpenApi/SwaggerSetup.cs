@@ -71,7 +71,10 @@ public static class SwaggerSetup
 
             options.SchemaFilter<JsonElementFieldSchemaFilter>();
             options.SchemaFilter<WorkOrderSchemaFilter>();
+            // SPEC-NULLABLE: a nullable object / enum reference says so (D-1…D-3); request bodies keep the bare reference.
+            options.SchemaFilter<NullableReferenceSchemaFilter>();
             options.DocumentFilter<ContractEnumDocumentFilter>();
+            options.DocumentFilter<NullableReferenceDocumentFilter>();
             options.SupportNonNullableReferenceTypes();
         });
 
