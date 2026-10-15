@@ -1,10 +1,10 @@
 ---
 ticket: POLE-PHOTO-AI
 title: Kỹ sư chụp ảnh một cột trong phiếu → AI phân loại, LƯU kết quả gắn pole_id + work_order_id
-status: ready
-phase: 1
+status: in_progress
+phase: 2
 owner: codex
-branch: docs/POLE-PHOTO-AI-p1
+branch: feat/POLE-PHOTO-AI
 depends_on:
   - "AI-1 (docs/contract-drift.md mục AI-1): POST /ai/detect, model YOLO normal/out — không ghi gì"
   - "CITIZEN-QR P2c (CQ-5, CLAUDE.md mục P2c): gợi ý AI cho ảnh công dân — đã có luật ảnh ban ngày, artifact_version, audit 'analyzed'"
@@ -80,3 +80,45 @@ Mọi khẳng định về code phải kèm `đường/dẫn:dòng`; output lệ
 - Không chạy toàn bộ `dotnet test` (DB/container dùng chung với lượt khác). Build (`dotnet build`) được.
 - Không commit, không push, không `git add -A`.
 - Không tự chọn phương án kiến trúc: chỗ mơ hồ ⇒ D-item.
+
+---
+
+## Quyết định của Mỹ — 15/10/2026 (đáp D-item của `.ai/results/POLE-PHOTO-AI-p1.md`)
+
+Nền **SELF-SIGNED**, chạm bề mặt API ⇒ chưa ổn định cho tới FW kế tiếp; mọi mục drift ghi rõ "nền tạm".
+
+| D | Chốt |
+|---|---|
+| D-1, D-4 | **Phương án B**: bảng mới hẹp `work_order_pole_photo`, endpoint dưới phiếu. Cả **ba loại phiếu** (survey / inspection / repair), **chỉ `in_progress`**, chỉ người được giao. Ảnh này **không** thay ảnh `after` của evidence. |
+| D-2 | Nhãn là **enum riêng `on \| off \| inconclusive`** (tên trường đề xuất `cv_state`/`ai_label` — Codex chọn một tên, ghi drift), **KHÔNG** mượn `fixture_status`, **không** có `dim`. `null` = AI chưa chạy được (`ai_status = unavailable`). |
+| D-5 | **ĐỔI so với khuyến nghị: kết quả ẢNH ĐƯỢC cập nhật trạng thái cột — nhưng CHỈ sau khi Quản lý xác nhận ảnh.** Chi tiết bên dưới (D-5a…D-5e). |
+| D-3, D-6…D-17 | **Theo đúng khuyến nghị của Codex ở mục 11** (port AI trung lập trong Shared, Citizen ủy quyền và giữ hash cũ; `ExecuteWorkOrders` / `ReadWorkOrders`; tập cột WO-12 liên xã, xã của ảnh lấy từ cột; chưa kiểm khoảng cách GPS; ID tiền tố mới do DB sinh; chuỗi phiên bản như Citizen; ảnh gốc nguyên byte + thumbnail sạch, bucket `luxmap-evidence`; audit entity `work_order`; chỉ route dưới phiếu, chưa bbox; AI đồng bộ ngoài transaction, model lỗi vẫn nhận ảnh; `client_op_id` bắt buộc + băm nội dung + 409 khi khác; không `op_type` sync mới; file ≤ 16 MiB / request ≤ 17 MiB / 40 MP trước decode; `captured_at` bắt buộc có Z/offset). |
+
+### D-5 — Quản lý xác nhận ảnh thì trạng thái cột mới đổi
+
+- **D-5a Luồng:** kỹ sư upload → AI gán `on/off/inconclusive` (lưu, như trên) → **Quản lý** quyết định trên ảnh: **xác nhận** hoặc **bác**. Chỉ **xác nhận** mới chạm trạng thái cột. Đề xuất route
+  `POST /api/v1/work-orders/{id}/pole-photos/{photo_id}/decision` body `{decision: confirm|reject, note?}` (Codex có thể đề xuất hình dạng khác, ghi drift). Capability: dùng capability sẵn của Quản lý cho việc duyệt (`ReviewSurveys` hoặc capability duyệt sự cố hiện có — chọn cái hợp nghĩa nhất, ghi lý do; **không** mở cho kỹ sư). Quyết định một lần (đã quyết → 409), khoá hàng đúng thứ tự, audit `confirmed` / `rejected` (actor User).
+- **D-5b Ánh xạ khi XÁC NHẬN** (không ghi `luminance_history`, không đụng baseline):
+  - `off` → `fixture_status = out`.
+  - `on` → `normal` **chỉ khi** trạng thái hiện tại là `out` hoặc `unknown` (hoặc chưa có dòng). Đang `dim` hoặc `normal` → **giữ nguyên** (ảnh "on" không bác bỏ được dim).
+  - `inconclusive` / AI null → **không xác nhận được** (409 hoặc 400, ghi drift) — không có gì để áp.
+- **D-5c Không ghi đè dữ liệu mới hơn:** chỉ áp khi `captured_at` của ảnh **mới hơn** mốc quan sát hiện tại của cột (`pole_current_status.last_seen_at` hoặc tương đương). Ảnh cũ hơn kết quả sweep đã công bố → xác nhận vẫn được ghi (audit) nhưng **không đổi trạng thái**, response nói rõ `status_applied = false` + lý do.
+- **D-5d Sự cố:** xác nhận `off` → tạo **một** fault `lamp_out`, `source_channel = cv`, `data_source` lấy từ cột, xã/tuyến từ cột, `confirmed` theo cùng luật của sự cố do sweep công bố, có audit, **nếu cột chưa có fault `lamp_out` đang mở** (`FaultStatusSets.Open`, đừng viết lại tập). Ảnh "on" **không** tự đóng sự cố nào. Fault phải truy vết được về ảnh (cột/trường nguồn gốc, khuôn `origin_observation_id` / `origin_node_id`).
+- **D-5e Quyền ghi `pole_current_status`:** hiện thuộc pipeline khảo sát (BE-15/17). Đường ghi mới **phải đi qua cùng một chỗ / cùng luật** với lượt công bố sweep (`SurveyReviewService.Publish` hoặc phần dùng chung tách ra) — tôn trọng CHECK `ck_pole_current_status_confidence_matches_status` / `confidence_range`, `data_source`, `status_confidence` hữu hạn 0..1. Không viết đường ghi thứ hai lệch luật. Nếu cần port để WorkOrders không tham chiếu Survey (vòng phụ thuộc), khai port như `IActiveWorkOrderLookup`. `last_sweep_id` của ảnh: Codex quyết hợp lý (ví dụ giữ nguyên) và ghi drift + CLAUDE.md.
+
+## Pha 2 — làm
+
+1. Hiện thực đúng các quyết định trên, theo kế hoạch mục 9 của P1 (file, migration chỉ thêm, đọc Up()/Down() trước khi apply, port AI, endpoint POST / list / detail / thumbnail / original / decision).
+2. Test tích hợp (HTTP + DB) và **phá thử** cho từng luật quan trọng: quyền 4 vai trò, người được giao, tập cột WO-12, replay/409, model lỗi vẫn 201, pixel cap trước decode, D-5b từng nhánh (dim giữ, out→normal, off→out), D-5c ảnh cũ không ghi đè, D-5d không tạo fault trùng, quyết định hai lần → 409, audit đúng một event mỗi `SaveChanges`. Ghi rõ phá thử nào đỏ.
+3. Chạy **toàn bộ** `dotnet test LuxMap.slnx` (BE-36: container riêng mỗi lượt — được phép) và đọc **mã thoát**; build `-warnaserror`; xuất lại OpenAPI + `gen_consolidated_spec.py` + redocly lint (lệnh trong `.ai/context/commands.md` / CI). Thêm bảng mới vào `scripts/copy_dev_to_supabase.py` `PLAN`.
+4. Ghi drift **PP-1…PP-n** vào `docs/contract-drift.md` (Decision maker: Mỹ, 15/10/2026, SELF-SIGNED, nền tạm, Consumer WP5/WP6 chưa báo), ràng buộc kỹ thuật vào `CLAUDE.md` (mục mới cuối file, khuôn các mục khác), thẻ tiến độ đầu `tracking.html`.
+5. Kết quả + output lệnh thật vào `.ai/results/POLE-PHOTO-AI-p2.md`.
+
+## KHÔNG ĐƯỢC làm (Pha 2)
+
+- Không chạm DB `luxmap_dev` (không `database update` trên nó, không `psql` vào nó). `.env` có sẵn cho tiến trình test đọc — **không in, không sửa, không chép nội dung** của nó. Không gọi API/MinIO thật ngoài test.
+- Không commit, không push, không `git add -A`. Claude review diff rồi commit.
+- Không thêm package NuGet. Không đổi enum `fixture_status` hay enum đã khoá ở Contract mục 1. Không đổi hành vi `POST /ai/detect` hay gợi ý công dân (hash `artifact_version` của Citizen phải giữ nguyên khi output không đổi — có test chứng minh).
+- Không sửa Contract `docs/api-contract-v1.1.md` (chỉ drift).
+- Không `ExecuteUpdate/ExecuteDelete`, không backdoor ngoài fixture test, không `ORDER BY` thẳng theo ID hay enum text.
+- Gặp chỗ mơ hồ mới ⇒ chọn phương án an toàn nhất, ghi thành D-item ở cuối `results/…-p2.md`, đừng âm thầm mở rộng phạm vi.
