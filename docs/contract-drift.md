@@ -1364,3 +1364,17 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 
 **Phải báo:** WP5 (kéo thả gọi endpoint này, **không** gọi `PUT /assets/poles/{id}` — thay thế toàn phần sẽ xoá `feeder_id` nếu body thiếu; hiện hộp xác nhận
 trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và hiện `distance_m`), WP6 (màn sửa vị trí). **Chưa báo.**
+
+### OPS-DEPLOY-VPS — triển khai lên một VPS (15/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 15/10/2026 — V-1…V-6 ở `docs/deploy/vps.md`. **SELF-SIGNED**; không đổi endpoint nào, chỉ đổi **địa chỉ** client gọi |
+| **Consumer** | WP5 (build web), WP6 (base URL của app). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| DEP-1 | **Web và API cùng một origin:** web ở `https://<tên miền>/`, API ở `https://<tên miền>/api/v1`. WP5 build với địa chỉ API **tương đối** `/api/v1` (không cần CORS); WP6 đặt base URL `https://<tên miền>/api/v1`. Tên miền chưa mua — sẽ báo khi có |
+| DEP-2 | Request khai `Content-Length` **lớn hơn 300 MiB** (mức lớn nhất API nhận — clip khảo sát) bị **reverse proxy** trả `413 UPLOAD_TOO_LARGE` đúng hình dạng lỗi, nhưng `details` **rỗng — không có `correlation_id`** (request không tới API). Dưới mức đó, lỗi vẫn do API trả như cũ |
+| DEP-3 | `/api/v1/internal/*` (callback của broker MQTT) **không** mở ra internet: 404 từ proxy. Thiết bị testbed dùng kênh **HTTP** (`/api/v1/device/…`), chưa có broker MQTT trên server |
+| DEP-4 | Swagger UI **tắt** ở môi trường triển khai (`Swagger:Enabled=false`); `/swagger` trả trang web. Spec đọc từ `docs/openapi/` |

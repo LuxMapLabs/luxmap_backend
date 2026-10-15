@@ -2196,3 +2196,27 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   đường ghi cột (form, import, ghi chú, sync, seeder, fixture) kèm audit — quyết định riêng. Hệ quả: sửa `geom` qua form đầy đủ / import chưa có vết.
 - Thứ tự: kiểm có cột **qua filter** (404) → `FOR UPDATE` → đọc lại → đo → `AssetStamp.Touch` (không đổi ⇒ không audit). Rollback
   `AuditPoleRelocation` gãy khi đã có audit `pole` / `relocated` (cùng họ BE-19).
+
+### OPS-DEPLOY-VPS — Docker, Caddy, một VPS (15/10/2026, `docs/deploy/vps.md`, drift DEP-1…DEP-4)
+
+- **Image build NGAY TRÊN SERVER** (`deploy/deploy.sh` → `docker compose build`), nên không có `-r` / RID nào: image luôn đúng kiến trúc
+  của máy chạy nó. Migration là **EF bundle trong cùng image** (`/app/efbundle`), service `migrate` profile `tools`, chạy **sau** backup.
+- `dotnet ef migrations bundle` **dựng host** để tìm DbContext, mà `Program` dừng khi thiếu cấu hình ⇒ Dockerfile đặt giá trị giả
+  `build-only` **chỉ cho lệnh đó**. Thêm biến bắt buộc lúc khởi động thì thêm vào dòng đó, nếu không image không build được.
+  ⚠️ `-c` của `dotnet ef` là **`--context`**, không phải cấu hình build (`No DbContext named 'Release'`) — dùng `--configuration`.
+- 🔴 **`deploy/compose.yml` là project `luxmap-prod`, KHÔNG BAO GIỜ `luxmap`.** Compose dev mang `name: luxmap` và đặt tên volume tường minh
+  `luxmap_postgres_data`; cùng tên thì stack production gắn vào **DB dev**, và `--remove-orphans` xoá container dev.
+- 🔴 **Caddyfile gắn theo THƯ MỤC (`./caddy:/etc/caddy`), không theo file.** Trình soạn thảo và `git pull` thay file bằng inode mới; bind mount
+  một file giữ inode cũ đã xoá ⇒ `caddy reload` lỗi và **cấu hình cũ chạy tiếp** (gặp thật lúc diễn tập).
+- **Trong Caddyfile, mọi `handle` chạy trước `respond` trần** ⇒ chặn một đường dẫn con phải là `handle <đường dài hơn>`, không phải
+  `respond @matcher` (đã thử: `/api/v1/internal/*` vẫn tới API).
+- 🔴 **Body khai lớn hơn mức API nhận ra 502, không phải 413**, nếu không có gì chặn trước: API trả 413 ngay từ `Content-Length` rồi đóng kết nối
+  trong lúc Caddy còn gửi body (`broken pipe`). Caddy tự trả 413 cho `Content-Length > 314572800` = `SurveyIngestService.ClipLimit`.
+  **Đổi `ClipLimit` (hay thêm endpoint nhận body lớn hơn) thì sửa con số trong `deploy/caddy/Caddyfile` cùng diff.** Endpoint multipart
+  (ảnh 16 MiB) không bị — API đọc rồi trả 400 bình thường (đo 120 MB: 3/3 lần 400).
+- **`ForwardedHeaders__KnownProxies__0` = IP cố định của Caddy (`172.30.0.10`)**, đặt trong `compose.yml`. Đổi IP hay subnet của Caddy thì sửa cả
+  hai cùng lúc; giá trị rỗng làm API **dừng lúc khởi động** (không phải IP), còn thiếu hẳn thì mọi client chung một xô giới hạn (phá thử đã đo).
+- Cảnh báo DataProtection (`keys … may not be persisted`) lúc khởi động là vô hại: không code nào dùng DataProtection. Nếu sau này dùng
+  (cookie auth, antiforgery) thì phải gắn volume cho thư mục khoá, nếu không mỗi lần deploy làm mất hiệu lực dữ liệu đã bảo vệ.
+- Script chép dữ liệu lên server vẫn là `scripts/copy_dev_to_supabase.py` (đích = PostGIS của VPS qua SSH tunnel, `localhost` nên không đòi TLS);
+  luật "bảng mới phải vào `PLAN`" vẫn áp.

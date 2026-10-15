@@ -43,12 +43,48 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
     <strong>POLE-LOCATION — kỹ sư hiện trường dời cột tới vị trí thật, 14/10/2026</strong>
-    <p><span class="tag t-next">Xong trên nhánh <code>feat/POLE-LOCATION</code>, chờ PR</span> <code>PUT /assets/poles/{id}/location</code> body
+    <p><span class="tag t-next">PR #148</span> <code>PUT /assets/poles/{id}/location</code> body
     <code>{lat, lng}</code>, capability mới <code>EditPoleLocation</code> (Quản lý + Kỹ sư). Không giới hạn khoảng dời; chặn 409 <code>POLE_OFF_SEGMENT</code>
     khi cách tuyến của cột &gt; 25 m — cùng ngưỡng <code>SurveyProcessing:RouteCorridorM</code> qua port <code>ISurveyCorridor</code>. Mỗi lần dời một audit
     <code>pole / relocated</code> (toạ độ cũ → mới). Migration <code>AuditPoleRelocation</code> chỉ dựng lại 2 CHECK của audit. 7 test mới, 3 chốt phá thử
     đều đỏ. Drift PL-1…PL-5. ⚠️ WP5 phải đổi kéo thả sang endpoint này (không dùng <code>PUT /assets/poles/{id}</code>, sẽ xoá <code>feeder_id</code>).
     Chưa làm: dời offline qua <code>/sync/push</code>; audit khi sửa <code>geom</code> bằng form đầy đủ / import.</p>
+  </div>
+  <div class="card">
+    <strong>OPS-DEPLOY-VPS — triển khai lên một VPS, 15/10/2026</strong>
+    <p><span class="tag t-next">Đã merge (PR #150) · chờ Mỹ thuê VPS + mua tên miền</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
+    Mỹ chốt V-1…V-6: <strong>một VPS Singapore</strong>, Docker Compose; <strong>PostGIS trên VPS</strong> (thay Supabase, <code>supabase.md</code> giữ làm
+    lịch sử); <strong>mua tên miền, web và API cùng origin</strong> (<code>/</code> web, <code>/api/v1</code> API); không EMQX (thiết bị dùng kênh HTTP).
+    Files: <code>Dockerfile</code> (API + ffmpeg + EF bundle, chạy non-root), <code>.dockerignore</code> (allowlist), <code>deploy/compose.yml</code>
+    (project <code>luxmap-prod</code>), <code>deploy/caddy/Caddyfile</code>, <code>deploy/.env.example</code>, <code>deploy/deploy.sh</code>
+    (build → backup → migrate → up), <code>deploy/backup.sh</code>, runbook <code>docs/deploy/vps.md</code>, drift DEP-1…DEP-4, CLAUDE.md.
+    <strong>Diễn tập trọn trên máy dev</strong> (<code>localhost</code>, HTTPS của Caddy): 44/44 migration; chép <code>luxmap_dev</code> bằng script cũ (41 bảng md5 khớp)
+    + mirror ảnh; web / đường SPA / 308; đăng nhập mobile + web (cookie <code>__Secure-</code>, refresh); upload ảnh; <strong>clip 290 MB thật</strong> qua Caddy;
+    IP thật tới API (client thứ hai có xô giới hạn riêng — phá thử bỏ proxy tin cậy thì dính chung); backup + khôi phục vào DB nháp.
+    Ba lỗi bắt được lúc diễn tập và đã sửa: clip vượt 300 MiB ra <strong>502</strong> (nay 413 từ Caddy), bind mount Caddyfile theo file làm reload chạy
+    cấu hình cũ, <code>respond</code> đứng sau <code>handle</code>. Còn: Mỹ thuê VPS + tên miền + Gmail app password, chạy runbook; báo WP5/WP6 (DEP-1).</p>
+  </div>
+  <div class="card">
+    <strong>Phiếu demo cả 3 loại trong <code>luxmap_dev</code>, 15/10/2026</strong>
+    <p><span class="tag t-next">Dữ liệu tạm</span> 17 phiếu <code>WO-0004…WO-0020</code> tạo qua API thật (audit + thông báo đủ), <code>engineer</code> giao cho <code>crew</code>:
+    kiểm tra 5 (giao / đang làm / chờ duyệt / nghiệm thu / chưa giao), sửa chữa 7 (giao / đang làm / chờ duyệt / bị trả / nghiệm thu — phiếu tiếp nối của
+    <code>WO-0007</code> / quá hạn / huỷ), khảo sát 5 (COM-070 + một phiếu mỗi xã thực địa). Sửa chữa / kiểm tra chỉ ở <strong>COM-070</strong> (sự cố
+    <code>public_imagery</code>, không lẫn số liệu <code>field</code>). Ảnh trước/sau lấy từ <code>img/</code>, thu nhỏ, bỏ EXIF. <code>luxmap_dev</code> lên
+    migration <code>AddScheduledJobs</code> (dump trước: <code>~/luxmap-db-backups/…_before_demo_wo_seed.dump</code>); job BE-26 sinh 3 sự cố
+    <code>node_offline</code> cho thiết bị mock im lặng.</p>
+  </div>
+  <div class="card">
+    <strong>Góp ý của thầy, 14/10/2026 — sơ đồ State Machine xong, còn lại chờ chốt</strong>
+    <p><span class="tag t-next">Sơ đồ trạng thái đã merge (PR #147)</span>
+    <code>docs/state-machines.md</code>: 10 sơ đồ Mermaid vẽ từ code trên <code>dev</code> — toàn cảnh, sự cố, phiếu công việc, phiên khảo sát,
+    báo cáo công dân, mã QR, lệnh ON/OFF/AUTO, <code>node_status</code>, tài khoản, <code>fixture_status</code>. Cả 10 render được bằng
+    mermaid-cli 11.4.2. Không đổi code.</p>
+    <p><span class="tag t-todo">Làm được ngay</span> Kỹ sư hiện trường cập nhật vị trí cột (endpoint + capability mới, chỉ thêm);
+    bbox của xã do Quản trị cấu hình, trả qua <code>/auth/me</code> để bản đồ khoá và mở ở tâm.
+    <span class="tag t-done">Backend đã có</span> Quản lý quản lý IoT (<code>/assets/iot-nodes</code>, <code>ManageAssets</code>); AI chạy YOLO offline,
+    không tốn token; số liệu dashboard (<code>/statistics/…</code>) — còn việc của FE.
+    <span class="tag t-block">Chờ chốt</span> Nhiều bóng / cột (phá API, cần version Contract); "ngày nhập" của bóng nghĩa là gì;
+    mã trụ + OTP SMS cho công dân (nhà cung cấp SMS, chống spam thay mã QR bí mật); nơi host API / MinIO / EMQX để deploy.</p>
   </div>
   <div class="card">
     <strong>BE-26 — job nền theo lịch, Phase 2, 14/10/2026</strong>
@@ -569,7 +605,7 @@
   <div class="card"><p><span class="tag t-done">Đã merge (PR #93, 05/10/2026)</span> Merge bằng quyền admin, <strong>vượt review code owner</strong> của <code>docs/api-contract-v1.1.md</code> và <code>docs/openapi/luxmap-v1.json</code> (Mỹ quyết; cùng cách #91) — Ngọc/Thịnh chưa đọc Contract v1.8, xác nhận ở FW kế tiếp. CI lần đầu đỏ vì factory test dọn tài khoản sau khi host đã huỷ (<code>ObjectDisposedException</code> lúc cleanup class, 1081 test vẫn xanh) — sửa ở <code>d51cb5e</code>. Phase 1: 14 D-item, Mỹ chốt cả 14 (<code>.ai/results/BE-33a-p1.md</code>); Mỹ chọn <strong>email mời</strong> thay mật khẩu tạm. Phase 2: <code>/api/v1/admin/users</code> (tạo không mật khẩu + email mời 72 giờ, liệt kê, xem, sửa vai trò/xã/email/họ tên, khoá thu hồi mọi phiên, mở khoá, gửi lại lời mời; <code>ManageUsers</code>), <code>POST /auth/password/set</code> và <code>/forgot</code> (ẩn danh, link một lần, đặt lại 1 giờ, luôn 202, 5 lần/15 phút/IP → 429). <strong>Gỡ <code>POST /auth/register</code></strong>. Migration <code>AdminCreatedAccounts</code>: <code>password_hash</code> nullable + <code>password_set_at</code>, CHECK phạm vi <code>*</code> ⇔ <code>system_admin</code> và CHECK mật khẩu đi cặp, bảng <code>account_token</code> (chỉ lưu băm) — đọc trước khi apply, sửa tay backfill trong <code>Up()</code> và hai chỗ <code>Down()</code>; vòng apply → rollback → apply trên luxmap_test. MailKit 4.18.1 (NuGet mới) + Mailpit trong compose (pin digest manifest list). Contract <strong>v1.8</strong>, drift BE-33a (A-1…A-7), OpenAPI sinh lại (76 implemented + 2), lint 8 cảnh báo như cũ. <strong>Kiểm:</strong> build 0 warning; <strong>1081 test xanh trên luxmap_test</strong> (659 API + 337 Shared + 44 Persistence + 41 Storage), 22 test mới; phá thử 3 luật (link cũ còn dùng, khoá Quản trị cuối, gửi thư cho tài khoản khoá) đều đỏ đúng test; luxmap_dev: dọn 14 tài khoản cặn <code>be12a/b</code> bằng script (chạy lại là no-op) rồi migrate, 4 tài khoản seed còn nguyên; end-to-end qua Mailpit thật: mời → đặt mật khẩu → đăng nhập → quên → đặt lại → mật khẩu cũ 401, không token thô nào trong log. <strong>Đã báo WP5/WP6 ngày 05/10/2026</strong>; chờ Ngọc/Thịnh xác nhận Contract v1.8 ở FW.</p></div>
 
   <h2>OPS-SUPABASE — database lên Supabase, 01/10/2026</h2>
-  <div class="card"><p><span class="tag t-next">Chờ Mỹ làm Phần A</span> Nhánh <code>chore/supabase-deploy</code>. Phase 1 do Codex (khảo sát tương thích + nháp runbook, bắt được lỗi checklist: chuỗi cloud trong <code>.env</code> dev sẽ kéo cả <code>dotnet test</code> lên cloud vì DotNetEnv ghi đè). Mỹ chốt D-1…D-7 theo đề xuất. Phase 2: <code>scripts/copy_dev_to_supabase.py</code> (mặc định chỉ kiểm, một transaction, từ chối đích không rỗng / migration lệch / bảng ngoài kế hoạch) + runbook <code>docs/deploy/supabase.md</code>. <strong>Diễn tập trên DB mô phỏng Supabase</strong> (role không superuser, PostGIS ở <code>extensions</code>): 23/23 migration, 16 bảng + 13 sequence khớp, API đăng nhập và bản đồ đúng. Còn lại: Mỹ tạo project + tắt Data API + bật PostGIS, rồi chạy runbook mục 2–5.</p></div>
+  <div class="card"><p><span class="tag t-done">Thay bằng OPS-DEPLOY-VPS (V-3, 15/10/2026) — DB chạy trên VPS; script chép vẫn dùng</span> Nhánh <code>chore/supabase-deploy</code>. Phase 1 do Codex (khảo sát tương thích + nháp runbook, bắt được lỗi checklist: chuỗi cloud trong <code>.env</code> dev sẽ kéo cả <code>dotnet test</code> lên cloud vì DotNetEnv ghi đè). Mỹ chốt D-1…D-7 theo đề xuất. Phase 2: <code>scripts/copy_dev_to_supabase.py</code> (mặc định chỉ kiểm, một transaction, từ chối đích không rỗng / migration lệch / bảng ngoài kế hoạch) + runbook <code>docs/deploy/supabase.md</code>. <strong>Diễn tập trên DB mô phỏng Supabase</strong> (role không superuser, PostGIS ở <code>extensions</code>): 23/23 migration, 16 bảng + 13 sequence khớp, API đăng nhập và bản đồ đúng. Còn lại: Mỹ tạo project + tắt Data API + bật PostGIS, rồi chạy runbook mục 2–5.</p></div>
 
   <h2>Khảo sát ảnh 03/10/2026 nạp vào <code>luxmap_dev</code>, 05/10/2026</h2>
   <div class="card"><p><span class="tag t-next">Dữ liệu tạm</span> 87 ảnh → <strong>84 cột</strong>: 23 khớp cột 28/09 (dùng lại mã <code>KS-20260928-…</code>, <strong>toạ độ đổi sang 03/10</strong>, lệch tối đa 18,7 m), <strong>61 cột mới</strong> (44 COM-001, 17 COM-002). Tuyến OSM <code>osm-long-phuoc</code> (1791 m, 42 cột) <strong>tách thành 5 đoạn thẳng</strong> "Long Phước – đoạn 1…5" theo khúc cua thật (Douglas–Peucker 15/20/30 m cùng kết quả). Nạp qua endpoint import thật: <strong>10 tuyến, 61 cột, 61 bóng, 23 cột cập nhật vị trí, 0 lỗi</strong>; DB 278 cột / 30 tuyến / 278 bóng. ⚠️ Mã tuyến không theo số đoạn (đoạn 1 = <code>SEG-025</code>, đoạn 2 = <code>SEG-021</code>…) — EF không giữ thứ tự <code>Add</code> (CLAUDE.md 7b); tên đoạn mới mang thứ tự. <strong>12 ảnh đèn hỏng = 2 đèn</strong>, báo bằng <code>POST /faults</code> (crew, <code>field_report</code>, <code>detected_at</code> = giờ chụp) kèm 2 ảnh mỗi sự cố: <code>FAULT-0029</code> trên <code>POLE-0268</code> (Đường N2) — đèn <strong>chập chờn</strong>, sáng 22:57:42 rồi tắt 22:57:45–52, ghi <code>lamp_out</code> có note; <code>FAULT-0030</code> <strong>không gắn cột</strong> (cột thép chưa có trong hồ sơ, cách cột gần nhất 1,3 km, COM-001). Chạy lại script trả cùng sự cố / ảnh (200). <strong>Mạch (cùng ngày):</strong> ảnh <code>03:10:26/Feeder</code> → 3 mạch <code>fdr-phuoc-thien-1…3</code> (COM-002, <code>FDR-004…006</code>), <strong>chưa gán cột nào</strong> (chờ xác nhận, để tỉ lệ cột có mạch đã xác nhận không bị thổi phồng); vị trí hộp ghi ở <code>img_out_031026/feeder/NGUON.txt</code> vì <code>feeder</code> không có cột điểm. Xoá <code>POLE-0187</code> và <code>POLE-0259</code> (trụ biến áp, không đèn) cùng bóng → DB 276 cột. ⚠️ Nhóm P015 đợt 28/09 gộp nhầm một cột đèn thép đang sáng (IMG_5514) với trụ biến áp: cột đèn đó <strong>chưa có trong hồ sơ</strong>. Bóng vẫn giá trị tạm <code>led_road_lamp</code> 150 W 2020-01-01 (drift <strong>FX-1</strong>). Nguồn và lệnh chạy lại: <code>img_out_031026/osm/NGUON.txt</code>, <code>apply_decisions.py</code>, <code>split_long_phuoc.py</code>, <code>broken_light/report_faults.sh</code> (không vào git). <strong>Chưa báo WP5/WP4.</strong></p></div>
