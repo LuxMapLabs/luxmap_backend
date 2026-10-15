@@ -1,0 +1,162 @@
+# OPS-DEPLOY-VPS — the whole system on ONE server (decided 15/10/2026, docs/deploy/vps.md):
+#   caddy (HTTPS, the only public ports) → api → postgres + minio, all on one private network.
+# Run from this directory: `./deploy.sh` (build, back up, migrate, start). Configuration: `cp .env.example .env`.
+#
+# What differs from the development docker-compose.yml at the root, on purpose:
+#   - no Redis (no code uses it), no Mailpit (real SMTP), no EMQX (devices use the HTTP channel over HTTPS — MQTT on
+#     the open internet would need its own TLS listener, see vps.md);
+#   - postgres and minio publish NOTHING to the internet: their ports bind 127.0.0.1, reachable only through SSH;
+#   - the API is reached only through Caddy, whose address is fixed so the API can trust exactly that one proxy.
+
+# NOT `luxmap`: that is the development stack's project name, and its volumes are named luxmap_postgres_data and
+# luxmap_minio_data explicitly. The same name here would attach to the development database on a machine running both,
+# and `--remove-orphans` would remove the development containers.
+name: luxmap-prod
+
+services:
+  postgres:
+    image: imresamu/postgis:17-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-luxmap}
+      POSTGRES_USER: ${POSTGRES_USER:-luxmap}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set, run `cp .env.example .env`}"
+      TZ: UTC
+      PGTZ: UTC
+    command: ["postgres", "-c", "timezone=UTC", "-c", "log_timezone=UTC"]
+    ports:
+      # 127.0.0.1 only: an SSH tunnel reaches it for the first data copy (vps.md step 6); the internet never does.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-luxmap} -d ${POSTGRES_DB:-luxmap} -q"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [backend]
+
+  # Same image and digest as development. quay.io refuses anonymous pulls since 26/09/2026: load the offline tarball on
+  # the server first (`docker load -i luxmap-minio-images.tar`, README step 3).
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is not set}"
+      MINIO_ROOT_PASSWORD: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is not set}"
+      TZ: UTC
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      # Images are served THROUGH the API (BE-11 rule 1); MinIO itself is reachable only through an SSH tunnel.
+      - "127.0.0.1:${MINIO_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks: [backend]
+
+  minio-mc:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    environment:
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is not set}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is not set}"
+      TZ: UTC
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mc alias set luxmap http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY"
+        mc mb --ignore-existing luxmap/luxmap-survey
+        mc mb --ignore-existing luxmap/luxmap-evidence
+        mc mb --ignore-existing luxmap/luxmap-video
+        mc mb --ignore-existing luxmap/luxmap-citizen
+        echo "luxmap-survey, luxmap-evidence, luxmap-video and luxmap-citizen are ready"
+    networks: [backend]
+
+  # The EF migration bundle of the SAME build as the API. Profile `tools`: `up` never runs it — deploy.sh runs it
+  # after the backup, so a migration is never applied to a database nobody saved first.
+  migrate:
+    image: luxmap-api:latest
+    profiles: ["tools"]
+    entrypoint: ["/app/efbundle"]
+    env_file: .env
+    environment: &internal-addresses
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      MINIO_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [backend]
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: luxmap-api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *internal-addresses
+      ASPNETCORE_ENVIRONMENT: Production
+      # Exactly Caddy's fixed address below. Without it the API ignores X-Forwarded-For and every client shares Caddy's
+      # rate-limit bucket (CITIZEN-QR P2b; measured in the rehearsal, docs/deploy/vps.md). Change both together.
+      ForwardedHeaders__KnownProxies__0: 172.30.0.10
+    volumes:
+      - api_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks: [backend]
+
+  caddy:
+    image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
+    restart: unless-stopped
+    environment:
+      LUXMAP_DOMAIN: "${LUXMAP_DOMAIN:?LUXMAP_DOMAIN is not set}"
+      ACME_EMAIL: "${ACME_EMAIL:?ACME_EMAIL is not set}"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      # The DIRECTORY, not the file: `git pull` and editors replace a file with a new inode, and a single-file bind
+      # mount keeps showing the old, deleted one — `caddy reload` then fails and the old config keeps running.
+      - ./caddy:/etc/caddy:ro
+      # The web SPA's build output (WP5): copy `dist/` here. Served as static files on the same origin as the API.
+      - ./web:/srv/web:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      backend:
+        ipv4_address: 172.30.0.10
+
+networks:
+  backend:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  postgres_data:
+  minio_data:
+  api_logs:
+  caddy_data:
+  caddy_config:

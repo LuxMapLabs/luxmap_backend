@@ -1343,3 +1343,17 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | JB-7 | `origin_node_id` (thiết bị gây ra sự cố) **lưu nội bộ, không emit** ra `GET /faults` — chưa có consumer cần. Thêm vào response là quyết định riêng |
 | JB-9 | **Giới hạn đã biết (review Codex):** sự cố `node_offline` không có cột / tuyến, nên phiếu **chỉ** gồm sự cố như vậy **không** vào `GET /sync/bundle` (gói chọn theo tuyến, §5.8) và không lọc được theo tuyến ở `GET /faults`. Đọc / tạo phiếu online vẫn đúng. Cho kỹ sư xử lý tại tủ khi offline là quyết định riêng (phạm vi gói theo tủ / thiết bị) — không tự gán tuyến cho sự cố (trái D-7) |
 | JB-8 | **Báo WP6 (D-9):** app đang tính quá hạn theo **ngày lịch của máy**; backend theo **đêm 12:00 Asia/Ho_Chi_Minh**. Từ 00:00 tới 11:59 hai bên lệch một ngày — nên đọc cờ `overdue` của `GET /work-orders/agenda` thay vì tự tính |
+
+### OPS-DEPLOY-VPS — triển khai lên một VPS (15/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 15/10/2026 — V-1…V-6 ở `docs/deploy/vps.md`. **SELF-SIGNED**; không đổi endpoint nào, chỉ đổi **địa chỉ** client gọi |
+| **Consumer** | WP5 (build web), WP6 (base URL của app). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| DEP-1 | **Web và API cùng một origin:** web ở `https://<tên miền>/`, API ở `https://<tên miền>/api/v1`. WP5 build với địa chỉ API **tương đối** `/api/v1` (không cần CORS); WP6 đặt base URL `https://<tên miền>/api/v1`. Tên miền chưa mua — sẽ báo khi có |
+| DEP-2 | Request khai `Content-Length` **lớn hơn 300 MiB** (mức lớn nhất API nhận — clip khảo sát) bị **reverse proxy** trả `413 UPLOAD_TOO_LARGE` đúng hình dạng lỗi, nhưng `details` **rỗng — không có `correlation_id`** (request không tới API). Dưới mức đó, lỗi vẫn do API trả như cũ |
+| DEP-3 | `/api/v1/internal/*` (callback của broker MQTT) **không** mở ra internet: 404 từ proxy. Thiết bị testbed dùng kênh **HTTP** (`/api/v1/device/…`), chưa có broker MQTT trên server |
+| DEP-4 | Swagger UI **tắt** ở môi trường triển khai (`Swagger:Enabled=false`); `/swagger` trả trang web. Spec đọc từ `docs/openapi/` |

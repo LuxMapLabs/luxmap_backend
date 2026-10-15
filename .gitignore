@@ -486,3 +486,6 @@ logs/
 
 # Con trỏ phiên làm việc của agent (.ai) — đổi mỗi phiên, không commit
 .ai/tasks/current.md
+
+# OPS-DEPLOY-VPS — the web SPA build copied onto the server
+deploy/web/
