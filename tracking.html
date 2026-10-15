@@ -43,7 +43,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
     <strong>OPS-DEPLOY-VPS — triển khai lên một VPS, 15/10/2026</strong>
-    <p><span class="tag t-next">Xong trên nhánh, chờ push / PR · chờ Mỹ thuê VPS + mua tên miền</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
+    <p><span class="tag t-next">PR #150 · chờ Mỹ thuê VPS + mua tên miền</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
     Mỹ chốt V-1…V-6: <strong>một VPS Singapore</strong>, Docker Compose; <strong>PostGIS trên VPS</strong> (thay Supabase, <code>supabase.md</code> giữ làm
     lịch sử); <strong>mua tên miền, web và API cùng origin</strong> (<code>/</code> web, <code>/api/v1</code> API); không EMQX (thiết bị dùng kênh HTTP).
     Files: <code>Dockerfile</code> (API + ffmpeg + EF bundle, chạy non-root), <code>.dockerignore</code> (allowlist), <code>deploy/compose.yml</code>
@@ -63,6 +63,19 @@
     <code>public_imagery</code>, không lẫn số liệu <code>field</code>). Ảnh trước/sau lấy từ <code>img/</code>, thu nhỏ, bỏ EXIF. <code>luxmap_dev</code> lên
     migration <code>AddScheduledJobs</code> (dump trước: <code>~/luxmap-db-backups/…_before_demo_wo_seed.dump</code>); job BE-26 sinh 3 sự cố
     <code>node_offline</code> cho thiết bị mock im lặng.</p>
+  </div>
+  <div class="card">
+    <strong>Góp ý của thầy, 14/10/2026 — sơ đồ State Machine xong, còn lại chờ chốt</strong>
+    <p><span class="tag t-next">Sơ đồ trạng thái đã merge (PR #147)</span>
+    <code>docs/state-machines.md</code>: 10 sơ đồ Mermaid vẽ từ code trên <code>dev</code> — toàn cảnh, sự cố, phiếu công việc, phiên khảo sát,
+    báo cáo công dân, mã QR, lệnh ON/OFF/AUTO, <code>node_status</code>, tài khoản, <code>fixture_status</code>. Cả 10 render được bằng
+    mermaid-cli 11.4.2. Không đổi code.</p>
+    <p><span class="tag t-todo">Làm được ngay</span> Kỹ sư hiện trường cập nhật vị trí cột (endpoint + capability mới, chỉ thêm);
+    bbox của xã do Quản trị cấu hình, trả qua <code>/auth/me</code> để bản đồ khoá và mở ở tâm.
+    <span class="tag t-done">Backend đã có</span> Quản lý quản lý IoT (<code>/assets/iot-nodes</code>, <code>ManageAssets</code>); AI chạy YOLO offline,
+    không tốn token; số liệu dashboard (<code>/statistics/…</code>) — còn việc của FE.
+    <span class="tag t-block">Chờ chốt</span> Nhiều bóng / cột (phá API, cần version Contract); "ngày nhập" của bóng nghĩa là gì;
+    mã trụ + OTP SMS cho công dân (nhà cung cấp SMS, chống spam thay mã QR bí mật); nơi host API / MinIO / EMQX để deploy.</p>
   </div>
   <div class="card">
     <strong>BE-26 — job nền theo lịch, Phase 2, 14/10/2026</strong>
