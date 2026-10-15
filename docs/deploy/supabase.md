@@ -1,5 +1,9 @@
 # Supabase — đưa database LuxMap lên cloud
 
+> ⚠️ **Đã thay bằng [vps.md](vps.md) (V-3, Mỹ, 15/10/2026): database chạy trên chính VPS, không lên Supabase.** File này giữ
+> làm lịch sử và vì cách chép dữ liệu (D-1, D-4, D-5, D-7) cùng script `copy_dev_to_supabase.py` vẫn dùng nguyên vẹn —
+> đích là PostGIS của VPS qua SSH tunnel. Các mục riêng của Supabase (dashboard, pooler, schema `extensions`, CA) không còn áp.
+
 Chỉ **database** lên Supabase. API và MinIO vẫn chạy ở máy dev. Không dùng Supabase Auth, Storage hay
 Data API: backend tự lo đăng nhập và phân quyền theo xã (Contract §2/§7), mọi đường khác đều đi vòng qua.
 
