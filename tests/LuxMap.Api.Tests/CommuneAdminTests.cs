@@ -246,8 +246,10 @@ public class CommuneAdminTests(AccountTestFactory factory) : IClassFixture<Accou
     {
         var id = await CreateAsync(await AdminAsync(), null);
 
+        // The assignment is a literal from BadFrames, never input; only the id is a parameter.
+        var sql = "UPDATE administrative_unit SET " + assignment + " WHERE commune_id = {0}";
         var error = await Assert.ThrowsAsync<PostgresException>(() => factory.QueryAsync(db =>
-            db.Database.ExecuteSqlRawAsync($"UPDATE administrative_unit SET {assignment} WHERE commune_id = {{0}}", id)));
+            db.Database.ExecuteSqlRawAsync(sql, id)));
 
         Assert.Equal("23514", error.SqlState);
     }
