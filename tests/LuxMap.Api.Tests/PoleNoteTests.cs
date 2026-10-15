@@ -162,7 +162,7 @@ public sealed class PoleNoteTests(AssetImportFixture fixture)
         var segmentId = (await Json(await manager.GetAsync($"/api/v1/assets/poles/{existing}"))).GetProperty("pole").GetProperty("segment_id").GetString();
         object Body(object? note) => new
         {
-            segment_id = segmentId, commune_id = fixture.CommuneId, geom_wkt = $"POINT ({Lng} {Lat})", data_source = "public_imagery", note,
+            segment_id = segmentId, commune_id = fixture.CommuneId, geom_wkt = FormattableString.Invariant($"POINT ({Lng} {Lat})"), data_source = "public_imagery", note,
         };
 
         var created = await manager.PostAsJsonAsync("/api/v1/assets/poles", Body("Gần chợ"));

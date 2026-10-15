@@ -96,7 +96,7 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         var body = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(extra.Replace("FEEDER", feeder))!;
         body["segment_id"] = JsonSerializer.SerializeToElement(segment);
         body["commune_id"] = JsonSerializer.SerializeToElement(fixture.CommuneId);
-        body["geom_wkt"] = JsonSerializer.SerializeToElement($"POINT ({Lng} {Lat})");
+        body["geom_wkt"] = JsonSerializer.SerializeToElement(FormattableString.Invariant($"POINT ({Lng} {Lat})"));
         body["data_source"] = JsonSerializer.SerializeToElement("field");
 
         var response = await client.PostAsJsonAsync(Poles, body);
@@ -213,7 +213,7 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         var client = await fixture.ManagerClientAsync();
         var tag = $"TC{Guid.NewGuid():N}"[..10].ToUpperInvariant();
         await AssetImportTests.ImportAsync(client, "cabinets", "c.csv",
-            "external_ref,cabinet_name,commune_id,geom_wkt,data_source" + $"\n{tag}-C,Tủ,{fixture.CommuneId},POINT({Lng} {Lat}),field");
+            "external_ref,cabinet_name,commune_id,geom_wkt,data_source" + FormattableString.Invariant($"\n{tag}-C,Tủ,{fixture.CommuneId},POINT({Lng} {Lat}),field"));
 
         var result = await AssetImportTests.ImportAsync(client, "feeders", "f.csv",
             "external_ref,feeder_name,commune_id,cabinet_external_ref,cabinet_source"
@@ -241,12 +241,12 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         var tag = $"TI{Guid.NewGuid():N}"[..10].ToUpperInvariant();
         await AssetImportTests.ImportAsync(client, "segments", "s.csv",
             "external_ref,segment_name,road_class,length_m,geom_wkt,commune_id,data_source"
-            + $"\n{tag}-S,Topology road,inter_village,100,\"LINESTRING({Lng} {Lat}, {Lng + 0.01} {Lat})\",{fixture.CommuneId},field");
+            + FormattableString.Invariant($"\n{tag}-S,Topology road,inter_village,100,\"LINESTRING({Lng} {Lat}, {Lng + 0.01} {Lat})\",{fixture.CommuneId},field"));
         await AssetImportTests.ImportAsync(client, "feeders", "f.csv",
             "external_ref,feeder_name,commune_id" + $"\n{tag}-F1,Lộ 1,{fixture.CommuneId}\n{tag}-F2,Lộ 2,{fixture.CommuneId}");
 
         const string Header = "external_ref,segment_external_ref,feeder_external_ref,commune_id,geom_wkt,data_source,feeder_source";
-        string Row(string feeder, string label) => $"\n{tag}-P,{tag}-S,{feeder},{fixture.CommuneId},POINT({Lng} {Lat}),field,{label}";
+        string Row(string feeder, string label) => FormattableString.Invariant($"\n{tag}-P,{tag}-S,{feeder},{fixture.CommuneId},POINT({Lng} {Lat}),field,{label}");
 
         await AssetImportTests.ImportAsync(client, "poles", "p.csv", Header + Row($"{tag}-F1", "verified"));
         var pole = await PoleByRefAsync($"{tag}-P");
@@ -534,7 +534,7 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
     {
         var body = JsonSerializer.SerializeToNode(relation)!.AsObject();
         body["segment_id"] = segment;
-        body["geom_wkt"] = $"POINT ({Lng} {Lat})";
+        body["geom_wkt"] = FormattableString.Invariant($"POINT ({Lng} {Lat})");
         body["data_source"] = "field";
         return body;
     }
@@ -544,7 +544,7 @@ public sealed class TopologyInferenceTests(AssetImportFixture fixture)
         var body = JsonSerializer.SerializeToNode(relation)!.AsObject();
         body["segment_id"] = segment;
         body["commune_id"] = fixture.CommuneId;
-        body["geom_wkt"] = $"POINT ({Lng} {Lat})";
+        body["geom_wkt"] = FormattableString.Invariant($"POINT ({Lng} {Lat})");
         body["data_source"] = "field";
 
         var response = await client.PostAsJsonAsync(Poles, body);
