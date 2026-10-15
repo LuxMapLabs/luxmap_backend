@@ -136,6 +136,13 @@ SUMMARY = {
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
+    # POLE-PHOTO-AI, PP-1…PP-10 — Mỹ SELF-SIGNED 15/10/2026, nền tạm; WP5/WP6 chưa báo.
+    ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
+    ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",
+    ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO] Kết quả AI và quyết định đã lưu; quyền qua phiếu và xã của ảnh",
+    ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail"): "[TẠM — POLE-PHOTO] JPEG thumbnail bỏ metadata, proxy có kiểm quyền, no-store",
+    ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/original"): "[TẠM — POLE-PHOTO] JPEG gốc nguyên byte, proxy có kiểm quyền, no-store",
+    ("post", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/decision"): "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần: off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history",
     # AI-1 — model YOLO ON / OFF (PR #118 làm lại sau review), SELF-SIGNED.
     ("post", "/api/v1/ai/detect"): "[TẠM — AI-1] Chạy model YOLO trên một ảnh JPEG (Quản lý): normal = sáng, out = tắt, bbox theo pixel; không ghi gì",
     # LIGHT-CTRL 2b — lệnh ON / OFF / AUTO + kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW).

@@ -279,16 +279,10 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
                 var choice = target.Choice;
                 var history = SurveyPublicationRules.History(target, sweep, run.RunId, poles[target.PoleId].CommuneId, now, ActorId);
                 db.Add(history);
-                var current = await db.Set<PoleCurrentStatus>().SingleOrDefaultAsync(p => p.PoleId == target.PoleId, ct);
-                if (SurveyPublicationRules.IsNewer(history.EvaluatedAt, current?.LastEvaluatedAt ?? current?.LastSeenAt))
-                {
-                    if (current is null) { current = new() { PoleId = target.PoleId, CommuneId = history.CommuneId }; db.Add(current); }
-                    current.FixtureStatus = history.ClassifiedAs; current.StatusConfidence = history.StatusConfidence;
-                    current.LastSeenAt = history.ClassifiedAs == FixtureStatus.Unknown ? null : history.EvaluatedAt;
-                    current.LastEvaluatedAt = history.EvaluatedAt; current.LastRunId = run.RunId;
-                    current.LastSweepId = sweep.SweepId; current.UpdatedAt = now;
-                    if (choice is not null && SurveyPublicationRules.FaultFor(choice.Status) is { } type) faults.Add((choice, type));
-                }
+                if (await PoleStatusPublication.StageAsync(db, target.PoleId, history.CommuneId,
+                    history.ClassifiedAs, history.StatusConfidence, history.EvaluatedAt, now, sweep.SweepId, run.RunId, ct)
+                    && choice is not null && SurveyPublicationRules.FaultFor(choice.Status) is { } type)
+                    faults.Add((choice, type));
                 if (choice is not null && choice.Status != FixtureStatus.Unknown)
                     await BuildBaselines(sweep, run, observations.Where(x => x.PoleId == target.PoleId).ToArray(), now, ct);
             }

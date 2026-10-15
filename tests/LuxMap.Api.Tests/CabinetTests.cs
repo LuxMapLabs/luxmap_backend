@@ -492,7 +492,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         external_ref = externalRef,
         cabinet_name = "cabinet probe",
         commune_id = communeId,
-        geom_wkt = $"POINT ({Lng} {Lat})",
+        geom_wkt = FormattableString.Invariant($"POINT ({Lng} {Lat})"),
         data_source = "field",
     };
 

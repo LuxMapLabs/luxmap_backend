@@ -91,10 +91,13 @@ public static class PrefixedIds
     /// <summary>One photo of a citizen submission (CITIZEN-QR P2b).</summary>
     public static readonly PrefixedIdSpec CitizenPhoto = new("CPH", 6, "citizen_photo_id_seq");
 
+    /// <summary>Single-pole work-order photo (PP-4, provisional).</summary>
+    public static readonly PrefixedIdSpec WorkOrderPolePhoto = new("PPH", 6, "pole_photo_id_seq");
+
     public static IReadOnlyList<PrefixedIdSpec> All { get; } =
     [
         Pole, Fault, RoadSegment, AdministrativeUnit, Fixture, Feeder, IotNode, SurveySweep,
         SurveyFrame, Detection, LuxReading, WorkOrder, RepairEvidence, ExternalUnit, AppUser, FaultCluster,
-        Notification, ElectricalCabinet, LightingCommand, QrCode, CitizenReport, CitizenSubmission, CitizenPhoto,
+        Notification, ElectricalCabinet, LightingCommand, QrCode, CitizenReport, CitizenSubmission, CitizenPhoto, WorkOrderPolePhoto,
     ];
 }

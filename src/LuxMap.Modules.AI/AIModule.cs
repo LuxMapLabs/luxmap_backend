@@ -21,6 +21,7 @@ public sealed class AIModule : ILuxMapModule
         options.Validate();
 
         services.AddSingleton(options);
+        services.AddSingleton<LuxMap.Shared.AI.ISingleLampPhotoHinter, YoloSingleLampPhotoHinter>();
         services.AddSingleton<YoloModel>();
         services.AddSingleton<YoloOnOffDetector>();
         services.AddKeyedSingleton<IOnOffDetector>(SurveyFrameOptions.YoloDetectorKey,

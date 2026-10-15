@@ -58,6 +58,8 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.HasSequence("pole_id_seq");
 
+            modelBuilder.HasSequence("pole_photo_id_seq");
+
             modelBuilder.HasSequence("qr_id_seq");
 
             modelBuilder.HasSequence("segment_id_seq");
@@ -1036,6 +1038,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("origin_observation_id");
 
+                    b.Property<string>("OriginPolePhotoId")
+                        .HasColumnType("text")
+                        .HasColumnName("origin_pole_photo_id");
+
                     b.Property<string>("OverrideFaultType")
                         .HasColumnType("text")
                         .HasColumnName("override_fault_type");
@@ -1139,6 +1145,9 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("OriginObservationId", "PoleId", "CommuneId")
                         .HasDatabaseName("ix_fault_origin_observation_id_pole_id_commune_id");
 
+                    b.HasIndex("OriginPolePhotoId", "PoleId", "CommuneId")
+                        .HasDatabaseName("ix_fault_origin_pole_photo_id_pole_id_commune_id");
+
                     b.HasIndex(new[] { "OriginNodeId", "CommuneId" }, "ix_fault_origin_node_id_commune_id")
                         .HasDatabaseName("ix_fault_origin_node_id_commune_id");
 
@@ -1166,6 +1175,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_fault_override_is_lamp_class", "override_fault_type IS NULL OR override_fault_type IN ('lamp_out', 'lamp_dim')");
 
                             t.HasCheckConstraint("ck_fault_pole_or_location", "pole_id IS NOT NULL OR (lat IS NOT NULL AND lng IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_fault_pole_photo_source", "origin_pole_photo_id IS NULL OR (source_channel = 'cv' AND fault_type = 'lamp_out' AND pole_id IS NOT NULL AND origin_observation_id IS NULL AND origin_node_id IS NULL)");
 
                             t.HasCheckConstraint("ck_fault_priority_score_finite", "priority_score IS NULL OR (priority_score <> 'NaN'::float8 AND priority_score <> 'Infinity'::float8 AND priority_score <> '-Infinity'::float8)");
 
@@ -3697,6 +3708,177 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", b =>
+                {
+                    b.Property<string>("PhotoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id")
+                        .HasDefaultValueSql("luxmap_format_id('PPH', nextval('pole_photo_id_seq'), 6)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "pole_photo_id_seq");
+
+                    b.Property<DateTime?>("AnalyzedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("analyzed_at");
+
+                    b.Property<string>("ArtifactVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("artifact_version");
+
+                    b.Property<long>("ByteCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_count");
+
+                    b.Property<DateTime>("CapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("captured_at");
+
+                    b.Property<Guid>("ClientOpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_op_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<double?>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<string>("CvState")
+                        .HasColumnType("text")
+                        .HasColumnName("cv_state");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Decision")
+                        .HasColumnType("text")
+                        .HasColumnName("decision");
+
+                    b.Property<string>("DecisionNote")
+                        .HasColumnType("text")
+                        .HasColumnName("decision_note");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<double>("Lat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lat");
+
+                    b.Property<double>("Lng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lng");
+
+                    b.Property<string>("ModelVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("model_version");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.Property<bool>("StatusApplied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("status_applied");
+
+                    b.Property<string>("StatusReason")
+                        .HasColumnType("text")
+                        .HasColumnName("status_reason");
+
+                    b.Property<long>("ThumbnailBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("thumbnail_bytes");
+
+                    b.Property<string>("ThumbnailKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("thumbnail_key");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploaded_by");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("PhotoId")
+                        .HasName("pk_work_order_pole_photo");
+
+                    b.HasAlternateKey("PhotoId", "PoleId", "CommuneId")
+                        .HasName("ak_work_order_pole_photo_photo_id_pole_id_commune_id");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_work_order_pole_photo_commune_id");
+
+                    b.HasIndex("DecidedBy")
+                        .HasDatabaseName("ix_work_order_pole_photo_decided_by");
+
+                    b.HasIndex("PoleId", "CapturedAt")
+                        .HasDatabaseName("ix_work_order_pole_photo_pole_id_captured_at");
+
+                    b.HasIndex("UploadedBy", "ClientOpId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pole_photo_user_operation");
+
+                    b.HasIndex("WorkOrderId", "CapturedAt", "UploadedAt")
+                        .HasDatabaseName("ix_work_order_pole_photo_work_order_id_captured_at_uploaded_at");
+
+                    b.ToTable("work_order_pole_photo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pole_photo_ai", "(cv_state IS NULL AND confidence IS NULL AND model_version IS NULL AND artifact_version IS NULL AND analyzed_at IS NULL) OR (cv_state IS NOT NULL AND cv_state IN ('on','off','inconclusive') AND model_version IS NOT NULL AND btrim(model_version) <> '' AND artifact_version IS NOT NULL AND btrim(artifact_version) <> '' AND analyzed_at IS NOT NULL AND ((cv_state = 'inconclusive' AND confidence IS NULL) OR (cv_state IN ('on','off') AND confidence IS NOT NULL AND confidence BETWEEN 0 AND 1 AND confidence <> 'NaN'::float8)))");
+
+                            t.HasCheckConstraint("ck_pole_photo_decision", "(decision IS NULL AND decided_by IS NULL AND decided_at IS NULL AND decision_note IS NULL AND NOT status_applied AND status_reason IS NULL) OR (decision IS NOT NULL AND decision IN ('confirm','reject') AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND status_reason IS NOT NULL AND (decision <> 'confirm' OR (cv_state IS NOT NULL AND cv_state IN ('on','off'))) AND (NOT status_applied OR decision = 'confirm'))");
+
+                            t.HasCheckConstraint("ck_pole_photo_keys", "btrim(object_key) <> '' AND btrim(thumbnail_key) <> '' AND request_hash ~ '^[0-9a-f]{64}$' AND client_op_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_pole_photo_lat", "lat BETWEEN -90 AND 90 AND lat <> 'NaN'::float8");
+
+                            t.HasCheckConstraint("ck_pole_photo_lng", "lng BETWEEN -180 AND 180 AND lng <> 'NaN'::float8");
+
+                            t.HasCheckConstraint("ck_pole_photo_sizes", "byte_count BETWEEN 1 AND 16777216 AND thumbnail_bytes > 0 AND width > 0 AND height > 0 AND width::bigint * height <= 40000000");
+
+                            t.HasCheckConstraint("ck_work_order_pole_photo_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderSegment", b =>
                 {
                     b.Property<string>("WorkOrderId")
@@ -4267,6 +4449,13 @@ namespace LuxMap.Persistence.Migrations
                         .HasPrincipalKey("ObservationId", "PoleId", "CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_fault_pole_observation_origin_observation_id_pole_id_commun");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", null)
+                        .WithMany()
+                        .HasForeignKey("OriginPolePhotoId", "PoleId", "CommuneId")
+                        .HasPrincipalKey("PhotoId", "PoleId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_fault_work_order_pole_photo_origin_pole_photo_id_pole_id_co");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Faults.Entities.FaultCluster", b =>
@@ -4958,6 +5147,43 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_work_order_overdue_notice_work_order");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_photo_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_work_order_pole_photo_app_user_decided_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_photo_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_photo_app_user_uploaded_by");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_photo_work_order_work_order_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderSegment", b =>

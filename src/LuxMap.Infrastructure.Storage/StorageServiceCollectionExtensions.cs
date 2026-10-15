@@ -46,6 +46,7 @@ public static class StorageServiceCollectionExtensions
 
         // CITIZEN-QR P2b: two untrusted photos cleaned at once, a short queue behind them, 503 beyond — the public form must not
         // be able to eat the server's memory.
+        services.AddSingleton<IOriginalJpegReader, OriginalJpegReader>();
         services.AddSingleton<IImageSanitizer>(new JpegSanitizer(SanitizerConcurrency, SanitizerQueue));
 
         return services;
