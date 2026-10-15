@@ -61,6 +61,13 @@ public static class LuxMapPolicies
     /// </summary>
     public const string EditPoleNotes = "cap:edit_pole_notes";
 
+    /// <summary>
+    /// Move a pole to where it really stands (POLE-LOCATION). Field engineers correct it on site, managers from the map —
+    /// only the position, and only within the survey corridor of the pole's own segment; any other asset write stays
+    /// <see cref="ManageAssets"/>.
+    /// </summary>
+    public const string EditPoleLocation = "cap:edit_pole_location";
+
     /// <summary>Read the fault list (BE-40). Kept apart from <see cref="ReadNetwork"/> so fault access can change without touching the map.</summary>
     /// <summary>BE-27 — read and mark one's OWN notifications. Every role, so no endpoint leans on the fallback.</summary>
     public const string ReadNotifications = "cap:read_notifications";
@@ -119,6 +126,7 @@ public static class LuxMapPolicies
             [ReadLuxReadings] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageAssets] = [UserRole.Manager],
             [EditPoleNotes] = [UserRole.Manager, UserRole.FieldEngineer],
+            [EditPoleLocation] = [UserRole.Manager, UserRole.FieldEngineer],
             [RecordLuxReading] = [UserRole.FieldEngineer],
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],

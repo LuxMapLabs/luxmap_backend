@@ -1,0 +1,46 @@
+# OPS-DEPLOY-VPS — one origin for everything: https://{$LUXMAP_DOMAIN}/api/* is the API, every other path is the web SPA.
+# One origin means the web's refresh cookie (__Secure-luxmap_rt, SameSite=Lax) is always first-party and the browser
+# sends no CORS preflight. Caddy obtains and renews the certificate itself (ports 80 and 443 must be open).
+{
+	email {$ACME_EMAIL}
+}
+
+{$LUXMAP_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# The MQTT broker's callback is for a broker on the private network, never for the internet. A `handle` with the
+	# longer path: Caddy runs every `handle` before a bare `respond`, so `respond @internal` would never be reached.
+	handle /api/v1/internal/* {
+		respond 404
+	}
+
+	# The API enforces each endpoint's own size limit (16 MiB for a photo, Kestrel's 30 MB elsewhere) and Caddy streams
+	# the body through. The one exception is a body DECLARED larger than the largest limit, a survey clip's 300 MiB
+	# (SurveyIngestService.ClipLimit): the API answers 413 from the header and closes the connection while Caddy is still
+	# sending, which reaches the client as a 502 (seen in the rehearsal). Caddy answers those itself, in the Contract's
+	# error shape. Caddy sets X-Forwarded-For from the TCP peer and ignores one sent by the client.
+	handle /api/* {
+		@too_large expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 314572800`
+		handle @too_large {
+			header Content-Type application/json
+			respond `{"error":{"code":"UPLOAD_TOO_LARGE","message":"Upload exceeds the endpoint limit.","details":{}}}` 413
+		}
+		handle {
+			reverse_proxy api:8080
+		}
+	}
+
+	handle {
+		root * /srv/web
+		# Client-side routes (/map, /work-orders/WO-0001) are served index.html; the SPA router takes over.
+		try_files {path} /index.html
+		file_server
+	}
+}

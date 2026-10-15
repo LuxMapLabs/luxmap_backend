@@ -1365,3 +1365,38 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 
 **Phải báo:** WP5 (màn Quản trị → Xã: danh sách / tạo / sửa khung; bản đồ đọc `map_bounds` từ `/auth/me`), WP6 (mở bản đồ ở `map_bounds.center`). **Chưa báo.**
 Ba xã trên `luxmap_dev` (`COM-070`, `COM-001`, `COM-002`) **chưa có khung** — Quản trị nhập sau khi deploy, hoặc tính từ toạ độ cột hiện có.
+
+### POLE-LOCATION — dời cột tới vị trí thật (14/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 14/10/2026 — theo góp ý của thầy ("vị trí cột cho kỹ sư hiện trường cập nhật"); WP5 đã làm kéo thả cột trên bản đồ. **SELF-SIGNED**, chạm API (chỉ thêm), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (kéo thả cột trên bản đồ), WP6 (sửa vị trí tại chỗ). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| PL-1 | `PUT /api/v1/assets/poles/{poleId}/location`, body `{lat, lng}` (EPSG:4326, cùng dạng `location` của `POST /faults`) → `200 {pole_id, lat, lng, moved_m, updated_at, updated_by, updated_by_name}`. Chỉ đổi vị trí; mọi trường khác vẫn qua `PUT /assets/poles/{poleId}` (`ManageAssets`). Thiếu toạ độ, ngoài ±90 / ±180 → 400 `VALIDATION_FAILED`; cột ngoài phạm vi xã → 404 |
+| PL-2 | Capability mới **`EditPoleLocation`** = Quản lý + Kỹ sư hiện trường (ma trận §2) |
+| PL-3 | **Không** giới hạn khoảng dời so với vị trí cũ (toạ độ ban đầu từ GPS ảnh có thể lệch vài chục mét). Giới hạn duy nhất: vị trí mới cách **tuyến của chính cột** ≤ hành lang khảo sát `SurveyProcessing:RouteCorridorM` (25 m) — đúng ngưỡng truy vấn cột của pipeline khảo sát dùng, đọc từ cùng một option. Vượt → 409 **`POLE_OFF_SEGMENT`**, `details {pole_id, segment_id, distance_m, corridor_m}`, không ghi gì. Đổi cột sang tuyến khác = form sửa đầy đủ. Tuyến `inter_commune` thuộc xã khác vẫn được đo |
+| PL-4 | Mỗi lần dời ghi **một** dòng audit: `entity_type = pole`, `action = relocated`, `before {lat, lng}`, `after {lat, lng, moved_m, segment_id, segment_distance_m}`. Gửi lại đúng vị trí đang có = không đổi gì (`moved_m = 0`, không audit, `updated_by` giữ nguyên). ⚠️ Chỉ đường này ghi audit — sửa `geom` qua form đầy đủ hay import **chưa** ghi |
+| PL-5 | Lịch sử khảo sát không đổi: mỗi run đã chụp GIS lúc chạy (`gis_snapshot`). Dời offline (op_type mới cho `/sync/push`) là **ticket sau** |
+
+**Lược đồ:** migration `AuditPoleRelocation` — chỉ dựng lại `ck_audit_event_entity_type` (+`pole`) và `ck_audit_event_action` (+`relocated`).
+`Down()` gãy khi đã có audit `pole` / `relocated` (cùng họ BE-19).
+
+**Phải báo:** WP5 (kéo thả gọi endpoint này, **không** gọi `PUT /assets/poles/{id}` — thay thế toàn phần sẽ xoá `feeder_id` nếu body thiếu; hiện hộp xác nhận
+trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và hiện `distance_m`), WP6 (màn sửa vị trí). **Chưa báo.**
+
+### OPS-DEPLOY-VPS — triển khai lên một VPS (15/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 15/10/2026 — V-1…V-6 ở `docs/deploy/vps.md`. **SELF-SIGNED**; không đổi endpoint nào, chỉ đổi **địa chỉ** client gọi |
+| **Consumer** | WP5 (build web), WP6 (base URL của app). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| DEP-1 | **Web và API cùng một origin:** web ở `https://<tên miền>/`, API ở `https://<tên miền>/api/v1`. WP5 build với địa chỉ API **tương đối** `/api/v1` (không cần CORS); WP6 đặt base URL `https://<tên miền>/api/v1`. Tên miền chưa mua — sẽ báo khi có |
+| DEP-2 | Request khai `Content-Length` **lớn hơn 300 MiB** (mức lớn nhất API nhận — clip khảo sát) bị **reverse proxy** trả `413 UPLOAD_TOO_LARGE` đúng hình dạng lỗi, nhưng `details` **rỗng — không có `correlation_id`** (request không tới API). Dưới mức đó, lỗi vẫn do API trả như cũ |
+| DEP-3 | `/api/v1/internal/*` (callback của broker MQTT) **không** mở ra internet: 404 từ proxy. Thiết bị testbed dùng kênh **HTTP** (`/api/v1/device/…`), chưa có broker MQTT trên server |
+| DEP-4 | Swagger UI **tắt** ở môi trường triển khai (`Swagger:Enabled=false`); `/swagger` trả trang web. Spec đọc từ `docs/openapi/` |

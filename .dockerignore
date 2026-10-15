@@ -1,0 +1,11 @@
+# OPS-DEPLOY-VPS — allowlist: the image is built from src/ and the root build settings only. The working tree also
+# holds gigabytes of survey photos and videos, and .env holds secrets; neither may reach the build context.
+*
+!src/
+!Directory.Build.props
+!BannedSymbols.txt
+!.editorconfig
+!luxmap.runsettings
+**/bin/
+**/obj/
+**/logs/

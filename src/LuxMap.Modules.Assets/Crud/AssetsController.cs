@@ -379,6 +379,24 @@ public sealed class AssetsController(
     public Task<PoleNoteResponse> SetPoleNoteAsync(string poleId, [FromBody] SetPoleNoteRequest request, CancellationToken ct)
         => service.SetPoleNoteAsync(poleId, request.ReadNote(), ct);
 
+    /// <summary>
+    /// Moves a pole to where it really stands (POLE-LOCATION). Body <c>{ "lat": …, "lng": … }</c>, EPSG:4326.
+    /// </summary>
+    /// <remarks>
+    /// Only the position. The new point must stay within the survey corridor of the pole's own segment
+    /// (<c>SurveyProcessing:RouteCorridorM</c>, 25 m), otherwise 409 <c>POLE_OFF_SEGMENT</c> and nothing is written. Every
+    /// move is audited with the old and new coordinates; sending the position it already has changes nothing.
+    /// </remarks>
+    [HttpPut("poles/{poleId}/location")]
+    [Authorize(Policy = LuxMapPolicies.EditPoleLocation)]
+    [ProducesResponseType<PoleLocationResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public Task<PoleLocationResponse> SetPoleLocationAsync(string poleId, [FromBody] SetPoleLocationRequest request, CancellationToken ct)
+        => service.SetPoleLocationAsync(poleId, request, ct);
+
     // ── BE-13 topology ────────────────────────────────────────────────────────────────────────
     //
     // ⚠️ PROVISIONAL — the Contract specifies no topology endpoint at all. Proposed in

@@ -593,6 +593,17 @@ public sealed record SetPoleNoteRequest
 /// <summary>What <c>PUT /assets/poles/{id}/note</c> answers: the pole's note as stored and who last changed the pole.</summary>
 public sealed record PoleNoteResponse(string PoleId, string? Note, DateTime UpdatedAt, string? UpdatedBy, string? UpdatedByName);
 
+/// <summary><c>PUT /assets/poles/{id}/location</c>: where the pole really stands, EPSG:4326.</summary>
+/// <remarks>Nullable members so an omitted coordinate is seen as missing, not as 0 — same as a fault report's <c>location</c>.</remarks>
+public sealed record SetPoleLocationRequest(double? Lat, double? Lng);
+
+/// <summary>
+/// What <c>PUT /assets/poles/{id}/location</c> answers: the position as stored, how far it moved (0 when it was already
+/// there), and who last changed the pole.
+/// </summary>
+public sealed record PoleLocationResponse(
+    string PoleId, double Lat, double Lng, double MovedM, DateTime UpdatedAt, string? UpdatedBy, string? UpdatedByName);
+
 /// <summary>One pole read on its own — the list row plus what only a detail view needs.</summary>
 public sealed record PoleDetail
 {

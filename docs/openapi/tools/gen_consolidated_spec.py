@@ -46,6 +46,7 @@ d["info"]["description"] = (
     "CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). "
     "BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). "
     "COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. "
+    "POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -130,6 +131,7 @@ SUMMARY = {
     ("get", "/api/v1/sync/bundle"): "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Không có since",
     ("post", "/api/v1/sync/push"): "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id",
     ("put", "/api/v1/assets/poles/{poleId}/note"): "[POLE-NOTE] Kỹ sư hiện trường / Quản lý ghi hoặc xoá ghi chú của cột (≤ 1000 ký tự; null hay rỗng = xoá)",
+    ("put", "/api/v1/assets/poles/{poleId}/location"): "[POLE-LOCATION] Kỹ sư hiện trường / Quản lý dời cột tới vị trí thật ({lat, lng}); quá 25 m khỏi tuyến của cột → 409 POLE_OFF_SEGMENT; mỗi lần dời ghi audit",
     ("get", "/api/v1/notifications"): "[BE-27] Thông báo của chính người gọi, mới nhất trước, kèm số chưa đọc (polling)",
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",

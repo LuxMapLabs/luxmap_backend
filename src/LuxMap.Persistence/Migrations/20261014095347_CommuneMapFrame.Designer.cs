@@ -3888,7 +3888,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("audit_event", null, t =>
                         {
-                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed')");
+                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated')");
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 
@@ -3900,7 +3900,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_audit_event_before_state_object", "before_state IS NULL OR jsonb_typeof(before_state) = 'object'");
 
-                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report')");
+                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report', 'pole')");
 
                             t.HasCheckConstraint("ck_audit_event_has_state", "before_state IS NOT NULL OR after_state IS NOT NULL");
                         });
