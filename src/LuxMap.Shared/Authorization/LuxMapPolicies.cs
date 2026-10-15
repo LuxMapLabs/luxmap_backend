@@ -50,6 +50,12 @@ public static class LuxMapPolicies
     public const string ManageUsers = "cap:manage_users";
 
     /// <summary>
+    /// COMMUNE-BBOX — list, create and edit communes (<c>/admin/communes</c>): the name and the map frame a user's map opens on.
+    /// System admin only, like accounts; assigning a manager to a commune stays <see cref="ManageUsers"/>.
+    /// </summary>
+    public const string ManageCommunes = "cap:manage_communes";
+
+    /// <summary>
     /// Write the free-text note on a pole (POLE-NOTE). Field engineers write it on site, managers too —
     /// without either gaining any other asset write, which stays <see cref="ManageAssets"/>.
     /// </summary>
@@ -124,6 +130,7 @@ public static class LuxMapPolicies
             [RecordLuxReading] = [UserRole.FieldEngineer],
             [ControlLighting] = [UserRole.Manager],
             [ManageUsers] = [UserRole.SystemAdmin],
+            [ManageCommunes] = [UserRole.SystemAdmin],
             [ReadFaults] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReadNotifications] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReviewFaults] = [UserRole.Manager],

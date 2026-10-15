@@ -1344,6 +1344,28 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | JB-9 | **Giới hạn đã biết (review Codex):** sự cố `node_offline` không có cột / tuyến, nên phiếu **chỉ** gồm sự cố như vậy **không** vào `GET /sync/bundle` (gói chọn theo tuyến, §5.8) và không lọc được theo tuyến ở `GET /faults`. Đọc / tạo phiếu online vẫn đúng. Cho kỹ sư xử lý tại tủ khi offline là quyết định riêng (phạm vi gói theo tủ / thiết bị) — không tự gán tuyến cho sự cố (trái D-7) |
 | JB-8 | **Báo WP6 (D-9):** app đang tính quá hạn theo **ngày lịch của máy**; backend theo **đêm 12:00 Asia/Ho_Chi_Minh**. Từ 00:00 tới 11:59 hai bên lệch một ngày — nên đọc cờ `overdue` của `GET /work-orders/agenda` thay vì tự tính |
 
+### COMMUNE-BBOX — khung bản đồ của xã do Quản trị cấu hình (14/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 14/10/2026 — theo góp ý của thầy (Admin cấu hình bbox của xã, gán Quản lý vào xã, bản đồ chỉ hiện trong bbox và mở ở tâm). **SELF-SIGNED**, chạm API (chỉ thêm), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (màn Quản trị xã; bản đồ khoá `maxBounds` + mở ở tâm), WP6 (bản đồ mở ở tâm). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| CB-1 | `administrative_unit` thêm **khung bản đồ** `bbox {min_lng, min_lat, max_lng, max_lat}` (EPSG:4326, nullable, cả bốn cùng có hoặc cùng null). Là **khung nhìn**, **không** phải ranh giới: phân quyền vẫn theo `commune_id` (§7); tài sản ngoài khung **không** bị ẩn, lọc hay từ chối |
+| CB-2 | Capability mới **`ManageCommunes`** = chỉ Quản trị hệ thống. `GET /api/v1/admin/communes` (phân trang, cũ trước), `GET /admin/communes/{id}`, `POST /admin/communes` `{name, bbox?}` → 201, `PUT /admin/communes/{id}` `{name, bbox}` — thay thế toàn phần, **cả hai khoá bắt buộc** (thiếu khoá → 400), `"bbox": null` xoá khung. **Không có DELETE** (mọi bảng giữ xã bằng `Restrict`). Gán Quản lý vào xã vẫn ở `/admin/users` |
+| CB-3 | Item: `{commune_id, name, bbox, center, created_at, updated_at}`; `center` = trung điểm của `bbox`, tính lúc đọc, `null` khi chưa có khung. Lưu form không đổi gì thì `updated_at` giữ nguyên |
+| CB-4 | Kiểm: `name` 1–200 ký tự (cắt khoảng trắng), trùng tên → 409 `IDENTIFIER_TAKEN`; `bbox` hữu hạn, trong ±180 / ±90, `min < max` cả hai trục (đảo lat/lng thường bị bắt vì vĩ độ > 90) → sai là 400 `VALIDATION_FAILED`; id lạ → 404 **`COMMUNE_NOT_FOUND`**. DB có CHECK tương ứng (kể cả NaN / ±Infinity) |
+| CB-5 | `GET /auth/me` **thêm** `communes[] {commune_id, name, bbox, center}` (các xã của tài khoản; Quản trị `*` = mọi xã) và **`map_bounds {bbox, center}`** = khung bao mọi xã **có** khung, `null` khi không xã nào có. `commune_ids` giữ nguyên. FE: `maxBounds = map_bounds.bbox`, mở ở `map_bounds.center`; `null` thì giữ cách hiện tại |
+| CB-6 | ⚠️ Spec: `bbox`, `center`, `map_bounds` nullable nhưng xuất ra là `$ref` trần (hạn chế chung SPEC-NULLABLE, như `latest_run`). Client sinh từ spec phải coi chúng là nullable |
+
+**Lược đồ:** migration `CommuneMapFrame` — 4 cột `bbox_*` (`double precision NULL`), CHECK `ck_administrative_unit_bbox_together` và
+`ck_administrative_unit_bbox_valid`. Không chạm index. `Down()` xoá cột (mất khung đã nhập).
+
+**Phải báo:** WP5 (màn Quản trị → Xã: danh sách / tạo / sửa khung; bản đồ đọc `map_bounds` từ `/auth/me`), WP6 (mở bản đồ ở `map_bounds.center`). **Chưa báo.**
+Ba xã trên `luxmap_dev` (`COM-070`, `COM-001`, `COM-002`) **chưa có khung** — Quản trị nhập sau khi deploy, hoặc tính từ toạ độ cột hiện có.
+
 ### POLE-LOCATION — dời cột tới vị trí thật (14/10/2026)
 
 | | |

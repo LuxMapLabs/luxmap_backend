@@ -6,7 +6,7 @@ namespace LuxMap.Modules.Admin;
 
 /// <summary>
 /// Admin module — Catalogue, thresholds, nodes, model versions, dashboards (BE-28..BE-35).
-/// Empty shell as of BE-01: no entities, no endpoints yet.
+/// First endpoints: communes and their map frames (COMMUNE-BBOX, <c>/admin/communes</c>).
 /// </summary>
 public sealed class AdminModule : ILuxMapModule
 {
@@ -14,5 +14,6 @@ public sealed class AdminModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddScoped<Communes.CommuneAdminService>();
     }
 }

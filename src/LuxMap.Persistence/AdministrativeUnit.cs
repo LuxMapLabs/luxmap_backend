@@ -1,5 +1,6 @@
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts;
+using LuxMap.Shared.Contracts.Communes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -25,8 +26,9 @@ namespace LuxMap.Persistence;
 /// </para>
 /// <para>
 /// No boundary polygon column: section 7 compares the claim against the <c>commune_id</c> column
-/// rather than doing spatial containment, and Branch C has no source of real boundaries. Adding a
-/// nullable column later is one small migration.
+/// rather than doing spatial containment, and there is still no source of real boundaries. What it does
+/// carry is a map FRAME (COMMUNE-BBOX): four numbers an administrator types in, so a user's map opens on
+/// their commune and stays there. Nothing is filtered or refused for lying outside it.
 /// </para>
 /// </remarks>
 public class AdministrativeUnit
@@ -53,9 +55,32 @@ public class AdministrativeUnit
     /// </remarks>
     public string? SeedKey { get; set; }
 
+    /// <summary>West edge of the map frame, EPSG:4326. The four bbox columns are all set or all null.</summary>
+    public double? BboxMinLng { get; set; }
+
+    public double? BboxMinLat { get; set; }
+
+    public double? BboxMaxLng { get; set; }
+
+    public double? BboxMaxLat { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>The map frame, or <c>null</c> when none was set. Read after the query: EF cannot translate it.</summary>
+    public CommuneBbox? GetBbox()
+        => BboxMinLng is { } minLng && BboxMinLat is { } minLat && BboxMaxLng is { } maxLng && BboxMaxLat is { } maxLat
+            ? new CommuneBbox(minLng, minLat, maxLng, maxLat)
+            : null;
+
+    public void SetBbox(CommuneBbox? bbox)
+    {
+        BboxMinLng = bbox?.MinLng;
+        BboxMinLat = bbox?.MinLat;
+        BboxMaxLng = bbox?.MaxLng;
+        BboxMaxLat = bbox?.MaxLat;
+    }
 }
 
 /// <summary>The <see cref="AdministrativeUnit.SeedKey"/> values this project defines.</summary>
@@ -77,7 +102,20 @@ public sealed class AdministrativeUnitConfiguration : IEntityTypeConfiguration<A
 {
     public void Configure(EntityTypeBuilder<AdministrativeUnit> builder)
     {
-        builder.ToTable(CommuneReferenceBuilderExtensions.CommuneTable);
+        builder.ToTable(CommuneReferenceBuilderExtensions.CommuneTable, table =>
+        {
+            table.HasCheckConstraint("ck_administrative_unit_bbox_together",
+                "(bbox_min_lng IS NULL) = (bbox_min_lat IS NULL) AND (bbox_min_lng IS NULL) = (bbox_max_lng IS NULL) "
+                + "AND (bbox_min_lng IS NULL) = (bbox_max_lat IS NULL)");
+            // The range bounds alone would already refuse NaN (Postgres sorts it above every number) and ±Infinity; the
+            // explicit NaN tests follow the double-precision convention anyway, so nobody has to re-derive that.
+            table.HasCheckConstraint("ck_administrative_unit_bbox_valid",
+                "bbox_min_lng IS NULL OR ("
+                + "bbox_min_lng <> 'NaN'::float8 AND bbox_min_lat <> 'NaN'::float8 "
+                + "AND bbox_max_lng <> 'NaN'::float8 AND bbox_max_lat <> 'NaN'::float8 "
+                + "AND bbox_min_lng >= -180 AND bbox_max_lng <= 180 AND bbox_min_lat >= -90 AND bbox_max_lat <= 90 "
+                + "AND bbox_min_lng < bbox_max_lng AND bbox_min_lat < bbox_max_lat)");
+        });
         builder.HasKey(unit => unit.CommuneId);
 
         builder.Property(unit => unit.CommuneId).HasPrefixedId(PrefixedIds.AdministrativeUnit);

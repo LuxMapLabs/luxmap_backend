@@ -42,8 +42,16 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>COMMUNE-BBOX — khung bản đồ của xã do Quản trị cấu hình, 14/10/2026</strong>
+    <p><span class="tag t-next">PR #149 (sửa CI: EF1002 trong test)</span> <code>/admin/communes</code> (liệt kê / tạo / sửa, không xoá),
+    capability mới <code>ManageCommunes</code> (Quản trị). Xã thêm <code>bbox</code> (4 cột, CHECK cả NaN / ±Infinity); <code>GET /auth/me</code> thêm
+    <code>communes[]</code> (tên, khung, tâm) và <code>map_bounds</code> (khung gộp + tâm) cho FE khoá bản đồ và mở ở tâm. Khung là khung nhìn: không
+    lọc, không chặn tài sản. Migration <code>CommuneMapFrame</code> chỉ thêm cột + CHECK. 21 test mới, 4 chốt phá thử đều đỏ. Drift CB-1…CB-6.
+    Còn: nhập khung cho 3 xã trên <code>luxmap_dev</code>; WP5 làm màn Quản trị xã.</p>
+  </div>
+  <div class="card">
     <strong>POLE-LOCATION — kỹ sư hiện trường dời cột tới vị trí thật, 14/10/2026</strong>
-    <p><span class="tag t-next">PR #148</span> <code>PUT /assets/poles/{id}/location</code> body
+    <p><span class="tag t-next">Đã merge (PR #148)</span> <code>PUT /assets/poles/{id}/location</code> body
     <code>{lat, lng}</code>, capability mới <code>EditPoleLocation</code> (Quản lý + Kỹ sư). Không giới hạn khoảng dời; chặn 409 <code>POLE_OFF_SEGMENT</code>
     khi cách tuyến của cột &gt; 25 m — cùng ngưỡng <code>SurveyProcessing:RouteCorridorM</code> qua port <code>ISurveyCorridor</code>. Mỗi lần dời một audit
     <code>pole / relocated</code> (toạ độ cũ → mới). Migration <code>AuditPoleRelocation</code> chỉ dựng lại 2 CHECK của audit. 7 test mới, 3 chốt phá thử

@@ -1,6 +1,7 @@
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Persistence;
+using LuxMap.Shared.Contracts.Communes;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -111,13 +112,41 @@ public sealed class AuthService(
             return null;
         }
 
+        var communeIds = await CommuneIdsForAsync(user, ct);
+        var communes = await CommunesForAsync(user, communeIds, ct);
         return new CurrentUserResponse(
             user.UserId,
             user.Username,
             user.Email,
             user.FullName,
             ContractEnum.ToDbValue(user.Role),
-            await CommuneIdsForAsync(user, ct));
+            communeIds,
+            communes,
+            MapBounds.Of(CommuneBbox.Union(communes.Where(commune => commune.Bbox is not null).Select(commune => commune.Bbox!))));
+    }
+
+    /// <summary>
+    /// COMMUNE-BBOX: the caller's communes with their names and map frames — every commune for system-wide scope. The anchor
+    /// table is never filtered (see <see cref="AdministrativeUnit"/>), so the ids decide, read from the same rows as the claim.
+    /// </summary>
+    private async Task<IReadOnlyList<CommuneSummary>> CommunesForAsync(
+        AppUser user, IReadOnlyList<string> communeIds, CancellationToken ct)
+    {
+        var query = dbContext.Set<AdministrativeUnit>().AsNoTracking();
+        if (!user.HasSystemWideScope)
+        {
+            query = query.Where(unit => communeIds.Contains(unit.CommuneId));
+        }
+
+        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, section 0).
+        var units = await query
+            .OrderBy(unit => unit.CreatedAt).ThenBy(unit => unit.CommuneId.Length).ThenBy(unit => unit.CommuneId)
+            .ToListAsync(ct);
+        return units.Select(unit =>
+        {
+            var bbox = unit.GetBbox();
+            return new CommuneSummary(unit.CommuneId, unit.Name, bbox, bbox?.Center());
+        }).ToList();
     }
 
     /// <param name="group">The endpoint group the token arrived at. A token issued by the other group

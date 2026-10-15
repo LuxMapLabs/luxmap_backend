@@ -2185,6 +2185,23 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - Job dùng `UtcMicrosecondClock` một lần mỗi lượt; một lượt quá hạn xử lý tối đa `Batch` (500) phiếu mỗi vòng, lặp tới khi hết.
 
 
+### COMMUNE-BBOX — khung bản đồ của xã (14/10/2026, drift CB-1…CB-6)
+
+- **bbox là KHUNG NHÌN, không phải ranh giới.** Đừng dùng nó để lọc, ẩn hay từ chối tài sản, và đừng suy `commune_id` từ nó: phân quyền
+  vẫn một nguồn là cột `commune_id` (§7). Ranh giới thật (polygon) vẫn chưa có nguồn.
+- Bốn cột `bbox_*` trên `administrative_unit` đọc/ghi qua **`GetBbox()` / `SetBbox()`** (EF không dịch được — đọc sau truy vấn). Trung điểm
+  (`center`) và khung gộp (`CommuneBbox.Union`) **tính lúc đọc, không lưu**.
+- `/admin/communes` nằm ở **module Admin** (nay tham chiếu Persistence). `AdministrativeUnit` không bị lọc theo xã — capability
+  `ManageCommunes` là thứ duy nhất giữ endpoint cho Quản trị.
+- `PUT /admin/communes/{id}` dùng **`[JsonRequired]`** để cả hai khoá bắt buộc mà `bbox` vẫn nhận `null` — khác khuôn `JsonElement` của
+  `feeder_id` / `note`, vì `bbox` là object có schema riêng. Gỡ `[JsonRequired]` thì form thiếu khoá sẽ xoá khung (canh bằng
+  `Put_needs_both_keys_and_an_explicit_null_clears_the_frame`).
+- Test tạo xã đặt tên tiền tố `bbox-test-` và tài khoản riêng; teardown xoá **tài khoản trước, xã sau** (`app_user_commune` giữ xã).
+- 🔴 **`AccountTestFactory.DeleteTestAccountsAsync()` xoá MỌI tài khoản tiền tố `acct-`, và `AccountAdminTests` gọi nó sau MỖI test.**
+  Class khác dùng chung tiền tố hay gọi chung hàm đó sẽ xoá tài khoản của nhau khi chạy song song → test đỏ ngẫu nhiên và
+  `40P01 deadlock` ở teardown (gặp thật ở COMMUNE-BBOX: 11 test đỏ, mỗi class chạy riêng thì xanh). Class mới: **tiền tố riêng** (`cbx-`)
+  và chỉ xoá tiền tố đó. Cũng đừng assert **tổng số** xã / tài khoản — class khác tạo cùng lúc; kiểm theo id hoặc tên.
+
 ### POLE-LOCATION — dời cột (14/10/2026, drift PL-1…PL-5)
 
 - **Ngưỡng hành lang có ĐÚNG MỘT nguồn: `SurveyProcessing:RouteCorridorM`.** Assets hỏi qua port **`ISurveyCorridor`** (Survey hiện thực,

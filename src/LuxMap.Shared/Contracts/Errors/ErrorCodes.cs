@@ -187,6 +187,9 @@ public static class ErrorCodes
     /// </summary>
     public const string NoteChanged = "NOTE_CHANGED";
 
+    /// <summary>404 — no commune has that id (COMMUNE-BBOX, <c>/admin/communes/{id}</c>).</summary>
+    public const string CommuneNotFound = "COMMUNE_NOT_FOUND";
+
     /// <summary>
     /// 409 — the new position of a pole is farther from its own road segment than the survey corridor (POLE-LOCATION).
     /// A survey would never see the pole there again. Nothing was written; moving a pole to another segment is the
