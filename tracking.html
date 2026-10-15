@@ -42,8 +42,17 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>POLE-LOCATION — kỹ sư hiện trường dời cột tới vị trí thật, 14/10/2026</strong>
+    <p><span class="tag t-next">PR #148</span> <code>PUT /assets/poles/{id}/location</code> body
+    <code>{lat, lng}</code>, capability mới <code>EditPoleLocation</code> (Quản lý + Kỹ sư). Không giới hạn khoảng dời; chặn 409 <code>POLE_OFF_SEGMENT</code>
+    khi cách tuyến của cột &gt; 25 m — cùng ngưỡng <code>SurveyProcessing:RouteCorridorM</code> qua port <code>ISurveyCorridor</code>. Mỗi lần dời một audit
+    <code>pole / relocated</code> (toạ độ cũ → mới). Migration <code>AuditPoleRelocation</code> chỉ dựng lại 2 CHECK của audit. 7 test mới, 3 chốt phá thử
+    đều đỏ. Drift PL-1…PL-5. ⚠️ WP5 phải đổi kéo thả sang endpoint này (không dùng <code>PUT /assets/poles/{id}</code>, sẽ xoá <code>feeder_id</code>).
+    Chưa làm: dời offline qua <code>/sync/push</code>; audit khi sửa <code>geom</code> bằng form đầy đủ / import.</p>
+  </div>
+  <div class="card">
     <strong>OPS-DEPLOY-VPS — triển khai lên một VPS, 15/10/2026</strong>
-    <p><span class="tag t-next">PR #150 · chờ Mỹ thuê VPS + mua tên miền</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
+    <p><span class="tag t-next">Đã merge (PR #150) · chờ Mỹ thuê VPS + mua tên miền</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
     Mỹ chốt V-1…V-6: <strong>một VPS Singapore</strong>, Docker Compose; <strong>PostGIS trên VPS</strong> (thay Supabase, <code>supabase.md</code> giữ làm
     lịch sử); <strong>mua tên miền, web và API cùng origin</strong> (<code>/</code> web, <code>/api/v1</code> API); không EMQX (thiết bị dùng kênh HTTP).
     Files: <code>Dockerfile</code> (API + ffmpeg + EF bundle, chạy non-root), <code>.dockerignore</code> (allowlist), <code>deploy/compose.yml</code>

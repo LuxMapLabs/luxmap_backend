@@ -31,6 +31,7 @@ public sealed class SurveyModule : ILuxMapModule
             return true;
         }).ValidateOnStart();
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SurveyProcessingOptions>>().Value.Frames);
+        services.AddSingleton<LuxMap.Modules.Assets.ISurveyCorridor, SurveyCorridor>();
         services.AddSingleton<IFrameExtractor, FfmpegFrameExtractor>();
         services.AddScoped<Review.SurveyReviewService>();
         services.AddScoped<Review.SurveyMediaAccess>();

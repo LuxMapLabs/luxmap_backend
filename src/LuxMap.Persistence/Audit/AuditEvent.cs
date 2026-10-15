@@ -35,7 +35,7 @@ public enum AuditActorKind
     /// </summary>
     Public,
 }
-public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport }
+public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport, Pole }
 public enum AuditAction
 {
     Created, Assigned, Reassigned, Unassigned, Started, Completed, Verified,
@@ -55,6 +55,9 @@ public enum AuditAction
 
     /// <summary>CITIZEN-QR P2c: the ON / OFF model gave its hint on a citizen report's photos (actor <c>cv</c>) — a suggestion, not a decision.</summary>
     Analyzed,
+
+    /// <summary>POLE-LOCATION: a pole was moved to a corrected position — the old and new coordinates are the before / after.</summary>
+    Relocated,
 }
 
 /// <summary>Marks business entities whose writes require one audit event per SaveChanges.</summary>

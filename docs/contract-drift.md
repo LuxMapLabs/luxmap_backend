@@ -1344,6 +1344,27 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | JB-9 | **Giới hạn đã biết (review Codex):** sự cố `node_offline` không có cột / tuyến, nên phiếu **chỉ** gồm sự cố như vậy **không** vào `GET /sync/bundle` (gói chọn theo tuyến, §5.8) và không lọc được theo tuyến ở `GET /faults`. Đọc / tạo phiếu online vẫn đúng. Cho kỹ sư xử lý tại tủ khi offline là quyết định riêng (phạm vi gói theo tủ / thiết bị) — không tự gán tuyến cho sự cố (trái D-7) |
 | JB-8 | **Báo WP6 (D-9):** app đang tính quá hạn theo **ngày lịch của máy**; backend theo **đêm 12:00 Asia/Ho_Chi_Minh**. Từ 00:00 tới 11:59 hai bên lệch một ngày — nên đọc cờ `overdue` của `GET /work-orders/agenda` thay vì tự tính |
 
+### POLE-LOCATION — dời cột tới vị trí thật (14/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 14/10/2026 — theo góp ý của thầy ("vị trí cột cho kỹ sư hiện trường cập nhật"); WP5 đã làm kéo thả cột trên bản đồ. **SELF-SIGNED**, chạm API (chỉ thêm), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (kéo thả cột trên bản đồ), WP6 (sửa vị trí tại chỗ). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| PL-1 | `PUT /api/v1/assets/poles/{poleId}/location`, body `{lat, lng}` (EPSG:4326, cùng dạng `location` của `POST /faults`) → `200 {pole_id, lat, lng, moved_m, updated_at, updated_by, updated_by_name}`. Chỉ đổi vị trí; mọi trường khác vẫn qua `PUT /assets/poles/{poleId}` (`ManageAssets`). Thiếu toạ độ, ngoài ±90 / ±180 → 400 `VALIDATION_FAILED`; cột ngoài phạm vi xã → 404 |
+| PL-2 | Capability mới **`EditPoleLocation`** = Quản lý + Kỹ sư hiện trường (ma trận §2) |
+| PL-3 | **Không** giới hạn khoảng dời so với vị trí cũ (toạ độ ban đầu từ GPS ảnh có thể lệch vài chục mét). Giới hạn duy nhất: vị trí mới cách **tuyến của chính cột** ≤ hành lang khảo sát `SurveyProcessing:RouteCorridorM` (25 m) — đúng ngưỡng truy vấn cột của pipeline khảo sát dùng, đọc từ cùng một option. Vượt → 409 **`POLE_OFF_SEGMENT`**, `details {pole_id, segment_id, distance_m, corridor_m}`, không ghi gì. Đổi cột sang tuyến khác = form sửa đầy đủ. Tuyến `inter_commune` thuộc xã khác vẫn được đo |
+| PL-4 | Mỗi lần dời ghi **một** dòng audit: `entity_type = pole`, `action = relocated`, `before {lat, lng}`, `after {lat, lng, moved_m, segment_id, segment_distance_m}`. Gửi lại đúng vị trí đang có = không đổi gì (`moved_m = 0`, không audit, `updated_by` giữ nguyên). ⚠️ Chỉ đường này ghi audit — sửa `geom` qua form đầy đủ hay import **chưa** ghi |
+| PL-5 | Lịch sử khảo sát không đổi: mỗi run đã chụp GIS lúc chạy (`gis_snapshot`). Dời offline (op_type mới cho `/sync/push`) là **ticket sau** |
+
+**Lược đồ:** migration `AuditPoleRelocation` — chỉ dựng lại `ck_audit_event_entity_type` (+`pole`) và `ck_audit_event_action` (+`relocated`).
+`Down()` gãy khi đã có audit `pole` / `relocated` (cùng họ BE-19).
+
+**Phải báo:** WP5 (kéo thả gọi endpoint này, **không** gọi `PUT /assets/poles/{id}` — thay thế toàn phần sẽ xoá `feeder_id` nếu body thiếu; hiện hộp xác nhận
+trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và hiện `distance_m`), WP6 (màn sửa vị trí). **Chưa báo.**
+
 ### OPS-DEPLOY-VPS — triển khai lên một VPS (15/10/2026)
 
 | | |

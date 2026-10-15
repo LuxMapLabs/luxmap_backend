@@ -188,6 +188,13 @@ public static class ErrorCodes
     public const string NoteChanged = "NOTE_CHANGED";
 
     /// <summary>
+    /// 409 — the new position of a pole is farther from its own road segment than the survey corridor (POLE-LOCATION).
+    /// A survey would never see the pole there again. Nothing was written; moving a pole to another segment is the
+    /// full asset edit.
+    /// </summary>
+    public const string PoleOffSegment = "POLE_OFF_SEGMENT";
+
+    /// <summary>
     /// <c>POST /sync/push</c> — an operation skipped because an earlier operation of the same batch, on the same
     /// work order or pole, was a conflict or was rejected (BE-43 D-7). <c>details.blocked_by</c> names it.
     /// </summary>

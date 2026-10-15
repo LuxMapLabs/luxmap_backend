@@ -2746,6 +2746,150 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/assets/poles/{poleId}/location": {
+      "put": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "poleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPoleLocationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPoleLocationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPoleLocationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleLocationResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleLocationResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleLocationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:edit_pole_location",
+        "x-luxmap-roles": [
+          "manager",
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/assets/feeders/{feederId}/poles": {
       "get": {
         "tags": [
@@ -13562,6 +13706,40 @@
         },
         "additionalProperties": false
       },
+      "PoleLocationResponse": {
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
+          },
+          "moved_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by_name": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "PoleMapBaseline": {
         "required": [
           "direction"
@@ -14814,6 +14992,22 @@
           "feeder_source": {
             "type": "string",
             "description": "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SetPoleLocationRequest": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
             "nullable": true
           }
         },
@@ -16644,7 +16838,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:edit_pole_location = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },

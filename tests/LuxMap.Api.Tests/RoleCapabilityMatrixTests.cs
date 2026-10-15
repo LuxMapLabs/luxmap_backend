@@ -50,6 +50,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ReadLuxReadings"] = ("GET", "/api/v1/lux-readings", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ManageAssets"] = ("POST", "/api/v1/assets/segments", ["manager"]),
         ["EditPoleNotes"] = ("PUT", "/api/v1/assets/poles/POLE-0/note", ["manager", "field_engineer"]),
+        ["EditPoleLocation"] = ("PUT", "/api/v1/assets/poles/POLE-0/location", ["manager", "field_engineer"]),
         ["RecordLuxReading"] = ("POST", "/api/v1/lux-readings", ["field_engineer"]),
         ["ControlLighting"] = ("POST", "/api/v1/lighting/commands", ["manager"]),
         ["ManageUsers"] = ("POST", "/api/v1/admin/users", ["system_admin"]),

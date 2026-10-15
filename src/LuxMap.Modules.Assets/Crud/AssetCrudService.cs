@@ -4,6 +4,7 @@ using LuxMap.Modules.Assets.Import;
 using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
+using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -28,7 +29,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// </remarks>
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
-    WarrantyCalendar warranty)
+    WarrantyCalendar warranty, ISurveyCorridor corridor, IAuditTrail audit)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -667,6 +668,83 @@ public sealed class AssetCrudService(
         var name = await dbContext.Set<AppUser>().Where(user => user.UserId == pole.UpdatedBy).Select(user => user.FullName).FirstOrDefaultAsync(ct);
         return new PoleNoteResponse(pole.PoleId, pole.Note, pole.UpdatedAt, pole.UpdatedBy, name);
     }
+
+    /// <summary>
+    /// Moves a pole to where it really stands (POLE-LOCATION) — a field engineer on site, or a manager dragging it on the map.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// No cap on how far it moves: a position first taken from a photo's GPS can be tens of metres out, and correcting that
+    /// is the point. The one limit is the survey corridor of the pole's OWN segment (<see cref="ISurveyCorridor"/>): past
+    /// it, the survey's pole query no longer sees the pole and it silently drops out of every later sweep. A drop onto
+    /// another road is refused for the same reason; moving a pole to another segment is the full edit (<see cref="ManageAssets"/>).
+    /// </para>
+    /// <para>
+    /// Read through the commune filter first — out of scope is a 404 before any lock — then lock the row, so the audit's
+    /// before-position is the one this move replaced and not one a concurrent move already overwrote.
+    /// </para>
+    /// </remarks>
+    public async Task<PoleLocationResponse> SetPoleLocationAsync(string poleId, SetPoleLocationRequest request, CancellationToken ct)
+    {
+        if (request.Lat is not { } lat || request.Lng is not { } lng || !Finite(lat, 90) || !Finite(lng, 180))
+        {
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "lat (within ±90) and lng (within ±180) are both required, and finite.",
+                new Dictionary<string, object?> { ["field"] = "location" });
+        }
+
+        if (!await dbContext.Set<Pole>().AnyAsync(candidate => candidate.PoleId == poleId, ct))
+        {
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound,
+                "That pole does not exist, or it is outside your permitted commune scope.");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+        await dbContext.Database.ExecuteSqlRawAsync("SELECT 1 FROM pole WHERE pole_id = {0} FOR UPDATE", [poleId], ct);
+        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+        var target = new Point(lng, lat) { SRID = 4326 };
+
+        var moved = await dbContext.Set<Pole>().Where(candidate => candidate.PoleId == poleId)
+            .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom, target)).SingleAsync(ct);
+        // Unfiltered on purpose: an inter_commune segment may belong to another commune than its pole (BE-REVIEW-02
+        // constraint 1). Only a distance leaves the query, never the segment.
+        var offSegment = await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
+            .Where(segment => segment.SegmentId == pole.SegmentId)
+            .Select(segment => SpatialFunctions.DistanceMeters(segment.Geom, target)).SingleAsync(ct);
+
+        var before = new { lat = pole.Geom.Y, lng = pole.Geom.X };
+        pole.Geom = target;
+        if (AssetStamp.Touch(dbContext, pole, actor))
+        {
+            if (offSegment > corridor.RouteCorridorM)
+            {
+                throw new LuxMapException(ErrorCodes.PoleOffSegment, HttpStatusCode.Conflict,
+                    $"That position is {offSegment:0.#} m from the pole's road segment; a survey only sees poles within "
+                    + $"{corridor.RouteCorridorM:0.#} m of it. To put the pole on another segment, edit the pole.",
+                    new Dictionary<string, object?>
+                    {
+                        ["pole_id"] = pole.PoleId, ["segment_id"] = pole.SegmentId,
+                        ["distance_m"] = Math.Round(offSegment, 1), ["corridor_m"] = corridor.RouteCorridorM,
+                    });
+            }
+
+            audit.Record(new AuditChange(pole.UpdatedAt, AuditActorKind.User, actor.UserId, actor.Role, pole.CommuneId,
+                AuditEntityType.Pole, pole.PoleId, AuditAction.Relocated, before,
+                new { lat, lng, moved_m = Math.Round(moved, 2), pole.SegmentId, segment_distance_m = Math.Round(offSegment, 2) }));
+        }
+        else
+        {
+            moved = 0;
+        }
+
+        await dbContext.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        var name = await dbContext.Set<AppUser>().Where(user => user.UserId == pole.UpdatedBy).Select(user => user.FullName).FirstOrDefaultAsync(ct);
+        return new PoleLocationResponse(pole.PoleId, pole.Geom.Y, pole.Geom.X, Math.Round(moved, 2), pole.UpdatedAt, pole.UpdatedBy, name);
+    }
+
+    private static bool Finite(double value, double limit) => double.IsFinite(value) && Math.Abs(value) <= limit;
 
     private void Touch(IUpdateStamped asset) => AssetStamp.Touch(dbContext, asset, actor);
 
