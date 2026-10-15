@@ -60,9 +60,19 @@ KEPT_RUNS = f"run_id IN (SELECT run_id FROM public.survey_processing_run WHERE {
 # CITIZEN-QR: ONE definition of each kept set, so a child never copies rows whose parent was left out (Codex review P2b #9).
 COPIED_USERS = f"(SELECT user_id FROM public.app_user WHERE {IN_USERS})"
 QR_KEPT = (f"{IN_COMMUNES} AND created_by IN {COPIED_USERS} AND (revoked_by IS NULL OR revoked_by IN {COPIED_USERS})")
-REPORT_KEPT = f"{IN_COMMUNES} AND (decided_by IS NULL OR decided_by IN {COPIED_USERS})"
+# PP-4: operational photos may be in a different commune from the parent work order.
+POLE_PHOTO_KEPT = (f"{IN_COMMUNES} AND uploaded_by IN {COPIED_USERS}"
+                   f" AND (decided_by IS NULL OR decided_by IN {COPIED_USERS})"
+                   f" AND pole_id IN (SELECT pole_id FROM public.pole WHERE {IN_COMMUNES})"
+                   f" AND work_order_id IN (SELECT work_order_id FROM public.work_order WHERE {IN_COMMUNES})")
+
+FAULT_KEPT = (f"{IN_COMMUNES} AND (origin_pole_photo_id IS NULL OR origin_pole_photo_id IN "
+              f"(SELECT photo_id FROM public.work_order_pole_photo WHERE {POLE_PHOTO_KEPT}))")
+REPORT_KEPT = (f"{IN_COMMUNES} AND (decided_by IS NULL OR decided_by IN {COPIED_USERS})"
+               f" AND (fault_id IS NULL OR fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT}))")
 SUBMISSION_KEPT = (f"{IN_COMMUNES} AND report_id IN (SELECT report_id FROM public.citizen_report WHERE {REPORT_KEPT})"
                    f" AND qr_id IN (SELECT qr_id FROM public.qr_code WHERE {QR_KEPT})")
+
 
 # (table, row filter, ORDER BY). Order = foreign-key order; checked against the catalogue at runtime.
 # Survey tables (BE-15, added 04/10/2026) follow the chain sweep -> run -> pass/frame -> observation -> history;
@@ -114,9 +124,12 @@ PLAN = [
      "baseline_id, observation_id"),
     ("luminance_history", f"{IN_COMMUNES} AND {KEPT_RUNS}", "sweep_id, pole_id"),
     ("pole_current_status", IN_COMMUNES, "pole_id"),
-    ("fault", IN_COMMUNES, "fault_id"),
-    ("work_order_fault", IN_COMMUNES, "work_order_id, fault_id"),
-    ("repair_evidence", IN_COMMUNES, "evidence_id"),
+    ("work_order_pole_photo", POLE_PHOTO_KEPT, "captured_at, uploaded_at, length(photo_id), photo_id"),
+    ("fault", FAULT_KEPT, "fault_id"),
+    ("work_order_fault", f"{IN_COMMUNES} AND fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT})",
+     "work_order_id, fault_id"),
+    ("repair_evidence", f"{IN_COMMUNES} AND (fault_id IS NULL OR fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT}))",
+     "evidence_id"),
     # CITIZEN-QR P2b: report → submission → photo (all RESTRICT). A report may point at a fault and its decider, so it follows
     # fault and the copied accounts; submissions follow their report and code; photos have no commune and go by their submission.
     ("citizen_report", REPORT_KEPT, "created_at, length(report_id), report_id"),

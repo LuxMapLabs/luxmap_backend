@@ -226,4 +226,23 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.Contains(paths, path => path.StartsWith("/api/v1/", StringComparison.Ordinal));
         Assert.DoesNotContain(paths, path => path.Contains("{version}", StringComparison.Ordinal));
     }
+    [Fact]
+    public void Pole_photo_contract_has_required_multipart_ON_OFF_labels_and_manager_decision()
+    {
+        var path = "/api/v1/work-orders/{id}/pole-photos";
+        var upload = Spec.GetProperty("paths").GetProperty(path).GetProperty("post");
+        var form = upload.GetProperty("requestBody").GetProperty("content").GetProperty("multipart/form-data").GetProperty("schema");
+        Assert.Equal(new[] { "captured_at", "client_op_id", "lat", "lng", "photo", "pole_id" },
+            form.GetProperty("required").EnumerateArray().Select(x => x.GetString()!).Order(StringComparer.Ordinal));
+        foreach (var code in new[] { "200", "201", "400", "404", "409", "413", "415", "503" })
+            Assert.True(upload.GetProperty("responses").TryGetProperty(code, out _));
+        var fields = Schema("PolePhotoItem").GetProperty("properties");
+        Assert.Equal(new[] { "on", "off", "inconclusive" }, fields.GetProperty("cv_state").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        Assert.True(fields.GetProperty("cv_state").GetProperty("nullable").GetBoolean());
+        Assert.DoesNotContain("classified_as", fields.EnumerateObject().Select(p => p.Name));
+        var review = Spec.GetProperty("paths").GetProperty(path + "/{photo_id}/decision").GetProperty("post");
+        Assert.Equal(LuxMap.Shared.Authorization.LuxMapPolicies.ReviewSurveys, review.GetProperty("x-luxmap-capability").GetString());
+        Assert.Equal(new[] { "manager" }, review.GetProperty("x-luxmap-roles").EnumerateArray().Select(v => v.GetString()));
+    }
+
 }

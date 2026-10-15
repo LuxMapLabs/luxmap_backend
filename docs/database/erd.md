@@ -45,6 +45,15 @@ gọn hơn đề xuất gốc (32 bảng mới → 22). Nguồn phạm vi: [Phi�
 nghiệm); ảnh báo sự cố EV-2 (staging hay multipart — FW); tên bảng notification (BE-27 cùng FE2); sync offline
 (BE-43 cùng WP6).
 
+## Bổ sung POLE-PHOTO-AI (15/10/2026, Mỹ SELF-SIGNED, nền tạm)
+
+Theo D-1…D-17 và D-5a…e, thêm `work_order_pole_photo` (PPH, metadata ảnh + snapshot AI ON/OFF + quyết định Quản lý),
+FK tới work_order, pole + commune, uploaded_by/decided_by; `fault.origin_pole_photo_id` nullable trỏ ghép tới ảnh/pole/xã.
+Đây là ảnh vận hành, không pole_observation hay evidence after. Chỉ confirm mới publish qua cùng writer survey;
+không ghi luminance_history/baseline. Q5 mở thêm nguồn **ảnh đã duyệt**, Q11 thêm nguồn ảnh cho fault; Q8 giữ registry survey,
+ảnh dùng chuỗi model/artifact như Citizen theo D-10 đợt đầu. Chi tiết drift PP-1…PP-10; migration AddWorkOrderPolePhotos.
+
+
 ## ERD
 
 Ký hiệu trong ngoặc của khoá: `HIỆN CÓ`, `SỬA` (bảng có, thêm/đổi cột), `MỚI`. Chỉ vẽ cột chính và quan hệ miền;

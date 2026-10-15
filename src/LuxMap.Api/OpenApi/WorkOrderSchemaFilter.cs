@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using LuxMap.Modules.WorkOrders;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -10,6 +11,15 @@ public sealed class WorkOrderSchemaFilter : ISchemaFilter
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
         if (schema is not OpenApiSchema concrete || concrete.Properties is null) return;
+        if (context.Type == typeof(PolePhotoItem))
+        {
+            concrete.Properties["cv_state"] = WireValues(true, "on", "off", "inconclusive");
+            concrete.Properties["ai_status"] = WireValues(false, "available", "unavailable");
+            concrete.Properties["decision"] = WireValues(true, "confirm", "reject");
+            concrete.Properties["status_reason"] = WireValues(true, "applied", "classification_preserved", "not_newer", "rejected");
+        }
+        if (context.Type == typeof(PolePhotoDecisionRequest))
+            concrete.Properties["decision"] = WireValues(false, "confirm", "reject");
         if (context.Type == typeof(CreateWorkOrderRequest))
         {
             foreach (var name in new[] { "work_order_id", "wo_status", "cluster_id", "priority_score" }) concrete.Properties.Remove(name);
@@ -48,4 +58,10 @@ public sealed class WorkOrderSchemaFilter : ISchemaFilter
             concrete.Properties["report_note"] = new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 10 };
         }
     }
+    private static OpenApiSchema WireValues(bool nullable, params string[] values) => new()
+    {
+        Type = nullable ? JsonSchemaType.String | JsonSchemaType.Null : JsonSchemaType.String,
+        Enum = [.. values.Select(value => (JsonNode)JsonValue.Create(value)!)],
+    };
+
 }

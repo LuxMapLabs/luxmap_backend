@@ -9,10 +9,9 @@ namespace LuxMap.Modules.Faults.Entities;
 /// </summary>
 /// <remarks>
 /// Faults arrive from three channels — CV over sweep imagery, IoT telemetry, and a survey crew
-/// reporting on site — and <see cref="SourceChannel"/> is what separates them. All three enter at
-/// <see cref="FaultStatus.Detected"/>: Contract section 2.8 is explicit that a fault reported by a
-/// person still goes through the same review as one the engine found. Nobody creates an
-/// already-confirmed fault.
+/// reporting on site — and <see cref="SourceChannel"/> is what separates them. Ordinary findings enter at
+/// <see cref="FaultStatus.Detected"/> and still need review. Manager-confirmed pole photos (PP-10)
+/// are the explicit exception: their new lamp-out fault is already confirmed by that decision.
 /// <para>
 /// These columns record the latest decision only. D-R13 requires the full sequence in the
 /// shared append-only audit_event table (BE-23a), not a separate FaultHistory table.
@@ -180,6 +179,8 @@ public class Fault : ICommuneScoped, IAudited
     /// <see cref="OriginObservationId"/>: Faults does not reference Telemetry.
     /// </summary>
     public string? OriginNodeId { get; set; }
+
+    public string? OriginPolePhotoId { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

@@ -14,7 +14,7 @@ using NetTopologySuite.LinearReferencing;
 namespace LuxMap.Modules.WorkOrders;
 
 /// <summary>
-/// One pole an engineer will meet on a work order, with the status the LAST published survey left on it.
+/// One pole an engineer will meet on a work order, with the latest published status (survey or confirmed pole photo).
 /// SELF-SIGNED (drift WO-12), provisional until FW.
 /// </summary>
 public sealed record WorkOrderPole
@@ -51,7 +51,7 @@ public sealed record WorkOrderPole
 
 /// <summary>
 /// <c>GET /work-orders/{id}/poles</c> — what is on the road the engineer was sent to, and what we last
-/// knew about each lamp, BEFORE the visit. The status is whatever the latest accepted survey published;
+/// knew about each lamp, BEFORE the visit. The status is the latest accepted survey or confirmed pole photo;
 /// this work order's own survey changes it only once a manager accepts the sweep.
 /// </summary>
 /// <remarks>
@@ -75,6 +75,12 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
 {
     private static readonly FaultStatus[] OpenStatuses = [.. FaultStatusSets.Open];
 
+    internal IQueryable<Pole> Targets(string id) => db.Set<Pole>().Where(p =>
+        db.Set<WorkOrder>().Any(w => w.WorkOrderId == id && w.SegmentId == p.SegmentId)
+        || db.Set<WorkOrderSegment>().Any(s => s.WorkOrderId == id && s.SegmentId == p.SegmentId)
+        || (from link in db.Set<WorkOrderFault>() join fault in db.Set<Fault>() on link.FaultId equals fault.FaultId
+            where link.WorkOrderId == id && fault.PoleId == p.PoleId select link).Any());
+
     public async Task<PagedResult<WorkOrderPole>> PolesAsync(string id, PageRequest page, CancellationToken ct)
     {
         var order = await db.Set<WorkOrder>().AsNoTracking().Where(x => x.WorkOrderId == id)
@@ -94,10 +100,8 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
             .GroupBy(x => x.PoleId)
             .ToDictionary(g => g.Key, g => g.OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length)
                 .ThenBy(x => x.FaultId, StringComparer.Ordinal).Select(x => x.FaultId).ToArray());
-        var faultPoleIds = faultsByPole.Keys.ToArray();
 
-        var rows = await db.Set<Pole>().AsNoTracking()
-            .Where(p => segmentIds.Contains(p.SegmentId) || faultPoleIds.Contains(p.PoleId))
+        var rows = await Targets(id).AsNoTracking()
             .Select(p => new
             {
                 p.PoleId, p.SegmentId, p.Geom, p.NearSensitivePoi,

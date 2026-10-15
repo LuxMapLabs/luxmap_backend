@@ -22,7 +22,7 @@ using Xunit.Abstractions;
 namespace LuxMap.Api.Tests;
 
 [Collection(nameof(AssetDatabaseCollection))]
-public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output) : IAsyncLifetime
+public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output) : IAsyncLifetime
 {
     private readonly Dictionary<string, AppUser> users = [];
     private readonly Dictionary<string, HttpClient> clients = [];
@@ -87,7 +87,7 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
                 await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {home} OR commune_id = {foreign}");
                 await transaction.CommitAsync();
             }
-            foreach (var table in new[] { "notification", "work_order_fault", "work_order_segment", "repair_evidence", "work_order", "fault", "fault_cluster", "fixture", "pole", "road_segment" })
+            foreach (var table in new[] { "notification", "work_order_fault", "work_order_segment", "repair_evidence", "fault", "work_order_pole_photo", "work_order", "fault_cluster", "fixture", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);
@@ -100,6 +100,8 @@ public class WorkOrderTests(AssetImportFixture factory, ITestOutputHelper output
         foreach (var client in clients.Values) client.Dispose();
         foreach (var client in photoClients.Values) client.Dispose();
         if (photoHost is not null) await photoHost.DisposeAsync();
+        foreach (var client in polePhotoClients.Values) client.Dispose();
+        if (polePhotoHost is not null) await polePhotoHost.DisposeAsync();
     }
 
     private async Task<JsonElement> Send(string who, string method, string path, object? body, int expected, string? error = null, int auditExpected = 1, string? correlation = null)

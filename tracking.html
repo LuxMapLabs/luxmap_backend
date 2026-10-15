@@ -42,6 +42,20 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>POLE-PHOTO-AI — ảnh cột trong phiếu → AI → Quản lý xác nhận, 15/10/2026</strong>
+    <p><span class="tag t-next">Pha 2 xong · chờ Claude review · chưa commit</span> Nhánh <code>feat/POLE-PHOTO-AI</code>.
+    6 route dưới <code>/work-orders/{id}/pole-photos</code>: upload/list/detail/thumbnail/original/decision.
+    Nhãn riêng <code>on/off/inconclusive</code>, lỗi model vẫn nhận ảnh; chỉ Quản lý xác nhận mới cập nhật trạng thái qua writer chung survey.
+    ON giữ dim, ảnh cũ không ghi đè; OFF mới tạo tối đa một lamp_out confirmed, truy vết về ảnh. Không ghi history/baseline, không thay ảnh after.
+    Migration chỉ thêm <code>AddWorkOrderPolePhotos</code>, chưa chạm DB dev. Drift PP-1…PP-10 (Mỹ SELF-SIGNED, nền tạm; WP5/WP6 chưa báo).</p>
+    <p class="muted">File: WorkOrders/Survey/AI/Shared/Storage, migration, test, PLAN copy và OpenAPI.
+    Đã kiểm: build <code>-warnaserror</code> exit 0; toàn suite locale gốc <strong>1.545 pass, 2 MQTT skip</strong>, exit 0;
+    53 ca API + 1 prefix mới; 9 chốt phá thử đỏ (bài dedup được tăng độ mạnh sau lượt đầu còn xanh). 20 test script pass (gồm predicate PLAN và các FK con); OpenAPI/generator/lint exit 0 (8 cảnh báo),
+    migration apply/down/reapply DB test riêng và Caddy 413 thật. Sửa 8 WKT nội suy trong test cũ để độc lập culture.
+    Còn: Claude review diff rồi commit theo yêu cầu; WP5/WP6 chưa báo, FW chưa xác nhận. Codex không commit/push.
+    Bằng chứng: <a href=".ai/results/POLE-PHOTO-AI-p2.md">kết quả P2</a>.</p>
+  </div>
+  <div class="card">
     <strong>COMMUNE-BBOX — khung bản đồ của xã do Quản trị cấu hình, 14/10/2026</strong>
     <p><span class="tag t-next">PR #149 (sửa CI: EF1002 trong test)</span> <code>/admin/communes</code> (liệt kê / tạo / sửa, không xoá),
     capability mới <code>ManageCommunes</code> (Quản trị). Xã thêm <code>bbox</code> (4 cột, CHECK cả NaN / ±Infinity); <code>GET /auth/me</code> thêm

@@ -192,6 +192,8 @@ Ba lỗi bắt được nhờ diễn tập, đã sửa trong file:
 
 1. **Clip vượt 300 MiB ra 502.** API trả 413 ngay từ `Content-Length` rồi đóng kết nối trong lúc Caddy còn đang gửi body →
    `broken pipe`. Caddy nay tự trả 413 đúng dạng lỗi Contract cho body khai lớn hơn 300 MiB.
+   POLE-PHOTO-AI (PP-8, 15/10/2026) thêm guard cùng cơ chế cho **POST `/api/v1/work-orders/*/pole-photos`**,
+   Content-Length > **17 MiB**: giữ 413 thay vì 502 khi API chặn sớm; file bên trong vẫn ≤16 MiB.
 2. **Gắn Caddyfile theo FILE làm `caddy reload` đọc file đã xoá.** Trình soạn thảo và `git pull` thay file bằng inode mới;
    container vẫn giữ inode cũ, reload báo lỗi và **cấu hình cũ chạy tiếp**. Nay gắn cả thư mục `deploy/caddy/`.
 3. **`respond @matcher` đứng sau mọi `handle`** trong thứ tự của Caddy, nên chặn `/api/v1/internal/*` bằng `respond` không

@@ -2237,3 +2237,31 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   (cookie auth, antiforgery) thì phải gắn volume cho thư mục khoá, nếu không mỗi lần deploy làm mất hiệu lực dữ liệu đã bảo vệ.
 - Script chép dữ liệu lên server vẫn là `scripts/copy_dev_to_supabase.py` (đích = PostGIS của VPS qua SSH tunnel, `localhost` nên không đòi TLS);
   luật "bảng mới phải vào `PLAN`" vẫn áp.
+
+### POLE-PHOTO-AI — ảnh một cột, duyệt rồi công bố (15/10/2026, drift PP-1…PP-10, nền tạm)
+
+- Khi sửa AI ảnh đơn, dùng port Shared `ISingleLampPhotoHinter` và luật `YoloSingleLampPhotoHinter`; Citizen adapter chỉ đổi tên nhãn.
+  Giữ khoá `Citizen:DaylightMeanLuma`, chuỗi băm `citizen-hint:single-lamp;daylight-mean-luma<=…` và prefix **cq** để không đổi phiên bản
+  Citizen khi output giữ nguyên. Model resolve lazy; lỗi model trả null, cancellation truyền tiếp.
+- Khi kiểm cột thuộc phiếu, dùng `WorkOrderPoleService.Targets` (cùng WO-12), không trang đầu. Xã/nguồn ảnh theo cột, có thể khác xã phiếu;
+  mọi read ảnh đi qua phiếu cha trước. Hàng ảnh scoped theo xã chưa đủ chặn kỹ sư khác trong cùng xã.
+- Khi ghi current-status, đi qua `Survey/Review/PoleStatusPublication.StageAsync` (sweep và ảnh dùng chung), caller khoá **hàng pole** cả
+  khi chưa có current row. Thứ tự **work_order → pole → photo**; storage/model ở ngoài transaction, rồi khoá và kiểm lại quyền/target.
+- **ON giữ dim/normal và confidence cũ nhưng tiến clock quan sát**, chặn ảnh OFF cũ ghi đè. Chỉ capture mới hơn
+  `LastEvaluatedAt ?? LastSeenAt` mới áp; ảnh cũ/bằng vẫn confirm được nhưng không đổi row/sinh fault. Ảnh áp xong
+  **LastSweepId/LastRunId=null**, không gán ảnh cho sweep; không ghi history/baseline. `classification_preserved` vẫn StatusApplied=true.
+- Fault từ ảnh do WorkOrders cấu hình FK ghép ảnh/pole/xã; source CV, lamp_out, không trộn origin khác. D-5d chốt **confirmed**
+  (sweep hiện vẫn detected); severity dùng cấu hình survey, chống trùng theo effective type + `FaultStatusSets.Open` dưới khoá cột.
+  Source/xã của cột đổi sau upload →409 khi confirm. ON không đóng fault; ảnh không thay evidence after.
+- Mỗi save **một** audit, transaction bao trọn upload/decision: submitted(User), analyzed(Cv), publication/applied(User),
+  fault/created(User), decision/confirmed hoặc rejected(User). Save phân tích lỗi phải rollback cả ảnh và submitted.
+  Replay/GET không infer hay audit lại; quyết định lần hai →409.
+- Khi sửa giới hạn ảnh, giữ cap 40 MP **trước decode** ở `IOriginalJpegReader` kể cả thiếu model. Body 17 MiB được chặn trước binding
+  bởi `PolePhotoBodyLimit`; Caddy phải giữ cùng guard Content-Length riêng route để tránh 502 từ early 413 (xem PP-8).
+- 🔴 **Body JSON khai bằng `sealed class` + property `init`, KHÔNG positional record có attribute kiểm tra trên tham số.**
+  `PolePhotoDecisionRequest` dạng record làm MVC ném `No property found that maps to constructor parameter 'Note'` → **500**, chỉ ở
+  lượt chạy toàn bộ (request đầu tiên đồng thời); chạy riêng test thì xanh 10/10. Khuôn đúng là các request ở `WorkOrderRequests.cs`.
+- **DB-only** `ak_pole_photo_target` / `fk_pole_photo_same_commune` không ở EF snapshot: bảo toàn khi sinh migration sau, canh catalog/FK.
+  Dọn fault **trước ảnh**, ảnh trước work_order/pole/user, audit trước actor/xã. PLAN copy phải giữ parent/users của ảnh và fault có nguồn ảnh.
+  Rollback migration mất metadata/kết quả/quyết định và origin ảnh của fault; object/audit không tự mất. Trên môi trường có dữ liệu ưu tiên
+  rollback ứng dụng, giữ schema; apply/down/reapply chỉ kiểm trên container test riêng trống.

@@ -27,6 +27,17 @@
 	# sending, which reaches the client as a 502 (seen in the rehearsal). Caddy answers those itself, in the Contract's
 	# error shape. Caddy sets X-Forwarded-For from the TCP peer and ignores one sent by the client.
 	handle /api/* {
+		# PP-8: this route rejects a declared body over 17 MiB BEFORE reading the multipart form.
+		# Match it here too, otherwise an early API 413 can surface as a proxy 502 (same issue as clips).
+		@pole_photo_too_large {
+			method POST
+			path /api/v1/work-orders/*/pole-photos
+			expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 17825792`
+		}
+		handle @pole_photo_too_large {
+			header Content-Type application/json
+			respond `{"error":{"code":"UPLOAD_TOO_LARGE","message":"Upload exceeds the endpoint limit.","details":{}}}` 413
+		}
 		@too_large expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 314572800`
 		handle @too_large {
 			header Content-Type application/json

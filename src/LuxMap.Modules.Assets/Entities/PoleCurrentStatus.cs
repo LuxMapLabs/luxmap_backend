@@ -4,23 +4,23 @@ using LuxMap.Shared.Contracts.Enums;
 namespace LuxMap.Modules.Assets.Entities;
 
 /// <summary>
-/// The result of the latest sweep that covered a pole — one row per pole, keyed by <c>pole_id</c>.
+/// The latest published observation (accepted sweep or Manager-confirmed pole photo) — one row per pole, keyed by <c>pole_id</c>.
 /// Backs four of the fifteen properties of Contract section 2.1: <c>fixture_status</c>,
 /// <c>status_confidence</c>, <c>last_seen_at</c>, <c>last_sweep_id</c>.
 /// <para>
-/// Those four are ONE event, not four fields. A single process (sweep processing, BE-15 → BE-17)
+/// Those four are ONE event, not four fields. The shared publication writer (BE-15 → BE-17 / PP-9)
 /// writes them together at a single moment. The mock set proves it: <c>status_confidence</c> is null
 /// on exactly the seven <c>unknown</c> poles, not one row off.
 /// </para>
 /// </summary>
 /// <remarks>
 /// <b>Schema here, writes elsewhere.</b> BE-09 creates the table because BE-14 (<c>GET /poles</c>)
-/// runs BEFORE BE-15 and needs these four properties. But the sweep pipeline OWNS the writes: asset
+/// runs BEFORE BE-15 and needs these four properties. But the publication writer OWNS the writes: asset
 /// CRUD and CSV import (BE-12) must never touch this table, which is why it is separate from
 /// <c>pole</c> rather than four more columns on it.
 /// <para>
-/// A missing row means "never covered by a sweep", which is a distinct state from a row saying
-/// <c>unknown</c> ("the latest sweep ran but could not see this pole").
+/// A missing row means no published observation yet; a row saying <c>unknown</c> means the latest
+/// published sweep could not see this pole. Confirmed photos can establish a status without a sweep.
 /// </para>
 /// </remarks>
 public class PoleCurrentStatus : ICommuneScoped
@@ -40,7 +40,7 @@ public class PoleCurrentStatus : ICommuneScoped
     public DateTime? LastSeenAt { get; set; }
 
     /// <summary>
-    /// The sweep that produced this classification. Plain <c>text</c> with NO foreign key: the
+    /// The sweep that produced this classification; null after a confirmed pole photo (PP-10). Plain <c>text</c> with NO foreign key: the
     /// <c>survey_sweep</c> table does not exist until BE-15, which adds the constraint in its own
     /// migration. This is the ONLY deferred foreign key in BE-09.
     /// </summary>
