@@ -57,7 +57,7 @@
   </div>
   <div class="card">
     <strong>COMMUNE-BBOX — khung bản đồ của xã do Quản trị cấu hình, 14/10/2026</strong>
-    <p><span class="tag t-next">PR #149 (sửa CI: EF1002 trong test)</span> <code>/admin/communes</code> (liệt kê / tạo / sửa, không xoá),
+    <p><span class="tag t-done">Đã merge (PR #149), 15/10/2026 · <code>luxmap_dev</code> đã migrate + ghi khung COM-070 / COM-001 / COM-002</span> <code>/admin/communes</code> (liệt kê / tạo / sửa, không xoá),
     capability mới <code>ManageCommunes</code> (Quản trị). Xã thêm <code>bbox</code> (4 cột, CHECK cả NaN / ±Infinity); <code>GET /auth/me</code> thêm
     <code>communes[]</code> (tên, khung, tâm) và <code>map_bounds</code> (khung gộp + tâm) cho FE khoá bản đồ và mở ở tâm. Khung là khung nhìn: không
     lọc, không chặn tài sản. Migration <code>CommuneMapFrame</code> chỉ thêm cột + CHECK. 21 test mới, 4 chốt phá thử đều đỏ. Drift CB-1…CB-6.
