@@ -43,7 +43,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
     <strong>POLE-PHOTO-AI — ảnh cột trong phiếu → AI → Quản lý xác nhận, 15/10/2026</strong>
-    <p><span class="tag t-next">Pha 2 xong · chờ Claude review · chưa commit</span> Nhánh <code>feat/POLE-PHOTO-AI</code>.
+    <p><span class="tag t-done">Đã merge (PR #151), 15/10/2026 · <code>luxmap_dev</code> đã migrate 16/10</span> Thử API thật 16/10 trên WO-0012 / <code>POLE-0071</code>: upload ảnh đêm 201 (1,7 s lúc model nạp lần đầu, AI <code>on</code> 0,49), gửi lại 200, khác ảnh 409, thumbnail 320 px <code>no-store</code>, kỹ sư tự duyệt 403, Quản lý xác nhận → cột <code>unknown → normal</code>, quyết định lần hai 409, audit đủ 4 event. Còn: báo WP5/WP6, FW xác nhận PP-*, WP4 đo độ chính xác trên ảnh thật.
     6 route dưới <code>/work-orders/{id}/pole-photos</code>: upload/list/detail/thumbnail/original/decision.
     Nhãn riêng <code>on/off/inconclusive</code>, lỗi model vẫn nhận ảnh; chỉ Quản lý xác nhận mới cập nhật trạng thái qua writer chung survey.
     ON giữ dim, ảnh cũ không ghi đè; OFF mới tạo tối đa một lamp_out confirmed, truy vết về ảnh. Không ghi history/baseline, không thay ảnh after.
