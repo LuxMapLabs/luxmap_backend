@@ -1,6 +1,7 @@
 # Sơ đồ trạng thái (State Machine) — LuxMap backend
 
-Vẽ lại từ **code đang chạy trên `dev`** (14/10/2026), không phải từ đặc tả. Mỗi mục nêu file giữ luật chuyển, để ai sửa
+Vẽ lại từ **code đang chạy trên `dev`** (14/10/2026; mục 10 và phần ảnh cột ở mục 0, 1, 9 thêm 16/10/2026 sau
+POLE-PHOTO-AI), không phải từ đặc tả. Mỗi mục nêu file giữ luật chuyển, để ai sửa
 luật thì sửa sơ đồ trong cùng PR. Tên trạng thái là **giá trị trên dây** (chuỗi thường, snake_case) — đúng thứ API trả về.
 
 Quy ước chung cho mọi máy dưới đây:
@@ -21,13 +22,14 @@ Quy ước chung cho mọi máy dưới đây:
 | 6 | Lệnh ON / OFF / AUTO | `lighting_command.status` | `Telemetry/Lighting/LightingCommandService.cs` |
 | 7 | Trạng thái thiết bị IoT `node_status` | **không lưu**, tính lúc đọc | `Telemetry/IotOptions.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs` |
 | 8 | Tài khoản người dùng | `is_locked`, `password_set_at` | `Identity/Accounts/UserAdminService.cs` |
-| 9 | Tình trạng đèn tại cột `fixture_status` | `pole_current_status` | `Survey/Review/SurveyReviewService.cs` (công bố khi duyệt sweep) |
+| 9 | Tình trạng đèn tại cột `fixture_status` | `pole_current_status` | `Survey/Review/SurveyReviewService.cs` (duyệt sweep), `ReviewedPolePhotoPublisher.cs` (xác nhận ảnh cột); cả hai ghi qua `PoleStatusPublication.cs` |
+| 10 | Ảnh cột trong phiếu (AI ON/OFF) | `work_order_pole_photo.decision`, `cv_state` | `WorkOrders/WorkOrderPolePhotoService.cs`, `Survey/Review/ReviewedPolePhotoPublisher.cs` |
 
 ---
 
 ## 0. Toàn cảnh
 
-Sự cố (`fault`) là trung tâm: bốn kênh sinh ra nó, phiếu công việc đưa nó tới đích. Đây là sơ đồ luồng, không phải máy
+Sự cố (`fault`) là trung tâm: năm kênh sinh ra nó, phiếu công việc đưa nó tới đích. Đây là sơ đồ luồng, không phải máy
 trạng thái — nó chỉ cho biết máy nào kích hoạt máy nào.
 
 ```mermaid
@@ -37,9 +39,15 @@ flowchart TB
     IOT["Job node_offline<br/>(thiết bị IoT im lặng)"]
     FR["Kỹ sư hiện trường<br/>POST /faults"]
     CR["Báo cáo công dân<br/>(QR, chờ Quản lý duyệt)"]
+    PP["Ảnh cột trong phiếu<br/>(AI ON/OFF, chờ Quản lý xác nhận)"]
+    PCS["Tình trạng đèn tại cột<br/>pole_current_status"]
     F(("Sự cố<br/>fault"))
 
     WO -- "phiếu survey in_progress:<br/>mới nhận upload video" --> SW
+    WO -- "phiếu bất kỳ in_progress:<br/>kỹ sư được giao chụp ảnh cột" --> PP
+    SW -- "accepted → công bố" --> PCS
+    PP -- "confirm → công bố" --> PCS
+    PP -- "confirm off → confirmed (CV)<br/>nếu cột chưa có lamp_out mở" --> F
     SW -- "accepted → detected (CV)" --> F
     IOT -- "detected" --> F
     FR -- "detected" --> F
@@ -58,7 +66,7 @@ flowchart TB
 stateDiagram-v2
     direction LR
     [*] --> detected : CV (duyệt sweep) / IoT (node_offline) / Kỹ sư báo tại chỗ
-    [*] --> confirmed : Quản lý chấp nhận báo cáo công dân
+    [*] --> confirmed : Quản lý chấp nhận báo cáo công dân<br/>hoặc xác nhận ảnh cột "off" (lamp_out, CV)
     detected --> confirmed : Quản lý PATCH confirm<br/>hoặc nghiệm thu phiếu kiểm tra có fault_present
     detected --> rejected : Quản lý PATCH reject (dương tính giả)
     confirmed --> in_progress : Kỹ sư start phiếu sửa chữa
@@ -79,6 +87,9 @@ stateDiagram-v2
   `completed_at` của phiếu), `verified` là Quản lý nghiệm thu. Hiện không có đường nào dừng ở `resolved`.
 - Sự cố đang thuộc một phiếu sửa chữa chưa đóng thì không duyệt được (`allowed_actions` rỗng, WO-10).
 - `fault_type` không bao giờ đổi; phân loại lại (`lamp_out` ↔ `lamp_dim`) ghi vào `override_fault_type`, chỉ khi sự cố còn mở.
+- Sự cố sinh từ **ảnh cột** (mục 10) vào thẳng `confirmed` vì Quản lý đã xác nhận ảnh: `fault_type = lamp_out`,
+  `source_channel = cv`, `origin_pole_photo_id` trỏ về ảnh. Chỉ sinh khi cột **chưa** có `lamp_out` mở (tính cả
+  `override_fault_type`); ảnh "on" **không** tự đóng sự cố nào. Sự cố từ sweep vẫn bắt đầu ở `detected`.
 - ⚠️ Phiếu sửa chữa bị **cancel** khi sự cố đã `in_progress`: sự cố ở lại `in_progress` (liên kết được nhả). Nó vẫn là
   sự cố mở, gắn được vào phiếu sửa chữa mới; `start` của phiếu mới bỏ qua nó, `verify` vẫn đưa nó tới `verified`.
 
@@ -258,28 +269,73 @@ stateDiagram-v2
 
 ## 9. Tình trạng đèn tại cột — `fixture_status`
 
-Thuộc **vị trí cột**, không thuộc bóng (BE-09). Chỉ đổi khi một sweep được **accept**; mỗi lần công bố ghi đè giá trị cũ
-bằng kết quả của lần khảo sát mới nhất phủ cột đó.
+Thuộc **vị trí cột**, không thuộc bóng (BE-09). Đổi theo **hai** đường, cả hai đều phải qua Quản lý và cùng ghi qua
+`PoleStatusPublication`: một sweep được **accept** (mọi chuyển dưới đây), hoặc Quản lý **xác nhận một ảnh cột** (mục 10,
+chỉ các chuyển ghi "ảnh"). Lần công bố chỉ áp khi quan sát của nó **mới hơn** quan sát hiện tại của cột.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> unknown : Cột mới — chưa sweep nào được công bố
-    unknown --> normal : sweep accepted
+    [*] --> unknown : Cột mới — chưa có quan sát nào được công bố
+    unknown --> normal : sweep accepted<br/>ảnh "on" confirm
     unknown --> dim : sweep accepted
-    unknown --> out : sweep accepted
+    unknown --> out : sweep accepted<br/>ảnh "off" confirm
     normal --> dim : sweep accepted
     dim --> normal : sweep accepted
-    normal --> out : sweep accepted
-    out --> normal : sweep accepted (sau sửa chữa)
-    dim --> out : sweep accepted
+    normal --> out : sweep accepted<br/>ảnh "off" confirm
+    out --> normal : sweep accepted (sau sửa chữa)<br/>ảnh "on" confirm
+    dim --> out : sweep accepted<br/>ảnh "off" confirm
     out --> dim : sweep accepted
     normal --> unknown : not_observed / on_off_conflict
     dim --> unknown : not_observed / on_off_conflict
     out --> unknown : not_observed / on_off_conflict
 ```
 
+- **Ảnh chỉ biết ON / OFF, không đo được độ sáng**, nên: "off" → `out`; "on" → `normal` **chỉ** khi cột đang `out`
+  hoặc `unknown`; cột đang `normal` / `dim` thì **giữ nguyên** trạng thái và độ tin cậy (ảnh "on" không bác bỏ được
+  `dim`), chỉ dời mốc quan sát lên. Ảnh không bao giờ sinh `dim` hay `unknown`.
+- Ảnh chụp **không mới hơn** quan sát hiện tại (`captured_at` ≤ `last_evaluated_at ?? last_seen_at`) vẫn xác nhận
+  được nhưng **không** đổi trạng thái (`status_reason = not_newer`). Áp ảnh xong, `last_sweep_id` của cột thành `null` —
+  ảnh không phải một sweep.
+
 - `unknown` **không phải lỗi**: sweep gần nhất không quan sát được cột (`not_observed`) hoặc các lượt đi qua cho kết quả
   ON/OFF trái nhau (`on_off_conflict`). Không bao giờ gộp vào `out` (BE-28).
 - Phân loại theo **tỉ lệ so với baseline của chính cột đó** (`dim_threshold_ratio` 0.80, `out_threshold_ratio` 0.15,
   cấu hình được). ⚠️ Phiếu v1.4 đổi kênh đo `dim` sang BH1750 trên xe (D-R20…D-R23, **chưa chốt**) — sơ đồ trạng thái
   không đổi, chỉ đổi cách quyết định giữa `normal` và `dim`.
+
+---
+
+## 10. Ảnh cột trong phiếu — AI ON / OFF, Quản lý xác nhận
+
+Kỹ sư **được giao** chụp một cột thuộc phiếu đang `in_progress` (cả ba loại phiếu; cột phải thuộc tập WO-12). Không có cột
+trạng thái riêng: suy từ `cv_state` (kết quả AI, ghi một lần lúc nhận ảnh) và `decision` (quyết định của Quản lý).
+
+```mermaid
+stateDiagram-v2
+    state "chờ duyệt" as pending
+    state "confirm — đã xác nhận" as confirm
+    state "reject — đã bác" as reject
+    [*] --> pending : Kỹ sư POST /work-orders/{id}/pole-photos<br/>AI gán cv_state on / off / inconclusive<br/>(model lỗi → cv_state null, ai_status = unavailable)
+    pending --> confirm : Quản lý confirm — chỉ khi cv_state on / off
+    pending --> reject : Quản lý reject (mọi cv_state)
+    confirm --> [*]
+    reject --> [*]
+
+    note right of confirm
+        status_reason:
+        applied — trạng thái cột đổi
+        classification_preserved — "on" trên cột normal / dim
+        not_newer — ảnh cũ hơn quan sát hiện tại, không đổi gì
+        "off" + áp được → sự cố lamp_out confirmed (nếu chưa có)
+    end note
+```
+
+- Gửi lại cùng `client_op_id` + cùng nội dung → 200, trả **đúng** ảnh và kết quả AI cũ (không chạy model lại);
+  cùng khoá khác nội dung (ảnh, cột, giờ chụp, toạ độ) → 409 `IDEMPOTENCY_CONFLICT`.
+- Quyết định **một lần**: lần hai → 409 `POLE_PHOTO_ALREADY_DECIDED`. Xác nhận ảnh `inconclusive` hoặc chưa có kết quả
+  AI → 409 `POLE_PHOTO_INCONCLUSIVE` (bác thì được). Cột đổi xã / `data_source` sau khi nhận ảnh → xác nhận 409
+  `POLE_PHOTO_TARGET_CHANGED`, bác vẫn được.
+- Phiếu không còn `in_progress` thì **không nhận ảnh mới**, nhưng Quản lý vẫn quyết định được ảnh đã nhận.
+- Ảnh này **không** thay ảnh `after` của phiếu sửa chữa, không ghi `luminance_history` / baseline.
+- Audit: `analyzed` (actor `cv`) và `submitted` lúc nhận ảnh; `confirmed` / `rejected` lúc quyết định; thêm `applied`
+  khi trạng thái cột được ghi, `created` (sự cố) khi sinh `lamp_out`.

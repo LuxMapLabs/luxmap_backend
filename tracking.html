@@ -129,7 +129,7 @@
     <p><span class="tag t-next">Sơ đồ trạng thái đã merge (PR #147)</span>
     <code>docs/state-machines.md</code>: 10 sơ đồ Mermaid vẽ từ code trên <code>dev</code> — toàn cảnh, sự cố, phiếu công việc, phiên khảo sát,
     báo cáo công dân, mã QR, lệnh ON/OFF/AUTO, <code>node_status</code>, tài khoản, <code>fixture_status</code>. Cả 10 render được bằng
-    mermaid-cli 11.4.2. Không đổi code.</p>
+    mermaid-cli 11.4.2. Không đổi code. <strong>16/10:</strong> thêm mục 10 (ảnh cột: chờ duyệt → confirm / reject) và đường "xác nhận ảnh" vào mục 0, 1 (sự cố <code>lamp_out</code> vào thẳng <code>confirmed</code>), 9 (<code>off → out</code>, <code>on → normal</code> chỉ từ <code>out</code>/<code>unknown</code>); 11/11 sơ đồ render được.</p>
     <p><span class="tag t-todo">Làm được ngay</span> Kỹ sư hiện trường cập nhật vị trí cột (endpoint + capability mới, chỉ thêm);
     bbox của xã do Quản trị cấu hình, trả qua <code>/auth/me</code> để bản đồ khoá và mở ở tâm.
     <span class="tag t-done">Backend đã có</span> Quản lý quản lý IoT (<code>/assets/iot-nodes</code>, <code>ManageAssets</code>); AI chạy YOLO offline,
