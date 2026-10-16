@@ -1,7 +1,7 @@
 ---
 ticket: POLE-PHOTO-AI
 title: Kỹ sư chụp ảnh một cột trong phiếu → AI phân loại, LƯU kết quả gắn pole_id + work_order_id
-status: review
+status: done
 phase: 2
 owner: codex
 branch: feat/POLE-PHOTO-AI
