@@ -42,6 +42,22 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-15 ffprobe — Pha 2b, packet PTS + sort, 17/10/2026</strong>
+    <p><span class="tag t-done">Code/test + nghiệm thu production đạt · D-1 đóng · chưa commit</span>
+    Probe <code>packet=pts</code> tránh giải mã toàn clip; sort PTS cho B-frame, giữ rotation và ngữ nghĩa thiếu/trùng PTS.
+    Clip 261 MB / 4.433 PTS: packet 0,154 s / 115.000 byte so với frame 65,593 s; sort(packet) = frame.
+    Hồi quy 30.000 frame + B-frame/ảnh thật xanh; bỏ sort → đỏ. Giữ stdout 16 MiB, timeout 60 s và quota.
+    Build <code>-warnaserror</code> exit 0; toàn suite <strong>1.550 pass, 2 MQTT skip</strong>, exit 0.</p>
+    <p>C xác nhận / D trên <code>luxmap-prod</code> đều <code>awaiting_review</code>, <strong>270 frame/lượt</strong>, worker
+    56,501 / 56,517 s; exit 0. Đỉnh API/tổng cùng mẫu: <strong>444,90/794,72 MiB</strong> (C),
+    <strong>1.005,00/1.426,29 MiB</strong> (D). D chồng lúc ffmpeg chạy: 10 upload 201 + 5 AI 200.
+    GPS/lux tổng hợp, nguồn simulated; không phải kiểm chất lượng CV/clock hiện trường. Đã dọn production;
+    dev giữ nguyên ID/StartedAt/mounts, healthy; video nguyên SHA-256/mtime/size. Lỗi parser log ở wrapper C đầu đã sửa và chạy xác nhận lại.</p>
+    <p class="muted">Files: extractor, SurveyFrameMediaTests, CLAUDE.md, docs/development.md, tracking.html;
+    <a href=".ai/results/BE-15-ffprobe-show-frames.md">kết quả Pha 2b, output thật và mã thoát</a>.
+    Chưa stage/commit/push theo yêu cầu ticket.</p>
+  </div>
+  <div class="card">
     <strong>POLE-PHOTO-AI — ảnh cột trong phiếu → AI → Quản lý xác nhận, 15/10/2026</strong>
     <p><span class="tag t-done">Đã merge (PR #151), 15/10/2026 · <code>luxmap_dev</code> đã migrate 16/10</span> Thử API thật 16/10 trên WO-0012 / <code>POLE-0071</code>: upload ảnh đêm 201 (1,7 s lúc model nạp lần đầu, AI <code>on</code> 0,49), gửi lại 200, khác ảnh 409, thumbnail 320 px <code>no-store</code>, kỹ sư tự duyệt 403, Quản lý xác nhận → cột <code>unknown → normal</code>, quyết định lần hai 409, audit đủ 4 event. Còn: báo WP5/WP6, FW xác nhận PP-*, WP4 đo độ chính xác trên ảnh thật.
     6 route dưới <code>/work-orders/{id}/pole-photos</code>: upload/list/detail/thumbnail/original/decision.
