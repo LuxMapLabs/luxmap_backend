@@ -1,7 +1,7 @@
 ---
 ticket: BE-15-ffprobe-show-frames
 title: Clip khảo sát thật > ~1 phút fail VIDEO_OUTPUT_LIMIT vì ffprobe in mọi trường của mọi frame
-status: ready
+status: review
 phase: 2
 owner: codex
 branch: fix/BE-15-ffprobe-show-frames
@@ -89,3 +89,24 @@ Claude đo trên 4 clip thật (ffprobe macOS, `-of json=compact=1`): tập PTS 
    `.ai/results/BE-15-ffprobe-show-frames.md` (thêm mục Pha 2b, đóng D-1).
 
 Mục KHÔNG ĐƯỢC làm ở trên vẫn áp nguyên. Không tăng timeout.
+
+---
+
+## Pha 2c — sửa phát hiện P2 của review (Codex, chỉ đọc, 17/10/2026)
+
+**P2 (đã tái hiện):** `packet=pts` + `Order()` đếm cả packet mang cờ **discard** của MOV/MP4 có **edit list** — packet chỉ để giải mã tham chiếu,
+không bao giờ thành frame. Ví dụ x264 12 frame, time base 1/1000, edit list `media_time=200`, `duration=360`: packet sau sort
+`[-120,-80,-40,0,40,…,320]` (3 packet đầu discard), frame thật `[0,40,…,320]` → clock đúng bị `CLOCK_VIDEO_MAPPING`; edit list cắt **đuôi** cũng
+làm điểm cuối lệch. Câu "giữ ngữ nghĩa parser frame cũ" ở `CLAUDE.md` (~dòng 1669) đang khẳng định quá rộng.
+
+1. Lấy thêm cờ packet (`packet=pts,flags`) và **loại packet có cờ discard (`D`)**. **Kiểm thực nghiệm** cả edit list cắt **đầu** lẫn cắt **đuôi**:
+   sau khi lọc, tập PTS packet có **bằng đúng** tập PTS frame (`frame=pts`) không. Nếu cắt đuôi KHÔNG được đánh cờ discard, tìm cách đúng mà vẫn
+   không giải mã toàn clip (đọc mov demuxer / thông tin stream); nếu không có cách chắc chắn → **D-item**, đừng đoán và đừng quay về giải mã cả clip.
+2. Test (khuôn `SurveyFrameMediaTests`): clip sinh có edit list cắt đầu **và** clip cắt đuôi, so danh sách PTS của extractor với `frame=pts` thật,
+   trích frame đầu/cuối đúng. Phá thử: bỏ lọc discard → test đỏ. Giữ test B-frame và test 30.000 frame.
+3. Kiểm lại 4 clip thật (`IMG_0458`, `IMG_0466`, `IMG_0465`, `export.MOV` ở working tree chính, chỉ đọc): tập PTS sau lọc vẫn bằng tập frame.
+4. Toàn bộ `dotnet test LuxMap.slnx` + build `-warnaserror`, đọc mã thoát. **Không cần** đo lại production (thời gian/RAM không đổi đáng kể) —
+   trừ khi cách sửa có giải mã thêm.
+5. Sửa câu khẳng định trong `CLAUDE.md`, cập nhật mục kết quả (thêm "Pha 2c"), commit **không**: để working tree cho Claude review.
+
+Mục KHÔNG ĐƯỢC làm vẫn áp nguyên.

@@ -912,3 +912,275 @@ Chưa đo trên VPS thuê thật; đây là stack production chạy local. Khôn
 clip B-frame tự sinh; không thay thế kiểm clock thiết bị WP6/ground truth/độ chính xác WP4. Chặn số phút
 chỉ cho layout JSON đã đo. Không còn D-item mới cần Mỹ quyết ở ticket này. **Chưa stage/commit/push**
 theo mục KHÔNG ĐƯỢC làm.
+
+
+---
+
+## Pha 2c — sửa P2: packet discard của edit list (Codex, 17/10/2026)
+
+**Đã thực hiện, để working tree cho Claude review; không stage/commit/push.** Nền `HEAD=834f583`
+đã có Pha 2b. File task đã được sửa và thư mục evidence đã untracked từ trước lượt này;
+không sửa lại file task hoặc các evidence Pha 2/Pha 2b.
+
+### Thay đổi và phạm vi
+
+- `FfmpegFrameExtractor`: lấy `packet=pts,flags`, loại packet có `D` **trước** khi đọc PTS,
+  rồi sort tăng dần như Pha 2b. Không lọc bằng dấu âm, FPS, duration hoặc phỏng đoán chỉ số frame.
+  Rotation vẫn đọc ở stream side data. Với packet còn lại, thiếu PTS → `VIDEO_INVALID`, trùng PTS
+  → `CLOCK_VIDEO_MAPPING`; không có frame hiển thị cũng → `CLOCK_VIDEO_MAPPING`.
+- `SurveyFrameMediaTests`: thêm hai ca edit list cắt đầu/cắt đuôi trên clip x264 12 frame có B-frame,
+  time base và movie timescale đều `1/1000`. Kiểm packet sau lọc **bằng đúng danh sách PTS frame thật**,
+  rồi chạy extractor trích đủ 9 frame hiển thị, kiểm thứ tự PTS/phone time, kích thước và mã màu
+  **từng ảnh, gồm ảnh đầu/cuối**. Dùng chung helper sinh clip với test B-frame sẵn có;
+  giữ test 30.000 frame, VFR, rotation. Fake packet bổ sung flags; thêm ca toàn discard và thiếu PTS
+  để chứng minh bỏ discard trước khi đọc PTS.
+- `CLAUDE.md`: bỏ khẳng định rộng “giữ ngữ nghĩa fail như parser frame cũ”, ghi rõ discard đầu/đuôi
+  và giới hạn bằng chứng packet/frame. `docs/development.md` đồng bộ lệnh probe; thẻ đầu `tracking.html`
+  cập nhật Pha 2c.
+
+Lệnh extractor cuối cùng (input là file tạm của extractor):
+
+```text
+ffprobe -v error -select_streams v:0 -show_entries stream=width,height,time_base:stream_side_data=rotation:packet=pts,flags -of json=compact=1 <input>
+```
+
+Không thêm giải mã vào probe, không đổi thuật toán chọn ảnh/seek. Giữ stdout **16 MiB**, timeout,
+`TemporaryBytesPerClip`, `MaximumFrameBytes` và package hiện có. `DescribeAsync` đã băm assembly
+extractor nên đổi code tự đổi artifact version; không thêm số version thủ công.
+
+### 1. Kiểm thực nghiệm edit list cắt đầu và cắt đuôi
+
+Lệnh thật, chạy độc lập với test/extractor:
+
+```bash
+python3 .ai/results/BE-15-ffprobe-show-frames-evidence/p2c/edit-list-probe.py
+```
+
+Script sinh video trong thư mục tạm, kiểm cấu trúc `elst` v0 một entry (ban đầu
+`duration=480, media_time=80`), chỉ đổi entry thành `duration=360` và `media_time=200` (cắt đầu)
+hoặc `80` (cắt đuôi); giữ nguyên tất cả packet tham chiếu nén. Output thật, **mã thoát script 0**:
+
+```text
+{"edit": "head", "duration": 360, "media_time": 200, "discard_pts": [-120, -80, -40], "sorted_unfiltered_pts": [-120, -80, -40, 0, 40, 80, 120, 160, 200, 240, 280, 320], "filtered_pts": [0, 40, 80, 120, 160, 200, 240, 280, 320], "frame_pts": [0, 40, 80, 120, 160, 200, 240, 280, 320], "filtered_equals_frames": true}
+{"edit": "tail", "duration": 360, "media_time": 80, "discard_pts": [360, 400, 440], "sorted_unfiltered_pts": [0, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440], "filtered_pts": [0, 40, 80, 120, 160, 200, 240, 280, 320], "frame_pts": [0, 40, 80, 120, 160, 200, 240, 280, 320], "filtered_equals_frames": true}
+All 5 ffmpeg/ffprobe commands exited 0; temporary_directory_removed=True
+```
+
+**Kết luận đã đo:** cả cắt đầu lẫn cắt đuôi đều được ffprobe 8.1.2 đánh cờ `D` đúng trên fixture này;
+lọc + sort trùng frame giải mã. Cắt đầu loại `[-120,-80,-40]`; cắt đuôi loại `[360,400,440]`.
+Không cần bổ sung đọc duration/mov demuxer hay quay về giải mã cả clip.
+Chi tiết đủ 5 lệnh, stdout/stderr và mã thoát **đều 0**:
+[`edit-list-probe.json`](BE-15-ffprobe-show-frames-evidence/p2c/edit-list-probe.json).
+Clip tạm đã tự dọn; không thêm video vào repo.
+
+### 2. Hồi quy đỏ → xanh và phá thử
+
+Lệnh đã chạy **trước khi sửa extractor**, trên code Pha 2b:
+
+```bash
+dotnet test tests/LuxMap.Infrastructure.Storage.Tests --filter FullyQualifiedName~Edit_list_discards --logger 'console;verbosity=normal'
+```
+
+Output thật (trích), **mã thoát 1**, đúng lỗi review ở cả hai ca:
+
+```text
+[xUnit.net 00:00:00.37]       LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+[xUnit.net 00:00:00.50]       LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+  Failed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Edit_list_discards_head_or_tail_packets_and_extracts_only_displayed_frames(trimHead: False) [214 ms]
+   LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+  Failed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Edit_list_discards_head_or_tail_packets_and_extracts_only_displayed_frames(trimHead: True) [137 ms]
+   LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+Test Run Failed.
+Total tests: 2
+     Failed: 2
+```
+
+Sau khi thêm flags + lọc discard:
+
+```bash
+dotnet test tests/LuxMap.Infrastructure.Storage.Tests --filter FullyQualifiedName~SurveyFrameMediaTests --logger 'console;verbosity=normal'
+```
+
+Output thật (trích), **mã thoát 0**:
+
+```text
+  Passed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Edit_list_discards_head_or_tail_packets_and_extracts_only_displayed_frames(trimHead: False) [159 ms]
+  Passed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Edit_list_discards_head_or_tail_packets_and_extracts_only_displayed_frames(trimHead: True) [137 ms]
+  Passed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Large_frame_probe_stays_bounded_and_extracts_the_last_frame [820 ms]
+  Passed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.B_frames_sort_packet_pts_to_frame_pts_and_extract_the_matching_images [141 ms]
+Test Run Successful.
+Total tests: 24
+     Passed: 24
+```
+
+**Phá thử:** giữ `packet=pts,flags`, chỉ bỏ dòng `.Where(...Contains('D'))`, chạy lại cùng lệnh
+`--filter FullyQualifiedName~Edit_list_discards`. Output thật (trích), **mã thoát test 1**:
+
+```text
+[xUnit.net 00:00:00.32]       LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+[xUnit.net 00:00:00.45]       LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+  Failed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Edit_list_discards_head_or_tail_packets_and_extracts_only_displayed_frames(trimHead: False) [172 ms]
+   LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+  Failed LuxMap.Infrastructure.Storage.Tests.SurveyFrameMediaTests.Edit_list_discards_head_or_tail_packets_and_extracts_only_displayed_frames(trimHead: True) [146 ms]
+   LuxMap.Modules.Survey.Processing.ProcessingFailure : CLOCK_VIDEO_MAPPING
+Total tests: 2
+     Failed: 2
+Test Run Failed.
+```
+
+Wrapper dùng `finally` khôi phục source extractor, output thật `Extractor restored: True`, exit 0;
+không để mutant trong working tree. Bản cuối (sau khi dùng chung helper sinh clip) được full suite
+bên dưới kiểm lại. Log đầy đủ:
+`p2c/regression-before.log`, `p2c/media-after.log`, `p2c/mutation-no-discard.log` trong thư mục evidence;
+[mã thoát mutation](BE-15-ffprobe-show-frames-evidence/p2c/mutation-no-discard-exit.json).
+
+### 3. Đối chiếu lại bốn clip thật — chỉ đọc
+
+```bash
+python3 .ai/results/BE-15-ffprobe-show-frames-evidence/p2c/probe.py
+```
+
+Mỗi clip chạy hai lệnh: lệnh probe mới ở trên và cùng lệnh với `frame=pts` làm oracle độc lập;
+so **toàn bộ danh sách PTS**, không chỉ count/first/last. Oracle giải mã chạy ngoài extractor,
+không thay `TimeoutSeconds` của ứng dụng. Script exit **0**, cả 8 ffprobe exit **0**, stderr rỗng.
+Số đo thật từ [`real-probe.json`](BE-15-ffprobe-show-frames-evidence/p2c/real-probe.json):
+
+| Clip | Packet | Discard | Sau lọc / frame | Bằng đúng | Packet / frame (s) | JSON packet (byte) | Exit packet / frame |
+|---|---:|---:|---:|---|---:|---:|---|
+| `IMG_0458.MOV` | 4433 | 0 | 4433 / 4433 | `true` | 0.061 / 63.629 | 185928 | `0 / 0` |
+| `IMG_0466.MOV` | 2306 | 0 | 2306 / 2306 | `true` | 0.039 / 32.541 | 96658 | `0 / 0` |
+| `IMG_0465.MOV` | 1316 | 0 | 1316 / 1316 | `true` | 0.054 / 22.979 | 55014 | `0 / 0` |
+| `export.MOV` | 1170 | 0 | 1170 / 1170 | `true` | 0.034 / 3.392 | 48839 | `0 / 0` |
+
+SHA-256 của hai danh sách PTS cũng được lưu trong JSON (khớp từng clip).
+Ba clip `IMG_*` giữ rotation `-90`, `export.MOV` giữ `-180`; stream đều `1920×1080`, `time_base=1/600`.
+Output thật cuối script:
+
+```json
+{"dev_unchanged": true, "all_four_pts_equal": true, "all_four_video_unchanged": true}
+```
+
+Bổ sung flags làm JSON lớn hơn số đo Pha 2b. Với **layout packet đã đo**, thay PTS bằng Int64 dài nhất,
+mỗi dòng tối đa 57 byte, chừa 4.096 byte metadata: `(16*1024*1024-4096)//57 = 294265` packet,
+tương đương khoảng **163,48 phút @30 fps / 81,74 phút @60 fps**. Đây là ước lượng theo layout/metadata
+đã đo, không phải giới hạn chung cho mọi clip hoặc cam kết vượt các timeout/quota khác.
+
+### 4. Toàn suite và build cuối cùng
+
+```bash
+dotnet test LuxMap.slnx
+```
+
+Output thật (trích), **mã thoát 0**:
+
+```text
+Passed!  - Failed:     0, Passed:    45, Skipped:     0, Total:    45, Duration: 803 ms - LuxMap.Persistence.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:    54, Skipped:     0, Total:    54, Duration: 5 s - LuxMap.Infrastructure.Storage.Tests.dll (net10.0)
+Passed!  - Failed:     0, Passed:   384, Skipped:     0, Total:   384, Duration: 277 ms - LuxMap.Shared.Tests.dll (net10.0)
+  Skipped LuxMap.Api.Tests.MqttEndToEndTests.A_device_receives_executes_and_acknowledges_over_the_real_broker [1 ms]
+  Skipped LuxMap.Api.Tests.MqttEndToEndTests.The_broker_enforces_identity_and_each_devices_own_topics [1 ms]
+Passed!  - Failed:     0, Passed:  1070, Skipped:     2, Total:  1072, Duration: 2 m 13 s - LuxMap.Api.Tests.dll (net10.0)
+```
+
+Tổng **1.553 pass, 2 MQTT skip, 0 fail**. API tests tự dựng PostGIS riêng theo BE-36;
+[`suite-containers.json`](BE-15-ffprobe-show-frames-evidence/p2c/suite-containers.json) ghi output thật lúc suite chạy:
+
+```text
+436710ba1fb3 festive_carson imresamu/postgis:17-3.5 Up 24 seconds
+c4d2b088367c luxmap_postgres imresamu/postgis:17-3.5 Up 4 days (healthy)
+```
+
+Lệnh `docker ps` này exit 0. Container PostGIS test `festive_carson` đã được framework dọn sau suite;
+không dùng `luxmap_dev` hoặc dựng broker DEV để ép hai test MQTT chạy.
+
+```bash
+dotnet build LuxMap.slnx -warnaserror
+```
+
+Output thật (trích), **mã thoát 0**:
+
+```text
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:02.04
+```
+
+### 5. Phạm vi an toàn, diff và bàn giao
+
+[`safety.json`](BE-15-ffprobe-show-frames-evidence/p2c/safety.json) lưu snapshot trước/sau của ID,
+StartedAt, mounts và health của `luxmap_postgres`/`luxmap_minio`: giữ nguyên, cả hai healthy.
+Bốn video thật giữ nguyên SHA-256, mtime và size. Chỉ test process đọc `.env`; không in, sửa hay chép nó.
+Không chạy compose/production, không truy cập DB DEV, không thao tác volume DEV hoặc worktree sizing,
+không prune/xoá image. **Không đo lại production** theo Pha 2c §4 vì extractor không thêm giải mã;
+số đo stack Pha 2b bên trên vẫn là bằng chứng của lượt đó, không gán thành số đo Pha 2c.
+
+Không phát sinh drift Contract: sửa nhận diện packet ngoài đoạn hiển thị, không thay endpoint/DTO/schema.
+Contract/OpenAPI không đổi, không tái xuất spec. Output thật các kiểm tra diff/phạm vi trước bàn giao:
+
+```json
+[
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--exit-code",
+      "--",
+      "docs/api-contract-v1.1.md",
+      "docs/openapi",
+      "deploy/compose.yml",
+      "Dockerfile",
+      "src/LuxMap.Modules.Survey/Processing/Frames/SurveyFrameOptions.cs",
+      "AGENTS.md",
+      "**/*.csproj",
+      "**/*Migration*"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--cached",
+      "--exit-code"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "git",
+      "rev-parse",
+      "--short",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "stdout": "834f583\n",
+    "stderr": ""
+  }
+]
+```
+
+✅ **Đã kiểm:** edit list đầu/đuôi bằng packet và frame thật; ảnh đầu/cuối và toàn bộ 9 frame;
+mutation bỏ discard đỏ; B-frame/30.000 frame/VFR/rotation; cả bốn clip thật khớp PTS;
+toàn suite + build warnaserror; source video/DEV nguyên trạng; không stage/commit/push.
+
+⚠️ **Chưa kiểm:** hai test MQTT cần broker thật được suite skip. Không đo lại production vì task cho phép
+bỏ khi không thêm giải mã; không khẳng định packet/frame tương đương cho mọi codec/container/edit list có thể có.
+
+📌 **D-item:** không phát sinh; nhánh “cắt đuôi không được đánh cờ discard” không xảy ra trong thực nghiệm này.
+Không còn tiêu chí Pha 2c chưa thực hiện; để Claude review working tree.

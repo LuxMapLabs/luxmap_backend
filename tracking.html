@@ -42,20 +42,14 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
-    <strong>BE-15 ffprobe — Pha 2b, packet PTS + sort, 17/10/2026</strong>
-    <p><span class="tag t-done">Code/test + nghiệm thu production đạt · D-1 đóng · chưa commit</span>
-    Probe <code>packet=pts</code> tránh giải mã toàn clip; sort PTS cho B-frame, giữ rotation và ngữ nghĩa thiếu/trùng PTS.
-    Clip 261 MB / 4.433 PTS: packet 0,154 s / 115.000 byte so với frame 65,593 s; sort(packet) = frame.
-    Hồi quy 30.000 frame + B-frame/ảnh thật xanh; bỏ sort → đỏ. Giữ stdout 16 MiB, timeout 60 s và quota.
-    Build <code>-warnaserror</code> exit 0; toàn suite <strong>1.550 pass, 2 MQTT skip</strong>, exit 0.</p>
-    <p>C xác nhận / D trên <code>luxmap-prod</code> đều <code>awaiting_review</code>, <strong>270 frame/lượt</strong>, worker
-    56,501 / 56,517 s; exit 0. Đỉnh API/tổng cùng mẫu: <strong>444,90/794,72 MiB</strong> (C),
-    <strong>1.005,00/1.426,29 MiB</strong> (D). D chồng lúc ffmpeg chạy: 10 upload 201 + 5 AI 200.
-    GPS/lux tổng hợp, nguồn simulated; không phải kiểm chất lượng CV/clock hiện trường. Đã dọn production;
-    dev giữ nguyên ID/StartedAt/mounts, healthy; video nguyên SHA-256/mtime/size. Lỗi parser log ở wrapper C đầu đã sửa và chạy xác nhận lại.</p>
-    <p class="muted">Files: extractor, SurveyFrameMediaTests, CLAUDE.md, docs/development.md, tracking.html;
-    <a href=".ai/results/BE-15-ffprobe-show-frames.md">kết quả Pha 2b, output thật và mã thoát</a>.
-    Chưa stage/commit/push theo yêu cầu ticket.</p>
+    <strong>BE-15 ffprobe — clip thực địa &gt; ~1 phút xử lý được, 17/10/2026</strong>
+    <p><span class="tag t-next">Xong trên nhánh <code>fix/BE-15-ffprobe-show-frames</code> · Codex review sạch · chưa push</span>
+    Phát hiện ở OPS-SIZING: clip thật 77–148 s fail <code>VIDEO_OUTPUT_LIMIT</code> (<code>-show_frames</code> in mọi trường mỗi frame, vượt
+    16 MiB), rồi <code>VIDEO_TIMEOUT</code> (<code>frame=pts</code> giải mã cả clip, 65 s &gt; 60 s). Probe nay <code>packet=pts,flags</code>, bỏ packet
+    discard (edit list), sort theo PTS: clip 261 MB probe 0,15 s. Test 30.000 frame, B-frame, edit list cắt đầu/đuôi; phá thử đỏ. Toàn suite
+    <strong>1.553 pass</strong>, exit 0. Production <code>luxmap-prod</code>: clip 148 s tới <code>awaiting_review</code>, 270 frame, 56,5 s;
+    đỉnh tổng <strong>1.426 MiB</strong> khi chồng 15 request ảnh. Giữ nguyên trần 16 MiB, timeout 60 s.</p>
+    <p class="muted"><a href=".ai/results/BE-15-ffprobe-show-frames.md">Kết quả, output thật và mã thoát</a> (Pha 2a, 2b, 2c).</p>
   </div>
   <div class="card">
     <strong>POLE-PHOTO-AI — ảnh cột trong phiếu → AI → Quản lý xác nhận, 15/10/2026</strong>
