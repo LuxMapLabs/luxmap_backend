@@ -83,8 +83,10 @@ public sealed class FfmpegFrameExtractor(IObjectStore store, SurveyFrameOptions 
                 if (count != expectedBytes || Convert.ToHexStringLower(hash.GetHashAndReset()) != expectedHash)
                     throw new ProcessingFailure("VIDEO_HASH_MISMATCH", "extractor");
             }
+            // Packet PTS avoids decoding the entire clip during probe (frame=pts does decode).
+            // Keep stream side data for display rotation; packets arrive in decode order with B-frames.
             var probe = await runner.RunAsync(options.FfprobePath,
-                ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,time_base:stream_side_data=rotation:frame=pts", "-show_frames", "-of", "json", input], options.TimeoutSeconds, ct);
+                ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,time_base:stream_side_data=rotation:packet=pts", "-of", "json=compact=1", input], options.TimeoutSeconds, ct);
             using var doc = JsonDocument.Parse(probe);
             var streamInfo = doc.RootElement.GetProperty("streams")[0];
             var timeBase = streamInfo.GetProperty("time_base").GetString()!.Split('/');
@@ -100,8 +102,9 @@ public sealed class FfmpegFrameExtractor(IObjectStore store, SurveyFrameOptions 
             if (Math.Abs(rotation % 180) == 90) (width, height) = (height, width);
             if (width <= 0 || height <= 0 || (long)width * height > 3840L * 2160)
                 throw new ProcessingFailure("VIDEO_DIMENSIONS", "extractor");
-            var sourcePts = doc.RootElement.GetProperty("frames").EnumerateArray()
-                .Select(f => f.GetProperty("pts").GetInt64()).ToArray();
+            var sourcePts = doc.RootElement.GetProperty("packets").EnumerateArray()
+                .Select(p => p.GetProperty("pts").GetInt64()).Order().ToArray();
+            // Missing PTS is VIDEO_INVALID; duplicates remain for the strict clock check below.
             var pts = sourcePts.Select(value => checked((long)decimal.Round((decimal)value * num * 1_000_000_000 / den, 0, MidpointRounding.AwayFromZero))).ToArray();
             // The phone declares PTS from its encoder (µs); the file stores integer ticks of the time base (1/90000 s =
             // 11.1 µs on Android). They agree within one tick, never exactly — the first real capture was 1 333 ns apart.

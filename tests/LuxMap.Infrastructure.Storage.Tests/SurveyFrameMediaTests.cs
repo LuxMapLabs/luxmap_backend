@@ -79,6 +79,92 @@ public sealed class SurveyFrameMediaTests
         finally { Directory.Delete(directory, true); }
     }
 
+    [Fact]
+    public async Task B_frames_sort_packet_pts_to_frame_pts_and_extract_the_matching_images()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "luxmap-b-frames-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            const int frameCount = 12, width = 64, height = 32;
+            var raw = Path.Combine(directory, "codes.rgb");
+            var pixels = new byte[frameCount * width * height * 3];
+            for (int n = 0; n < frameCount; n++)
+            for (int i = n * width * height * 3; i < (n + 1) * width * height * 3; i += 3)
+            {
+                pixels[i] = (byte)(30 + 15 * n); pixels[i + 1] = 80; pixels[i + 2] = 40;
+            }
+            await File.WriteAllBytesAsync(raw, pixels);
+            var video = Path.Combine(directory, "b-frames.mp4");
+            await MediaProcess.RunAsync("ffmpeg", ["-v", "error", "-f", "rawvideo", "-pixel_format", "rgb24",
+                "-video_size", "64x32", "-framerate", "25", "-i", raw, "-c:v", "libx264", "-crf", "18",
+                "-bf", "2", "-x264-params", "b-adapt=0:scenecut=0:keyint=30", "-video_track_timescale", "1000", "-y", video], 30, default);
+            using var packets = JsonDocument.Parse(await MediaProcess.RunAsync("ffprobe", ["-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height,time_base:stream_side_data=rotation:packet=pts", "-of", "json=compact=1", video], 30, default));
+            using var frames = JsonDocument.Parse(await MediaProcess.RunAsync("ffprobe", ["-v", "error", "-select_streams", "v:0",
+                "-show_entries", "frame=pts,pict_type", "-of", "json=compact=1", video], 30, default));
+            var packetPts = packets.RootElement.GetProperty("packets").EnumerateArray().Select(p => p.GetProperty("pts").GetInt64()).ToArray();
+            var framePts = frames.RootElement.GetProperty("frames").EnumerateArray().Select(f => f.GetProperty("pts").GetInt64()).ToArray();
+            Assert.Contains(frames.RootElement.GetProperty("frames").EnumerateArray(), f => f.GetProperty("pict_type").GetString() == "B");
+            Assert.False(packetPts.SequenceEqual(framePts)); // The fixture must actually require reordering.
+            Assert.Equal(framePts, packetPts.Order().ToArray());
+            Assert.Equal(Enumerable.Range(0, frameCount).Select(n => n * 40L), framePts);
+            Assert.Equal("1/1000", packets.RootElement.GetProperty("streams")[0].GetProperty("time_base").GetString());
+
+            var bytes = await File.ReadAllBytesAsync(video);
+            long lastPtsNs = framePts[^1] * 1_000_000;
+            var options = new SurveyFrameOptions { TempRoot = Path.Combine(directory, "extract"), FramesPerSecond = 30 };
+            using var extractor = new FfmpegFrameExtractor(new ClipStore(bytes), options);
+            var output = new List<ExtractedFrame>();
+            await extractor.ExtractAsync("clip", bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                new(0, 0, lastPtsNs, 1_000_000_000, 1_000_000_000 + lastPtsNs, 1, 1000),
+                [new(1_000_000_000, 1_000_000_000, 1_000_000_000 + lastPtsNs)],
+                (frame, _) => { output.Add(frame); return Task.CompletedTask; }, default);
+            Assert.Equal(framePts.Select(p => p * 1_000_000), output.Select(f => f.PtsNs));
+            for (int n = 0; n < output.Count; n++)
+            {
+                using var image = Image.Load<Rgb24>(output[n].Jpeg);
+                Assert.Equal(width, image.Width); Assert.Equal(height, image.Height);
+                Assert.Equal(image.Width, output[n].Width); Assert.Equal(image.Height, output[n].Height);
+                Assert.InRange((int)image[width / 2, height / 2].R, 30 + 15 * n - 8, 30 + 15 * n + 8);
+                Assert.Equal(1_000_000_000 + output[n].PtsNs, output[n].PhoneElapsedNs);
+            }
+            Assert.Empty(Directory.GetFileSystemEntries(options.TempRoot));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    [Theory]
+    [InlineData("[{}, {\"pts\":40}]", "VIDEO_INVALID")]
+    [InlineData("[{\"pts\":0}, {\"pts\":40}, {\"pts\":40}, {\"pts\":120}]", "CLOCK_VIDEO_MAPPING")]
+    [InlineData("[]", "CLOCK_VIDEO_MAPPING")]
+    public async Task Missing_duplicate_or_empty_packet_pts_fail_before_consumption(string packets, string code)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "luxmap-packet-pts-" + Guid.NewGuid().ToString("N"));
+        byte[] clip = [0, 1, 2, 3];
+        int consumed = 0;
+        try
+        {
+            using var extractor = new FfmpegFrameExtractor(new ClipStore(clip), new() { TempRoot = directory }, new PacketProbeRunner(packets));
+            var error = await Assert.ThrowsAsync<ProcessingFailure>(() => extractor.ExtractAsync("clip", clip.Length,
+                Convert.ToHexStringLower(SHA256.HashData(clip)), new(0, 0, 120_000_000, 0, 120_000_000, 1, 1000),
+                [new(40_000_000, 0, 120_000_000)], (_, _) => { consumed++; return Task.CompletedTask; }, default));
+            Assert.Equal(code, error.Code); Assert.Equal(0, consumed);
+            Assert.Empty(Directory.GetFileSystemEntries(directory));
+        }
+        finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    private sealed class PacketProbeRunner(string packets) : IMediaProcessRunner
+    {
+        public Task<string> RunAsync(string executable, IEnumerable<string> arguments, double timeoutSeconds,
+            CancellationToken ct, Action? checkOutput = null)
+        {
+            Assert.Contains("-show_entries", arguments); // Invalid PTS must fail before extraction starts.
+            return Task.FromResult("{\"streams\":[{\"width\":64,\"height\":32,\"time_base\":\"1/1000\"}],\"packets\":" + packets + "}");
+        }
+    }
+
     /// <summary>
     /// A phone declares PTS from its encoder (microseconds); the MP4 stores integer ticks of 1/90000 s (11.1 µs). They
     /// agree within one tick, never exactly: the first real capture (SM-A075F, 02/10/2026) declared a last PTS of
@@ -225,6 +311,45 @@ public sealed class SurveyFrameMediaTests
     }
 
     [Fact]
+    public async Task Large_frame_probe_stays_bounded_and_extracts_the_last_frame()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "luxmap-large-probe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            // 30,000 tiny frames: the old -show_frames command emits over 16 MiB even at 64x64.
+            // The compressed clip is under 1 MiB; no large fixture or real-time encoding is needed.
+            const int frameCount = 30_000;
+            var video = Path.Combine(directory, "long.mp4");
+            await MediaProcess.RunAsync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=size=64x64:rate=30",
+                "-frames:v", frameCount.ToString(System.Globalization.CultureInfo.InvariantCulture), "-c:v", "libx264",
+                "-preset", "ultrafast", "-bf", "0", "-video_track_timescale", "30000", "-y", video], 30, default);
+            var bytes = await File.ReadAllBytesAsync(video);
+            Assert.InRange(bytes.Length, 1, 1024 * 1024);
+            // Prove the fixture triggers the original failure through the real bounded process runner.
+            var oldProbe = await Assert.ThrowsAsync<ProcessingFailure>(() => MediaProcess.RunAsync("ffprobe",
+                ["-v", "error", "-select_streams", "v:0", "-show_entries",
+                    "stream=width,height,time_base:stream_side_data=rotation:frame=pts", "-show_frames", "-of", "json", video], 30, default));
+            Assert.Equal("VIDEO_OUTPUT_LIMIT", oldProbe.Code);
+
+            long lastPts = (long)decimal.Round((frameCount - 1) * 1_000_000_000m / 30, 0, MidpointRounding.AwayFromZero);
+            var clock = new ClipClock(0, 0, lastPts, 0, lastPts, 1, 30000);
+            var options = new SurveyFrameOptions { TempRoot = Path.Combine(directory, "extract") };
+            using var extractor = new FfmpegFrameExtractor(new ClipStore(bytes), options);
+            var output = new List<ExtractedFrame>();
+            await extractor.ExtractAsync("clip", bytes.Length, Convert.ToHexStringLower(SHA256.HashData(bytes)), clock,
+                [new(lastPts, lastPts, lastPts)], (frame, _) => { output.Add(frame); return Task.CompletedTask; }, default);
+            var last = Assert.Single(output);
+            Assert.Equal(lastPts, last.PtsNs); Assert.Equal(lastPts, last.PhoneElapsedNs);
+            using var image = Image.Load<Rgb24>(last.Jpeg);
+            Assert.Equal(64, image.Width); Assert.Equal(64, image.Height);
+            Assert.Equal(image.Width, last.Width); Assert.Equal(image.Height, last.Height);
+            Assert.Empty(Directory.GetFileSystemEntries(options.TempRoot));
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    [Fact]
     public async Task Corrupt_clip_and_download_cancellation_leave_no_temporary_files()
     {
         var directory = Path.Combine(Path.GetTempPath(), "luxmap-media-cleanup-" + Guid.NewGuid().ToString("N"));
@@ -303,8 +428,8 @@ public sealed class SurveyFrameMediaTests
             CancellationToken ct, Action? checkOutput = null)
         {
             var args = arguments.ToArray();
-            if (args.Contains("-show_frames"))
-                return """{"streams":[{"width":64,"height":32,"time_base":"1/1000"}],"frames":[{"pts":0},{"pts":40},{"pts":120}]}""";
+            if (args.Contains("-show_entries"))
+                return """{"streams":[{"width":64,"height":32,"time_base":"1/1000"}],"packets":[{"pts":0},{"pts":40},{"pts":120}]}""";
             int count = mode == "missing" ? 2 : 3;
             for (int i = 1; i <= count; i++)
             {

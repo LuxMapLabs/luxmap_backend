@@ -666,6 +666,13 @@ Cấu hình trong `SurveyProcessing:Frames`, được chụp trong `settings_sna
 | `MinimumConfidence` / `MinimumBoxArea` | 0,7 / 0,0001 diện tích chuẩn hoá |
 | `DimThresholdRatio` | 0,80 |
 
+Probe dùng `-show_entries stream=width,height,time_base:stream_side_data=rotation:packet=pts -of json=compact=1`.
+Đọc `packets[].pts`, sắp tăng dần để lấy thứ tự hiển thị khi có B-frame; thiếu PTS trả `VIDEO_INVALID`,
+PTS trùng trả `CLOCK_VIDEO_MAPPING`. `frame=pts` buộc giải mã toàn clip, có thể vượt timeout trên HEVC.
+Không thêm `-show_frames` / `-show_packets`: các cờ đó bật lại mọi trường, dễ vượt trần stdout 16 MiB.
+Rotation đọc từ side data của stream. Trần stdout không tương đương một giới hạn số phút cố định
+(còn phụ thuộc metadata/PTS); timeout và quota giữ nguyên.
+
 Cắt theo cửa sổ theo thứ tự thời gian, khử trùng PTS ở phần chồng nhau. Mỗi lượt tối đa **64 vế**
 (`MaximumSelectionTerms`); cửa sổ lớn chia thêm lượt. Seek lùi 1 giây bằng `-ss`, `-seek_timestamp 1`,
 `-noaccurate_seek`, giữ `-copyts` và chọn `eq(pts,...)` theo tick/time_base gốc từ ffprobe.

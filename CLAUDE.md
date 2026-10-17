@@ -1660,6 +1660,22 @@ factory tự liệt kê assembly module sẽ âm thầm thiếu module mới, v�
 cho bảng của module đó. Sinh migration trong môi trường không có `.env` thì đặt
 `ConnectionStrings__LuxMap` giả cho lệnh đó, đừng đổi đường dựng model.
 
+### BE-15 — ffprobe: lấy packet PTS, sắp thứ tự và giữ rotation (17/10/2026)
+
+**Dùng `packet=pts` + sort tăng dần, không dùng `frame=pts` để probe toàn clip.** `frame=` buộc
+ffprobe giải mã video: HEVC 148 s vượt timeout 60 s dù stdout đã nhỏ. Packet đến theo thứ tự giải mã,
+**không phải thứ tự hiển thị khi có B-frame**; phải sort PTS trước khi kiểm clock/chọn frame/seek.
+Không suy từ FPS, không khử PTS trùng: thiếu PTS → `VIDEO_INVALID`, trùng → `CLOCK_VIDEO_MAPPING`,
+giữ ngữ nghĩa fail như parser frame cũ. Rotation vẫn ở **`stream.side_data_list`**:
+`stream=width,height,time_base:stream_side_data=rotation:packet=pts -of json=compact=1`.
+Không thêm `-show_frames` (bật mọi trường frame, vượt stdout 16 MiB) hay `-show_packets` (bật lại
+mọi trường packet). Giữ trần stdout, timeout và quota hiện có. Dung lượng JSON còn phụ thuộc metadata
+và độ dài PTS, không suy giới hạn số phút chung chỉ từ FPS. `DescribeAsync` băm assembly extractor
+nên sửa lệnh tự đổi `artifact_version`, không cần tăng số version thủ công.
+Canh bằng `Large_frame_probe_stays_bounded_and_extracts_the_last_frame` (video tự sinh, lệnh cũ vượt trần),
+`B_frames_sort_packet_pts_to_frame_pts_and_extract_the_matching_images` (đối chiếu packet/frame PTS
+và mã màu ảnh; bỏ sort phải đỏ), test thiếu/trùng PTS và VFR/rotation sẵn có.
+
 ### BE-15 P2c — FK ghép không giữ được hàng có cột null (04/10/2026)
 
 **FK ghép `MATCH SIMPLE` bỏ qua hẳn hàng có BẤT KỲ cột nào null — kể cả các cột còn lại không null.**
