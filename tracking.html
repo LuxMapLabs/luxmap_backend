@@ -42,6 +42,16 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-15 ffprobe — clip thực địa &gt; ~1 phút xử lý được, 17/10/2026</strong>
+    <p><span class="tag t-next">Xong trên nhánh <code>fix/BE-15-ffprobe-show-frames</code> · Codex review sạch · chưa push</span>
+    Phát hiện ở OPS-SIZING: clip thật 77–148 s fail <code>VIDEO_OUTPUT_LIMIT</code> (<code>-show_frames</code> in mọi trường mỗi frame, vượt
+    16 MiB), rồi <code>VIDEO_TIMEOUT</code> (<code>frame=pts</code> giải mã cả clip, 65 s &gt; 60 s). Probe nay <code>packet=pts,flags</code>, bỏ packet
+    discard (edit list), sort theo PTS: clip 261 MB probe 0,15 s. Test 30.000 frame, B-frame, edit list cắt đầu/đuôi; phá thử đỏ. Toàn suite
+    <strong>1.553 pass</strong>, exit 0. Production <code>luxmap-prod</code>: clip 148 s tới <code>awaiting_review</code>, 270 frame, 56,5 s;
+    đỉnh tổng <strong>1.426 MiB</strong> khi chồng 15 request ảnh. Giữ nguyên trần 16 MiB, timeout 60 s.</p>
+    <p class="muted"><a href=".ai/results/BE-15-ffprobe-show-frames.md">Kết quả, output thật và mã thoát</a> (Pha 2a, 2b, 2c).</p>
+  </div>
+  <div class="card">
     <strong>POLE-PHOTO-AI — ảnh cột trong phiếu → AI → Quản lý xác nhận, 15/10/2026</strong>
     <p><span class="tag t-done">Đã merge (PR #151), 15/10/2026 · <code>luxmap_dev</code> đã migrate 16/10</span> Thử API thật 16/10 trên WO-0012 / <code>POLE-0071</code>: upload ảnh đêm 201 (1,7 s lúc model nạp lần đầu, AI <code>on</code> 0,49), gửi lại 200, khác ảnh 409, thumbnail 320 px <code>no-store</code>, kỹ sư tự duyệt 403, Quản lý xác nhận → cột <code>unknown → normal</code>, quyết định lần hai 409, audit đủ 4 event. Còn: báo WP5/WP6, FW xác nhận PP-*, WP4 đo độ chính xác trên ảnh thật.
     6 route dưới <code>/work-orders/{id}/pole-photos</code>: upload/list/detail/thumbnail/original/decision.
