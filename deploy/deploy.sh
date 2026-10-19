@@ -12,6 +12,12 @@ if grep -q 'CHANGE_ME' .env; then
   exit 1
 fi
 mkdir -p web
+# backup.sh runs before the migration as this user; fail here, before the build, not halfway through (vps.md step 4).
+backup_dir="${BACKUP_DIR:-/var/backups/luxmap}"
+if ! { mkdir -p "$backup_dir" 2>/dev/null && [ -w "$backup_dir" ]; }; then
+  echo "cannot write $backup_dir: sudo mkdir -p $backup_dir && sudo chown \$USER $backup_dir" >&2
+  exit 1
+fi
 
 docker compose build api
 docker compose up -d --wait postgres minio

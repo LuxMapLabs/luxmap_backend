@@ -57,9 +57,17 @@ cd /opt/luxmap/deploy && cp .env.example .env && chmod 600 .env
 `WEB_APP_BASE_URL`) phải cùng một giá trị. Gmail SMTP cần **app password** (bật xác minh 2 bước trước) — Gmail chạy được từ
 Linux, chỉ macOS mới vướng kiểm tra thu hồi chứng chỉ (BE-33a).
 
+Worker khảo sát để **tắt** (`SurveyProcessing__Enabled=false`): sweep đã nộp nằm `queued` và được xử lý khi bật. Bật lúc
+cổng `VIDEO_DEVICE_MAPPING_PENDING` (D-07) còn giữ thì mọi sweep `field` **thất bại ngay** ở bước `video_clock`, và không
+có API nào xếp lại hàng cho sweep đã thất bại. Chỉ bật sớm khi demo bằng sweep `simulated`; detector đã đặt sẵn `yolo`.
+
 ## 4. Triển khai
 
+Thư mục backup phải có **trước** lần deploy đầu: `deploy.sh` backup trước khi migrate, chạy bằng user thường, và dừng nếu
+không ghi được vào đó.
+
 ```bash
+sudo mkdir -p /var/backups/luxmap && sudo chown $USER /var/backups/luxmap
 cd /opt/luxmap && deploy/deploy.sh
 ```
 
@@ -72,14 +80,16 @@ Kiểm: `curl -I https://<tên miền>/` (200) và `curl https://<tên miền>/a
 ## 5. Web SPA (WP5)
 
 WP5 build với địa chỉ API **tương đối** `/api/v1` (cùng origin), rồi chép kết quả build vào `deploy/web/` (thư mục này
-git-ignore):
+git-ignore). Thiếu `VITE_API_URL` thì bản build gọi `http://localhost:5141`:
 
 ```bash
+VITE_API_URL=/api/v1 npm run build
 rsync -a --delete dist/ <user>@<vps>:/opt/luxmap/deploy/web/
 ```
 
 Không cần khởi động lại gì: Caddy đọc file trực tiếp, đường dẫn phía client (`/map`, `/work-orders/WO-0001`) trả `index.html`.
-App Android (WP6) đặt base URL `https://<tên miền>/api/v1`.
+App Android (WP6) đặt `API_BASE_URL=https://<tên miền>/` — **không** kèm `api/v1`: mỗi đường dẫn trong app đã bắt đầu bằng
+`api/v1/…`, kèm thêm là thành `/api/v1/api/v1/…` (404). Bản release cũng đọc giá trị này; để trống là trỏ emulator `10.0.2.2`.
 
 ## 6. Dữ liệu — chọn MỘT trong hai
 
@@ -107,26 +117,46 @@ docker run --rm -e SRC_KEY -e SRC_SECRET -e DST_KEY -e DST_SECRET --entrypoint /
   mc alias set src http://host.docker.internal:9000 "$SRC_KEY" "$SRC_SECRET"
   mc alias set dst http://host.docker.internal:19000 "$DST_KEY" "$DST_SECRET"
   for b in luxmap-survey luxmap-evidence luxmap-video luxmap-citizen; do mc mirror "src/$b" "dst/$b"; done'
+```
+
+Rồi làm **mục 7 bước 1 khi API còn tắt**, sau đó mới bật lại:
+
+```bash
 ssh <user>@<vps> 'cd /opt/luxmap/deploy && docker compose start api'
 ```
 
-## 7. 🔴 Đổi mật khẩu bốn tài khoản demo (sau 6b)
+## 7. 🔴 Bỏ mật khẩu dev của bốn tài khoản demo (sau 6b)
 
-Đường (b) chép **mật khẩu dev** (`change_this_password_0x` trong `.env.example`) lên một máy chủ công khai. Đổi ngay:
+Đường (b) chép **mật khẩu dev** (`change_this_password_0x` trong `.env.example`, ai trong nhóm cũng biết) lên một máy chủ
+công khai. Xoá chúng **trước khi API bật lại**, nên không có lúc nào đăng nhập bằng mật khẩu dev được:
 
-1. Đăng nhập `admin`, `PATCH /api/v1/admin/users/{id}` đặt `email` thật cho cả bốn tài khoản.
-2. Với từng email: `POST /api/v1/auth/password/forgot` `{"email": "…"}` → thư mang link `…/set-password?token=…` → đặt mật
-   khẩu mới (trang của web, hoặc `POST /api/v1/auth/password/set`).
+1. Vẫn qua tunnel của 6b, API còn tắt: đặt email thật và đưa cả bốn về trạng thái "đã mời, chưa đặt mật khẩu"
+   (`password_hash` và `password_set_at` cùng NULL — `ck_app_user_password_set_together`; đăng nhập trả 401 như sai mật khẩu):
+   ```bash
+   psql "$LUXMAP_TARGET_URL" -v ON_ERROR_STOP=1 <<'SQL'
+   BEGIN;
+   UPDATE app_user SET email = '<email thật của admin>'    WHERE username = 'admin';
+   UPDATE app_user SET email = '<email thật của agency>'   WHERE username = 'agency';
+   UPDATE app_user SET email = '<email thật của engineer>' WHERE username = 'engineer';
+   UPDATE app_user SET email = '<email thật của crew>'     WHERE username = 'crew';
+   UPDATE app_user SET password_hash = NULL, password_set_at = NULL
+    WHERE username IN ('admin', 'agency', 'engineer', 'crew');
+   COMMIT;
+   SQL
+   ```
+2. Bật API (lệnh cuối của 6b). Với từng email: `POST /api/v1/auth/password/forgot` `{"email": "…"}` → tài khoản chưa có mật
+   khẩu nhận **thư mời** mang link `…/set-password?token=…` → đặt mật khẩu bằng `POST /api/v1/auth/password/set`
+   (`{"token": "…", "new_password": "…"}`, tối thiểu 12 ký tự). Web chưa có trang `/set-password`, nên link trong thư
+   ra 404 tới khi WP5 làm.
 
 Seed (`--seed`) **bỏ qua tài khoản đã có**, nên đổi `SEED_*` trong `.env` không đổi được mật khẩu của chúng.
 
 ## 8. Sao lưu
 
 `deploy/backup.sh`: dump DB (định dạng custom) + `mc mirror` bốn bucket vào `/var/backups/luxmap`, giữ dump 14 ngày.
-`deploy.sh` gọi nó trước mỗi migration. Hằng đêm:
+`deploy.sh` gọi nó trước mỗi migration (thư mục đã tạo ở mục 4). Hằng đêm:
 
 ```bash
-sudo mkdir -p /var/backups/luxmap && sudo chown $USER /var/backups/luxmap
 ( crontab -l 2>/dev/null; echo '15 3 * * * cd /opt/luxmap/deploy && ./backup.sh >> /var/backups/luxmap/backup.log 2>&1' ) | crontab -
 ```
 
