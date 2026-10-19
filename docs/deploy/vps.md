@@ -16,7 +16,7 @@ internet ──443──▶ caddy ──┬─ /api/*  ──▶ api:8080 ──
 | V-1 | **Một VPS chạy tất cả**, Docker Compose. Không PaaS, không máy nhà + tunnel (tunnel cắt request ở 100 MB, clip tới 300 MiB) |
 | V-2 | Đặt ở **Singapore** |
 | V-3 | **PostGIS trên chính VPS** — **thay việc đặt DB trên Supabase** ([supabase.md](supabase.md), OPS-SUPABASE). DB cạnh API (NFR bbox < 500 ms), không bị tạm dừng vì gói free, không pooler. Cách chép của D-1/D-4/D-5 **giữ nguyên**: `copy_dev_to_supabase.py` chạy qua SSH tunnel (bước 6) |
-| V-4 | **Mua tên miền riêng, web chạy cùng server, cùng origin với API.** Cookie refresh của web (`__Secure-luxmap_rt`, `SameSite=Lax`) luôn là first-party, trình duyệt không gửi preflight CORS |
+| V-4 | **Tên miền riêng `luxmap.com.vn`** (Mỹ thuê 19/10/2026), **web chạy cùng server, cùng origin với API.** Cookie refresh của web (`__Secure-luxmap_rt`, `SameSite=Lax`) luôn là first-party, trình duyệt không gửi preflight CORS |
 | V-5 | **Không triển khai EMQX.** Thiết bị testbed dùng kênh HTTP (`Lighting__Channel=http`, `/api/v1/device/…` qua HTTPS). MQTT trên internet cần listener TLS riêng — làm khi thật sự cần |
 | V-6 | Migration chạy bằng **EF bundle của cùng bản build**, **sau** một lần backup — `deploy.sh` giữ thứ tự đó |
 
@@ -26,7 +26,8 @@ tiến trình API; đĩa vì một đêm khảo sát là vài GB video (100–15
 ## 1. Thuê máy, trỏ tên miền (Mỹ làm)
 
 1. Tạo VPS Ubuntu 24.04 ở Singapore. Đăng nhập bằng **SSH key**, tắt đăng nhập mật khẩu.
-2. Ở nhà cung cấp tên miền: bản ghi **A** `<tên miền>` → IP của VPS (thêm AAAA nếu VPS có IPv6).
+2. Ở nhà cung cấp tên miền (DNS đang do nhà đăng ký quản lý, NS `hoian` / `danang.vclouddns.com`): bản ghi **A**
+   `luxmap.com.vn` → IP của VPS (thêm AAAA nếu VPS có IPv6). Kiểm: `dig +short luxmap.com.vn` ra đúng IP trước khi chạy bước 4.
    ⚠️ Nếu DNS ở Cloudflare thì để **DNS only** (mây xám): proxy của Cloudflare cắt request ở 100 MB.
 3. Tường lửa: chỉ mở **22, 80, 443** (cả 443/udp cho HTTP/3).
    ```bash

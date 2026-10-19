@@ -1396,7 +1396,7 @@ trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và h
 
 | Mã | Quyết định |
 |---|---|
-| DEP-1 | **Web và API cùng một origin:** web ở `https://<tên miền>/`, API ở `https://<tên miền>/api/v1`. WP5 build với địa chỉ API **tương đối** `/api/v1` (không cần CORS); WP6 đặt base URL `https://<tên miền>/api/v1`. Tên miền chưa mua — sẽ báo khi có |
+| DEP-1 | **Web và API cùng một origin:** web ở `https://<tên miền>/`, API ở `https://<tên miền>/api/v1`. WP5 build với địa chỉ API **tương đối** `/api/v1` (không cần CORS); WP6 đặt base URL `https://luxmap.com.vn/` — **không** kèm `api/v1`, vì mọi đường dẫn trong app đã bắt đầu bằng `api/v1/…` (bản đầu của dòng này ghi `…/api/v1`, sai; sửa 19/10/2026). Tên miền: **`luxmap.com.vn`** (Mỹ thuê 19/10/2026) |
 | DEP-2 | Request khai `Content-Length` **lớn hơn 300 MiB** (mức lớn nhất API nhận — clip khảo sát) bị **reverse proxy** trả `413 UPLOAD_TOO_LARGE` đúng hình dạng lỗi, nhưng `details` **rỗng — không có `correlation_id`** (request không tới API). Dưới mức đó, lỗi vẫn do API trả như cũ |
 | DEP-3 | `/api/v1/internal/*` (callback của broker MQTT) **không** mở ra internet: 404 từ proxy. Thiết bị testbed dùng kênh **HTTP** (`/api/v1/device/…`), chưa có broker MQTT trên server |
 | DEP-4 | Swagger UI **tắt** ở môi trường triển khai (`Swagger:Enabled=false`); `/swagger` trả trang web. Spec đọc từ `docs/openapi/` |
