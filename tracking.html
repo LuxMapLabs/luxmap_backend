@@ -97,6 +97,15 @@
     cấu hình cũ, <code>respond</code> đứng sau <code>handle</code>. Còn: Mỹ thuê VPS + tên miền + Gmail app password, chạy runbook; báo WP5/WP6 (DEP-1).</p>
   </div>
   <div class="card">
+    <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>
+    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>fix/BE-07-login-rate-limit</code>. Lỗi chặn deploy v1 từ review sẵn sàng deploy:
+    <code>/auth/login</code> và <code>/auth/web/login</code> không có giới hạn nào. Nay <strong>10 lần / 5 phút / địa chỉ</strong>, hai endpoint
+    <strong>chung một xô</strong>, mọi lần thử đều đếm → <code>429 RATE_LIMITED</code> + <code>Retry-After</code>; refresh không bị giới hạn.
+    Spec sinh lại (chỉ thêm 429 ở hai endpoint). 3 test mới (<code>LoginRateLimitTests</code>); phá thử gỡ giới hạn khỏi đăng nhập web → đỏ.
+    Test host nâng giới hạn lên 1.000.000, chỉnh qua <code>LoginPermitLimit</code> (<code>UseSetting</code> không hạ được). Drift LG-1…LG-3,
+    SELF-SIGNED. Còn: báo WP5/WP6 xử lý 429 ở màn đăng nhập.</p>
+  </div>
+  <div class="card">
     <strong>Phiếu demo cả 3 loại trong <code>luxmap_dev</code>, 15/10/2026</strong>
     <p><span class="tag t-next">Dữ liệu tạm</span> 17 phiếu <code>WO-0004…WO-0020</code> tạo qua API thật (audit + thông báo đủ), <code>engineer</code> giao cho <code>crew</code>:
     kiểm tra 5 (giao / đang làm / chờ duyệt / nghiệm thu / chưa giao), sửa chữa 7 (giao / đang làm / chờ duyệt / bị trả / nghiệm thu — phiếu tiếp nối của

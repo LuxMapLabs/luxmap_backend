@@ -34,6 +34,7 @@ public static class RateLimitSetup
             // address unless that proxy is configured as trusted (ForwardedHeadersSetup).
             AddPerAddress(options, configuration, LuxMapRateLimits.PublicLookup, "RateLimits:PublicLookup", 30, 10);
             AddPerAddress(options, configuration, LuxMapRateLimits.PublicReport, "RateLimits:PublicReport", 10, 60);
+            AddPerAddress(options, configuration, LuxMapRateLimits.Login, "RateLimits:Login", 10, 5);
 
             // The Contract's error shape, not the middleware's bare 503 default. Written here rather than
             // through ExceptionHandlingMiddleware.WriteAsync: that clears the response, Retry-After included.

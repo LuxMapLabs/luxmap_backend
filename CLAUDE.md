@@ -1746,6 +1746,12 @@ kèm test cho từng cờ.
 **Bộ giới hạn tần suất chia theo `RemoteIpAddress`.** Sau reverse proxy mọi client chung một địa chỉ (của proxy) ⇒
 chung một xô 5 lần / 15 phút. Deploy sau proxy phải cấu hình forwarded headers **trước**.
 
+**Đăng nhập có giới hạn tần suất (LOGIN-RATE, drift LG-1…LG-3), và mọi test đăng nhập từ cùng một địa chỉ.** `LuxMapTestHost`
+nâng `RateLimits:Login:PermitLimit` lên 1.000.000 trong `CreateHost`; giá trị đặt ở hook đó **thắng `UseSetting`**, nên test muốn hạ
+giới hạn phải override `LoginPermitLimit` (khuôn `LoginRateLimitTestFactory`), không `UseSetting` — làm vậy test vẫn chạy, chỉ không
+bao giờ thấy 429. Endpoint đăng nhập mới phải gắn **cùng** policy `LuxMapRateLimits.Login`: policy riêng là xô riêng, kẻ dò mật khẩu
+xen kẽ hai đường để được gấp đôi số lần.
+
 **`ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` — xoá luôn header đã đặt.** Lỗi nào cần header
 riêng (`Retry-After` của 429) phải tự ghi body, như `RateLimitSetup.OnRejected`.
 

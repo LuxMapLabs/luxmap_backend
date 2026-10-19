@@ -8,7 +8,6 @@ using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Storage;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -497,21 +496,5 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
         using var check = Image.Load(bytes);
         Assert.NotNull(check.Metadata.ExifProfile);
         return bytes;
-    }
-
-    /// <summary>TestServer has no client address; this sets one from a header, before the forwarded-headers middleware runs.</summary>
-    private sealed class TestPeerAddress : IStartupFilter
-    {
-        public const string Header = "X-Test-Peer";
-
-        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
-        {
-            app.Use(async (context, nextMiddleware) =>
-            {
-                if (context.Request.Headers.TryGetValue(Header, out var peer)) context.Connection.RemoteIpAddress = IPAddress.Parse(peer!);
-                await nextMiddleware();
-            });
-            next(app);
-        };
     }
 }
