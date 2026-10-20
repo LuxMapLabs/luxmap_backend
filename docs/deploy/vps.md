@@ -155,10 +155,19 @@ Seed (`--seed`) **bỏ qua tài khoản đã có**, nên đổi `SEED_*` trong `
 ## 8. Sao lưu
 
 `deploy/backup.sh`: dump DB (định dạng custom) + `mc mirror` bốn bucket vào `/var/backups/luxmap`, giữ dump 14 ngày.
-`deploy.sh` gọi nó trước mỗi migration (thư mục đã tạo ở mục 4). Hằng đêm:
+`deploy.sh` gọi nó trước mỗi migration (thư mục đã tạo ở mục 4). Hằng đêm lúc **03:15 giờ Việt Nam**:
 
 ```bash
-( crontab -l 2>/dev/null; echo '15 3 * * * cd /opt/luxmap/deploy && ./backup.sh >> /var/backups/luxmap/backup.log 2>&1' ) | crontab -
+( crontab -l 2>/dev/null; echo '15 20 * * * cd /opt/luxmap/deploy && ./backup.sh >> /var/backups/luxmap/backup.log 2>&1' ) | crontab -
+```
+
+⚠️ Cron chạy theo **múi giờ của máy chủ**, mà image Ubuntu của VPS để **UTC** (`timedatectl show -p Timezone`): `20:15 UTC`
+= `03:15` UTC+7. Viết `15 3 * * *` thì backup chạy lúc 10:15 sáng giờ Việt Nam, giữa giờ dùng. Kiểm một lần sau khi cài, trong
+môi trường tối giản như cron (`PATH` chỉ `/usr/bin:/bin`), rồi xem `backup.log`:
+
+```bash
+env -i HOME=$HOME PATH=/usr/bin:/bin /bin/sh -c 'cd /opt/luxmap/deploy && ./backup.sh >> /var/backups/luxmap/backup.log 2>&1'
+tail -1 /var/backups/luxmap/backup.log      # backup <stamp>: … database, … objects
 ```
 
 ⚠️ Bản sao lưu nằm **trên cùng đĩa** với dữ liệu — chép thêm ra ngoài định kỳ (`rsync` về máy nhóm, hoặc snapshot đĩa của
