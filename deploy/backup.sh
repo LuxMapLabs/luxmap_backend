@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # OPS-DEPLOY-VPS — one backup of the database AND the object store, into $BACKUP_DIR (default /var/backups/luxmap).
 #   ./backup.sh                 # from this directory; deploy.sh calls it before every migration
-#   cron: 15 3 * * * cd /opt/luxmap/deploy && ./backup.sh >> /var/backups/luxmap/backup.log 2>&1
+#   cron: 15 20 * * * cd /opt/luxmap/deploy && ./backup.sh >> /var/backups/luxmap/backup.log 2>&1   (server is UTC: 03:15 in Vietnam)
 #
 # The database dump is the custom format (`pg_restore` restores it). The object store is mirrored, not archived: photos
 # and videos never change once written (keys carry their id or hash), so a mirror only copies what is new.

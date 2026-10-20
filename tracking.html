@@ -96,7 +96,7 @@
   </div>
   <div class="card">
     <strong>OPS-DEPLOY-VPS — triển khai lên một VPS, 15/10/2026</strong>
-    <p><span class="tag t-next">Đã merge (PR #150) · tên miền <code>luxmap.com.vn</code> đã có (19/10) · chờ thuê VPS</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
+    <p><span class="tag t-next">Đã merge (PR #150) · <strong>đang chạy tại https://luxmap.com.vn</strong> (20/10/2026)</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
     Mỹ chốt V-1…V-6: <strong>một VPS Singapore</strong>, Docker Compose; <strong>PostGIS trên VPS</strong> (thay Supabase, <code>supabase.md</code> giữ làm
     lịch sử); <strong>mua tên miền, web và API cùng origin</strong> (<code>/</code> web, <code>/api/v1</code> API); không EMQX (thiết bị dùng kênh HTTP).
     Files: <code>Dockerfile</code> (API + ffmpeg + EF bundle, chạy non-root), <code>.dockerignore</code> (allowlist), <code>deploy/compose.yml</code>
@@ -106,7 +106,12 @@
     + mirror ảnh; web / đường SPA / 308; đăng nhập mobile + web (cookie <code>__Secure-</code>, refresh); upload ảnh; <strong>clip 290 MB thật</strong> qua Caddy;
     IP thật tới API (client thứ hai có xô giới hạn riêng — phá thử bỏ proxy tin cậy thì dính chung); backup + khôi phục vào DB nháp.
     Ba lỗi bắt được lúc diễn tập và đã sửa: clip vượt 300 MiB ra <strong>502</strong> (nay 413 từ Caddy), bind mount Caddyfile theo file làm reload chạy
-    cấu hình cũ, <code>respond</code> đứng sau <code>handle</code>. Còn: Mỹ thuê VPS + tên miền + Gmail app password, chạy runbook; báo WP5/WP6 (DEP-1).</p>
+    cấu hình cũ, <code>respond</code> đứng sau <code>handle</code>. Còn: Mỹ thuê VPS + tên miền + Gmail app password, chạy runbook; báo WP5/WP6 (DEP-1).
+    <strong>20/10/2026 — deploy thật:</strong> OVH VPS-1 Singapore (2 vCore / 4 GB / 40 GB, Ubuntu 24.04, IP 15.235.242.213), tên miền
+    <code>luxmap.com.vn</code> (iNET, tắt proxy "Bảo vệ"). SSH chỉ key, ufw 22/80/443, swap 4 GB. <code>deploy.sh</code>: 47 migration, chứng
+    chỉ Let's Encrypt; chép <code>luxmap_dev</code> (42 bảng md5 khớp, 30 object ảnh); 4 tài khoản demo đổi email + bỏ mật khẩu dev rồi đặt
+    lại qua thư mời (Gmail <code>luxmap.noreply</code>); backup cron 03:15 VN. Hai lỗi bắt được: <code>deploy.sh</code> dò <code>CHANGE_ME</code>
+    cả ở chú thích (PR #160), cron "3:15" chạy theo UTC. Còn: WP5 build web; báo WP5/WP6 (DEP-1, LG-1…LG-3).</p>
   </div>
   <div class="card">
     <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>
