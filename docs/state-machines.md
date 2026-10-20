@@ -1,173 +1,185 @@
-# Sơ đồ trạng thái (State Machine) — LuxMap backend
+# State Machines — LuxMap backend
 
-Vẽ lại từ **code đang chạy trên `dev`**, không phải từ đặc tả: bản đầu 14/10/2026, mục 10 thêm 16/10/2026 sau
-POLE-PHOTO-AI; **20/10/2026 đối chiếu lại toàn bộ với code** (review chỉ-đọc của Codex, từng phát hiện được kiểm lại
-trên code) và thêm mục 11–13. Mỗi mục nêu file giữ luật chuyển, để ai sửa luật thì sửa sơ đồ trong cùng PR. Tên trạng
-thái là **giá trị trên dây** (chuỗi thường, snake_case) — đúng thứ API trả về; ngoại lệ ghi rõ ở từng mục.
+Drawn from **the code running on `dev`**, not from the specification: first version 14/10/2026, section 10 added
+16/10/2026 after POLE-PHOTO-AI; **re-checked in full against the code on 20/10/2026** (a read-only Codex review, every
+finding verified against the code) and sections 11–13 added. Each section names the files that hold its transition rules:
+whoever changes a rule updates the diagram in the same PR. State names are **wire values** (lowercase snake_case strings) —
+exactly what the API returns; exceptions are stated in each section.
 
-Quy ước chung cho mọi máy dưới đây:
+Conventions for every machine below:
 
-- Chuyển trạng thái không có trong sơ đồ → **409** (`INVALID_STATE_TRANSITION` hoặc mã riêng nêu ở từng mục). Dữ liệu
-  gửi kèm sai (thiếu trường, link hết hạn…) là **400**, không phải 409.
-- Sự cố, phiếu công việc và báo cáo của công dân trả sẵn **`allowed_actions`** để FE ẩn nút trước, không để người dùng bấm
-  rồi mới lỗi. Các máy khác không có trường này.
-- Chuyển trạng thái nghiệp vụ ghi vào **audit append-only** (BE-23a, D-R13): mỗi lượt lưu **đúng một** dòng, một thao tác
-  có thể gồm nhiều lượt lưu (ví dụ nhận ảnh cột: `submitted` rồi `analyzed`). Ngoại lệ: tài khoản người dùng (mục 8) và
-  refresh token (mục 13) không thuộc xã nào nên chỉ ghi structured log; bóng đèn (mục 11) chỉ đóng dấu `updated_by` /
-  `updated_at` trên chính dòng đó.
-- Trạng thái đóng (`[*]` ở cuối) là cuối cùng: không có đường quay lại; việc tiếp theo là một bản ghi **mới**.
+- A transition not shown in the diagram → **409** (`INVALID_STATE_TRANSITION` or the specific code named in each section).
+  Invalid input sent with it (a missing field, an expired link…) is **400**, not 409.
+- Faults, work orders and citizen reports return **`allowed_actions`** so the front end hides a button up front instead of
+  letting the user press it and fail. The other machines have no such field.
+- Business state changes are written to the **append-only audit** (BE-23a, D-R13): **exactly one** row per save, and one
+  operation may span several saves (for example receiving a pole photo: `submitted`, then `analyzed`). Exceptions: user
+  accounts (section 8) and refresh tokens (section 13) belong to no commune, so they are only written to the structured log;
+  lamps (section 11) only stamp `updated_by` / `updated_at` on their own row.
+- A closing state (`[*]` at the end) is final: there is no way back; whatever comes next is a **new** record.
 
-| # | Máy trạng thái | Lưu ở | Luật chuyển nằm ở |
+| # | State machine | Stored in | Transition rules live in |
 |---|---|---|---|
-| 0 | Toàn cảnh — các máy nối với nhau thế nào | — | — |
-| 1 | Sự cố `fault_status` | `fault.fault_status` | `Faults/FaultTransitions.cs`, `FaultReviewRules.cs` |
-| 2 | Phiếu công việc `wo_status` | `work_order.wo_status` | `WorkOrders/WorkOrderRules.cs`, `WorkOrderService.cs` |
-| 3 | Phiên khảo sát `survey_sweep.status` | `survey_sweep.status`, `processing_status` | `Survey/Ingest/SurveyIngestService.cs`, `Processing/SurveyProcessor.cs`, `Review/SurveyReviewService.cs` |
-| 4 | Báo cáo của công dân | `citizen_report.status` | `Citizen/CitizenReviewService.cs`, `PublicReportService.cs` |
-| 5 | Mã QR trên cột | `qr_code.revoked_at` | `Citizen/QrCodeService.cs` |
-| 6 | Lệnh ON / OFF / AUTO | `lighting_command.status` | `Telemetry/Lighting/LightingCommandService.cs`, `Telemetry/Mqtt/MqttLightingHandler.cs` |
-| 7 | Trạng thái thiết bị IoT `node_status` | **không lưu**, tính lúc đọc | `Telemetry/IotOptions.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs` |
-| 8 | Tài khoản người dùng | `is_locked`, `password_set_at` | `Identity/Accounts/UserAdminService.cs`, `PasswordService.cs` |
-| 9 | Tình trạng đèn tại cột `fixture_status` | `pole_current_status` | `Survey/Processing/Frames/FrameClassification.cs` (phân loại), `Survey/Review/SurveyReviewService.cs` (duyệt sweep), `ReviewedPolePhotoPublisher.cs` (xác nhận ảnh cột); cả hai ghi qua `PoleStatusPublication.cs` |
-| 10 | Ảnh cột trong phiếu (AI ON/OFF) | `work_order_pole_photo.decision`, `cv_state` | `WorkOrders/WorkOrderPolePhotoService.cs`, `Survey/Review/ReviewedPolePhotoPublisher.cs` |
-| 11 | Bóng đèn — lắp / gỡ | `fixture.removed_date` | `Assets/Crud/AssetCrudService.cs` |
-| 12 | Chế độ rơ-le `control_mode` | `feeder_control.control_mode`, `mode_seq` | `Telemetry/Lighting/LightingCommandService.cs` (`RecordAsync`) |
-| 13 | Phiên đăng nhập — refresh token | `refresh_token.revoked_at`, `revoked_reason` | `Identity/Auth/AuthService.cs`, `Accounts/AccountTokens.cs` |
+| 0 | Overview — how the machines connect | — | — |
+| 1 | Fault `fault_status` | `fault.fault_status` | `Faults/FaultTransitions.cs`, `FaultReviewRules.cs` |
+| 2 | Work order `wo_status` | `work_order.wo_status` | `WorkOrders/WorkOrderRules.cs`, `WorkOrderService.cs` |
+| 3 | Survey sweep `survey_sweep.status` | `survey_sweep.status`, `processing_status` | `Survey/Ingest/SurveyIngestService.cs`, `Processing/SurveyProcessor.cs`, `Review/SurveyReviewService.cs` |
+| 4 | Citizen report | `citizen_report.status` | `Citizen/CitizenReviewService.cs`, `PublicReportService.cs` |
+| 5 | QR code on a pole | `qr_code.revoked_at` | `Citizen/QrCodeService.cs` |
+| 6 | ON / OFF / AUTO command | `lighting_command.status` | `Telemetry/Lighting/LightingCommandService.cs`, `Telemetry/Mqtt/MqttLightingHandler.cs` |
+| 7 | IoT device status `node_status` | **not stored**, computed on read | `Telemetry/IotOptions.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs` |
+| 8 | User account | `is_locked`, `password_set_at` | `Identity/Accounts/UserAdminService.cs`, `PasswordService.cs` |
+| 9 | Lamp condition at a pole `fixture_status` | `pole_current_status` | `Survey/Processing/Frames/FrameClassification.cs` (classification), `Survey/Review/SurveyReviewService.cs` (sweep review), `ReviewedPolePhotoPublisher.cs` (pole photo confirmation); both write through `PoleStatusPublication.cs` |
+| 10 | Pole photo in a work order (AI ON/OFF) | `work_order_pole_photo.decision`, `cv_state` | `WorkOrders/WorkOrderPolePhotoService.cs`, `Survey/Review/ReviewedPolePhotoPublisher.cs` |
+| 11 | Lamp — fitted / removed | `fixture.removed_date` | `Assets/Crud/AssetCrudService.cs` |
+| 12 | Relay mode `control_mode` | `feeder_control.control_mode`, `mode_seq` | `Telemetry/Lighting/LightingCommandService.cs` (`RecordAsync`) |
+| 13 | Sign-in session — refresh token | `refresh_token.revoked_at`, `revoked_reason` | `Identity/Auth/AuthService.cs`, `Accounts/AccountTokens.cs` |
 
 ---
 
-## 0. Toàn cảnh
+## 0. Overview
 
-Sự cố (`fault`) là trung tâm: năm kênh sinh ra nó, phiếu công việc đưa nó tới đích. Đây là sơ đồ luồng, không phải máy
-trạng thái — nó chỉ cho biết máy nào kích hoạt máy nào.
+The fault (`fault`) is the centre: five channels create it, and work orders carry it to the end. This is a flow diagram,
+not a state machine — it only shows which machine triggers which.
 
 ```mermaid
 flowchart TB
-    WO["Phiếu công việc<br/>work_order"]
-    SW["Phiên khảo sát<br/>survey_sweep"]
-    IOT["Job node_offline<br/>(thiết bị IoT im lặng)"]
-    FR["Kỹ sư hiện trường<br/>POST /faults"]
-    CR["Báo cáo công dân<br/>(QR, chờ Quản lý duyệt)"]
-    PP["Ảnh cột trong phiếu<br/>(AI ON/OFF, chờ Quản lý xác nhận)"]
-    PCS["Tình trạng đèn tại cột<br/>pole_current_status"]
-    F(("Sự cố<br/>fault"))
+    WO["Work order<br/>work_order"]
+    SW["Survey sweep<br/>survey_sweep"]
+    IOT["node_offline job<br/>(silent IoT device)"]
+    FR["Field Engineer<br/>POST /faults"]
+    CR["Citizen report<br/>(QR, awaiting Manager review)"]
+    PP["Pole photo in a work order<br/>(AI ON/OFF, awaiting Manager confirmation)"]
+    PCS["Lamp condition at the pole<br/>pole_current_status"]
+    F(("Fault<br/>fault"))
 
-    WO -- "phiếu survey in_progress:<br/>mới nhận upload video" --> SW
-    WO -- "phiếu bất kỳ in_progress:<br/>kỹ sư được giao chụp ảnh cột" --> PP
-    SW -- "accepted → công bố<br/>(chỉ quan sát mới hơn)" --> PCS
-    PP -- "confirm → công bố<br/>(chỉ ảnh mới hơn)" --> PCS
+    WO -- "survey work order in_progress:<br/>accepts video uploads" --> SW
+    WO -- "any work order in_progress:<br/>assigned engineer photographs poles" --> PP
+    SW -- "accepted → publish<br/>(newer observations only)" --> PCS
+    PP -- "confirm → publish<br/>(newer photos only)" --> PCS
     PP -- "confirm off → confirmed (CV) *" --> F
     SW -- "accepted → detected (CV) *" --> F
     IOT -- "detected" --> F
     FR -- "detected" --> F
-    CR -- "accept → confirmed<br/>merge → gắn vào sự cố mở" --> F
-    F -- "Quản lý confirm / reject" --> F
-    F -- "gắn vào phiếu kiểm tra / sửa chữa" --> WO
+    CR -- "accept → confirmed<br/>merge → attach to an open fault" --> F
+    F -- "Manager confirm / reject" --> F
+    F -- "attached to an inspection / repair order" --> WO
     WO -- "inspection verify + fault_present → confirmed<br/>repair start → in_progress<br/>repair verify → resolved → verified" --> F
     WO -- "inspection verified → follow_up repair" --> WO
 ```
 
-- `*` Sweep và ảnh cột chỉ sinh sự cố khi quan sát **được áp** (mới hơn quan sát hiện tại của cột) và cột **chưa** có sự cố
-  mở cùng loại — chi tiết ở mục 1.
-- Phiếu kiểm tra nhận mọi sự cố mở; phiếu sửa chữa chỉ nhận sự cố `confirmed` / `in_progress`.
-- Một sự cố chỉ thuộc **một** phiếu chưa đóng tại một thời điểm (409 `FAULT_ALREADY_IN_WORK_ORDER`); phiếu `verified` /
-  `cancelled` nhả liên kết (`work_order_fault.released_at`) để sự cố gắn được vào phiếu khác.
+- `*` A sweep or a pole photo creates a fault only when its observation is **applied** (newer than the pole's current
+  observation) and the pole has **no** open fault of the same type — details in section 1.
+- An inspection order takes any open fault; a repair order only takes `confirmed` / `in_progress` faults.
+- A fault belongs to **one** unclosed work order at a time (409 `FAULT_ALREADY_IN_WORK_ORDER`); a `verified` / `cancelled`
+  order releases its links (`work_order_fault.released_at`) so the fault can be attached to another order.
 
 ---
 
-## 1. Sự cố — `fault_status`
+## 1. Fault — `fault_status`
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> detected : CV (duyệt sweep) / IoT (node_offline) / Kỹ sư báo tại chỗ
-    [*] --> confirmed : Quản lý chấp nhận báo cáo công dân<br/>hoặc xác nhận ảnh cột "off" được áp (lamp_out, CV)
-    detected --> confirmed : Quản lý PATCH confirm<br/>hoặc nghiệm thu phiếu kiểm tra có fault_present
-    detected --> rejected : Quản lý PATCH reject (dương tính giả)
-    confirmed --> in_progress : Kỹ sư start phiếu sửa chữa
-    in_progress --> resolved : Quản lý verify phiếu sửa chữa
-    resolved --> verified : cùng lượt verify đó
+    [*] --> detected : CV (sweep review) / IoT (node_offline) / Field Engineer on site
+    [*] --> confirmed : Manager accepts a citizen report<br/>or confirms an applied "off" pole photo (lamp_out, CV)
+    detected --> confirmed : Manager PATCH confirm<br/>or inspection order verified with fault_present
+    detected --> rejected : Manager PATCH reject (false positive)
+    confirmed --> in_progress : Engineer starts the repair order
+    in_progress --> resolved : Manager verifies the repair order
+    resolved --> verified : same verify
     rejected --> [*]
     verified --> [*]
 
     note right of in_progress
-        Sự cố MỞ = detected, confirmed, in_progress
-        (FaultStatusSets.Open — định nghĩa duy nhất)
+        OPEN fault = detected, confirmed, in_progress
+        (FaultStatusSets.Open — the single definition)
     end note
 ```
 
-- `PATCH /faults/{id}` **chỉ** làm được `detected → confirmed | rejected` (`FaultReviewRules.IsReviewTransition`). Ba bước
-  sau do **phiếu sửa chữa** đẩy; gửi chúng qua `PATCH` → 409 dù máy trạng thái cho phép.
-- `resolved` và `verified` được ghi **cùng một lượt** verify phiếu: `resolved_by` là kỹ sư được giao (thời điểm =
-  `completed_at` của phiếu), `verified` là Quản lý nghiệm thu. Hiện không có đường nào dừng ở `resolved`.
-- Sự cố đang thuộc một phiếu sửa chữa chưa đóng thì không duyệt được (`allowed_actions` rỗng, WO-10).
-- `fault_type` không bao giờ đổi; phân loại lại (`lamp_out` ↔ `lamp_dim`) ghi vào `override_fault_type`, chỉ khi sự cố còn mở.
-- **Khử trùng lặp khi sinh tự động:** sweep và ảnh cột chỉ sinh sự cố khi cột **chưa** có sự cố mở cùng loại hiệu lực
-  (`override_fault_type ?? fault_type`). Duyệt sweep sinh `lamp_out` / `lamp_dim` ở `detected`; xác nhận ảnh "off" sinh
-  `lamp_out` ở thẳng `confirmed` vì Quản lý đã xem ảnh (`origin_pole_photo_id` trỏ về ảnh). Cả hai chỉ sinh khi quan sát
-  **được áp** (mới hơn quan sát hiện tại của cột, mục 9). Ảnh "on" **không** tự đóng sự cố nào.
-- ⚠️ Phiếu sửa chữa bị **cancel** khi sự cố đã `in_progress`: sự cố ở lại `in_progress` (liên kết được nhả). Nó vẫn là
-  sự cố mở, gắn được vào phiếu sửa chữa mới; `start` của phiếu mới bỏ qua nó, `verify` vẫn đưa nó tới `verified`.
+- `PATCH /faults/{id}` can **only** do `detected → confirmed | rejected` (`FaultReviewRules.IsReviewTransition`). The three
+  later steps are driven by the **repair order**; sending them through `PATCH` → 409 even though the machine allows them.
+- `resolved` and `verified` are written in **the same** work order verify: `resolved_by` is the assigned engineer (time =
+  the order's `completed_at`), `verified` is the Manager who signs it off. Today no path stops at `resolved`.
+- A fault held by an unclosed repair order cannot be reviewed (`allowed_actions` empty, WO-10).
+- `fault_type` never changes; reclassification (`lamp_out` ↔ `lamp_dim`) goes into `override_fault_type`, only while the
+  fault is open.
+- **De-duplication on automatic creation:** a sweep or a pole photo creates a fault only when the pole has **no** open
+  fault of the same effective type (`override_fault_type ?? fault_type`). Sweep review creates `lamp_out` / `lamp_dim` at
+  `detected`; confirming an "off" photo creates `lamp_out` straight at `confirmed` because the Manager has seen the photo
+  (`origin_pole_photo_id` points at it). Both create only when the observation is **applied** (newer than the pole's
+  current observation, section 9). An "on" photo **never** closes a fault.
+- ⚠️ A repair order **cancelled** while its fault is `in_progress`: the fault stays `in_progress` (the link is released).
+  It is still an open fault and can join a new repair order; that order's `start` skips it, its `verify` still takes it to
+  `verified`.
 
 ---
 
-## 2. Phiếu công việc — `wo_status`
+## 2. Work order — `wo_status`
 
-Ba loại phiếu (`task_kind`): `inspection` (kiểm tra), `repair` (sửa chữa), `survey` (khảo sát đêm) — cùng một máy trạng thái.
+Three kinds (`task_kind`): `inspection`, `repair`, `survey` (night survey) — one state machine for all three.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> open : Quản lý tạo, chưa giao
-    [*] --> assigned : Quản lý tạo kèm assigned_to
+    [*] --> open : Manager creates, unassigned
+    [*] --> assigned : Manager creates with assigned_to
     open --> assigned : assign
     assigned --> open : unassign
-    assigned --> assigned : reassign
-    in_progress --> assigned : reassign (started_at bị xoá)
+    note right of assigned
+        reassign to another engineer
+        stays assigned
+    end note
+    in_progress --> assigned : reassign (started_at cleared)
     in_progress --> open : unassign
-    assigned --> in_progress : Kỹ sư start
-    in_progress --> done : Kỹ sư complete
-    done --> in_progress : Quản lý return (kèm lý do)
-    done --> verified : Quản lý verify
-    open --> cancelled : Quản lý cancel (kèm lý do)
+    assigned --> in_progress : Engineer start
+    in_progress --> done : Engineer complete
+    done --> in_progress : Manager return (with a reason)
+    done --> verified : Manager verify
+    open --> cancelled : Manager cancel (with a reason)
     assigned --> cancelled : cancel
     in_progress --> cancelled : cancel
     verified --> [*]
     cancelled --> [*]
 ```
 
-| Hành động | Ai | Từ trạng thái | Điều kiện thêm |
+| Action | Who | From | Extra conditions |
 |---|---|---|---|
-| `assign` / `reassign` / `unassign` / `edit` / `cancel` | Quản lý | `open`, `assigned`, `in_progress` | người được giao phải là Kỹ sư hiện trường đang hoạt động, có đủ xã của phiếu (phiếu khảo sát: đủ xã của mọi tuyến), ngược lại 409 `ASSIGNEE_NOT_ELIGIBLE`; giao lại đúng người đang giữ thì không đổi gì; `cancel` bắt buộc `note` |
-| `start` | Kỹ sư **được giao** | `assigned` | phiếu sửa chữa: sự cố `confirmed` → `in_progress` |
-| `complete` | Kỹ sư được giao | `in_progress` | `report_note` ≥ 10 ký tự (sau khi bỏ khoảng trắng hai đầu); sửa chữa phải có ảnh `after` (409 `AFTER_EVIDENCE_REQUIRED`); kiểm tra phải có `fault_outcomes` cho mọi sự cố |
-| `return` | Quản lý | `done` | bắt buộc `note` |
-| `verify` | Quản lý | `done` | sửa chữa: sự cố → `resolved` → `verified`; kiểm tra: sự cố `fault_present` + `detected` → `confirmed` |
-| `follow_up` | Quản lý | `verified` | chỉ phiếu **kiểm tra** sinh được phiếu **sửa chữa** nối chuỗi (FR-2); phải có ít nhất một sự cố `fault_present` (409 `NOTHING_TO_FOLLOW_UP`), sự cố chọn phải còn hợp lệ cho sửa chữa (409 `FAULT_STATUS_NOT_ELIGIBLE`) và chưa thuộc phiếu khác (409 `FAULT_ALREADY_IN_WORK_ORDER`) |
+| `assign` / `reassign` / `unassign` / `edit` / `cancel` | Manager | `open`, `assigned`, `in_progress` | the assignee must be an active Field Engineer covering the order's commune (survey order: every commune of its segments), otherwise 409 `ASSIGNEE_NOT_ELIGIBLE`; reassigning to the current assignee changes nothing; `cancel` requires `note` |
+| `start` | **Assigned** engineer | `assigned` | repair order: faults `confirmed` → `in_progress` |
+| `complete` | Assigned engineer | `in_progress` | `report_note` ≥ 10 characters (after trimming); a repair order needs an `after` photo (409 `AFTER_EVIDENCE_REQUIRED`); an inspection order needs `fault_outcomes` for every fault |
+| `return` | Manager | `done` | requires `note` |
+| `verify` | Manager | `done` | repair: faults → `resolved` → `verified`; inspection: faults with `fault_present` + `detected` → `confirmed` |
+| `follow_up` | Manager | `verified` | only an **inspection** order can spawn a chained **repair** order (FR-2); it needs at least one `fault_present` fault (409 `NOTHING_TO_FOLLOW_UP`), each chosen fault must still be eligible for repair (409 `FAULT_STATUS_NOT_ELIGIBLE`) and not held by another order (409 `FAULT_ALREADY_IN_WORK_ORDER`) |
 
-- `verified` và `cancelled` đặt `closed_at` và **nhả** mọi liên kết sự cố — sự cố đó gắn được vào phiếu khác.
-- Phiếu sửa chữa chỉ nhận sự cố `confirmed` / `in_progress`; phiếu kiểm tra nhận mọi sự cố mở; phiếu khảo sát không nhận sự cố.
-- Phiếu khảo sát chỉ nhận upload video khi đang `in_progress` (xem mục 3).
-- Job `work_order_overdue` (BE-26) báo quá hạn cho phiếu `open | assigned | in_progress` — chỉ thông báo, **không** đổi trạng thái.
+- `verified` and `cancelled` set `closed_at` and **release** every fault link — those faults can join another order.
+- A repair order takes only `confirmed` / `in_progress` faults; an inspection order takes any open fault; a survey order
+  takes none.
+- A survey order accepts video uploads only while `in_progress` (see section 3).
+- The `work_order_overdue` job (BE-26) flags overdue `open | assigned | in_progress` orders — a notification only, it
+  **never** changes the status.
 
 ---
 
-## 3. Phiên khảo sát — `survey_sweep.status`
+## 3. Survey sweep — `survey_sweep.status`
 
-Sweep có hai cột: `status` (vòng đời đầy đủ, hiển thị) và `processing_status` (chỉ phần xử lý của worker). Sơ đồ theo
-`status`; bảng dưới sơ đồ cho biết `processing_status` tương ứng.
+A sweep has two columns: `status` (the full, displayed lifecycle) and `processing_status` (the worker's part only). The
+diagram follows `status`; the table under it gives the matching `processing_status`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> uploading : Kỹ sư POST /sweeps (phiếu survey đang in_progress)
+    [*] --> uploading : Engineer POST /sweeps (survey order in_progress)
     uploading --> uploading : PUT clips / raw (gps_track, lux_log, capture_config)
-    uploading --> queued : POST submit — đủ clip + 3 file thô, hash khớp manifest
-    queued --> processing : Worker nhận việc (lease)
-    processing --> processing : lease hết hạn → worker khác nhận lại
-    processing --> awaiting_review : Xử lý thành công
-    processing --> queued : Lỗi PROCESSING_ERROR, còn lượt thử
-    processing --> failed : Hết lượt thử / lỗi không thử lại (vd. JOB_SCOPE_INVALID)
-    awaiting_review --> accepted : Quản lý duyệt accept → công bố trạng thái đèn + sinh sự cố CV
-    awaiting_review --> returned : Quản lý return (kèm ghi chú)
+    uploading --> queued : POST submit — all clips + 3 raw files, hashes match the manifest
+    queued --> processing : Worker claims the job (lease)
+    note right of processing
+        lease expired → another worker
+        reclaims the job (stays processing)
+    end note
+    processing --> awaiting_review : Processing succeeded
+    processing --> queued : PROCESSING_ERROR, attempts left
+    processing --> failed : Out of attempts / non-retryable error (e.g. JOB_SCOPE_INVALID)
+    awaiting_review --> accepted : Manager accept → publish lamp status + create CV faults
+    awaiting_review --> returned : Manager return (with a note)
     accepted --> [*]
     returned --> [*]
     failed --> [*]
@@ -178,309 +190,325 @@ stateDiagram-v2
 | `uploading` | `not_started` |
 | `queued` | `queued` |
 | `processing` | `processing` |
-| `awaiting_review`, `accepted`, `returned` | `succeeded` — duyệt không đổi kết quả xử lý |
+| `awaiting_review`, `accepted`, `returned` | `succeeded` — review does not change the processing result |
 | `failed` | `failed` |
 
-- `submit` thiếu file → 409 `UPLOAD_INCOMPLETE`; hash lệch → 409 `MANIFEST_MISMATCH`. Gửi lại `submit` y hệt sau khi đã
-  qua `uploading` là idempotent (trả lại kết quả cũ).
-- Thứ tự kiểm khi duyệt: `run_id` phải là lượt xử lý **`succeeded`** của chính sweep đó (409 `INVALID_REVIEW_RUN`) →
-  gửi lại **cùng `client_op_id`, cùng nội dung** trả kết quả cũ, cùng khoá khác nội dung → 409 `IDEMPOTENCY_CONFLICT` →
-  sweep không ở `awaiting_review` → 409 `SWEEP_ALREADY_REVIEWED` → lệch `expected_version` → 409 `VERSION_CONFLICT`.
-- `accept` còn đòi cột trong sweep **vẫn** cùng xã / `data_source` như lúc xử lý (409 `SURVEY_SCOPE_CHANGED`).
-- **Chỉ `accepted` mới công bố** kết quả lên `pole_current_status` (mục 9) và sinh sự cố `lamp_out` / `lamp_dim` (theo
-  luật khử trùng lặp ở mục 1). `returned` chỉ ghi quyết định; khảo sát lại là một sweep mới.
-- ⚠️ Sweep `data_source = field` hiện thất bại ở bước `video_clock` với `VIDEO_DEVICE_MAPPING_PENDING` (cổng D-07 chưa gỡ);
-  sweep đã `failed` không có đường xếp lại hàng.
+- `submit` with files missing → 409 `UPLOAD_INCOMPLETE`; a hash mismatch → 409 `MANIFEST_MISMATCH`. Re-sending an identical
+  `submit` after the sweep has left `uploading` is idempotent (returns the earlier result).
+- Review checks, in order: `run_id` must be a **`succeeded`** processing run of that sweep (409 `INVALID_REVIEW_RUN`) → a
+  repeat with **the same `client_op_id` and content** returns the earlier result, the same key with different content →
+  409 `IDEMPOTENCY_CONFLICT` → sweep not in `awaiting_review` → 409 `SWEEP_ALREADY_REVIEWED` → `expected_version`
+  mismatch → 409 `VERSION_CONFLICT`.
+- `accept` also requires the sweep's poles to **still** have the commune / `data_source` they had at processing time (409
+  `SURVEY_SCOPE_CHANGED`).
+- **Only `accepted` publishes** results to `pole_current_status` (section 9) and creates `lamp_out` / `lamp_dim` faults
+  (under the de-duplication rule in section 1). `returned` only records the decision; surveying again is a new sweep.
+- ⚠️ A `data_source = field` sweep currently fails at the `video_clock` stage with `VIDEO_DEVICE_MAPPING_PENDING` (the
+  D-07 gate is still in place); a `failed` sweep has no path back into the queue.
 
 ---
 
-## 4. Báo cáo của công dân — `citizen_report.status`
+## 4. Citizen report — `citizen_report.status`
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : Công dân gửi form QR (POST /public/reports)
+    [*] --> pending : Citizen sends the QR form (POST /public/reports)
     note left of pending
-        Lượt gửi thêm cùng cột, cùng đêm
-        được gộp vào báo cáo đang chờ
+        Further sends for the same pole, same night,
+        are merged into the pending report
     end note
-    pending --> accepted : Quản lý accept → tạo sự cố MỚI ở confirmed
-    pending --> merged : Quản lý merge vào một sự cố MỞ của cùng cột
-    pending --> rejected : Quản lý reject (kèm lý do)
+    pending --> accepted : Manager accept → creates a NEW fault at confirmed
+    pending --> merged : Manager merges into an OPEN fault on the same pole
+    pending --> rejected : Manager reject (with a reason)
     accepted --> [*]
     merged --> [*]
     rejected --> [*]
 ```
 
-- Báo cáo của dân **không bao giờ** tự thành sự cố — luôn qua Quản lý (D-R1).
-- Mỗi quyết định gửi kèm `submission_count` đã đọc; có lượt gửi mới chen vào → 409 `CITIZEN_REPORT_CHANGED`. Quyết định
-  **một lần**: lần hai → 409 `CITIZEN_REPORT_ALREADY_DECIDED`.
-- `accept` chỉ tạo `lamp_out` / `lamp_dim` khi báo cáo có lượt gửi đúng loại đó (409 `CITIZEN_REPORT_NOT_ACCEPTABLE`) và
-  cột **chưa** có sự cố mở cùng loại (409 `OPEN_FAULT_EXISTS` — khi đó dùng `merge`).
-- `merge` chỉ vào sự cố mở (`detected | confirmed | in_progress`) **trên chính cột đó**, ngược lại 409 `FAULT_NOT_MERGEABLE`.
+- A citizen report **never** becomes a fault by itself — it always goes through a Manager (D-R1).
+- Each decision carries the `submission_count` that was read; a new send in between → 409 `CITIZEN_REPORT_CHANGED`.
+  Decided **once**: a second decision → 409 `CITIZEN_REPORT_ALREADY_DECIDED`.
+- `accept` creates `lamp_out` / `lamp_dim` only when the report has a send of that type (409
+  `CITIZEN_REPORT_NOT_ACCEPTABLE`) and the pole has **no** open fault of that type (409 `OPEN_FAULT_EXISTS` — use `merge`
+  instead).
+- `merge` only into an open fault (`detected | confirmed | in_progress`) **on that same pole**, otherwise 409
+  `FAULT_NOT_MERGEABLE`.
 
 ---
 
-## 5. Mã QR trên cột
+## 5. QR code on a pole
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> active : Quản lý cấp mã (POST /qr-codes)
-    active --> revoked : Quản lý thu hồi
-    active --> revoked : Quản lý cấp mã mới cho cùng cột (mã cũ tự thu hồi)
+    [*] --> active : Manager issues a code (POST /qr-codes)
+    active --> revoked : Manager revokes
+    active --> revoked : Manager issues a new code for the same pole (the old one is revoked)
     revoked --> [*]
 ```
 
-- Mỗi cột tối đa **một** mã `active` (`ux_qr_code_pole_id_active`). Thu hồi lần hai → 409 `QR_CODE_ALREADY_REVOKED`.
-- Mã `revoked` không gửi báo cáo được nữa. Lượt gửi và lượt thu hồi cùng khoá hàng `pole`; lượt gửi kiểm lại mã **dưới
-  khoá**, nên mã đã bị thu hồi lúc đó thì lượt gửi bị từ chối.
+- At most **one** `active` code per pole (`ux_qr_code_pole_id_active`). Revoking twice → 409 `QR_CODE_ALREADY_REVOKED`.
+- A `revoked` code can no longer send reports. A send and a revoke take the same `pole` row lock; the send re-checks the
+  code **under that lock**, so a code revoked by then refuses the send.
 
 ---
 
-## 6. Lệnh điều khiển đèn ON / OFF / AUTO — `lighting_command.status`
+## 6. ON / OFF / AUTO lighting command — `lighting_command.status`
 
-Chỉ thiết bị **testbed** (`supports_remote_control = true`), chỉ Quản lý bấm (D-R7). Một lần bấm sinh một lệnh cho mỗi
-rơ-le đã nối của thiết bị đã cấp bí mật; không có rơ-le nào điều khiển được → 409 `NO_CONTROLLABLE_RELAY`.
+**Testbed** devices only (`supports_remote_control = true`), Manager only (D-R7). One press creates one command per wired
+relay of a device that has been issued a secret; no controllable relay → 409 `NO_CONTROLLABLE_RELAY`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : Quản lý POST /lighting/commands
-    pending --> delivered : Thiết bị lấy lệnh (HTTP poll)<br/>hoặc báo đã nhận / ACK qua MQTT
-    delivered --> applied : Thiết bị ACK applied
-    delivered --> failed : Thiết bị ACK failed
-    pending --> superseded : Lệnh mới cho cùng rơ-le / nối lại hoặc tháo rơ-le / tắt remote control
-    delivered --> superseded : (cùng lý do)
-    pending --> expired : Quá expires_at
-    delivered --> expired : Quá expires_at
+    [*] --> pending : Manager POST /lighting/commands
+    pending --> delivered : Device fetches the command (HTTP poll)<br/>or sends a receipt / ACK over MQTT
+    delivered --> applied : Device ACK applied
+    delivered --> failed : Device ACK failed
+    pending --> superseded : Newer command for the same relay / relay rewired or unwired / remote control turned off
+    delivered --> superseded : (same reasons)
+    pending --> expired : Past expires_at
+    delivered --> expired : Past expires_at
     applied --> [*]
     failed --> [*]
     superseded --> [*]
     expired --> [*]
 ```
 
-- Qua **HTTP**, ACK trên lệnh còn `pending` → 409 `COMMAND_NOT_DELIVERED` (phải lấy lệnh trước). Qua **MQTT**, ACK hợp
-  lệ trên lệnh `pending` tự chuyển sang `delivered` rồi áp kết quả.
-- ACK phải đúng `seq` của lệnh; `applied` phải báo đúng chế độ đã yêu cầu, `failed` phải có `error` — sai là 400. ACK cuối
-  gửi lại y hệt → 200; cùng lệnh khác nội dung → 409.
-- ACK trên lệnh đã `expired` / `superseded` → 409 `COMMAND_CLOSED`, nhưng báo cáo **vẫn được lưu** vào lịch sử: thiết bị
-  nói thật về rơ-le của nó. Chế độ rơ-le đổi theo luật ở mục 12.
-- `expired` được ghi khi có lượt ghi chạm thiết bị; lúc đọc, lệnh mở đã quá hạn **hiển thị** là `expired` ngay.
+- Over **HTTP**, an ACK on a command still `pending` → 409 `COMMAND_NOT_DELIVERED` (fetch the command first). Over
+  **MQTT**, a valid ACK on a `pending` command moves it to `delivered` first, then applies the result.
+- An ACK must carry the command's `seq`; `applied` must report the requested mode, `failed` must carry an `error` —
+  otherwise 400. Repeating the final ACK unchanged → 200; the same command with different content → 409.
+- An ACK on an `expired` / `superseded` command → 409 `COMMAND_CLOSED`, but the report is **still stored** in the history:
+  the device is telling the truth about its relay. The relay mode changes under the rule in section 12.
+- `expired` is written when a write touches the device; on read, an open command past its deadline **shows** as `expired`
+  at once.
 
 ---
 
-## 7. Thiết bị IoT — `node_status`
+## 7. IoT device — `node_status`
 
-Không lưu trong DB: tính từ `last_report_at` và `Iot:OfflineAfter` (mặc định 1 giờ) mỗi lần đọc.
+Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter` (default 1 hour) on every read.
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    [*] --> never_reported : Đăng ký thiết bị
-    never_reported --> online : Báo cáo lần đầu
-    online --> offline : Im lặng > OfflineAfter
-    offline --> online : Báo cáo lại
+    [*] --> never_reported : Device registered
+    never_reported --> online : First report
+    online --> offline : Silent > OfflineAfter
+    offline --> online : Reports again
 ```
 
-- Đúng bằng ngưỡng vẫn là `online`.
-- Job `node_offline` (BE-26) sinh **một** sự cố `node_offline` (`detected`, `source_channel = iot`) cho mỗi lần thiết bị
-  vượt ngưỡng. Thiết bị online lại **không** tự đóng sự cố — Quản lý xử lý như mọi sự cố khác.
+- Exactly at the threshold is still `online`.
+- The `node_offline` job (BE-26) creates **one** `node_offline` fault (`detected`, `source_channel = iot`) each time a
+  device crosses the threshold. Coming back online **does not** close the fault — the Manager handles it like any other.
 
 ---
 
-## 8. Tài khoản người dùng
+## 8. User account
 
-Không có cột trạng thái: suy từ `is_locked` và `password_set_at` lúc đọc (`UserAdminService`, trường `status` của `/admin/users`).
+No status column: derived from `is_locked` and `password_set_at` on read (`UserAdminService`, the `status` field of
+`/admin/users`).
 
 ```mermaid
 stateDiagram-v2
-    [*] --> invited : Quản trị tạo tài khoản → email mời
-    invited --> invited : Gửi lại lời mời
-    invited --> active : Người dùng đặt mật khẩu qua link
-    invited --> locked : Quản trị khoá
-    active --> locked : Quản trị khoá
-    locked --> active : Mở khoá (đã có mật khẩu)
-    locked --> invited : Mở khoá (chưa đặt mật khẩu)
+    [*] --> invited : System Admin creates the account → invitation email
+    invited --> invited : Resend the invitation
+    invited --> active : User sets a password through the link
+    invited --> locked : System Admin locks
+    active --> locked : System Admin locks
+    locked --> active : Unlock (password already set)
+    locked --> invited : Unlock (no password yet)
 ```
 
-- Không tự đăng ký (D-R11). Không khoá được chính mình; không khoá / hạ vai trò **Quản trị cuối cùng** đang hoạt động.
-- Đặt mật khẩu cần link **chưa dùng, chưa hết hạn** (mời 72 giờ, đặt lại 1 giờ); sai → **400 `INVALID_ACCOUNT_TOKEN`**.
-  Tài khoản đang khoá vẫn dùng được link còn hạn nhưng **vẫn `locked`**; mở khoá sau đó thì thành `active`.
-- Khoá tài khoản thu hồi mọi refresh token (mục 13); access token đã cấp vẫn dùng được tới khi hết hạn (tối đa 60 phút).
-- Tài khoản `active` không nhận lời mời nữa (409 `ACCOUNT_ALREADY_ACTIVE`) — dùng "quên mật khẩu".
-- Đăng nhập tài khoản `invited` trả `401 INVALID_CREDENTIALS`, y như sai mật khẩu.
-- Không ghi `audit_event` (tài khoản không thuộc xã nào, D-12): mỗi thay đổi là một dòng structured log nêu Quản trị đã làm.
+- No self-registration (D-R11). An admin cannot lock themselves, nor lock / demote the **last** active System Admin.
+- Setting a password needs a link that is **unused and unexpired** (invitation 72 hours, reset 1 hour); otherwise **400
+  `INVALID_ACCOUNT_TOKEN`**. A locked account can still use a valid link but **stays `locked`**; unlocking it afterwards
+  makes it `active`.
+- Locking revokes every refresh token (section 13); access tokens already issued keep working until they expire (at most
+  60 minutes).
+- An `active` account no longer gets invitations (409 `ACCOUNT_ALREADY_ACTIVE`) — use "forgot password".
+- Signing in to an `invited` account returns `401 INVALID_CREDENTIALS`, exactly like a wrong password.
+- No `audit_event` (an account belongs to no commune, D-12): every change is a structured log line naming the admin.
 
 ---
 
-## 9. Tình trạng đèn tại cột — `fixture_status`
+## 9. Lamp condition at a pole — `fixture_status`
 
-Thuộc **vị trí cột**, không thuộc bóng (BE-09). Đổi theo **hai** đường, cả hai đều phải qua Quản lý và cùng ghi qua
-`PoleStatusPublication`: một sweep được **accept** (mọi chuyển dưới đây), hoặc Quản lý **xác nhận một ảnh cột** (mục 10,
-chỉ các chuyển ghi "ảnh"). Lần công bố chỉ áp khi quan sát của nó **mới hơn** quan sát hiện tại của cột.
+Belongs to the **pole's position**, not to the lamp (BE-09). It changes along **two** paths, both through a Manager and both
+writing through `PoleStatusPublication`: a sweep is **accepted** (every transition below), or a Manager **confirms a pole
+photo** (section 10, only the transitions marked "photo"). A publication applies only when its observation is **newer**
+than the pole's current one.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> unknown : Cột mới — chưa có quan sát nào được công bố
-    unknown --> normal : sweep accepted<br/>ảnh "on" confirm
+    [*] --> unknown : New pole — no observation published yet
+    unknown --> normal : sweep accepted<br/>"on" photo confirmed
     unknown --> dim : sweep accepted
-    unknown --> out : sweep accepted<br/>ảnh "off" confirm
+    unknown --> out : sweep accepted<br/>"off" photo confirmed
     normal --> dim : sweep accepted
     dim --> normal : sweep accepted
-    normal --> out : sweep accepted<br/>ảnh "off" confirm
-    out --> normal : sweep accepted<br/>ảnh "on" confirm
-    dim --> out : sweep accepted<br/>ảnh "off" confirm
+    normal --> out : sweep accepted<br/>"off" photo confirmed
+    out --> normal : sweep accepted<br/>"on" photo confirmed
+    dim --> out : sweep accepted<br/>"off" photo confirmed
     out --> dim : sweep accepted
-    normal --> unknown : sweep accepted — thiếu / xung đột bằng chứng
-    dim --> unknown : sweep accepted — thiếu / xung đột bằng chứng
-    out --> unknown : sweep accepted — thiếu / xung đột bằng chứng
+    normal --> unknown : sweep accepted — missing / conflicting evidence
+    dim --> unknown : sweep accepted — missing / conflicting evidence
+    out --> unknown : sweep accepted — missing / conflicting evidence
 ```
 
-Sơ đồ lược các **vòng tại chỗ**: một công bố mới có thể giữ nguyên phân loại ở cả bốn trạng thái (ví dụ ảnh "off" trên cột
-đang `out`) — mốc quan sát vẫn dời lên.
+The diagram leaves out **self-loops**: a new publication can keep the classification in any of the four states (for
+example an "off" photo on a pole already `out`) — the observation clock still moves forward.
 
-**Phân loại một quan sát** — một lượt xe đi qua cột (`FrameClassification`), theo thứ tự:
+**Classifying one observation** — one pass of the vehicle by the pole (`FrameClassification`), in this order:
 
-| Điều kiện | Kết quả |
+| Condition | Result |
 |---|---|
-| Có khoảng hở video (`video_gap`), không gán được bằng chứng CV cho cột (`no_detection`, `frame_poor`, `on_off_conflict`, …), hoặc sweep không đi qua cột (`not_observed`) | `unknown` |
-| CV thấy đèn **tắt** | `out` |
-| CV thấy đèn **sáng**, thiếu baseline / đỉnh lux / số đo lux tin được | `normal` (không đánh giá độ sáng) |
-| CV thấy đèn **sáng**, đỉnh lux ÷ baseline của chính cột **< `dim_threshold_ratio`** (mặc định 0.80) | `dim` |
-| CV thấy đèn **sáng**, tỉ lệ ≥ ngưỡng | `normal` |
+| A video gap (`video_gap`), no CV evidence associated with the pole (`no_detection`, `frame_poor`, `on_off_conflict`, …), or the sweep did not pass the pole (`not_observed`) | `unknown` |
+| CV sees the lamp **off** | `out` |
+| CV sees the lamp **on**, missing baseline / peak lux / trustworthy lux readings | `normal` (brightness not evaluated) |
+| CV sees the lamp **on**, peak lux ÷ the pole's own baseline **< `dim_threshold_ratio`** (default 0.80) | `dim` |
+| CV sees the lamp **on**, ratio ≥ threshold | `normal` |
 
-Khi duyệt sweep, mỗi cột được công bố theo **quan sát tốt nhất** của nó (ưu tiên quan sát không `unknown`, rồi độ tin cậy CV
-cao hơn — không bao giờ xếp theo độ sáng). Riêng khi các lượt đi qua cho ON và OFF trái nhau, cột được công bố `unknown`
+At sweep review each pole is published from its **best observation** (non-`unknown` first, then higher CV confidence —
+never ranked by brightness). When passes disagree between ON and OFF, the pole is published as `unknown`
 (`on_off_conflict`) — `SurveyPublicationRules.Choose`.
 
-- **Ảnh chỉ biết ON / OFF, không đo được độ sáng**, nên: "off" → `out`; "on" → `normal` **chỉ** khi cột đang `out`
-  hoặc `unknown`; cột đang `normal` / `dim` thì **giữ nguyên** trạng thái và độ tin cậy (ảnh "on" không bác bỏ được
-  `dim`), chỉ dời mốc quan sát lên. Ảnh không bao giờ sinh `dim` hay `unknown`.
-- Ảnh chụp **không mới hơn** quan sát hiện tại (`captured_at` ≤ `last_evaluated_at ?? last_seen_at`) vẫn xác nhận
-  được nhưng **không** đổi gì (`status_reason = not_newer`). Chỉ khi ảnh **được áp**, `last_sweep_id` của cột mới thành
-  `null` — ảnh không phải một sweep.
-- `unknown` **không phải lỗi**: sweep gần nhất không có bằng chứng đủ tin cho cột đó. Không bao giờ gộp vào `out` (BE-28).
-- ⚠️ Kênh đo `dim` (BH1750 trên xe, Phiếu v1.4) còn chờ chốt D-R20…D-R23 — sơ đồ trạng thái không đổi, chỉ đổi cách quyết
-  định giữa `normal` và `dim`.
+- **A photo only knows ON / OFF and cannot measure brightness**, so: "off" → `out`; "on" → `normal` **only** when the pole
+  is `out` or `unknown`; a pole that is `normal` / `dim` **keeps** its status and confidence (an "on" photo cannot rebut
+  `dim`), and only its observation clock moves forward. A photo never produces `dim` or `unknown`.
+- A photo **not newer** than the current observation (`captured_at` ≤ `last_evaluated_at ?? last_seen_at`) can still be
+  confirmed but changes **nothing** (`status_reason = not_newer`). Only when a photo is **applied** does the pole's
+  `last_sweep_id` become `null` — a photo is not a sweep.
+- `unknown` **is not an error**: the latest sweep had no trustworthy evidence for that pole. It is never merged into `out`
+  (BE-28).
+- ⚠️ The `dim` measurement channel (BH1750 on the vehicle, Registration v1.4) awaits D-R20…D-R23 — the state machine stays
+  the same; only how `normal` and `dim` are told apart changes.
 
 ---
 
-## 10. Ảnh cột trong phiếu — AI ON / OFF, Quản lý xác nhận
+## 10. Pole photo in a work order — AI ON / OFF, Manager confirmation
 
-Kỹ sư **được giao** chụp một cột thuộc phiếu đang `in_progress` (cả ba loại phiếu; cột phải thuộc tập WO-12). Không có cột
-trạng thái riêng: suy từ `cv_state` (kết quả AI, ghi một lần lúc nhận ảnh) và `decision` (quyết định của Quản lý).
-"Chờ duyệt" là **`decision = null`** trên dây, không phải một giá trị trạng thái.
+The **assigned** engineer photographs a pole of a work order that is `in_progress` (any of the three kinds; the pole must be
+in the WO-12 set). There is no status column: the state is derived from `cv_state` (the AI result, written once when the
+photo arrives) and `decision` (the Manager's decision). "Awaiting review" is **`decision = null`** on the wire, not a status
+value.
 
 ```mermaid
 stateDiagram-v2
-    state "chờ duyệt (decision = null)" as pending
-    state "confirm — đã xác nhận" as confirm
-    state "reject — đã bác" as reject
-    [*] --> pending : Kỹ sư POST /work-orders/{id}/pole-photos<br/>AI gán cv_state on / off / inconclusive<br/>(model lỗi → cv_state null, ai_status = unavailable)
-    pending --> confirm : Quản lý confirm — chỉ khi cv_state on / off
-    pending --> reject : Quản lý reject (mọi cv_state)
+    state "awaiting review (decision = null)" as pending
+    state "confirm — confirmed" as confirm
+    state "reject — rejected" as reject
+    [*] --> pending : Engineer POST /work-orders/{id}/pole-photos<br/>AI sets cv_state on / off / inconclusive<br/>(model failure → cv_state null, ai_status = unavailable)
+    pending --> confirm : Manager confirm — only when cv_state is on / off
+    pending --> reject : Manager reject (any cv_state)
     confirm --> [*]
     reject --> [*]
 
     note right of confirm
         status_reason:
-        applied — quan sát được ghi (phân loại có thể giữ nguyên)
-        classification_preserved — "on" trên cột normal / dim
-        not_newer — ảnh cũ hơn quan sát hiện tại, không đổi gì
-        "off" được áp → sự cố lamp_out confirmed (nếu chưa có)
+        applied — observation written (classification may stay the same)
+        classification_preserved — "on" on a normal / dim pole
+        not_newer — photo older than the current observation, nothing changes
+        "off" applied → lamp_out fault confirmed (if none open)
     end note
 ```
 
-- Gửi lại cùng `client_op_id` + cùng nội dung → 200, trả **đúng** ảnh và kết quả AI cũ (không chạy model lại);
-  cùng khoá khác nội dung (ảnh, cột, giờ chụp, toạ độ) → 409 `IDEMPOTENCY_CONFLICT`.
-- Quyết định **một lần**: lần hai → 409 `POLE_PHOTO_ALREADY_DECIDED`. Xác nhận ảnh `inconclusive` hoặc chưa có kết quả
-  AI → 409 `POLE_PHOTO_INCONCLUSIVE` (bác thì được). Cột đổi xã / `data_source` sau khi nhận ảnh → xác nhận 409
-  `POLE_PHOTO_TARGET_CHANGED`, bác vẫn được.
-- Phiếu không còn `in_progress` thì **không nhận ảnh mới**, nhưng Quản lý vẫn quyết định được ảnh đã nhận.
-- Ảnh này **không** thay ảnh `after` của phiếu sửa chữa, không ghi `luminance_history` / baseline.
-- Audit lúc nhận ảnh: `submitted`, thêm `analyzed` (actor `cv`) **chỉ khi** AI trả kết quả. Lúc quyết định: `confirmed` /
-  `rejected`; thêm `applied` khi trạng thái cột được ghi, `created` (sự cố) khi sinh `lamp_out`.
+- Re-sending the same `client_op_id` + the same content → 200, returning **the same** photo and AI result (the model is
+  not run again); the same key with different content (photo, pole, capture time, coordinates) → 409
+  `IDEMPOTENCY_CONFLICT`.
+- Decided **once**: a second decision → 409 `POLE_PHOTO_ALREADY_DECIDED`. Confirming an `inconclusive` photo or one with
+  no AI result → 409 `POLE_PHOTO_INCONCLUSIVE` (rejecting is allowed). The pole's commune / `data_source` changed after the
+  photo arrived → confirming is 409 `POLE_PHOTO_TARGET_CHANGED`, rejecting still works.
+- Once the work order is no longer `in_progress` it **takes no new photos**, but the Manager can still decide photos
+  already received.
+- This photo **does not** replace a repair order's `after` evidence, and writes no `luminance_history` / baseline.
+- Audit when a photo arrives: `submitted`, plus `analyzed` (actor `cv`) **only when** the AI returned a result. On decision:
+  `confirmed` / `rejected`; plus `applied` when the pole status is written, and `created` (fault) when a `lamp_out` is
+  created.
 
 ---
 
-## 11. Bóng đèn — lắp / gỡ
+## 11. Lamp — fitted / removed
 
-Bóng (`fixture`) là thiết bị gắn trên cột; **tình trạng sáng không nằm ở đây** mà ở cột (mục 9). Vòng đời của bóng chỉ là
-lắp rồi gỡ, suy từ `removed_date`.
+A lamp (`fixture`) is the device mounted on a pole; **its lit condition is not stored here** but on the pole (section 9).
+A lamp's lifecycle is only fitted, then removed, derived from `removed_date`.
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    state "đang dùng (removed_date = null)" as active
-    state "đã gỡ" as removed
-    [*] --> active : Quản lý ghi bóng mới (POST /assets/fixtures hoặc import)
-    [*] --> removed : Ghi bóng cũ kèm removed_date (nhập lịch sử)
-    active --> removed : Quản lý ngừng dùng (PUT /assets/fixtures/{id}/removal)
+    state "in service (removed_date = null)" as active
+    state "removed" as removed
+    [*] --> active : Manager records a new lamp (POST /assets/fixtures or import)
+    [*] --> removed : Old lamp recorded with removed_date (history import)
+    active --> removed : Manager retires it (PUT /assets/fixtures/{id}/removal)
     removed --> [*]
 ```
 
-- Mỗi cột tối đa **một** bóng đang dùng (`ux_fixture_pole_id_active`); ghi bóng **đang dùng** vào cột đã có bóng → 409
-  `POLE_HAS_ACTIVE_FIXTURE`. Bóng ghi kèm `removed_date` là lịch sử, đứng cạnh bóng đang dùng được. Thay bóng = ngừng dùng
-  bóng cũ rồi ghi bóng mới.
-- `removed_date` ≥ `install_date` (CHECK `ck_fixture_removed_after_install`); gỡ lần hai → **400 `VALIDATION_FAILED`** —
-  `removed_date` là lịch sử thiết bị, không ghi đè.
-- Bóng **không** có DELETE và không có PUT thay thế; import bóng chỉ chèn, không cập nhật.
-- Không ghi `audit_event`: gỡ bóng chỉ đổi `removed_date` và đóng dấu `updated_by` / `updated_at`.
+- At most **one** lamp in service per pole (`ux_fixture_pole_id_active`); recording a lamp **in service** on a pole that
+  already has one → 409 `POLE_HAS_ACTIVE_FIXTURE`. A lamp recorded with `removed_date` is history and can sit beside the
+  one in service. Replacing a lamp = retire the old one, then record the new one.
+- `removed_date` ≥ `install_date` (CHECK `ck_fixture_removed_after_install`); retiring twice → **400 `VALIDATION_FAILED`**
+  — `removed_date` is equipment history and is not overwritten.
+- A lamp has **no** DELETE and no replacing PUT; lamp import only inserts, never updates.
+- No `audit_event`: retiring a lamp only changes `removed_date` and stamps `updated_by` / `updated_at`.
 
 ---
 
-## 12. Chế độ rơ-le — `feeder_control.control_mode`
+## 12. Relay mode — `feeder_control.control_mode`
 
-Chế độ **thiết bị báo** cho từng rơ-le (mạch điện), khác với vòng đời lệnh ở mục 6: lệnh là điều Quản lý yêu cầu, chế độ
-là điều thiết bị nói nó đang chạy.
+The mode **the device reports** for each relay (circuit), separate from the command lifecycle in section 6: a command is
+what the Manager asks for, the mode is what the device says it is running.
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    state "chưa báo (null)" as none
-    state "đã báo: on / off / auto" as reported
-    [*] --> none : Nối rơ-le vào mạch
-    none --> reported : thiết bị báo chế độ (kèm ACK)
-    reported --> reported : báo mới hơn → đổi sang chế độ được báo
-    none --> [*] : tháo rơ-le
-    reported --> [*] : tháo rơ-le
+    state "not reported (null)" as none
+    state "reported: on / off / auto" as reported
+    [*] --> none : Relay wired to a circuit
+    none --> reported : device reports a mode (with an ACK)
+    reported --> reported : newer report → switch to the reported mode
+    none --> [*] : relay unwired
+    reported --> [*] : relay unwired
 ```
 
-- Báo cáo chế độ đi kèm ACK của một lệnh. Nó chỉ được ghi khi `seq` của lệnh **lớn hơn** `mode_seq` hiện tại **và** chưa có
-  lệnh nào mới hơn đã giao cho rơ-le đó (D-10) — ACK đến trễ của lệnh cũ không đè được chế độ mới.
-- Tháo rơ-le xoá dòng `feeder_control`; nối lại là dòng mới, bắt đầu từ "chưa báo" (`mode_seq` mất theo). Lịch sử lệnh
-  vẫn còn, nên ACK cũ chỉ bị chặn khi đã có lệnh **mới hơn được giao** cho rơ-le đó; nối lại mà chưa giao lệnh nào thì ACK
-  cũ vẫn ghi được chế độ.
+- A mode report comes with a command's ACK. It is written only when the command's `seq` is **above** the current
+  `mode_seq` **and** no newer command has been delivered to that relay (D-10) — a late ACK of an old command cannot
+  overwrite a newer mode.
+- Unwiring deletes the `feeder_control` row; rewiring is a new row that starts at "not reported" (`mode_seq` goes with
+  it). The command history survives, so an old ACK is blocked only once a **newer command has been delivered** to that
+  relay; rewired with no command delivered yet, an old ACK can still set the mode.
 
 ---
 
-## 13. Phiên đăng nhập — refresh token
+## 13. Sign-in session — refresh token
 
-Mỗi lần đăng nhập mở một **chuỗi** token (`chain_id`); mỗi lần refresh **xoay** sang token mới trong cùng chuỗi. Trạng thái
-suy từ `revoked_at`, `revoked_reason` và hai hạn: hạn trượt của token và hạn tuyệt đối của chuỗi.
+Each sign-in opens a token **chain** (`chain_id`); each refresh **rotates** to a new token in the same chain. The state is
+derived from `revoked_at`, `revoked_reason` and two deadlines: the token's sliding expiry and the chain's absolute expiry.
 
 ```mermaid
 stateDiagram-v2
     direction LR
-    state "còn hiệu lực" as valid
-    state "đã xoay (rotation)" as rotated
-    state "đã thu hồi" as revoked
-    state "hết hạn" as expired
-    [*] --> valid : Đăng nhập (mở chuỗi) / refresh (token kế tiếp)
-    valid --> rotated : POST refresh → cấp token mới cùng chuỗi
-    valid --> revoked : logout / khoá tài khoản / đặt lại mật khẩu<br/>hoặc token cũ của chuỗi bị dùng lại sau ân hạn (reuse_detected)
-    valid --> expired : quá hạn trượt hoặc hạn tuyệt đối của chuỗi
-    rotated --> rotated : bị dùng lại → 401, sau cửa sổ ân hạn thì<br/>thu hồi token còn hiệu lực của chuỗi
+    state "valid" as valid
+    state "rotated" as rotated
+    state "revoked" as revoked
+    state "expired" as expired
+    [*] --> valid : Sign-in (opens a chain) / refresh (next token)
+    valid --> rotated : POST refresh → new token in the same chain
+    valid --> revoked : logout / account locked / password reset<br/>or an older token of the chain reused after the grace window (reuse_detected)
+    valid --> expired : past the sliding expiry or the chain's absolute expiry
+    rotated --> rotated : reused → 401, after the grace window<br/>the chain's valid token is revoked
     rotated --> [*]
     revoked --> [*]
     expired --> [*]
 ```
 
-- `revoked_reason`: `rotation`, `logout`, `reuse_detected`, `account_locked`, `password_reset`. Token đã thu hồi hay hết
-  hạn dùng lại → 401, **không** cấp gì.
-- Token đã xoay bị dùng lại luôn nhận 401. Trong cửa sổ ân hạn (mặc định 30 giây, `ReuseGraceSeconds`) chỉ dừng ở đó:
-  request thua trong một cặp refresh đồng thời không bị coi là đánh cắp. Sau cửa sổ đó, server coi là token bị lộ và thu
-  hồi token còn hiệu lực của chuỗi — cả hai bên phải đăng nhập lại. Dùng lại token đã `logout` không bao giờ kích hoạt việc này.
-- Khoá tài khoản thu hồi mọi refresh token (`account_locked`), nên refresh sau đó nhận **401**. Đăng nhập tài khoản đang
-  khoá: sai mật khẩu → 401 như thường, **đúng** mật khẩu → 403 `ACCOUNT_LOCKED` (kiểm khoá sau mật khẩu để không lộ tài
-  khoản có tồn tại).
-- Không ghi `audit_event`: token không thuộc xã nào; phát hiện dùng lại được ghi log cảnh báo.
+- `revoked_reason`: `rotation`, `logout`, `reuse_detected`, `account_locked`, `password_reset`. A revoked or expired token
+  presented again → 401, **nothing** is issued.
+- A rotated token presented again always gets 401. Inside the grace window (default 30 seconds, `ReuseGraceSeconds`) that
+  is all: the losing request of two concurrent refreshes is not treated as theft. After the window, the server treats the
+  token as leaked and revokes the chain's valid token — both sides must sign in again. Reusing a token that was logged out
+  never triggers this.
+- Locking an account revokes every refresh token (`account_locked`), so a refresh afterwards gets **401**. Signing in to a
+  locked account: a wrong password → 401 as usual, the **right** password → 403 `ACCOUNT_LOCKED` (the lock is checked after
+  the password so the response does not reveal that the account exists).
+- No `audit_event`: a token belongs to no commune; reuse detection is written as a warning log line.
