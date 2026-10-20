@@ -6,6 +6,7 @@ using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace LuxMap.Modules.Identity.Auth;
 
@@ -26,12 +27,14 @@ namespace LuxMap.Modules.Identity.Auth;
 public sealed class AuthController(AuthService authService) : ControllerBase
 {
     [HttpPost("login")]
+    [EnableRateLimiting(LuxMapRateLimits.Login)]
     [ClientSurface(ClientSurface.Mobile)]
     [AllowAnonymous]
     [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<AuthTokenResponse>> LoginAsync(
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)

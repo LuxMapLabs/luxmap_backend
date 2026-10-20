@@ -17,4 +17,10 @@ public static class LuxMapRateLimits
 
     /// <summary>CITIZEN-QR P2b (D-8): the public report form — 10 per hour per client address by default.</summary>
     public const string PublicReport = "public-report";
+
+    /// <summary>
+    /// <c>POST /auth/login</c> and <c>POST /auth/web/login</c>, ONE bucket for both: 10 per 5 minutes per client address by
+    /// default, every attempt counted. Without it, passwords could be guessed from the internet as fast as PBKDF2 answers.
+    /// </summary>
+    public const string Login = "login";
 }

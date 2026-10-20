@@ -1,3 +1,4 @@
+using System.Globalization;
 using LuxMap.Persistence.Jobs;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -18,12 +19,19 @@ namespace LuxMap.Api.Tests;
 /// </remarks>
 public abstract class LuxMapTestHost : WebApplicationFactory<Program>
 {
+    /// <summary>Login attempts per client address per window in this host (production default: 10).</summary>
+    protected virtual int LoginPermitLimit => 1_000_000;
+
     protected override IHost CreateHost(IHostBuilder builder)
     {
         TestDatabase.EnsureReady();
         // BE-26: a background job scans EVERY commune of the shared run database with the real clock — it would write notices for
         // other classes' work orders and break their teardown (Restrict). Forced off here, not only in UseTestCorsOrigin.
         builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection([new("Jobs:Enabled", "false")]));
+        // Every test logs in from the same (absent) client address, so the login limit would refuse most of the run. Set here
+        // because a value set in this hook wins over UseSetting; LoginRateLimitTests lowers it through the property.
+        builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(
+            [new("RateLimits:Login:PermitLimit", LoginPermitLimit.ToString(CultureInfo.InvariantCulture))]));
         var host = base.CreateHost(builder);
         TestDatabase.AssertTargets(host.Services);
         if (host.Services.GetRequiredService<ScheduledJobOptions>().Enabled)

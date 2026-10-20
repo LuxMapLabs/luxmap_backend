@@ -1426,3 +1426,16 @@ trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và h
 **WP6 cần nhận:** form/nhãn ON ≠ đủ sáng, UUID + file giữ nguyên qua retry, hàng chờ trước complete, ảnh after vẫn đi evidence.
 **WP5 cần nhận:** danh sách/media theo phiếu, thao tác duyệt, thông điệp ảnh cũ/inconclusive/unavailable, `last_sweep_id` có thể null khi cột đã được xác nhận bằng ảnh.
 FW cần xác nhận nền tạm; chưa có tuyên bố độ chính xác CV từ ảnh tổng hợp trong test.
+
+### LOGIN-RATE — giới hạn tần suất đăng nhập (19/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan) giao 19/10/2026 sau review sẵn sàng deploy v1; con số 10 / 5 phút do Claude đề xuất. **SELF-SIGNED**, chạm bề mặt API (mã trả về mới) ⇒ chờ FW kế tiếp xác nhận |
+| **Consumer** | WP5 (form đăng nhập web), WP6 (màn đăng nhập mobile). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| LG-1 | `POST /auth/login` và `POST /auth/web/login` trả **`429 RATE_LIMITED`** kèm header `Retry-After` (giây) khi một địa chỉ client vượt **10 lần / 5 phút** (cửa sổ cố định; cấu hình `RateLimits:Login`). Hình dạng lỗi như `POST /auth/password/forgot` (Contract v1.8 mục 0, bảng mã lỗi) |
+| LG-2 | **Hai endpoint chung MỘT xô** theo địa chỉ, và **mọi** lần thử đều đếm — đúng hay sai mật khẩu. Qua giới hạn thì mật khẩu **không được kiểm** (kể cả đúng) cho tới khi cửa sổ mở lại. Client nên hiện thông báo kèm thời gian chờ từ `Retry-After`, không tự thử lại |
+| LG-3 | `refresh`, `logout`, `me` **không** bị giới hạn. Địa chỉ là địa chỉ sau reverse proxy tin cậy (`ForwardedHeaders:KnownProxies`); nhiều máy chung một IP công khai (CGNAT nhà mạng, NAT văn phòng xã) dùng chung xô |
