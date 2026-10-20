@@ -285,25 +285,27 @@ stateDiagram-v2
 
 ---
 
+
 ## 7. IoT device — `node_status`
 
 Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter` (default 1 minute) on every read.
 
-```flowchart TD
+```mermaid
+flowchart TD
     A["Scheduled job: node_offline (BE-26)"] --> B["Find IoT devices"]
     B --> C{"Has reported before?"}
 
-    C -- No --> D["Keep never_reported"]
-    C -- Yes --> E{"Silence duration > OfflineAfter?"}
+    C -- "No" --> D["Keep never_reported"]
+    C -- "Yes" --> E{"Silence duration > OfflineAfter?"}
 
-    E -- No --> F["No offline fault created"]
-    E -- Yes --> G{"Already processed this offline transition?"}
+    E -- "No" --> F["No offline fault created"]
+    E -- "Yes" --> G{"Already processed this offline transition?"}
 
-    G -- No --> H["Create one node_offline fault"]
+    G -- "No" --> H["Create one node_offline fault"]
     H --> I["status = detected"]
     I --> J["source_channel = iot"]
 
-    G -- Yes --> K["Do not create duplicate fault"]
+    G -- "Yes" --> K["Do not create duplicate fault"]
 
     J --> L["Device reports again"]
     L --> M["node_status = online"]
@@ -317,8 +319,8 @@ Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter
 ```
 
 - Exactly at the threshold is still `online`.
-- The `node_offline` job (BE-26) creates **one** `node_offline` fault (`detected`, `source_channel = iot`) each time a
-  device crosses the threshold. Coming back online **does not** close the fault — the Manager handles it like any other.
+- The `node_offline` job (BE-26) creates **one** `node_offline` fault (`detected`, `source_channel = iot`) each time a device crosses the threshold. Coming back online **does not** close the fault — the Manager handles it like any other.
+
 
 ---
 
