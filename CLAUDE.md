@@ -109,7 +109,7 @@ Controlled Reference Capture Set **rời deliverable** ở v1.4; giá trị `cal
   `DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`; bảng prefix ở `PrefixedId.cs`. Không dùng `LPAD(…, 4, '0')`: nó **cắt**
   giá trị dài hơn độ rộng (12345 → `1234`), sinh ID sai / trùng.
 - **ID là TỐI THIỂU N chữ số:** cột thứ 10000 là `POLE-10000`. Vì vậy **không bao giờ `ORDER BY` ID trần** (`POLE-10000 < POLE-9999`),
-  kể cả làm tiebreaker; khuôn đúng **`ORDER BY created_at, length(id), id`** (`now()` là đầu transaction nên cả mẻ chung `created_at`).
+  kể cả làm tiebreaker, và không lọc khoảng trên ID chuỗi; khuôn đúng **`ORDER BY created_at, length(id), id`** (`now()` là đầu transaction nên cả mẻ chung `created_at`).
   Test thứ tự phải assert **có thứ tự**, trên ID hai bên ngưỡng độ rộng, ghi trong cùng transaction (`PrefixedIdOrderingTests`).
   Validator phía client: `^POLE-[0-9]{4,}$` (`[0-9]`, không `\d`).
 - **Client không sinh ID hiển thị.** Thao tác offline mang `client_op_id` (UUID); server gán ID thật và trả lại.
@@ -299,7 +299,7 @@ Vi phạm thì hệ thống vẫn chạy, số liệu vẫn ra, nhưng kết qu�
 - **`dim` là tỉ lệ so với baseline của chính cột đó**, không bao giờ là lux tuyệt đối; `out` do CV OFF. Lux thủ công (`LuxReading`) chỉ dùng
   so **tương đối** giữa cột / đêm theo quy trình đo cố định — không phải lux tuyệt đối, không dùng chấm đạt / không đạt chuẩn chiếu sáng.
 - **`unknown` đếm riêng, không gộp vào `out`.**
-- **Mọi phát hiện tự động ghi kèm phiên bản model / artifact** (BE-34). Không tái lập được thì không phải kết quả.
+- **Mọi phát hiện tự động ghi kèm phiên bản model / artifact / firmware** (BE-34). Không tái lập được thì không phải kết quả.
 - **Mọi phát hiện tự động và mọi quyết định của người vào audit trail** (D-R13). Cột `confirmed_by` / `resolved_by` trên `fault` chỉ là
   quyết định mới nhất.
 - **Precision / recall báo RIÊNG từng lớp** (ON/OFF của CV; Normal / Dim / Out so với field verification). Con số gộp giấu lớp khó.

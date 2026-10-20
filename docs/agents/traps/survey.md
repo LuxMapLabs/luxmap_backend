@@ -4,33 +4,27 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi pipeline kh�
 
 ## Bốn quy tắc chốt ở BE-42 — số đo lux
 
-> 🔴 **Nền đã đổi ở Phiếu v1.4 (27/09/2026) — bốn quy tắc dưới đây mô tả code HIỆN CÓ, chưa phải hướng
-> đi.** Quy tắc 1 dựa trên tiền đề *lux là ground truth chấm CV*; ở v1.4 đỉnh lux theo cột **chính là**
-> tín hiệu `dim`, nên chuỗi luminance sẽ lấy từ lux (D-R22, D-R23). `lux_value` "cảm biến điện thoại"
-> (D-R15) thành module BH1750 trên xe, lấy mẫu theo sweep — D-R21 **chốt hướng (B)** (SELF-SIGNED): chuỗi mẫu thô theo sweep + đỉnh theo cột vào chuỗi luminance; `LuxReading` giữ cho đo **thủ công**. Đặc tả BE-15 chưa viết; upload video (D-R28) còn chặn.
-> Quy tắc 2 (`commune_id` server tra) và 4 (`Restrict`) **giữ nguyên** dù chọn hướng nào. XML doc của
-> `LuxReading.cs` còn ghi *"ABSOLUTE `lux_value`"* — lệch cả D-R15, sửa ở Phase 2.
+**BH1750FVI gắn ở đầu xe máy khảo sát**; vị trí/cách gắn theo `docs/field/BE-15-pilot-drive.md`, không tự đổi bố trí giữa các lượt.
 
-**1. `LuxReading` KHÔNG phải `luminance_history`. Lẫn hai cái là hỏng nghiên cứu.**
+Nền BH1750/v1.4: xem `CLAUDE.md`, phần mở đầu; D-R22/D-R23 chốt 07/10, D-R21/D-R24 là nền SELF-SIGNED.
 
-| | `LuxReading` (BE-42) | `luminance_history` (BE-15/BE-17 + CV) |
+**1. `LuxReading` thủ công KHÁC lux theo sweep trong `luminance_history`.**
+
+| | `LuxReading` (BE-42) | `luminance_history` (BE-15/BE-17) |
 |---|---|---|
-| Ai sinh | **Người** đo bằng **điện thoại** | **CV** xử lý ảnh sweep |
+| Ai sinh | Người đo thủ công | Server ghép CV ON/OFF + đỉnh lux BH1750 theo cột |
 | Thời gian | `measured_at` | `observed_at` |
-| Giá trị | `lux_value` — **số đọc TƯƠNG ĐỐI** của cảm biến ánh sáng điện thoại | `baseline_ratio` — **tỉ lệ, không đơn vị** |
-| Truy vết | `meter_model` — **model điện thoại** | `sweep_id` |
-| ID hiển thị | `LUX-0001` | **không có** |
+| Giá trị | `lux_value` tương đối | `PeakLux`, `CvState`, `BaselineRatio`, `classified_as` |
+| Truy vết | `meter_model` của dụng cụ | sweep / run / observation / baseline |
+| ID hiển thị | `LUX-0001` | Không có |
 
-⚠️ **`lux_value` là TƯƠNG ĐỐI (D-R15, Contract §5.7).** Đo theo quy trình cố định — cùng máy, cùng app,
-cùng tư thế — nên sai số hệ thống của cảm biến là chung cho mọi lần đo và triệt tiêu khi so tương đối.
-Chỉ dùng để so giữa các cột và giữa các đêm; **không bao giờ** là lux tuyệt đối, **không** dùng để đánh
-giá đạt/không đạt chuẩn chiếu sáng. Ngưỡng cảnh báo 200 là kiểm tra hợp lệ dữ liệu thô, không mang nghĩa
-trắc quang. Tên cột **giữ nguyên**.
-
-Contract §5.7 gọi lux là **một trong các nguồn ground truth cho RQ1**: CV-12 dùng nó để **chấm** phân loại của CV.
-Ghi lux vào chuỗi luminance là để CV tự chấm chính mình, và làm lệch luôn biểu đồ của BE-20.
-Chúng gặp nhau **đúng một chỗ**: trường `nearest_luminance` của `GET /lux-readings`, ghép theo
-**THỜI GIAN** ±48 giờ (không phải không gian).
+Lux thủ công dùng so tương đối giữa cột/đêm theo quy trình cố định, không chấm đạt chuẩn chiếu sáng;
+phân loại `dim` chỉ dùng baseline **của chính cột** (`CLAUDE.md`, mục Quy tắc dễ sai âm thầm).
+Giữ cùng dụng cụ, app và tư thế giữa các lượt đo: sai số hệ thống chung mới cho phép so tương đối có nghĩa.
+Ngưỡng cảnh báo 200 chỉ kiểm hợp lệ dữ liệu thô, không mang nghĩa trắc quang; giữ tên cột.
+Lux BH1750 theo sweep là **đầu vào** phân loại, không dùng chính nó làm ground truth của `dim`.
+D-R23 chọn tấm lọc ND (B) trước, lux kế tay (A) sau (`docs/contract-drift.md`, Quyết định khảo sát 07/10).
+`nearest_luminance` dự kiến ghép theo **thời gian ±48 giờ**, không theo không gian.
 
 **2. `commune_id` do SERVER tra từ `pole_id`, client gửi là 400.**
 
@@ -43,21 +37,18 @@ Lý lẽ denormalize của `Fixture` (*"không bao giờ là resource riêng"*) 
 `LuxReading` có endpoint riêng. Cột vẫn denormalize (bắt buộc, nếu không thì lọt cả query filter lẫn
 guard), nhưng **không emit ra response**.
 
-**3. `nearest_luminance` LUÔN `null` cho tới BE-17 — khác với "không có điểm trong ±48h".**
+**3. `nearest_luminance` hiện luôn `null`, nhưng history đã có.**
 
-Bảng `luminance_history` chưa tồn tại. **Khoá vẫn được emit**, không bị bỏ khỏi JSON, để CV-12 bind
-theo hình dạng cuối ngay bây giờ. **Nợ có chủ: BE-15/BE-17** nối nguồn thật và xoá mục drift số 17.
+Giữ khoá trong JSON; đó là nợ nối nguồn thật thuộc giai đoạn A của D-R23 (`LuxReadingService.SearchAsync`),
+không phải kết luận "không có điểm trong ±48 giờ". Quyết định/nợ: `docs/contract-drift.md`, D-R23.
 
 **4. FK `lux_reading → pole` là `Restrict`, KHÔNG `Cascade`.**
 
 Lux là sự kiện đã xảy ra và là ground truth RQ1 — xoá pole không được âm thầm xoá dữ liệu nghiên cứu.
-Cũng để **không tạo bảng cascade thứ ba**: guard `SaveChanges` không thấy cascade do DB thực hiện
-(xem mục 1c). `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
+Guard không thấy cascade của DB: xem `docs/agents/traps/commune-scope.md`, mục 1c. `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
 
 **Phân quyền (Contract v1.7):** `POST` = `RecordLuxReading` (**chỉ Kỹ sư hiện trường**), `GET` =
-`ReadLuxReadings` (cả bốn vai trò). Tới v1.6 `POST` **không gắn policy nào**, nên mọi vai trò đã đăng nhập
-đều ghi được — kể cả Cấp giám sát chỉ-đọc. Phạm vi địa bàn **vẫn được canh riêng** — qua lượt đọc pole
-và qua guard.
+`ReadLuxReadings` (cả bốn vai trò). Phạm vi xã vẫn canh riêng qua đọc pole và guard; lịch sử D-R5 ở `docs/contract-drift.md`.
 
 ## BE-15 P2a — khoá hàng, upload dài và EF design-time (02/10/2026)
 
@@ -80,7 +71,7 @@ cho bảng của module đó. Sinh migration trong môi trường không có `.e
 ## BE-15 — ffprobe: lấy packet PTS, sắp thứ tự và giữ rotation (17/10/2026)
 
 **Dùng `packet=pts,flags`, loại cờ discard `D` rồi sort tăng dần; không dùng `frame=pts` để probe toàn clip.** `frame=` buộc
-ffprobe giải mã video: HEVC 148 s vượt timeout 60 s dù stdout đã nhỏ. Packet đến theo thứ tự giải mã,
+ffprobe giải mã video, có thể vượt timeout dù stdout nhỏ. Packet đến theo thứ tự giải mã,
 **không phải thứ tự hiển thị khi có B-frame**; phải sort PTS trước khi kiểm clock/chọn frame/seek.
 **MOV/MP4 có edit list có thể giữ packet tham chiếu ngoài đoạn hiển thị**, cả đầu lẫn đuôi clip.
 Packet mang `D` không thành frame: lọc trước khi đọc PTS, kiểm clock và chọn ảnh; chỉ sort là chưa đủ.
@@ -109,10 +100,10 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
 
 ## AI-1 — model YOLO trong backend (08/10/2026)
 
-- **Một model, hai lối vào:** `YoloModel` (singleton, nạp lúc dùng lần đầu) phục vụ cả `YoloOnOffDetector` (pipeline khảo sát,
-  keyed `IOnOffDetector` khoá `"yolo"` — Survey **không** tham chiếu AI) lẫn `POST /ai/detect`. Đừng viết lối decode / tiền xử lý thứ hai.
-- 🔴 **Decode chỉ qua `JpegMagicBytes` + `ThumbnailFactory.JpegOnly`** — tiền đề để tắt advisory ImageSharp. Bản #118 decode bằng
-  cấu hình mặc định và tin `Content-Type`; `JpegOnlyDecodeTests` giờ đỏ nếu ai viết lại như vậy.
+- **Một model, ba caller:** `YoloModel` (singleton, nạp lúc dùng lần đầu) phục vụ `YoloOnOffDetector` (pipeline khảo sát,
+  keyed `IOnOffDetector` khoá `"yolo"` — Survey **không** tham chiếu AI), `POST /ai/detect` và `YoloSingleLampPhotoHinter`
+  (Citizen + ảnh cột). Dùng chung decode / tiền xử lý.
+- Decode JPEG theo `docs/agents/traps/media-storage.md`, mục Hai ràng buộc về ImageSharp (`JpegOnlyDecodeTests`).
 - **Model được KIỂM lúc nạp:** input `[1,3,640,640]`, output `[1,6,N]`, metadata `names` đúng `normal, out` theo thứ tự, SHA-256
   khớp `Ai:ModelSha256`. Đổi model = đổi mã ghim trong cùng PR. Tiền xử lý theo Ultralytics: xoay EXIF, letterbox xám 114,
   resize **bilinear** (`KnownResamplers.Triangle` — mặc định của ImageSharp là bicubic, lệch với `cv2.INTER_LINEAR`).
@@ -143,7 +134,7 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
   bởi `PolePhotoBodyLimit`; Caddy phải giữ cùng guard Content-Length riêng route để tránh 502 từ early 413 (xem PP-8).
 - 🔴 **Body JSON khai bằng `sealed class` + property `init`, KHÔNG positional record có attribute kiểm tra trên tham số.**
   `PolePhotoDecisionRequest` dạng record làm MVC ném `No property found that maps to constructor parameter 'Note'` → **500**, chỉ ở
-  lượt chạy toàn bộ (request đầu tiên đồng thời); chạy riêng test thì xanh 10/10. Khuôn đúng là các request ở `WorkOrderRequests.cs`.
+  request đầu tiên đồng thời; chạy riêng có thể che lỗi. Khuôn đúng là các request ở `WorkOrderRequests.cs`.
 - **DB-only** `ak_pole_photo_target` / `fk_pole_photo_same_commune` không ở EF snapshot: bảo toàn khi sinh migration sau, canh catalog/FK.
   Dọn fault **trước ảnh**, ảnh trước work_order/pole/user, audit trước actor/xã. PLAN copy phải giữ parent/users của ảnh và fault có nguồn ảnh.
   Rollback migration mất metadata/kết quả/quyết định và origin ảnh của fault; object/audit không tự mất. Trên môi trường có dữ liệu ưu tiên

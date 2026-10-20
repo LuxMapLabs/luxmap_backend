@@ -28,8 +28,9 @@ thầm. **Ticket tạo bảng thì thêm bảng vào `PLAN` trong cùng PR**: b�
   `respond @matcher` (đã thử: `/api/v1/internal/*` vẫn tới API).
 - 🔴 **Body khai lớn hơn mức API nhận ra 502, không phải 413**, nếu không có gì chặn trước: API trả 413 ngay từ `Content-Length` rồi đóng kết nối
   trong lúc Caddy còn gửi body (`broken pipe`). Caddy tự trả 413 cho `Content-Length > 314572800` = `SurveyIngestService.ClipLimit`.
-  **Đổi `ClipLimit` (hay thêm endpoint nhận body lớn hơn) thì sửa con số trong `deploy/caddy/Caddyfile` cùng diff.** Endpoint multipart
-  (ảnh 16 MiB) không bị — API đọc rồi trả 400 bình thường (đo 120 MB: 3/3 lần 400).
+  **Đổi `ClipLimit` (hay thêm endpoint nhận body lớn hơn) thì sửa guard trong `deploy/caddy/Caddyfile` cùng diff.** Evidence multipart
+  đọc body rồi mới trả lỗi; không suy rộng sang mọi multipart: pole-photo từ chối trước binding, có guard Content-Length 17 MiB riêng
+  (`PolePhotoBodyLimit`, PP-8). Thiếu guard này vẫn có thể ra 502.
 - **`ForwardedHeaders__KnownProxies__0` = IP cố định của Caddy (`172.30.0.10`)**, đặt trong `compose.yml`. Đổi IP hay subnet của Caddy thì sửa cả
   hai cùng lúc; giá trị rỗng làm API **dừng lúc khởi động** (không phải IP), còn thiếu hẳn thì mọi client chung một xô giới hạn (phá thử đã đo).
 - Cảnh báo DataProtection (`keys … may not be persisted`) lúc khởi động là vô hại: không code nào dùng DataProtection. Nếu sau này dùng

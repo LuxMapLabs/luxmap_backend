@@ -4,11 +4,8 @@ Repo single-context. Cách các skill đọc tài liệu domain ở repo này.
 
 ## Trước khi khảo sát, đọc theo thứ tự ưu tiên
 
-1. `docs/api-contract-v1.1.md` (Contract hợp nhất) — **thắng mọi thứ khác**.
-2. `docs/tasks-backend.csv` — phạm vi và lịch.
-3. `CLAUDE.md` (= `AGENTS.md`) — quy ước kỹ thuật, bẫy đã gặp.
-4. `docs/contract-drift.md` — mọi quyết định đã chốt từ sau Contract (D-item, SELF-SIGNED, drift theo ticket).
-5. `CONTEXT.md` ở gốc repo, nếu có — bảng thuật ngữ.
+Đọc `CLAUDE.md`, mục **Nguồn sự thật**, cho thứ tự hiện hành (kể cả quyết định drift đã chốt);
+quy ước theo vùng ở `docs/agents/traps/*.md`. Thuật ngữ đọc `CONTEXT.md` ở gốc repo nếu có.
 
 `CONTEXT.md` chưa có thì **im lặng bỏ qua**; `/domain-modeling` tạo nó khi một thuật ngữ thật sự được chốt.
 
@@ -19,7 +16,7 @@ Repo này đã có sổ quyết định; một thư mục ADR sẽ là câu tr�
 | Loại | Ghi vào |
 |---|---|
 | Quyết định của nhóm, deviation so với Contract | `docs/contract-drift.md` (luật FW-00 ở đầu file: ai ký, im lặng bao lâu) |
-| Ràng buộc kỹ thuật nội bộ, bẫy | `CLAUDE.md` |
+| Ràng buộc kỹ thuật nội bộ, bẫy | `CLAUDE.md` (luật chung) / `docs/agents/traps/<vùng>.md` (luật vùng) |
 | Luật áp nhiều ticket | Contract, chỉ sau khi duyệt và tăng version |
 
 Khi `/domain-modeling` muốn tạo ADR, ghi thành một mục trong `docs/contract-drift.md` thay vào đó.

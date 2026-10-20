@@ -94,7 +94,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
     {
         await Db(async db =>
         {
-            // Every table here holds a RESTRICT reference to the next one (CLAUDE.md, BE-14 trap 3).
+            // Every table here holds a RESTRICT reference to the next one (docs/agents/traps/spatial-map.md, BE-14 trap 3).
             foreach (var table in new[] { "notification", "work_order_fault", "work_order", "fault", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
@@ -143,7 +143,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
     /// <remarks>
     /// All four rows go in ONE SaveChanges so they share <c>created_at</c> — otherwise the tiebreak
     /// never runs. The two tied IDs sit either side of a width boundary picked above everything the
-    /// live table and sequence hold, so they cannot collide (CLAUDE.md, no literal IDs).
+    /// live table and sequence hold, so they cannot collide (docs/agents/traps/testing.md, no literal IDs).
     /// </remarks>
     /// <summary>
     /// Drift N-6: the detail is exactly the list item — same keys, same values, location falling back to the pole —

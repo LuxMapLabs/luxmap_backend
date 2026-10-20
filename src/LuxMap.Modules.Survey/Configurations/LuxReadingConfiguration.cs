@@ -73,7 +73,7 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
 
         // RESTRICT, never cascade. A lux reading is an event that happened and the ground truth for
         // RQ1 — deleting a pole must not silently delete research data. It also keeps this out of the
-        // cascade blind spot recorded in CLAUDE.md 1c: the SaveChanges guard cannot see deletions the
+        // cascade blind spot recorded in docs/agents/traps/commune-scope.md, section 1c: the SaveChanges guard cannot see deletions the
         // database performs on its own.
         //
         // Declared WITHOUT a navigation property, the same convention as HasCommuneReference:

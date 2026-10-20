@@ -9,7 +9,7 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
   `qr_id`, `pole_id`, `replaces` / `replaced_by`. Canh bằng `Issuing_again_revokes_the_code_in_use_and_the_audit_never_holds_a_code`.
 - **Một mã đang dùng mỗi cột**: `IssueAsync` đọc cột qua filter TRƯỚC (ngoài phạm vi là 404, Quản lý xã khác không chờ khoá), rồi
   `FOR UPDATE` hàng `pole`, rồi mới tìm mã đang dùng; `ux_qr_code_pole_id_active` là lớp chặn cuối. Phá thử bỏ khoá →
-  `Simultaneous_presses_leave_exactly_one_code_in_use` đỏ 3/3. Thu hồi + cấp mới là **hai** `SaveChanges` trong một giao dịch (mỗi lần
+  `Simultaneous_presses_leave_exactly_one_code_in_use` đỏ. Thu hồi + cấp mới là **hai** `SaveChanges` trong một giao dịch (mỗi lần
   đúng một audit, BE-23a).
 - **Hai `HasIndex` trên CÙNG cột phải có tên model** (`HasIndex(x => x.PoleId, "tên")`) — không thì EF coi lần gọi thứ hai là lần đầu
   và **đè** nó. Ở đây cần cả unique partial `ux_qr_code_pole_id_active` lẫn `ix_qr_code_pole_id` đầy đủ (partial không phục vụ hàng
@@ -18,8 +18,7 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
   cấp mới đọc mã là "đang dùng" trước khi thu hồi commit, rồi ghi đè người / thời điểm thu hồi kèm audit `revoked` thứ hai (bảng
   không có row version). Canh bằng `Issue_and_revoke_both_wait_for_the_pole_lock` (giữ khoá `FOR NO KEY UPDATE`; phá thử → đỏ).
 - `commune_id` của mã **chép từ cột** ở server, như `fixture`; client không gửi được.
-- Teardown xoá `qr_code` **trước** `pole` và tài khoản (FK `Restrict` tới cả hai). Rollback `AddQrCodes` gãy khi `audit_event` đã có
-  `entity_type = 'qr_code'` hoặc `action = 'revoked'` (cùng họ BE-19).
+- Teardown xoá `qr_code` **trước** `pole` và tài khoản (FK `Restrict` tới cả hai). Rollback `AddQrCodes`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 
 ## CITIZEN-QR P2b — form công khai, không token (13/10/2026, drift PB-1…PB-8)
 
@@ -29,7 +28,7 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
   backdoor, không `*`, không lấy xã từ client hay từ token tình cờ gửi kèm.
 - **`[AllowAnonymous]` trên TỪNG action của `PublicController`**, không cấp class. Ba nơi nêu đích danh hai route và phải sửa cùng diff
   khi đổi: `AnonymousEndpointTests` (cả hai phép kiểm), `OpenApiSpecTests` (ngoại lệ `/api/v1/public/`), generator spec (`is_anonymous`).
-- **Mã đi trong BODY, không bao giờ trong đường dẫn** — log request ghi `RequestPath` (D-16). Endpoint mới của phía công khai giữ luật này.
+- Mã đi trong BODY; luật bảo vệ code/`qr_id` xem mục P2a, không chép vào path/log/audit.
 - **Ảnh công dân qua `IImageSanitizer` TRƯỚC `StoreImageAsync`** (ngoại lệ BE-11 quy tắc 4, chỉ cho ảnh công dân): đọc có giới hạn byte →
   magic bytes → `IdentifyAsync` + giới hạn pixel (chỉ đọc header) → decode trong cổng `SemaphoreSlim` → `AutoOrient` → bỏ EXIF/XMP/IPTC/ICC →
   mã hoá lại. Decode luôn qua `ThumbnailFactory.JpegOnly` (tiền đề tắt advisory ImageSharp). Phá thử: bỏ giới hạn pixel → test bom pixel đỏ;
@@ -54,8 +53,7 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
   `With_no_proxy_configured_a_forwarded_address_is_ignored_from_every_peer` và `Forwarded_addresses_count_only_from_a_trusted_proxy`
   (giả địa chỉ peer bằng `IStartupFilter`).
 - Gửi lại: khoá `client_op_id` gắn với **mã + băm nội dung** (kể cả ảnh), tra ở cả bước sớm lẫn khi bắt trùng `ux_citizen_submission_client_op_id`.
-- Teardown: `citizen_photo` (theo submission) → `citizen_submission` → `citizen_report` → `qr_code` → `pole`. Rollback `AddCitizenReports` gãy
-  khi `audit_event` đã có actor `public` hoặc entity `citizen_report` (cùng họ BE-19).
+- Teardown: `citizen_photo` (theo submission) → `citizen_submission` → `citizen_report` → `qr_code` → `pole`. Rollback `AddCitizenReports`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 
 ## CITIZEN-QR P2c — hàng chờ duyệt (13/10/2026, drift PC-1…PC-10)
 
@@ -72,12 +70,11 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
 - 🔴 **`CitizenPhoto` là `IAudited` từ P2c** (gợi ý AI là phát hiện tự động, D-R13). Mọi đường ghi ảnh phải có đúng một audit trong cùng
   `SaveChanges`: lượt gửi công khai (`submitted`, actor `public`) và gợi ý (`analyzed`, actor `cv`, entity `citizen_report`).
 - **Không inject `YoloModel` vào service trên đường request.** Constructor của nó ném khi thiếu file model ⇒ DI làm cả màn chi tiết 500.
-  `YoloCitizenPhotoHinter` resolve lười trong vùng bắt lỗi; gợi ý là tuỳ chọn, hàng chờ thì không. Model chạy **ngoài** transaction và
+  `YoloSingleLampPhotoHinter` resolve lười trong vùng bắt lỗi; `YoloCitizenPhotoHinter` chỉ là adapter đổi nhãn; gợi ý là tuỳ chọn, hàng chờ thì không. Model chạy **ngoài** transaction và
   khoá; chỉ lượt ghi khoá hàng ảnh và chỉ ghi ảnh **còn `ai_hint` null** — hai lượt mở cùng lúc có thể cùng chạy model nhưng chỉ một
-  ghi, một event (`The_hint_is_an_audited_automated_finding_written_once`, phá thử đỏ 3/3).
+  ghi, một event (`The_hint_is_an_audited_automated_finding_written_once`).
 - `artifact_version` của gợi ý = phiên bản detector **+** băm luật gợi ý (một bóng, ngưỡng ảnh ban ngày). Đổi `Citizen:DaylightMeanLuma`
   là đổi phiên bản — đừng tách luật ra khỏi chuỗi đó.
-- Test model thật **không** khẳng định model thấy gì: nó gọi khung đen có một điểm sáng là một bóng `out`. Chỉ canh hợp đồng (nhãn hợp lệ,
-  confidence đúng khi kết luận, dạng phiên bản) — cùng quy ước AI-1.
+- Test model chỉ canh hợp đồng, không chứng minh accuracy: xem `docs/agents/traps/survey.md`, mục AI-1.
 - Teardown: `citizen_photo` → `citizen_submission` → `citizen_report` **trước `fault`** — báo cáo đã chấp nhận / gộp giữ sự cố bằng
-  `Restrict`. Rollback `AddCitizenReview` gãy khi audit đã có `accepted` / `merged` / `analyzed` (cùng họ BE-19).
+  `Restrict`. Rollback `AddCitizenReview`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.

@@ -4,39 +4,17 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi viết / sử
 
 ## Quy ước: MỌI test ghi tài sản nằm trong `AssetDatabaseCollection`, và KHÔNG test nào ghim ID bằng literal
 
-Hai quy tắc, một nguyên nhân: **`pole_id_seq` là tài nguyên TOÀN CỤC dùng chung**, còn DB phát triển
-thì dùng chung giữa mọi lượt chạy.
+`pole_id_seq` là tài nguyên dùng chung **trong một lượt chạy**; mỗi lượt có container PostGIS riêng (BE-36).
 
-**1. Một collection duy nhất cho 16 class ghi tài sản.** xUnit chạy song song các class **khác
-collection**, tuần tự các class **cùng collection**. `PrefixedIdOverflowTests` phải `setval` ghim
-sequence tới ngưỡng độ rộng đệm rồi chèn — việc đó **không chịu được người ghi thứ hai**: lượt lùi
-sequence trao cho hàng xóm một ID đã có, còn `nextval` của hàng xóm cướp mất ID vừa ghim. Bên thua
-chết vì `pk_pole`, thông điệp không hề nhắc tới race.
+**1. Một collection cho mọi class ghi tài sản.** xUnit tuần tự các class trong `AssetDatabaseCollection`.
+`PrefixedIdOverflowTests` lùi sequence để chạm ngưỡng độ rộng; người ghi song song có thể cướp ID hoặc nhận ID đã có,
+ra `23505 pk_pole`. Không tách collection để tăng tốc.
 
-Đo thật, 5 lượt mỗi bên, cùng máy cùng DB: tách hai collection → **4,1–4,3 s, 4/5 lượt đỏ**; gộp một
-collection → **5,2–5,4 s, 5/5 xanh**. **Một giây đổi lấy bộ test không còn đỏ ngẫu nhiên.** Đừng tách
-ra lại vì lý do tốc độ.
-
-**2. Không literal ID nào trong test — chọn dải từ bảng LIVE.**
-
-> 🔴 `AssetSchemaFixture` chèn 2500 cột bắt đầu từ **chỗ `pole_id_seq` đang đứng**, KHÔNG phải từ 1.
-
-`PrefixedIdOverflowTests` từng giành literal `3000` / `30000`, canh bằng
-`Assert.True(SyntheticPoleCount < 3000)` — câu đó **mã hoá một tiền đề sai**. Sau khi BE-39 seed bộ
-mock FO-26, sequence đứng ở **854**, khối 2500 cột rơi vào **855..3354**, trùm lên 3000. Hậu quả
-không dừng ở một test: lượt `setval(2999)` **làm nhiễm độc sequence** cho khoảng 355 lượt chèn kế
-tiếp, nên một lượt chạy đỏ 36 test, lượt sau đỏ 76 — trông y hệt flaky, thực ra tất định.
-
-Đường đúng: hỏi bảng xem số nào còn trống rồi mới ghim (`FreeFourDigitDecadeAsync`), và nêu tiền đề
-thành assert có thông điệp (`RequireFreeAsync`) thay vì để nó lộ ra dưới dạng `23505` trần từ trong
-`SaveChanges`.
-
-⚠️ Ngưỡng **9999 → 10000** là ngoại lệ: nó do chính độ rộng đệm quy định nên **không dời đi đâu
-được**. Vì vậy thập niên `1000` bị loại khỏi danh sách ứng viên — bội mười của nó đúng là 10000.
-
-**BE-36 (11/10/2026) chỉ xoá NỬA giữa các lượt của lớp lỗi này** — mỗi lượt một DB sạch, nên cặn và
-sequence trôi từ lượt trước không còn. **Nửa trong một lượt vẫn còn nguyên:** mọi class vẫn chung một DB
-và chung `pole_id_seq`, nên hai quy tắc trên vẫn bắt buộc và **đừng tách collection**.
+**2. Chọn dải từ bảng LIVE, không ghim literal ID.** `AssetSchemaFixture` chèn từ chỗ sequence đang đứng, không từ 1.
+Dùng `FreeFourDigitDecadeAsync`, assert tiền đề bằng `RequireFreeAsync`; chọn dải trống rồi **trả sequence về giá trị cũ
+trong `try/finally`**. Dải đang ghi trống không chứng minh cả đoạn sequence sẽ đi qua đều trống.
+Ngưỡng **9999 → 10000** là ngoại lệ cố định bởi độ rộng đệm; loại thập niên `1000` khỏi ứng viên.
+Không `setval` trong fixture để nâng sàn theo ID lớn nhất: nó có thể đẩy khối dữ liệu vào đúng dải ngưỡng mà test giữ.
 
 ## Hai bẫy test chốt ở REG-v1.2 — culture và tài khoản seed
 

@@ -24,8 +24,8 @@ namespace LuxMap.Api.Tests;
 /// </para>
 /// <para>
 /// Ids are written EXPLICITLY with raw SQL rather than by moving a sequence. Rewinding
-/// <c>segment_id_seq</c> past live rows is the poisoning that cost this repo a run of 36 red tests
-/// and then 76 (CLAUDE.md, the id-collision note), and nothing here needs generation to be involved
+/// <c>segment_id_seq</c> past live rows can cause collisions (docs/agents/traps/testing.md),
+/// and nothing here needs generation to be involved
 /// — only the ordering is under test.
 /// </para>
 /// <para>

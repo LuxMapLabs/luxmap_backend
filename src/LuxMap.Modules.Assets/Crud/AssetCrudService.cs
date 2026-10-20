@@ -1045,7 +1045,7 @@ public sealed class AssetCrudService(
             Location = new AssetLocation { Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X },
 
             // ⚠️ Through the query filter — the feeders THIS caller can see — and in id order, never the bare id
-            // (created_at, length, id: CLAUDE.md section 0).
+            // (created_at, length, id: CLAUDE.md, Quy ước API).
             FeederIds = dbContext.Set<Feeder>()
                 .Where(feeder => feeder.CabinetId == cabinet.CabinetId)
                 .OrderBy(feeder => feeder.CreatedAt)

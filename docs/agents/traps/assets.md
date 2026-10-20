@@ -6,19 +6,17 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi CRUD / import
 
 **1. Nhóm endpoint là `/api/v1/assets/…`, KHÔNG phải `/poles`.**
 
-Contract mục 2.1 đã đặc tả `GET /poles`: `bbox` bắt buộc, trả `FeatureCollection`, quá 2000 cột →
-413. Đó là **endpoint bản đồ của BE-14**. Một danh sách kiểm kê trả lời cùng đường dẫn sẽ chiếm mất
-chỗ đó. Hai bề mặt, hai việc khác nhau — đừng gộp.
+Bề mặt bản đồ là `/api/v1/map/poles` (MAP-1); xem `CLAUDE.md`, mục API đã đặc tả. Danh sách kiểm kê dùng `/assets/…`.
 
 ```
-GET/POST      /api/v1/assets/{segments|feeders|poles}    POST /api/v1/assets/fixtures
-PUT/DELETE    /api/v1/assets/{segments|feeders|poles}/{id}
+GET/POST      /api/v1/assets/{segments|cabinets|feeders|poles}    POST /api/v1/assets/fixtures
+PUT/DELETE    /api/v1/assets/{segments|cabinets|feeders|poles}/{id}
 PUT           /api/v1/assets/poles/{id}/feeder           PUT  /api/v1/assets/fixtures/{id}/removal
-POST          /api/v1/assets/import/{segments|feeders|poles|fixtures}
+POST          /api/v1/assets/import/{segments|cabinets|feeders|poles|fixtures}
 ```
 
 **Fixture KHÔNG có DELETE, và cũng không có PUT thay thế** — ngừng dùng thiết bị là việc của
-`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. Ba loại còn lại xoá
+`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. Bốn loại còn lại xoá
 được và **khoá ngoại quyết định**, không kiểm trong code: `fault` / `lux_reading` giữ pole,
 `pole` / `fault` / `fault_cluster` giữ segment, `pole.feeder_id` giữ feeder — tất cả `Restrict`, vi
 phạm là 409 `ASSET_IN_USE` kèm tên constraint trong `details` (kể cả khi ràng buộc vấp ở bóng của
@@ -30,26 +28,26 @@ cột). Drift 43 (18/09/2026) mở đường cho pole; **drift 44 (20/09/2026)**
 > `Replacing_a_pole_without_a_feeder_id_clears_its_circuit` — test đó **ghi lại một quyết định**,
 > đừng "sửa" cho field dính lại.
 >
-> **`commune_id` KHÔNG nằm trong ba request update.** Chuyển tài sản sang xã khác không phải sửa mà
+> **`commune_id` KHÔNG nằm trong request update tài sản.** Chuyển tài sản sang xã khác không phải sửa mà
 > là chuyển giao: đổi luôn ai nhìn thấy dòng đó, và phải kiểm scope ở **cả hai** phía. Riêng với
 > `feeder` thì còn nặng hơn — `RequireFeederInCommuneAsync` chỉ chạy khi ghi **POLE**, không bao giờ
 > chạy khi feeder đổi xã, nên cho sửa sẽ kéo tủ điện ra khỏi các cột đang đấu vào nó và **mọi cặp đó
 > lặng lẽ thành liên-xã mà không còn lượt ghi nào bắt được**.
 
-**2. `external_ref` — khoá tự nhiên DUY NHẤT của lược đồ, trên BA bảng.**
+**2. `external_ref` — khoá tự nhiên DUY NHẤT của lược đồ, trên BỐN bảng.**
 
-`road_segment`, `feeder`, `pole`. `text NULL` trong DB, **BẮT BUỘC trong file import**, unique là
-**partial index** `(commune_id, external_ref) WHERE external_ref IS NOT NULL`. **KHÔNG emit ra API.**
+`road_segment`, `electrical_cabinet`, `feeder`, `pole`. `text NULL` trong DB, **BẮT BUỘC trong file import**, unique là
+**partial index** `(commune_id, external_ref) WHERE external_ref IS NOT NULL`. Inventory API emit `external_ref`;
+**không emit ra properties bản đồ** (`AssetContracts`, `AssetConfigurations`).
 
 `fixture` **không có** — một cột mang nhiều bóng qua thời gian nên không mã nào chỉ đúng một lần lắp
 đặt. Vì vậy **nhập bóng là INSERT-ONLY**: cột đã có bóng → lỗi theo dòng. Upsert bừa ở đây sẽ nhân
 đôi lịch sử thiết bị mà không ai phát hiện.
 
-Template tham chiếu bằng `segment_external_ref` / `feeder_external_ref` / `pole_external_ref`, **không
-phải `SEG-001` / `FDR-001`** — mã đó do DB sinh lúc INSERT, người soạn file không biết trước. Trước
-BE-12a bộ bốn file không nạp được liền mạch: phải nạp tuyến, mở DB tra mã, rồi mới điền vào file cột.
+Template tham chiếu bằng `segment_external_ref` / `cabinet_external_ref` / `feeder_external_ref` / `pole_external_ref`, **không
+phải `SEG-001` / `FDR-001`** — mã đó do DB sinh lúc INSERT, người soạn file không biết trước.
 
-Xem quy tắc partial index ngay dưới đây — nó **không** phải chuyện riêng của BE-12a.
+Quy tắc partial index: xem `docs/agents/traps/migrations.md`, mục PARTIAL INDEX.
 
 **3. Ngữ nghĩa nhập: kiểm TOÀN BỘ trước, ghi tập hợp lệ trong MỘT transaction, trả 200.**
 
@@ -68,7 +66,7 @@ ghi. Lỗi ở bước ghi **rollback cả mẻ, trả 500**, không đổ lỗi
 > đường ghi này**, và vì bản sửa đúng là **upsert thật (`ON CONFLICT DO UPDATE`)**, không phải thêm
 > một lượt kiểm nữa — thêm kiểm chỉ thu hẹp cửa sổ chứ không đóng được.
 
-Kết quả: `{inserted, updated, failed, total_errors, truncated, rows[]}`.
+Kết quả: `{inserted, updated, unchanged, failed, total_errors, truncated, rows[], total_warnings, warnings[]}` (`ImportResult`).
 
 - **200 chứ không phải 4xx**, vì các dòng hợp lệ đã ghi thật; bọc trong `{error:…}` là nói sai. Tiền
   lệ: `POST /lux-readings` trùng `client_op_id` trả 200 (Contract mục 5.8). **Không dùng 207** — nó
@@ -79,7 +77,7 @@ Kết quả: `{inserted, updated, failed, total_errors, truncated, rows[]}`.
   không cắt thì body trả về lớn hơn cả file gửi lên.
 
 **Mỗi request nạp ĐÚNG MỘT loại file.** Đó là thứ làm cho tham chiếu an toàn: tuyến của một cột đã
-được commit ở request trước nên đã có `SEG-001` thật. Nạp cả bốn loại trong một transaction sẽ phải
+được commit ở request trước nên đã có `SEG-001` thật. Thứ tự: **segments → cabinets → feeders → poles → fixtures** (`ImportKindExtensions.LoadOrder`). Nạp cả năm loại trong một transaction sẽ phải
 phân giải tham chiếu tới hàng chưa có ID. Thứ tự tự thực thi: nạp cột trước tuyến thì **mọi** dòng
 báo `segment_external_ref` không khớp gì cả.
 
@@ -98,21 +96,9 @@ trên nó, `RequireClaim(role, <danh sách>)` — OR giữa các giá trị, **k
 được **nêu tên**. Quản trị hệ thống **không** ghi tài sản nữa (D-R12): nó đọc qua `*`, nhưng `*` làm
 guard `SaveChanges` cho nó qua hết — nên **chỉ policy** đứng giữa nó và bảng tài sản.
 
-**Không endpoint nghiệp vụ nào được dựa vào fallback** (fallback = "đã đăng nhập" = cả bốn vai trò, tức
-mở cho Cấp giám sát chỉ-đọc trên cả endpoint ghi). Ngoại lệ có tên: `GET /auth/me`.
-`CapabilityPolicyCoverageTests` đỏ khi endpoint thiếu capability, khi endpoint nêu policy ngoài ma trận,
-hoặc khi policy đăng ký nhận vai trò ma trận không nêu. Capability chưa có endpoint (`ControlLighting`,
-`ManageUsers`) khai sẵn; capability khác (survey review, work order, fault) thêm **cùng ticket** của nó.
-
-> 🔴 **Capability RỖNG là capability MỞ, không phải đóng.** `RequireClaim(role)` không kèm giá trị nào
-> chỉ đòi claim `role` **tồn tại** — tức nhận **mọi** vai trò. Phát hiện bằng sabotage: bỏ vai trò duy
-> nhất của `ManageAssets` là Cấp giám sát tạo được tuyến. `AuthorizationSetup` nay **từ chối khởi động**
-> khi một capability rỗng; muốn bỏ capability thì **xoá** nó, đừng làm rỗng.
-
-> 🔴 **Test kỳ vọng phải là LITERAL, không đọc từ ma trận.** Test suy kỳ vọng từ `Matrix` sẽ đồng ý với
-> mọi ma trận, kể cả ma trận sai. `RoleCapabilityMatrixTests` (HTTP, 4 vai trò × 6 capability) và
-> `CapabilityMatrixTests` (Shared, không cần Docker) chép bảng của Contract; đổi quyền là sửa cả hai
-> trong cùng diff.
+Luật capability, fallback, capability rỗng và test literal: xem `CLAUDE.md`, mục Vai trò và phân quyền.
+`CapabilityPolicyCoverageTests` có ngoại lệ máy đặt tên trong `MachineEndpoints`; `ControlLighting` và `ManageUsers`
+đã có endpoint thật. Giữ `RoleCapabilityMatrixTests` và `CapabilityMatrixTests`, không cố định số capability trong tài liệu.
 
 `LuxMapPolicies` nằm ở **`LuxMap.Shared`** từ BE-12a — chuyển từ
 `LuxMap.Api` sang **`LuxMap.Shared`**: host tham chiếu module chứ không ngược lại, nên controller
@@ -145,12 +131,10 @@ một dòng sai không được vứt 499 dòng còn lại.
 
 | Bảng | Nguồn |
 |---|---|
-| `road_segment`, `feeder`, `pole` | **BODY / file**, kiểm bằng `Narrow` |
+| `road_segment`, `electrical_cabinet`, `feeder`, `pole` | **BODY / file**, kiểm bằng `Narrow` |
 | `fixture` | **Chép từ pole.** Client gửi cũng không đọc |
 
-`pole` **không** suy được từ segment: `road_class = inter_commune` nghĩa là đường chạy **giữa** các
-xã, nên cột của nó nằm ở xã khác với xã sở hữu tuyến là chuyện hợp lệ. Còn `fixture` thì luôn ở
-đúng xã của cột mang nó — cho file khai sẽ để hai giá trị lệch nhau mà không có gì phát hiện.
+`fixture` chép xã từ pole ở server; luật feeder cùng xã và ngoại lệ tuyến liên xã: xem mục O-7.
 
 **Parser CSV tự viết**, ở `LuxMap.Shared/Csv/` (144 dòng code, không thêm package). Xử lý BOM UTF-8,
 CRLF, ô bọc nháy kép chứa dấu phẩy, và tự dò delimiter `,` / `;` bằng cách **chỉ đếm ký tự ngoài
@@ -175,12 +159,7 @@ gửi GeoJSON dưới dạng field sẽ vỡ ở một ngưỡng chẳng liên q
 
 ## Tám ràng buộc chốt ở BE-REVIEW-02 (18/09/2026)
 
-**1. Mạch điện của cột phải cùng xã với cột. ✅ Nay là RÀNG BUỘC DB — xem mục O-7 bên dưới.**
-`RequireFeederInCommuneAsync` (POST/PUT) và kiểm theo dòng trong `PlanPolesAsync` (import) vẫn là thứ
-**trả lời**: 409 `CROSS_COMMUNE_REFERENCE`, không phải 403. Đường ghi mới (seeder BE-39, sync BE-43)
-**vẫn nên gọi** — không phải để an toàn mà để có thông điệp tử tế; quên thì FK chặn, nhưng chặn bằng
-500. **Tuyến thì KHÔNG kiểm**: `road_class = inter_commune` là đường chạy giữa các xã, cột ở xã khác
-với chủ tuyến là hợp lệ.
+**1. Mạch điện cùng xã, tuyến liên xã được phép: xem mục O-7 (FK ghép + lớp app trả 409 `CROSS_COMMUNE_REFERENCE`).**
 
 **2. `DateTime` trên query string KHÔNG đi qua `UtcDateTimeConverter`.** Converter đó chỉ áp cho JSON.
 Query binder trả `Kind=Unspecified` khi thiếu `Z`, và `.ToUniversalTime()` trên nó dịch theo múi giờ
@@ -213,16 +192,10 @@ lên `HttpContext.Items`, trang status-code đọc lại); `COMMUNE_FORBIDDEN` c
 
 **7b. Nạp bộ mock: dùng `scripts/seed_mock_set.py`, KHÔNG dùng endpoint import.**
 Endpoint import nạp đúng dữ liệu nhưng **không giữ được ID của mock**: EF Core không bảo toàn thứ tự
-`Add` khi database sinh khoá. Đo thật ngày 20/09 trên bảng rỗng với sequence đã đặt lại về 1: **102
-trên 103 cột** rơi vào ID khác, `POLE-0047` hoá thành cột `POLE-0062` của mock, `SEG-001` mang tên
-tuyến C. FE hardcode `POLE-0047` nên như vậy là hỏng demo. Script ghi ID tường minh rồi `setval`
-sequence qua vùng đã dùng, đúng quyết định D-6.
+`Add` khi database sinh khoá. FE tham chiếu ID mock nên script phải INSERT ID tường minh rồi `setval`
+sequence trên vùng đã dùng (D-6, Contract §1.2). Canh kỳ vọng thứ tự bằng `PrefixedIdOrderingTests`, không dựa `AddRange`.
 
-**7. DB dev dùng chung bị test đẩy sequence.** `pole_id_seq` ở 396 625 với 0 cột (đo 18/09/2026):
-cột thật đầu tiên trên DB này là `POLE-396626`. Hệ quả cho **BE-39**: seed bộ mock phải INSERT ID tường
-minh (`POLE-0001…`) rồi `setval` sequence lên trên giá trị lớn nhất — ngoại lệ hệ thống đã chốt (D-6),
-ghi trong Contract mục 1.2. Fixture test đã dọn token của tài khoản seed nó đăng nhập (N-5);
-`AuthTestFactory` chưa — từ BE-36 token đó chết cùng container cuối lượt, nhưng trong một lượt vẫn tích lại.
+**7. Sequence dùng chung trong một lượt test:** xem `docs/agents/traps/testing.md`, mục bộ test tài sản; không chạy trên DB dev.
 
 **8. Spec hợp nhất `docs/openapi/luxmap-v1.5.json` là file SINH.** Sinh bằng
 `python3 docs/openapi/tools/gen_consolidated_spec.py` từ `luxmap-v1.json` (xuất từ code) — chạy lại
@@ -237,8 +210,7 @@ cột `fk_pole_feeder_feeder_id` **bị thay thế**, không phải thêm chồn
 
 **1. 🔴 `MATCH SIMPLE` là thứ giữ cho cột-không-có-mạch hợp lệ. ĐỪNG "siết" sang `MATCH FULL`.**
 
-Mặc định của Postgres là `MATCH SIMPLE`: hàng nào có **bất kỳ** cột FK nào null thì **bỏ qua hẳn**
-lượt kiểm — `feeder_id` null, `commune_id` không null, hàng vẫn vào.
+Luật FK ghép nullable: xem `docs/agents/traps/survey.md`, mục BE-15 P2c. Ở đây `feeder_id` null, `commune_id` không null vẫn hợp lệ.
 
 ⚠️ **Lý do ban đầu của quy tắc này đã đổi, quy tắc thì không.** Trước v1.6 nó tồn tại vì cột
 `solar_all_in_one` không đấu vào mạch nào; đèn solar nay hết, nên **mọi cột rồi sẽ có feeder**.
@@ -277,20 +249,27 @@ chuyển feeder sang xã khác vốn đã bị BE-12a cấm (nó kéo tủ đi�
 còn lượt ghi nào bắt được), nên EF đang thực thi một luật nhóm đã chốt. Dịch lại lỗi thì phải bắt
 `InvalidOperationException` quanh `SaveChanges` và khớp theo thông điệp có thể đổi khi nâng phiên bản
 — bắt quá rộng một kiểu lỗi quá phổ biến, để làm đẹp thông điệp cho một thao tác không bao giờ được
-phép thành công. Xem thêm ngoại lệ ghi ở mục 1c.
+phép thành công. Canh bằng `Changing_a_tracked_feeders_own_commune_is_refused_by_EF_before_the_guard_sees_it`
+(`docs/agents/traps/commune-scope.md`, mục 1c).
 
 ⚠️ **Index đổi hình:** `ix_pole_feeder_id` → `ix_pole_feeder_id_commune_id`. Vẫn dẫn đầu bằng
 `feeder_id` nên phục vụ được mọi truy vấn lọc theo feeder, và vì query filter BE-08 luôn nhét
 `commune_id` vào `WHERE`, index ghép còn phủ tốt hơn. **`ix_pole_commune_id` KHÔNG bị drop** — đã soi
-riêng lúc đọc migration, vì đây đúng là cái bẫy đã cắn ở BE-12a (xem quy ước partial index).
+riêng lúc đọc migration, vì đây đúng là cái bẫy đã cắn ở BE-12a (xem `docs/agents/traps/migrations.md`, mục PARTIAL INDEX).
+
+## Testbed dùng cùng mô hình tài sản
+
+Bộ testbed FO-07 đăng ký như `RoadSegment` thật, không tạo thực thể riêng; cùng pipeline với dữ liệu khác,
+phân biệt bằng `data_source` (`calibration_rig`, Contract §1.6). Controlled Reference Capture Set rời deliverable v1.4;
+không dùng luật này để seed thêm khi D-R25 còn chờ.
 
 ## Bộ mock FO-26 — đã bàn giao
 
 `mock-poles.geojson`, `mock-pole-detail.json`, `mock-faults.json`, `mock-work-orders.json`, `mock-iot-nodes.geojson`.
 
-Nội dung cố ý cài sẵn: **103 cột** (70 `normal` / 10 `dim` / 16 `out` / 7 `unknown`), một **cụm lỗi cả đoạn trên `SEG-003`**, **12 IoT node**, và **`POLE-0047`** có chuỗi runtime suy giảm dần 18 đêm (`dim`, có `NODE-047` — đèn mờ dần, không tắt phụt; từ Contract v1.6 là cột `grid` / `led_road_lamp`).
-
-FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** để demo khớp với những gì FE đã dựng.
+Bộ mock có 103 cột và **3 IoT node ở tủ điện** (`mocks/mock-iot-nodes.geojson`); seed bằng
+`scripts/seed_mock_set.py`, giữ ID để demo khớp FE. Detail/runtime của `POLE-0047` còn theo mô hình NODE-047 cũ:
+xem deviation tại `docs/contract-drift.md` (I-18 và BE-20), không dùng làm ngoại lệ cho IoT ở tủ.
 
 > ✅ **`external_ref` — CHỐT 03/10/2026 (Mỹ, D-R10 đóng): mã VĨNH VIỄN do nhóm quản lý; mã kiểm kê của xã đi cột RIÊNG.**
 >
@@ -298,10 +277,8 @@ FE đang code theo bộ này. **BE-39 phải seed lại đúng bộ mock đó** 
 >   `pole_id` / `segment_id` của mock. **Không đổi tên, không ghi đè** `external_ref` sau khi đã nạp.
 > - Mã kiểm kê của xã (nếu xã giao, ví dụ số sơn trên cột) vào cột **`inventory_code`** riêng — nullable, unique trong mỗi xã —
 >   thêm bằng migration **khi xã thật sự giao**, ánh xạ bằng vị trí + người kiểm. **Không** dùng nó làm khoá import.
-> - 🔴 **Bẫy còn mở:** `KS-…` sinh từ **giờ chụp ảnh**, tức là mã của **lần chụp**, không phải của cột. Khảo sát lại bằng
->   `scripts/photos_to_poles.py` sẽ cấp mã MỚI cho cột cũ ⇒ import tạo **cột trùng**. `--existing` hiện chỉ báo trong review,
->   **chưa** dùng lại mã. Phải sửa công cụ (dùng lại `external_ref` của cột cũ khi vị trí khớp, ca mơ hồ vào review) **trước
->   lần khảo sát ảnh thứ hai**.
+> - Khảo sát ảnh lần sau **phải dùng `scripts/photos_to_poles.py --existing`**: vị trí khớp thì dùng lại
+>   `group.matched.external_ref`, không import lại cột cũ; ca mơ hồ đưa vào review. Sinh lại `KS-…` theo giờ ảnh mới sẽ tạo cột trùng.
 > - Đường "xoá sạch nạp lại" cho cột thực địa còn mở tới khi **phiên khảo sát thực địa đầu tiên được xử lý** (`pole_observation`
 >   trỏ vào `pole` bằng `Restrict`); quyết định này làm cho đường đó không còn cần thiết.
 
@@ -358,8 +335,7 @@ cột, enum, ngày, `null` viết y như JSON. Dòng phải **phẳng** (ô obje
 phẳng và gọi nó, đừng tự format. `GetTypeInfo` cần options đã có resolver: `Write` khoá options trước (`MakeReadOnly`) — gặp
 thật ở test đơn vị, đỏ hay xanh tuỳ test nào chạy trước.
 
-Generator spec có `S["PoleProperties"]` viết tay với `additionalProperties: false` — trường mới trên `properties` bản đồ phải
-thêm vào đó (đã thêm `warranty_status`), nếu không spec hợp nhất từ chối chính response thật.
+Trường mới trong properties bản đồ phải cập nhật schema viết tay: xem `docs/agents/traps/iot-lighting.md`, mục BE-14b (kể cả `warranty_status`).
 
 ## CABINET — trụ điện tổng là tài sản, IoT là thiết bị gắn lên trụ (07/10/2026, drift CAB-1…CAB-8)
 
@@ -412,7 +388,7 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 ## COMMUNE-BBOX — khung bản đồ của xã (14/10/2026, drift CB-1…CB-6)
 
 - **bbox là KHUNG NHÌN, không phải ranh giới.** Đừng dùng nó để lọc, ẩn hay từ chối tài sản, và đừng suy `commune_id` từ nó: phân quyền
-  vẫn một nguồn là cột `commune_id` (§7). Ranh giới thật (polygon) vẫn chưa có nguồn.
+  vẫn một nguồn là cột `commune_id` (`CLAUDE.md`, mục Phạm vi xã). Ranh giới thật (polygon) vẫn chưa có nguồn.
 - Bốn cột `bbox_*` trên `administrative_unit` đọc/ghi qua **`GetBbox()` / `SetBbox()`** (EF không dịch được — đọc sau truy vấn). Trung điểm
   (`center`) và khung gộp (`CommuneBbox.Union`) **tính lúc đọc, không lưu**.
 - `/admin/communes` nằm ở **module Admin** (nay tham chiếu Persistence). `AdministrativeUnit` không bị lọc theo xã — capability
@@ -423,7 +399,7 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - Test tạo xã đặt tên tiền tố `bbox-test-` và tài khoản riêng; teardown xoá **tài khoản trước, xã sau** (`app_user_commune` giữ xã).
 - 🔴 **`AccountTestFactory.DeleteTestAccountsAsync()` xoá MỌI tài khoản tiền tố `acct-`, và `AccountAdminTests` gọi nó sau MỖI test.**
   Class khác dùng chung tiền tố hay gọi chung hàm đó sẽ xoá tài khoản của nhau khi chạy song song → test đỏ ngẫu nhiên và
-  `40P01 deadlock` ở teardown (gặp thật ở COMMUNE-BBOX: 11 test đỏ, mỗi class chạy riêng thì xanh). Class mới: **tiền tố riêng** (`cbx-`)
+  `40P01 deadlock` ở teardown (chạy riêng từng class có thể che race). Class mới: **tiền tố riêng** (`cbx-`)
   và chỉ xoá tiền tố đó. Cũng đừng assert **tổng số** xã / tài khoản — class khác tạo cùng lúc; kiểm theo id hoặc tên.
 
 ## POLE-LOCATION — dời cột (14/10/2026, drift PL-1…PL-5)
@@ -436,4 +412,4 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - **`Pole` KHÔNG phải `IAudited`**: audit `relocated` do service ghi chủ động, guard không ép. Làm `Pole` thành `IAudited` sẽ bắt **mọi**
   đường ghi cột (form, import, ghi chú, sync, seeder, fixture) kèm audit — quyết định riêng. Hệ quả: sửa `geom` qua form đầy đủ / import chưa có vết.
 - Thứ tự: kiểm có cột **qua filter** (404) → `FOR UPDATE` → đọc lại → đo → `AssetStamp.Touch` (không đổi ⇒ không audit). Rollback
-  `AuditPoleRelocation` gãy khi đã có audit `pole` / `relocated` (cùng họ BE-19).
+  `AuditPoleRelocation`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.

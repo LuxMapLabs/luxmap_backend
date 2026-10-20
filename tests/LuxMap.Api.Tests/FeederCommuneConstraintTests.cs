@@ -271,7 +271,7 @@ public sealed class FeederCommuneConstraintTests(AssetImportFixture fixture)
     /// 403 <c>COMMUNE_FORBIDDEN</c> the guard would have produced before O-7.
     /// <para>
     /// <b>The data is not at risk and never was.</b> Both layers REFUSE; what changed is which one
-    /// refuses and how legibly. Recorded because CLAUDE.md section 1c advertises the guard as covering
+    /// refuses and how legibly. Recorded because docs/agents/traps/commune-scope.md, section 1c advertises the guard as covering
     /// every <c>ICommuneScoped</c> entity, and that sentence is now inaccurate for this one path —
     /// the path BE-39's seeder and BE-43's sync will be written on.
     /// </para>

@@ -255,7 +255,7 @@ public class FaultSchemaTests(AssetSchemaFixture fixture) : IAsyncLifetime
     {
         // RESTRICT, not cascade. Removing a pole must not erase the record that its lamp was once
         // out — that record is the acceptance criterion of this ticket. It also keeps faults out of
-        // the cascade blind spot in CLAUDE.md 1c, where the SaveChanges guard cannot see deletions
+        // the cascade blind spot in docs/agents/traps/commune-scope.md, section 1c, where the SaveChanges guard cannot see deletions
         // the database performs.
         var poleId = await NewPoleAsync();
         var fault = NewFault(poleId, fixture.CommuneId);

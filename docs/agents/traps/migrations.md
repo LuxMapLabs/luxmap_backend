@@ -11,17 +11,9 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi tạo / sửa
    `AlterColumn`. Thêm một cột thì migration chỉ được có `AddColumn` (+ index nếu mình khai).
 2. **`Down()` có đối xứng với `Up()` không?**
 
-**Đây là một LỚP LỖI, không phải hai sự cố rời rạc.** Cả hai lỗi nặng nhất của repo tới giờ đều
-thuộc lớp này — chúng **qua compile, qua toàn bộ test, và chỉ lộ ra khi có người đọc SQL**:
-
-| Lỗi | Qua được gì | Lộ ra khi |
-|---|---|---|
-| **BE-06** — `LPAD` cắt bớt ID, cột thứ 10000 thành `POLE-1000` | compile ✓ test ✓ | đọc lại biểu thức `DEFAULT` |
-| **BE-12a** — EF `DropIndex` ba index `commune_id` khi thêm partial unique index | compile ✓ test ✓ | đọc migration sinh ra |
-
-Không có công cụ nào trong stack bắt được lớp này: analyzer không đọc SQL, test tích hợp chạy trên DB
-đã apply nên nó *thấy* lược đồ mới là bình thường, và cả hai lỗi đều **không ném exception** — chúng
-làm dữ liệu sai hoặc truy vấn chậm dần. Thứ duy nhất bắt được là mắt người, một lần, trước khi apply.
+Đọc SQL để bắt lỗi ngoài assertion hiện có: `LPAD` cắt ID có thể tạo ID sai; collision thì PK chặn bằng `23505`.
+EF có thể drop index đầy đủ khi thêm partial index mà query vẫn trả đúng. `PrefixedIdOverflowTests` đã canh overflow/collision;
+`ScheduledJobTests` kiểm catalog index đầy đủ cạnh partial. Test chỉ phủ invariant đã viết thành assertion, không thay việc đọc migration.
 
 ## Quy ước: PARTIAL INDEX không bao giờ thay thế được index khoá ngoại
 
@@ -41,10 +33,9 @@ migration **DROP cả ba** `ix_pole_commune_id`, `ix_road_segment_commune_id`, `
 Index còn lại không phủ hàng `external_ref IS NULL` — tức **đa số cột**, những cột nạp từ ảnh công
 khai. Bắt được lúc đọc migration sinh ra, **không phải** lúc chạy: không có lỗi, chỉ chậm dần.
 
-**Ticket sắp đụng vào:** **BE-15** và **BE-17** gần như chắc chắn — bất kỳ unique index nào kiểu
-`(commune_id, <cái gì đó>)`. Mẫu đúng ở `ExternalRefColumn.HasExternalRef`.
+Áp cho mọi index kiểu `(commune_id, <cái gì đó>)`; mẫu đúng ở `ExternalRefColumn.HasExternalRef`.
 
-Xem quy tắc quy trình ngay dưới đây — không có `DropIndex` nào được phép xuất hiện trong một
+Xem quy trình đọc migration ở đầu file — không có `DropIndex` nào được phép xuất hiện trong một
 migration mà bạn chỉ định thêm cột.
 
 ## Quy ước: `ExecuteUpdate` / `ExecuteDelete` bị CẤM ở compile-time
@@ -67,8 +58,8 @@ Hai nhóm ngoại lệ đang tồn tại, đều chính đáng và đều đã p
 
 | Chỗ | Lý do |
 |---|---|
-| `AuthService` (4 chỗ) | `RefreshToken` **không** `ICommuneScoped` — guard chưa bao giờ áp. Và luồng xoay token của BE-07 **phụ thuộc** vào số dòng mà `UPDATE` có điều kiện trả về để phân xử refresh đồng thời; nạp-rồi-sửa không diễn đạt được điều đó mà không tái tạo race. |
-| Teardown của test (13 chỗ) | Xoá hàng loạt là cách duy nhất dọn được dưới scope rỗng. **BE-36 KHÔNG xoá nhu cầu**: cả lượt chạy dùng chung một DB, class sau vẫn thấy dữ liệu class trước. Chỉ gỡ được khi mỗi collection có DB riêng. |
+| `AuthService` | `RefreshToken` **không** `ICommuneScoped` — guard chưa bao giờ áp. Và luồng xoay token của BE-07 **phụ thuộc** vào số dòng mà `UPDATE` có điều kiện trả về để phân xử refresh đồng thời; nạp-rồi-sửa không diễn đạt được điều đó mà không tái tạo race. |
+| Test kiểm hành vi / teardown | Dọn dữ liệu theo test dưới scope rỗng hoặc kiểm trực tiếp đường bulk ngoài guard; mỗi ngoại lệ cần pragma giải thích. **BE-36 KHÔNG xoá nhu cầu**: cả lượt chạy dùng chung một DB, class sau vẫn thấy dữ liệu class trước. Chỉ gỡ được khi mỗi collection có DB riêng. |
 
 ⚠️ **BannedApiAnalyzers có lỗ, đã đo ở BE-10:** nó chỉ khớp khi **mọi tham số được truyền tường
 minh**, mà cả hai API bulk đều có `CancellationToken` tuỳ chọn. Nên có thêm `BannedBulkWriteApiTests`
@@ -107,20 +98,31 @@ của mọi endpoint để sửa một vấn đề chỉ nằm ở ba literal.
 cả `2` lẫn `"2"` (kể cả enum nullable), trả 400 `VALIDATION_FAILED` trước tầng ghi. Canh bằng
 `JsonEnumHandlingTests` và `JsonPipelineConventionTests`; query string vẫn đi qua `WireEnum`, không qua converter JSON.
 
-**Ticket sắp tạo cột kiểu này — phải áp quy ước ngay từ migration đầu:**
+Các cột đo hiện có (`PeakLux`, `BaselineRatio`, confidence) đã có CHECK trong cấu hình Survey/Assets.
+`pole_current_status.status_confidence` có `ck_pole_current_status_confidence_range` hữu hạn `0..1`;
+`normalized_luminance` của detail là DTO tương thích từ ratio. Cột mới phải có CHECK từ migration đầu, không dựa tên DTO.
 
-| Ticket | Cột |
+## Rollback dựng lại CHECK cũ
+
+`Down()` dựng CHECK hẹp hơn sẽ gãy nếu đã ghi giá trị mới; audit append-only còn không cho xoá để lách.
+Kiểm điều kiện dữ liệu **trước rollback**; apply/down/reapply chỉ thử trên DB test riêng. Các trường hợp phải xét:
+
+| Migration | Dữ liệu làm CHECK cũ từ chối |
 |---|---|
-| BE-15 / BE-17 | `normalized_luminance`, `baseline_ratio` |
-| BE-33 | `dim_threshold_ratio`, `out_threshold_ratio` |
+| `AddFaultReview` | audit entity `fault` |
+| `AddQrCodes` | audit entity `qr_code` hoặc action `revoked` |
+| `AddCitizenReports` | audit actor `public` hoặc entity `citizen_report` |
+| `AddCitizenReview` | audit action `accepted`, `merged`, `analyzed` |
+| `AddLightingCommands` | audit actor `system`, entity/action `lighting_*` mới |
+| `AddScheduledJobs` | notification type `work_order_overdue` |
+| `AuditPoleRelocation` | audit entity `pole`, action `relocated` |
 
-> 🔴 **`pole_current_status.status_confidence` ĐANG HỞ — chưa sửa, chờ quyết.**
-> Nó nhận `NaN`, `Infinity`, **và cả giá trị ngoài `0..1`** (đã chèn thật `42.5` và nó vào). CHECK duy
-> nhất trên cột đó là `ck_pole_current_status_confidence_matches_status`, chỉ ràng buộc **NULL hay
-> không** so với `fixture_status`, không nói gì về giá trị. XML doc ghi *"0..1"* nhưng **không có
-> ràng buộc nào thực thi**. Quyền ghi bảng đó thuộc **BE-15/BE-17** nên bản sửa thuộc về đó.
+**Thu hẹp enum:** chuyển dữ liệu sang giá trị còn hợp lệ **trước** khi siết CHECK (`DropSolarFixtures`).
+`Down()` khôi phục CHECK không khôi phục thông tin solar đã đổi sang grid.
 
 ## `luxmap_format_id` — `CREATE FUNCTION` đứng TRƯỚC mọi migration dùng nó
+
+**Không lọc khoảng bằng ID text trần** khi có thể qua ngưỡng độ rộng: cùng bẫy thứ tự chuỗi của `CLAUDE.md`, mục Quy ước API.
 
 ID có prefix sinh bằng **sequence PostgreSQL**, format ở tầng DB (biểu thức `DEFAULT` chuẩn ở `CLAUDE.md`, mục Quy ước API). EF map bằng
 `.HasDefaultValueSql()` + `.ValueGeneratedOnAdd()`; sequence an toàn concurrency sẵn, không cần bảng counter; chấp nhận khoảng trống trong

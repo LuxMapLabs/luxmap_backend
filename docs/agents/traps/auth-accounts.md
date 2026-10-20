@@ -11,7 +11,7 @@ phải error.
 
 Đã suýt phát sinh thật ở `GET /auth/me`: `AuthController` mang `[AllowAnonymous]` cấp class từ BE-07,
 nên endpoint mới sẽ **mở cho người chưa đăng nhập**. Cách sửa đã áp: chuyển `[AllowAnonymous]` xuống
-**từng** method cấp token (`login`, `register`, `refresh`, `logout`), để mặc-định-đóng của BE-08 áp
+**từng** method cấp token (`login`, `refresh`, `logout`; không còn `register`), để mặc-định-đóng của BE-08 áp
 cho mọi endpoint viết sau.
 
 > 🔴 **Test theo HÀNH VI không bắt được cái này.** Với `[AllowAnonymous]` cấp class, request không
@@ -21,6 +21,8 @@ cho mọi endpoint viết sau.
 > route**: `endpoint.Metadata.GetMetadata<IAllowAnonymous>()` phải `null`
 > (`CurrentUserTests.It_is_not_declared_anonymous_even_though_its_four_siblings_are`). Kiểm bằng phá
 > hoại: trả `[AllowAnonymous]` về cấp class thì test hành vi **vẫn xanh**, test metadata **đỏ**.
+
+**Cấp giám sát xem nhiều xã theo danh sách xã được gán, không có cấp huyện** (D-R3, Contract §2); quyền vẫn theo capability + địa bàn.
 
 ## BE-33a — tài khoản do Quản trị tạo, mời qua email (05/10/2026)
 
@@ -48,11 +50,9 @@ nhập tạm như `refresh_token`, không thuộc xã nào nên vùng mù cascad
 `SKIPPED` của `copy_dev_to_supabase.py` (link gắn với `WEB_APP_BASE_URL` của nguồn).
 
 **Kiểm tra thu hồi chứng chỉ SMTP giữ mặc định CHẶT của MailKit — không soft-fail, không tắt (05/10/2026).** Trên
-macOS, .NET trả `RevocationStatusUnknown` cho chứng chỉ của `smtp.gmail.com` (chỉ có CRL, không OCSP) nên gửi thư thất
-bại; trên Linux cùng code, cùng mạng, cùng phút thì qua (đo trong container `runtime-deps:10.0`). Mỹ giao làm theo khuyến
-nghị của Codex: **Mac dùng Mailpit, Gmail chỉ chạy từ Linux**. Chấp nhận "không xác định" (soft-fail) nghĩa là ai giữ
-khoá của một chứng chỉ đã thu hồi mà chặn được đường tải CRL sẽ được cho qua — và kết nối đó mang mật khẩu ứng dụng
-Gmail cùng link đặt mật khẩu. Đừng thêm `CheckCertificateRevocation = false` hay callback nới lỏng "cho chạy được".
+macOS có thể gặp `RevocationStatusUnknown` khi kiểm chứng chỉ SMTP. Theo quyết định đã ghi: **Mac dùng Mailpit, Gmail chạy từ Linux**.
+Không soft-fail: kẻ giữ khoá chứng chỉ đã thu hồi và chặn tải CRL có thể được cho qua, lộ mật khẩu ứng dụng/link đặt mật khẩu.
+Đừng thêm `CheckCertificateRevocation = false` hay callback nới lỏng "cho chạy được".
 Nếu máy chủ Linux đích cũng lỗi thì mới xét lại, và callback phải: chỉ dung thứ `RevocationStatusUnknown` /
 `OfflineRevocation`, đòi `SslPolicyErrors` **bằng đúng** `RemoteCertificateChainErrors` (sai tên miền luôn bị từ chối),
 kèm test cho từng cờ.
@@ -66,8 +66,7 @@ giới hạn phải override `LoginPermitLimit` (khuôn `LoginRateLimitTestFacto
 bao giờ thấy 429. Endpoint đăng nhập mới phải gắn **cùng** policy `LuxMapRateLimits.Login`: policy riêng là xô riêng, kẻ dò mật khẩu
 xen kẽ hai đường để được gấp đôi số lần.
 
-**`ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` — xoá luôn header đã đặt.** Lỗi nào cần header
-riêng (`Retry-After` của 429) phải tự ghi body, như `RateLimitSetup.OnRejected`.
+Header lỗi theo `CLAUDE.md`, mục Bẫy chung; 429 tự ghi body bằng `RateLimitSetup.OnRejected` để giữ `Retry-After`.
 
 **`FakeTimeProvider` không lùi được** (`Advance` âm ném ngoại lệ). Đẩy đồng hồ host lên rồi không lùi làm **mọi access
 token cấp sau đó chưa tới hạn hiệu lực** → 401 hàng loạt ở các test sau, trông như lỗi phân quyền. Muốn test hết hạn

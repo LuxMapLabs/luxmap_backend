@@ -454,7 +454,7 @@ TLS. **Không commit mật khẩu thật.**
 `RevocationStatusUnknown` cho chứng chỉ của `smtp.gmail.com` (Google chỉ công bố CRL, không OCSP), và MailKit từ chối
 kết nối — API báo `invitation_sent: false`. Trên Linux cùng code, cùng mạng, cùng phút thì kiểm tra thu hồi qua và
 đăng nhập thành công (đo 05/10/2026, `mcr.microsoft.com/dotnet/runtime-deps:10.0`, Ubuntu 24.04). **Không** nới kiểm
-tra chứng chỉ để chạy được trên Mac — xem CLAUDE.md mục BE-33a.
+tra chứng chỉ để chạy được trên Mac — xem `docs/agents/traps/auth-accounts.md`, mục BE-33a.
 
 Database dev tạo trước BE-33a có thể còn 14 tài khoản test `be12a-*` / `be12b-*` vi phạm CHECK mới; chạy
 `scripts/cleanup_be12_leftover_accounts.sql` (xem đầu file) **trước** `dotnet ef database update`.

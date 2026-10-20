@@ -216,7 +216,7 @@ namespace LuxMap.Persistence.Migrations
             // the device's own cabinet, and a switched feeder or device cannot move. CAB-5: a device never sits on a
             // field cabinet — ON UPDATE CASCADE carries the cabinet's provenance onto the device, where the CHECK
             // above refuses `field`. The cascade rewrites one non-commune column on a same-commune row, so the
-            // CommuneWriteGuard blind spot for database cascades (CLAUDE.md 1c) does not open.
+            // CommuneWriteGuard blind spot for database cascades (docs/agents/traps/commune-scope.md, section 1c) does not open.
             migrationBuilder.Sql("""
                 ALTER TABLE feeder ADD CONSTRAINT ux_feeder_feeder_id_cabinet_id UNIQUE (feeder_id, cabinet_id);
                 ALTER TABLE iot_node ADD CONSTRAINT ux_iot_node_node_id_cabinet_id UNIQUE (node_id, cabinet_id);

@@ -4,21 +4,11 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi sự cố, ph
 
 ## Năm quy tắc chốt ở BE-18 — sự cố
 
-**1. Ghi vết đặt TRÊN bảng `fault`, không có `FaultHistory`.**
+**1. Cột trên fault chỉ giữ quyết định MỚI NHẤT; audit giữ chuỗi.**
 
-Contract mục 2.5 chỉ cho kỹ sư đổi **ba** trường (`fault_status`, `override_fault_type`, `note`), nên
-số quyết định đáng ghi là hữu hạn và biết trước. Cột `reported_by` · `confirmed_by`+`confirmed_at` ·
-`resolved_by`+`resolved_at` trả lời thẳng câu hỏi *ai làm gì*. Một bảng change-log tổng quát nặng hơn
-vấn đề, và vẫn phải quyết "actor là gì khi engine sinh sự cố".
-
-⚠️ **Đánh đổi: chỉ giữ quyết định MỚI NHẤT, không giữ chuỗi.** Một fault đi
-`detected → confirmed → rejected` chỉ còn trạng thái cuối.
-
-> 🔴 **Audit trail nay là BẮT BUỘC, không còn "nếu BE-19 cần" (D-R13, 25/09/2026).** Phiếu v1.2 đòi
-> *"an audit trail of every automated finding and engineer decision"*. Hướng đã chốt: **một bảng audit
-> append-only dùng chung** cho quyết định fault (BE-18/19), lệnh điều khiển đèn (D-R7) và review survey
-> session — **không** làm `FaultHistory` riêng cho từng loại. Thiết kế chi tiết ở Phase 1 của **BE-19**.
-> Các cột trên dòng `fault` vẫn giữ (trả lời nhanh *ai quyết mới nhất*), nhưng không còn là toàn bộ vết.
+`reported_by`, `confirmed_by/at`, `resolved_by/at` trả lời nhanh ai quyết gần nhất, không thay audit append-only
+(BE-23a dưới đây). Chuỗi ví dụ hợp lệ: `detected → confirmed → in_progress → resolved`.
+PATCH có cả `severity`; request/response xem `PatchFaultRequest` và Contract §2.5, không dựng `FaultHistory` riêng.
 
 `reported_by` **NULL với fault do CV/IoT sinh**, và đó là câu trả lời đúng chứ không phải dữ liệu
 thiếu — `source_channel` đã nói engine nào. **Không dựng user hệ thống giả**: nó làm mọi dòng trông
@@ -31,25 +21,24 @@ thiếu — `source_channel` đã nói engine nào. **Không dựng user hệ th
 | Có `pole_id` | Server tra từ pole. Client gửi → **400** |
 | `pole_id` NULL | Lấy từ **scope JWT**. Đúng một commune → lấy luôn. Nhiều hơn một → **400**, client phải chọn (và giá trị chọn phải trong scope) |
 
-Không suy được từ `lat`/`lng`: **`administrative_unit` không có cột geometry** — cố ý khi đó, vì chưa có
-nguồn ranh giới thật (`AdministrativeUnit.cs`). ⚠️ Lý do này dựa trên FO-01 (nay `SUPERSEDED`) — **nền đã
-đổi, cần xét lại** (follow-up trong `tracking.html`). Đã đăng ký drift: Contract mục 2.8 không có
-`commune_id` trong body.
+Không suy xã từ `lat/lng`: `AdministrativeUnit` chưa có polygon ranh giới; bbox là khung nhìn, không phải ranh giới.
+Contract §2.8 đã có `commune_id` cho ca không pole (O-10 đã hợp nhất).
+
+Ảnh báo tại chỗ gửi qua `POST /faults/{id}/photos` (EV-2), không có `photo_frame_id` trong POST fault;
+`repair_evidence` có đúng một cha (phiếu **hoặc** sự cố). Xem `docs/contract-drift.md`, BE-24.
 
 **3. `priority_score` là cột LƯU, nullable.**
 
-Contract nói **CV-16 tính** — một tiến trình ngoài API, nên giá trị phải có chỗ ghi vào. Và mục 2.4
-đặt thứ tự mặc định `-priority_score`: sắp theo biểu thức tính lúc query thì **không dùng được index
-và phân trang không ổn định**. Fault CV-16 chưa chấm phải nằm **cuối**, không phải đầu.
+`priority_score` dành cho CV-16, nullable; **sort mặc định là `-severity`** (P-3, `FaultSort.Default`).
+Canh thứ tự mức bằng `FaultListTests.Default_order_is_severity_by_rank_not_alphabet_then_oldest_first`;
+luật hạng enum ở `CLAUDE.md`, mục Enum. Khi chọn sort priority, fault chưa chấm nằm cuối. Không hard-code trọng số; đổi trọng số phải xét tính lại dữ liệu lưu
+(theo P-1 / BE-33 / CV-16, không gán cho job BE-26).
 
-> 🔴 **`ix_fault_priority_score` trên DB là `DESC` TRẦN, không phải `DESC NULLS LAST`** (đo 29/09/2026:
-> `pg_indexes` → `btree (priority_score DESC)`). Postgres xếp NULL **lên đầu** với `DESC`, nên index
+> 🔴 **`ix_fault_priority_score` là `DESC` TRẦN, không phải `DESC NULLS LAST`** (`FaultConfigurations`). Postgres xếp NULL **lên đầu** với `DESC`, nên index
 > này không phục vụ thứ tự NULL-cuối. `IsDescending()` của EF không sinh `NULLS LAST`; câu cũ ở đây
 > và comment trong `FaultConfigurations` đã nói sai. **Truy vấn phải tự ép NULL xuống cuối**
 > (`OrderBy(x => x.PriorityScore == null)` trước) — BE-40 làm vậy, canh bằng sabotage trong
 > `FaultListTests`. Muốn index phục vụ được thì cần migration riêng (BE-32), đừng tưởng đã có.
-
-⚠️ **Nợ:** BE-33 đổi trọng số thì phải **tính lại toàn bảng**. Job nền là **BE-26 (W12)**.
 
 **4. `fault_cluster` là BẢNG, không phải cột text trần.**
 
@@ -58,52 +47,33 @@ không ràng buộc thứ HAI**, cùng họ với `pole_current_status.last_swee
 một giá trị trỏ vào cụm không tồn tại. Bảng cũng cho lần gom cụm chỗ tự ghi lại:
 `clustering_model_version` là thứ **BE-34** cần để trả lời *kết quả nào do model phiên bản nào sinh*.
 
-Chưa có gì ghi vào bảng này — CV-15 gom cụm, mà CV-15 phụ thuộc **BE-13** (chưa làm).
+Seed mock đã ghi `fault_cluster` (`scripts/seed_mock_set.py`); không đồng nhất dữ liệu seed với pipeline gom cụm CV-15.
+Tiến độ topology/gom cụm xem `tracking.html`.
 
 **5. Toàn bộ FK là `Restrict`. Fault là sự kiện đã xảy ra.**
 
 Xoá cột không làm cho việc "đèn từng hỏng ngày 20/8" chưa từng xảy ra, và cột ghi vết trên chính dòng
-đó **là** tiêu chí nghiệm thu của ticket. Cascade còn mở rộng **vùng mù** ở mục 1c — guard
+đó **là** tiêu chí nghiệm thu của ticket. Cascade còn mở rộng **vùng mù** ở `docs/agents/traps/commune-scope.md`, mục 1c — guard
 `SaveChanges` không thấy cascade do DB thực hiện.
 
 **Định nghĩa "fault MỞ" — CHỐT, một chỗ duy nhất: `FaultStatusSets.Open`.**
 
-```
-open fault  ==  fault_status ∈ { detected, confirmed, in_progress }
-```
-
-Contract liệt kê 6 trạng thái nhưng **không nói cái nào là mở** — `open_fault_count` xuất hiện đúng
-một lần ở mục 2.1, trong một khối code, **không kèm câu mô tả nào**; `has_open_fault` và
-`open_faults[]` cũng vậy. Trong khi đó `open_fault_count`, BE-28 và BE-40 đều cần **cùng một** câu
-trả lời. Ba ticket tự quyết riêng sẽ ra ba con số khác nhau mà không ai giải thích được.
+Tập mở và cách gọi `FaultStatusSets.Open` / `IsOpen`: xem `CLAUDE.md`, mục Enum (Contract §1).
 
 Ba trạng thái bị loại vì **ba lý do khác nhau** — đó là lý do tập này được viết ra tường minh thay vì
 diễn đạt kiểu "chưa xong": `rejected` = kỹ sư kết luận nó chưa từng là sự cố (dương tính giả),
 `resolved` = đã sửa, `verified` = đã nghiệm thu. Chỉ cái đầu là phán xét về **bản thân sự cố**.
-
-> 🔴 **KHÔNG viết lại tập trạng thái này ở bất kỳ đâu khác.** Không `IN ('detected', …)` trong SQL,
-> không `new[] { … }` trong LINQ, không danh sách chép tay trong test. Cần biết một fault có mở
-> không thì gọi **`FaultStatusSets.IsOpen(status)`**; cần cả tập thì dùng **`FaultStatusSets.Open`**.
-> Bản sao thứ hai sẽ đúng vào ngày nó được viết và sai vào ngày định nghĩa đổi, **và không có gì phát
-> hiện được** — cùng loại lỗi câm mà `commune_id` mồ côi và `LPAD` cắt ID đã gây ra.
-
-**Drift 27 giờ ĐÃ CÓ câu trả lời**, và đó là quyết định **nội bộ backend**, không phải đổi Contract:
-Contract không định nghĩa nên không có gì để mâu thuẫn. Vẫn giữ mục drift để nêu ở FW-00 — WP5 cần
-biết con số họ nhận được đếm theo tập nào.
 
 **Hai test canh, và chúng bắt hai thứ KHÁC nhau** (`OpenFaultCountTests`, ở `LuxMap.Shared.Tests` nên
 chạy được cả khi không có Docker):
 
 | Test | Canh gì | Đỏ khi |
 |---|---|---|
-| `The_count_on_every_pole_matches_the_faults_that_are_actually_open` | **DỮ LIỆU** — `open_fault_count` của cả 103 cột trong `mock-poles.geojson` khớp số đếm thật từ `mock-faults.json` | ai đó thêm/sửa fault mà quên cập nhật count |
+| `The_count_on_every_pole_matches_the_faults_that_are_actually_open` | **DỮ LIỆU** — `open_fault_count` của mọi cột trong `mock-poles.geojson` khớp số đếm thật từ `mock-faults.json` | ai đó thêm/sửa fault mà quên cập nhật count |
 | `Only_detected_confirmed_and_in_progress_count_as_open` | **ĐỊNH NGHĨA** — dựng fault trong bộ nhớ phủ cả 6 trạng thái | ai đó đổi tập trong `FaultStatusSets.Open` |
 
-⚠️ **Không gộp hai test làm một.** Kiểm bằng phá hoại: thêm `FaultStatus.Rejected` vào
-`FaultStatusSets.Open` làm test **định nghĩa ĐỎ** nhưng test **dữ liệu vẫn XANH** — vì cả 28 fault
-trong bộ mock hiện đều mở (21 `detected` + 7 `confirmed`, không có `rejected`/`resolved`/`verified`
-nào), nên nới định nghĩa không đổi con số nào. Test dữ liệu **không thể** phân biệt các định nghĩa
-"open" khác nhau cho tới khi bộ mock có fault đã đóng.
+⚠️ **Không gộp hai test làm một.** Mock chỉ có fault mở nên nới định nghĩa vẫn có thể giữ test dữ liệu xanh;
+test định nghĩa phải phủ cả trạng thái đóng. Giữ test định nghĩa độc lập với dữ liệu mock.
 
 **Hai test dùng CHUNG một hàm đếm** (`CountByPole`). Nếu tách thành hai đường thì test định nghĩa
 không còn bảo vệ test dữ liệu — nó sẽ chỉ khẳng định một ý kiến riêng.
@@ -116,7 +86,7 @@ before/after rồi gọi đúng một `SaveChanges` cùng thay đổi nghiệp v
 Guard ở cả sync/async từ chối sửa/xoá audit (kể cả backdoor); khi có thay đổi `IAudited`,
 bắt buộc đúng một audit mới. Backdoor chỉ bỏ yêu cầu có event cho seed/fixture.
 Guard đếm event, không chứng minh nội dung event khớp thao tác: service và test nghiệp vụ phải kiểm điều đó.
-BE-23 sẽ gắn marker cho WorkOrder/WorkOrderFault; Fault đợi BE-19.
+`WorkOrder`, `WorkOrderFault`, `WorkOrderSegment` và `Fault` đã implement `IAudited`; mọi writer phải stage audit.
 
 Trigger DB chặn UPDATE/DELETE/TRUNCATE với SQLSTATE `55000`.
 **Append-only chặn lỗi ứng dụng, KHÔNG chặn người có quyền SQL.**
@@ -160,8 +130,9 @@ Câu hỏi "fault nào đang nằm trong phiếu nào" đi qua port **`IActiveWo
 WorkOrders hiện thực. **BE-19 dùng lại đúng port này** để trả 409 khi fault thuộc phiếu sửa chữa đang
 chạy (WO-10) — đừng thêm project reference, và đừng chuyển endpoint fault sang WorkOrders.
 
-Port đọc `WorkOrderFault` (chỉ scope theo xã), **không** đọc `WorkOrder` (scope theo cả người được
-giao), nên ID trả về cả với phiếu người gọi không mở được — đó là quyết định F-3, không phải rò.
+`ActiveWorkOrdersAsync` chỉ đọc `WorkOrderFault` (scope xã), nên ID trả về cả với phiếu người gọi không mở được (F-3).
+`ActiveRepairsAsync` còn JOIN `WorkOrder.IgnoreQueryFilters` để đọc `TaskKind`; scope vẫn neo từ bảng nối đã lọc xã,
+không để assignee filter giấu phiếu sửa chữa của người khác (`ActiveWorkOrderLookup`).
 
 `location` của fault = `lat/lng` của fault, thiếu thì điểm của cột — **cùng luật** với chi tiết WO.
 CHECK `ck_fault_pole_or_location` cho phép fault có cột mà không toạ độ, nên chỉ đọc `fault.lat` là
@@ -207,9 +178,7 @@ bắt lỗi xong phải **rollback trước** mọi truy vấn khác (`WorkOrder
 `FaultType?` — EF không bind được một danh sách không-null vào cột nullable, cũng không dịch được
 `Contains(override ?? type)`.
 
-⚠️ **`Down()` của `AddFaultReview` gãy khi đã có audit `entity_type = 'fault'`** — nó dựng lại CHECK cũ
-chỉ nhận `work_order`, mà bảng audit không cho xoá. Rollback migration này chỉ chạy được trên DB chưa có
-quyết định sự cố nào (cùng họ lưu ý của BE-23a).
+Rollback `AddFaultReview`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 
 **Test chuyển trạng thái phải thử chuyển HỢP LỆ ở §3.2 nhưng cấm ở `PATCH`** (`confirmed → in_progress`).
 Chuyển mà máy trạng thái vốn cấm thì 409 dù có luật riêng của `PATCH` hay không — sabotage gỡ luật đó đã
@@ -280,9 +249,7 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
 **Test dựng nhiều cột trong MỘT `SaveChanges` không được giả định ID theo thứ tự `AddRange`** — EF không giữ thứ tự khi DB sinh khoá
 (cùng bẫy 7b). Kỳ vọng thứ tự phải sắp theo luật ID (`IdOrder` trong `SyncTests`).
 
-**Generator spec:** stub `ni()` của hai endpoint sync và các schema viết tay `Sync*`, `PoleFeature(Collection)`, `SegmentFeature(Collection)`,
-`PointGeometry`, `LineStringGeometry` đã xoá (mồ côi khi stub đi). `object?` trong C# xuất `nullable` không `type` → lint lỗi; vá ở phần
-"lint fix" của generator như `ApiError.details`.
+**Generator spec:** `object?` C# xuất `nullable` không `type` → lint lỗi; vá tại phần "lint fix" của generator như `ApiError.details`.
 
 ## BE-26 — job nền theo lịch trên lease của DB (14/10/2026, drift JB-1…JB-8)
 
@@ -307,8 +274,7 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
 - `fault.origin_node_id` cấu hình ở **Telemetry** (`FaultOriginNodeConfiguration`), như `origin_observation_id` ở Survey: Faults không
   tham chiếu Telemetry; Telemetry nay tham chiếu Faults. FK ghép `(origin_node_id, commune_id)` → `iot_node`; index FK khai tường minh
   cạnh unique partial (quy tắc partial index). CHECK `ck_fault_node_source`: có thiết bị ⇒ `iot` và không cột.
-- Teardown xoá `fault` (giữ `iot_node`) và `work_order_overdue_notice` (giữ `work_order`) **trước** cha. Rollback `AddScheduledJobs` gãy
-  khi `notification` đã có `work_order_overdue` (CHECK dựng lại không nhận) — cùng họ BE-19.
+- Teardown xoá `fault` (giữ `iot_node`) và `work_order_overdue_notice` (giữ `work_order`) **trước** cha. Rollback `AddScheduledJobs`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 - 🔴 **Mọi lời gọi DB của worker nằm TRONG vòng retry, kể cả bước tạo dòng lúc khởi động.** Exception thoát khỏi
   `BackgroundService.ExecuteAsync` với mặc định `StopHost` **dừng cả API** — DB khởi động chậm hơn API là đủ (review Codex F-1). Canh bằng
   `A_database_unavailable_at_startup_does_not_end_the_worker` (khoá bảng + `Command Timeout` 1 s; phá thử → đỏ).

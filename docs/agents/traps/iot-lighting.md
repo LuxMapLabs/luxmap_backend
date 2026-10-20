@@ -2,6 +2,9 @@
 
 Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi thiết bị IoT, scheme `Device`, lệnh ON/OFF/AUTO, MQTT. Luật chung cho mọi ticket nằm ở `CLAUDE.md`.
 
+**Phát hiện tự động từ IoT phải truy vết phiên bản firmware**, cùng yêu cầu model/artifact ở core (BE-34, ERD Q8).
+Không thay yêu cầu này bằng một version ứng dụng chung.
+
 ## BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 
 **Schema và quyền ghi tách nhau như `pole_current_status`.** `feeder_control` là bảng riêng khoá theo
@@ -12,6 +15,8 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi thiết bị 
 **`iot_node.data_source` siết hơn enum.** `ck_iot_node_data_source_not_field` chỉ nhận
 `calibration_rig | simulated`: nhóm không lắp thiết bị ngoài thực địa (D-R10). Mở rộng CHECK này là
 quyết định, không phải sửa lỗi.
+
+**Danh sách quan hệ tính lúc đọc**, không lưu bản sao: `controller_node_ids[]`, `segment_ids[]`, `feeder_ids[]` (I-7b).
 
 **`node_status` không lưu.** `IotOptions.StatusAt` tính từ `last_report_at` và `Iot:OfflineAfter`
 (mặc định 1 giờ); đúng bằng ngưỡng vẫn `online`. IOT-11 phải sinh `node_offline` từ **cùng**
@@ -32,8 +37,7 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 
 - 🔴 **Scheme `Device` KHÔNG phải mặc định; endpoint thiết bị gắn `[Authorize(Policy = DeviceAuth.Policy)]`, KHÔNG BAO GIỜ
   `[AllowAnonymous]`** (nó bỏ toàn bộ authorization). Policy `DeviceOnly` ghim `AddAuthenticationSchemes(Device)` — gỡ dòng đó thì
-  Bearer của người dùng chạm được endpoint thiết bị (phá thử: 3 test đỏ). Endpoint thiết bị thật (2b) phải là **ngoại lệ có tên** trong
-  `CapabilityPolicyCoverageTests` (policy ngoài ma trận), không nới luật chung.
+  Bearer của người dùng chạm được endpoint thiết bị. Coverage ngoại lệ máy: xem mục LC-12 và `CLAUDE.md`, Vai trò và phân quyền.
 - **Principal thiết bị:** `commune_ids` = đúng một xã của thiết bị (không bao giờ `*`), `device_node_id`, **không** `role` ⇒
   `CommuneScopeAccessor` có sẵn cho ra phạm vi một xã, query filter + guard áp như mọi request; không capability nào nhận nó. Mọi truy
   vấn lệnh (2b) còn phải lọc `node_id = device_node_id` — cùng xã không có nghĩa là được đụng thiết bị khác.
@@ -43,7 +47,7 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 - **Nối rơ-le khoá hàng `iot_node`** (`SELECT 1 … FOR UPDATE` rồi mới đọc qua filter); lệnh điều khiển (2b) phải lấy **cùng** khoá.
   Nối lại một rơ-le = xoá dòng `feeder_control` cũ + chèn dòng mới trong một `SaveChanges` (EF xoá trước, chèn sau — canh bằng test).
 - **Header theo RFC 9110:** chữ `Device` không phân biệt hoa thường, sau nó 1+ dấu cách; credential không chứa khoảng trắng.
-- 🔴 **`ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` ⇒ xoá `WWW-Authenticate`.** Trang 401 chỉ giữ lại challenge
+- Header lỗi theo `CLAUDE.md`, mục Bẫy chung. Trang 401 chỉ giữ lại challenge
   **trần** của scheme `Device` (`ApiConventionsSetup.DeviceChallenge`). **Đừng "sửa cho đều" thành giữ mọi challenge:** challenge
   của JwtBearer mang `error_description` (token hết hạn, sai khoá ký…) — đúng nguyên nhân mà `UNAUTHENTICATED` cố ý không tách.
 - **Khoá hàng sau khi đã scope:** đọc thiết bị qua filter xã TRƯỚC, rồi mới `FOR UPDATE` theo `node_id` **và** `commune_id` — khoá
@@ -54,7 +58,7 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 
 ## LIGHT-CTRL 2b — lệnh ON / OFF / AUTO (08/10/2026, drift LC-11)
 
-- **Một dịch vụ, mọi kênh:** `LightingCommandService` giữ trọn vòng đời (bấm, giao, ACK, hết hạn, thay). Adapter MQTT sau này
+- **Một dịch vụ, mọi kênh:** `LightingCommandService` giữ trọn vòng đời (bấm, giao, ACK, hết hạn, thay). `MqttLightingHandler` hiện
   **gọi đúng các hàm đó** — không viết luồng lệnh thứ hai, không để QoS của broker thay ACK nghiệp vụ.
 - 🔴 **Mọi lượt ghi chạm lệnh khoá hàng `iot_node` trước** (đọc qua filter → `FOR UPDATE` theo `node_id` + `commune_id` → đọc
   lại). Lần bấm nhiều thiết bị khoá theo thứ tự `node_id` ordinal; nối rơ-le lấy cùng khoá. Sau khoá phải **lập kế hoạch lại** và so —
@@ -63,20 +67,17 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
   cùng transaction. Nhánh trả lời sớm của ACK vẫn phải **commit** — không thì các lệnh hết hạn vừa lưu bị rollback.
 - **`seq` là cột identity**, không vẽ trước: DB cấp lúc INSERT, tăng dần qua mọi phiên; hai lần bấm trên một thiết bị đã tuần tự
   nhờ khoá. `command_id` thì **vẽ trước** (khuôn `NextFaultId`) vì audit của lần bấm phải liệt kê nó. Sắp lệnh theo `seq`,
-  **không** theo `command_id` (luật độ rộng tối thiểu, mục 0).
+  **không** theo `command_id` (luật độ rộng tối thiểu ở `CLAUDE.md`, mục Quy ước API).
 - **`control_mode` chỉ đổi theo báo cáo của thiết bị, chỉ khi `seq` mới hơn `mode_seq` VÀ chưa có lệnh mới hơn nào được giao cho
   rơ-le đó** (D-10, I-6) — kể cả ACK trên lệnh đã đóng (`COMMAND_CLOSED`, vẫn lưu audit `reported`). `mode_seq` một mình **không đủ**:
   nó nằm trên dòng `feeder_control`, mà tháo rơ-le là xoá dòng ⇒ tháo + nối lại sẽ reset nó (Codex review 2b). Lịch sử lệnh thì còn.
 - **Tắt `supports_remote_control` thay mọi lệnh đang mở** (registry, actor Quản lý) và **poll không bao giờ giao** cho thiết bị đã tắt
   cờ (actor `system` nếu cờ đổi đường khác) — D-R7.
-- 🔴 **Test chứng minh "có lấy khoá" phải giữ khoá bằng `FOR NO KEY UPDATE`, không `FOR UPDATE`.** Chèn hàng có FK tới `iot_node`
-  lấy KEY SHARE, và `UPDATE last_report_at` lấy NO KEY UPDATE — với `FOR UPDATE` cả hai tự chờ, test xanh dù service bỏ khoá
-  (phá thử đã lộ). Khuôn: `LightingCommandTests.HoldingTheDeviceLockAsync`; poll phải đẩy `last_report_at` ra tương lai trước.
-- **Lệnh thiết bị luôn lọc thêm `node_id` = principal** — cùng xã không có nghĩa là được đụng lệnh của thiết bị khác.
-- **Endpoint thiết bị là ngoại lệ có tên** trong `CapabilityPolicyCoverageTests.DeviceEndpoints` và trong `OpenApiSpecTests`
-  (`/api/v1/device/` khai scheme `Device`, không capability). Thêm endpoint thiết bị = sửa cả hai, nhìn thấy trong diff.
+- Test giữ khoá theo `CLAUDE.md`, mục Test; khuôn `LightingCommandTests.HoldingTheDeviceLockAsync`, poll đẩy `last_report_at` ra tương lai trước.
+- Lọc lệnh theo principal thiết bị: xem LIGHT-CTRL 2a, mục Principal thiết bị.
+- Endpoint thiết bị khai scheme `Device` trong `OpenApiSpecTests`; coverage máy theo mục LC-12 (`MachineEndpoints`). Thêm route phải sửa cả hai.
 - Teardown: `lighting_command` → `lighting_request` **trước** `feeder_control`, `iot_node`, `feeder` và tài khoản (đều `Restrict`).
-  Rollback `AddLightingCommands` gãy khi `audit_event` đã có giá trị mới (`system`, `lighting_*`, …) — cùng họ BE-19.
+  Rollback `AddLightingCommands`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 
 ## LC-12 — kênh MQTT cho thiết bị (08/10/2026)
 
@@ -85,8 +86,7 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 - **Worker không có principal ⇒ `LightingScopeFactory` tạo context phạm vi = xã của thiết bị** (khuôn `JobScope`). Tra thiết bị
   **không lọc** chỉ để lập danh tính / phạm vi (`CommuneOfAsync`, `NodesWithOpenCommandsAsync`); mọi xử lý nghiệp vụ đi qua context
   có phạm vi.
-- **Kiểm tra mà controller làm bằng DataAnnotations phải nằm trong service** (`AckAsync`: `seq`, `result` bắt buộc, `error` ≤ 500) —
-  bản tin MQTT không đi qua controller. Cùng luật BE-43.
+- Validation cho kênh ngoài HTTP theo `CLAUDE.md`, mục Bẫy chung; ví dụ `AckAsync`: `seq`, `result` bắt buộc, `error` ≤ 500 (MQTT không qua controller).
 - 🔴 **Endpoint của MÁY (thiết bị, broker) là ngoại lệ có tên** ở `CapabilityPolicyCoverageTests.MachineEndpoints` (route → policy).
   Callback broker dùng scheme `Broker` (khoá `Mqtt:CallbackKey`, so băm thời gian cố định), **không** `[AllowAnonymous]`, ẩn khỏi
   OpenAPI (`[ApiExplorerSettings(IgnoreApi = true)]`).
