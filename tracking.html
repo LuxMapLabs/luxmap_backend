@@ -119,18 +119,21 @@
   </div>
   <div class="card">
     <strong>WO-SURVEY-CHAIN — tạo lịch kiểm tra tiếp từ phiếu khảo sát, 20/10/2026</strong>
-    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/WO-SURVEY-CHAIN</code>. Đề xuất của WP5, review Claude + Codex: <strong>bác</strong> phần tạo
+    <p><span class="tag t-done">Đã merge #161</span> 20/10/2026. Đề xuất của WP5, review Claude + Codex: <strong>bác</strong> phần tạo
     sự cố lúc <code>verify</code> và gắn sự cố vào phiếu khảo sát (duyệt sweep đã sinh sự cố → trùng; liên kết không được giải phóng → chặn phiếu kiểm tra).
     Nay <code>follow-up</code> nhận <strong>khảo sát → kiểm tra</strong>, chung <code>case_id</code>; tập mang sang tính lúc gọi qua port
     <code>ISurveyFindingLookup</code>: kết quả <strong>mới nhất</strong> của từng cột trong các sweep đã duyệt → mọi sự cố <strong>mở</strong> cùng loại hiệu lực,
     kể cả sự cố có từ trước; bỏ sự cố đang ở phiếu khác (lọc lại sau khoá); chỉ xã neo. Không migration, không endpoint mới.
-    5 test mới (<code>SurveyPublicationTests</code>), 4 phá thử đều đỏ. Drift WSC-1…WSC-5, SELF-SIGNED. Còn: báo WP5 (nút "Tạo lịch kiểm tra").</p>
+    7 test mới (<code>SurveyPublicationTests</code>), 6 phá thử đều đỏ (2 thêm sau review Codex). Drift WSC-1…WSC-5, SELF-SIGNED. Còn: báo WP5 (nút "Tạo lịch kiểm tra").</p>
   </div>
   <div class="card">
     <strong>PHOTO-REVIEW — kỹ sư sửa nhãn AI của ảnh cột, 20/10/2026</strong>
-    <p><span class="tag t-next">Đang làm (Codex)</span> Nhánh <code>feat/PHOTO-REVIEW</code>. Đề xuất WP5 bỏ quyết định của Quản lý → <strong>bác phần xoá</strong>.
-    Mỹ chốt: Quản lý vẫn công bố; thêm <code>final_cv_state</code> / <code>review_note</code> / <code>reviewed_by</code> / <code>reviewed_at</code> +
-    <code>PATCH …/review</code> cho người được giao; nhãn người sửa công bố với confidence <strong>null</strong>, sự cố <code>field_report</code>.</p>
+    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/PHOTO-REVIEW</code> (Codex code, Claude review). Đề xuất WP5 bỏ quyết định của Quản lý →
+    <strong>bác phần xoá</strong>. Mỹ chốt: Quản lý vẫn công bố (<code>/decision</code> giữ nguyên); thêm <code>final_cv_state</code> / <code>review_note</code> /
+    <code>reviewed_by</code> / <code>reviewed_at</code> + <code>PATCH …/review</code> cho người được giao, phiếu <code>in_progress</code>, ảnh chưa quyết.
+    Confirm công bố <code>final_cv_state ?? cv_state</code>; nhãn người đổi → <code>status_confidence = null</code> (nới CHECK current-status), sự cố
+    <code>field_report</code>, <code>reported_by</code> = kỹ sư. Migration <code>AddPolePhotoReviews</code> (Down có preflight). Toàn bộ test xanh (Api 1112),
+    19/20 phá thử đỏ (con còn lại bị query filter chặn). Drift PP-11…PP-15, SELF-SIGNED. Còn: báo WP5/WP6.</p>
   </div>
   <div class="card">
     <strong>Phiếu demo cả 3 loại trong <code>luxmap_dev</code>, 15/10/2026</strong>

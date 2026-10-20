@@ -342,14 +342,12 @@ public sealed class PoleCurrentStatusConfiguration : IEntityTypeConfiguration<Po
 
         builder.HasCommuneReference(status => status.CommuneId);
 
-        // The invariant the mock set exhibits on all 103 poles: confidence is absent exactly when the
-        // status is `unknown`. Enforced in BOTH directions — no confidence without an observation, no
-        // observation without a confidence.
+        // PHOTO-REVIEW: a human classification has no AI score; unknown still cannot carry one.
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(
                 "ck_pole_current_status_confidence_matches_status",
-                "(status_confidence IS NULL) = (fixture_status = 'unknown')");
+                "fixture_status <> 'unknown' OR status_confidence IS NULL");
 
             // 0..1 and FINITE (BE-REVIEW-02, M-6 — drift 24). The XML doc promised 0..1 for months
             // while the column accepted 42.5, NaN and Infinity; a real INSERT proved it. NaN is the

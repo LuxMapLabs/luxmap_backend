@@ -71,6 +71,18 @@ public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService phot
         return File(stream, "image/jpeg");
     }
 
+    /// <summary>Assignee reviews ON/OFF before a Manager decides; changed labels require a note.</summary>
+    [HttpPatch("{photo_id}/review")]
+    [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
+    [ProducesResponseType(typeof(PolePhotoItem), 200)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 400)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 401)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 403)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 404)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 409)]
+    public Task<PolePhotoItem> Review(string id, [FromRoute(Name = "photo_id")] string photoId,
+        PolePhotoReviewRequest request, CancellationToken ct) => photos.ReviewAsync(id, photoId, request, ct);
+
     /// <summary>One Manager decision; an ON photo cannot disprove dim, and older photos cannot overwrite current status.</summary>
     [HttpPost("{photo_id}/decision")]
     [Authorize(Policy = LuxMapPolicies.ReviewSurveys)]

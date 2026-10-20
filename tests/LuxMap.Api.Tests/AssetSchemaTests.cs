@@ -210,7 +210,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
     }
 
     [Fact]
-    public async Task Status_confidence_is_absent_exactly_when_the_status_is_unknown()
+    public async Task Known_status_can_have_no_AI_score_after_human_review()
     {
         var poleId = await NewPoleAsync();
 
@@ -227,8 +227,8 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
             return await db.SaveChangesAsync();
         });
 
-        // The other direction: an observed status without a confidence must be rejected by the CHECK.
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => fixture.WriteAsSystemAsync(async db =>
+        // PHOTO-REVIEW D-3: known classifications may come from a human, without an AI score.
+        var written = await fixture.WriteAsSystemAsync(async db =>
         {
             var status = await db.Set<PoleCurrentStatus>()
                 .IgnoreQueryFilters()
@@ -237,9 +237,9 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
             status.FixtureStatus = FixtureStatus.Dim;
             status.StatusConfidence = null;
             return await db.SaveChangesAsync();
-        }));
+        });
 
-        Assert.Contains("ck_pole_current_status_confidence_matches_status", error.InnerException?.Message);
+        Assert.Equal(1, written);
     }
 
     /// <summary>

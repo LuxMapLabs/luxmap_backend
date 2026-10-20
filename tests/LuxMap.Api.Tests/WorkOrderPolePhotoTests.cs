@@ -50,7 +50,7 @@ public partial class WorkOrderTests
         {
             s.Replace(ServiceDescriptor.Singleton<IObjectStore>(poleStore));
             s.Replace(ServiceDescriptor.Singleton<ISingleLampPhotoHinter>(poleHints));
-            s.AddDbContext<LuxMapDbContext>((_, o) => o.AddInterceptors(poleSave));
+            s.AddDbContext<LuxMapDbContext>((_, o) => o.AddInterceptors(poleSave, photoCommands));
         }));
         if (polePhotoClients.TryGetValue(who, out var prior)) return prior;
         var client = polePhotoHost.CreateClient();
@@ -257,7 +257,7 @@ public partial class WorkOrderTests
 
     [Theory]
     [InlineData("inconclusive")] [InlineData(null)]
-    public async Task Inconclusive_or_unavailable_can_only_be_rejected(string? state)
+    public async Task Unreviewed_inconclusive_or_unavailable_can_only_be_rejected(string? state)
     {
         poleHints.Result = state is null ? null : new(state, null, "v1", "a1");
         var pole = await PlantPole(.2); var id = await Plant(WorkOrderStatus.InProgress);
@@ -457,6 +457,7 @@ public partial class WorkOrderTests
     private sealed class PhotoSaveProbe : SaveChangesInterceptor
     {
         public bool FailAnalysis;
+        public AuditAction? FailAction;
         public readonly List<int> EventCounts = [];
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData data,
             InterceptionResult<int> result, CancellationToken cancellationToken = default)
@@ -466,6 +467,8 @@ public partial class WorkOrderTests
                 || data.Context.ChangeTracker.Entries<Fault>().Any(e => e.State == EntityState.Added && e.Entity.OriginPolePhotoId != null)
                 || entries.Any(e => e.Entity.EntityId.StartsWith("WO-", StringComparison.Ordinal)))
                 EventCounts.Add(entries.Length);
+            if (FailAction is { } fail && entries.Any(e => e.Entity.Action == fail))
+                throw new InvalidOperationException("Injected review/decision save failure");
             if (FailAnalysis && entries.Any(e => e.Entity.Action == AuditAction.Analyzed))
                 throw new InvalidOperationException("Injected second-save failure");
             return ValueTask.FromResult(result);

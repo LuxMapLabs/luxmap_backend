@@ -13,11 +13,14 @@ public sealed class WorkOrderSchemaFilter : ISchemaFilter
         if (schema is not OpenApiSchema concrete || concrete.Properties is null) return;
         if (context.Type == typeof(PolePhotoItem))
         {
+            concrete.Properties["final_cv_state"] = WireValues(true, "on", "off");
             concrete.Properties["cv_state"] = WireValues(true, "on", "off", "inconclusive");
             concrete.Properties["ai_status"] = WireValues(false, "available", "unavailable");
             concrete.Properties["decision"] = WireValues(true, "confirm", "reject");
             concrete.Properties["status_reason"] = WireValues(true, "applied", "classification_preserved", "not_newer", "rejected");
         }
+        if (context.Type == typeof(PolePhotoReviewRequest))
+            concrete.Properties["final_cv_state"] = WireValues(false, "on", "off");
         if (context.Type == typeof(PolePhotoDecisionRequest))
             concrete.Properties["decision"] = WireValues(false, "confirm", "reject");
         if (context.Type == typeof(CreateWorkOrderRequest))
