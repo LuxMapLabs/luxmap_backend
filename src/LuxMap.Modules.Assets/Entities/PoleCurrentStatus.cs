@@ -9,8 +9,8 @@ namespace LuxMap.Modules.Assets.Entities;
 /// <c>status_confidence</c>, <c>last_seen_at</c>, <c>last_sweep_id</c>.
 /// <para>
 /// Those four are ONE event, not four fields. The shared publication writer (BE-15 → BE-17 / PP-9)
-/// writes them together at a single moment. The mock set proves it: <c>status_confidence</c> is null
-/// on exactly the seven <c>unknown</c> poles, not one row off.
+/// writes them together at a single moment. PHOTO-REVIEW also permits a human classification without
+/// an AI score; an ON photo preserving a prior classification keeps that classification's score.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -31,9 +31,8 @@ public class PoleCurrentStatus : ICommuneScoped
     public FixtureStatus FixtureStatus { get; set; }
 
     /// <summary>
-    /// 0..1, or <c>NULL</c> when the status is <c>unknown</c>. A CHECK constraint pins the two
-    /// together in both directions: no confidence without an observation, no observation without a
-    /// confidence.
+    /// Finite 0..1 AI score, or <c>NULL</c> for unknown or a human classification without an AI score.
+    /// Unknown must carry null; known statuses may have no score (PHOTO-REVIEW PP-14).
     /// </summary>
     public double? StatusConfidence { get; set; }
 

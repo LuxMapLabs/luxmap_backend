@@ -1427,6 +1427,20 @@ trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và h
 **WP5 cần nhận:** danh sách/media theo phiếu, thao tác duyệt, thông điệp ảnh cũ/inconclusive/unavailable, `last_sweep_id` có thể null khi cột đã được xác nhận bằng ảnh.
 FW cần xác nhận nền tạm; chưa có tuyên bố độ chính xác CV từ ảnh tổng hợp trong test.
 
+### PHOTO-REVIEW — kỹ sư sửa nhãn trước khi Quản lý công bố (20/10/2026)
+
+**Mỹ SELF-SIGNED 20/10/2026**, theo R-1…R-3 và D-1…D-5 trong `.ai/tasks/PHOTO-REVIEW.md`.
+Các mục PP-11…PP-15 chạm API ⇒ **nền tạm, chờ FW xác nhận**. WP5/WP6 **chưa báo**; Contract văn bản giữ nguyên.
+Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/decision`, policy `ReviewSurveys` và bốn trường `decision*`.
+
+| Mã | Quyết định / bề mặt client (nền tạm) |
+|---|---|
+| **PP-11** | Thêm `final_cv_state`, `review_note`, `reviewed_by`, `reviewed_at` vào mọi response `PolePhotoItem` (upload/replay/list/detail/decision/review). **Chưa review: cả bốn null**, không backfill; bộ `cv_state/confidence/model_version/artifact_version/analyzed_at` giữ nguyên. `PATCH /api/v1/work-orders/{id}/pole-photos/{photo_id}/review`, policy `ExecuteWorkOrders`, chỉ **người được giao**, phiếu `in_progress`, ảnh chưa có decision. Body `{final_cv_state: on\|off, review_note?: string\|null}`; 200 trả snapshot. Ngoài quyền role →403; chưa đăng nhập →401; cha ngoài xã/không được giao →404 `WORK_ORDER_NOT_FOUND`; ảnh ngoài phiếu/xã →404 `POLE_PHOTO_NOT_FOUND`. |
+| **PP-12** | Nhận on/off cả khi AI null/inconclusive. Trim note, trắng thành null; **khác `cv_state` (kể cả null) phải có note**, tối đa 2000 ký tự. Label sai/thiếu/null hoặc note thiếu/trắng khi cần/quá dài →400 `VALIDATION_FAILED`. Không có reset-null. Review không infer, lưu object, công bố current-status hay tạo fault. Khi confirm, nhãn hiệu lực là `final_cv_state ?? cv_state`; chỉ trả 409 `POLE_PHOTO_INCONCLUSIVE` nếu nhãn hiệu lực vẫn không phải on/off. Reject vẫn hợp lệ. |
+| **PP-13** | Cho sửa nhiều lần trước decision; cùng nhãn + note đã chuẩn hóa + reviewer là **no-op**: 200, giữ `reviewed_at`, không audit. Về đúng nhãn AI vẫn giữ dấu review, note có thể null. Phiếu không `in_progress` →409 `WORK_ORDER_NOT_IN_PROGRESS` sau kiểm quyền; ảnh đã quyết →409 `POLE_PHOTO_ALREADY_DECIDED`. Thứ tự khóa **work_order → pole → photo**, đọc lại dưới khóa; mỗi thay đổi review một audit `details_changed` User, snapshot before/after. Review/decision cùng transaction với audit; decision thắng thì review bị từ chối, review thắng thì decision dùng review mới. **Không If-Match** (D-5): `/decision` công bố review mới nhất sau khóa, có thể khác nội dung màn hình Quản lý vừa xem. |
+| **PP-14** | Nhãn người đổi (khác AI hoặc AI không kết luận) không mượn score/model AI: current-status mới `out`/`normal` có **`status_confidence=null`**. CHECK current-status nay chỉ cấm confidence khi `unknown`, vẫn giữ range hữu hạn; CHECK history/observation không đổi. Nhãn đúng AI dùng bộ AI gốc. Luật PP-9/PP-10 vẫn áp: on giữ dim/normal **và confidence cũ**, tiến observation clock; ảnh cũ/bằng không apply/tạo fault; không history/baseline, không đóng fault; áp ảnh thì last_sweep_id/last_run_id=null. Audit publication/decision/fault lưu nhãn hiệu lực, nguồn `ai`/`engineer`, reviewer/time/note và bộ AI gốc trong `provenance`. |
+| **PP-15** | Off người đổi tạo `lamp_out` **confirmed**, `source_channel=field_report`, `reported_by=reviewed_by`, `status_confidence=null`, `detection_model_version=null`; **`confirmed_by` vẫn là Quản lý**. Off đúng AI giữ nguồn `cv`, score/artifact AI. Cả hai giữ `origin_pole_photo_id`, nguồn dữ liệu/xã/tuyến theo cột và severity cấu hình survey; chống trùng effective lamp_out thuộc `FaultStatusSets.Open` bất kể source. FK reviewer Restrict, CHECK bộ review/note và photo-origin fault; PLAN copy giữ reviewer hoặc loại ảnh cùng fault phụ thuộc. `Down()` từ chối nếu đã có review, known-status không score hoặc photo fault nguồn mới: rollback ứng dụng, giữ schema; không xóa dấu review/bịa score/đổi source để ép rollback. |
+
 ### LOGIN-RATE — giới hạn tần suất đăng nhập (19/10/2026)
 
 | | |

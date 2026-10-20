@@ -18,7 +18,7 @@ class PolePhotoCopyPlanTests(unittest.TestCase):
                 CREATE TABLE public.pole(pole_id TEXT, commune_id TEXT);
                 CREATE TABLE public.work_order(work_order_id TEXT, commune_id TEXT);
                 CREATE TABLE public.work_order_pole_photo(photo_id TEXT, work_order_id TEXT, pole_id TEXT,
-                    commune_id TEXT, uploaded_by TEXT, decided_by TEXT);
+                    commune_id TEXT, uploaded_by TEXT, decided_by TEXT, reviewed_by TEXT);
                 CREATE TABLE public.fault(fault_id TEXT, commune_id TEXT, origin_pole_photo_id TEXT);
                 CREATE TABLE public.work_order_fault(work_order_id TEXT, fault_id TEXT, commune_id TEXT);
                 CREATE TABLE public.repair_evidence(evidence_id TEXT, fault_id TEXT, commune_id TEXT);
@@ -30,10 +30,12 @@ class PolePhotoCopyPlanTests(unittest.TestCase):
                 INSERT INTO public.pole VALUES ('pole','COM-001');
                 INSERT INTO public.work_order VALUES ('order','COM-001');
                 INSERT INTO public.work_order_pole_photo VALUES
-                    ('keep-photo','order','pole','COM-001','kept-user','kept-user'),
-                    ('drop-photo','order','pole','COM-001','left-user','kept-user');
+                    ('keep-photo','order','pole','COM-001','kept-user','kept-user','kept-user'),
+                    ('drop-photo','order','pole','COM-001','left-user','kept-user',NULL),
+                    ('drop-review','order','pole','COM-001','kept-user',NULL,'left-user'),
+                    ('keep-unreviewed','order','pole','COM-001','kept-user',NULL,NULL);
                 INSERT INTO public.fault VALUES ('keep-fault','COM-001','keep-photo'),
-                    ('drop-fault','COM-001','drop-photo'), ('ordinary-fault','COM-001',NULL);
+                    ('drop-fault','COM-001','drop-photo'), ('drop-review-fault','COM-001','drop-review'), ('ordinary-fault','COM-001',NULL);
                 INSERT INTO public.work_order_fault VALUES ('order','keep-fault','COM-001'), ('order','drop-fault','COM-001');
                 INSERT INTO public.repair_evidence VALUES ('keep-evidence','keep-fault','COM-001'),
                     ('drop-evidence','drop-fault','COM-001'), ('order-evidence',NULL,'COM-001');
@@ -45,7 +47,7 @@ class PolePhotoCopyPlanTests(unittest.TestCase):
                 INSERT INTO public.citizen_photo VALUES ('keep-citizen-photo','keep-send'), ('drop-citizen-photo','drop-send');
             """)
             cases = [
-                ("work_order_pole_photo", "photo_id", ["keep-photo"]),
+                ("work_order_pole_photo", "photo_id", ["keep-photo", "keep-unreviewed"]),
                 ("fault", "fault_id", ["keep-fault", "ordinary-fault"]),
                 ("work_order_fault", "fault_id", ["keep-fault"]),
                 ("repair_evidence", "evidence_id", ["keep-evidence", "order-evidence"]),

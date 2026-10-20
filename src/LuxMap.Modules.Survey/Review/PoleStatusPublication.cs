@@ -12,7 +12,7 @@ internal static class PoleStatusPublication
         FixtureStatus status, double? confidence, DateTime evaluatedAt, DateTime now,
         string? sweepId, long? runId, CancellationToken ct)
     {
-        if ((status == FixtureStatus.Unknown) != (confidence is null)
+        if (status == FixtureStatus.Unknown && confidence is not null
             || confidence is { } c && (!double.IsFinite(c) || c is < 0 or > 1))
             throw new InvalidOperationException("Invalid published confidence.");
         var current = await db.Set<PoleCurrentStatus>().SingleOrDefaultAsync(p => p.PoleId == poleId, ct);

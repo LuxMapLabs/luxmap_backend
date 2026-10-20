@@ -245,4 +245,23 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.Equal(new[] { "manager" }, review.GetProperty("x-luxmap-roles").EnumerateArray().Select(v => v.GetString()));
     }
 
+    [Fact]
+    public void Pole_photo_review_is_additive_assignee_only_and_has_literal_wire_fields()
+    {
+        const string path = "/api/v1/work-orders/{id}/pole-photos/{photo_id}/review";
+        var review = Spec.GetProperty("paths").GetProperty(path).GetProperty("patch");
+        Assert.Equal("cap:execute_work_orders", review.GetProperty("x-luxmap-capability").GetString());
+        Assert.Equal(new[] { "field_engineer" }, review.GetProperty("x-luxmap-roles").EnumerateArray().Select(v => v.GetString()));
+        foreach (var code in new[] { "200", "400", "401", "403", "404", "409" })
+            Assert.True(review.GetProperty("responses").TryGetProperty(code, out _));
+        var request = Schema("PolePhotoReviewRequest");
+        Assert.Contains("final_cv_state", request.GetProperty("required").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal(new[] { "on", "off" }, request.GetProperty("properties").GetProperty("final_cv_state").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal(2000, request.GetProperty("properties").GetProperty("review_note").GetProperty("maxLength").GetInt32());
+        var fields = Schema("PolePhotoItem").GetProperty("properties");
+        Assert.Equal(new[] { "on", "off" }, fields.GetProperty("final_cv_state").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        foreach (var field in new[] { "final_cv_state", "review_note", "reviewed_by", "reviewed_at", "decision", "decided_by", "decided_at", "decision_note" })
+            Assert.True(fields.GetProperty(field).GetProperty("nullable").GetBoolean());
+    }
+
 }

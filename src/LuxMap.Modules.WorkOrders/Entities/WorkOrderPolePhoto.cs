@@ -30,6 +30,10 @@ public sealed class WorkOrderPolePhoto : ICommuneScoped, IAudited
     public string? ModelVersion { get; set; }
     public string? ArtifactVersion { get; set; }
     public DateTime? AnalyzedAt { get; set; }
+    public string? FinalCvState { get; set; }
+    public string? ReviewNote { get; set; }
+    public string? ReviewedBy { get; set; }
+    public DateTime? ReviewedAt { get; set; }
     public string? Decision { get; set; }
     public string? DecidedBy { get; set; }
     public DateTime? DecidedAt { get; set; }
