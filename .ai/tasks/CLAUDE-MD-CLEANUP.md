@@ -1,8 +1,8 @@
 ---
 ticket: CLAUDE-MD-CLEANUP
 title: Tách CLAUDE.md thành lõi + tra cứu theo vùng, sửa nội dung lỗi thời
-status: ready
-phase: 1
+status: review
+phase: 2
 owner: claude
 branch: docs/CLAUDE-MD-CLEANUP
 ---
