@@ -67,7 +67,10 @@ public sealed class FollowUpWorkOrderRequest
     [Required] public TaskKind? TaskKind { get; init; }
     /// <summary>Defaults to the parent's title.</summary>
     [StringLength(200, MinimumLength = 1)] public string? Title { get; init; }
-    /// <summary>A subset of the parent's fault_present faults, to split the next step; defaults to all of them.</summary>
+    /// <summary>
+    /// A subset of the faults the parent carries, to split the next step; defaults to all of them. An inspection carries
+    /// its fault_present faults; a survey the open faults on the poles its accepted result found out / dim (drift WSC-2).
+    /// </summary>
     public string[]? FaultIds { get; init; }
     public string? AssignedTo { get; init; }
     public DateOnly? DueDate { get; init; }

@@ -20,7 +20,7 @@ using Npgsql;
 namespace LuxMap.Modules.WorkOrders;
 
 public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor actor,
-    IAuditTrail audit, FaultTransitions transitions)
+    IAuditTrail audit, FaultTransitions transitions, ISurveyFindingLookup surveys)
 {
     private string ActorId => actor.UserId ?? throw new LuxMapException("UNAUTHENTICATED", HttpStatusCode.Unauthorized, "Authentication required.");
 
@@ -202,7 +202,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     /// <summary>
     /// Creates the next step of a chain from a verified work order (drift FR-2). The server carries the
-    /// target over — the faults the inspection found present — so the Manager only picks who and when.
+    /// target over — the faults the inspection found present, or the open faults on the poles an accepted
+    /// survey found out / dim (WSC-2) — so the Manager only picks who and when.
     /// </summary>
     public async Task<WorkOrderDetail> FollowUp(string id, FollowUpWorkOrderRequest request, CancellationToken ct)
     {
@@ -213,22 +214,46 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         if (!WorkOrderRules.FollowUpKinds(parent.TaskKind).Contains(kind))
             throw Error("INVALID_STATE_TRANSITION", HttpStatusCode.Conflict, ("work_order_id", id),
                 ("task_kind", parent.TaskKind), ("allowed_follow_up_kinds", WorkOrderRules.FollowUpKinds(parent.TaskKind)));
-        var present = await db.Set<WorkOrderFault>()
+        Func<Fault, bool>? keep = null;
+        List<string> present;
+        if (parent.TaskKind == TaskKind.Survey)
+        {
+            var findings = (await surveys.FindingsAsync(id, parent.CommuneId, ct))
+                .Select(x => (x.PoleId, x.FaultType, x.DataSource)).ToHashSet();
+            var poles = findings.Select(x => x.PoleId).Distinct().ToArray();
+            var open = FaultStatusSets.Open.ToArray();
+            // WSC-2…WSC-4: open, in the survey's anchor commune, not held by a running order, and matching the pole's
+            // latest accepted result by data source and EFFECTIVE type — a fault opened before the survey included.
+            keep = fault => fault.CommuneId == parent.CommuneId && FaultStatusSets.IsOpen(fault.FaultStatus)
+                && findings.Contains((fault.PoleId!, fault.OverrideFaultType ?? fault.FaultType, fault.DataSource));
+            var candidates = await db.Set<Fault>().AsNoTracking()
+                .Where(x => x.CommuneId == parent.CommuneId && poles.Contains(x.PoleId!) && open.Contains(x.FaultStatus)
+                    && !db.Set<WorkOrderFault>().Any(link => link.FaultId == x.FaultId && link.ReleasedAt == null))
+                .ToListAsync(ct);
+            present = candidates.Where(keep).Select(x => x.FaultId).ToList();
+        }
+        else present = await db.Set<WorkOrderFault>()
             .Where(x => x.WorkOrderId == id && x.InspectionOutcome == InspectionOutcome.FaultPresent)
             .Select(x => x.FaultId).ToListAsync(ct);
         if (present.Count == 0) throw Error("NOTHING_TO_FOLLOW_UP", HttpStatusCode.Conflict, ("work_order_id", id));
         var ids = request.FaultIds ?? present.ToArray();
         if (ids.Length == 0 || ids.Distinct().Count() != ids.Length || ids.Except(present).Any())
-            throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "fault_ids"), ("carried_fault_ids", present.Order().ToArray()));
+            throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "fault_ids"),
+                ("carried_fault_ids", present.OrderBy(x => x.Length).ThenBy(x => x, StringComparer.Ordinal).ToArray()));
         var faults = await db.Set<Fault>().Where(x => ids.Contains(x.FaultId))
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).ToListAsync(ct);
         var title = request.Title is null ? parent.Title : ValidTitle(request.Title);
         return await Insert(new(kind, title, faults, null, request.AssignedTo, request.DueDate, request.ScheduledDate,
-            request.Note, Materials(request.MaterialsNote), parent), ct);
+            request.Note, Materials(request.MaterialsNote), parent, keep), ct);
     }
 
+    /// <param name="Keep">
+    /// Set for a survey follow-up: after the fault locks, a fault that no longer qualifies or was taken by
+    /// another order meanwhile is dropped rather than failing the whole request (WSC-3).
+    /// </param>
     private sealed record NewWorkOrder(TaskKind Kind, string Title, List<Fault> Faults, RoadSegment? Road,
-        string? AssignedTo, DateOnly? DueDate, DateOnly? ScheduledDate, string? Note, string? MaterialsNote, WorkOrder? Parent);
+        string? AssignedTo, DateOnly? DueDate, DateOnly? ScheduledDate, string? Note, string? MaterialsNote, WorkOrder? Parent,
+        Func<Fault, bool>? Keep = null);
 
     private async Task<WorkOrderDetail> Insert(NewWorkOrder order, CancellationToken ct)
     {
@@ -239,6 +264,14 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         await FaultLocks.LockAsync(db, ids, ct);
         var faults = await db.Set<Fault>().AsNoTracking().Where(x => ids.Contains(x.FaultId))
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).ToListAsync(ct);
+        if (order.Keep is { } keep)
+        {
+            var busy = await db.Set<WorkOrderFault>().Where(x => ids.Contains(x.FaultId) && x.ReleasedAt == null)
+                .Select(x => x.FaultId).ToListAsync(ct);
+            faults = faults.Where(x => keep(x) && WorkOrderRules.Eligible(order.Kind, x.FaultStatus) && !busy.Contains(x.FaultId)).ToList();
+            if (faults.Count == 0) throw Error("NOTHING_TO_FOLLOW_UP", HttpStatusCode.Conflict, ("work_order_id", order.Parent!.WorkOrderId));
+            ids = faults.Select(x => x.FaultId).ToArray();
+        }
         string commune;
         string? segment;
         if (faults.Count > 0)

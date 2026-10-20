@@ -1,5 +1,6 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Faults;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Map.Features;
@@ -7,6 +8,7 @@ using LuxMap.Modules.Notifications.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Modules.Survey.Review;
+using LuxMap.Modules.WorkOrders;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
@@ -16,6 +18,7 @@ using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NetTopologySuite.Geometries;
@@ -77,11 +80,11 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     private sealed record Capture(string Id, long Run, uint Version, string Frame, DateTime At);
-    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false, string? alsoTouches = null)
+    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false, string? alsoTouches = null, string? workOrder = null)
     {
         await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
         var at = DateTime.UnixEpoch.AddDays(20000 + day);
-        var sweep = new SurveySweep { WorkOrderId = order, CommuneId = a, CapturedBy = user, ClientOpId = Guid.NewGuid(), BootSessionId = Guid.NewGuid(),
+        var sweep = new SurveySweep { WorkOrderId = workOrder ?? order, CommuneId = a, CapturedBy = user, ClientOpId = Guid.NewGuid(), BootSessionId = Guid.NewGuid(),
             CreateRequestHash = new('a',64), UtcAnchor = at, EndedElapsedNs = 10_000_000_000L, DataSource = DataSource.Simulated,
             Status = SweepStatus.AwaitingReview, ProcessingStatus = SweepProcessingStatus.Succeeded };
         db.Add(sweep); await db.SaveChangesAsync();
@@ -636,24 +639,190 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         Assert.Equal(3, detail.LuminanceHistory.Count); // history belongs to the pole, not the lamp
     }
 
+    // WO-SURVEY-CHAIN (drift WSC-1…WSC-5): a verified survey follows up into an inspection carrying the open faults
+    // on the poles its latest accepted result found out / dim, in its anchor commune only.
+    private WorkOrderService Orders(LuxMapDbContext db) => new(db, new Actor(user), new AuditTrail(db, new Correlation()),
+        new FaultTransitions(), new SurveyFindingLookup(db));
+
+    private async Task VerifyOrder()
+    {
+        await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
+        var wo = await db.Set<WorkOrder>().SingleAsync(w => w.WorkOrderId == order);
+        wo.WoStatus = WorkOrderStatus.Verified; wo.CompletedAt = wo.ClosedAt = DateTime.UtcNow; wo.ReportNote = "Surveyed both roads";
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<string> PlantFault(FaultType type, FaultStatus status, FaultType? overridden = null, string? heldBy = null,
+        DataSource source = DataSource.Simulated)
+    {
+        await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
+        var fault = new Fault { CommuneId = a, SegmentId = road, PoleId = poles[0], FaultType = type, OverrideFaultType = overridden,
+            FaultStatus = status, Severity = Severity.Medium, SourceChannel = SourceChannel.FieldReport, ReportedBy = user,
+            DataSource = source, DetectedAt = DateTime.UnixEpoch.AddDays(19990) };
+        db.Add(fault); await db.SaveChangesAsync();
+        if (heldBy is not null) db.Add(new WorkOrderFault { WorkOrderId = heldBy, FaultId = fault.FaultId, CommuneId = a, LinkedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync(); return fault.FaultId;
+    }
+
+    private async Task<string> RunningInspection()
+    {
+        await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
+        var now = DateTime.UtcNow;
+        var wo = new WorkOrder { CommuneId = a, CreatedBy = user, AssignedTo = user, AssignedAt = now, TaskKind = TaskKind.Inspection,
+            WoStatus = WorkOrderStatus.Assigned, Title = "Already running", SegmentId = road, CreatedAt = now, UpdatedAt = now };
+        db.Add(wo); await db.SaveChangesAsync(); return wo.WorkOrderId;
+    }
+
+    private async Task<WorkOrderDetail> FollowUp(TaskKind kind = TaskKind.Inspection, IInterceptor? interceptor = null)
+    {
+        await using var db = Db(interceptor: interceptor);
+        return await Orders(db).FollowUp(order, new FollowUpWorkOrderRequest { TaskKind = kind }, default);
+    }
+
+    [Fact]
+    public async Task A_verified_survey_follows_up_into_an_inspection_carrying_the_anchor_communes_new_fault_on_one_case()
+    {
+        await Accept(await Plant(1, state: "off"));
+        await using (var db = Db())
+            Assert.DoesNotContain("follow_up", (await Orders(db).Detail(order, default)).AllowedActions);
+        await VerifyOrder();
+        await using (var db = Db())
+            Assert.Contains("follow_up", (await Orders(db).Detail(order, default)).AllowedActions);
+
+        var child = await FollowUp();
+
+        await using var check = Db();
+        var created = await check.Set<Fault>().SingleAsync(f => f.PoleId == poles[0]);
+        Assert.Equal(TaskKind.Inspection, child.TaskKind);
+        Assert.Equal(order, child.ParentWorkOrderId);
+        Assert.Equal(order, child.CaseId);
+        Assert.Equal(a, child.CommuneId);
+        // The commune B pole was out too, but only the anchor commune's fault is carried (WSC-4).
+        Assert.Equal([created.FaultId], child.FaultIds);
+        Assert.True(await check.Set<Fault>().AnyAsync(f => f.PoleId == poles[1] && f.FaultStatus == FaultStatus.Detected));
+        // The survey itself stays without fault links (WSC-5).
+        Assert.False(await check.Set<WorkOrderFault>().AnyAsync(l => l.WorkOrderId == order));
+    }
+
+    [Fact]
+    public async Task A_fault_opened_before_the_survey_is_carried_by_effective_type_and_busy_rejected_or_other_type_ones_are_not()
+    {
+        var running = await RunningInspection();
+        var earlier = await PlantFault(FaultType.LampDim, FaultStatus.Confirmed, overridden: FaultType.LampOut);
+        await PlantFault(FaultType.LampDim, FaultStatus.Detected);
+        await PlantFault(FaultType.LampOut, FaultStatus.Rejected);
+        await PlantFault(FaultType.LampOut, FaultStatus.Detected, heldBy: running);
+        await PlantFault(FaultType.LampOut, FaultStatus.Detected, source: DataSource.Field);
+        await Accept(await Plant(1, state: "off"));
+        await VerifyOrder();
+
+        var child = await FollowUp();
+
+        Assert.Equal([earlier], child.FaultIds);
+        await using var check = Db();
+        // The earlier fault suppressed a new one at publication: carrying only faults the survey created would lose it.
+        Assert.Equal(5, await check.Set<Fault>().CountAsync(f => f.PoleId == poles[0]));
+    }
+
+    [Fact]
+    public async Task The_latest_accepted_result_decides_so_an_older_out_followed_by_normal_carries_nothing()
+    {
+        // Accepted in reverse capture order: the later night (normal) is still the latest result.
+        await Accept(await Plant(2)); await Accept(await Plant(1, state: "off"));
+        await VerifyOrder();
+        await PlantFault(FaultType.LampOut, FaultStatus.Detected);
+
+        var refused = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp());
+        Assert.Equal("NOTHING_TO_FOLLOW_UP", refused.Code);
+    }
+
+    [Fact]
+    public async Task Another_survey_orders_later_normal_does_not_take_this_orders_finding_away()
+    {
+        await Accept(await Plant(1, state: "off"));
+        string other;
+        await using (var db = Db())
+        {
+            using var seed = db.EnterUnscopedSystemWriteBackdoor();
+            var wo = new WorkOrder { CommuneId = a, CreatedBy = user, AssignedTo = user, AssignedAt = DateTime.UtcNow, TaskKind = TaskKind.Survey,
+                WoStatus = WorkOrderStatus.InProgress, Title = "Second survey", StartedAt = DateTime.UtcNow };
+            db.Add(wo); await db.SaveChangesAsync(); other = wo.WorkOrderId;
+        }
+        await Accept(await Plant(2, workOrder: other));
+        await VerifyOrder();
+
+        var child = await FollowUp();
+
+        await using var check = Db();
+        Assert.Equal([await check.Set<Fault>().Where(f => f.PoleId == poles[0]).Select(f => f.FaultId).SingleAsync()], child.FaultIds);
+    }
+
+    [Fact]
+    public async Task A_survey_follows_up_only_once_verified_and_only_into_an_inspection()
+    {
+        await Accept(await Plant(1, state: "off"));
+        var early = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp());
+        Assert.Equal("INVALID_STATE_TRANSITION", early.Code);
+        await VerifyOrder();
+        var repair = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp(TaskKind.Repair));
+        Assert.Equal("INVALID_STATE_TRANSITION", repair.Code);
+        Assert.Equal(new[] { TaskKind.Inspection }, repair.Details["allowed_follow_up_kinds"]);
+    }
+
+    [Fact]
+    public async Task A_fault_taken_by_another_order_while_waiting_for_its_lock_is_dropped_not_a_409()
+    {
+        var running = await RunningInspection();
+        var taken = await PlantFault(FaultType.LampOut, FaultStatus.Confirmed);
+        var kept = await PlantFault(FaultType.LampOut, FaultStatus.Detected);
+        await Accept(await Plant(1, state: "off"));
+        await VerifyOrder();
+
+        var child = await FollowUp(interceptor: new TakeBeforeLock(this, taken, running));
+
+        Assert.Equal([kept], child.FaultIds);
+        await using var db = Db();
+        Assert.Equal(running, await db.Set<WorkOrderFault>().Where(l => l.FaultId == taken).Select(l => l.WorkOrderId).SingleAsync());
+    }
+
+    /// <summary>Links the fault to another order on a separate connection just before the follow-up takes the fault locks.</summary>
+    private sealed class TakeBeforeLock(SurveyPublicationTests test, string fault, string holder) : DbCommandInterceptor
+    {
+        private bool done;
+        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(System.Data.Common.DbCommand command,
+            CommandEventData data, InterceptionResult<int> result, CancellationToken ct = default)
+        {
+            if (!done && command.CommandText.Contains("FROM fault WHERE fault_id = ANY", StringComparison.Ordinal))
+            {
+                done = true;
+                await using var db = test.Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
+                db.Add(new WorkOrderFault { WorkOrderId = holder, FaultId = fault, CommuneId = test.a, LinkedAt = DateTime.UtcNow });
+                await db.SaveChangesAsync(ct);
+            }
+            return result;
+        }
+    }
+
     public async Task DisposeAsync()
     {
         await using var db = Db(); await using var tx = await db.Database.BeginTransactionAsync();
         await db.Database.ExecuteSqlRawAsync("SET LOCAL luxmap.audit_purge = 'on'");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {a} OR commune_id = {b}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_fault WHERE commune_id = {a} OR commune_id = {b}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM fault WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole_current_status WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM luminance_history WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM baseline_member WHERE baseline_id IN (SELECT baseline_id FROM luminance_baseline WHERE pole_id = ANY({poles}))");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole_observation WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM luminance_baseline WHERE pole_id = ANY({poles})");
-        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE survey_sweep SET status = 'awaiting_review', accepted_run_id = NULL, reviewed_at = NULL, reviewed_by = NULL, review_client_op_id = NULL, review_request_hash = NULL WHERE work_order_id = {order}");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_pass WHERE run_id IN (SELECT run_id FROM survey_processing_run WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id = {order}))");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_processing_run WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id = {order})");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_frame WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id = {order})");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_video_clip WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id = {order})");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_sweep WHERE work_order_id = {order}");
-        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_segment WHERE work_order_id = {order}");
+        await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE survey_sweep SET status = 'awaiting_review', accepted_run_id = NULL, reviewed_at = NULL, reviewed_by = NULL, review_client_op_id = NULL, review_request_hash = NULL WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_pass WHERE run_id IN (SELECT run_id FROM survey_processing_run WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b})))");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_processing_run WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b}))");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_frame WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b}))");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_video_clip WHERE sweep_id IN (SELECT sweep_id FROM survey_sweep WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b}))");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM survey_sweep WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_segment WHERE work_order_id IN (SELECT work_order_id FROM work_order WHERE commune_id = {a} OR commune_id = {b})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order WHERE (commune_id = {a} OR commune_id = {b}) AND work_order_id <> {order}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order WHERE work_order_id = {order}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM fixture WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE pole_id = ANY({poles})");

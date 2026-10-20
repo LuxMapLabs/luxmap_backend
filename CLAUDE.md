@@ -1580,6 +1580,12 @@ trong cùng `verify`, cùng audit. Đây là ngoại lệ thứ hai của "chỉ
 biết: sự cố `confirmed` có thể có `confirmed_by` là người nghiệm thu một phiếu, không phải người gọi
 `PATCH /faults`.
 
+**Khảo sát → kiểm tra (WO-SURVEY-CHAIN, drift WSC-1…WSC-5).** Phiếu khảo sát **không bao giờ** có `work_order_fault`: tập
+mang sang tính lúc gọi `follow-up`, qua port **`ISurveyFindingLookup`** (Survey hiện thực — Survey tham chiếu WorkOrders, không
+ngược lại). Chọn kết quả **mới nhất** của từng cột rồi mới xét `out`/`dim`; lọc ngược lại thì một `out` cũ sống lại sau `normal`.
+Nhánh khảo sát truyền `NewWorkOrder.Keep`: `Insert` lọc lại **sau** `FaultLocks` và **bỏ** sự cố vừa bị phiếu khác lấy thay vì 409.
+Đừng "sửa" thành tạo sự cố lúc `verify`: duyệt sweep đã sinh sự cố (`SurveyReviewService.Publish`).
+
 ### BE-19 — duyệt sự cố, audit và khoá hàng (29/09/2026)
 
 **`Fault` là `IAudited`.** Mọi đường ghi sự cố (BE-41 báo tại chỗ, ingest CV/IoT, IOT-11) phải thêm

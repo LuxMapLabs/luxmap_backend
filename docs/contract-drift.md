@@ -1439,3 +1439,20 @@ FW cần xác nhận nền tạm; chưa có tuyên bố độ chính xác CV t�
 | LG-1 | `POST /auth/login` và `POST /auth/web/login` trả **`429 RATE_LIMITED`** kèm header `Retry-After` (giây) khi một địa chỉ client vượt **10 lần / 5 phút** (cửa sổ cố định; cấu hình `RateLimits:Login`). Hình dạng lỗi như `POST /auth/password/forgot` (Contract v1.8 mục 0, bảng mã lỗi) |
 | LG-2 | **Hai endpoint chung MỘT xô** theo địa chỉ, và **mọi** lần thử đều đếm — đúng hay sai mật khẩu. Qua giới hạn thì mật khẩu **không được kiểm** (kể cả đúng) cho tới khi cửa sổ mở lại. Client nên hiện thông báo kèm thời gian chờ từ `Retry-After`, không tự thử lại |
 | LG-3 | `refresh`, `logout`, `me` **không** bị giới hạn. Địa chỉ là địa chỉ sau reverse proxy tin cậy (`ForwardedHeaders:KnownProxies`); nhiều máy chung một IP công khai (CGNAT nhà mạng, NAT văn phòng xã) dùng chung xô |
+
+### WO-SURVEY-CHAIN — tạo lịch kiểm tra tiếp từ phiếu khảo sát (20/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan) chốt 20/10/2026 sau review đề xuất của WP5 (Claude + Codex). Chạm bề mặt API (cặp `follow_up` mới, ngữ nghĩa `fault_ids`) ⇒ **SELF-SIGNED, nền tạm**, chờ FW kế tiếp xác nhận. Mở rộng FR-2 ("khảo sát thêm ở BE-15") |
+| **Đề xuất gốc bị bác** | Tạo sự cố lúc `verify` phiếu khảo sát và ghi `work_order_fault` vào phiếu khảo sát: duyệt sweep **đã** sinh sự cố `detected` (BE-15/BE-17) nên sẽ trùng, và liên kết thêm lúc verify không được giải phóng nên chặn chính phiếu kiểm tra |
+| **Consumer** | WP5 (nút "Tạo lịch kiểm tra" trên phiếu khảo sát). **Chưa báo** |
+| **Scope** | WorkOrders (`FollowUp`, `FollowUpKinds`, port `ISurveyFindingLookup`), Survey (`SurveyFindingLookup`). Không migration, không endpoint mới, không đổi hình dạng body/response |
+
+| Mã | Quyết định |
+|---|---|
+| WSC-1 | `POST /work-orders/{id}/follow-up` nhận cặp **khảo sát → kiểm tra** (thêm vào kiểm tra → sửa chữa). Phiếu khảo sát `verified` có `follow_up` trong `allowed_actions` của Quản lý; khảo sát → sửa chữa vẫn 409 `INVALID_STATE_TRANSITION`, `allowed_follow_up_kinds = ["inspection"]`. Phiếu con có `parent_work_order_id` = phiếu khảo sát và `case_id` = phiếu khảo sát (gốc chuỗi) |
+| WSC-2 | Tập mang sang **tính lúc gọi**, không lưu trước: lấy kết quả **mới nhất** của từng cột trong các sweep **đã duyệt** của phiếu (`luminance_history` của `accepted_run_id`, theo `evaluated_at`, rồi `published_at`, rồi `sweep_id` theo độ dài) — chọn mới nhất **trước** rồi mới xét `out`/`dim`, nên lần sau `normal`/`unknown` làm mất phát hiện cũ. Mang mọi sự cố **còn mở** trên cột đó cùng `data_source` và cùng **loại hiệu lực** (`override_fault_type ?? fault_type`: `out → lamp_out`, `dim → lamp_dim`), **kể cả sự cố đã mở từ trước** khảo sát (lúc duyệt sweep nó chặn việc sinh sự cố mới) |
+| WSC-3 | Bỏ qua sự cố đang nằm trong phiếu **đang chạy** khác (`released_at IS NULL`), kể cả khi bị lấy **trong lúc** chờ khoá: lọc lại sau khi khoá sự cố, không trả 409 cả request. Không còn gì → 409 `NOTHING_TO_FOLLOW_UP`. Khác nhánh kiểm tra → sửa chữa, nơi sự cố bận vẫn là 409 `FAULT_ALREADY_IN_WORK_ORDER` |
+| WSC-4 | Khảo sát liên xã: chỉ mang sự cố thuộc **xã neo** của phiếu khảo sát (`work_order.commune_id`). Xã khác cần phiếu riêng |
+| WSC-5 | Phiếu khảo sát **không** có liên kết `work_order_fault` và luồng này **không** tạo sự cố. `fault_ids` vẫn là tập con của tập mang sang; sai → 400 kèm `carried_fault_ids`, nay sắp theo độ dài rồi mã (luật ID độ rộng tối thiểu) ở cả hai nhánh |
