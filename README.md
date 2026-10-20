@@ -6,7 +6,7 @@ Web SPA (WP5), app Android (WP6) và engine CV (WP4) qua REST API `/api/v1`.
 
 - Đặc tả API: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) — nguồn sự thật, thắng mọi tài liệu khác
 - Đọc code từ đâu: [`docs/code-walkthrough.md`](docs/code-walkthrough.md)
-- Sơ đồ trạng thái (sự cố, phiếu, khảo sát, QR, lệnh đèn…): [`docs/state-machines.md`](docs/state-machines.md)
+- Sơ đồ trạng thái (sự cố, phiếu, khảo sát, QR, lệnh đèn…), viết bằng tiếng Anh: [`docs/state-machines.md`](docs/state-machines.md)
 - Quy ước và các bẫy đã biết: [`CLAUDE.md`](CLAUDE.md)
 - Lệnh và cấu hình chi tiết: [`docs/development.md`](docs/development.md)
 - Triển khai lên máy chủ: [`docs/deploy/vps.md`](docs/deploy/vps.md)
