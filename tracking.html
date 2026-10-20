@@ -83,8 +83,18 @@
     Chưa làm: dời offline qua <code>/sync/push</code>; audit khi sửa <code>geom</code> bằng form đầy đủ / import.</p>
   </div>
   <div class="card">
+    <strong>OPS-DEPLOY v1 — vá runbook sau review sẵn sàng deploy, 19/10/2026</strong>
+    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>fix/OPS-DEPLOY-v1-readiness</code>. Review của Codex trên <code>dev</code> (99ec6fd), Claude
+    kiểm lại từng điểm. Sửa: tạo <code>/var/backups/luxmap</code> ở mục 4 <strong>trước</strong> lần deploy đầu (trước đây ở mục 8, nên
+    <code>deploy.sh</code> dừng ở bước backup), và <code>deploy.sh</code> nay chặn sớm trước khi build nếu không ghi được thư mục đó; mục 7 xoá mật khẩu dev
+    bằng SQL <strong>khi API còn tắt</strong> (trước đây API bật lại với mật khẩu dev trước khi đổi); base URL Android là <code>https://&lt;tên miền&gt;/</code>,
+    không kèm <code>api/v1</code>; web build với <code>VITE_API_URL=/api/v1</code>; <code>.env.example</code> thêm khoá worker khảo sát, <strong>để tắt</strong>
+    vì cổng <code>VIDEO_DEVICE_MAPPING_PENDING</code> (D-07) làm mọi sweep <code>field</code> thất bại vĩnh viễn nếu bật. Còn: rate limit cho
+    <code>/auth/login</code> và <code>/auth/web/login</code>; lỗi chặn của web/mobile thuộc WP5/WP6.</p>
+  </div>
+  <div class="card">
     <strong>OPS-DEPLOY-VPS — triển khai lên một VPS, 15/10/2026</strong>
-    <p><span class="tag t-next">Đã merge (PR #150) · chờ Mỹ thuê VPS + mua tên miền</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
+    <p><span class="tag t-next">Đã merge (PR #150) · tên miền <code>luxmap.com.vn</code> đã có (19/10) · chờ thuê VPS</span> Nhánh <code>feat/OPS-DEPLOY-VPS</code>.
     Mỹ chốt V-1…V-6: <strong>một VPS Singapore</strong>, Docker Compose; <strong>PostGIS trên VPS</strong> (thay Supabase, <code>supabase.md</code> giữ làm
     lịch sử); <strong>mua tên miền, web và API cùng origin</strong> (<code>/</code> web, <code>/api/v1</code> API); không EMQX (thiết bị dùng kênh HTTP).
     Files: <code>Dockerfile</code> (API + ffmpeg + EF bundle, chạy non-root), <code>.dockerignore</code> (allowlist), <code>deploy/compose.yml</code>
