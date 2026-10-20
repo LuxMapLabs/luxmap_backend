@@ -7,8 +7,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 [ -f .env ] || { echo "deploy/.env is missing: cp .env.example .env, then fill it in" >&2; exit 1; }
-if grep -q 'CHANGE_ME' .env; then
-  echo "deploy/.env still has CHANGE_ME values" >&2
+# Comments are skipped: the template's own header mentions CHANGE_ME, so a fully filled .env would never pass.
+unfilled="$(grep -v '^[[:space:]]*#' .env | grep 'CHANGE_ME' | cut -d= -f1 || true)"
+if [ -n "$unfilled" ]; then
+  echo "deploy/.env still has CHANGE_ME values:" $unfilled >&2
   exit 1
 fi
 mkdir -p web

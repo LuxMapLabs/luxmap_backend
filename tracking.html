@@ -90,7 +90,9 @@
     bằng SQL <strong>khi API còn tắt</strong> (trước đây API bật lại với mật khẩu dev trước khi đổi); base URL Android là <code>https://&lt;tên miền&gt;/</code>,
     không kèm <code>api/v1</code>; web build với <code>VITE_API_URL=/api/v1</code>; <code>.env.example</code> thêm khoá worker khảo sát, <strong>để tắt</strong>
     vì cổng <code>VIDEO_DEVICE_MAPPING_PENDING</code> (D-07) làm mọi sweep <code>field</code> thất bại vĩnh viễn nếu bật. Còn: rate limit cho
-    <code>/auth/login</code> và <code>/auth/web/login</code>; lỗi chặn của web/mobile thuộc WP5/WP6.</p>
+    <code>/auth/login</code> và <code>/auth/web/login</code>; lỗi chặn của web/mobile thuộc WP5/WP6.
+    <strong>20/10 (lúc dựng VPS thật):</strong> <code>deploy.sh</code> từ chối mọi <code>.env</code> dù đã điền đủ, vì dò <code>CHANGE_ME</code> cả ở
+    dòng chú thích đầu file mẫu — nay bỏ qua chú thích và nêu tên khoá còn thiếu.</p>
   </div>
   <div class="card">
     <strong>OPS-DEPLOY-VPS — triển khai lên một VPS, 15/10/2026</strong>
