@@ -10,7 +10,7 @@ thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 > Contract v1.7 §2.
 >
 > 📄 **Nguồn phiếu hiện hành: v1.4 (27/09/2026)** — mục *Registration v1.4* bên dưới. Vai trò không đổi so
-> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R25…D-R28 **còn chờ quyết**.
+> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R28 = A **chốt 02/10** (BE-15 Phase 1); D-R26 ghi nhận; D-R25, D-R27 **còn chờ quyết**.
 
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
 archive: (1) ghi ngay, bốn trường Decision / Decision maker / Date / Scope; (2) policy là một vai trò
@@ -1470,3 +1470,10 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | WSC-3 | Bỏ qua sự cố đang nằm trong phiếu **đang chạy** khác (`released_at IS NULL`), kể cả khi bị lấy **trong lúc** chờ khoá: lọc lại sau khi khoá sự cố, không trả 409 cả request. Không còn gì → 409 `NOTHING_TO_FOLLOW_UP`. Khác nhánh kiểm tra → sửa chữa, nơi sự cố bận vẫn là 409 `FAULT_ALREADY_IN_WORK_ORDER` |
 | WSC-4 | Khảo sát liên xã: chỉ mang sự cố thuộc **xã neo** của phiếu khảo sát (`work_order.commune_id`). Xã khác cần phiếu riêng |
 | WSC-5 | Phiếu khảo sát **không** có liên kết `work_order_fault` và luồng này **không** tạo sự cố. `fault_ids` vẫn là tập con của tập mang sang; sai → 400 kèm `carried_fault_ids`, nay sắp theo độ dài rồi mã (luật ID độ rộng tối thiểu) ở cả hai nhánh |
+
+### CLAUDE-MD-CLEANUP — chỗ lệch tìm ra khi rà CLAUDE.md (20/10/2026)
+
+| Mã | Chỗ lệch | Xử lý |
+|---|---|---|
+| CLAUDE-MD-1 | Contract tự mâu thuẫn về nguồn `lamp_out` / `lamp_dim`: `api-contract-v1.1.md:285` nói chỉ từ CV, `:703` (BE-41) cho Kỹ sư hiện trường báo tại chỗ (`field_report`); code nhận cả hai (`FaultReportService`), và ảnh cột người sửa nhãn cũng sinh `field_report` (PP-15) | Sửa câu `:285` ở lần lên version kế tiếp; không đổi hành vi |
+| CLAUDE-MD-2 | Tóm tắt đầu file này (dòng 13) ghi D-R25…D-R28 "còn chờ quyết", nhưng **D-R28 = A** đã chốt ở BE-15 Phase 1 (02/10, mục *BE-15 Phase 1 — chốt*) | **Đã sửa** câu tóm tắt cùng PR; D-R25, D-R27 vẫn chờ |
