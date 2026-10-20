@@ -29,7 +29,7 @@ Contract §2.8 đã có `commune_id` cho ca không pole (O-10 đã hợp nhất)
 
 **3. `priority_score` là cột LƯU, nullable.**
 
-`priority_score` dành cho CV-16, nullable; **sort mặc định là `-severity`** (P-3, `FaultSort.Default`).
+`priority_score` là cột **lưu**, nullable, dành cho CV-16 (tiến trình ngoài API) ghi vào — sắp theo biểu thức tính lúc query thì không dùng được index và phân trang không ổn định; **sort mặc định là `-severity`** (P-3, `FaultSort.Default`).
 Canh thứ tự mức bằng `FaultListTests.Default_order_is_severity_by_rank_not_alphabet_then_oldest_first`;
 luật hạng enum ở `CLAUDE.md`, mục Enum. Khi chọn sort priority, fault chưa chấm nằm cuối. Không hard-code trọng số; đổi trọng số phải xét tính lại dữ liệu lưu
 (theo P-1 / BE-33 / CV-16, không gán cho job BE-26).
