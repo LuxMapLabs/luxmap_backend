@@ -35,6 +35,7 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddSingleton<IFrameExtractor, FfmpegFrameExtractor>();
         services.AddScoped<Review.SurveyReviewService>();
         services.AddScoped<LuxMap.Modules.WorkOrders.IPolePhotoPublication, Review.ReviewedPolePhotoPublisher>();
+        services.AddScoped<LuxMap.Modules.WorkOrders.ISurveyFindingLookup, Review.SurveyFindingLookup>();
         services.AddScoped<Review.SurveyMediaAccess>();
         services.AddOptions<Review.SurveyReviewOptions>().Bind(configuration.GetSection("SurveyReview"))
             .Validate(o => o.IsValid(), "Invalid SurveyReview options.").ValidateOnStart();

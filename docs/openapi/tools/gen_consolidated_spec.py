@@ -227,7 +227,7 @@ for method, suffix, summary in [
     ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault"),
     ("post", "/{id}/return", "Quản lý trả việc để làm tiếp"),
     ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),
-    ("post", "/{id}/follow-up", "[FR-2] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu; server mang sự cố fault_present sang, chung case_id"),
+    ("post", "/{id}/follow-up", "[FR-2, WSC] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu, chung case_id: kiểm tra → sửa chữa mang sự cố fault_present; khảo sát → kiểm tra mang sự cố mở trên cột mà lần khảo sát đã duyệt thấy out/dim (xã neo)"),
 ]:
     SUMMARY[(method, "/api/v1/work-orders" + suffix)] = "[TẠM — WO-1…WO-12] " + summary
 

@@ -19,9 +19,10 @@ public static class WorkOrderRules
         _ => false,
     };
 
-    /// <summary>Which kinds may follow a verified work order of this kind (drift FR-2). Survey joins with BE-15.</summary>
+    /// <summary>Which kinds may follow a verified work order of this kind (drift FR-2, WSC-1).</summary>
     public static TaskKind[] FollowUpKinds(TaskKind parent) => parent switch
     {
+        TaskKind.Survey => [TaskKind.Inspection],
         TaskKind.Inspection => [TaskKind.Repair],
         _ => [],
     };
