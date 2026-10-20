@@ -287,15 +287,33 @@ stateDiagram-v2
 
 ## 7. IoT device — `node_status`
 
-Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter` (default 1 hour) on every read.
+Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter` (default 1 minute) on every read.
 
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> never_reported : Device registered
-    never_reported --> online : First report
-    online --> offline : Silent > OfflineAfter
-    offline --> online : Reports again
+```flowchart TD
+    A["Scheduled job: node_offline (BE-26)"] --> B["Find IoT devices"]
+    B --> C{"Has reported before?"}
+
+    C -- No --> D["Keep never_reported"]
+    C -- Yes --> E{"Silence duration > OfflineAfter?"}
+
+    E -- No --> F["No offline fault created"]
+    E -- Yes --> G{"Already processed this offline transition?"}
+
+    G -- No --> H["Create one node_offline fault"]
+    H --> I["status = detected"]
+    I --> J["source_channel = iot"]
+
+    G -- Yes --> K["Do not create duplicate fault"]
+
+    J --> L["Device reports again"]
+    L --> M["node_status = online"]
+    M --> N["Existing fault remains open"]
+    N --> O["Manager handles fault"]
+
+    D --> P["End"]
+    F --> P
+    K --> P
+    O --> P
 ```
 
 - Exactly at the threshold is still `online`.
