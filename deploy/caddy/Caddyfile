@@ -48,8 +48,21 @@
 		}
 	}
 
+	# Built JS/CSS carry a content hash in the name, so a new build never reuses a URL: cache for a year. No SPA
+	# fallback here — a missing asset must stay a 404, never index.html cached as a script.
+	handle /assets/* {
+		root * /srv/web
+		# Only on a file that exists: a 404 marked immutable would be cached for the year too.
+		@exists file
+		header @exists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	handle {
 		root * /srv/web
+		# index.html (and every SPA route that serves it) is revalidated on each load, so the browser picks up a
+		# new deploy at once. Without a Cache-Control header it guessed a lifetime and kept running the old bundle.
+		header Cache-Control "no-cache"
 		# Client-side routes (/map, /work-orders/WO-0001) are served index.html; the SPA router takes over.
 		try_files {path} /index.html
 		file_server
