@@ -61,7 +61,7 @@ public sealed class PoleDetailService(
             .Where(f => f.PoleId == poleId && f.RemovedDate == null)
             .Select(f => new { f.FixtureId, Detail = new PoleMapFixture
             {
-                FixtureType = f.FixtureType, PowerSource = f.PowerSource, LampWatt = f.LampWatt,
+                FixtureType = f.FixtureType, PowerSource = f.PowerSource, LampWatt = f.LampWatt, LampCount = f.LampCount,
                 InstallDate = f.InstallDate, WarrantyExpiry = f.WarrantyExpiry,
             } })
             .SingleOrDefaultAsync(ct);

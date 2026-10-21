@@ -1470,3 +1470,18 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | WSC-3 | Bỏ qua sự cố đang nằm trong phiếu **đang chạy** khác (`released_at IS NULL`), kể cả khi bị lấy **trong lúc** chờ khoá: lọc lại sau khi khoá sự cố, không trả 409 cả request. Không còn gì → 409 `NOTHING_TO_FOLLOW_UP`. Khác nhánh kiểm tra → sửa chữa, nơi sự cố bận vẫn là 409 `FAULT_ALREADY_IN_WORK_ORDER` |
 | WSC-4 | Khảo sát liên xã: chỉ mang sự cố thuộc **xã neo** của phiếu khảo sát (`work_order.commune_id`). Xã khác cần phiếu riêng |
 | WSC-5 | Phiếu khảo sát **không** có liên kết `work_order_fault` và luồng này **không** tạo sự cố. `fault_ids` vẫn là tập con của tập mang sang; sai → 400 kèm `carried_fault_ids`, nay sắp theo độ dài rồi mã (luật ID độ rộng tối thiểu) ở cả hai nhánh |
+
+### LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn (21/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan) chọn hướng **A** ngày 21/10/2026: một bản ghi `fixture` mang số bóng giống nhau lắp cùng lúc, **không** mở nhiều bóng đang dùng trên một cột (hướng B). Giữ D-11 (BE-REVIEW-02): mỗi cột tối đa một bản ghi bóng đang dùng. Chạm bề mặt API (trường mới) ⇒ **SELF-SIGNED, nền tạm** |
+| **Consumer** | WP5 (form / import tài sản, popup bản đồ), WP6 (chi tiết cột). **Chưa báo** |
+| **Scope** | Assets, Map, WorkOrders, Statistics; migration `AddFixtureLampCount`; mock `mock-poles.geojson` / `mock-pole-detail.json` thêm `lamp_count: 1`; spec sinh lại |
+
+| Mã | Quyết định |
+|---|---|
+| LMC-1 | Cột `fixture.lamp_count integer NOT NULL DEFAULT 1`, CHECK `ck_fixture_lamp_count` = `1..4` (trần bắt lỗi gõ công suất vào ô số bóng). Bóng hiện có tự thành 1. **`lamp_watt` là công suất MỘT bóng** — tổng = `lamp_count × lamp_watt`, không lưu |
+| LMC-2 | `POST /assets/fixtures` nhận `lamp_count?` (1..4, vắng = 1; ngoài khoảng → 400). Import bóng: cột `lamp_count` **tuỳ chọn**, ô trống / thiếu cột = 1, ngoài 1..4 → lỗi theo dòng. Không có PUT: đổi số bóng = ghi bóng cũ đã tháo (`removed_date`) rồi thêm bản ghi mới, như thay bóng |
+| LMC-3 | `lamp_count` xuất hiện ở mọi chỗ có `lamp_watt`: `properties` của `GET /map/poles` (**nullable**, `null` khi cột không có bóng đang dùng), `fixture` của `GET /map/poles/{id}`, `active_fixture` của danh sách tài sản, `GET /work-orders/{id}/poles`, `GET /statistics/warranty` (cả CSV) |
+| LMC-4 | **Trạng thái đèn vẫn theo cột**, không theo bóng: CV và đỉnh lux mỗi cột không tách được hai bóng. Cột hai bóng tắt một → CV thấy ON, lux tụt so với baseline → `dim`. Thay bộ đèn (đổi số bóng) là bản ghi `fixture` mới nên baseline cũ không còn dùng (khuôn sẵn có của baseline theo bóng) |

@@ -127,6 +127,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                         lamp.PowerSource,
                         lamp.FixtureType,
                         lamp.LampWatt,
+                        lamp.LampCount,
                         lamp.InstallDate,
                         lamp.WarrantyExpiry,
                     })
@@ -163,6 +164,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                     PowerSource = row.Lamp?.PowerSource,
                     FixtureType = row.Lamp?.FixtureType,
                     LampWatt = row.Lamp?.LampWatt,
+                    LampCount = row.Lamp?.LampCount,
                     InstallDate = row.Lamp?.InstallDate,
                     WarrantyExpiry = row.Lamp?.WarrantyExpiry,
                     WarrantyStatus = window.Classify(row.Lamp?.WarrantyExpiry),

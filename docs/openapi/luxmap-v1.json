@@ -11430,6 +11430,7 @@
           "fixture_id",
           "fixture_type",
           "install_date",
+          "lamp_count",
           "lamp_watt",
           "power_source"
         ],
@@ -11445,6 +11446,10 @@
             "$ref": "#/components/schemas/PowerSource"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32"
           },
@@ -12670,6 +12675,13 @@
             "minimum": 1,
             "type": "integer",
             "format": "int32"
+          },
+          "lamp_count": {
+            "maximum": 4,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "install_date": {
             "type": "string",
@@ -15044,6 +15056,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "lamp_count": {
+            "type": "integer",
+            "format": "int32"
+          },
           "install_date": {
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
@@ -15514,6 +15530,11 @@
             "$ref": "#/components/schemas/FixtureType"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32",
             "nullable": true
@@ -17070,6 +17091,11 @@
             "format": "int32",
             "nullable": true
           },
+          "lamp_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "install_date": {
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
@@ -17587,6 +17613,7 @@
           "fixture_id",
           "fixture_type",
           "install_date",
+          "lamp_count",
           "lamp_watt",
           "pole_id",
           "segment_id",
@@ -17615,6 +17642,11 @@
             "$ref": "#/components/schemas/FixtureType"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32",
             "nullable": true
@@ -18179,6 +18211,11 @@
             "$ref": "#/components/schemas/FixtureType"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32",
             "nullable": true

@@ -142,6 +142,24 @@ internal sealed class ImportRowReader(IImportRow row, List<ImportRowError> error
         return value;
     }
 
+    /// <summary>An empty cell (or a file without the column) is <paramref name="fallback"/>; anything else must be a whole number in range.</summary>
+    public int OptionalInt(string column, int fallback, int min, int max)
+    {
+        var text = row[column];
+        if (text is null)
+        {
+            return fallback;
+        }
+
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < min || value > max)
+        {
+            Fail(column, $"'{text}' is not a whole number from {min} to {max}.");
+            return fallback;
+        }
+
+        return value;
+    }
+
     /// <summary>Contract section 0: dates without a time are <c>YYYY-MM-DD</c>, never the locale format.</summary>
     public DateOnly? Date(string column, bool required)
     {

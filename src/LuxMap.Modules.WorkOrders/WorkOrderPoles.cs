@@ -38,9 +38,10 @@ public sealed record WorkOrderPole
     public int OpenFaultCount { get; init; }
     public bool NearSensitivePoi { get; init; }
 
-    /// <summary>The lamp in use; both <c>null</c> when the pole has no active fixture.</summary>
+    /// <summary>The lamp in use; all <c>null</c> when the pole has no active fixture.</summary>
     public FixtureType? FixtureType { get; init; }
     public int? LampWatt { get; init; }
+    public int? LampCount { get; init; }
 
     /// <summary>Faults of THIS work order standing on the pole — the poles to repair or inspect.</summary>
     public required string[] WorkOrderFaultIds { get; init; }
@@ -109,7 +110,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 Status = db.Set<PoleCurrentStatus>().Where(s => s.PoleId == p.PoleId)
                     .Select(s => new { s.FixtureStatus, s.StatusConfidence, s.LastSeenAt }).FirstOrDefault(),
                 Lamp = db.Set<Fixture>().Where(f => f.PoleId == p.PoleId && f.RemovedDate == null)
-                    .Select(f => new { f.FixtureType, f.LampWatt }).FirstOrDefault(),
+                    .Select(f => new { f.FixtureType, f.LampWatt, f.LampCount }).FirstOrDefault(),
                 // FaultStatusSets.Open is the one definition of an open fault (BE-18); never a copied list.
                 OpenFaults = db.Set<Fault>().Count(f => f.PoleId == p.PoleId && OpenStatuses.Contains(f.FaultStatus)),
             })
@@ -155,6 +156,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 NearSensitivePoi = r.NearSensitivePoi,
                 FixtureType = r.Lamp?.FixtureType,
                 LampWatt = r.Lamp?.LampWatt,
+                LampCount = r.Lamp?.LampCount,
                 WorkOrderFaultIds = faultsByPole.GetValueOrDefault(r.PoleId, []),
                 Note = r.Note,
             };

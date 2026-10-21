@@ -66,6 +66,7 @@ public sealed record PoleMapFixture
     public FixtureType FixtureType { get; init; }
     public PowerSource PowerSource { get; init; }
     public int LampWatt { get; init; }
+    public int LampCount { get; init; }
     public DateOnly InstallDate { get; init; }
 
     /// <summary><c>null</c> = warranty expiry unknown, which must read differently from "still covered" (D-R16).</summary>

@@ -359,8 +359,8 @@ S["LatLng"] = {"type": "object", "required": ["lat", "lng"], "additionalProperti
 
 S["PoleProperties"] = {
     "type": "object", "additionalProperties": False,
-    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1). Không có data_source / external_ref / feeder_id (không emit).",
-    "required": ["pole_id", "segment_id", "fixture_status", "power_source", "fixture_type", "lamp_watt",
+    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1) + lamp_count (LAMP-COUNT LMC-3). Không có data_source / external_ref / feeder_id (không emit).",
+    "required": ["pole_id", "segment_id", "fixture_status", "power_source", "fixture_type", "lamp_watt", "lamp_count",
                  "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
     "properties": OrderedDict([
         ("pole_id", {"$ref": "#/components/schemas/PoleId"}),
@@ -371,6 +371,8 @@ S["PoleProperties"] = {
         ("power_source", {"$ref": "#/components/schemas/PowerSource"}),
         ("fixture_type", {"$ref": "#/components/schemas/FixtureType"}),
         ("lamp_watt", {"type": "integer", "format": "int32"}),
+        ("lamp_count", {"type": "integer", "format": "int32", "minimum": 1, "maximum": 4, "nullable": True,
+                        "description": "LAMP-COUNT LMC-1: số bóng giống nhau của bộ đèn đang dùng (cột cần đôi = 2); lamp_watt là công suất MỘT bóng; null khi cột không có bóng đang dùng"}),
         ("install_date", {"type": "string", "format": "date"}),
         ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),
         ("warranty_status", {"$ref": "#/components/schemas/WarrantyStatus",

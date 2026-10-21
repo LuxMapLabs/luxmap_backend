@@ -132,7 +132,7 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, items[3].GetProperty("days_remaining").ValueKind);
         Assert.Equal(JsonValueKind.Null, items[3].GetProperty("fixture_id").ValueKind);
         Assert.Equal(JsonValueKind.Null, items[4].GetProperty("warranty_expiry").ValueKind);
-        Assert.Equal(new[] { "commune_id", "data_source", "days_remaining", "fixture_id", "fixture_type", "install_date", "lamp_watt",
+        Assert.Equal(new[] { "commune_id", "data_source", "days_remaining", "fixture_id", "fixture_type", "install_date", "lamp_count", "lamp_watt",
                 "pole_id", "segment_id", "warranty_expiry", "warranty_status" },
             items[0].EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
     }
@@ -295,7 +295,7 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
         Assert.Equal($"warranty-{Today:yyyy-MM-dd}.csv", response.Content.Headers.ContentDisposition!.FileName);
         var lines = await Lines(response);
-        Assert.Equal("pole_id,segment_id,commune_id,data_source,fixture_id,fixture_type,lamp_watt,install_date,warranty_expiry,warranty_status,days_remaining", lines[0]);
+        Assert.Equal("pole_id,segment_id,commune_id,data_source,fixture_id,fixture_type,lamp_watt,lamp_count,install_date,warranty_expiry,warranty_status,days_remaining", lines[0]);
         Assert.Equal(3, lines.Length);
         Assert.StartsWith($"{first},{road},{home},field,", lines[1]);
         Assert.EndsWith($",{Today.AddDays(-2):yyyy-MM-dd},expired,-2", lines[1]);

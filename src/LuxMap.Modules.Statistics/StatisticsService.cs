@@ -188,6 +188,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
                 FixtureId = (string?)f.FixtureId,
                 FixtureType = (FixtureType?)f.FixtureType,
                 LampWatt = (int?)f.LampWatt,
+                LampCount = (int?)f.LampCount,
                 InstallDate = (DateOnly?)f.InstallDate,
                 Expiry = (DateOnly?)f.WarrantyExpiry,
             };
@@ -221,7 +222,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
             Items = [.. found.Select(r => new WarrantyItem
             {
                 PoleId = r.PoleId, SegmentId = r.SegmentId, CommuneId = r.CommuneId, DataSource = r.DataSource,
-                FixtureId = r.FixtureId, FixtureType = r.FixtureType, LampWatt = r.LampWatt, InstallDate = r.InstallDate,
+                FixtureId = r.FixtureId, FixtureType = r.FixtureType, LampWatt = r.LampWatt, LampCount = r.LampCount, InstallDate = r.InstallDate,
                 WarrantyExpiry = r.Expiry,
                 WarrantyStatus = window.Classify(r.Expiry),
                 DaysRemaining = window.DaysRemaining(r.Expiry),

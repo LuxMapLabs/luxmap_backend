@@ -114,6 +114,13 @@
     cả ở chú thích (PR #160), cron "3:15" chạy theo UTC. Còn: WP5 build web; báo WP5/WP6 (DEP-1, LG-1…LG-3).</p>
   </div>
   <div class="card">
+    <strong>LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn, 21/10/2026</strong>
+    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/LAMP-COUNT</code>. Mỹ chọn hướng A: <code>fixture.lamp_count</code> (1..4, mặc định 1),
+    vẫn một bản ghi bóng đang dùng mỗi cột, trạng thái vẫn theo cột. Tạo bóng / import nhận <code>lamp_count</code> tuỳ chọn; trường hiện ở
+    bản đồ, chi tiết cột, danh sách tài sản, cột của phiếu, thống kê bảo hành. Migration <code>AddFixtureLampCount</code>; mock thêm
+    <code>lamp_count: 1</code>. 7 test mới, 3 phá thử đỏ. Drift LMC-1…LMC-4, SELF-SIGNED. Còn: báo WP5/WP6.</p>
+  </div>
+  <div class="card">
     <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>
     <p><span class="tag t-next">Chờ PR</span> Nhánh <code>fix/BE-07-login-rate-limit</code>. Lỗi chặn deploy v1 từ review sẵn sàng deploy:
     <code>/auth/login</code> và <code>/auth/web/login</code> không có giới hạn nào. Nay <strong>10 lần / 5 phút / địa chỉ</strong>, hai endpoint

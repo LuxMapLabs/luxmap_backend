@@ -13867,6 +13867,7 @@
           "fixture_id",
           "fixture_type",
           "install_date",
+          "lamp_count",
           "lamp_watt",
           "power_source"
         ],
@@ -13882,6 +13883,10 @@
             "$ref": "#/components/schemas/PowerSource"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32"
           },
@@ -15106,6 +15111,13 @@
             "minimum": 1,
             "type": "integer",
             "format": "int32"
+          },
+          "lamp_count": {
+            "maximum": 4,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "install_date": {
             "type": "string",
@@ -17480,6 +17492,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "lamp_count": {
+            "type": "integer",
+            "format": "int32"
+          },
           "install_date": {
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
@@ -17919,7 +17935,7 @@
       "PoleProperties": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1). Không có data_source / external_ref / feeder_id (không emit).",
+        "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1) + lamp_count (LAMP-COUNT LMC-3). Không có data_source / external_ref / feeder_id (không emit).",
         "required": [
           "pole_id",
           "segment_id",
@@ -17927,6 +17943,7 @@
           "power_source",
           "fixture_type",
           "lamp_watt",
+          "lamp_count",
           "install_date",
           "warranty_status",
           "commune_id",
@@ -17961,6 +17978,14 @@
           "lamp_watt": {
             "type": "integer",
             "format": "int32"
+          },
+          "lamp_count": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 4,
+            "nullable": true,
+            "description": "LAMP-COUNT LMC-1: số bóng giống nhau của bộ đèn đang dùng (cột cần đôi = 2); lamp_watt là công suất MỘT bóng; null khi cột không có bóng đang dùng"
           },
           "install_date": {
             "type": "string",
@@ -19519,6 +19544,11 @@
             "format": "int32",
             "nullable": true
           },
+          "lamp_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "install_date": {
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
@@ -20036,6 +20066,7 @@
           "fixture_id",
           "fixture_type",
           "install_date",
+          "lamp_count",
           "lamp_watt",
           "pole_id",
           "segment_id",
@@ -20064,6 +20095,11 @@
             "$ref": "#/components/schemas/FixtureType"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32",
             "nullable": true
@@ -20628,6 +20664,11 @@
             "$ref": "#/components/schemas/FixtureType"
           },
           "lamp_watt": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "lamp_count": {
             "type": "integer",
             "format": "int32",
             "nullable": true
