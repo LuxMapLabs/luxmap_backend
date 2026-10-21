@@ -368,7 +368,7 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
 
     private static Guid Key(object op) => (Guid)((Dictionary<string, object?>)op)["client_op_id"]!;
 
-    /// <summary>One batch shares created_at, so the id rule decides: length first, then the text (CLAUDE.md section 0).</summary>
+    /// <summary>One batch shares created_at, so the id rule decides: length first, then the text (CLAUDE.md, Quy ước API).</summary>
     private static string[] IdOrder(params string[] ids) => [.. ids.OrderBy(id => id.Length).ThenBy(id => id, StringComparer.Ordinal)];
 
     private static string[] Strings(JsonElement array) => [.. array.EnumerateArray().Select(x => x.GetString()!)];

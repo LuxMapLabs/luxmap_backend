@@ -15,7 +15,7 @@ namespace LuxMap.Modules.Faults.Configurations;
 /// ⚠️ <c>&gt;= 0</c> does NOT exclude <c>NaN</c> or <c>Infinity</c>: PostgreSQL sorts <c>NaN</c>
 /// ABOVE every other float, the opposite of IEEE 754. And the NaN test is <c>&lt;&gt; 'NaN'</c>, NOT
 /// <c>x = x</c> — PostgreSQL treats NaN as equal to itself, so that idiom is a real tautology here.
-/// Both were established by experiment during the BE-42 fix; see CLAUDE.md.
+/// See docs/agents/traps/migrations.md, measured double precision CHECKs, for the database rule.
 /// </remarks>
 internal static class FiniteChecks
 {
@@ -131,7 +131,7 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
 
         // RESTRICT everywhere. A fault is an event that happened: removing a pole must not erase the
         // record that its lamp was once out, and the audit columns on this row are the acceptance
-        // criterion of BE-18. Cascade would also widen the blind spot recorded in CLAUDE.md 1c,
+        // criterion of BE-18. Cascade would also widen the blind spot recorded in docs/agents/traps/commune-scope.md, section 1c,
         // where the SaveChanges guard cannot see deletions the database performs.
         builder.HasOne<Pole>().WithMany()
             .HasForeignKey(fault => fault.PoleId).OnDelete(DeleteBehavior.Restrict);
@@ -167,9 +167,9 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
         builder.HasIndex(fault => fault.ClusterId).HasDatabaseName("ix_fault_cluster_id");
         builder.HasIndex(fault => fault.FaultStatus).HasDatabaseName("ix_fault_fault_status");
 
-        // Meant for the default ordering of Contract section 5.4 (-priority_score, unscored last).
+        // For explicit priority-score sorting (unscored last); the default is -severity (P-3).
         // ⚠️ IsDescending() emits a plain DESC, which PostgreSQL sorts NULLS FIRST — so this index
-        // does NOT serve that order; GET /faults forces NULLs last in the query (CLAUDE.md, BE-18 rule 3).
+        // does NOT serve that order; GET /faults forces NULLs last in the query (docs/agents/traps/faults-workorders.md, BE-18 rule 3).
         builder.HasIndex(fault => fault.PriorityScore)
             .IsDescending()
             .HasDatabaseName("ix_fault_priority_score");

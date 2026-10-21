@@ -268,9 +268,8 @@ public class PrefixedIdOverflowTests(AssetSchemaFixture fixture)
     /// <remarks>
     /// 🔴 <b>Rewinding a SHARED sequence and leaving it there poisons every later insert in the
     /// run.</b> These two tests move it backwards on purpose, and without putting it back the next
-    /// few hundred inserts climb through numbers that other rows may already hold — the failure
-    /// CLAUDE.md records as one run red at 36 tests and the next at 76, deterministic but looking
-    /// like flake. Picking a free range is not enough on its own: <c>FreeFourDigitDecadeAsync</c>
+    /// inserts climb through numbers that other rows may already hold (docs/agents/traps/testing.md).
+    /// Picking a free range is not enough on its own: <c>FreeFourDigitDecadeAsync</c>
     /// checks the decade it writes into, not the whole stretch above it that the sequence then walks
     /// through.
     /// </remarks>

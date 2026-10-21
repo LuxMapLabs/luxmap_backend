@@ -35,7 +35,7 @@ public sealed class QrCodeConfiguration : IEntityTypeConfiguration<QrCode>
         builder.HasIndex(qr => qr.PoleId, ActivePerPoleIndex).IsUnique().HasFilter("revoked_at IS NULL").HasDatabaseName(ActivePerPoleIndex);
 
         // 🔴 The partial index above leads with pole_id, so EF's convention would skip the FK index on it — and the partial
-        // one does not serve revoked rows (partial-index rule in CLAUDE.md). Declared explicitly, under a distinct name —
+        // one does not serve revoked rows (partial-index rule in docs/agents/traps/migrations.md). Declared explicitly, under a distinct name —
         // both indexes on one column need a MODEL name too, or EF treats the second HasIndex as the first and overwrites it.
         builder.HasIndex(qr => qr.PoleId, "ix_qr_code_pole_id").HasDatabaseName("ix_qr_code_pole_id");
         builder.HasIndex(qr => qr.CreatedBy);

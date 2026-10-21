@@ -91,7 +91,7 @@ public sealed class UserAdminService(
 
         var total = await query.CountAsync(ct);
 
-        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, section 0).
+        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, Quy ước API).
         var users = await query
             .OrderBy(user => user.CreatedAt).ThenBy(user => user.UserId.Length).ThenBy(user => user.UserId)
             .Skip(page.Skip).Take(page.PageSize)

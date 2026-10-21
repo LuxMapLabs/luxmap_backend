@@ -17,7 +17,7 @@ Vì sao ticket này tồn tại. Ba đến năm câu. Nêu rõ consumer nào đa
 ## Phải đọc trước
 
 - `docs/api-contract-v1.1.md` mục <…>
-- `CLAUDE.md` mục <…>
+- `CLAUDE.md` (lõi) + `docs/agents/traps/<vùng>.md` mục <…> (đọc theo vùng code của ticket)
 - <file code liên quan>
 
 ## Yêu cầu

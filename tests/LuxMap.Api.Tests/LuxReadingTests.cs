@@ -504,7 +504,7 @@ public class LuxReadingTests(AssetSchemaFixture fixture) : IAsyncLifetime
     {
         // RESTRICT, not cascade. A lux reading is the ground truth for RQ1; removing a pole must not
         // quietly remove research data. It also keeps this out of the cascade blind spot recorded in
-        // CLAUDE.md 1c, where the SaveChanges guard cannot see deletions the database performs.
+        // docs/agents/traps/commune-scope.md, section 1c, where the SaveChanges guard cannot see deletions the database performs.
         using var client = await FieldEngineerClientAsync();
         var poleId = await NewPoleAsync();
 

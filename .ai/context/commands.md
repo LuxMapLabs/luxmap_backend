@@ -95,7 +95,7 @@ ngoài Development thì `CorsSetup` dừng khởi động khi danh sách rỗng.
 
 ⚠️ **Tên file spec đổi theo version** — nay là `luxmap-v1.5.json`. Khi version nhảy, `DST` trong
 `gen_consolidated_spec.py` đổi theo, và phải sửa cùng lúc: `docs/development.md`, `CLAUDE.md` (mục Nguồn sự
-thật và ràng buộc BE-REVIEW-02 số 8), và file này. Kiểm tra `ls docs/openapi/` trước khi chạy.
+thật), `docs/agents/traps/assets.md` (BE-REVIEW-02 số 8), và file này. Kiểm tra `ls docs/openapi/` trước khi chạy.
 
 ## Kiểm tra nhanh trước khi báo xong
 

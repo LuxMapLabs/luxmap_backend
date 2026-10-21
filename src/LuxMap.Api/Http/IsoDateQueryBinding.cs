@@ -17,7 +17,7 @@ namespace LuxMap.Api.Http;
 /// <para>
 /// This binder only GUARDS THE SHAPE, then hands the value to the framework binder unchanged — so what a valid
 /// value means is exactly what it meant before (a <see cref="DateTime"/> without <c>Z</c> still arrives as
-/// <c>Unspecified</c> for <c>UtcNormalization.ToUtc</c>, CLAUDE.md BE-REVIEW-02 rule 2). <c>[0-9]</c>, not
+/// <c>Unspecified</c> for <c>UtcNormalization.ToUtc</c>, docs/agents/traps/assets.md, BE-REVIEW-02 rule 2). <c>[0-9]</c>, not
 /// <c>\d</c>: <c>\d</c> matches every Unicode digit.
 /// </para>
 /// </remarks>

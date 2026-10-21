@@ -39,7 +39,7 @@ public enum ObjectVariant
 /// <remarks>
 /// ⚠️ <b>Never sort by an object key.</b> The id inside it is a Contract prefixed id, whose width is a
 /// MINIMUM and not a fixed length, so <c>FRM-100000</c> sorts before <c>FRM-999999</c> as a string.
-/// Same trap as the one recorded against <c>ORDER BY pole_id</c> in CLAUDE.md section 0. Order by a
+/// Same trap as the one recorded against <c>ORDER BY pole_id</c> in CLAUDE.md, Quy ước API. Order by a
 /// timestamp or a sequence in the database instead; the object store is not an index.
 /// <para>
 /// <c>commune_id</c> is deliberately NOT part of the key. Authorization has exactly one source of
