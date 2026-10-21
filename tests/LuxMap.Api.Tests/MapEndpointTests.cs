@@ -182,8 +182,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     /// in a DIFFERENT commune, so the BE-08 query filter hides them from this caller and the count
     /// would come back under the limit — the endpoint would answer 200 and the test would pass for
     /// the wrong reason. The rows are removed in a <c>finally</c>: a run that leaves poles behind
-    /// poisons <c>pole_id_seq</c> for every later insert, which is the failure CLAUDE.md records as
-    /// costing one run 36 red tests and the next 76.
+    /// can collide with later sequence inserts; see docs/agents/traps/testing.md, shared sequence rules.
     /// </para>
     /// </remarks>
     [Fact]
@@ -313,7 +312,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     /// The calibration rig is off the map by default and appears only when named.
     /// </summary>
     /// <remarks>
-    /// Section 1.6, and CLAUDE.md is blunt about why: the FO-07 rig is registered as a real
+    /// Section 1.6, and docs/agents/traps/assets.md, Testbed, explains why: the FO-07 rig is registered as a real
     /// RoadSegment so the pipeline has one path, which puts its poles in the same table as the study
     /// area's. Mixing photometric ground truth into sensory-labelled figures is a serious error, not
     /// a presentation detail.
@@ -455,8 +454,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     /// 🔴 <b>Explicit ids, so these inserts never call <c>nextval</c>.</b> Taking 2000 values out of
     /// the shared <c>pole_id_seq</c> would wreck <c>PrefixedIdOverflowTests</c>, which rewinds the
     /// sequence to a decade it has checked is free and then writes into it — a 2000-wide block makes
-    /// "free decade" untrue and the two tests fight over ids. CLAUDE.md records what that costs: one
-    /// run red at 36 tests, the next at 76, deterministic but looking flaky.
+    /// "free decade" untrue and the two tests fight over ids (docs/agents/traps/testing.md, shared sequence).
     /// <para>
     /// Seven digits also keeps them recognisable as synthetic in a shared database, and the width is
     /// a MINIMUM so a longer id is perfectly legal (Contract section 1.2).

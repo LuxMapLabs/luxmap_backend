@@ -5,10 +5,10 @@ sẽ lệch trong vòng một tuần (`AGENTS.md` đã lệch `CLAUDE.md` 102 d�
 
 | Câu hỏi | File |
 |---|---|
-| Endpoint này hình dạng gì, mã lỗi nào, enum nào | `docs/api-contract-v1.1.md` — **thắng mọi thứ** |
-| Bản máy đọc khớp 1-1 với Contract | bản hợp nhất mới nhất trong `docs/openapi/` — **tên file đổi theo version**, xem `docs/contract-drift.md` |
+| Endpoint này hình dạng gì, mã lỗi nào, enum nào | `docs/api-contract-v1.1.md`; thứ tự khi lệch: `CLAUDE.md`, mục Nguồn sự thật |
+| Bản máy đọc khớp 1-1 với Contract | `docs/openapi/luxmap-v1.5.json`; cách sinh: `docs/agents/traps/assets.md`, BE-REVIEW-02 số 8 |
 | Ticket này phạm vi tới đâu, tuần nào | `docs/tasks-backend.csv` |
-| Viết code theo quy ước gì, bẫy nào đã biết | `CLAUDE.md` (= `AGENTS.md`) |
+| Viết code theo quy ước gì, bẫy nào đã biết | `CLAUDE.md` (= `AGENTS.md`) → bảng tra `docs/agents/traps/*.md`, đọc file vùng trước khi sửa |
 | Ai ký, im lặng bao lâu tính là gì, quyết định treo đi đâu | đầu `docs/contract-drift.md` (FW-00) |
 | Code đang lệch Contract ở đâu | phần thân `docs/contract-drift.md`; log cũ `docs/archive/` |
 | Viết endpoint mới thì phải làm gì để không hở quyền | `docs/authorization-guide.md` — **đọc trước khi viết** |
@@ -23,11 +23,7 @@ sẽ lệch trong vòng một tuần (`AGENTS.md` đã lệch `CLAUDE.md` 102 d�
 2. **Không tạo migration** khi chưa hỏi. Schema là thứ WP4/WP5/WP6 đã dựng lên trên.
 3. **Không tự chọn phương án kiến trúc.** Ghi thành D-item, Mỹ chốt.
 
-## Cột mốc trạng thái (cập nhật khi lệch thực tế)
+## Trạng thái và version
 
-- `dev` là branch làm việc; `main` chỉ có commit init.
-- Các trường status/completion trong `docs/tasks-backend.csv` là **trường chết** — đọc `tracking.html`.
-- Open item O-6: `pole.feeder_id` chưa có dữ liệu — đang chặn BE-13 và CV-15.
-- Contract hợp nhất là **v1.7** (25/09/2026), file máy đọc **vẫn** là `docs/openapi/luxmap-v1.5.json`
-  (tên file giữ từ v1.5, cố ý). `CLAUDE.md` và `README.md` đã được đồng bộ (25/09/2026) — chỗ nào còn ghi `luxmap-v1.4.json` là **lịch sử**
-  (`tracking.html`, `docs/review/`, `docs/contract-drift.md`), đừng "sửa cho nhất quán".
+Tiến độ / blocker: `tracking.html`; status/completion trong `docs/tasks-backend.csv` không phản ánh tiến độ.
+Version Contract/spec: `CLAUDE.md`, mục Nguồn sự thật. Bản trong `docs/archive/` và `docs/review/` là lịch sử, không đồng bộ ngược.

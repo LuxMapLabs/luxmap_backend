@@ -114,6 +114,15 @@
     cả ở chú thích (PR #160), cron "3:15" chạy theo UTC. Còn: WP5 build web; báo WP5/WP6 (DEP-1, LG-1…LG-3).</p>
   </div>
   <div class="card">
+    <strong>CLAUDE-MD-CLEANUP — tách CLAUDE.md thành lõi + tra cứu theo vùng, 20/10/2026</strong>
+    <p><span class="tag t-done">Đã merge #167</span> 21/10/2026. Nhánh <code>docs/CLAUDE-MD-CLEANUP</code> (Claude + Codex). <code>CLAUDE.md</code> (cũng là <code>AGENTS.md</code>,
+    nạp vào mọi phiên) từ <strong>2.293 dòng / 204 KB còn 338 dòng / 32 KB</strong>: chỉ luật áp mọi ticket + bảng trỏ tới
+    12 file <code>docs/agents/traps/*.md</code>. Codex kiểm từng khẳng định với code (44 lỗi thời, 14 mâu thuẫn, 32 trùng, 11 sai tầng) và áp
+    vào file tra cứu; 9 luật rơi khi viết lại lõi đã phục hồi. Sửa luật đang dẫn sai: sort sự cố <code>-severity</code>, <code>out</code> do CV,
+    nguồn <code>lamp_*</code>, <code>LPAD</code>, phạm vi theo JWT, không Hangfire. Luật ưu tiên mới (D-4): quyết định drift đã chốt thắng chữ
+    Contract chưa hợp nhất. Drift CLAUDE-MD-1/2. Comment trong code trỏ lại đúng file. Đã rebase sau #164, đoạn PHOTO-REVIEW nằm ở <code>survey.md</code>.</p>
+  </div>
+  <div class="card">
     <strong>LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn, 21/10/2026</strong>
     <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/LAMP-COUNT</code>. Mỹ chọn hướng A: <code>fixture.lamp_count</code> (1..4, mặc định 1),
     vẫn một bản ghi bóng đang dùng mỗi cột, trạng thái vẫn theo cột. Tạo bóng / import nhận <code>lamp_count</code> tuỳ chọn; trường hiện ở
@@ -140,7 +149,7 @@
   </div>
   <div class="card">
     <strong>PHOTO-REVIEW — kỹ sư sửa nhãn AI của ảnh cột, 20/10/2026</strong>
-    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/PHOTO-REVIEW</code> (Codex code, Claude review). Đề xuất WP5 bỏ quyết định của Quản lý →
+    <p><span class="tag t-done">Đã merge #164</span> 20/10/2026 (Codex code, Claude review). Đề xuất WP5 bỏ quyết định của Quản lý →
     <strong>bác phần xoá</strong>. Mỹ chốt: Quản lý vẫn công bố (<code>/decision</code> giữ nguyên); thêm <code>final_cv_state</code> / <code>review_note</code> /
     <code>reviewed_by</code> / <code>reviewed_at</code> + <code>PATCH …/review</code> cho người được giao, phiếu <code>in_progress</code>, ảnh chưa quyết.
     Confirm công bố <code>final_cv_state ?? cv_state</code>; nhãn người đổi → <code>status_confidence = null</code> (nới CHECK current-status), sự cố

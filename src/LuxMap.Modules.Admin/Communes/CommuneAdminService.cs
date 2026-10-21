@@ -29,7 +29,7 @@ public sealed class CommuneAdminService(LuxMapDbContext db, ICurrentActorAccesso
     {
         var query = db.Set<AdministrativeUnit>().AsNoTracking();
         var total = await query.CountAsync(ct);
-        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, section 0).
+        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, Quy ước API).
         var units = await query
             .OrderBy(unit => unit.CreatedAt).ThenBy(unit => unit.CommuneId.Length).ThenBy(unit => unit.CommuneId)
             .Skip(page.Skip).Take(page.PageSize)

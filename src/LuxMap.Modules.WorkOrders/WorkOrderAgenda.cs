@@ -142,7 +142,7 @@ public sealed record WorkOrderAgenda
 /// Visibility is the listing's: the query filter already narrows a field engineer to their own orders and
 /// everyone to their communes. Distances go through <see cref="SpatialFunctions.DistanceMeters"/> over the
 /// handful of roads of a few orders, so no bounding-box pre-filter is needed (that rule guards a LEADING
-/// predicate on a large table, CLAUDE.md BE-10).
+/// predicate on a large table, docs/agents/traps/spatial-map.md, BE-10).
 /// </para>
 /// </remarks>
 public sealed class WorkOrderAgendaService(LuxMapDbContext db, ICurrentActorAccessor actor,

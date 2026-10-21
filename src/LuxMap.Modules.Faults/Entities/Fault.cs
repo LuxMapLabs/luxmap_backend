@@ -113,13 +113,11 @@ public class Fault : ICommuneScoped, IAudited
     /// have run yet.
     /// </summary>
     /// <remarks>
-    /// A stored column rather than something computed per query. Contract section 2.4 makes the
-    /// default order <c>-priority_score</c>, and ordering by an expression cannot use an index and
-    /// gives unstable pages. It also has to be storable at all: the Contract says CV-16 computes it,
-    /// and a value produced outside the API needs somewhere to land.
+    /// A stored column for CV-16 output and explicit priority-score sorting. The default is
+    /// <c>-severity</c> (P-3); a value produced outside the API still needs somewhere to land.
     /// <para>
     /// ⚠️ The cost is that changing the weights (BE-33) means recomputing the column for every row.
-    /// That job belongs to BE-26; recorded in CLAUDE.md.
+    /// Scoring is deferred to BE-33/CV-16 (docs/agents/traps/faults-workorders.md, BE-18 rule 3).
     /// </para>
     /// </remarks>
     public double? PriorityScore { get; set; }

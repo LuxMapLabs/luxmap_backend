@@ -26,7 +26,7 @@ Nối vào cuối file ticket dưới heading `## Ghi chú triage`. Kết quả 
 
 ## `.ai/` KHÔNG nhận bốn loại phát hiện
 
-Deviation → `docs/contract-drift.md` · luật nhiều ticket → Contract (sau khi duyệt) · ràng buộc kỹ thuật → `CLAUDE.md` ·
+Deviation → `docs/contract-drift.md` · luật nhiều ticket → Contract (sau khi duyệt) · ràng buộc kỹ thuật → `CLAUDE.md` (luật chung) / `docs/agents/traps/<vùng>.md` (luật vùng) ·
 tiến độ → `tracking.html`. Ghi vào `.ai/` là WP5/WP6 không bao giờ đọc được.
 
 ## Wayfinding

@@ -262,7 +262,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
     /// </summary>
     /// <remarks>
     /// No size limit, like segments: a commune has a handful of cabinets. Features come in id order
-    /// (<c>created_at, length(id), id</c> — never the bare id, see CLAUDE.md section 0).
+    /// (<c>created_at, length(id), id</c> — never the bare id, see CLAUDE.md, Quy ước API).
     /// </remarks>
     public async Task<FeatureCollection<IotNodeProperties>> IotNodesAsync(
         IotNodeMapQuery query, CancellationToken ct)
@@ -535,7 +535,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
     /// </summary>
     /// <remarks>
     /// SRID 4326 set EXPLICITLY: a geometry built in code carries SRID 0, and PostGIS refuses to
-    /// compare mixed SRIDs — the same trap WKTReader has, recorded in CLAUDE.md for BE-12a.
+    /// compare mixed SRIDs — the same trap WKTReader has, recorded in docs/agents/traps/assets.md, BE-12a.
     /// </remarks>
     private static Polygon Envelope(BoundingBox box)
         => new(new LinearRing([

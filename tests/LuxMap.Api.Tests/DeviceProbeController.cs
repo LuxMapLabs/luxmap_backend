@@ -14,7 +14,7 @@ namespace LuxMap.Api.Tests;
 /// </summary>
 /// <remarks>
 /// Its OWN controller, not <c>TestEndpointsController</c>: that one carries a class-level <c>[AllowAnonymous]</c>, which beats a
-/// method-level <c>[Authorize]</c> (CLAUDE.md, ASP0026) and would make this probe prove nothing.
+/// method-level <c>[Authorize]</c> (docs/agents/traps/auth-accounts.md, [AllowAnonymous]) and would make this probe prove nothing.
 /// </remarks>
 [ApiController]
 [ApiVersion("1.0")]

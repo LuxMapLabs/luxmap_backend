@@ -1,0 +1,286 @@
+285 of 1788 non-empty old lines not present verbatim
+    3: Nền tảng GIS + IoT + Computer Vision quản lý tài sản và sự cố chiếu sáng đường nông thôn.
+    4: Tên đề tài (Phiếu đăng ký FA26SE222 v1.4, mục 3.1 — không đổi từ v1.2): **LuxMap: A GIS, IoT and Computer Vision Platform for
+    5: Rural Road Lighting Asset and Fault Management** — *LuxMap: Hệ thống bản đồ số GIS tích hợp IoT và thị giác
+    6: máy tính để quản lý tài sản và sự cố chiếu sáng đường giao thông nông thôn*. Phiếu (bản markdown:
+    7: `docs/registration/FA26SE222_v1.4.md`, từ 27/09/2026; bản v1.2 là lịch sử) là nguồn chuẩn cho actor, chức
+    8: năng, NFR và deliverable.
+   10: > 🔴 **Phiếu v1.4 (27/09/2026) đổi kênh đo độ sáng — nền của BE-42 và của phân loại `dim` đã đổi, CHƯA
+   11: > CHỐT.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750FVI gắn trên xe khảo sát — đầu xe máy**, lấy mẫu liên tục suốt sweep;
+   12: > **Dim = CV nói ON + đỉnh lux lúc ngang cột dưới ngưỡng baseline của chính cột đó**. Enum mục 1 **không
+   13: > đổi**. Các đề xuất D-R20…D-R28 ở `docs/contract-drift.md` (mục *Registration v1.4*) **chưa có chữ ký** và
+   14: > đa số chạm API → mọi chỗ bên dưới nói "đo sáng bằng điện thoại", "lux là ground truth chấm CV" là **nền
+   15: > cũ**: đừng xây ticket mới lên đó. **D-R21 / D-R24 đã chốt hướng (SELF-SIGNED 27/09, nền tạm)**: mỗi
+   16: > phiên = video + log lux BLE + GPS track + cấu hình quay, **chung đồng hồ `elapsedRealtimeNanos`**,
+   17: > server xử lý toàn bộ; upload video (clip <1 phút, ~100–150 MB) là **D-R28 — đề xuất proxy qua API, chờ quyết**. Khảo sát:
+   18: > `.ai/results/registration-v1.4-phase1.md`.
+   19: Capstone FA26SE222 · W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2, phụ trách: BE1 – Mỹ**.
+   21: Backend phục vụ 3 consumer: **Web SPA** (WP5), **Android native** (WP6), **engine CV** (WP4).
+   22: Không có consumer nào khác. **Công dân (Citizen) không có tài khoản**: họ báo sự cố qua mã QR trên cột
+   23: — `/public/…` không token, Quản lý duyệt ở `/citizen-reports` (D-R1, CITIZEN-QR P2a–P2c; xem mục "Vai trò").
+   27: Ba tài liệu, thứ tự ưu tiên khi mâu thuẫn:
+   29: 1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.8** (05/10/2026; tên file giữ nguyên để liên kết cũ còn đúng). **Thắng mọi thứ khác.** Đã gộp v1.0 → v1.4, toàn bộ drift 1–43 và các quyết định BE-REVIEW-02; bản máy đọc khớp 1-1 là `docs/openapi/luxmap-v1.5.json`. Log drift cũ ở `docs/archive/contract-drift-v1.md`, log mới ở `docs/contract-drift.md`.
+   30: 2. **`docs/tasks-backend.csv`** — task list v2.1, phạm vi và lịch.
+   31: 3. File này — quy ước làm việc và những chỗ dễ sai. Không phải đặc tả.
+   33: Khi phát hiện mâu thuẫn: làm theo Contract, ghi lại chỗ lệch, nêu ở buổi review — đừng tự ý chọn bên nào.
+   35: > **Lệch `manual` / `field_report` đã xử lý:** bản hợp nhất chốt **`field_report`**, khớp task list. Giá trị `manual` của v1.0 đã bỏ.
+   41: Nguyên tắc vận hành quyết định của nhóm nằm ở **đầu `docs/contract-drift.md`** (FW-00, chốt
+   42: 07/09/2026) — năm mục, nói về *cách quyết* chứ không phải quyết cái gì. Đọc khi cần biết ai ký, im
+   43: lặng bao lâu thì tính là gì, và một quyết định treo thì đi đâu.
+   45: **Mục 5 là mục áp dụng thường xuyên nhất**, vì nó quyết định file nào nhận phát hiện vừa tìm ra:
+   49: | **Deviation** — code lệch Contract, mock lệch Contract | `docs/contract-drift.md` |
+   50: | **Luật áp nhiều ticket** — quy tắc chung cho FE/BE/mobile | `docs/api-contract-v1.1.md`, **chỉ sau khi duyệt và tăng version** |
+   51: | **Ràng buộc kỹ thuật nội bộ** — bẫy, quy ước, thứ dễ sai âm thầm | **File này** |
+   54: **Ghi sai tầng cũng tệ như không ghi:**
+   56: - Một **ràng buộc kỹ thuật** nhét vào `tracking.html` sẽ **trôi mất khi mục đó được đóng** — bài học
+   57:   còn nguyên trong repo này: quy tắc `LPAD` cắt ID và quy tắc partial index đều phải nằm ở đây mới
+   58:   còn tác dụng ở ticket sau.
+   59: - Một **deviation** nhét vào `CLAUDE.md` **không bao giờ tới tay WP5/WP6** — họ không đọc file này.
+   60: - Một **quyết định nội bộ** đẩy thẳng vào Contract là đổi thứ FE đã code theo mà chưa ai duyệt.
+   62: ⚠️ Ba mục còn lại đáng nhớ khi làm việc một mình: quyết định **không ghi vào repo thì coi như chưa
+   63: xảy ra**; im lặng quá 3 ngày làm việc là **approve với thay đổi không chạm bề mặt API** nhưng
+   64: **ESCALATE với thay đổi có chạm** — không bao giờ là approve; và một quyết định `SELF-SIGNED` chạm bề
+   65: mặt API **chưa ổn định** cho tới khi FW kế tiếp xác nhận, nên ticket xây lên trên nó **phải ghi rõ nền
+   66: là tạm**.
+   72: Repo này có thể được nhiều agent cùng phục vụ (Claude Code, Codex). Vùng bàn giao giữa chúng là
+   73: `.ai/`, và **`AGENTS.md` là symlink tới chính file này** — Codex đọc `AGENTS.md` theo quy ước, nên
+   74: một file duy nhất phục vụ cả hai, và symlink luôn phân giải theo branch đang đứng. Đừng tạo lại
+   75: `AGENTS.md` thành file thường: bản `AGENTS.md` cũ (untracked, 17/09/2026) là bản chép đông cứng của
+   76: `CLAUDE.md` trên `dev`, nên trên nhánh này nó thiếu trọn 74 dòng, vẫn ghi Contract v1.1, và không có
+   77: tám ràng buộc BE-REVIEW-02 lẫn luật `[AllowAnonymous]` cấp CLASS.
+   79: Trước khi bắt đầu một ticket, đọc theo thứ tự:
+   81: 1. `.ai/context/sources.md` — tra nhanh file nào trả lời câu hỏi gì
+   82: 2. `.ai/tasks/<ticket>.md` — phạm vi, tiêu chí xong, và mục **KHÔNG ĐƯỢC làm**
+   83: 3. `.ai/context/commands.md` — lệnh build/test/migrate (bản đầy đủ: `docs/development.md`; chạy lần đầu: `README.md`)
+   85: Ghi kết quả vào `.ai/results/<ticket>.md`, review vào `.ai/reviews/<ticket>-by-<agent>.md`. Quy ước
+   86: đầy đủ, vòng đời ticket và quy tắc hai pha: `.ai/README.md`.
+   88: ⚠️ `.ai/` **đứng cuối** thứ tự ưu tiên — sau Contract, sau `tasks-backend.csv`, sau file này. Và nó
+   89: **không nhận** bốn loại phát hiện ở bảng trên: deviation vẫn về `contract-drift.md`, ràng buộc kỹ
+   90: thuật vẫn về đây, tiến độ vẫn về `tracking.html`. Một deviation ghi trong `.ai/results/` là deviation
+   91: **không bao giờ tới tay WP5/WP6**.
+   97: > ⚠️ **v1.4 (27/09):** dòng "Ngoài thực địa" bên dưới còn ghi *đo sáng tương đối bằng điện thoại* — v1.4 đo
+   98: > bằng **module BH1750 trên xe khảo sát** (vẫn **không** lắp gì lên cột hay lưới của xã). Controlled
+   99: > Reference Capture Set **rời deliverable** ở v1.4; giá trị `calibration_rig` **giữ** trong enum (D-R25).
+  100: > Luật tách `data_source` giữ nguyên. Bảng giữ nguyên tới khi D-R21/D-R25 chốt.
+  102: Phiếu v1.2 **thay FO-01** (24/08/2026, "không có thử nghiệm hiện trường" — nay `SUPERSEDED`, ghi ở
+  103: `docs/contract-drift.md`). Phạm vi thực tế của nhóm:
+  107: | **Ngoài thực địa** (xã đối tác) | Quay **video đêm** đèn đường thật; đo sáng **tương đối bằng điện thoại**; kiểm tra trạng thái đèn **bằng mắt** ban đêm (ground truth lớp `out`). **Không** lắp thiết bị, **không** thao tác lưới chiếu sáng của xã | `field` |
+  108: | **Mô hình testbed tự dựng** (đèn LED) | Toàn bộ IoT (trạng thái nguồn, dòng điện, thời gian vận hành); demo **điều khiển cưỡng chế ON/OFF/AUTO**; **Controlled Reference Capture Set** — mức sáng biết trước (trước đây gọi là "bộ hiệu chuẩn tự dựng", FO-07) | `calibration_rig` (telemetry testbed: Contract O-9) |
+  109: | **Khởi động AI** | Ảnh đêm công khai + controlled reference, trong lúc chờ quay thực địa (phiếu mục 4) | `public_imagery` |
+  110: | Telemetry mô phỏng | Runtime khi chưa có thiết bị (FO-25) | `simulated` |
+  112: 🔴 **Dữ liệu testbed không bao giờ mang `field`.** Gộp thí nghiệm có kiểm soát vào số liệu hiện trường là
+  113: đúng loại lỗi luật tách `data_source` sinh ra để chặn.
+  115: ⚠️ **Ground truth không còn một nguồn.** Trước đây bộ hiệu chuẩn là "ground truth photometric duy nhất";
+  116: nay có video thực địa + số đo tương đối bằng điện thoại + kiểm tra bằng mắt cho lớp `out` + controlled
+  117: reference trên testbed. ⚠️ **Ở v1.4 lux BH1750 là ĐẦU VÀO của phân loại `dim`, không còn là ground truth
+  118: của nó** — ground truth `dim` mới chưa chốt (**D-R23, ưu tiên cao**). Bốn quyết định từng dựa trên FO-01 **chưa sửa code**, mỗi cái là một follow-up
+  119: "nền đã đổi, cần xét lại" trong `tracking.html`: `external_ref` là danh tính vĩnh viễn (**ưu tiên cao**),
+  120: `administrative_unit` không geometry, `data_source = field` (nay sẽ có bản ghi), và ground truth.
+  122: **Hệ quả cho backend:** nguồn dữ liệu phải giữ tách bạch từ lúc ingest tới lúc thống kê. Nếu không lưu được nguồn ngay ở `SurveySweep` và `Fault`, tới lúc báo cáo sẽ không tách ra được nữa — và CV-11, CV-18, IOT-16 đều yêu cầu báo cáo tách riêng. Gộp số liệu giữa dữ liệu có ground truth thật và dữ liệu gán nhãn cảm quan là lỗi nghiêm trọng, không phải chi tiết trình bày.
+  124: Trường riêng cho việc này đã được chốt ở **mục 1**:
+  127: data_source : field | public_imagery | calibration_rig | simulated
+  130: Gắn trên `SurveySweep`, `SurveyFrame`, `Fault`, `TelemetryReading`, `LuxReading`. Mọi API thống kê phải lọc và nhóm được theo trường này (BE-28, BE-30).
+  132: **Cộng thêm `Pole`, `Fixture`, `RoadSegment`** (chốt ở BE-09). Contract mục 1 không liệt kê ba cái này nhưng mục 2.9 bắt buộc phải có — không có `data_source` ở tầng tài sản thì không tách được cột hiệu chuẩn khỏi cột thật lúc thống kê. Contract sẽ lên v1.2. **Ba cột này LƯU và LỌC được, nhưng KHÔNG emit ra `properties`** — bộ mock là nguồn chuẩn cho hình dạng response và không có trường này.
+  134: **Đây là chiều khác với `source_channel`.** `source_channel` = kênh nào phát hiện ra (`cv` / `iot` / `field_report`). `data_source` = dữ liệu đến từ đâu. Một sự cố có thể mang `source_channel = cv` và `data_source = calibration_rig` cùng lúc.
+  136: **Bộ hiệu chuẩn FO-07 được đăng ký như `RoadSegment` thật** (mục 2.9), không tạo thực thể riêng — để pipeline chạy đúng một đường, không rẽ nhánh.
+  142: - Base URL `/api/v1`
+  143: - **JSON snake_case** — `JsonNamingPolicy.SnakeCaseLower`
+  144: - **Enum trả về là chuỗi thường.** Int enum của .NET sẽ làm hỏng FE — đây là lỗi Contract nêu đích danh.
+  145: - **Thời gian: ISO 8601 UTC, hậu tố `Z`.** DB `TIMESTAMPTZ`, Npgsql yêu cầu `DateTimeKind.Utc` — sai kind là ném exception. Xử lý ở biên, không vá tại chỗ gọi.
+  146: - **Ngày không giờ: `YYYY-MM-DD`** — `install_date`, `warranty_expiry`, `night_of`.
+  147: - **ID là chuỗi có prefix:** `POLE-0001`, `FAULT-0001`, `SEG-001`, `COM-001`. Không phải `int`, không phải `Guid`. Bảng prefix đầy đủ và cách sinh ở **mục 0.1–0.4**.
+  148: - **⚠️ ID là TỐI THIỂU N chữ số, không phải ĐÚNG N.** Contract mục 0.3: vượt ngưỡng thì ID dài ra — cột thứ 10000 là `POLE-10000`, **không phải** `POLE-1000`. Hai hệ quả:
+  149:   - **Không bao giờ `ORDER BY pole_id`.** So chuỗi thì `POLE-10000 < POLE-9999`. Sắp theo `created_at` hoặc theo sequence. Lọc theo khoảng trên text cũng sai từ cột thứ 10000.
+  150:     - ⚠️ **`created_at` MỘT MÌNH KHÔNG ĐỦ, và chỗ hở nằm ở tiebreaker.** `now()` của Postgres là
+  151:       thời điểm **bắt đầu transaction**, nên **cả mẻ nạp dùng chung đúng một giá trị** — đo thật:
+  152:       cả 103 cột mock có cùng một `created_at`. Vậy `created_at` không sắp xếp gì bên trong một mẻ,
+  153:       và **tiebreaker mới là thứ quyết định thứ tự thật**. Để `ThenBy(pole_id)` trần là mở lại đúng
+  154:       cái bug dòng trên vừa cấm.
+  155:     - **Khuôn đúng: `ORDER BY created_at, length(id), id`.** Sắp theo độ dài trước thì ID ngắn đứng
+  156:       trước, khôi phục thứ tự số trong cùng một prefix. Áp ở `ListAsync` (BE-12a) và
+  157:       `TopologyPageAsync` (BE-13); listing mới **phải** theo khuôn này.
+  158:     - 🔴 **Test so TẬP không bắt được lỗi này.** `Assert.Equal` trên hai collection đã sắp vẫn xanh
+  159:       khi thứ tự sai. Phải assert **có thứ tự**, trên ID nằm hai bên ngưỡng độ rộng, và **ghi trong
+  160:       cùng một transaction** để chúng trùng `created_at`. Canh bằng `PrefixedIdOrderingTests`.
+  161:   - Regex/validator phía FE và mobile phải là `^POLE-[0-9]{4,}$`, **không phải** `[0-9]{4}` — và `[0-9]`, không `\d` (`\d` khớp chữ số Unicode).
+  162: - **Cách sinh ID — mô tả chuẩn, mọi chỗ khác trỏ về đây.** ID sinh ở tầng DB qua `DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`. Tên sequence theo khuôn `<thing>_id_seq` — `pole_id_seq`, `fixture_id_seq`, `segment_id_seq`… (bảng đầy đủ ở `PrefixedId.cs`).
+  163:   - **Không dùng `LPAD(nextval(...)::text, 4, '0')`.** `LPAD` của Postgres **cắt bớt** khi giá trị dài hơn độ rộng: `nextval` = 12345 với width 4 cho ra `'2345'`. Kết quả là ID trùng, sai **câm** — không ràng buộc nào bắt được. Đã lật ở commit `8ea9930`.
+  164: - **Phân trang:** `?page=1&page_size=50` → `{page, page_size, total, items[]}`. `page_size` **tối đa 200**.
+  165: - **Lỗi:** `{ "error": { "code": "...", "message": "...", "details": {} } }` + correlation id.
+  166: - Auth: `Authorization: Bearer <jwt>`.
+  170: - Endpoint bản đồ trả **`FeatureCollection`** chuẩn.
+  171: - Toạ độ thứ tự **`[lng, lat]`**.
+  172: - Dữ liệu nghiệp vụ nằm **phẳng** trong `feature.properties`, không lồng nhau — FE gán thẳng vào MapLibre layer.
+  173: - **Không dùng `feature.id`.** Dùng `properties.pole_id`.
+  177: - **API luôn trả EPSG:4326.**
+  178: - **EPSG:3405 (VN-2000) chỉ dùng nội bộ DB và xuất báo cáo — không bao giờ trả ra API.** FE không reproject.
+  179: - Không tính khoảng cách bằng cách trừ toạ độ.
+  192: source_channel : cv | iot | field_report        # v1.0 ghi 'manual', đã bỏ
+  195: node_role      : segment_controller                  # 28/09 — sampled_fixture đã bỏ (I-1)
+  200: **Không thêm giá trị, không đổi tên, không dùng int.** FE đã hardcode.
+  202: > 🔴 **`power_source` và `fixture_type` THU HẸP còn một giá trị — Contract v1.6, 22/09/2026.** Đèn
+  203: > năng lượng mặt trời ra khỏi phạm vi đồ án. Giá trị bị **xoá khỏi enum**, không để lại không dùng:
+  204: > một giá trị không gì sinh ra được là giá trị ticket sau tưởng mình được phép ghi, và CHECK ở DB
+  205: > sẽ cho qua. Migration `DropSolarFixtures` **đổi 45 hàng RỒI mới siết CHECK** — đảo thứ tự là
+  206: > migration gãy trên chính dữ liệu nó sắp bảo vệ, và `Down()` khôi phục được ràng buộc nhưng
+  207: > **không khôi phục được dữ liệu** (đổi solar→grid là mất thông tin).
+  209: > ⚠️ **Phần PIN không đi theo.** IoT vẫn đo runtime, `runtime_decline` vẫn là `fault_type` hợp lệ —
+  210: > giờ sáng của đèn lưới cũng suy giảm được. `POLE-0047` giữ chuỗi 18 đêm, chỉ đổi sang `grid`.
+  212: > Hệ quả đã áp: BE-13 **bỏ `power_source`** khỏi listing cột-chưa-gán (trường đó chỉ sinh ra để tách
+  213: > *"solar nên không mạch"* khỏi *"chưa ai gán"*, mà vế đầu nay không tồn tại); O-6 từ **58/103 dòng
+  214: > cần điền thành 103/103**, vì mọi cột nay đều chạy điện lưới.
+  216: Ràng buộc nghiệp vụ đi kèm:
+  218: - **`unknown` không phải lỗi** — nghĩa là sweep gần nhất không phủ được cột đó. Có ký hiệu riêng ở FE, **không gộp vào `out`** ở bất kỳ thống kê nào (BE-28).
+  219: > ⚠️ **Mô hình IoT (28/09/2026, `docs/contract-drift.md` → "BE-14 / IoT"; hiện thực BE-14b).** Thiết bị chỉ ở **tủ điện tổng**, không IoT trên từng cột, không `battery_pct`. Thiết bị nối tới đèn qua **rơ-le gộp vào feeder** (`feeder_control`, 0/1 thiết bị mỗi feeder), không có bảng thiết bị ↔ cột. `has_iot_node` luôn `false`; `controller_node_ids[]`, `segment_ids[]`, `feeder_ids[]` tính lúc đọc. Contract §5.6 **chưa** cập nhật (drift I-18) — ticket IoT theo drift, không theo Contract hay mock cũ.
+  221: - `runtime_decline` **chỉ** đến từ IoT. `lamp_dim` và `lamp_out` **chỉ** đến từ CV (v1.4: `lamp_dim` do CV **và** cảm biến BH1750 cùng quyết — `source_channel` giữ `cv`? **D-R20, chờ quyết**). Một cột có thể mang **cả hai cùng lúc** — mô hình dữ liệu phải cho phép.
+  222: - Luồng `fault_status` hợp lệ: `detected → confirmed | rejected`, rồi `confirmed → in_progress → resolved → verified`. Chuyển sai luồng → **409** để FE disable nút trước, không để user bấm rồi mới lỗi (BE-19).
+  228: > **Bốn endpoint bản đồ nằm dưới `/api/v1/map/` (drift MAP-1, 02/10/2026)**, không phải `/poles`, `/segments`,
+  229: > `/iot-nodes` như Contract v1.7 ghi — SELF-SIGNED, chờ FW. Không client nào gọi đường cũ lúc đổi.
+  231: | Endpoint | Ràng buộc |
+  233: | `GET /map/poles` | `bbox` **bắt buộc**, không có endpoint "lấy tất cả". Lọc: `status`, `power_source`, `segment_id`, `commune_id`, `has_open_fault`. Quá 2000 cột → **413** `BBOX_TOO_LARGE`. |
+  234: | `GET /map/poles/{id}` | Trả **đủ trong 1 request** (BE-20, hình dạng thật ở `docs/contract-drift.md` → BE-20): `fixture` (null nếu không có bóng đang dùng), `current_status` (`unknown` khi chưa có sweep công bố), `iot_node` (**luôn null**), `luminance_baseline` + `luminance_baselines[]` (theo chiều đi), `luminance_history[]` (≤30 điểm, cũ → mới), `runtime_history[]` (**luôn rỗng**), `open_faults[]`, `recent_frames[]` (chỉ frame người gọi mở được). Ngoài phạm vi xã → 404. |
+  235: | `GET /map/segments` | `bbox` bắt buộc. `FeatureCollection` của `LineString`. |
+  236: | `GET /faults` | **Phân trang JSON, KHÔNG phải GeoJSON.** Mỗi item có `location{lat,lng}`. Sắp mặc định `-priority_score`. |
+  237: | `PATCH /faults/{id}` | Body: `fault_status`, `override_fault_type?`, `note?`. |
+  238: | `POST /faults` | **BE-41.** Chỉ Kỹ sư hiện trường (`ReportFaults`). Có cột → xã/tuyến/**`data_source` lấy từ cột** (không áp cứng `field`); không cột → bắt buộc `location`. `client_op_id` gửi lại → 200 cùng sự cố. `detected_at?` cho hàng chờ offline. **Không có `photo_frame_id`**: ảnh gửi sau qua `POST /faults/{id}/photos` (EV-2) — cùng bảng `repair_evidence`, một cha (phiếu **hoặc** sự cố). |
+  239: | `GET/POST/PATCH /work-orders` | `POST` body: `{title, fault_ids[], assigned_to?, due_date?}` |
+  240: | `GET /work-orders/{id}/poles` | **WO-12.** Cột trên đoạn được giao (hợp cột mang fault của phiếu) kèm trạng thái đèn **lần khảo sát đã duyệt gần nhất**, theo thứ tự dọc đường — kỹ sư biết TRƯỚC khi đi. Quyền xem = quyền xem phiếu (ngoài phạm vi / không phải người được giao → 404); cột xã ngoài phạm vi trên đường liên xã không hiện. `position` là thứ tự, không phải khoảng cách. |
+  241: | `POST /work-orders/{id}/evidence` | multipart: `file`, `kind`, `captured_at`, `lat`, `lng`, `client_op_id?` (BE-24). `kind`: **`before`/`after` chỉ ở phiếu sửa chữa, `observation` chỉ ở phiếu kiểm tra** (EV-1). Chỉ người được giao, phiếu `in_progress`. Phiếu sửa chữa **không `complete` được khi chưa có ảnh `after`** (409 `AFTER_EVIDENCE_REQUIRED`). Xem: `GET /work-orders/{id}/evidence`, `GET /evidence/{id}/thumbnail\|original` (proxy, quyền theo phiếu cha). |
+  242: | `GET /map/iot-nodes` | `bbox`, trả `FeatureCollection` |
+  243: | `GET /sweeps` | `sweep_id, started_at, ended_at, segment_ids[], frame_count, coverage_pct, processing_status` |
+  244: | `GET /sync/bundle` | **BE-43, Contract v1.13 §5.8.** Chỉ `field_engineer` (`SyncOffline`). `segment_id` lặp ≤ 20, vắng = tuyến của phiếu mở của tôi. **Bản chụp đầy đủ, không `since`** (gửi → 400). Cột = properties bản đồ + `note`; phiếu dạng chi tiết |
+  245: | `POST /sync/push` | **BE-43.** 5 `op_type` qua **service của endpoint gốc**, kiểm capability **từng thao tác**. `applied` / `conflicts` (server thắng, kèm `server_state`) / `rejected`. Khử trùng lặp: cột `client_op_id` sẵn có, hoặc bảng `sync_operation` |
+  250: pole_id, segment_id, fixture_status, status_confidence (0..1|null),
+  251: power_source, fixture_type, lamp_watt, install_date, warranty_expiry,
+  252: commune_id, last_seen_at, last_sweep_id, open_fault_count,
+  253: has_iot_node, near_sensitive_poi
+  259: segment_id, segment_name, road_class, length_m, pole_count,
+  260: controller_node_ids[], has_active_segment_fault      # 28/09: danh sách tính lúc đọc (I-7b)
+  263: `has_active_segment_fault = true` → FE highlight **cả tuyến**. Đây là output của spatial clustering (CV-15), khác bản chất với lỗi từng bóng.
+  267: `baseline_value`, `dim_threshold_ratio` (mặc định **0.80**), `out_threshold_ratio` (mặc định **0.15**) — cấu hình được qua BE-33, **không hard-code**.
+  269: Mỗi điểm trong `luminance_history` phải có sẵn **`baseline_ratio`** và **`classified_as`**. **Tính ở backend.** FW-13 vẽ biểu đồ theo `baseline_ratio` kèm đường ngưỡng — nếu backend trả giá trị tuyệt đối thì FE sẽ tự tính và hai bên lệch nhau.
+  275: Contract v1.0 viết để **gỡ chặn FE**, nên chỉ phủ phần đọc cho bản đồ. Những task sau **không có trong Contract** — cần đặc tả trước khi hiện thực, đừng tự sinh endpoint rồi coi như xong:
+  277: | Task | Thiếu |
+  279: | ~~BE-07~~ | ~~Endpoint đăng ký / đăng nhập / refresh~~ → **đã đặc tả ở Contract mục 4 (v1.2)** |
+  280: | ~~BE-12~~ | ~~CRUD tài sản + import CSV~~ → **BE-12a đã đặc tả và hiện thực**; hình dạng response khi ĐỌC là **BE-12b**, đã hiện thực ở Contract §5.3.1 (SELF-SIGNED, chờ FW xác nhận) |
+  281: | BE-15, BE-16 | Upload sweep, validate metadata phơi sáng |
+  282: | BE-27 | Notification — **chốt tên bảng/entity cùng FE2 trước W16** |
+  283: | BE-29, BE-30 | Dashboard còn lại (BE-28 **đã hiện thực** 07/10/2026 — `/statistics/…`, drift BE-28 ST-1…ST-10, SELF-SIGNED; BE-30 thêm `group_by` không đổi hình dạng; **BE-31 đã hiện thực** 12/10/2026 — `warranty_status`, `/statistics/warranty`, `format=csv`, drift W-1…W-8) |
+  284: | BE-33→35 | Quản trị danh mục, node, model version |
+  285: | ~~BE-41~~ | ~~`POST /faults`~~ → **đã đặc tả ở mục 2.8** |
+  286: | ~~BE-42~~ | ~~endpoint lux~~ → **đã đặc tả ở mục 2.9** |
+  288: BE-41 và BE-42 đã được đặc tả ở bản hợp nhất (mục 2.8 và 2.9). **BE-12a** được đặc tả riêng ngoài
+  289: Contract và đã hiện thực — nhóm endpoint `/assets/…`, xem mục BE-12a bên dưới; **BE-12b** (hình dạng
+  290: response khi đọc một tài sản) đã hiện thực ở Contract §5.3.1; quyết định SELF-SIGNED còn chờ FW xác nhận. Phần còn lại trong bảng vẫn chưa có đặc
+  291: tả — cần thống nhất trước khi hiện thực, đừng tự sinh endpoint rồi coi như xong.
+  293: Còn để mở: vector tile khi vượt ~5000 cột, realtime khi sweep xong (giai đoạn 1 dùng polling). Phân quyền theo `commune_id` **đã chốt ở mục 7**, không còn để mở.
+  295: **Lưu trữ đã chốt (D-R16, Contract §3.3):** ảnh, telemetry, fault giữ **tối thiểu qua hết bảo hành** của
+  296: tài sản; hết bảo hành **không** xoá / archive gì — chỉ gắn **cảnh báo "hết bảo hành"**, tính từ
+  297: `fixture.warranty_expiry` của bóng đang dùng so với hôm nay, **không lưu thành cột trạng thái** (hiện ở bản
+  298: đồ, danh sách tài sản, fault / work order). ⚠️ Ngày bảo hành nằm trên **`fixture`**, không trên `pole`, và
+  299: **nullable** — "không biết hạn bảo hành" phải hiện khác "còn bảo hành". Hiện thực: **BE-31 xong** (`warranty_status`, drift W-1…W-8); retention còn BE-35.
+  305: `Pole` · `Fixture` · `RoadSegment` · `Feeder` · `ElectricalCabinet` · `IotNode` · `TelemetryReading` ·
+  306: `SurveySweep` · `SurveyFrame` · `Detection` · `LuminanceBaseline` · `LuxReading` ·
+  307: `Fault` · `FaultCluster` · `WorkOrder` · `RepairEvidence` ·
+  308: `AdministrativeUnit` · `AppUser` · `RefreshToken`
+  310: > **Lược đồ đích theo Phiếu v1.4 — [`docs/database/erd.md`](docs/database/erd.md) (OPS-SCHEMA, 01/10/2026).**
+  311: > 17 bảng hiện có giữ nguyên; 22 bảng mới vào qua migration của ticket sở hữu, theo các quyết định Q1–Q17 ở
+  312: > đó. `ExternalUnit` đã **bỏ** (Q13 — Phiếu v1.4 chỉ giao việc cho Kỹ sư hiện trường). Ticket tạo bảng mới
+  313: > phải đọc file đó trước; đổi một quyết định Q-x thì ghi lại, đừng lặng lẽ thiết kế khác.
+  315: Điểm dễ sai:
+  317: - **`Pole` và `Fixture` tách riêng** (BE-09). Cột là kết cấu vật lý; bóng là thiết bị gắn trên đó. Một cột mang được nhiều bóng, bóng thay được trong khi cột vẫn tồn tại. Lịch sử tình trạng thuộc về **vị trí cột** — nên `Fixture` **không có cột trạng thái nào**. CV đọc ảnh đêm: nó thấy một nguồn sáng ở một vị trí, không tách được bóng số 1 với bóng số 2. Và trạng thái theo từng bóng sẽ buộc phải có quy tắc tổng hợp, mà quy tắc đúng thì không tồn tại: hai bóng một `out` một `unknown` đòi hỏi xếp `unknown` vào thang bậc so với `out`, đúng thứ Contract mục 1 cấm.
+  318: - **`SurveyFrame` và `RepairEvidence` là hai luồng ảnh riêng** (BE-11). Ảnh khảo sát là dữ liệu chính, không phải file đính kèm.
+  319: - **`LuxReading`** (BE-42) cần xong ở **W4** — FO-14 đo lux ở W5, FM-14 và CV-12 phụ thuộc.
+  320: - Ảnh **không** nằm trong database. MinIO giữ bytes, row giữ key.
+ 1351: Bốn vai trò đăng nhập theo Phiếu v1.2 mục 3.2.c — **không đổi ở v1.4** (Contract v1.7 §2, D-R6):
+ 1353: | Vai trò | `user_role` | Thay cho (≤ v1.6) | Tài khoản demo |
+ 1355: | **Cấp giám sát** (Superior) — bản đồ, thống kê, báo cáo; **chỉ đọc** | `superior` | `management_agency` | `agency` |
+ 1356: | **Quản lý** (Manager) — tài sản, giao việc khảo sát / sửa chữa, duyệt sự cố, điều khiển đèn testbed | `manager` | `maintenance_engineer` | `engineer` |
+ 1357: | **Kỹ sư hiện trường** (Field Engineer) — khảo sát đêm, kiểm tra, sửa chữa (Tổ khảo sát đã gộp vào đây) | `field_engineer` | `field_crew` | `crew` |
+ 1358: | **Quản trị hệ thống** (System Admin) — tài khoản, vai trò, cấu hình, giám sát, log | `system_admin` | `administrator` | `admin` |
+ 1360: Phân quyền theo vai trò (ma trận capability, mục BE-12a quy tắc 4) **và** theo địa bàn. Cấp giám sát
+ 1361: xem nhiều xã bằng **danh sách xã được gán**, không có cấp huyện (D-R3). Username seed và biến
+ 1362: `SEED_*_PASSWORD` **giữ tên cũ** — chúng là định danh, không phải nhãn (D-R6).
+ 1364: **Không có tự đăng ký (D-R11).** Quản trị hệ thống tạo tài khoản, gán vai trò và xã qua `/admin/users`; người
+ 1365: dùng nhận **email mời** và tự đặt mật khẩu (BE-33a, Contract v1.8 §4.8–4.9). `POST /auth/register` **đã gỡ**.
+ 1367: **Công dân (Citizen) không có tài khoản, không có vai trò (D-R1).** Họ báo sự cố qua **QR trên cột**; báo
+ 1368: cáo vào **hàng chờ riêng**, Quản lý duyệt rồi mới thành `fault`. **Không** thêm giá trị vào
+ 1369: `source_channel`, và **không** để báo cáo của dân đi thẳng vào `fault` — nguyên tắc cũ vẫn đúng: không có
+ 1370: luồng nào để một người "tạo sự cố" rồi hệ thống tin ngay, **người có vai trò duyệt** chứ không tạo.
+ 1371: `Fault` do engine sinh (`cv` / `iot`) hoặc do Kỹ sư hiện trường báo tại chỗ (`field_report`).
+ 1373: **Điều khiển ON/OFF/AUTO (D-R7).** Chỉ **Quản lý** (`ControlLighting`); chỉ thiết bị
+ 1374: `supports_remote_control = true` — tức thiết bị **testbed** tự dựng; thiết bị ngoài thực địa luôn
+ 1375: `false`, vì nhóm không có quyền vận hành lưới chiếu sáng của xã; **mọi lệnh ghi audit**. Docs viết
+ 1376: *"supported lighting devices (testbed demo)"*. Đừng viết như thể hệ thống điều khiển lưới thật.
+ 1384: - **Từ chối `SurveyFrame` thiếu metadata phơi sáng** (BE-16). Thiếu ISO / shutter / aperture / GPS / heading → từ chối kèm lý do rõ. Không nhận, không suy đoán. Ảnh auto-exposure **không sửa được sau khi chụp**.
+ 1385: - **Ngưỡng phân loại là tỉ lệ so với baseline của chính cột đó**, không bao giờ là giá trị luminance tuyệt đối.
+ 1386: - **Không so sánh độ sáng giữa hai cột khác nhau.**
+ 1388: - **Mọi phát hiện tự động ghi kèm phiên bản model và firmware** (BE-34). Không tái lập được thì không phải kết quả.
+ 1389: - **Mọi phát hiện tự động và mọi quyết định của người đều vào audit trail** (D-R13): bảng audit append-only dùng chung, thiết kế ở BE-19. Cột `confirmed_by/at`, `resolved_by/at` trên dòng `fault` (BE-18) chỉ là quyết định mới nhất.
+ 1390: - **Precision / recall báo RIÊNG cho `out` và `dim`** (NFR phiếu v1.2; v1.4 tách thành P/R/F1 cho **ON/OFF** của CV cộng đối chiếu Normal / Dim / Out với **field verification** — vẫn báo riêng từng lớp). `dim` là lớp khó và đáng giá; một con số gộp sẽ giấu nó — cùng họ lỗi với gộp `unknown` vào `out`.
+ 1391: - **Báo tỉ lệ cột có mạch điện được xác nhận** (NFR *feeder topology coverage*). Cột không gán được mạch thì gom cụm chỉ theo hình học, và **độ tin cậy giảm phải được ghi lại** — không im lặng coi như có mạch.
+ 1392: - **Sự cố cấp đoạn là một nguyên nhân, không phải N sự cố bóng.** CV-15 sinh `cluster_id` và `fault_type = segment_outage`.
+ 1393: - **Telemetry ingest idempotent theo `(node_id, reading_time)`** (IOT-09). Store-and-forward chắc chắn gửi trùng — đó là hoạt động bình thường.
+ 1395: - **Node im lặng quá ngưỡng → `Fault` loại `node_offline`.** Im lặng là tín hiệu, không phải khoảng trống.
+ 1401: - .NET modular monolith · ASP.NET Core Web API · `/api/v1`
+ 1402: - PostgreSQL + **PostGIS** + Redis — **không pgvector** (BE-02)
+ 1403: - EF Core + Npgsql + **NetTopologySuite** — map cả `Point` và `LineString` (BE-03)
+ 1404: - MinIO · Hangfire · Serilog · Swagger + JWT security scheme
+ 1405: - Testcontainers cho test tích hợp với PostGIS thật (BE-36)
+ 1407: Yêu cầu Contract mục 5:
+ 1409: 1. Tên bảng và cột **`snake_case` toàn chữ thường, không quote**. Postgres fold identifier không quote; mixed case buộc quote ở mọi nơi.
+ 1410: 2. Mọi `TIMESTAMPTZ` đọc/ghi bằng `DateTimeKind.Utc`.
+ 1411: 3. `geometry(Point,4326)` / `geometry(LineString,4326)` có **GIST index**. Query `bbox` **bắt buộc dùng `ST_Intersects` với index**, không quét bảng — kiểm chứng bằng `EXPLAIN`.
+ 1412: 4. Endpoint `bbox` trả **dưới 500ms với 2000 cột**.
+ 1413: 5. Enum trả chuỗi thường.
+ 1415: Ngoài ra: một statement lỗi **abort cả transaction** — chặt hơn SQL Server. Không cố tiếp tục sau khi bắt exception trong transaction scope.
+ 1421: | Task | Ai chờ | Hạn ngầm |
+ 1423: | BE-05 OpenAPI spec | FM-04 sinh DTO Kotlin | W1 |
+ 1424: | BE-07 auth | FM-05 | W1 |
+ 1425: | **BE-42 `LuxReading`** | FM-14, FO-14 (đo lux W5), CV-12 | **W4 — đã đẩy sớm, đừng trễ** · ⚠️ v1.4: FO-14 đổi sang BH1750 trên xe, việc thật sự cần sớm là ingest mẫu theo sweep (D-R21, D-R27) |
+ 1426: | BE-13 topology | CV-05 pole association, CV-15 clustering | W4 |
+ 1427: | BE-14 bbox | FW-08, FM-15 | W4 |
+ 1428: | BE-19, BE-20 | FW-12, FW-13, FM-17 | W8–W9 |
+ 1429: | BE-24 evidence | FM-18 | W11 |
+ 1430: | BE-27 Notification | FM-21 | W12 |
+ 1431: | BE-41 `field_report` fault | FM-19 | W13 |
+ 1432: | BE-43 sync | FM-20 offline đầy đủ | W14–W15 |
+ 1458: - Đừng đổi field hoặc enum — Contract đã publish. Lệch thì ghi lại và nêu ở review, không tự sửa.
+ 1459: - Đừng trả EPSG:3405 ra API.
+ 1460: - Đừng trả `GET /faults` dưới dạng GeoJSON.
+ 1461: - Đừng trả enum dạng số.
+ 1462: - Đừng dùng `feature.id`.
+ 1463: - Đừng làm endpoint "lấy tất cả" không có `bbox`.
+ 1464: - Đừng bắt FE gọi nhiều lần để dựng màn chi tiết cột.
+ 1465: - Đừng để FE tự tính `baseline_ratio` hay `classified_as`.
+ 1466: - Đừng gộp `unknown` vào `out`.
+ 1467: - Đừng gộp số liệu giữa các nguồn `data_source` — và đừng gắn `field` cho dữ liệu testbed.
+ 1468: - Đừng hard-code ngưỡng dim/out hay trọng số ưu tiên.
+ 1469: - Đừng đề xuất node IoT cho mọi cột — sparse IoT là thiết kế, không phải điểm cần tối ưu.
+ 1470: - Đừng cho báo cáo QR của công dân đi thẳng vào `fault`, và đừng tạo tài khoản / vai trò cho công dân.
+ 1471: - Đừng viết điều khiển ON/OFF/AUTO như thể nó chạm lưới chiếu sáng của xã — chỉ thiết bị testbed.
+ 1472: - Đừng giả định có mạng — mobile phải chạy trọn ca offline.
+ 1473: - Đừng âm thầm bỏ frame không hợp lệ.
+ 1479: - Nhánh Git mang mã task: `feat/BE-09-pole-fixture-entity`, `feat/BE-43-sync-bundle`.
+ 1480: - **Stage theo đường dẫn tường minh. Không bao giờ `git add -A` hay `git add .`** — nó quét cả file
+ 1481:   untracked không liên quan. Đã xảy ra ở BE-12: `AGENTS.md` (1055 dòng, có sẵn trong working tree)
+ 1482:   bị nuốt vào commit đầu của ticket.
+ 1483: - Mã task: `BE-` backend · `IOT-` telemetry · `CV-` vision/analytics · `FW-` web · `FM-` mobile · `FO-` field ops.
+ 1484: - Mọi API cùng định dạng response, có correlation id (BE-04).
+ 1485: - Test tích hợp chạy trên PostGIS thật, phủ truy vấn không gian và bbox.
+ 1489: W1 (xong): nền tảng **BE-01 → BE-00 → BE-02..BE-07**. W2–W3 (đang): GIS tài sản — BE-09/10/11/12a/12 xong, BE-42 và BE-18 đẩy sớm, BE-REVIEW-02 xong 18/09/2026. O-7 (FK ghép) xong 21/09/2026. **Kế tiếp: BE-13** — cần **O-6** (file `feeder_id` cho bộ mock).
+ 1491: Sau đó: GIS tài sản (W2–W4) → khảo sát (W5–W7) → sự cố (W7–W9) → quy trình (W9–W12) → dashboard (W13–W15) → quản trị (W15–W17) → hoàn thiện (W17–W21).
+ 1493: **Đã chốt ở mục 0.1–0.4:** ID sinh bằng **sequence PostgreSQL**, format ngay ở tầng DB — biểu thức `DEFAULT` chuẩn nằm ở **mục 0**, không chép lại ở đây. EF Core map bằng `.HasDefaultValueSql()` + `.ValueGeneratedOnAdd()`. Sequence an toàn concurrency sẵn, không cần bảng counter. Chấp nhận có khoảng trống trong dãy số khi insert lỗi.
+ 1495: > ⚠️ **Ghi chép lịch sử:** chỗ này trước đây ghi dạng `LPAD`. Cách đó SAI và đã bị bỏ ở commit `8ea9930` — lý do ở **mục 0**. Đừng khôi phục lại dạng `LPAD`.
+ 1497: **Client không sinh ID hiển thị.** Thao tác offline mang `client_op_id` (UUID); server gán ID thật khi nhận và trả lại ánh xạ.
+ 1499: **`CREATE FUNCTION` phải luôn đứng TRƯỚC mọi migration dùng nó trong `DEFAULT`.** `luxmap_format_id` được tạo trong `FixPrefixedIdOverflow`, và `DEFAULT` của **6 cột ID** gọi nó. Nếu sau này gộp migration thì thứ tự đó là **ràng buộc cứng**, không phải chi tiết trình bày — đảo thứ tự là DB không dựng được. `Down()` drop function để đối xứng, chép đúng chữ ký trong code: `DROP FUNCTION IF EXISTS luxmap_format_id(text, bigint, int)` — `int`, không phải `integer`.
+ 1501: > **6 chứ không phải 16 — cách phân biệt, để không ai sửa ngược.** 6 là số cột **tồn tại tại thời điểm migration** đó: `segment_id`, `pole_id`, `fixture_id`, `feeder_id`, `user_id`, `commune_id`. `PrefixedIds` khai **16 SPEC**, nhưng 10 spec còn lại thuộc entity chưa được tạo (`Fault`, `SurveyFrame`, `LuxReading`…). Số cột thật sẽ tăng dần khi các entity đó ra đời; con số 16 chỉ đúng cho *bảng prefix*, không đúng cho *migration này*.
+ 1503: Ba task mới v2.0 dễ bị quên vì không có trong kế hoạch cũ: **BE-40**, **BE-41**, **BE-43**. Cả ba đang chặn WP6.
+ 1619: `HasContractEnum` lưu enum thành **text** (đúng giá trị trên dây), nên `OrderBy(x => x.Severity)` sắp theo
+ 1620: **bảng chữ cái**: `critical, high, low, medium` — sai mà trông như có thứ tự. Cùng họ với bẫy
+ 1621: `ORDER BY pole_id` ở mục 0. Muốn sắp theo mức thì dùng **hạng tường minh** dạng `Expression` để EF sinh
+ 1622: `CASE` (`FaultQueryService.SeverityRank`); một hàm C# gọi trong `OrderBy` thì EF **không dịch được**.
+ 1623: Test phải trồng các giá trị theo thứ tự mà sắp chữ cái sẽ lộ sai (`Default_order_is_severity_by_rank_…`).
+ 2042: Ticket là file `.ai/tasks/<mã>.md` theo giao thức `.ai/` (mã từ `docs/tasks-backend.csv`), không dùng GitHub Issues. See `docs/agents/issue-tracker.md`.
+ 2046: Vai trò triage ánh xạ vào trường `status:` (và `owner:`) sẵn có của ticket, không thêm label riêng. See `docs/agents/triage-labels.md`.
+ 2050: Single-context: thuật ngữ ở `CONTEXT.md` gốc repo; quyết định vào `docs/contract-drift.md` / `CLAUDE.md`, **không** có `docs/adr/`. See `docs/agents/domain.md`.

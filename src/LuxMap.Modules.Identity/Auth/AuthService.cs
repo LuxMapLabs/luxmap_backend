@@ -138,7 +138,7 @@ public sealed class AuthService(
             query = query.Where(unit => communeIds.Contains(unit.CommuneId));
         }
 
-        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, section 0).
+        // Prefixed ids are at least N digits, not exactly N: order by length before text (CLAUDE.md, Quy ước API).
         var units = await query
             .OrderBy(unit => unit.CreatedAt).ThenBy(unit => unit.CommuneId.Length).ThenBy(unit => unit.CommuneId)
             .ToListAsync(ct);

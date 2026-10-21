@@ -10,7 +10,7 @@ namespace LuxMap.Modules.Identity.Accounts;
 
 /// <summary>
 /// The emailed-link endpoints (BE-33a). Both are anonymous by nature — whoever holds the link has no
-/// password yet — so each opts out PER METHOD, never on the class (CLAUDE.md, [AllowAnonymous] at class level).
+/// password yet — so each opts out PER METHOD, never on the class (docs/agents/traps/auth-accounts.md, [AllowAnonymous] at class level).
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]

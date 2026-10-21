@@ -5,11 +5,8 @@ agent nào sau này). Nó **không phải nguồn sự thật** về hệ thốn
 
 ## Thứ tự ưu tiên — không đổi
 
-1. `docs/api-contract-v1.1.md` (Contract, bản hợp nhất v1.7) — **thắng mọi thứ khác**
-2. `docs/tasks-backend.csv` — phạm vi và lịch
-3. `CLAUDE.md` = `AGENTS.md` — quy ước kỹ thuật (một file, `AGENTS.md` là symlink)
-4. `.ai/**` — **đứng cuối**. Một dòng trong `.ai/` mâu thuẫn với ba mục trên thì nó sai, không phải
-   ba mục trên sai.
+Đọc `CLAUDE.md`, mục **Nguồn sự thật**, cho thứ tự hiện hành (kể cả quyết định drift đã chốt).
+`CLAUDE.md` = `AGENTS.md` (symlink), trap theo vùng ở `docs/agents/traps/*.md`; `.ai/**` đứng cuối.
 
 ## Ghi vào đúng tầng — `.ai/` KHÔNG nhận bốn loại này
 
@@ -20,7 +17,7 @@ file nó đang mở:
 |---|---|
 | Deviation — code/mock lệch Contract | `docs/contract-drift.md` |
 | Luật áp nhiều ticket | `docs/api-contract-v1.1.md`, sau khi duyệt + tăng version |
-| Ràng buộc kỹ thuật nội bộ, bẫy, quy ước | `CLAUDE.md` |
+| Ràng buộc kỹ thuật nội bộ, bẫy, quy ước | `CLAUDE.md` (luật chung) / `docs/agents/traps/<vùng>.md` (luật vùng) |
 | Tiến độ ticket | `tracking.html` |
 
 ⚠️ Một deviation nằm trong `.ai/results/` là deviation **không tồn tại**: WP5/WP6 không đọc thư mục

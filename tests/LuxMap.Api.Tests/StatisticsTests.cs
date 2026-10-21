@@ -141,7 +141,7 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
             .Select(r => (r.GetProperty("commune_id").GetString(), r.GetProperty("segment_id").GetString(), r.GetProperty("pole_count").GetInt32()))
             .ToArray();
         // Expected order follows the ID rule (length, then ordinal) — never insert order: EF does not keep the
-        // AddRange order when the database generates keys (CLAUDE.md, BE-REVIEW-02 7b).
+        // AddRange order when the database generates keys (docs/agents/traps/assets.md, BE-REVIEW-02 7b).
         var expected = new (string?, string?, int)[] { (home, road, 2), (home, otherRoad, 1), (foreign, foreignRoad, 1) }
             .OrderBy(r => r.Item1!.Length).ThenBy(r => r.Item1, StringComparer.Ordinal)
             .ThenBy(r => r.Item2!.Length).ThenBy(r => r.Item2, StringComparer.Ordinal).ToArray();

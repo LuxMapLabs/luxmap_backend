@@ -166,7 +166,7 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
     /// <remarks>
     /// 🔴 The tiebreak is <c>created_at, length(fault_id), fault_id</c>, never <c>fault_id</c> alone:
     /// as text <c>FAULT-10000</c> sorts before <c>FAULT-9999</c>, and a whole seeding batch shares one
-    /// <c>created_at</c>, so the tiebreak is what actually orders it (CLAUDE.md, section 0).
+    /// <c>created_at</c>, so the tiebreak is what actually orders it (CLAUDE.md, Quy ước API).
     /// <para>
     /// ⚠️ <c>ix_fault_priority_score</c> is a plain DESC index (NULLs first in PostgreSQL), so it does
     /// not serve this NULLS-LAST order. Harmless at hundreds of rows; recorded for BE-32.

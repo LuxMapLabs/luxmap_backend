@@ -81,7 +81,7 @@ Kiểm: `curl -I https://<tên miền>/` (200) và `curl https://<tên miền>/a
 ## 5. Web SPA (WP5)
 
 WP5 build với địa chỉ API **tương đối** `/api/v1` (cùng origin), rồi chép kết quả build vào `deploy/web/` (thư mục này
-git-ignore). Thiếu `VITE_API_URL` thì bản build gọi `http://localhost:5141`:
+git-ignore). Thiếu `VITE_API_URL` thì bản build gọi `https://localhost:7252` (`src/config/apiClient.ts`). Quy trình cập nhật đầy đủ: [update.md](update.md):
 
 ```bash
 VITE_API_URL=/api/v1 npm run build
@@ -181,6 +181,8 @@ docker compose start api
 ```
 
 ## 9. Cập nhật phiên bản
+
+Quy trình từng bước cho cả backend và web, kèm kiểm tra và sự cố thường gặp: **[update.md](update.md)**.
 
 ```bash
 cd /opt/luxmap && git pull && deploy/deploy.sh

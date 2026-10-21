@@ -10,7 +10,7 @@ thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 > Contract v1.7 §2.
 >
 > 📄 **Nguồn phiếu hiện hành: v1.4 (27/09/2026)** — mục *Registration v1.4* bên dưới. Vai trò không đổi so
-> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R25…D-R28 **còn chờ quyết**.
+> với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R28 = A **chốt 02/10** (BE-15 Phase 1); D-R26 ghi nhận; D-R25, D-R27 **còn chờ quyết**.
 
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
 archive: (1) ghi ngay, bốn trường Decision / Decision maker / Date / Scope; (2) policy là một vai trò
@@ -1471,6 +1471,13 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | WSC-4 | Khảo sát liên xã: chỉ mang sự cố thuộc **xã neo** của phiếu khảo sát (`work_order.commune_id`). Xã khác cần phiếu riêng |
 | WSC-5 | Phiếu khảo sát **không** có liên kết `work_order_fault` và luồng này **không** tạo sự cố. `fault_ids` vẫn là tập con của tập mang sang; sai → 400 kèm `carried_fault_ids`, nay sắp theo độ dài rồi mã (luật ID độ rộng tối thiểu) ở cả hai nhánh |
 
+### CLAUDE-MD-CLEANUP — chỗ lệch tìm ra khi rà CLAUDE.md (20/10/2026)
+
+| Mã | Chỗ lệch | Xử lý |
+|---|---|---|
+| CLAUDE-MD-1 | Contract tự mâu thuẫn về nguồn `lamp_out` / `lamp_dim`: `api-contract-v1.1.md:285` nói chỉ từ CV, `:703` (BE-41) cho Kỹ sư hiện trường báo tại chỗ (`field_report`); code nhận cả hai (`FaultReportService`), và ảnh cột người sửa nhãn cũng sinh `field_report` (PP-15) | Sửa câu `:285` ở lần lên version kế tiếp; không đổi hành vi |
+| CLAUDE-MD-2 | Tóm tắt đầu file này (dòng 13) ghi D-R25…D-R28 "còn chờ quyết", nhưng **D-R28 = A** đã chốt ở BE-15 Phase 1 (02/10, mục *BE-15 Phase 1 — chốt*) | **Đã sửa** câu tóm tắt cùng PR; D-R25, D-R27 vẫn chờ |
+
 ### LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn (21/10/2026)
 
 | | |
@@ -1481,7 +1488,7 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 
 | Mã | Quyết định |
 |---|---|
-| LMC-1 | Cột `fixture.lamp_count integer NOT NULL DEFAULT 1`, CHECK `ck_fixture_lamp_count` = `1..4` (trần bắt lỗi gõ công suất vào ô số bóng). Bóng hiện có tự thành 1. **`lamp_watt` là công suất MỘT bóng** — tổng = `lamp_count × lamp_watt`, không lưu |
+| LMC-1 | Cột `fixture.lamp_count integer NOT NULL` (migration backfill `1` cho bóng hiện có rồi **bỏ default** — EF luôn ghi giá trị), CHECK `ck_fixture_lamp_count` = `1..4` (trần bắt lỗi gõ công suất vào ô số bóng). Bóng hiện có tự thành 1. **`lamp_watt` là công suất MỘT bóng** — tổng = `lamp_count × lamp_watt`, không lưu |
 | LMC-2 | `POST /assets/fixtures` nhận `lamp_count?` (1..4, vắng = 1; ngoài khoảng → 400). Import bóng: cột `lamp_count` **tuỳ chọn**, ô trống / thiếu cột = 1, ngoài 1..4 → lỗi theo dòng. Không có PUT: đổi số bóng = ghi bóng cũ đã tháo (`removed_date`) rồi thêm bản ghi mới, như thay bóng |
 | LMC-3 | `lamp_count` xuất hiện ở mọi chỗ có `lamp_watt`: `properties` của `GET /map/poles` (**nullable**, `null` khi cột không có bóng đang dùng), `fixture` của `GET /map/poles/{id}`, `active_fixture` của danh sách tài sản, `GET /work-orders/{id}/poles`, `GET /statistics/warranty` (cả CSV) |
 | LMC-4 | **Trạng thái đèn vẫn theo cột**, không theo bóng: CV và đỉnh lux mỗi cột không tách được hai bóng. Cột hai bóng tắt một → CV thấy ON, lux tụt so với baseline → `dim`. Thay bộ đèn (đổi số bóng) là bản ghi `fixture` mới nên baseline cũ không còn dùng (khuôn sẵn có của baseline theo bóng) |

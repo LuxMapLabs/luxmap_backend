@@ -383,7 +383,7 @@ public sealed class AssetImportService(
             // and the CRUD paths already refuse it through RequireFeederInCommuneAsync. This is the
             // third write path, and it had the hole open. The SEGMENT is deliberately NOT checked:
             // road_class = inter_commune means a road running BETWEEN communes, so a pole in another
-            // commune than its segment's owner is legitimate (CLAUDE.md, BE-12a rule 6).
+            // commune than its segment's owner is legitimate (docs/agents/traps/assets.md, BE-12a rule 6).
             if (feeder is not null && communeId is not null
                 && !string.Equals(feeder.CommuneId, communeId, StringComparison.Ordinal))
             {

@@ -32,7 +32,7 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
 
         // The list (newest first) and the unread badge, per person. The partial index serves only the
         // count; the full index still covers every row, and commune_id keeps its own index (see the
-        // partial-index rule in CLAUDE.md).
+        // partial-index rule in docs/agents/traps/migrations.md).
         builder.HasIndex(notice => new { notice.RecipientUserId, notice.CreatedAt })
             .IsDescending(false, true)
             .HasDatabaseName("ix_notification_recipient_created");

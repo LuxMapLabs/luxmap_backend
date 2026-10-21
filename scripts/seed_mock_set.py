@@ -24,7 +24,7 @@ WHAT IT DOES NOT SEED, and why:
                      DEMO-SEG-00n) and hangs every pole on its segment's feeder, so the cabinet
                      devices have lamps to reach (decision I-11, 28/09/2026). This is NOT circuit
                      data: CV-15 must not treat it as topology, and O-6 replaces it.
-  pole_current_status  Its writes belong to BE-15/BE-17 (CLAUDE.md). The mock does carry
+  pole_current_status  Its writes belong to Survey (docs/agents/traps/commune-scope.md, BE-09 rule 2). The mock does carry
                      fixture_status, status_confidence, last_seen_at and last_sweep_id, so this is a
                      deliberate omission rather than a missing feature.
   survey_sweep, survey_frame, luminance_history

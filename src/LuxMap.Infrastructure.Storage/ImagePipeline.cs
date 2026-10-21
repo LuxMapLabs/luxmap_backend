@@ -49,7 +49,7 @@ public static class ImagePipeline
     /// roughly 5–15 MB for a survey photograph, against a thumbnail of a few tens of KB. Sequential
     /// uploads therefore stay flat no matter how long the sweep is. Hundreds of frames arriving at
     /// once would not: that is a batching and concurrency decision, and it belongs to BE-15, which
-    /// owns the sweep upload endpoint. Recorded in CLAUDE.md so it is not discovered under load.
+    /// owns the sweep upload endpoint. See docs/agents/traps/media-storage.md, BE-11 rule 6, for the bounded-memory requirement.
     /// </para>
     /// </remarks>
     public static async Task<PreparedImage> PrepareAsync(

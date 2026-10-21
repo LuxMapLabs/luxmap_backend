@@ -406,11 +406,11 @@ S["SegmentProperties"] = {
 
 # BE-20: PoleDetail and its parts (PoleDetailFixture/Status/Baseline/HistoryPoint/OpenFault/Frame) now come
 # from the live code. The hand-written copies stood here and would OVERWRITE the exported schemas
-# (CLAUDE.md, BE-14b) — they described the Contract's per-pole iot_node and runtime_history, which drift I-1 and
+# (docs/agents/traps/iot-lighting.md, BE-14b) — they described the Contract's per-pole iot_node and runtime_history, which drift I-1 and
 # I-9 removed.
 
 # BE-40: FaultItem and its page now come from the live code (FaultItem / FaultItemPagedResult).
-# The hand-written copies stood here and would OVERWRITE the exported schema (CLAUDE.md, BE-14b).
+# The hand-written copies stood here and would OVERWRITE the exported schema (docs/agents/traps/iot-lighting.md, BE-14b).
 # BE-19: PatchFaultRequest now comes from the live code; the hand-written copy would overwrite it.
 # BE-41: ReportFaultRequest / ReportedFault come from the live code; the hand-written CreateFaultRequest
 # (with photo_frame_id, removed by EV-2) and CreatedFaultResponse would describe the old shape.

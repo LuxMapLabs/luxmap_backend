@@ -125,7 +125,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
     /// <summary>
     /// 🔴 <c>feeder_ids</c> is in id order, not text order — and the length tiebreaker is what decides it, because
-    /// one batch shares one <c>created_at</c> (CLAUDE.md section 0). The two ids straddle a width boundary and are
+    /// one batch shares one <c>created_at</c> (CLAUDE.md, Quy ước API). The two ids straddle a width boundary and are
     /// written in ONE statement, so <c>created_at</c> ties; as text <c>FDR-1000000</c> would sort first.
     /// </summary>
     [Fact]
@@ -591,7 +591,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
     /// <summary>
     /// A pair like <c>FDR-999999</c> / <c>FDR-1000000</c> that no row holds, far above where <c>feeder_id_seq</c>
-    /// stands — chosen from the LIVE table, never a literal (CLAUDE.md: the shared sequence).
+    /// stands — chosen from the LIVE table, never a literal (docs/agents/traps/testing.md: the shared sequence).
     /// </summary>
     private async Task<(string Shorter, string Longer)> FreeStraddlingFeederIdsAsync()
     {
