@@ -82,7 +82,7 @@ Trên **máy dev**, trong repo `luxmap-web`:
 git checkout dev && git pull --ff-only
 npm ci
 VITE_API_URL=/api/v1 VITE_MAPTILER_KEY=<khoá MapTiler> npm run build
-grep -rl "localhost" dist/ && echo "SAI: bản build còn trỏ localhost" || echo "OK"
+grep -rlE "localhost:[0-9]+" dist/ && echo "SAI: bản build còn trỏ localhost" || echo "OK"
 ```
 
 - **`VITE_API_URL=/api/v1` là bắt buộc.** Web và API cùng origin (`luxmap.com.vn`), nên địa chỉ là đường dẫn tương đối.
@@ -90,6 +90,8 @@ grep -rl "localhost" dist/ && echo "SAI: bản build còn trỏ localhost" || ec
 - Biến `VITE_*` được **đóng vào bản build** lúc build: đổi giá trị là phải build lại. Khoá MapTiler vì thế công khai trong
   bundle — giới hạn nó theo tên miền `luxmap.com.vn` trong trang quản lý của MapTiler.
 - Cảnh báo `Some chunks are larger than 500 kB` là bình thường, không chặn build.
+- Chuỗi `http://localhost` **không kèm cổng** trong bundle là giá trị dự phòng của React Router / axios, vô hại; phép kiểm
+  bên dưới chỉ bắt `localhost:<cổng>`, tức địa chỉ API dev bị đóng vào bản build.
 
 Chép lên VPS — **hai lượt**, để người đang mở trang không bao giờ nhận `index.html` mới trỏ tới file chưa chép xong:
 
@@ -98,7 +100,8 @@ rsync -az --exclude index.html dist/ vps:/opt/luxmap/deploy/web/     # 1. file m
 rsync -az --delete dist/ vps:/opt/luxmap/deploy/web/                 # 2. index.html mới, xoá file cũ
 ```
 
-Không cần khởi động lại gì: Caddy đọc file trực tiếp. Chép **vào** thư mục `deploy/web/`, đừng thay cả thư mục
+Không cần khởi động lại gì: Caddy đọc file trực tiếp, gửi `index.html` với `Cache-Control: no-cache` nên trình duyệt nhận bản
+mới ngay ở lần tải sau, còn `/assets/*` (tên có mã băm) được cache một năm. Chép **vào** thư mục `deploy/web/`, đừng thay cả thư mục
 (`mv`, xoá rồi tạo lại) — container gắn thư mục cũ và sẽ phục vụ bản cũ hoặc trả 404.
 
 Kiểm: mở `https://luxmap.com.vn` (Ctrl/Cmd-Shift-R), đăng nhập, mở thẳng một đường dẫn sâu (ví dụ `/map`) — phải ra trang, không 404.
