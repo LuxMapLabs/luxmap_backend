@@ -137,6 +137,14 @@
     thời mới (<code>AssetImportConcurrencyTests</code>), phá thử bỏ khoá → đỏ. Không đổi API, không migration.</p>
   </div>
   <div class="card">
+    <strong>OPS-DEPLOY — web tự deploy + cache header, 21/10/2026</strong>
+    <p><span class="tag t-done">Đã chạy</span> Web: workflow GitHub Actions trong <code>luxmap-web</code> (#51) — merge vào <code>dev</code> là tự
+    test → build (<code>VITE_API_URL=/api/v1</code>) → rsync lên VPS → kiểm bundle; key deploy bị <code>rrsync</code> khoá chỉ ghi thư mục web,
+    host key ghim. Lượt đầu xanh. Caddy (#170): <code>index.html</code> <code>no-cache</code>, <code>/assets/*</code> cache 1 năm — trước đó trình duyệt
+    giữ bản web cũ sau deploy. Bản đồ web mở theo <code>map_bounds</code> của <code>/auth/me</code> (luxmap-web #49). Dữ liệu mock COM-070 đã xoá,
+    tài khoản chỉ còn 2 xã thực địa. Tài liệu: <code>docs/deploy/update.md</code> mục B (tự động) / B2 (khẩn cấp).</p>
+  </div>
+  <div class="card">
     <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>
     <p><span class="tag t-next">Chờ PR</span> Nhánh <code>fix/BE-07-login-rate-limit</code>. Lỗi chặn deploy v1 từ review sẵn sàng deploy:
     <code>/auth/login</code> và <code>/auth/web/login</code> không có giới hạn nào. Nay <strong>10 lần / 5 phút / địa chỉ</strong>, hai endpoint
