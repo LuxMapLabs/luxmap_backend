@@ -124,10 +124,17 @@
   </div>
   <div class="card">
     <strong>LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn, 21/10/2026</strong>
-    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/LAMP-COUNT</code>. Mỹ chọn hướng A: <code>fixture.lamp_count</code> (1..4, mặc định 1),
+    <p><span class="tag t-done">Đã merge #168</span> 21/10/2026. Nhánh <code>feat/LAMP-COUNT</code>. Mỹ chọn hướng A: <code>fixture.lamp_count</code> (1..4, mặc định 1),
     vẫn một bản ghi bóng đang dùng mỗi cột, trạng thái vẫn theo cột. Tạo bóng / import nhận <code>lamp_count</code> tuỳ chọn; trường hiện ở
     bản đồ, chi tiết cột, danh sách tài sản, cột của phiếu, thống kê bảo hành. Migration <code>AddFixtureLampCount</code>; mock thêm
     <code>lamp_count: 1</code>. 7 test mới, 3 phá thử đỏ. Drift LMC-1…LMC-4, SELF-SIGNED. Còn: báo WP5/WP6.</p>
+  </div>
+  <div class="card">
+    <strong>BE-12a — import đồng thời xếp hàng theo loại, 21/10/2026</strong>
+    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>fix/BE-12a-import-queue</code>. Đóng hạn chế "upsert không nguyên tử": hai lượt
+    nạp cùng file đồng thời từng ra <strong>500</strong> (cả hai đọc trống, cả hai chèn, bên thua đụng unique). Nay transaction mở trước bước
+    lập kế hoạch và lấy <code>pg_advisory_xact_lock</code> theo loại file; mọi lượt ghi vẫn qua <code>SaveChanges</code> / guard. Test đồng
+    thời mới (<code>AssetImportConcurrencyTests</code>), phá thử bỏ khoá → đỏ. Không đổi API, không migration.</p>
   </div>
   <div class="card">
     <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>

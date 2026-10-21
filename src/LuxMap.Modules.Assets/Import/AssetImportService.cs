@@ -20,19 +20,13 @@ namespace LuxMap.Modules.Assets.Import;
 /// unresolvable reference, a commune outside scope. A write-time failure aborts the whole batch and
 /// surfaces as 500 rather than being blamed on a row.
 /// <para>
-/// ⚠️ <b>KNOWN LIMITATION — the upsert is not atomic, so one row-level failure CAN still reach the
-/// write.</b> The lookup below reads existing rows and then adds or mutates them; read and write are
-/// separate statements. Two imports of the same file running at once both read nothing, both
-/// <c>Add</c>, and the second loses to <c>ux_*_commune_external_ref</c> inside
-/// <c>SaveChanges</c> — arriving as a raw <c>DbUpdateException</c> and a 500, not as a validated row
-/// error carrying a line number.
-/// </para>
-/// <para>
-/// Left as it is for BE-12a: the batch is one transaction, so the loser writes nothing and no data is
-/// corrupted, and a second administrator uploading the same inventory file at the same second is not
-/// a case worth designing for yet. It is written down because <b>BE-12b inherits this write path</b>,
-/// and because the honest fix is a real upsert (<c>ON CONFLICT DO UPDATE</c>) rather than another
-/// pre-check, which would only narrow the window.
+/// <b>Concurrent imports are queued by file kind.</b> The transaction takes a PostgreSQL advisory
+/// transaction lock BEFORE planning, so the next import of the same kind reads the previous one's
+/// committed rows. Read and write remain separate statements, but imports of that kind run serially.
+/// Raw <c>ON CONFLICT</c> would bypass the change tracker, <c>CommuneWriteGuard</c> and
+/// <c>AssetStamp.Touch</c>; all row writes still go through <c>SaveChanges</c>. Commit, rollback and
+/// disposal all release the lock, including an unchanged or invalid batch with nothing to write.
+/// Other asset write paths do not take this import lock.
 /// </para>
 /// <para>
 /// <b>One kind of file per request.</b> That is what makes references safe: a pole's segment was
@@ -113,6 +107,23 @@ public sealed class AssetImportService(
         var warnings = new List<ImportRowError>();
         var readers = rows.Select(row => new ImportRowReader(row, errors)).ToList();
 
+        // Stable, explicit bigint keys in the "LMI" (LuxMap import) range, independent of enum order or .NET hashes.
+        // Imports are rare: serializing a whole kind, across communes, is enough without per-row lock ordering.
+        var lockKey = kind switch
+        {
+            ImportKind.Segments => 0x4C4D4901L,
+            ImportKind.Cabinets => 0x4C4D4902L,
+            ImportKind.Feeders => 0x4C4D4903L,
+            ImportKind.Poles => 0x4C4D4904L,
+            ImportKind.Fixtures => 0x4C4D4905L,
+            _ => 0x4C4D4900L,
+        };
+
+        // Lock before any planner reads. `await using` rolls back and releases it on every early return or failure,
+        // including a CommuneWriteGuard refusal in SaveChanges. This SELECT does not write or bypass tracked rows.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
+
         var plan = kind switch
         {
             ImportKind.Segments => await PlanSegmentsAsync(readers, cancellationToken),
@@ -127,16 +138,12 @@ public sealed class AssetImportService(
 
         if (plan.Inserted + plan.Updated == 0)
         {
-            // Nothing tracked, so nothing to commit. Detach anything a planner attached before it
-            // discovered the row was bad, so a later request in the same scope starts clean.
+            // No row changes to commit. Disposal rolls back and releases the lock. Detach anything a planner
+            // attached before it discovered the row was bad, so a later request in the same scope starts clean.
             dbContext.ChangeTracker.Clear();
             return ImportResult.From(0, 0, plan.Unchanged, failed, errors, warnings);
         }
 
-        // One transaction for the whole batch. `await using` rolls back on any escape — including the
-        // 403 CommuneWriteGuard throws from inside SaveChanges — so the connection is never left
-        // holding an open transaction.
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -253,11 +260,11 @@ public sealed class AssetImportService(
     /// the import never detaches one, the same rule as a pole's note and as <c>PUT</c> (CAB-6). Moving a feeder a
     /// device switches is a row error (CAB-4).
     /// <para>
-    /// ⚠️ <b>Same known limitation as the upsert (class remarks):</b> the relay lookup is read BEFORE the write
-    /// transaction. A relay wired in between makes the database refuse at the write — the batch rolls back whole
-    /// and answers 500, nothing is corrupted. Accepted while the only writer of <c>feeder_control</c> is a seed
-    /// script (Codex review 07/10/2026, P2); the fix is locking the rows inside the transaction, not another
-    /// pre-check.
+    /// ⚠️ <b>The import lock does not serialize relay wiring:</b> the relay lookup is inside the transaction,
+    /// but another writer can wire a relay between that read and the write. The database then refuses the write —
+    /// the batch rolls back whole and answers 500, nothing is corrupted. Accepted: the other writer is a Manager wiring a
+    /// relay (<c>PUT /assets/iot-nodes/{id}/relays/{n}</c>, LIGHT-CTRL 2a), as rare as an import (Codex review 07/10/2026,
+    /// P2); coordinating those writers requires row locks, not another pre-check.
     /// </para>
     /// </remarks>
     private async Task<WritePlan> PlanFeedersAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
