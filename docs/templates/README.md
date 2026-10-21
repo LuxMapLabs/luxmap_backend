@@ -286,7 +286,8 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã có bóng → lỗi theo dòng** (insert-only) |
 | `fixture_type` | **Có** | enum | `led_road_lamp` — **giá trị duy nhất** từ Contract v1.6 (`ck_fixture_fixture_type`) |
 | `power_source` | **Có** | enum | `grid` — **giá trị duy nhất** từ Contract v1.6 — `ck_fixture_power_source` |
-| `lamp_watt` | **Có** | integer | |
+| `lamp_watt` | **Có** | integer | Công suất **một** bóng |
+| `lamp_count` | Không | integer `1..4` | Số bóng **giống nhau** lắp cùng lúc trên cột (cột cần đôi = `2`). Để trống / không có cột = `1` (LAMP-COUNT) |
 | `install_date` | **Có** | date | `YYYY-MM-DD` |
 | `removed_date` | Không | date | Để trống nghĩa là bóng **đang lắp**. Thay bóng thì điền vào dòng cũ và thêm một dòng mới |
 | `warranty_expiry` | Không | date | Không phải bóng nào cũng có bảo hành |
@@ -317,6 +318,7 @@ Kiểm chứng template có đủ để nạp lại 103 cột trong `mocks/mock-
 | `power_source` | ✅ `fixtures.csv` → `power_source` (**bảng `fixture`**, không phải `pole`) |
 | `fixture_type` | ✅ `fixtures.csv` → `fixture_type` |
 | `lamp_watt` | ✅ `fixtures.csv` → `lamp_watt` |
+| `lamp_count` | ✅ `fixtures.csv` → `lamp_count` (tuỳ chọn, mặc định 1) |
 | `install_date` | ✅ `fixtures.csv` → `install_date` |
 | `warranty_expiry` | ✅ `fixtures.csv` → `warranty_expiry` |
 | `fixture_status` | ❌ Bảng `pole_current_status` — **BE-15/BE-17 sở hữu quyền ghi**, import cấm đụng |

@@ -115,12 +115,19 @@
   </div>
   <div class="card">
     <strong>CLAUDE-MD-CLEANUP — tách CLAUDE.md thành lõi + tra cứu theo vùng, 20/10/2026</strong>
-    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>docs/CLAUDE-MD-CLEANUP</code> (Claude + Codex). <code>CLAUDE.md</code> (cũng là <code>AGENTS.md</code>,
+    <p><span class="tag t-done">Đã merge #167</span> 21/10/2026. Nhánh <code>docs/CLAUDE-MD-CLEANUP</code> (Claude + Codex). <code>CLAUDE.md</code> (cũng là <code>AGENTS.md</code>,
     nạp vào mọi phiên) từ <strong>2.293 dòng / 204 KB còn 338 dòng / 32 KB</strong>: chỉ luật áp mọi ticket + bảng trỏ tới
     12 file <code>docs/agents/traps/*.md</code>. Codex kiểm từng khẳng định với code (44 lỗi thời, 14 mâu thuẫn, 32 trùng, 11 sai tầng) và áp
     vào file tra cứu; 9 luật rơi khi viết lại lõi đã phục hồi. Sửa luật đang dẫn sai: sort sự cố <code>-severity</code>, <code>out</code> do CV,
     nguồn <code>lamp_*</code>, <code>LPAD</code>, phạm vi theo JWT, không Hangfire. Luật ưu tiên mới (D-4): quyết định drift đã chốt thắng chữ
     Contract chưa hợp nhất. Drift CLAUDE-MD-1/2. Comment trong code trỏ lại đúng file. Đã rebase sau #164, đoạn PHOTO-REVIEW nằm ở <code>survey.md</code>.</p>
+  </div>
+  <div class="card">
+    <strong>LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn, 21/10/2026</strong>
+    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/LAMP-COUNT</code>. Mỹ chọn hướng A: <code>fixture.lamp_count</code> (1..4, mặc định 1),
+    vẫn một bản ghi bóng đang dùng mỗi cột, trạng thái vẫn theo cột. Tạo bóng / import nhận <code>lamp_count</code> tuỳ chọn; trường hiện ở
+    bản đồ, chi tiết cột, danh sách tài sản, cột của phiếu, thống kê bảo hành. Migration <code>AddFixtureLampCount</code>; mock thêm
+    <code>lamp_count: 1</code>. 7 test mới, 3 phá thử đỏ. Drift LMC-1…LMC-4, SELF-SIGNED. Còn: báo WP5/WP6.</p>
   </div>
   <div class="card">
     <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>

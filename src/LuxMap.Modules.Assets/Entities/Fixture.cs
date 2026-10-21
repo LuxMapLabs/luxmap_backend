@@ -47,7 +47,14 @@ public class Fixture : ICommuneScoped, IUpdateStamped
 
     public PowerSource PowerSource { get; set; }
 
+    /// <summary>Wattage of ONE lamp; a fitting with <see cref="LampCount"/> lamps draws that many times this.</summary>
     public int LampWatt { get; set; }
+
+    /// <summary>
+    /// Identical lamps fitted and replaced together on this pole — a double-arm pole is one fitting with two
+    /// (LAMP-COUNT, drift LMC-1). Status stays per pole: CV and the per-pole lux peak cannot tell the lamps apart.
+    /// </summary>
+    public int LampCount { get; set; } = 1;
 
     /// <summary>
     /// <c>date</c>, not <c>timestamptz</c> — Contract section 0 separates the two, and a fitting is

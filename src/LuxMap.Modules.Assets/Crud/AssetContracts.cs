@@ -163,6 +163,10 @@ public sealed record CreateFixtureRequest
     [Range(1, 10_000)]
     public int? LampWatt { get; init; }
 
+    /// <summary>Identical lamps on the pole, fitted together (LAMP-COUNT). Defaults to 1.</summary>
+    [Range(1, 4)]
+    public int? LampCount { get; init; }
+
     [Required]
     public DateOnly? InstallDate { get; init; }
 
@@ -428,6 +432,8 @@ public sealed record ActiveFixture
     public required PowerSource PowerSource { get; init; }
 
     public required int LampWatt { get; init; }
+
+    public required int LampCount { get; init; }
 
     public required DateOnly InstallDate { get; init; }
 

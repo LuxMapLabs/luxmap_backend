@@ -112,6 +112,7 @@ public sealed record WarrantyItem
 
     public required FixtureType? FixtureType { get; init; }
     public required int? LampWatt { get; init; }
+    public required int? LampCount { get; init; }
     public required DateOnly? InstallDate { get; init; }
 
     /// <summary><c>null</c> = not on record (or no lamp) — <see cref="WarrantyStatus"/> is then <c>unknown</c>.</summary>

@@ -83,7 +83,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
         string[] expected =
         [
             "pole_id", "segment_id", "fixture_status", "status_confidence", "power_source",
-            "fixture_type", "lamp_watt", "install_date", "warranty_expiry", "commune_id",
+            "fixture_type", "lamp_watt", "lamp_count", "install_date", "warranty_expiry", "commune_id",
             "last_seen_at", "last_sweep_id", "open_fault_count", "has_iot_node", "near_sensitive_poi",
             "warranty_status",
         ];

@@ -52,6 +52,9 @@ public record PoleProperties
 
     public int? LampWatt { get; init; }
 
+    /// <summary>Lamps in the active fitting (LAMP-COUNT); <c>null</c> with no active fixture, like <c>lamp_watt</c>.</summary>
+    public int? LampCount { get; init; }
+
     public DateOnly? InstallDate { get; init; }
 
     public DateOnly? WarrantyExpiry { get; init; }

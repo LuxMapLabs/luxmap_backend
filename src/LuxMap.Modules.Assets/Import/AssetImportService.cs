@@ -510,6 +510,7 @@ public sealed class AssetImportService(
             var fixtureType = reader.RequiredEnum<FixtureType>("fixture_type");
             var powerSource = reader.RequiredEnum<PowerSource>("power_source");
             var watt = reader.RequiredInt("lamp_watt");
+            var lampCount = reader.OptionalInt("lamp_count", 1, 1, 4);
             var installDate = reader.Date("install_date", required: true);
             var removedDate = reader.Date("removed_date", required: false);
             var warranty = reader.Date("warranty_expiry", required: false);
@@ -548,6 +549,7 @@ public sealed class AssetImportService(
                 FixtureType = fixtureType,
                 PowerSource = powerSource,
                 LampWatt = watt,
+                LampCount = lampCount,
                 InstallDate = installDate!.Value,
                 RemovedDate = removedDate,
                 WarrantyExpiry = warranty,

@@ -1477,3 +1477,18 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 |---|---|---|
 | CLAUDE-MD-1 | Contract tự mâu thuẫn về nguồn `lamp_out` / `lamp_dim`: `api-contract-v1.1.md:285` nói chỉ từ CV, `:703` (BE-41) cho Kỹ sư hiện trường báo tại chỗ (`field_report`); code nhận cả hai (`FaultReportService`), và ảnh cột người sửa nhãn cũng sinh `field_report` (PP-15) | Sửa câu `:285` ở lần lên version kế tiếp; không đổi hành vi |
 | CLAUDE-MD-2 | Tóm tắt đầu file này (dòng 13) ghi D-R25…D-R28 "còn chờ quyết", nhưng **D-R28 = A** đã chốt ở BE-15 Phase 1 (02/10, mục *BE-15 Phase 1 — chốt*) | **Đã sửa** câu tóm tắt cùng PR; D-R25, D-R27 vẫn chờ |
+
+### LAMP-COUNT — cột cần đôi: số bóng trên một bộ đèn (21/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan) chọn hướng **A** ngày 21/10/2026: một bản ghi `fixture` mang số bóng giống nhau lắp cùng lúc, **không** mở nhiều bóng đang dùng trên một cột (hướng B). Giữ D-11 (BE-REVIEW-02): mỗi cột tối đa một bản ghi bóng đang dùng. Chạm bề mặt API (trường mới) ⇒ **SELF-SIGNED, nền tạm** |
+| **Consumer** | WP5 (form / import tài sản, popup bản đồ), WP6 (chi tiết cột). **Chưa báo** |
+| **Scope** | Assets, Map, WorkOrders, Statistics; migration `AddFixtureLampCount`; mock `mock-poles.geojson` / `mock-pole-detail.json` thêm `lamp_count: 1`; spec sinh lại |
+
+| Mã | Quyết định |
+|---|---|
+| LMC-1 | Cột `fixture.lamp_count integer NOT NULL` (migration backfill `1` cho bóng hiện có rồi **bỏ default** — EF luôn ghi giá trị), CHECK `ck_fixture_lamp_count` = `1..4` (trần bắt lỗi gõ công suất vào ô số bóng). Bóng hiện có tự thành 1. **`lamp_watt` là công suất MỘT bóng** — tổng = `lamp_count × lamp_watt`, không lưu |
+| LMC-2 | `POST /assets/fixtures` nhận `lamp_count?` (1..4, vắng = 1; ngoài khoảng → 400). Import bóng: cột `lamp_count` **tuỳ chọn**, ô trống / thiếu cột = 1, ngoài 1..4 → lỗi theo dòng. Không có PUT: đổi số bóng = ghi bóng cũ đã tháo (`removed_date`) rồi thêm bản ghi mới, như thay bóng |
+| LMC-3 | `lamp_count` xuất hiện ở mọi chỗ có `lamp_watt`: `properties` của `GET /map/poles` (**nullable**, `null` khi cột không có bóng đang dùng), `fixture` của `GET /map/poles/{id}`, `active_fixture` của danh sách tài sản, `GET /work-orders/{id}/poles`, `GET /statistics/warranty` (cả CSV) |
+| LMC-4 | **Trạng thái đèn vẫn theo cột**, không theo bóng: CV và đỉnh lux mỗi cột không tách được hai bóng. Cột hai bóng tắt một → CV thấy ON, lux tụt so với baseline → `dim`. Thay bộ đèn (đổi số bóng) là bản ghi `fixture` mới nên baseline cũ không còn dùng (khuôn sẵn có của baseline theo bóng) |

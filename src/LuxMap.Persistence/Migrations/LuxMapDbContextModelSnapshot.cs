@@ -269,6 +269,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("install_date");
 
+                    b.Property<int>("LampCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("lamp_count");
+
                     b.Property<int>("LampWatt")
                         .HasColumnType("integer")
                         .HasColumnName("lamp_watt");
@@ -320,6 +324,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_fixture_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
 
                             t.HasCheckConstraint("ck_fixture_fixture_type", "\"fixture_type\" IN ('led_road_lamp')");
+
+                            t.HasCheckConstraint("ck_fixture_lamp_count", "lamp_count BETWEEN 1 AND 4");
 
                             t.HasCheckConstraint("ck_fixture_power_source", "\"power_source\" IN ('grid')");
 

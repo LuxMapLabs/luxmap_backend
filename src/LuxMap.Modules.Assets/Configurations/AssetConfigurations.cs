@@ -266,6 +266,11 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
         builder.Property(fixture => fixture.FixtureId).HasPrefixedId(PrefixedIds.Fixture);
         builder.Property(fixture => fixture.PoleId).HasColumnType("text").IsRequired();
         builder.Property(fixture => fixture.LampWatt).IsRequired();
+        // No database default: EF would omit a 0 and let the default turn it into 1 instead of the CHECK refusing it
+        // (ModelDefaultValueTests). The migration backfills 1, then drops the default. The CHECK's upper bound catches a
+        // wattage typed into the count (LAMP-COUNT).
+        builder.Property(fixture => fixture.LampCount).IsRequired();
+        builder.ToTable(table => table.HasCheckConstraint("ck_fixture_lamp_count", "lamp_count BETWEEN 1 AND 4"));
 
         // Contract section 0 separates dates from timestamps: these three are DATE, never TIMESTAMPTZ.
         builder.Property(fixture => fixture.InstallDate).HasColumnType("date").IsRequired();
