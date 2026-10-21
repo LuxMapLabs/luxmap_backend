@@ -139,3 +139,10 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
   Dọn fault **trước ảnh**, ảnh trước work_order/pole/user, audit trước actor/xã. PLAN copy phải giữ parent/users của ảnh và fault có nguồn ảnh.
   Rollback migration mất metadata/kết quả/quyết định và origin ảnh của fault; object/audit không tự mất. Trên môi trường có dữ liệu ưu tiên
   rollback ứng dụng, giữ schema; apply/down/reapply chỉ kiểm trên container test riêng trống.
+
+- **PHOTO-REVIEW (20/10, PP-11…PP-15):** fallback `FinalCvState ?? CvState` chỉ lúc công bố. Nhãn người đổi đi qua
+  `IPolePhotoPublication` với provenance riêng; score/model AI gốc chỉ là snapshot, không phải score của kết luận người sửa.
+  Current-status known có thể không score; history/observation vẫn giữ invariant cũ. Review phải đọc lại sau khóa đủ ba hàng;
+  chỉ chờ UPDATE ảnh không chứng minh explicit photo lock (test canh cả thứ tự command). Down `AddPolePhotoReviews` có preflight
+  chống mất review và không ép dữ liệu mới về CHECK cũ; trên DB có review thì rollback ứng dụng, giữ schema.
+  SQL trim dùng `chr(11)` cho vertical tab: PostgreSQL `E'\v'` là chữ `v`, vừa lọt whitespace vừa từ chối note hợp lệ `v`.

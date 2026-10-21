@@ -33,4 +33,4 @@ $ dotnet build --disable-build-servers
 
 ## Còn
 
-- Rebase lên `dev` sau PR #164: chép đoạn PHOTO-REVIEW (mục POLE-PHOTO-AI của CLAUDE.md cũ) vào `docs/agents/traps/survey.md`.
+- ✅ Rebase lên `dev` sau PR #164: đoạn PHOTO-REVIEW (6 dòng, nguyên văn) nằm cuối mục POLE-PHOTO-AI của `docs/agents/traps/survey.md`.

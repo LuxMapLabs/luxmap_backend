@@ -120,7 +120,7 @@
     12 file <code>docs/agents/traps/*.md</code>. Codex kiểm từng khẳng định với code (44 lỗi thời, 14 mâu thuẫn, 32 trùng, 11 sai tầng) và áp
     vào file tra cứu; 9 luật rơi khi viết lại lõi đã phục hồi. Sửa luật đang dẫn sai: sort sự cố <code>-severity</code>, <code>out</code> do CV,
     nguồn <code>lamp_*</code>, <code>LPAD</code>, phạm vi theo JWT, không Hangfire. Luật ưu tiên mới (D-4): quyết định drift đã chốt thắng chữ
-    Contract chưa hợp nhất. Drift CLAUDE-MD-1/2. Comment trong code trỏ lại đúng file. Còn: rebase sau #164, chép đoạn PHOTO-REVIEW vào <code>survey.md</code>.</p>
+    Contract chưa hợp nhất. Drift CLAUDE-MD-1/2. Comment trong code trỏ lại đúng file. Đã rebase sau #164, đoạn PHOTO-REVIEW nằm ở <code>survey.md</code>.</p>
   </div>
   <div class="card">
     <strong>LOGIN-RATE — giới hạn tần suất đăng nhập, 19/10/2026</strong>
@@ -142,7 +142,7 @@
   </div>
   <div class="card">
     <strong>PHOTO-REVIEW — kỹ sư sửa nhãn AI của ảnh cột, 20/10/2026</strong>
-    <p><span class="tag t-next">Chờ PR</span> Nhánh <code>feat/PHOTO-REVIEW</code> (Codex code, Claude review). Đề xuất WP5 bỏ quyết định của Quản lý →
+    <p><span class="tag t-done">Đã merge #164</span> 20/10/2026 (Codex code, Claude review). Đề xuất WP5 bỏ quyết định của Quản lý →
     <strong>bác phần xoá</strong>. Mỹ chốt: Quản lý vẫn công bố (<code>/decision</code> giữ nguyên); thêm <code>final_cv_state</code> / <code>review_note</code> /
     <code>reviewed_by</code> / <code>reviewed_at</code> + <code>PATCH …/review</code> cho người được giao, phiếu <code>in_progress</code>, ảnh chưa quyết.
     Confirm công bố <code>final_cv_state ?? cv_state</code>; nhãn người đổi → <code>status_confidence = null</code> (nới CHECK current-status), sự cố
