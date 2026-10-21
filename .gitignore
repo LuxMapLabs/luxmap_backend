@@ -489,3 +489,4 @@ logs/
 
 # OPS-DEPLOY-VPS — the web SPA build copied onto the server
 deploy/web/
+deploy/web.prev/
