@@ -80,6 +80,9 @@ Kiểm: `curl -I https://<tên miền>/` (200) và `curl https://<tên miền>/a
 
 ## 5. Web SPA (WP5)
 
+> Từ 21/10/2026 web **tự deploy** khi merge vào `dev` của `luxmap-web` (GitHub Actions) — xem [update.md](update.md) mục B.
+> Cách tay dưới đây chỉ còn dùng khi khẩn cấp (update.md mục B2).
+
 WP5 build với địa chỉ API **tương đối** `/api/v1` (cùng origin), rồi chép kết quả build vào `deploy/web/` (thư mục này
 git-ignore). Thiếu `VITE_API_URL` thì bản build gọi `https://localhost:7252` (`src/config/apiClient.ts`). Quy trình cập nhật đầy đủ: [update.md](update.md):
 

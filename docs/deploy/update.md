@@ -5,10 +5,10 @@ không lặp lại phần dựng máy lần đầu.
 
 ```
 máy dev ──git push──▶ GitHub (dev) ──git pull──▶ VPS /opt/luxmap ──deploy.sh──▶ API mới   (backend)
-máy dev ──npm run build──▶ dist/ ──rsync──▶ VPS /opt/luxmap/deploy/web ──▶ Caddy phục vụ  (web)
+merge vào dev (luxmap-web) ──GitHub Actions: test, build──▶ rsync ──▶ VPS /opt/luxmap/deploy/web ──▶ Caddy  (web)
 ```
 
-Backend build **trên VPS** (image đúng kiến trúc của máy). Web build **trên máy dev** rồi chép lên — VPS không cần Node.
+Backend build **trên VPS** (image đúng kiến trúc của máy). Web build **trên GitHub Actions** rồi chép lên — VPS không cần Node.
 
 ## Cần có
 
@@ -16,7 +16,7 @@ Backend build **trên VPS** (image đúng kiến trúc của máy). Web build **
 |---|---|
 | SSH | Key của bạn nằm trong `~/.ssh/authorized_keys` của user `ubuntu` trên VPS. Thử: `ssh ubuntu@15.235.242.213 true` |
 | Backend | Thay đổi đã **merge vào `dev`** và CI xanh. VPS luôn chạy `dev` |
-| Web | Node 18+ trên máy dev, repo `luxmap-web`, khoá MapTiler (`VITE_MAPTILER_KEY`) |
+| Web | Không cần gì: merge vào `dev` của `luxmap-web` là đủ (mục B). Chỉ cách tay khẩn cấp (B2) mới cần Node 20+ và SSH |
 
 Lệnh dưới dùng `vps` thay cho `ubuntu@15.235.242.213`. Thêm vào `~/.ssh/config` một lần:
 
@@ -74,7 +74,31 @@ docker compose up -d api           # compose thấy .env đổi → tạo lại 
   ([vps.md mục 8](vps.md#8-sao-lưu)). Một số migration còn **từ chối** chạy `Down()` khi đã có dữ liệu mới (ví dụ
   `AddPolePhotoReviews`) — trên máy có dữ liệu, quay lui **code**, giữ schema.
 
-## B. Cập nhật web
+## B. Cập nhật web — tự động (GitHub Actions)
+
+**Merge vào `dev` của `luxmap-web` là đủ.** Workflow `.github/workflows/deploy-web.yml` của repo web chạy:
+
+```
+npm ci → npm test → npm run build (VITE_API_URL=/api/v1) → chặn bản build còn localhost:<cổng>
+       → rsync lên VPS (file mới trước, index.html sau) → kiểm https://luxmap.com.vn đang chạy đúng bundle vừa build
+```
+
+Khoảng 2–3 phút sau merge, web mới đã chạy. Xem kết quả ở tab **Actions** của repo web.
+
+- **Test đỏ / build lỗi → không deploy**, bản đang chạy giữ nguyên. Sửa rồi merge lại.
+- **Quay lui:** revert commit lỗi trên `dev` của `luxmap-web`; workflow tự deploy lại bản trước. Chạy lại không cần commit:
+  Actions → *Deploy web to VPS* → **Run workflow**.
+- Mọi thứ merge vào `dev` của web mà qua `npm test` đều **lên production** — chỉ merge thứ đã sẵn sàng ra mắt.
+- **Secrets** của repo web: `VPS_DEPLOY_KEY`, `VITE_MAPTILER_KEY`. Key deploy (`luxmap-web-ci-deploy`) trên VPS bị khoá
+  `restrict,command="/usr/bin/rrsync /opt/luxmap/deploy/web"`: chỉ rsync được vào thư mục web — không shell, không đọc `.env`.
+  **Thu hồi:** xoá dòng đó trong `~ubuntu/.ssh/authorized_keys`. Host key của VPS được ghim trong workflow: đổi máy / cài lại
+  OS thì phải cập nhật `VPS_KNOWN_HOSTS` trong file workflow, nếu không deploy dừng (cố ý, không tin key lạ).
+- Không cần khởi động lại gì: Caddy đọc file trực tiếp, gửi `index.html` với `Cache-Control: no-cache` nên trình duyệt nhận bản
+  mới ngay ở lần tải sau, còn `/assets/*` (tên có mã băm) được cache một năm.
+
+## B2. Deploy web bằng tay — chỉ khi khẩn cấp
+
+Khi GitHub Actions không chạy được (GitHub sự cố, secret hỏng). Cần Node 20+ và SSH bằng key của chính bạn.
 
 Trên **máy dev**, trong repo `luxmap-web`:
 
@@ -93,9 +117,11 @@ grep -rlE "localhost:[0-9]+" dist/ && echo "SAI: bản build còn trỏ localhos
 - Chuỗi `http://localhost` **không kèm cổng** trong bundle là giá trị dự phòng của React Router / axios, vô hại; phép kiểm
   bên dưới chỉ bắt `localhost:<cổng>`, tức địa chỉ API dev bị đóng vào bản build.
 
-Chép lên VPS — **hai lượt**, để người đang mở trang không bao giờ nhận `index.html` mới trỏ tới file chưa chép xong:
+Chép lên VPS — giữ bản đang chạy ở `web.prev` để quay lui, rồi chép **hai lượt** để người đang mở trang không bao giờ nhận
+`index.html` mới trỏ tới file chưa chép xong:
 
 ```bash
+ssh vps 'cd /opt/luxmap/deploy && rm -rf web.prev && cp -a web web.prev'
 rsync -az --exclude index.html dist/ vps:/opt/luxmap/deploy/web/     # 1. file mới (tên có mã băm, không đè file cũ)
 rsync -az --delete dist/ vps:/opt/luxmap/deploy/web/                 # 2. index.html mới, xoá file cũ
 ```
@@ -106,7 +132,7 @@ mới ngay ở lần tải sau, còn `/assets/*` (tên có mã băm) được ca
 
 Kiểm: mở `https://luxmap.com.vn` (Ctrl/Cmd-Shift-R), đăng nhập, mở thẳng một đường dẫn sâu (ví dụ `/map`) — phải ra trang, không 404.
 
-**Quay lui web:** checkout commit cũ của `luxmap-web`, build và rsync lại như trên.
+**Quay lui nhanh:** `ssh vps 'rsync -a --delete /opt/luxmap/deploy/web.prev/ /opt/luxmap/deploy/web/'`.
 
 > `vercel.json` trong repo web chỉ dùng cho bản xem thử. Bản chính chạy trên VPS cùng origin với API: đặt web ở tên miền
 > khác thì cookie refresh (`__Secure-luxmap_rt`, `SameSite=Lax`) không gửi được và phải mở CORS.
@@ -123,8 +149,9 @@ Backend cập nhật không cần build lại app, trừ khi API đổi hình d�
 | `deploy.sh` dừng: `CHANGE_ME values` | Bản mới thêm biến vào `.env.example` | So `deploy/.env.example` với `.env`, thêm biến còn thiếu |
 | `deploy.sh` dừng ở `migrate` | Migration lỗi trên dữ liệu thật | API cũ vẫn chạy; đọc log, báo nhóm; **không** chạy lại tay từng bước |
 | Trang trả **502** | Container API dừng / đang khởi động | `docker compose ps`, `docker compose logs --tail 100 api` |
-| `/` trả **404** | `deploy/web/` trống | Làm mục B |
-| Web lỗi mạng, DevTools thấy gọi `localhost` | Build thiếu `VITE_API_URL` | Build lại với `VITE_API_URL=/api/v1` |
+| `/` trả **404** | `deploy/web/` trống | Chạy lại workflow web (mục B) hoặc B2 |
+| Workflow web đỏ ở *Upload* / *Install the deploy key* | Secret `VPS_DEPLOY_KEY` sai, key bị thu hồi, hoặc host key VPS đổi | Kiểm secret / dòng key trên VPS / `VPS_KNOWN_HOSTS` |
+| Web lỗi mạng, DevTools thấy gọi `localhost` | Build thiếu `VITE_API_URL` (chỉ xảy ra với B2; workflow tự chặn) | Build lại với `VITE_API_URL=/api/v1` |
 | Upload lớn trả **413** | Đúng giới hạn (clip 300 MiB, ảnh cột 16 MiB) | Không phải lỗi deploy |
 | Đĩa đầy | Video khảo sát + cache build Docker | `df -h`, `docker system df`; xoá cache build: `docker builder prune` |
 | Sửa `deploy/caddy/Caddyfile` không ăn | Caddy chưa nạp lại | `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` |
