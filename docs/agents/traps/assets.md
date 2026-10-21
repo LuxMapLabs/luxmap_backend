@@ -54,17 +54,19 @@ Quy tắc partial index: xem `docs/agents/traps/migrations.md`, mục PARTIAL IN
 Dòng vi phạm FK / CHECK / enum / phạm vi xã **phải bị bắt ở bước kiểm**, không được lọt xuống bước
 ghi. Lỗi ở bước ghi **rollback cả mẻ, trả 500**, không đổ lỗi cho dòng nào.
 
-> 🔴 **HẠN CHẾ ĐÃ BIẾT — không phải "thiết kế". Upsert KHÔNG nguyên tử.**
+> **Import đồng thời xếp hàng theo loại bằng advisory lock (BE-12a import race, 21/10/2026).**
 >
-> Bước đọc-trước và bước ghi là hai câu lệnh riêng. **Hai request nạp cùng một file đồng thời**: cả
-> hai đọc không thấy gì, cả hai `Add`, và cái thua đụng `ux_*_commune_external_ref` ngay trong
-> `SaveChanges`. Đó **đúng là** một lỗi mức-dòng lọt xuống bước ghi, và nó nổi lên dưới dạng
-> `DbUpdateException` thô → 500, **không phải** kết quả validate có số dòng.
+> Transaction mở **trước bước lập kế hoạch**; câu lệnh đầu tiên là `SELECT pg_advisory_xact_lock(...)`, với
+> khoá số nguyên hằng cố định riêng cho `segments` / `cabinets` / `feeders` / `poles` / `fixtures` (không dùng
+> `GetHashCode` của .NET). Lượt sau chờ lượt trước commit rồi mới đọc hàng hiện có, nên cùng một file được cập
+> nhật / giữ nguyên thay vì cả hai cùng `Add` rồi thua `ux_*_commune_external_ref` → 500. Commit, rollback hay
+> dispose đều nhả khoá, kể cả nhánh không có gì để ghi. Canh bằng `AssetImportConcurrencyTests`.
 >
-> **Chưa sửa ở BE-12a** — một transaction, thua thì không ghi gì, dữ liệu không hỏng, và hai người
-> quản lý nạp cùng file trong cùng một giây chưa đáng thiết kế riêng. Ghi lại vì **BE-12b kế thừa đúng
-> đường ghi này**, và vì bản sửa đúng là **upsert thật (`ON CONFLICT DO UPDATE`)**, không phải thêm
-> một lượt kiểm nữa — thêm kiểm chỉ thu hẹp cửa sổ chứ không đóng được.
+> **Không dùng SQL thô `ON CONFLICT` hay `ExecuteUpdate`:** ghi vòng qua ChangeTracker sẽ vô hiệu
+> `CommuneWriteGuard` và bỏ đường đóng dấu `AssetStamp.Touch` (N-4). Mọi ghi hàng vẫn qua `SaveChanges`. Import
+> hiếm nên chấp nhận **hai lượt cùng loại chạy tuần tự, kể cả khác xã**; loại khác nhau có khoá riêng. Khoá này
+> chỉ phối hợp các request import, **không** bao phủ CRUD hay nối rơ-le (`PUT /assets/iot-nodes/{id}/relays/…`):
+> nối rơ-le xen giữa lượt đọc và lượt ghi của import feeder vẫn làm cả mẻ rollback và trả 500.
 
 Kết quả: `{inserted, updated, unchanged, failed, total_errors, truncated, rows[], total_warnings, warnings[]}` (`ImportResult`).
 
