@@ -1,7 +1,7 @@
 ---
 ticket: OPS-SIZING
 title: Đo đỉnh RAM / CPU / đĩa của stack production để chọn cấu hình VPS
-status: ready
+status: done
 phase: 1
 owner: codex
 branch: docs/OPS-SIZING

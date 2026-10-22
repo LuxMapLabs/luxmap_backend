@@ -1,7 +1,7 @@
 ---
 ticket: LAMP-COUNT
 title: Cột cần đôi — số bóng giống nhau trên một bộ đèn (lamp_count)
-status: review
+status: done
 phase: 2
 owner: claude
 branch: feat/LAMP-COUNT

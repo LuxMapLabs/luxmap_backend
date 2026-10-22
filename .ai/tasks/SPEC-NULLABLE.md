@@ -1,7 +1,7 @@
 ---
 ticket: SPEC-NULLABLE
 title: OpenAPI khai đúng object / enum có thể null — `$ref` trần đang nói "không bao giờ null"
-status: ready
+status: blocked
 phase: 2
 owner: claude (P1b) · codex (P1a, review)
 branch: docs/SPEC-NULLABLE-p1
@@ -11,6 +11,7 @@ contract_refs:
 depends_on:
   - "D-1…D-6 chốt 13/10 (Mỹ) — .ai/results/SPEC-NULLABLE-p1.md"
   - "Merge Phase 2 chỉ sau khi WP5 sửa scripts/generate-types.js (D-4)"
+  - "BLOCKED 22/10: Phase 2 ở PR #143 (draft), giữ tới khi WP5 sửa generator (D-4)"
 ---
 
 ## Bối cảnh
