@@ -49,8 +49,8 @@
     (<code>statfs</code>), database, dung lượng theo bucket kèm lần đối chiếu gần nhất. Job <code>storage_reconciliation</code> (ngày, chỉ báo cáo,
     ân hạn 24 h) và <code>storage_capacity</code> (15 phút, <strong>email</strong> cho Quản trị khi trống &lt; 15 %, một lần mỗi đợt — đổi từ thông
     báo trong app vì thông báo luôn thuộc một xã). Migration <code>AddSystemMonitoring</code> chỉ thêm. Contract <strong>v1.15</strong>, drift
-    SM-1…SM-8. Build <code>-warnaserror</code> 0 warning; toàn suite <strong>1.627 pass</strong>, 2 skip, exit 0; 14 test mới, 4 phá thử đều đỏ;
-    migration up / down / reapply trên DB nháp. Còn: báo WP5; migrate <code>luxmap_dev</code> và VPS.
+    SM-1…SM-8. Build <code>-warnaserror</code> 0 warning; toàn suite <strong>1.628 pass</strong>, 2 skip, exit 0; 15 test mới, 4 phá thử đều đỏ;
+    migration up / down / reapply trên DB nháp. Codex review dở dang (hết quota): 1 phát hiện (C-1, đua thời điểm ở <code>storage_alert</code>) đã sửa. Còn: lượt Codex cho phần chưa xem; báo WP5; migrate <code>luxmap_dev</code> và VPS.
     <a href=".ai/results/BE-35-p2.md">Kết quả Phase 2</a>.</p>
   </div>
   <div class="card">
