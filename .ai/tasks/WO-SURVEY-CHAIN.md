@@ -1,7 +1,7 @@
 ---
 ticket: WO-SURVEY-CHAIN
 title: Tạo lịch kiểm tra tiếp từ phiếu khảo sát đã nghiệm thu — mang sang sự cố khảo sát phát hiện, chung case_id
-status: review
+status: done
 phase: 2
 owner: claude
 branch: feat/WO-SURVEY-CHAIN

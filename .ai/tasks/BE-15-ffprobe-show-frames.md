@@ -1,7 +1,7 @@
 ---
 ticket: BE-15-ffprobe-show-frames
 title: Clip khảo sát thật > ~1 phút fail VIDEO_OUTPUT_LIMIT vì ffprobe in mọi trường của mọi frame
-status: review
+status: done
 phase: 2
 owner: codex
 branch: fix/BE-15-ffprobe-show-frames

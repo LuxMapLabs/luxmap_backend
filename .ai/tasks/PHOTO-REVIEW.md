@@ -1,7 +1,7 @@
 ---
 ticket: PHOTO-REVIEW
 title: Kỹ sư sửa nhãn AI của ảnh cột (final_cv_state) trước khi Quản lý quyết định công bố
-status: review
+status: done
 phase: 2
 owner: codex
 branch: feat/PHOTO-REVIEW
