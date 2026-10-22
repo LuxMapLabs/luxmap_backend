@@ -43,14 +43,14 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
     <strong>BE-35 — giám sát job và dung lượng lưu trữ, Phase 2, 22/10/2026</strong>
-    <p><span class="tag t-next">Xong trên nhánh <code>feat/BE-35-system-status</code> · chờ PR</span>
+    <p><span class="tag t-next">Xong trên nhánh <code>feat/BE-35-system-status</code> · PR vào dev</span>
     <code>GET /admin/system/status</code> (capability <code>MonitorSystem</code>, chỉ Quản trị): trạng thái từng job nền
     (<code>running</code> / <code>stalled</code> / <code>failing</code> / <code>ok</code>), sweep theo trạng thái + kẹt + 20 lần lỗi mới nhất, đĩa
     (<code>statfs</code>), database, dung lượng theo bucket kèm lần đối chiếu gần nhất. Job <code>storage_reconciliation</code> (ngày, chỉ báo cáo,
     ân hạn 24 h) và <code>storage_capacity</code> (15 phút, <strong>email</strong> cho Quản trị khi trống &lt; 15 %, một lần mỗi đợt — đổi từ thông
     báo trong app vì thông báo luôn thuộc một xã). Migration <code>AddSystemMonitoring</code> chỉ thêm. Contract <strong>v1.15</strong>, drift
-    SM-1…SM-8. Build <code>-warnaserror</code> 0 warning; toàn suite <strong>1.628 pass</strong>, 2 skip, exit 0; 15 test mới, 4 phá thử đều đỏ;
-    migration up / down / reapply trên DB nháp. Codex review dở dang (hết quota): 1 phát hiện (C-1, đua thời điểm ở <code>storage_alert</code>) đã sửa. Còn: lượt Codex cho phần chưa xem; báo WP5; migrate <code>luxmap_dev</code> và VPS.
+    SM-1…SM-8. Build <code>-warnaserror</code> 0 warning; toàn suite <strong>1.629 pass</strong>, 2 skip, exit 0; 16 test mới, 4 phá thử đều đỏ;
+    migration up / down / reapply trên DB nháp. Codex review dở dang (hết quota): 1 phát hiện (C-1, đua thời điểm ở <code>storage_alert</code>) đã sửa; phần còn lại Claude tự review, sửa thêm S-1 (một địa chỉ lỗi làm mọi Quản trị nhận thư lại). Còn: báo WP5; migrate <code>luxmap_dev</code> và VPS.
     <a href=".ai/results/BE-35-p2.md">Kết quả Phase 2</a>.</p>
   </div>
   <div class="card">
