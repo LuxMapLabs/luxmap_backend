@@ -43,7 +43,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
     <strong>BE-35 — giám sát job và dung lượng lưu trữ, Phase 1, 22/10/2026</strong>
-    <p><span class="tag t-block">Phase 1 xong · chờ Mỹ chốt D-1…D-10</span> Nhánh <code>docs/BE-35-p1</code>. Kéo sớm từ W16 vì VPS
+    <p><span class="tag t-next">Phase 1 xong · D-1…D-10 chốt 22/10 theo đề xuất (D-8 bỏ qua) · Phase 2 sẵn sàng</span> Nhánh <code>docs/BE-35-p1</code>. Kéo sớm từ W16 vì VPS
     chỉ có <strong>40 GB</strong> chung cho Postgres, MinIO, frame tạm, image và backup, trong khi OPS-SIZING dự trù ≥ 160 GB. Phát hiện:
     <code>last_error</code> của <code>scheduled_job</code> bị xoá ở lần chạy thành công kế tiếp, không đếm lần lỗi, job bị bỏ đói không có
     dấu hiệu (dev: <code>next_run_at</code> quá hạn 5 ngày); <code>IObjectStore</code> chưa có list / delete; S3 không trả dung lượng trống.
