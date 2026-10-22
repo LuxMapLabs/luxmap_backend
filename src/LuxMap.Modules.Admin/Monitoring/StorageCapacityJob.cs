@@ -21,8 +21,9 @@ namespace LuxMap.Modules.Admin.Monitoring;
 /// </para>
 /// <para>
 /// 🔴 Once per spell comes from the database, not the lease: <see cref="StorageAlertConfiguration.OneOpen"/> lets one spell be open,
-/// and the mail is CLAIMED by the one <c>UPDATE … WHERE notified_at IS NULL</c> that wins. A failed send puts the claim back so the next
-/// run retries — an admin already mailed in that run may then get the mail twice, never zero times.
+/// and the mail is CLAIMED by the one <c>UPDATE … WHERE notified_at IS NULL</c> that wins. When NO admin could be mailed the claim goes
+/// back and the next run retries; when some were, it stays and the job fails naming the ones missed — one bouncing address must not
+/// mail everyone else again at every retry.
 /// </para>
 /// <para>
 /// Each instance snapshots its own <c>now</c>, so a run that started before another opened the spell may mail or close it: its stamps
@@ -67,20 +68,53 @@ public sealed class StorageCapacityJob(
             alertId = claimed;
         }
 
+        var admins = new List<AppUser>();
+        var missed = new List<string>();
+        var sent = 0;
         try
         {
-            var admins = await AdminsAsync(ct);
-            foreach (var admin in admins) await mail.SendAsync(Message(admin, space), ct);
-            log.LogWarning("Disk space low ({Free:P1} free); mailed {Count} system admins ({Correlation}).",
-                space.FreeRatio, admins.Count, correlationId);
+            admins = await AdminsAsync(ct);
+            foreach (var admin in admins)
+            {
+                try
+                {
+                    await mail.SendAsync(Message(admin, space), ct);
+                    sent++;
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    missed.Add(admin.Username);
+                    log.LogError(error, "Low-disk mail to {Username} failed ({Correlation}).", admin.Username, correlationId);
+                }
+            }
         }
-        catch
+        catch when (sent == 0)
         {
-            await using var release = dataSource.CreateCommand("UPDATE storage_alert SET notified_at = NULL WHERE alert_id = $1");
-            release.Parameters.Add(new NpgsqlParameter { Value = alertId });
-            await release.ExecuteNonQueryAsync(CancellationToken.None);
+            await ReleaseAsync(alertId);
             throw;
         }
+
+        if (missed.Count > 0 && sent == 0)
+        {
+            await ReleaseAsync(alertId);
+            throw new InvalidOperationException($"Low-disk mail reached none of {admins.Count} system admins; the next run retries.");
+        }
+
+        // Someone was reached: the claim stays, or a single bouncing address would mail everyone else again at every retry.
+        if (missed.Count > 0)
+            throw new InvalidOperationException(
+                $"Low-disk mail reached {sent} of {admins.Count} system admins; not sent to {string.Join(", ", missed)}.");
+
+        if (admins.Count == 0) log.LogWarning("Disk space low ({Free:P1} free) and no active system admin to mail ({Correlation}).",
+            space.FreeRatio, correlationId);
+        else log.LogWarning("Disk space low ({Free:P1} free); mailed {Count} system admins ({Correlation}).", space.FreeRatio, sent, correlationId);
+    }
+
+    private async Task ReleaseAsync(long alertId)
+    {
+        await using var release = dataSource.CreateCommand("UPDATE storage_alert SET notified_at = NULL WHERE alert_id = $1");
+        release.Parameters.Add(new NpgsqlParameter { Value = alertId });
+        await release.ExecuteNonQueryAsync(CancellationToken.None);
     }
 
     /// <summary>Active = not locked and the password already set, the meaning <c>Notifier.ManagersCoveringAsync</c> uses.</summary>

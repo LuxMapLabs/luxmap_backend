@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using LuxMap.Modules.Admin.Monitoring;
+using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
@@ -258,6 +259,38 @@ public sealed class SystemMonitoringTests(AssetImportFixture factory) : IAsyncLi
     }
 
     [Fact]
+    public async Task One_unreachable_admin_does_not_make_the_others_mailed_again_every_retry()
+    {
+        var broken = new AppUser
+        {
+            Username = "monitoring" + Guid.NewGuid().ToString("N"), Email = "broken-" + Guid.NewGuid().ToString("N") + "@example.invalid",
+            FullName = "Broken admin", PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow,
+            Role = UserRole.SystemAdmin, HasSystemWideScope = true,
+        };
+        await Db(async db => { db.Add(broken); return await db.SaveChangesAsync(); });
+        try
+        {
+            var disk = new FakeDisk { Ratio = 0.10 };
+            var mail = new RecordingEmailSender();
+            var job = new StorageCapacityJob(disk, Source, factory.Services.GetRequiredService<JobContextFactory>(),
+                new FailingFor(broken.Email, mail), new MonitoringOptions(), NullLogger<StorageCapacityJob>.Instance);
+            var admin = await SeedAdminEmailAsync();
+            var now = DateTime.UtcNow;
+
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => job.RunAsync(now, "partial", CancellationToken.None));
+            Assert.Contains(broken.Username, error.Message); // the job shows failing, naming who was missed
+            await job.RunAsync(now.AddMinutes(5), "retry", CancellationToken.None);
+
+            Assert.Single(mail.To(admin)); // reached once — not again at every retry because one address bounces
+            Assert.NotNull((await Db(db => db.Set<StorageAlert>().AsNoTracking().SingleAsync())).NotifiedAt);
+        }
+        finally
+        {
+            await Db(db => db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = {broken.UserId}"));
+        }
+    }
+
+    [Fact]
     public async Task A_run_that_started_before_the_spell_opened_can_still_mail_and_close_it()
     {
         // Codex (BE-35 review): two instances snapshot the clock at different times. The later one opens the spell; the earlier one,
@@ -406,6 +439,15 @@ public sealed class SystemMonitoringTests(AssetImportFixture factory) : IAsyncLi
     {
         await using var command = Source.CreateCommand(sql);
         await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>An SMTP server that refuses one address and delivers the rest.</summary>
+    private sealed class FailingFor(string address, RecordingEmailSender inner) : IEmailSender
+    {
+        public Task SendAsync(EmailMessage message, CancellationToken ct)
+            => string.Equals(message.ToAddress, address, StringComparison.OrdinalIgnoreCase)
+                ? throw new InvalidOperationException("550 mailbox unavailable (test).")
+                : inner.SendAsync(message, ct);
     }
 
     private sealed class FakeDisk : IDiskProbe
