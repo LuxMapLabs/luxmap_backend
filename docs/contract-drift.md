@@ -1492,3 +1492,22 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | LMC-2 | `POST /assets/fixtures` nhận `lamp_count?` (1..4, vắng = 1; ngoài khoảng → 400). Import bóng: cột `lamp_count` **tuỳ chọn**, ô trống / thiếu cột = 1, ngoài 1..4 → lỗi theo dòng. Không có PUT: đổi số bóng = ghi bóng cũ đã tháo (`removed_date`) rồi thêm bản ghi mới, như thay bóng |
 | LMC-3 | `lamp_count` xuất hiện ở mọi chỗ có `lamp_watt`: `properties` của `GET /map/poles` (**nullable**, `null` khi cột không có bóng đang dùng), `fixture` của `GET /map/poles/{id}`, `active_fixture` của danh sách tài sản, `GET /work-orders/{id}/poles`, `GET /statistics/warranty` (cả CSV) |
 | LMC-4 | **Trạng thái đèn vẫn theo cột**, không theo bóng: CV và đỉnh lux mỗi cột không tách được hai bóng. Cột hai bóng tắt một → CV thấy ON, lux tụt so với baseline → `dim`. Thay bộ đèn (đổi số bóng) là bản ghi `fixture` mới nên baseline cũ không còn dùng (khuôn sẵn có của baseline theo bóng) |
+
+### BE-35 — giám sát job nền và dung lượng lưu trữ (22/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 22/10/2026 — D-1…D-10 của Phase 1 (`.ai/results/BE-35-p1.md`) theo đề xuất, **D-8 bỏ qua**; D-7 đổi kênh sang **email** (Mỹ, 22/10, khi hiện thực). **SELF-SIGNED**, chạm API (chỉ thêm), đã hợp nhất vào **Contract v1.15 mục 4.10**, nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (màn Quản trị hệ thống). Mobile không dùng. **Chưa báo** |
+| **Scope** | Admin (endpoint, 2 job), Persistence (`scheduled_job` + 2 cột), Shared (`IObjectInventory`, `StoredObjectColumn`), Survey / WorkOrders / Citizen (khai bảng ảnh); migration `AddSystemMonitoring` |
+
+| Mã | Quyết định |
+|---|---|
+| SM-1 | Capability mới **`MonitorSystem` = [system_admin]**. Quản lý theo dõi từng sweep qua BE-17 như cũ |
+| SM-2 | **`GET /admin/system/status`** — một request cho cả màn: `jobs[]`, `survey_processing`, `storage` (Contract v1.15 mục 4.10). Toàn hệ thống, không chia theo xã |
+| SM-3 | Trạng thái job: `running` (lease còn hạn) > `stalled` (đến hạn quá `Jobs:PollSeconds + Jobs:LeaseSeconds` = 315 s mặc định mà không ai giữ lease, hoặc job chưa có dòng) > `failing` (`consecutive_failures > 0`) > `ok`. So bằng `now()` của DB. Liệt kê job **bản build đăng ký**, không phải mọi dòng của bảng |
+| SM-4 | `scheduled_job` thêm `last_failed_at` (giữ qua lần thành công) và `consecutive_failures` (về 0 khi thành công); CHECK `ck_scheduled_job_consecutive_failures` (đếm > 0 thì phải có `last_failed_at`). Không bảng lịch sử từng lượt |
+| SM-5 | Đĩa: `statfs` trên **`Monitoring:DiskPath`** (mặc định thư mục của app — trên VPS một đĩa nó nằm cùng đĩa với volume Docker), `null` khi không đo được. Bucket: `object_count` / `bytes` **cộng từ dòng DB** (ảnh gốc + thumbnail) qua `StoredObjectColumn` mỗi module khai; database: `pg_database_size` |
+| SM-6 | Job **`storage_reconciliation`** (ngày một lần): đọc key từ dòng **trước**, rồi liệt kê bucket (ListObjectsV2). Mồ côi = object không dòng nào trỏ tới, cũ hơn **`Monitoring:OrphanGraceHours`** (24); thiếu = dòng trỏ tới object không còn. Mẫu ≤ 20 key mỗi loại, một dòng mỗi bucket trong `storage_reconciliation` (ghi đè). **Chỉ báo cáo, không xoá** — xoá là ticket riêng có chữ ký |
+| SM-7 | Job **`storage_capacity`** (15 phút): trống dưới **`Monitoring:LowDiskRatio`** (0,15) mở một đợt trong `storage_alert` (`ux_storage_alert_open`: tối đa một đợt mở) và **gửi email** cho mọi `system_admin` đang hoạt động, một lần mỗi đợt; lên lại trên ngưỡng thì đóng đợt. **Lệch đề xuất D-7** (thông báo `storage_low` trong app): `notification.commune_id` bắt buộc và lọc theo xã, đĩa không thuộc xã nào — không thêm type thông báo, §5.9 không đổi. Gửi lỗi ⇒ job `failing`, lần sau gửi lại (người đã nhận ở lần lỗi có thể nhận hai lần) |
+| SM-8 | **Giới hạn đã biết:** worker chết thì không job nào báo được (D-8 bỏ qua) — chỉ thấy `stalled` khi có người mở màn. Ngưỡng không có vùng trễ: dung lượng dao động quanh 15 % có thể sinh nhiều đợt / nhiều thư |

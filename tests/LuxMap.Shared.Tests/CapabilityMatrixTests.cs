@@ -41,6 +41,7 @@ public class CapabilityMatrixTests
         ["cap:manage_qr_codes"] = ["manager"],
         ["cap:read_citizen_reports"] = ["manager", "superior", "system_admin"],
         ["cap:review_citizen_reports"] = ["manager"],
+        ["cap:monitor_system"] = ["system_admin"],
     };
 
     [Fact]

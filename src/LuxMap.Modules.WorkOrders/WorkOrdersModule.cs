@@ -1,5 +1,6 @@
 using LuxMap.Modules.Faults;
 using LuxMap.Shared.Modularity;
+using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -28,5 +29,11 @@ public sealed class WorkOrdersModule : ILuxMapModule
 
         // BE-26 — runs under the scheduled job runner (LuxMap.Persistence.Jobs).
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.WorkOrderOverdueJob>();
+
+        // BE-35 — what these tables hold in the store, for the storage totals and the orphan check.
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "repair_evidence"));
+        services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "repair_evidence"));
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "work_order_pole_photo"));
+        services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "work_order_pole_photo"));
     }
 }

@@ -76,7 +76,9 @@ public sealed class ScheduledJobRunner(NpgsqlDataSource dataSource, ScheduledJob
     {
         await using var command = dataSource.CreateCommand("""
             UPDATE scheduled_job SET next_run_at = now() + make_interval(secs => $3), lease_token = NULL, lease_expires_at = NULL,
-                last_finished_at = now(), last_error = $4, run_count = run_count + CASE WHEN $4 IS NULL THEN 1 ELSE 0 END
+                last_finished_at = now(), last_error = $4, run_count = run_count + CASE WHEN $4 IS NULL THEN 1 ELSE 0 END,
+                last_failed_at = CASE WHEN $4 IS NULL THEN last_failed_at ELSE now() END,
+                consecutive_failures = CASE WHEN $4 IS NULL THEN 0 ELSE consecutive_failures + 1 END
             WHERE job_name = $1 AND lease_token = $2
             """);
         command.Parameters.Add(new NpgsqlParameter { Value = name });

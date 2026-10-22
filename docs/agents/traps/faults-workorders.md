@@ -281,3 +281,6 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
 - Test worker đợi **dòng `scheduled_job`** đạt trạng thái cuối rồi mới `StopAsync`: tín hiệu từ job đến TRƯỚC lượt `CompleteAsync`, và dừng
   sớm sẽ hủy chính lượt ghi đó (F-2).
 - Job dùng `UtcMicrosecondClock` một lần mỗi lượt; một lượt quá hạn xử lý tối đa `Batch` (500) phiếu mỗi vòng, lặp tới khi hết.
+- **BE-35 (drift SM-3, SM-4):** `last_error` xoá khi lần sau thành công, nhưng `last_failed_at` **giữ** và `consecutive_failures` về 0 —
+  đọc "job có lỗi gần đây không" ở `last_failed_at`, không ở `last_error`. `GET /admin/system/status` gọi job `stalled` khi đến hạn quá
+  `PollSeconds + LeaseSeconds` mà không ai giữ lease; job mới chỉ cần đăng ký `IScheduledJob` là tự hiện trên màn đó.

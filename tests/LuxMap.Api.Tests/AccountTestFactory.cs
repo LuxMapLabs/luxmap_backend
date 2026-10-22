@@ -93,6 +93,9 @@ public sealed partial class RecordingEmailSender : IEmailSender
         return Task.CompletedTask;
     }
 
+    /// <summary>Every address mailed, once each.</summary>
+    public IReadOnlyList<string> Addresses => sent.Select(message => message.ToAddress).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
     public IReadOnlyList<EmailMessage> To(string address)
         => sent.Where(message => string.Equals(message.ToAddress, address, StringComparison.OrdinalIgnoreCase)).ToList();
 

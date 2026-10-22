@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.14 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.15 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -13,11 +13,12 @@
 **v1.11:** 06/10/2026 (`GET /faults/{fault_id}` — chi tiết một sự cố, drift N-6) ·
 **v1.12:** 06/10/2026 (người sửa cuối `updated_by` trên tài sản, `note` thành chuỗi, import nạp ghi chú; BREAKING) ·
 **v1.13:** 06/10/2026 (BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push`; `performed_at?` cho bước của phiếu) ·
-**v1.14:** 06/10/2026 (BE-25 — `GET /work-orders/agenda`, việc đêm nay của kỹ sư gom theo tuyến).
+**v1.14:** 06/10/2026 (BE-25 — `GET /work-orders/agenda`, việc đêm nay của kỹ sư gom theo tuyến) ·
+**v1.15:** 22/10/2026 (BE-35 — `GET /admin/system/status`, giám sát job nền và dung lượng lưu trữ; capability `MonitorSystem`).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.14, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.15, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
@@ -240,6 +241,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 | `ManageUsers` | **system_admin** | mọi `/admin/users*` — tạo tài khoản, gán vai trò và xã, khoá, gửi lại lời mời (v1.8, mục 4.9) |
 | `ReadNotifications` | superior, manager, field_engineer, system_admin | mọi `/notifications*` — chỉ thông báo **của chính người gọi** (v1.10, mục 5.9) |
 | `SyncOffline` | **field_engineer** | `GET /sync/bundle`, `POST /sync/push` (v1.13, mục 5.8) — mỗi thao tác trong hàng chờ **còn** kiểm capability của chính nó |
+| `MonitorSystem` | **system_admin** | `GET /admin/system/status` (v1.15, mục 4.10) — số liệu toàn hệ thống, không chia theo xã |
 
 - `/auth/*` cấp token không cần token.
 - Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
@@ -519,6 +521,51 @@ Luật:
 - **Gửi mail lỗi không làm hỏng thao tác:** tài khoản vẫn được tạo, `invitation_sent: false`, Quản trị
   bấm gửi lại. Gửi lại cho tài khoản đã đặt mật khẩu → `409 ACCOUNT_ALREADY_ACTIVE`.
 - Không xoá tài khoản — khoá thay xoá (lịch sử sự cố, phiếu việc trỏ vào tài khoản).
+
+### 4.10 Giám sát hệ thống — `GET /api/v1/admin/system/status` — `implemented` (v1.15, BE-35)
+
+Capability **`MonitorSystem`** (chỉ `system_admin`, mục 2). Endpoint của **web**, chỉ đọc, **toàn hệ thống** — không lọc,
+không chia theo xã. Một request cho cả màn Quản trị hệ thống:
+
+```json
+{
+  "generated_at": "2026-10-22T03:00:00.000000Z",
+  "jobs": [
+    { "name": "node_offline", "state": "ok", "next_run_at": "…Z", "last_started_at": "…Z", "last_finished_at": "…Z",
+      "last_error": null, "last_failed_at": null, "consecutive_failures": 0, "run_count": 1440 }
+  ],
+  "survey_processing": {
+    "by_status": { "not_started": 0, "queued": 1, "processing": 0, "succeeded": 12, "failed": 2 },
+    "stuck": 0,
+    "recent_failures": [ { "sweep_id": "SWP-004", "attempt": 3, "error_code": "VIDEO_TIMEOUT", "stage": "frames", "finished_at": "…Z" } ]
+  },
+  "storage": {
+    "disk": { "total_bytes": 42949672960, "free_bytes": 6442450944, "free_ratio": 0.15, "low": false },
+    "database_bytes": 58720256,
+    "buckets": [
+      { "bucket": "evidence", "object_count": 30, "bytes": 13668649,
+        "reconciliation": { "checked_at": "…Z", "store_object_count": 30, "store_bytes": 13668649, "orphan_count": 0,
+          "orphan_bytes": 0, "missing_count": 0, "orphan_sample": [], "missing_sample": [] } }
+    ]
+  }
+}
+```
+
+| Trường | Ghi chú |
+|---|---|
+| `jobs[]` | Mọi job nền **bản build này đăng ký**, sắp theo tên. `next_run_at` … `last_finished_at` null khi job chưa có dòng (runner chưa khởi động) |
+| `jobs[].state` | `running` (đang giữ lease còn hạn) · `stalled` (đến hạn quá một lượt quét + một lease mà không ai chạy — worker chết hoặc tắt) · `failing` (lần chạy cuối lỗi) · `ok`. Giờ so là **giờ của DB** |
+| `jobs[].last_error` | Lỗi của lần cuối, **xoá** khi lần sau thành công; `last_failed_at` thì **giữ**, `consecutive_failures` về 0 |
+| `survey_processing.by_status` | Số sweep theo `processing_status`; đủ 5 khoá, 0 khi không có |
+| `survey_processing.stuck` | `processing` với lease đã hết hạn |
+| `survey_processing.recent_failures` | ≤ 20 lần chạy lỗi mới nhất, mới trước; `error_code` là mã của worker (`VIDEO_TIMEOUT`, `RETRY_EXHAUSTED`…) |
+| `storage.disk` | Đĩa chứa dữ liệu (cấu hình `Monitoring:DiskPath`); **null** khi không đo được. `low` = `free_ratio` dưới `Monitoring:LowDiskRatio` (mặc định 0,15) |
+| `storage.database_bytes` | `pg_database_size` |
+| `storage.buckets[]` | Đủ 4 bucket `survey` / `evidence` / `video` / `citizen`. `object_count` / `bytes` **theo dòng trong DB** (ảnh gốc + thumbnail) |
+| `storage.buckets[].reconciliation` | Lần đối chiếu gần nhất với object store (job ngày một lần); **null** trước lần đầu. Mồ côi = object không dòng nào trỏ tới, **cũ hơn 24 giờ**; thiếu = dòng trỏ tới object không còn. Mẫu ≤ 20 key. **Chỉ báo cáo — không gì bị xoá** |
+
+Đĩa trống dưới ngưỡng thì server **gửi email** (không phải thông báo trong app — thông báo luôn thuộc một xã) cho mọi
+`system_admin` đang hoạt động, **một lần mỗi đợt**; đợt đóng khi dung lượng trống lên lại trên ngưỡng.
 
 ---
 
@@ -963,6 +1010,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.15 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-35 — giám sát hệ thống** (mục 4.10, drift SM-1…SM-8; D-1…D-10 chốt 22/10, D-8 bỏ qua). **Thêm** `GET /admin/system/status` và capability `MonitorSystem` (chỉ `system_admin`). Chỉ thêm, không đổi gì đã có. Cảnh báo đĩa gửi **email**, không qua `/notifications`. Nền tạm tới FW |
 | v1.14 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-25 — việc đêm nay của kỹ sư, gom theo tuyến** (mục 5.5, drift BE-25; D-1…D-8 chốt theo đề xuất A). **Thêm** `GET /work-orders/agenda` (`night_of?`, `near?`, `assigned_to?`; capability `ReadWorkOrders`, không capability mới); `USER_NOT_FOUND` dùng thêm cho `assigned_to` không hợp lệ. **Siết** ngày/giờ trên query string thành chỉ ISO 8601 (mục 0) cho mọi endpoint — `scheduled_from` / `scheduled_to` của `GET /work-orders` và `from` / `to` của `GET /lux-readings` trước đây nhận cả `06/10/2026` và đọc sai thành 10/06; nay `400`. Client đã gửi ISO không bị ảnh hưởng. Không đổi trường nào có sẵn, không migration. Chiều đi của tuyến khảo sát (D-7) **tách ticket riêng**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.13 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-43 — đồng bộ offline** (mục 5.8, drift BE-43; đóng O-5). `GET /sync/bundle`: bản chụp đầy đủ theo tuyến (`segment_id` lặp ≤ 20; vắng = tuyến của phiếu mở của tôi), **không** `since`; cột kèm `note`, phiếu dạng chi tiết. `POST /sync/push`: 5 `op_type` qua service của endpoint gốc, kiểm capability từng thao tác, kết quả `applied` / `conflicts` / `rejected`, `BLOCKED_BY_EARLIER_OP`; khử trùng lặp bằng cột sẵn có hoặc bảng mới `sync_operation`. Capability mới **`SyncOffline`** = `field_engineer`. Mã lỗi mới `NOTE_CHANGED`, `BLOCKED_BY_EARLIER_OP`. **Thêm** `performed_at?` cho `POST /work-orders/{id}/start` (body tuỳ chọn) và `…/complete`. Chỉ thêm. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.12 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **Người sửa cuối trên tài sản + ghi chú qua import** (mục 5.3, 5.3.1; drift POLE-NOTE N-4). **BREAKING:** `note` ở danh sách / chi tiết kiểm kê, `GET /map/poles/{pole_id}`, `GET /work-orders/{id}/poles` đổi từ object `{text, updated_at, updated_by, updated_by_name}` thành **chuỗi \| null**; response của `PUT /assets/poles/{poleId}/note` thành `{pole_id, note, updated_at, updated_by, updated_by_name}`. **Thêm:** `updated_by` + `updated_by_name` trên dòng cột / tuyến / tủ điện của kiểm kê (người sửa gần nhất, chỉ đổi khi giá trị thật sự đổi); kết quả import thêm `unchanged`, `total_warnings`, `warnings[]`; cột `note` tuỳ chọn trong file `poles` (ô có chữ ghi đè, ô trống giữ, thay ghi chú khác thì cảnh báo kèm nguyên văn cũ). `updated` của import nay chỉ đếm dòng thật sự đổi. WP5/WP6 chưa được báo hình dạng v1.9 nên đổi lúc này; chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |

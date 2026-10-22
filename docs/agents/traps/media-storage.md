@@ -48,7 +48,17 @@ Cả hai chiều đều có thể hỏng giữa chừng. Chiều này hỏng th�
 chiếu ra được. Chiều ngược lại hỏng thành **row mồ côi**, tức `thumbnail_url` trả 404 ngay trước mặt
 người dùng. Chọn chiều để lỗi rơi vào chỗ máy dọn được, không phải chỗ người nhìn thấy.
 
-Đối chiếu object mồ côi và dung lượng thuộc BE-35; tiến độ xem `tracking.html`. Mỗi lượt ghi trả **byte thật**, không tin `Content-Length`.
+Mỗi lượt ghi trả **byte thật**, không tin `Content-Length` — tổng dung lượng của BE-35 cộng từ chính các cột byte đó.
+
+**BE-35 (22/10/2026, drift SM-5…SM-6) — đối chiếu và dung lượng:**
+
+- 🔴 **Bảng mới giữ object key phải khai `StoredObjectColumn`** (bucket, bảng, cột key, cột byte) trong module sở hữu nó — một dòng
+  cho ảnh gốc, một cho thumbnail. Không khai thì bảng **rơi khỏi** tổng dung lượng và khỏi đối chiếu, mà vẫn chạy bình thường.
+  `SystemMonitoringTests.Every_object_key_column_…` đỏ khi `information_schema` có cột `*object_key` / `*thumbnail_key` chưa khai.
+- Đối chiếu đọc key của **dòng trước**, liệt kê bucket **sau** (dòng chỉ commit sau khi object đã ghi, nên "thiếu" không thể là đua).
+  Object mới hơn `Monitoring:OrphanGraceHours` (24) chưa phải mồ côi — upload đang chạy trông y như mồ côi.
+- Đối chiếu **chỉ báo cáo**. Liệt kê ở `IObjectInventory`, tách khỏi `IObjectStore`: không đường ghi nào được dựa vào liệt kê bucket.
+  `IObjectStore` vẫn **không** có delete — xoá object (mồ côi, ảnh công dân bị bác) là ticket riêng có chữ ký.
 
 **4. Ảnh gốc khảo sát / evidence / ảnh cột giữ NGUYÊN BYTE; thumbnail là object RIÊNG.**
 

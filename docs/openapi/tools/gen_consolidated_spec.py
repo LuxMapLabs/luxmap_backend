@@ -47,6 +47,7 @@ d["info"]["description"] = (
     "BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). "
     "COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. "
     "POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. "
+    "v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -202,6 +203,7 @@ SUMMARY = {
     ("post", "/api/v1/admin/communes"): "[COMMUNE-BBOX] Quản trị tạo xã; bbox {min_lng, min_lat, max_lng, max_lat} tuỳ chọn",
     ("get", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Chi tiết một xã",
     ("put", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Thay tên + khung bản đồ; cả hai khoá bắt buộc, bbox null = xoá khung",
+    ("get", "/api/v1/admin/system/status"): "[BE-35] Quản trị: job nền, xử lý sweep, đĩa trống, database và dung lượng theo bucket",
     ("post", "/api/v1/auth/refresh"): "Xoay vòng refresh token (mobile)",
     ("post", "/api/v1/auth/logout"): "Thu hồi refresh token (mobile); luôn 204",
     ("post", "/api/v1/lux-readings"): "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",

@@ -153,6 +153,34 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Failures_in_a_row_are_counted_and_the_last_one_stays_dated_after_a_success()
+    {
+        var name = await NewJobAsync();
+        var runner = Runner();
+        for (var i = 0; i < 2; i++)
+        {
+            await SqlAsync("UPDATE scheduled_job SET next_run_at = now() WHERE job_name = {0}", name);
+            var failing = (await runner.ClaimAsync([name], CancellationToken.None))!.Value;
+            Assert.True(await runner.FailAsync(name, failing.Token, TimeSpan.FromHours(1), "boom", CancellationToken.None));
+        }
+
+        var failed = await RowAsync(name);
+        Assert.Equal(2, failed.ConsecutiveFailures);
+        Assert.Equal(failed.LastFinishedAt, failed.LastFailedAt);
+
+        await SqlAsync("UPDATE scheduled_job SET next_run_at = now() WHERE job_name = {0}", name);
+        var claim = (await runner.ClaimAsync([name], CancellationToken.None))!.Value;
+        Assert.True(await runner.CompleteAsync(name, claim.Token, TimeSpan.FromHours(1), CancellationToken.None));
+
+        // BE-35 (D-4): the success clears the error and the count, but a job that failed an hour ago still shows when.
+        var recovered = await RowAsync(name);
+        Assert.Equal(0, recovered.ConsecutiveFailures);
+        Assert.Null(recovered.LastError);
+        Assert.Equal(failed.LastFailedAt, recovered.LastFailedAt);
+        Assert.Equal(1, recovered.RunCount);
+    }
+
+    [Fact]
     public async Task The_worker_runs_due_jobs_records_a_failure_and_runs_the_job_again()
     {
         var job = new FlakyJob("test_" + Guid.NewGuid().ToString("N")[..20]);

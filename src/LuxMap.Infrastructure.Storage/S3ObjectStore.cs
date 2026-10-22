@@ -18,8 +18,28 @@ namespace LuxMap.Infrastructure.Storage;
 /// avoids everywhere, including for PostgreSQL.
 /// </para>
 /// </remarks>
-public sealed class S3ObjectStore(IAmazonS3 client, ILogger<S3ObjectStore> logger) : IObjectStore
+public sealed class S3ObjectStore(IAmazonS3 client, ILogger<S3ObjectStore> logger) : IObjectStore, IObjectInventory
 {
+    /// <summary>ListObjectsV2 page by page (≤ 1000 keys each), so a large bucket never sits in memory at once.</summary>
+    /// <remarks>AWSSDK v4 leaves an empty page's <c>S3Objects</c> null and its value fields nullable.</remarks>
+    public async IAsyncEnumerable<ListedObject> ListAsync(
+        StorageBucket bucket, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var request = new ListObjectsV2Request { BucketName = StorageKeys.NameOf(bucket) };
+        while (true)
+        {
+            var page = await client.ListObjectsV2Async(request, cancellationToken);
+            foreach (var item in page.S3Objects ?? [])
+            {
+                yield return new ListedObject(item.Key, item.Size ?? 0,
+                    (item.LastModified ?? DateTime.MinValue).ToUniversalTime());
+            }
+
+            if (page.IsTruncated != true) yield break;
+            request.ContinuationToken = page.NextContinuationToken;
+        }
+    }
+
     public Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content,
         StreamUpload upload, CancellationToken cancellationToken = default)
         => MultipartUpload.StoreAsync(client, bucket, key, content, upload, logger, cancellationToken);
