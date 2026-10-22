@@ -1,4 +1,5 @@
 using LuxMap.Shared.Modularity;
+using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,5 +25,9 @@ public sealed class CitizenModule : ILuxMapModule
         services.AddScoped<CitizenReviewService>();
         services.AddSingleton<ICitizenPhotoHinter, YoloCitizenPhotoHinter>();
         services.AddSingleton<CitizenHintBackoff>();
+
+        // BE-35 — what this table holds in the store, for the storage totals and the orphan check.
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Citizen, "citizen_photo"));
+        services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Citizen, "citizen_photo"));
     }
 }

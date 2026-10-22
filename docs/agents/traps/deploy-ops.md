@@ -37,3 +37,7 @@ thầm. **Ticket tạo bảng thì thêm bảng vào `PLAN` trong cùng PR**: b�
   (cookie auth, antiforgery) thì phải gắn volume cho thư mục khoá, nếu không mỗi lần deploy làm mất hiệu lực dữ liệu đã bảo vệ.
 - Script chép dữ liệu lên server vẫn là `scripts/copy_dev_to_supabase.py` (đích = PostGIS của VPS qua SSH tunnel, `localhost` nên không đòi TLS);
   luật "bảng mới phải vào `PLAN`" vẫn áp.
+- **BE-35 — đĩa đo được là đĩa chứa `Monitoring:DiskPath`** (mặc định thư mục của app trong container). Trên VPS một đĩa nó trùng
+  đĩa của volume Docker và `/var/backups/luxmap`. Tách volume / backup sang đĩa khác thì trỏ `Monitoring__DiskPath` vào một volume
+  trên đĩa cần canh (vd. `/app/logs`), nếu không cảnh báo đo nhầm đĩa. Thư cảnh báo đĩa đi qua SMTP của thư mời — `SMTP_*` sai thì
+  job `storage_capacity` hiện `failing` trên `GET /admin/system/status`.

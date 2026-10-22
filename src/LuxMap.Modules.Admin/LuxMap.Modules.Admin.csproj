@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
     <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Identity\LuxMap.Modules.Identity.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Survey\LuxMap.Modules.Survey.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -115,6 +115,12 @@ public static class LuxMapPolicies
     /// <summary>CITIZEN-QR P2c (D-11) — decide a citizen report (accept as a fault, merge into one, reject) and open its photos.</summary>
     public const string ReviewCitizenReports = "cap:review_citizen_reports";
 
+    /// <summary>
+    /// BE-35 (D-1) — the system monitoring page: background jobs, survey processing, disk and buckets. System-wide figures, so the
+    /// system admin only; a Manager follows one sweep through <see cref="ReadSurveys"/>.
+    /// </summary>
+    public const string MonitorSystem = "cap:monitor_system";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -143,5 +149,6 @@ public static class LuxMapPolicies
             [ManageQrCodes] = [UserRole.Manager],
             [ReadCitizenReports] = [UserRole.Superior, UserRole.Manager, UserRole.SystemAdmin],
             [ReviewCitizenReports] = [UserRole.Manager],
+            [MonitorSystem] = [UserRole.SystemAdmin],
         };
 }

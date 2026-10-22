@@ -42,7 +42,10 @@ public static class StorageServiceCollectionExtensions
                 AuthenticationRegion = "us-east-1",
             }));
 
-        services.AddSingleton<IObjectStore, S3ObjectStore>();
+        // One adapter behind both contracts; registered by its own type so a test that swaps IObjectStore keeps a working inventory.
+        services.AddSingleton<S3ObjectStore>();
+        services.AddSingleton<IObjectStore>(provider => provider.GetRequiredService<S3ObjectStore>());
+        services.AddSingleton<IObjectInventory>(provider => provider.GetRequiredService<S3ObjectStore>());
 
         // CITIZEN-QR P2b: two untrusted photos cleaned at once, a short queue behind them, 503 beyond — the public form must not
         // be able to eat the server's memory.

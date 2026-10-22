@@ -162,6 +162,8 @@ SKIPPED = {
     "account_token": "link mời / đặt lại mật khẩu trong email (BE-33a) — gắn với WEB_APP_BASE_URL của nguồn; gửi lại ở đích",
     "scheduled_job": "lịch và lease của job nền (BE-26) — đích tự tạo dòng lúc khởi động; chép sang sẽ mang theo lease của nguồn",
     "sync_operation": "bộ nhớ gửi lại của hàng chờ offline (BE-43) — điện thoại trỏ vào máy chủ nguồn không đẩy hàng chờ sang đích",
+    "storage_reconciliation": "kết quả đối chiếu object của bucket NGUỒN (BE-35) — đích tự đối chiếu ở lượt job đầu tiên",
+    "storage_alert": "đợt đĩa đầy của máy NGUỒN (BE-35) — đĩa đích khác, chép sang sẽ chặn thư cảnh báo của đích",
     "__ef_migrations_history": "đích có lịch sử riêng do migration ghi",
     "spatial_ref_sys": "bảng của PostGIS, extension ở đích tự có",
 }

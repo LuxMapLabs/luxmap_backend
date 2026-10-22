@@ -1,5 +1,6 @@
 using LuxMap.Modules.Survey.LuxReadings;
 using LuxMap.Shared.Modularity;
+using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -55,5 +56,11 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddHostedService<Processing.SurveyProcessingWorker>();
         services.AddScoped<LuxReadingService>();
         services.AddScoped<Ingest.SurveyIngestService>();
+
+        // BE-35 — what these tables hold in the store, for the storage totals and the orphan check.
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Survey, "survey_frame"));
+        services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Survey, "survey_frame"));
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Video, "survey_video_clip"));
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Video, "survey_raw_file"));
     }
 }

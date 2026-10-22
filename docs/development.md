@@ -720,6 +720,22 @@ Review P2c vòng 2: member baseline chỉ nhận normal, lọc từ ngày lắp 
 fixture_id; thay bóng phải tích luỹ member mới. Results thêm `published_as`/`is_representative`
 để xem trước công bố qua mọi lượt. Thumbnail thiếu object trả 503 `STORAGE_OBJECT_MISSING`.
 
+## Giám sát hệ thống — BE-35
+
+`GET /api/v1/admin/system/status` (chỉ Quản trị, Contract mục 4.10) gom trạng thái job nền, xử lý sweep, đĩa trống,
+dung lượng database và dung lượng theo bucket. Hai job mới chạy trên runner BE-26: `storage_capacity` (15 phút — đĩa
+trống dưới ngưỡng thì gửi **email** cho mọi Quản trị, một lần mỗi đợt) và `storage_reconciliation` (ngày một lần — so
+key của dòng với object trong bucket, **chỉ báo cáo**, không xoá).
+
+| Khoá `Monitoring:*` | Mặc định | Ý nghĩa |
+|---|---:|---|
+| `DiskPath` | thư mục của app | Đường dẫn nằm trên đĩa cần canh (`statfs`) |
+| `LowDiskRatio` | 0,15 | Dưới tỉ lệ trống này là thấp: `disk.low` và thư cảnh báo |
+| `OrphanGraceHours` | 24 | Object không dòng nào trỏ tới chỉ là mồ côi khi cũ hơn mức này |
+
+Thư cảnh báo dùng SMTP của thư mời (`SMTP_*`). Bảng ảnh mới phải khai `StoredObjectColumn` trong module của nó
+(`docs/agents/traps/media-storage.md`, mục BE-35).
+
 ## Công dân báo sự cố qua QR — CITIZEN-QR P2a / P2b / P2c
 
 **P2a (Quản lý):** `POST /api/v1/qr-codes {pole_id}` cấp mã (thu hồi mã đang dùng của cột), `POST /api/v1/qr-codes/{qr_id}/revoke`,

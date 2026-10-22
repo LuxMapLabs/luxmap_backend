@@ -1,0 +1,152 @@
+using System.Globalization;
+using LuxMap.Modules.Identity.Accounts;
+using LuxMap.Modules.Identity.Entities;
+using LuxMap.Persistence.Jobs;
+using LuxMap.Shared.Contracts.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Npgsql;
+using NpgsqlTypes;
+
+namespace LuxMap.Modules.Admin.Monitoring;
+
+/// <summary>
+/// Every 15 minutes: free disk below <see cref="MonitoringOptions.LowDiskRatio"/> opens a spell and mails every active system admin
+/// ONCE for it; back above the line closes the spell (BE-35, D-7).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Mail, not an in-app notice</b> (Mỹ, 22/10/2026): <c>notification</c> belongs to a commune — its <c>commune_id</c> is required and
+/// filtered — and a disk belongs to none. Mail also reaches an admin who is not looking at the app, which is the point of an alert.
+/// </para>
+/// <para>
+/// 🔴 Once per spell comes from the database, not the lease: <see cref="StorageAlertConfiguration.OneOpen"/> lets one spell be open,
+/// and the mail is CLAIMED by the one <c>UPDATE … WHERE notified_at IS NULL</c> that wins. When NO admin could be mailed the claim goes
+/// back and the next run retries; when some were, it stays and the job fails naming the ones missed — one bouncing address must not
+/// mail everyone else again at every retry.
+/// </para>
+/// <para>
+/// Each instance snapshots its own <c>now</c>, so a run that started before another opened the spell may mail or close it: its stamps
+/// are raised to <c>opened_at</c> (<c>GREATEST</c>), never written before it (<c>ck_storage_alert_order</c>; Codex, BE-35 review).
+/// </para>
+/// </remarks>
+public sealed class StorageCapacityJob(
+    IDiskProbe disk, NpgsqlDataSource dataSource, JobContextFactory contexts, IEmailSender mail, MonitoringOptions options,
+    ILogger<StorageCapacityJob> log) : IScheduledJob
+{
+    private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
+
+    public string Name => "storage_capacity";
+
+    public TimeSpan Interval => TimeSpan.FromMinutes(15);
+
+    public async Task RunAsync(DateTime now, string correlationId, CancellationToken ct)
+    {
+        var space = disk.Measure();
+        if (space.FreeRatio >= options.LowDiskRatio)
+        {
+            await using var close = dataSource.CreateCommand("UPDATE storage_alert SET closed_at = GREATEST($1, opened_at) WHERE closed_at IS NULL");
+            close.Parameters.Add(new NpgsqlParameter { Value = now, NpgsqlDbType = NpgsqlDbType.TimestampTz });
+            if (await close.ExecuteNonQueryAsync(ct) > 0) log.LogInformation("Disk space is back above the line ({Correlation}).", correlationId);
+            return;
+        }
+
+        await using (var open = dataSource.CreateCommand(
+            "INSERT INTO storage_alert (opened_at, free_ratio_at_open) VALUES ($1, $2) ON CONFLICT DO NOTHING"))
+        {
+            open.Parameters.Add(new NpgsqlParameter { Value = now, NpgsqlDbType = NpgsqlDbType.TimestampTz });
+            open.Parameters.Add(new NpgsqlParameter { Value = space.FreeRatio });
+            await open.ExecuteNonQueryAsync(ct);
+        }
+
+        long alertId;
+        await using (var claim = dataSource.CreateCommand(
+            "UPDATE storage_alert SET notified_at = GREATEST($1, opened_at) WHERE closed_at IS NULL AND notified_at IS NULL RETURNING alert_id"))
+        {
+            claim.Parameters.Add(new NpgsqlParameter { Value = now, NpgsqlDbType = NpgsqlDbType.TimestampTz });
+            if (await claim.ExecuteScalarAsync(ct) is not long claimed) return; // already mailed for this spell
+            alertId = claimed;
+        }
+
+        var admins = new List<AppUser>();
+        var missed = new List<string>();
+        var sent = 0;
+        try
+        {
+            admins = await AdminsAsync(ct);
+            foreach (var admin in admins)
+            {
+                try
+                {
+                    await mail.SendAsync(Message(admin, space), ct);
+                    sent++;
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    missed.Add(admin.Username);
+                    log.LogError(error, "Low-disk mail to {Username} failed ({Correlation}).", admin.Username, correlationId);
+                }
+            }
+        }
+        catch when (sent == 0)
+        {
+            await ReleaseAsync(alertId);
+            throw;
+        }
+
+        if (missed.Count > 0 && sent == 0)
+        {
+            await ReleaseAsync(alertId);
+            throw new InvalidOperationException($"Low-disk mail reached none of {admins.Count} system admins; the next run retries.");
+        }
+
+        // Someone was reached: the claim stays, or a single bouncing address would mail everyone else again at every retry.
+        if (missed.Count > 0)
+            throw new InvalidOperationException(
+                $"Low-disk mail reached {sent} of {admins.Count} system admins; not sent to {string.Join(", ", missed)}.");
+
+        if (admins.Count == 0) log.LogWarning("Disk space low ({Free:P1} free) and no active system admin to mail ({Correlation}).",
+            space.FreeRatio, correlationId);
+        else log.LogWarning("Disk space low ({Free:P1} free); mailed {Count} system admins ({Correlation}).", space.FreeRatio, sent, correlationId);
+    }
+
+    private async Task ReleaseAsync(long alertId)
+    {
+        await using var release = dataSource.CreateCommand("UPDATE storage_alert SET notified_at = NULL WHERE alert_id = $1");
+        release.Parameters.Add(new NpgsqlParameter { Value = alertId });
+        await release.ExecuteNonQueryAsync(CancellationToken.None);
+    }
+
+    /// <summary>Active = not locked and the password already set, the meaning <c>Notifier.ManagersCoveringAsync</c> uses.</summary>
+    private async Task<List<AppUser>> AdminsAsync(CancellationToken ct)
+    {
+        await using var db = contexts.Unscoped();
+        return await db.Set<AppUser>().AsNoTracking()
+            .Where(user => user.Role == UserRole.SystemAdmin && !user.IsLocked && user.PasswordSetAt != null)
+            .OrderBy(user => user.UserId.Length).ThenBy(user => user.UserId)
+            .ToListAsync(ct);
+    }
+
+    private EmailMessage Message(AppUser admin, DiskSpace space)
+    {
+        var free = Gigabytes(space.FreeBytes);
+        var total = Gigabytes(space.TotalBytes);
+        var ratio = space.FreeRatio.ToString("P0", Vietnamese);
+        var line = options.LowDiskRatio.ToString("P0", Vietnamese);
+        return new(admin.Email, admin.FullName, $"[LuxMap] Đĩa máy chủ sắp đầy — còn {ratio}",
+            $"""
+            Chào {admin.FullName},
+
+            Đĩa của máy chủ LuxMap còn trống {free} trên {total} ({ratio}), dưới ngưỡng cảnh báo {line}.
+
+            Database, ảnh và video khảo sát, thư mục xử lý frame và bản sao lưu cùng nằm trên đĩa này. Khi đĩa đầy, nhận ảnh, nhận
+            video và xử lý sweep sẽ lỗi.
+
+            Xem chi tiết dung lượng theo từng bucket ở màn Quản trị hệ thống.
+
+            Thư này gửi một lần mỗi khi dung lượng trống rơi xuống dưới ngưỡng.
+            """);
+    }
+
+    private static string Gigabytes(long bytes) => (bytes / 1_073_741_824d).ToString("N1", Vietnamese) + " GB";
+}
