@@ -258,6 +258,29 @@ public sealed class SystemMonitoringTests(AssetImportFixture factory) : IAsyncLi
     }
 
     [Fact]
+    public async Task A_run_that_started_before_the_spell_opened_can_still_mail_and_close_it()
+    {
+        // Codex (BE-35 review): two instances snapshot the clock at different times. The later one opens the spell; the earlier one,
+        // still running, must not stamp notified_at / closed_at BEFORE opened_at (ck_storage_alert_order).
+        var (disk, mail, job) = Capacity();
+        var admin = await SeedAdminEmailAsync();
+        var earlier = DateTime.UtcNow;
+        var later = earlier.AddMinutes(1);
+        disk.Ratio = 0.10;
+        mail.Fail = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => job.RunAsync(later, "opens", CancellationToken.None));
+
+        mail.Fail = false;
+        await job.RunAsync(earlier, "mails", CancellationToken.None);
+        Assert.Single(mail.To(admin));
+
+        disk.Ratio = 0.40;
+        await job.RunAsync(earlier, "closes", CancellationToken.None);
+        var spell = await Db(db => db.Set<StorageAlert>().AsNoTracking().SingleAsync());
+        Assert.True(spell.NotifiedAt >= spell.OpenedAt && spell.ClosedAt >= spell.OpenedAt);
+    }
+
+    [Fact]
     public async Task Simultaneous_checks_open_one_spell_and_mail_each_admin_once()
     {
         var (disk, mail, job) = Capacity();

@@ -24,6 +24,10 @@ namespace LuxMap.Modules.Admin.Monitoring;
 /// and the mail is CLAIMED by the one <c>UPDATE … WHERE notified_at IS NULL</c> that wins. A failed send puts the claim back so the next
 /// run retries — an admin already mailed in that run may then get the mail twice, never zero times.
 /// </para>
+/// <para>
+/// Each instance snapshots its own <c>now</c>, so a run that started before another opened the spell may mail or close it: its stamps
+/// are raised to <c>opened_at</c> (<c>GREATEST</c>), never written before it (<c>ck_storage_alert_order</c>; Codex, BE-35 review).
+/// </para>
 /// </remarks>
 public sealed class StorageCapacityJob(
     IDiskProbe disk, NpgsqlDataSource dataSource, JobContextFactory contexts, IEmailSender mail, MonitoringOptions options,
@@ -40,7 +44,7 @@ public sealed class StorageCapacityJob(
         var space = disk.Measure();
         if (space.FreeRatio >= options.LowDiskRatio)
         {
-            await using var close = dataSource.CreateCommand("UPDATE storage_alert SET closed_at = $1 WHERE closed_at IS NULL");
+            await using var close = dataSource.CreateCommand("UPDATE storage_alert SET closed_at = GREATEST($1, opened_at) WHERE closed_at IS NULL");
             close.Parameters.Add(new NpgsqlParameter { Value = now, NpgsqlDbType = NpgsqlDbType.TimestampTz });
             if (await close.ExecuteNonQueryAsync(ct) > 0) log.LogInformation("Disk space is back above the line ({Correlation}).", correlationId);
             return;
@@ -56,7 +60,7 @@ public sealed class StorageCapacityJob(
 
         long alertId;
         await using (var claim = dataSource.CreateCommand(
-            "UPDATE storage_alert SET notified_at = $1 WHERE closed_at IS NULL AND notified_at IS NULL RETURNING alert_id"))
+            "UPDATE storage_alert SET notified_at = GREATEST($1, opened_at) WHERE closed_at IS NULL AND notified_at IS NULL RETURNING alert_id"))
         {
             claim.Parameters.Add(new NpgsqlParameter { Value = now, NpgsqlDbType = NpgsqlDbType.TimestampTz });
             if (await claim.ExecuteScalarAsync(ct) is not long claimed) return; // already mailed for this spell
