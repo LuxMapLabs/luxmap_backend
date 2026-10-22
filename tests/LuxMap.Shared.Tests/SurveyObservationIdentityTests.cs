@@ -23,7 +23,7 @@ public sealed class SurveyObservationIdentityTests
             passes.Select(p => ("segment", 100d, p)).ToList(), [Pole("pole")],
             new("left", [new(0, 0, 20_000_000_000, 0, 20_000_000_000, 1, 1000)]),
             new Dictionary<int, List<DetectedFrame>> { [0] = [Frame(first.TimeNs)] },
-            new NoBaseline(), new(), default);
+            new NoBaseline(), new(), .8, default);
         Assert.Equal(2, result.Observations.Count);
         var sweep = new SurveySweep { WorkOrderId = "order", CommuneId = "commune", CapturedBy = "user", CreateRequestHash = new('a', 64), UtcAnchor = DateTime.UnixEpoch, DataSource = DataSource.Simulated };
         var forward = new SurveyPass { PassNo = 0, Run = run, SegmentId = "segment", Direction = "forward", QualityFlags = "{}" };
@@ -54,7 +54,7 @@ public sealed class SurveyObservationIdentityTests
             samePole ? [Pole("pole")] : [Pole("pole"), Pole(other)],
             new("front", [new(0, 0, 20_000_000_000, 0, 20_000_000_000, 1, 1000)]),
             new Dictionary<int, List<DetectedFrame>> { [0] = [Frame(10_000_000_000)] },
-            new NoBaseline(), new(), default);
+            new NoBaseline(), new(), .8, default);
         Assert.Equal(2, result.Observations.Count);
         Assert.All(result.Observations.Values, cv =>
         {

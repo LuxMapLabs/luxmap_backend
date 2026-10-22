@@ -15,13 +15,6 @@ public sealed class TelemetryModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
-        var options = configuration.GetSection(IotOptions.SectionName).Get<IotOptions>() ?? new IotOptions();
-
-        // A non-positive threshold STOPS startup rather than marking every device offline.
-        options.Validate();
-
-        services.AddSingleton(options);
-
         // BE-26 — a silent device raises node_offline under the scheduled job runner (LuxMap.Persistence.Jobs).
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.NodeOfflineJob>();
 

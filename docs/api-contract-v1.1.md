@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.15 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.16 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -14,17 +14,18 @@
 **v1.12:** 06/10/2026 (người sửa cuối `updated_by` trên tài sản, `note` thành chuỗi, import nạp ghi chú; BREAKING) ·
 **v1.13:** 06/10/2026 (BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push`; `performed_at?` cho bước của phiếu) ·
 **v1.14:** 06/10/2026 (BE-25 — `GET /work-orders/agenda`, việc đêm nay của kỹ sư gom theo tuyến) ·
-**v1.15:** 22/10/2026 (BE-35 — `GET /admin/system/status`, giám sát job nền và dung lượng lưu trữ; capability `MonitorSystem`).
+**v1.15:** 22/10/2026 (BE-35 — `GET /admin/system/status`, giám sát job nền và dung lượng lưu trữ; capability `MonitorSystem`) ·
+**v1.16:** 22/10/2026 (BE-33 — `/admin/settings`, ngưỡng `dim` và ngưỡng offline do Quản trị sửa; capability `ManageSettings`).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.15, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.16, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (85 operation, cả 85
-`implemented` — đếm lại ở v1.14 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (136 operation, cả 136
+`implemented` — đếm lại ở v1.16 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -140,6 +141,7 @@ client **không** parse.
 | `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
 | `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
 | `INVALID_ACCOUNT_TOKEN` | 400 | Link mời / đặt lại mật khẩu không tồn tại, hết hạn hoặc đã dùng — một mã (v1.8, mục 4.8) |
+| `SETTING_NOT_FOUND` | 404 | `PUT /admin/settings/{key}` với khoá không có (v1.16, mục 4.11) |
 | `USER_NOT_FOUND` | 404 | `/admin/users/{id}` không tồn tại (v1.8, mục 4.9); `GET /work-orders/agenda`: `assigned_to` không phải kỹ sư hiện trường thuộc xã của người gọi, hoặc kỹ sư hỏi lịch của người khác (v1.14, mục 5.5) |
 | `IDENTIFIER_TAKEN` | 409 | Username hoặc email đã có tài khoản khác dùng, không phân biệt hoa thường (`POST`/`PATCH /admin/users`; v1.8) |
 | `LAST_SYSTEM_ADMIN` | 409 | Thao tác sẽ không còn Quản trị hệ thống nào đăng nhập được (hạ vai trò, khoá; v1.8) |
@@ -242,6 +244,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 | `ReadNotifications` | superior, manager, field_engineer, system_admin | mọi `/notifications*` — chỉ thông báo **của chính người gọi** (v1.10, mục 5.9) |
 | `SyncOffline` | **field_engineer** | `GET /sync/bundle`, `POST /sync/push` (v1.13, mục 5.8) — mỗi thao tác trong hàng chờ **còn** kiểm capability của chính nó |
 | `MonitorSystem` | **system_admin** | `GET /admin/system/status` (v1.15, mục 4.10) — số liệu toàn hệ thống, không chia theo xã |
+| `ManageSettings` | **system_admin** | `GET /admin/settings`, `PUT /admin/settings/{key}` (v1.16, mục 4.11) — cấu hình toàn hệ thống, đổi kết quả nghiên cứu |
 
 - `/auth/*` cấp token không cần token.
 - Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
@@ -567,6 +570,45 @@ không chia theo xã. Một request cho cả màn Quản trị hệ thống:
 Đĩa trống dưới ngưỡng thì server **gửi email** (không phải thông báo trong app — thông báo luôn thuộc một xã) cho mọi
 `system_admin` đang hoạt động, **một lần mỗi đợt**; đợt đóng khi dung lượng trống lên lại trên ngưỡng.
 
+
+### 4.11 Cấu hình hệ thống — `/api/v1/admin/settings` — `implemented` (v1.16, BE-33)
+
+Capability **`ManageSettings`** (chỉ `system_admin`, mục 2). Endpoint của **web**, **toàn hệ thống**. Hai khoá; bảng
+`system_setting` là **nguồn duy nhất** (không còn trong appsettings), đổi có hiệu lực ở lượt đọc kế tiếp — không deploy, không
+restart, không cache.
+
+| Khoá | Đơn vị | Mặc định | Miền nhận | Áp ở |
+|---|---|---|---|---|
+| `dim_threshold_ratio` | `ratio` | 0.80 | 0.50 – 0.95 | Lần xử lý sweep được nhận **sau** lúc đổi (chụp vào run); đường ngưỡng ở `GET /map/poles/{pole_id}` |
+| `iot_offline_after_minutes` | `minutes` | 60 | 5 – 1440, số nguyên | `node_status` ở `GET /map/iot-nodes`; job sinh `node_offline` |
+
+**`GET /admin/settings`** → `200`, không phân trang:
+
+```json
+{ "items": [
+  { "key": "dim_threshold_ratio", "value": 0.8, "default_value": 0.8, "min": 0.5, "max": 0.95, "unit": "ratio",
+    "updated_at": null, "updated_by": null },
+  { "key": "iot_offline_after_minutes", "value": 60, "default_value": 60, "min": 5, "max": 1440, "unit": "minutes",
+    "updated_at": "2026-10-22T08:00:00.000000Z", "updated_by": "USR-001" }
+] }
+```
+
+`updated_at` / `updated_by` **null** khi giá trị mặc định chưa từng bị đổi.
+
+**`PUT /admin/settings/{key}`** body `{ "value": 0.75, "note": "…" }` → `200` trả **một item** như trên.
+
+| Trường | Ghi chú |
+|---|---|
+| `value` | Bắt buộc, trong miền của khoá; ngoài miền / thiếu / phút lẻ → `400 VALIDATION_FAILED` (`details.field = "value"`) |
+| `note` | Tuỳ chọn, ≤ 500 ký tự (cắt khoảng trắng hai đầu) — lý do, lưu kèm thay đổi |
+
+- Khoá không có → `404 SETTING_NOT_FOUND`.
+- Gửi đúng giá trị đang có → `200`, **không** ghi gì.
+- Mỗi lần đổi ghi một dòng lịch sử **append-only** (giá trị cũ, mới, ai, lúc nào, `note`, correlation id). Hai Quản trị lưu cùng
+  lúc thì lần sau chờ lần trước rồi lấy giá trị của lần trước làm giá trị cũ.
+- **Không phân loại lại** dữ liệu đã có: sweep đã xử lý / đã công bố giữ ngưỡng của lần xử lý (`luminance_history[].dim_threshold_ratio`,
+  mục 5.1); sự cố `node_offline` đã sinh giữ nguyên. Một lần im lặng của thiết bị chỉ sinh **một** `node_offline`, kể cả khi ngưỡng
+  đổi giữa chừng.
 ---
 
 ## 5. Endpoint theo resource
@@ -594,12 +636,15 @@ lamp_watt, install_date, warranty_expiry}, current_status{fixture_status, status
 determined_at, source_channel}, iot_node{node_id, node_status, last_report_at}|null,
 luminance_baseline{baseline_value, baseline_window_nights, dim_threshold_ratio, out_threshold_ratio,
 computed_at}, luminance_history[]{observed_at, sweep_id, normalized_luminance, baseline_ratio,
-classified_as}, runtime_history[]{night_of, runtime_hours, on_at, off_at, source} (chỉ khi có node),
+classified_as, dim_threshold_ratio}, runtime_history[]{night_of, runtime_hours, on_at, off_at, source} (chỉ khi có node),
 open_faults[]{fault_id, fault_type, severity, fault_status, priority_score}, recent_frames[]{frame_id,
 sweep_id, captured_at, thumbnail_url, distance_m, heading_deg}`.
 
 `baseline_ratio` và `classified_as` **tính ở backend**; FE vẽ `baseline_ratio` kèm đường ngưỡng
-`dim_threshold_ratio`. Ngưỡng cấu hình qua BE-33 (mặc định 0.80 / 0.15), không hard-code. `thumbnail_url`
+`luminance_baseline.dim_threshold_ratio` = ngưỡng **đang áp** (Quản trị sửa qua mục 4.11, mặc định 0.80), không hard-code.
+Mỗi điểm `luminance_history[]` mang **`dim_threshold_ratio` của lần xử lý đã phân loại nó** (v1.16, chỉ thêm; `null` khi lần
+xử lý không ghi) — đổi ngưỡng không phân loại lại điểm cũ, nên điểm cũ có thể nằm khác phía đường ngưỡng hiện tại.
+`out_threshold_ratio` luôn `null` (D-R22: `out` do CV quyết). `thumbnail_url`
 là đường dẫn **tương đối qua API**, không presigned. Ngoài phạm vi → `404`.
 
 ### 5.2 Đoạn đường — `[NOT IMPLEMENTED]` (BE-14)
@@ -1010,6 +1055,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.16 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33 — cấu hình hệ thống** (mục 4.11, drift SET-1…SET-7; D-1…D-8 chốt 22/10). **Thêm** `GET /admin/settings`, `PUT /admin/settings/{key}`, capability `ManageSettings` (chỉ `system_admin`), mã lỗi `SETTING_NOT_FOUND`, trường `dim_threshold_ratio` trên từng điểm `luminance_history[]` của `GET /map/poles/{pole_id}`. `luminance_baseline.dim_threshold_ratio` giữ nghĩa ngưỡng đang áp, nay đọc từ cấu hình. Chỉ thêm, không đổi gì đã có. "Danh mục loại đèn / loại sự cố / trọng số" của task list **không** làm (enum khoá cứng; P-1). Nền tạm tới FW |
 | v1.15 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-35 — giám sát hệ thống** (mục 4.10, drift SM-1…SM-8; D-1…D-10 chốt 22/10, D-8 bỏ qua). **Thêm** `GET /admin/system/status` và capability `MonitorSystem` (chỉ `system_admin`). Chỉ thêm, không đổi gì đã có. Cảnh báo đĩa gửi **email**, không qua `/notifications`. Nền tạm tới FW |
 | v1.14 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-25 — việc đêm nay của kỹ sư, gom theo tuyến** (mục 5.5, drift BE-25; D-1…D-8 chốt theo đề xuất A). **Thêm** `GET /work-orders/agenda` (`night_of?`, `near?`, `assigned_to?`; capability `ReadWorkOrders`, không capability mới); `USER_NOT_FOUND` dùng thêm cho `assigned_to` không hợp lệ. **Siết** ngày/giờ trên query string thành chỉ ISO 8601 (mục 0) cho mọi endpoint — `scheduled_from` / `scheduled_to` của `GET /work-orders` và `from` / `to` của `GET /lux-readings` trước đây nhận cả `06/10/2026` và đọc sai thành 10/06; nay `400`. Client đã gửi ISO không bị ảnh hưởng. Không đổi trường nào có sẵn, không migration. Chiều đi của tuyến khảo sát (D-7) **tách ticket riêng**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.13 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-43 — đồng bộ offline** (mục 5.8, drift BE-43; đóng O-5). `GET /sync/bundle`: bản chụp đầy đủ theo tuyến (`segment_id` lặp ≤ 20; vắng = tuyến của phiếu mở của tôi), **không** `since`; cột kèm `note`, phiếu dạng chi tiết. `POST /sync/push`: 5 `op_type` qua service của endpoint gốc, kiểm capability từng thao tác, kết quả `applied` / `conflicts` / `rejected`, `BLOCKED_BY_EARLIER_OP`; khử trùng lặp bằng cột sẵn có hoặc bảng mới `sync_operation`. Capability mới **`SyncOffline`** = `field_engineer`. Mã lỗi mới `NOTE_CHANGED`, `BLOCKED_BY_EARLIER_OP`. **Thêm** `performed_at?` cho `POST /work-orders/{id}/start` (body tuỳ chọn) và `…/complete`. Chỉ thêm. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |

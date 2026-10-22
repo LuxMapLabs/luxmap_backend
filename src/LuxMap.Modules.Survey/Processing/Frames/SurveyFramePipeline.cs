@@ -23,7 +23,7 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
 {
     public async Task<FramePipelineResult> ProcessAsync(LuxMapDbContext db, SurveySweep sweep, SurveyProcessingRun run,
         List<(string Segment, double Length, PassResult Pass)> passes, ProjectedPole[] poles,
-        Func<CancellationToken, Task> heartbeat, double leaseSeconds, CancellationToken ct)
+        Func<CancellationToken, Task> heartbeat, double leaseSeconds, double dimThresholdRatio, CancellationToken ct)
     {
         // D-06 and D-07 block real field processing; fake results never attach to field assets.
         if (sweep.DataSource != DataSource.Simulated) throw new ProcessingFailure("VIDEO_DEVICE_MAPPING_PENDING", "video_clock");
@@ -121,7 +121,7 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
             }
         }
         await ClassifyObservationsAsync(result, run, sweep, passes, poles, mapping,
-            clips.ToDictionary(c => c.ClipNo, c => outputs.GetValueOrDefault(c.ClipId) ?? []), new Review.SurveyBaselineLookup(db), options, ct);
+            clips.ToDictionary(c => c.ClipNo, c => outputs.GetValueOrDefault(c.ClipId) ?? []), new Review.SurveyBaselineLookup(db), options, dimThresholdRatio, ct);
         result.FrameCount = await db.Set<SurveyFrame>().CountAsync(x => x.SweepId == sweep.SweepId, ct) + result.NewFrames.Count;
         return result;
     }
@@ -129,7 +129,7 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
     public static async Task ClassifyObservationsAsync(FramePipelineResult result, SurveyProcessingRun run, SurveySweep sweep,
         List<(string Segment, double Length, PassResult Pass)> passes, ProjectedPole[] poles,
         VideoClockMapping mapping, IReadOnlyDictionary<int, List<DetectedFrame>> outputs,
-        ISurveyBaselineLookup baselines, SurveyFrameOptions options, CancellationToken ct)
+        ISurveyBaselineLookup baselines, SurveyFrameOptions options, double dimThresholdRatio, CancellationToken ct)
     {
         foreach (var (pass, passNo) in passes.Select((pass, index) => (pass, index)))
         foreach (var p in pass.Pass.Observations)
@@ -145,7 +145,7 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
             var before = sweep.AtElapsed(sweep.StartedElapsedNs)
                 ?? throw new InvalidOperationException("A submitted sweep must have a valid start time.");
             var baseline = await baselines.FindAsync(new(p.PoleId, pass.Pass.Direction, sweep.SweepId, before, sweep.DataSource), ct);
-            result.Observations.Add((passNo, p.PoleId, p.TimeNs), EvaluateObservation(association, p.Peak?.Lux, baseline?.Value, flags, options.DimThresholdRatio) with { Baseline = baseline });
+            result.Observations.Add((passNo, p.PoleId, p.TimeNs), EvaluateObservation(association, p.Peak?.Lux, baseline?.Value, flags, dimThresholdRatio) with { Baseline = baseline });
         }
         // Resolve once across the whole run, before coverage and persistence. A pole revisited in
         // another pass may reuse evidence; distinct poles must never claim the same prediction.
@@ -155,7 +155,7 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
         for (int i = 0; i < observations.Length; i++)
             if (resolved[i].Reason == "shared_cv_evidence")
                 result.Observations[observations[i].Key] = new(resolved[i],
-                    FrameClassification.Classify(resolved[i], null, null, [], options.DimThresholdRatio));
+                    FrameClassification.Classify(resolved[i], null, null, [], dimThresholdRatio));
         int denominator = poles.Select(p => p.PoleId).Distinct().Count();
         run.DetectionCoveragePct = denominator == 0 ? null : 100d * result.Observations.Where(x => x.Value.Association.State != null).Select(x => x.Key.Pole).Distinct().Count() / denominator;
         run.DimCoveragePct = denominator == 0 ? null : 100d * result.Observations.Where(x => x.Value.Classification.DimEvaluationEligible).Select(x => x.Key.Pole).Distinct().Count() / denominator;

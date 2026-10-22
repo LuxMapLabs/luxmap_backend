@@ -100,6 +100,7 @@ public sealed record PoleMapBaseline
     /// <summary>Accepted sweeps behind the value — one member per sweep, normally one per night.</summary>
     public int BaselineWindowNights { get; init; }
 
+    /// <summary>The threshold in force NOW (system setting, BE-33): the line to draw. Each history point carries its own.</summary>
     public double DimThresholdRatio { get; init; }
 
     /// <summary>
@@ -126,6 +127,12 @@ public sealed record PoleMapHistoryPoint
     public double? BaselineRatio { get; init; }
 
     public FixtureStatus ClassifiedAs { get; init; }
+
+    /// <summary>
+    /// ADDITIVE (BE-33 D-4): the threshold <see cref="ClassifiedAs"/> was decided with — the run's, which may differ from
+    /// <c>luminance_baseline.dim_threshold_ratio</c> (the threshold in force now). <c>null</c> when the run recorded none.
+    /// </summary>
+    public double? DimThresholdRatio { get; init; }
 
     /// <summary>ADDITIVE: relative lux peak behind the point, <c>null</c> when not observed.</summary>
     public double? PeakLux { get; init; }

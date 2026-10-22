@@ -23,12 +23,11 @@ public sealed class SurveyFrameOptions
     public double FramesPerSecond { get; set; } = 5;
     public double MinimumConfidence { get; set; } = .7;
     public double MinimumBoxArea { get; set; } = .0001;
-    public double DimThresholdRatio { get; set; } = .8;
     public bool IsValid() => GetType().GetProperties().Where(p => p.PropertyType == typeof(double))
         .All(p => p.GetValue(this) is double v && double.IsFinite(v) && v > 0)
         && MaximumConcurrentClips > 0 && MaximumConcurrentClips <= 8 && TemporaryBytesPerClip > MaximumFrameBytes
         && MaximumFrameBytes > 0 && MinimumConfidence <= 1 && MinimumBoxArea <= 1
-        && DimThresholdRatio <= 1 && FramesPerSecond <= 30 && BeforeSeconds + AfterSeconds <= 30
+        && FramesPerSecond <= 30 && BeforeSeconds + AfterSeconds <= 30
         && Detector is "fake" or "unconfigured" or YoloDetectorKey;
     public void ValidateEnvironment(string environment)
     {

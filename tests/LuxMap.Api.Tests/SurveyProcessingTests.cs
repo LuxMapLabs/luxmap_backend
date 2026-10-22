@@ -7,6 +7,7 @@ using LuxMap.Modules.Survey.Processing;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Http;
@@ -128,6 +129,18 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM administrative_unit WHERE commune_id = {a} OR commune_id = {b}");
         await tx.CommitAsync();
         media.Dispose();
+    }
+
+    /// <summary>BE-33: the dim threshold comes from the system setting, and the run records the one it used where runs always have.</summary>
+    [Fact]
+    public async Task The_run_records_the_dim_threshold_the_setting_held_when_it_was_claimed()
+    {
+        await factory.WithSettingAsync(SystemSettingKeys.DimThresholdRatio, .65, async () =>
+            Assert.True(await Processor().ProcessOneAsync(sweepId: sweep)));
+
+        await using var db = Db();
+        var run = await db.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep);
+        Assert.Equal(.65, SurveySettingsSnapshot.DimThresholdRatioOf(run.SettingsSnapshot));
     }
 
     [Fact]

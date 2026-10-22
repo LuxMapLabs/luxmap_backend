@@ -4273,6 +4273,99 @@ namespace LuxMap.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LuxMap.Persistence.Settings.SystemSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasColumnType("text")
+                        .HasColumnName("key");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("updated_by");
+
+                    b.Property<double>("Value")
+                        .HasColumnType("double precision")
+                        .HasColumnName("value");
+
+                    b.HasKey("Key")
+                        .HasName("pk_system_setting");
+
+                    b.HasIndex("UpdatedBy")
+                        .HasDatabaseName("ix_system_setting_updated_by");
+
+                    b.ToTable("system_setting", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_system_setting_key", "key IN ('dim_threshold_ratio', 'iot_offline_after_minutes')");
+
+                            t.HasCheckConstraint("ck_system_setting_updated_together", "(updated_at IS NULL) = (updated_by IS NULL)");
+
+                            t.HasCheckConstraint("ck_system_setting_value", "value <> 'NaN'::float8 AND value <> 'Infinity'::float8 AND value <> '-Infinity'::float8 AND CASE key WHEN 'dim_threshold_ratio' THEN value BETWEEN 0.5 AND 0.95 WHEN 'iot_offline_after_minutes' THEN value BETWEEN 5 AND 1440 AND value = trunc(value) ELSE false END");
+                        });
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.Settings.SystemSettingChange", b =>
+                {
+                    b.Property<long>("ChangeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("change_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ChangeId"));
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("ChangedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("changed_by");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("key");
+
+                    b.Property<double>("NewValue")
+                        .HasColumnType("double precision")
+                        .HasColumnName("new_value");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<double>("OldValue")
+                        .HasColumnType("double precision")
+                        .HasColumnName("old_value");
+
+                    b.HasKey("ChangeId")
+                        .HasName("pk_system_setting_change");
+
+                    b.HasIndex("ChangedBy")
+                        .HasDatabaseName("ix_system_setting_change_changed_by");
+
+                    b.HasIndex("Key", "ChangeId")
+                        .HasDatabaseName("ix_system_setting_change_key_change_id");
+
+                    b.ToTable("system_setting_change", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_system_setting_change_new_value", "new_value <> 'NaN'::float8 AND new_value <> 'Infinity'::float8 AND new_value <> '-Infinity'::float8 AND CASE key WHEN 'dim_threshold_ratio' THEN new_value BETWEEN 0.5 AND 0.95 WHEN 'iot_offline_after_minutes' THEN new_value BETWEEN 5 AND 1440 AND new_value = trunc(new_value) ELSE false END");
+
+                            t.HasCheckConstraint("ck_system_setting_change_note", "note IS NULL OR char_length(note) <= 500");
+
+                            t.HasCheckConstraint("ck_system_setting_change_old_value", "old_value <> 'NaN'::float8 AND old_value <> 'Infinity'::float8 AND old_value <> '-Infinity'::float8 AND CASE key WHEN 'dim_threshold_ratio' THEN old_value BETWEEN 0.5 AND 0.95 WHEN 'iot_offline_after_minutes' THEN old_value BETWEEN 5 AND 1440 AND old_value = trunc(old_value) ELSE false END");
+                        });
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.ElectricalCabinet", b =>
                 {
                     b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
@@ -5368,6 +5461,32 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_audit_event_administrative_unit_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.Settings.SystemSetting", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_system_setting_app_user_updated_by");
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.Settings.SystemSettingChange", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_system_setting_change_app_user_changed_by");
+
+                    b.HasOne("LuxMap.Persistence.Settings.SystemSetting", null)
+                        .WithMany()
+                        .HasForeignKey("Key")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_system_setting_change_system_setting_key");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.Feeder", b =>

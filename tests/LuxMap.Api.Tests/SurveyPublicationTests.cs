@@ -12,6 +12,7 @@ using LuxMap.Modules.WorkOrders;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Paging;
@@ -80,7 +81,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     private sealed record Capture(string Id, long Run, uint Version, string Frame, DateTime At);
-    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false, string? alsoTouches = null, string? workOrder = null)
+    private async Task<Capture> Plant(int day, double lux = 100, string state = "on", string direction = "forward", bool halfCovered = false, string? alsoTouches = null, string? workOrder = null, double threshold = .8)
     {
         await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
         var at = DateTime.UnixEpoch.AddDays(20000 + day);
@@ -89,7 +90,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
             Status = SweepStatus.AwaitingReview, ProcessingStatus = SweepProcessingStatus.Succeeded };
         db.Add(sweep); await db.SaveChangesAsync();
         var run = new SurveyProcessingRun { SweepId = sweep.SweepId, CommuneId = a, Attempt = 1, LeaseOwner = Guid.NewGuid(),
-            LeaseExpiresAt = at.AddMinutes(1), InputHash = new('b',64), SettingsSnapshot = "{}", GisSnapshot = System.Text.Json.JsonSerializer.Serialize(new {
+            LeaseExpiresAt = at.AddMinutes(1), InputHash = new('b',64),
+            SettingsSnapshot = System.Text.Json.JsonSerializer.Serialize(new { frames = new { dim_threshold_ratio = threshold } }), GisSnapshot = System.Text.Json.JsonSerializer.Serialize(new {
                 communes = alsoTouches is null ? new[] { a, b } : new[] { a, b, alsoTouches },
                 poles = poles.Select((id, i) => new { pole_id = id, commune_id = i == 0 ? a : b }) }),
             AlgorithmVersionId = algorithm, ClockVersionId = clock, ModelVersionId = model, ExtractorVersionId = extractor,
@@ -106,7 +108,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         {
             var baseline = await new SurveyBaselineLookup(db).FindAsync(new(poles[i], direction, sweep.SweepId, at, DataSource.Simulated), default);
             var cv = i == 0 ? state : "off";
-            var classification = FrameClassification.Classify(new(cv, .95, frame.FrameId, 1, "associated"), lux, baseline?.Value, [], .8);
+            var classification = FrameClassification.Classify(new(cv, .95, frame.FrameId, 1, "associated"), lux, baseline?.Value, [], threshold);
             db.Add(new PoleObservation { Run = run, Pass = pass, PoleId = poles[i], CommuneId = i == 0 ? a : b, DataSource = DataSource.Simulated,
                 ObservedAt = at.AddSeconds(5), ObservedElapsedNs = 5_000_000_000L, PeakAtElapsedNs = 5_000_000_000L, PeakLux = lux,
                 AssociationConfidence = .9, CvState = cv, CvConfidence = .95, RepresentativeFrameId = frame.FrameId,
@@ -492,8 +494,30 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     private PoleDetailService Detail(LuxMapDbContext db, string[]? ids = null)
-        => new(db, new SurveyFrameOptions(), new SurveyMediaAccess(db, new Scope(ids ?? [a, b])),
+        => new(db, new SurveyMediaAccess(db, new Scope(ids ?? [a, b])),
             new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System));
+
+    /// <summary>
+    /// BE-33 D-4: a point keeps the threshold its run classified it with; the baseline carries the one in force now. A ratio of 0.7
+    /// under a run at 0.6 stays <c>normal</c> beside a 0.75 line drawn today — and the front end can tell why.
+    /// </summary>
+    [Fact]
+    public async Task Each_history_point_carries_its_runs_threshold_and_the_baseline_the_current_one()
+    {
+        foreach (var day in new[] { 1, 2, 3 }) await Accept(await Plant(day, 100));
+        await Accept(await Plant(4, 70, threshold: .6));
+
+        await factory.WithSettingAsync(SystemSettingKeys.DimThresholdRatio, .75, async () =>
+        {
+            await using var db = Db();
+            var detail = await Detail(db).GetAsync(poles[0], default);
+
+            Assert.Equal([.8, .8, .8, .6], detail.LuminanceHistory.Select(h => h.DimThresholdRatio));
+            var last = detail.LuminanceHistory[^1];
+            Assert.Equal((FixtureStatus.Normal, .7), (last.ClassifiedAs, Math.Round(last.BaselineRatio!.Value, 6)));
+            Assert.Equal(.75, Assert.Single(detail.LuminanceBaselines).DimThresholdRatio);
+        });
+    }
 
     [Fact]
     public async Task Pole_detail_shows_published_history_baseline_status_faults_and_frames()
@@ -521,6 +545,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         Assert.Equal(.5, last.BaselineRatio!.Value, 6);
         Assert.Equal(last.BaselineRatio, last.NormalizedLuminance);
         Assert.Equal(50, last.PeakLux);
+        Assert.All(detail.LuminanceHistory, h => Assert.Equal(.8, h.DimThresholdRatio)); // the run's threshold, per point (BE-33 D-4)
 
         // Baseline: median of 100/110/90 over three accepted sweeps, forward, with the configured dim ratio.
         var baseline = Assert.Single(detail.LuminanceBaselines);

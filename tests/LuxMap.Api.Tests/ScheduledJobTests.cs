@@ -10,6 +10,7 @@ using LuxMap.Modules.WorkOrders.Jobs;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Persistence.Jobs;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -346,7 +347,7 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal(DataSource.Simulated, fault.DataSource);
         Assert.Equal(Severity.Medium, fault.Severity);
         Assert.Equal(node, fault.OriginNodeId);
-        Assert.Equal(last.AddHours(1), fault.DetectedAt); // Iot:OfflineAfter, not when the job ran
+        Assert.Equal(last.AddHours(1), fault.DetectedAt); // the iot_offline_after_minutes setting, not when the job ran
         Assert.Equal((16.05, 108.25), (fault.Lat, fault.Lng)); // the cabinet's point
         Assert.Null(fault.PoleId);
         Assert.Null(fault.SegmentId);
@@ -368,12 +369,12 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
     [Fact]
     public async Task The_job_agrees_with_the_map_status_on_both_sides_of_the_threshold_and_ignores_never_reported()
     {
-        var iot = factory.Services.GetRequiredService<IotOptions>();
-        var atThreshold = Night10 - iot.OfflineAfter;
+        var offlineAfter = (await Db(db => SystemSettingValues.ReadAsync(db, default))).IotOfflineAfter;
+        var atThreshold = Night10 - offlineAfter;
         var past = atThreshold.AddTicks(-10); // one microsecond more
         // The job's SQL restates StatusAt (EF cannot translate a method); pinned against the map's own rule on both sides.
-        Assert.Equal(NodeStatus.Online, iot.StatusAt(atThreshold, Night10));
-        Assert.Equal(NodeStatus.Offline, iot.StatusAt(past, Night10));
+        Assert.Equal(NodeStatus.Online, NodeSilence.StatusAt(atThreshold, Night10, offlineAfter));
+        Assert.Equal(NodeStatus.Offline, NodeSilence.StatusAt(past, Night10, offlineAfter));
         await PlantNodeAsync(atThreshold);
         var (offline, _) = await PlantNodeAsync(past);
         await PlantNodeAsync(null); // never_reported: not yet in service
@@ -412,6 +413,40 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
 
         var first = new DateTime(2001, 3, 10, 2, 0, 0, DateTimeKind.Utc);
         Assert.Equal([first, Night10.AddHours(3)], (await FaultsAsync()).Select(f => f.DetectedAt).Order());
+    }
+
+    [Fact]
+    public async Task The_job_reads_the_threshold_from_the_setting_at_every_pass()
+    {
+        var last = Night10.AddMinutes(-45);
+        await PlantNodeAsync(last);
+
+        await OfflineAsync(Night10); // 45 minutes silent, under the seeded 60
+        Assert.Empty(await FaultsAsync());
+
+        await factory.WithSettingAsync(SystemSettingKeys.IotOfflineAfterMinutes, 30, () => OfflineAsync(Night10));
+
+        var fault = Assert.Single(await FaultsAsync());
+        Assert.Equal(last.AddMinutes(30), fault.DetectedAt);
+        Assert.Contains("quá 30 phút", fault.Note, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// BE-33 D-8: <c>detected_at</c> is last report + threshold, so a threshold changed in the middle of a silence moves it — and a
+    /// duplicate check on the exact <c>detected_at</c> (and the unique index) would let the same silence in a second time.
+    /// </summary>
+    [Fact]
+    public async Task Changing_the_threshold_in_the_middle_of_a_silence_does_not_raise_it_twice()
+    {
+        var last = new DateTime(2001, 3, 10, 1, 0, 0, DateTimeKind.Utc);
+        await PlantNodeAsync(last);
+        await OfflineAsync(Night10);
+
+        await factory.WithSettingAsync(SystemSettingKeys.IotOfflineAfterMinutes, 30, () => OfflineAsync(Night10.AddMinutes(1)));
+        await factory.WithSettingAsync(SystemSettingKeys.IotOfflineAfterMinutes, 120, () => OfflineAsync(Night10.AddMinutes(2)));
+
+        var fault = Assert.Single(await FaultsAsync());
+        Assert.Equal(last.AddHours(1), fault.DetectedAt);
     }
 
     [Fact]

@@ -18,9 +18,14 @@ quyết định, không phải sửa lỗi.
 
 **Danh sách quan hệ tính lúc đọc**, không lưu bản sao: `controller_node_ids[]`, `segment_ids[]`, `feeder_ids[]` (I-7b).
 
-**`node_status` không lưu.** `IotOptions.StatusAt` tính từ `last_report_at` và `Iot:OfflineAfter`
-(mặc định 1 giờ); đúng bằng ngưỡng vẫn `online`. IOT-11 phải sinh `node_offline` từ **cùng**
-`IotOptions`, không tự đặt ngưỡng thứ hai.
+**`node_status` không lưu.** `NodeSilence.StatusAt` tính từ `last_report_at` và cấu hình
+`iot_offline_after_minutes` (mặc định 60, Quản trị sửa qua `/admin/settings` — BE-33); đúng bằng ngưỡng vẫn `online`.
+Ngưỡng đọc bằng `SystemSettingValues.ReadAsync`, **không cache**, một lần mỗi request / mỗi lượt job — đọc hai lần trong
+một lượt là hai ngưỡng khác nhau khi Quản trị vừa sửa. Không đặt lại ngưỡng trong appsettings (BE-33 SET-2).
+
+**Ngưỡng đổi được ⇒ một lần im lặng nhận diện bằng `last_report_at`, không bằng `detected_at`** (BE-33 SET-7).
+`detected_at = last_report_at + ngưỡng` dời theo ngưỡng; kiểm trùng trên `detected_at` chính xác sẽ sinh `node_offline`
+thứ hai cho cùng lần im lặng (`ScheduledJobTests.Changing_the_threshold_in_the_middle_of_a_silence_does_not_raise_it_twice`).
 
 **Teardown của fixture phải xoá `feeder_control` rồi `iot_node` TRƯỚC `feeder` và xã** — cả hai
 `Restrict` (cùng họ bẫy BE-14 số 3). `AssetSchemaFixture` và `AssetImportFixture` đã làm.
