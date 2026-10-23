@@ -131,9 +131,24 @@ public static class SurveyRawParser
     public static long ParseDigits(string? text, string field, int line = 0)
         => text is { Length: > 0 } && text.All(c => c is >= '0' and <= '9')
             && long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? value : throw Invalid(line, field);
-    /// <summary>Provenance text is a label, not a document: at most <see cref="LabelMaxLength"/> characters, or the file is refused.</summary>
+    /// <summary>
+    /// Provenance text is a label, not a document: at most <see cref="LabelMaxLength"/> characters counted as PostgreSQL's
+    /// <c>char_length</c> counts them (Unicode scalars), no control characters (a JSON <c>\u0000</c> is valid JSON but no PostgreSQL
+    /// text — refused here, before the object is written, or it would be stored and then fail the row), no lone surrogate.
+    /// </summary>
     private static string Label(JsonElement root, string field)
-        => Text(root, field, 1) is { Length: <= LabelMaxLength } text ? text : throw Invalid(1, field);
+    {
+        var text = Text(root, field, 1);
+        var scalars = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (char.IsControl(text[i])) throw Invalid(1, field);
+            if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])) i++;
+            else if (char.IsSurrogate(text[i])) throw Invalid(1, field);
+            scalars++;
+        }
+        return scalars <= LabelMaxLength ? text : throw Invalid(1, field);
+    }
     public const int LabelMaxLength = 200;
     private static long Digits(JsonElement root, string field, int line) => ParseDigits(Text(root, field, line), field, line);
     private static long Integer(JsonElement root, string field, int line, long min = 0, long max = long.MaxValue)

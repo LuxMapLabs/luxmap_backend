@@ -210,16 +210,23 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
         Assert.Equal(((long?)null, (string?)null), (gps.ModuleFirmwareVersionId, gps.PhoneModel));
     }
 
-    /// <summary>A provenance label is a label: over 200 characters the whole file is refused, nothing stored.</summary>
-    [Fact]
-    public async Task An_oversized_provenance_label_refuses_the_file()
+    /// <summary>
+    /// A provenance label is a label: over 200 characters, or holding a control character (a JSON <c>\u0000</c> is valid JSON but no
+    /// PostgreSQL text), the whole file is refused before anything is stored. 200 emoji are 200 characters, as char_length counts.
+    /// </summary>
+    [Theory]
+    [InlineData("long", 400)]
+    [InlineData("nul", 400)]
+    [InlineData("emoji", 200)]
+    public async Task A_provenance_label_is_at_most_200_characters_and_no_control_character(string label, int status)
     {
         var id = await Create();
-        var config = Config().Replace("\"phone_model\":\"fixture\"", $"\"phone_model\":\"{new string('p', 201)}\"", StringComparison.Ordinal);
+        var value = label switch { "long" => new string('p', 201), "nul" => "a\\u0000b", _ => string.Concat(Enumerable.Repeat("😀", 200)) };
+        var config = Config().Replace("\"phone_model\":\"fixture\"", $"\"phone_model\":\"{value}\"", StringComparison.Ordinal);
 
-        await Raw(id, "capture_config", config, 400);
+        await Raw(id, "capture_config", config, status);
 
-        Assert.False(await Db(db => db.Set<SurveyRawFile>().AnyAsync(x => x.SweepId == id)));
+        Assert.Equal(status == 200, await Db(db => db.Set<SurveyRawFile>().AnyAsync(x => x.SweepId == id)));
     }
 
     [Fact]

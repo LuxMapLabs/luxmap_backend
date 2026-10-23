@@ -57,6 +57,10 @@ public sealed class ArtifactVersionTests(AssetImportFixture fixture)
         """{"component":"node_firmware","version":"1","artifact_hash":"ABC"}""",
         """{"component":"node_firmware","version":"1","artifact_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}""",
         """{"component":"node_firmware","version":"1","metadata":[1,2]}""",
+        // `$` in .NET also matches before a final newline: 64 hex + "\n" must not pass as a hash (Codex review).
+        """{"component":"node_firmware","version":"1","artifact_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"}""",
+        // Valid JSON, but jsonb stores no NUL: a 400 about the metadata, never a 500.
+        """{"component":"node_firmware","version":"nul-metadata","metadata":{"note":"\u0000"}}""",
     };
 
     /// <summary>Only a firmware can be registered; the server writes every other component from the code it runs.</summary>
@@ -71,7 +75,7 @@ public sealed class ArtifactVersionTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task Registering_a_version_a_device_already_reported_is_a_conflict()
+    public async Task Registering_a_version_twice_is_a_conflict()
     {
         var admin = await AdminAsync();
         var version = Fresh("fw-");
@@ -81,6 +85,22 @@ public sealed class ArtifactVersionTests(AssetImportFixture fixture)
 
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
         Assert.Contains(ErrorCodes.ArtifactVersionExists, await again.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>A device reported the firmware first: its row has no hash and, being immutable, cannot gain one — 409, row unchanged.</summary>
+    [Fact]
+    public async Task Registering_a_version_a_device_already_reported_is_a_conflict_and_leaves_its_row()
+    {
+        var rig = await new LightingTestRig(fixture).RigAsync();
+        var version = Fresh("fw-");
+        await Heartbeat(rig.Node, version);
+
+        var registered = await (await AdminAsync()).PostAsJsonAsync(Url, new { component = "node_firmware", version, artifact_hash = new string('d', 64) });
+
+        Assert.Equal(HttpStatusCode.Conflict, registered.StatusCode);
+        Assert.Contains(ErrorCodes.ArtifactVersionExists, await registered.Content.ReadAsStringAsync());
+        var row = await fixture.QueryAsync(db => db.Set<ArtifactVersion>().AsNoTracking().SingleAsync(v => v.Version == version));
+        Assert.Equal(((string?)null, (string?)null), (row.ArtifactHash, row.CreatedBy));
     }
 
     /// <summary>

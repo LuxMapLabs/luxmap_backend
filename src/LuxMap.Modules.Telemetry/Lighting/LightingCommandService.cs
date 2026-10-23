@@ -292,11 +292,16 @@ public sealed class LightingCommandService(
         return firmwareVersion is null || firmware is not null;
     }
 
-    /// <summary>BE-34 D-4: caller holds the device lock. Nothing is written when the device still runs what it ran.</summary>
+    /// <summary>
+    /// BE-34 D-4: caller holds the device lock. Nothing is written — not even the registry is touched — when the device still runs
+    /// what it ran: a heartbeat a minute on the same firmware costs one indexed read.
+    /// </summary>
     private async Task RecordFirmwareLockedAsync(string nodeId, string firmware, DateTime now, CancellationToken ct)
     {
-        var versionId = await ArtifactRegistry.EnsureFirmwareAsync(db, ArtifactComponents.NodeFirmware, firmware, ct);
         var node = await db.Set<IotNode>().SingleAsync(row => row.NodeId == nodeId, ct);
+        if (node.FirmwareVersionId is { } current
+            && await db.Set<ArtifactVersion>().AnyAsync(v => v.VersionId == current && v.Version == firmware, ct)) return;
+        var versionId = await ArtifactRegistry.EnsureFirmwareAsync(db, ArtifactComponents.NodeFirmware, firmware, ct);
         if (node.FirmwareVersionId == versionId) return;
         node.FirmwareVersionId = versionId;
         db.Add(new IotNodeFirmware { NodeId = node.NodeId, CommuneId = node.CommuneId, FirmwareVersionId = versionId, FirstSeenAt = now });

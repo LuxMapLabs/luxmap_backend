@@ -166,6 +166,8 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
         Assert.NotNull(await LastReportAsync(rig.Node));
         Assert.Null(await CurrentFirmwareAsync(rig.Node));
         Assert.Empty(await FirmwareHistoryAsync(rig.Node));
+        if (value is not null)
+            Assert.False(await fixture.QueryAsync(db => db.Set<ArtifactVersion>().AnyAsync(v => v.Version == value || v.Version == value.Trim())));
     }
 
     /// <summary>Anything that is not a well-formed v1 message on a device's own topic is dropped, changes nothing and is not answered.</summary>

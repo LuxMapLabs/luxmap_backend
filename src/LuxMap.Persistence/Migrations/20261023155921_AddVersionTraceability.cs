@@ -181,8 +181,10 @@ namespace LuxMap.Persistence.Migrations
                 DO $$
                 BEGIN
                     IF EXISTS (SELECT 1 FROM artifact_version WHERE component IN ('node_firmware', 'lux_module_firmware')
-                               OR artifact_hash IS NULL OR created_by IS NOT NULL) THEN
-                        RAISE EXCEPTION 'AddVersionTraceability cannot be rolled back: artifact_version holds firmware or registered rows';
+                               OR artifact_hash IS NULL OR created_by IS NOT NULL)
+                       OR EXISTS (SELECT 1 FROM iot_node_firmware)
+                       OR EXISTS (SELECT 1 FROM iot_node WHERE firmware_version_id IS NOT NULL) THEN
+                        RAISE EXCEPTION 'AddVersionTraceability cannot be rolled back: firmware or registered versions are recorded';
                     END IF;
                 END $$;
                 """);

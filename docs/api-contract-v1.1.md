@@ -667,7 +667,8 @@ không thêm được, vì bất biến). Muốn có hash: đăng ký **trước
 
 **Nguồn gốc phiên khảo sát (D-7).** `module_firmware_version_id`, `profile_id`, `app_version`, `phone_model`, `camera_id` của
 `capture_config` (và `module_firmware_version_id` của header `lux_log`) nay được **lưu nguyên** — không kiểm với registry, không từ chối
-phiên; ý nghĩa của hai id số chốt cùng WP6. Ba trường chữ tối đa **200 ký tự**, dài hơn → `400` (file bị từ chối, không lưu gì).
+phiên; ý nghĩa của hai id số chốt cùng WP6. Ba trường chữ tối đa **200 ký tự** (đếm như `char_length`, một emoji là một ký tự), không ký
+tự điều khiển (kể cả `\u0000`) — sai → `400` (file bị từ chối, không lưu gì).
 ---
 
 ## 5. Endpoint theo resource

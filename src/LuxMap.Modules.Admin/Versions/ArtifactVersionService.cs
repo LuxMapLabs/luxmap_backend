@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using LuxMap.Persistence;
@@ -44,7 +45,7 @@ public sealed partial class ArtifactVersionService(
             : Sha256().IsMatch(request.ArtifactHash) ? request.ArtifactHash
             : throw Invalid("artifact_hash", "artifact_hash is a SHA-256 in lowercase hex (64 characters).");
         var metadata = request.Metadata is not { } m ? "{}"
-            : JsonSerializer.Serialize(m) is { Length: <= MetadataMaxBytes } raw ? raw
+            : JsonSerializer.Serialize(m) is var raw && Encoding.UTF8.GetByteCount(raw) <= MetadataMaxBytes ? raw
             : throw Invalid("metadata", $"metadata is a JSON object of at most {MetadataMaxBytes} bytes.");
         var userId = actor.UserId ?? throw new InvalidOperationException("An authorized request carries a user id.");
 
@@ -63,6 +64,11 @@ public sealed partial class ArtifactVersionService(
             // A device may have reported it first: that row has no hash and cannot gain one (rows are immutable).
             throw new LuxMapException(ErrorCodes.ArtifactVersionExists, HttpStatusCode.Conflict,
                 "That component already has this version — registered, or reported by a device first.");
+        }
+        catch (DbUpdateException error) when (error.InnerException is PostgresException { SqlState: "22P05" or "22P02" })
+        {
+            // jsonb takes no \u0000 and no lone surrogate escape (Codex review): the metadata, not a server fault.
+            throw Invalid("metadata", "metadata holds a character the database cannot store (\\u0000 or a lone surrogate).");
         }
 
         logger.LogInformation("Artifact version {VersionId} ({Component} {Version}) registered by {AdminId}.", row.VersionId, component, version, userId);
@@ -85,6 +91,7 @@ public sealed partial class ArtifactVersionService(
     private static LuxMapException Invalid(string field, string message)
         => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message, new Dictionary<string, object?> { ["field"] = field });
 
-    [GeneratedRegex("^[0-9a-f]{64}$")]
+    // \z, not $: in .NET `$` also matches before a final "\n", which would let a 65-character "hash" through (Codex review).
+    [GeneratedRegex(@"\A[0-9a-f]{64}\z")]
     private static partial Regex Sha256();
 }

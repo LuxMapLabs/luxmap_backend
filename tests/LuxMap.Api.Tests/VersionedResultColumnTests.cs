@@ -38,6 +38,24 @@ public sealed class VersionedResultColumnTests(AssetImportFixture fixture)
         var missing = inSchema.Where(column => !registered.Contains(column) && !NotCounted.ContainsKey(column)).Order().ToList();
         Assert.True(missing.Count == 0, $"Version columns with no VersionedResultColumn registration: {string.Join(", ", missing)}");
         Assert.All(NotCounted.Keys, column => Assert.Contains(column, inSchema));
+        // Deliberately not counted means NOT registered too: registering one would count each photo twice.
+        Assert.All(NotCounted.Keys, column => Assert.DoesNotContain(column, registered));
+    }
+
+    /// <summary>The other direction: every name a registration splices into SQL is a real column, so a typo fails here, not at request time.</summary>
+    [Fact]
+    public async Task Every_registered_table_and_column_exists()
+    {
+        var columns = (await fixture.QueryAsync(db => db.Database.SqlQueryRaw<string>("""
+            SELECT table_name || '.' || column_name AS "Value" FROM information_schema.columns WHERE table_schema = 'public'
+            """).ToListAsync())).ToHashSet(StringComparer.Ordinal);
+
+        foreach (var c in fixture.Services.GetServices<VersionedResultColumn>())
+        {
+            Assert.Contains($"{c.Table}.{c.Column}", columns);
+            if (c.DataSourceColumn is not null) Assert.Contains($"{c.Table}.{c.DataSourceColumn}", columns);
+            if (c.Reference == VersionReference.ViaParent) Assert.Contains($"{c.ParentTable}.{c.ParentKey}", columns);
+        }
     }
 
     /// <summary>A result reached through its parent (an observation through its run) points at a parent that is itself registered.</summary>

@@ -351,6 +351,16 @@ def preflight(src: Db, dst: Db, source_db: str = "luxmap_dev") -> dict[str, list
         if child in position and parent != child and position.get(parent, -1) >= position[child]:
             raise Refused(f"thứ tự khoá ngoại sai: {child} trỏ tới {parent} nhưng {parent} không đứng trước")
 
+    # BE-34 (Codex P2 review P1): a firmware a NON-copied admin registered is left out of artifact_version (created_by is RESTRICT),
+    # but a kept device or history row may cite it — the COPY would then die on a foreign key half-way. Refuse up front, by name.
+    orphaned = src.run(
+        f"SELECT DISTINCT v.version_id FROM public.artifact_version v WHERE NOT (v.created_by IS NULL OR v.created_by IN {COPIED_USERS})"
+        f" AND (v.version_id IN (SELECT firmware_version_id FROM public.iot_node WHERE {IN_COMMUNES})"
+        f" OR v.version_id IN (SELECT firmware_version_id FROM public.iot_node_firmware WHERE {IN_COMMUNES}))").split()
+    if orphaned:
+        raise Refused(f"artifact_version {orphaned} do Quản trị KHÔNG được chép đăng ký, nhưng thiết bị được chép đang trỏ tới —"
+                      f" chép thêm tài khoản đó hoặc để thiết bị báo firmware ở đích")
+
     columns = {}
     for table in planned:
         query = ("SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' "
