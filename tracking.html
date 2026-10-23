@@ -42,6 +42,14 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê, 23/10/2026</strong>
+    <p><span class="tag t-next">Xong trên nhánh <code>feat/ASSET-COMMUNE-NAME</code> (tách từ <code>dev</code>) · PR mở · chưa báo WP5</span>
+    Theo yêu cầu của Mỹ: <code>commune_name</code> cạnh <code>commune_id</code> trên dòng cột / tuyến / mạch / tủ điện của
+    <code>/assets/…</code>, cả danh sách lẫn chi tiết — tên hiện tại của xã, đọc lúc trả, không migration. Drift ACN-1 (SELF-SIGNED, chỉ thêm;
+    hợp nhất Contract mục 5.3.1 sau BE-33 để không giành số version). Spec xuất lại (+4 thuộc tính, op giữ 134), lint 9 warning như cũ.
+    1 test mới + 2 test khoá danh sách khoá cập nhật; phá thử (trả <code>commune_id</code> vào chỗ tên) đỏ đúng test.</p>
+  </div>
+  <div class="card">
     <strong>BE-33 — cấu hình hệ thống do Quản trị sửa, Phase 1, 22/10/2026</strong>
     <p><span class="tag t-next">Phase 1 xong · D-1…D-8 chốt 22/10 theo đề xuất · Phase 2 đang làm</span> Nhánh <code>docs/BE-33-p1</code>. Chưa có <code>system_setting</code>;
     mọi ngưỡng nằm trong appsettings, đổi phải restart. "Loại đèn / loại sự cố" là enum khoá cứng, "trọng số" thuộc công thức CV-16 chưa
