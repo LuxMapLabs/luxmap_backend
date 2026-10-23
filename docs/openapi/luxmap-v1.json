@@ -6,6 +6,235 @@
     "version": "v1"
   },
   "paths": {
+    "/api/v1/admin/artifact-versions": {
+      "get": {
+        "tags": [
+          "AdminArtifactVersions"
+        ],
+        "summary": "[Web] List",
+        "parameters": [
+          {
+            "name": "component",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_settings",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      },
+      "post": {
+        "tags": [
+          "AdminArtifactVersions"
+        ],
+        "summary": "[Web] Register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterArtifactVersionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterArtifactVersionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterArtifactVersionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_settings",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      }
+    },
+    "/api/v1/admin/artifact-versions/{id}/usage": {
+      "get": {
+        "tags": [
+          "AdminArtifactVersions"
+        ],
+        "summary": "[Web] Usage",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionUsage"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionUsage"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactVersionUsage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_settings",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      }
+    },
     "/api/v1/admin/communes": {
       "get": {
         "tags": [
@@ -11813,6 +12042,75 @@
         },
         "additionalProperties": false
       },
+      "ArtifactVersionItem": {
+        "type": "object",
+        "properties": {
+          "version_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "component": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "artifact_hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": { },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "ArtifactVersionItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactVersionItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "ArtifactVersionUsage": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/ArtifactVersionItem"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResultCount"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "AssetLocation": {
         "required": [
           "lat",
@@ -16103,6 +16401,29 @@
         },
         "additionalProperties": false
       },
+      "RegisterArtifactVersionRequest": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string",
+            "nullable": true
+          },
+          "version": {
+            "type": "string",
+            "nullable": true
+          },
+          "artifact_hash": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": { },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RejectCitizenReportRequest": {
         "type": "object",
         "properties": {
@@ -16368,6 +16689,27 @@
           },
           "client_op_id": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResultCount": {
+        "type": "object",
+        "properties": {
+          "result": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "by_data_source": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -18817,6 +19159,9 @@
     }
   ],
   "tags": [
+    {
+      "name": "AdminArtifactVersions"
+    },
     {
       "name": "AdminCommunes"
     },

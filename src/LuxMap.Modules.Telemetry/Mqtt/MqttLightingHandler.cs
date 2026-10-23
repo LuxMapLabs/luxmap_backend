@@ -4,6 +4,7 @@ using LuxMap.Modules.Telemetry.Lighting;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
+using LuxMap.Persistence.Versions;
 using Microsoft.Extensions.Logging;
 
 namespace LuxMap.Modules.Telemetry.Mqtt;
@@ -47,8 +48,10 @@ public sealed class MqttLightingHandler(LightingScopeFactory scopes, ILogger<Mqt
                 case MqttTopics.Ack when Read<MqttAckMessage>(payload) is { CommandId: { } id } ack && MqttTopics.IsCommandId(id):
                     return await AckAsync(scope.Service, target.NodeId, id, ack, ct);
 
-                case MqttTopics.Heartbeat when Read<MqttHeartbeatMessage>(payload) is not null:
-                    await scope.Service.TouchAsync(target.NodeId, ct);
+                case MqttTopics.Heartbeat when Read<MqttHeartbeatMessage>(payload) is { } heartbeat:
+                    if (!await scope.Service.TouchAsync(target.NodeId, heartbeat.FirmwareVersion, ct))
+                        log.LogWarning("MQTT heartbeat from {NodeId}: firmware_version is not a version (blank, over {Max} characters or"
+                            + " control characters); not stored.", target.NodeId, ArtifactRegistry.VersionMaxLength);
                     return null;
 
                 default:

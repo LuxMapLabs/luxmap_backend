@@ -2,6 +2,7 @@ using LuxMap.Modules.Assets;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using LuxMap.Shared.Versions;
 
 namespace LuxMap.Modules.Telemetry;
 
@@ -15,6 +16,10 @@ public sealed class TelemetryModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        // BE-34 — which devices run a firmware now, and every change of firmware they reported.
+        services.AddSingleton(new VersionedResultColumn("iot_node", "iot_node", "firmware_version_id", VersionReference.Id, "data_source"));
+        services.AddSingleton(new VersionedResultColumn("iot_node_firmware_change", "iot_node_firmware", "firmware_version_id", VersionReference.Id));
+
         // BE-26 — a silent device raises node_offline under the scheduled job runner (LuxMap.Persistence.Jobs).
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.NodeOfflineJob>();
 

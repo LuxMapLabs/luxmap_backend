@@ -2,6 +2,7 @@ using LuxMap.Shared.Modularity;
 using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using LuxMap.Shared.Versions;
 
 namespace LuxMap.Modules.Citizen;
 
@@ -29,5 +30,8 @@ public sealed class CitizenModule : ILuxMapModule
         // BE-35 — what this table holds in the store, for the storage totals and the orphan check.
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Citizen, "citizen_photo"));
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Citizen, "citizen_photo"));
+
+        // BE-34 — a citizen photo's AI hint carries only "{model}+{rules}", no bare model version.
+        services.AddSingleton(new VersionedResultColumn("citizen_photo", "citizen_photo", "ai_artifact_version", VersionReference.ComposedText));
     }
 }

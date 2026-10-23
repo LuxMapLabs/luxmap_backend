@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using LuxMap.Modules.Survey.Processing;
 using LuxMap.Modules.Survey.Processing.Frames;
 using Microsoft.Extensions.DependencyInjection;
+using LuxMap.Shared.Versions;
 
 namespace LuxMap.Modules.Survey;
 
@@ -62,5 +63,15 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Survey, "survey_frame"));
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Video, "survey_video_clip"));
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Video, "survey_raw_file"));
+
+        // BE-34 — where these tables name the version behind a result, for GET /admin/artifact-versions/{id}/usage.
+        foreach (var column in new[] { "algorithm_version_id", "clock_version_id", "model_version_id", "extractor_version_id", "classification_version_id" })
+            services.AddSingleton(new VersionedResultColumn("survey_run", "survey_processing_run", column, VersionReference.Id));
+        services.AddSingleton(new VersionedResultColumn("survey_frame", "survey_frame", "extractor_version_id", VersionReference.Id, "data_source"));
+        services.AddSingleton(new VersionedResultColumn("detection", "detection", "model_version_id", VersionReference.Id));
+        services.AddSingleton(new VersionedResultColumn("luminance_baseline", "luminance_baseline", "algorithm_version_id", VersionReference.Id, "data_source"));
+        services.AddSingleton(VersionedResultColumn.Through("survey_pass", "survey_pass", "run_id", "survey_processing_run", "run_id"));
+        services.AddSingleton(VersionedResultColumn.Through("pole_observation", "pole_observation", "run_id", "survey_processing_run", "run_id", "data_source"));
+        services.AddSingleton(VersionedResultColumn.Through("luminance_history", "luminance_history", "run_id", "survey_processing_run", "run_id", "data_source"));
     }
 }

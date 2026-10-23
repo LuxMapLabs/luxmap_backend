@@ -42,8 +42,19 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-34 — registry phiên bản, firmware, Phase 2, 24/10/2026</strong>
+    <p><span class="tag t-next">PR mở từ <code>feat/BE-34-versions</code> · <code>luxmap_dev</code> / VPS chưa migrate · chưa báo WP5 / WP6 / Đạt / WP4</span>
+    Registry <code>artifact_version</code> xuống Persistence, thêm firmware; heartbeat MQTT nay <strong>lưu</strong> firmware (con trỏ trên
+    <code>iot_node</code> + lịch sử bất biến <code>iot_node_firmware</code>, chỉ ghi khi đổi); 5 trường nguồn gốc của file khảo sát được lưu;
+    <code>/admin/artifact-versions</code> (liệt kê, đăng ký firmware, <strong>đếm kết quả theo phiên bản</strong> qua 14 khai báo
+    <code>VersionedResultColumn</code>). Migration <code>AddVersionTraceability</code> chỉ thêm; phép thử bắt được CHECK để lọt <code>cv_model</code>
+    không hash (NULL CHECK = qua) và <code>AlterColumn</code> bị trigger bất biến chặn. Contract <strong>v1.18</strong>, drift VR-1…VR-9.
+    Codex (<code>-p river</code>) review: 2 P1 + 5 P2 + 6 P3 đã sửa, 2 P2 giữ có lý do (~1,26M token). Toàn suite <strong>1.684 pass</strong>,
+    2 skip, exit 0; 28 lượt test mới, 8 phá thử đều đỏ đúng test; spec 136 → 139 op. <a href=".ai/results/BE-34-p2.md">Kết quả Phase 2</a>.</p>
+  </div>
+  <div class="card">
     <strong>BE-34 — phiên bản firmware và model AI, Phase 1, 23/10/2026</strong>
-    <p><span class="tag t-next">Phase 1 xong · D-1…D-9 chốt 23/10 theo đề xuất · Phase 2 đang làm</span> Nhánh <code>docs/BE-34-p1</code>. Registry
+    <p><span class="tag t-done">Phase 1 xong · D-1…D-9 chốt 23/10 theo đề xuất</span> Nhánh <code>docs/BE-34-p1</code>. Registry
     <code>artifact_version</code> chỉ nhận 5 thành phần của pipeline khảo sát, không có API; firmware <strong>rơi mất ở hai nguồn</strong>:
     heartbeat MQTT gửi <code>firmware_version</code> nhưng handler bỏ, <code>module_firmware_version_id</code> của file khảo sát bắt buộc
     nhưng không trỏ vào đâu và không ra cột nào. Phiên bản model nằm ở 8 bảng với 3 dạng (FK / chuỗi / chuỗi ghép).

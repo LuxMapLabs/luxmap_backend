@@ -7,7 +7,7 @@ namespace LuxMap.Modules.Admin;
 /// <summary>
 /// Admin module — Catalogue, thresholds, nodes, model versions, dashboards (BE-28..BE-35).
 /// Communes and their map frames (COMMUNE-BBOX, <c>/admin/communes</c>); system monitoring (BE-35, <c>/admin/system/status</c>);
-/// system settings (BE-33, <c>/admin/settings</c>).
+/// system settings (BE-33, <c>/admin/settings</c>); the version registry (BE-34, <c>/admin/artifact-versions</c>).
 /// </summary>
 public sealed class AdminModule : ILuxMapModule
 {
@@ -17,6 +17,8 @@ public sealed class AdminModule : ILuxMapModule
     {
         services.AddScoped<Communes.CommuneAdminService>();
         services.AddScoped<Settings.SettingsService>(); // BE-33, /admin/settings
+        services.AddSingleton<Versions.VersionUsage>(); // BE-34, /admin/artifact-versions
+        services.AddScoped<Versions.ArtifactVersionService>();
 
         // BE-35 — the monitoring page and the two storage jobs (the job runner is LuxMap.Persistence.Jobs).
         var monitoring = configuration.GetSection(Monitoring.MonitoringOptions.SectionName).Get<Monitoring.MonitoringOptions>()

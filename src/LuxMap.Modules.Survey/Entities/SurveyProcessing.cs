@@ -4,16 +4,6 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Survey.Entities;
 
-public sealed class ArtifactVersion : IImmutableRecord
-{
-    public long VersionId { get; set; }
-    public required string Component { get; set; }
-    public required string Version { get; set; }
-    public required string ArtifactHash { get; set; }
-    public string Metadata { get; set; } = "{}";
-    public DateTime CreatedAt { get; set; }
-}
-
 /// <summary>Inserted once at completion. Mutable lease state belongs to SurveySweep (D-09).</summary>
 public sealed class SurveyProcessingRun : ICommuneScoped, IImmutableRecord
 {

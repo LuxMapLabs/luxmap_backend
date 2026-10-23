@@ -1668,58 +1668,6 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
-            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.ArtifactVersion", b =>
-                {
-                    b.Property<long>("VersionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("version_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("VersionId"));
-
-                    b.Property<string>("ArtifactHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("artifact_hash");
-
-                    b.Property<string>("Component")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("component");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("Metadata")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("metadata");
-
-                    b.Property<string>("Version")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("version");
-
-                    b.HasKey("VersionId")
-                        .HasName("pk_artifact_version");
-
-                    b.HasIndex("Component", "Version")
-                        .IsUnique()
-                        .HasDatabaseName("ix_artifact_version_component_version");
-
-                    b.ToTable("artifact_version", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_artifact_version_component", "component IN ('clock_algorithm','association_algorithm','classification_algorithm','cv_model','frame_extractor')");
-
-                            t.HasCheckConstraint("ck_artifact_version_hash", "artifact_hash ~ '^[0-9a-f]{64}$' AND length(version) > 0");
-
-                            t.HasCheckConstraint("ck_artifact_version_metadata", "jsonb_typeof(metadata) = 'object'");
-                        });
-                });
-
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.BaselineMember", b =>
                 {
                     b.Property<long>("BaselineId")
@@ -2727,14 +2675,34 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("kind");
 
+                    b.Property<string>("AppVersion")
+                        .HasColumnType("text")
+                        .HasColumnName("app_version");
+
                     b.Property<long>("ByteCount")
                         .HasColumnType("bigint")
                         .HasColumnName("byte_count");
+
+                    b.Property<string>("CameraId")
+                        .HasColumnType("text")
+                        .HasColumnName("camera_id");
+
+                    b.Property<long?>("ModuleFirmwareVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("module_firmware_version_id");
 
                     b.Property<string>("ObjectKey")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("object_key");
+
+                    b.Property<string>("PhoneModel")
+                        .HasColumnType("text")
+                        .HasColumnName("phone_model");
+
+                    b.Property<long?>("ProfileId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("profile_id");
 
                     b.Property<int>("SchemaVersion")
                         .HasColumnType("integer")
@@ -2755,6 +2723,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_survey_raw_file_hash", "sha256 ~ '^[0-9a-f]{64}$'");
 
                             t.HasCheckConstraint("ck_survey_raw_file_kind", "\"kind\" IN ('gps_track', 'lux_log', 'capture_config')");
+
+                            t.HasCheckConstraint("ck_survey_raw_file_provenance", "(kind = 'capture_config' OR (profile_id IS NULL AND app_version IS NULL AND phone_model IS NULL AND camera_id IS NULL)) AND (kind <> 'gps_track' OR module_firmware_version_id IS NULL) AND (module_firmware_version_id IS NULL OR module_firmware_version_id >= 1) AND (profile_id IS NULL OR profile_id >= 1) AND char_length(coalesce(app_version, '')) <= 200 AND char_length(coalesce(phone_model, '')) <= 200 AND char_length(coalesce(camera_id, '')) <= 200");
 
                             t.HasCheckConstraint("ck_survey_raw_file_schema", "schema_version = 1");
                         });
@@ -3162,6 +3132,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("data_source");
 
+                    b.Property<long?>("FirmwareVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("firmware_version_id");
+
                     b.Property<DateTime?>("LastReportAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_report_at");
@@ -3196,6 +3170,9 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_iot_node_commune_id");
 
+                    b.HasIndex("FirmwareVersionId")
+                        .HasDatabaseName("ix_iot_node_firmware_version_id");
+
                     b.HasIndex("CabinetId", "CommuneId")
                         .HasDatabaseName("ix_iot_node_cabinet_id_commune_id");
 
@@ -3209,6 +3186,53 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_iot_node_node_role", "\"node_role\" IN ('segment_controller')");
                         });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.IotNodeFirmware", b =>
+                {
+                    b.Property<long>("ChangeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("change_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ChangeId"));
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<long>("FirmwareVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("firmware_version_id");
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("node_id");
+
+                    b.HasKey("ChangeId")
+                        .HasName("pk_iot_node_firmware");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_iot_node_firmware_commune_id");
+
+                    b.HasIndex("FirmwareVersionId")
+                        .HasDatabaseName("ix_iot_node_firmware_firmware_version_id");
+
+                    b.HasIndex("NodeId", "CommuneId")
+                        .HasDatabaseName("ix_iot_node_firmware_node_id_commune_id");
+
+                    b.HasIndex("NodeId", "FirstSeenAt")
+                        .HasDatabaseName("ix_iot_node_firmware_node_id_first_seen_at");
+
+                    b.ToTable("iot_node_firmware", (string)null);
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
@@ -4366,6 +4390,64 @@ namespace LuxMap.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LuxMap.Persistence.Versions.ArtifactVersion", b =>
+                {
+                    b.Property<long>("VersionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("version_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("VersionId"));
+
+                    b.Property<string>("ArtifactHash")
+                        .HasColumnType("text")
+                        .HasColumnName("artifact_hash");
+
+                    b.Property<string>("Component")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("component");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Metadata")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("version");
+
+                    b.HasKey("VersionId")
+                        .HasName("pk_artifact_version");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_artifact_version_created_by");
+
+                    b.HasIndex("Component", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_artifact_version_component_version");
+
+                    b.ToTable("artifact_version", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_artifact_version_component", "component IN ('clock_algorithm','association_algorithm','classification_algorithm','cv_model','frame_extractor','node_firmware','lux_module_firmware')");
+
+                            t.HasCheckConstraint("ck_artifact_version_hash", "length(version) > 0 AND ((artifact_hash IS NOT NULL AND artifact_hash ~ '^[0-9a-f]{64}$') OR (artifact_hash IS NULL AND component IN ('node_firmware','lux_module_firmware')))");
+
+                            t.HasCheckConstraint("ck_artifact_version_metadata", "jsonb_typeof(metadata) = 'object'");
+                        });
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.ElectricalCabinet", b =>
                 {
                     b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
@@ -4796,7 +4878,7 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.Detection", b =>
                 {
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("ModelVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -4824,7 +4906,7 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuminanceBaseline", b =>
                 {
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("AlgorithmVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -4980,7 +5062,7 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.SurveyFrame", b =>
                 {
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("ExtractorVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -5045,20 +5127,20 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.SurveyProcessingRun", b =>
                 {
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("AlgorithmVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_survey_processing_run_artifact_version_algorithm_version_id");
 
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("ClassificationVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_survey_processing_run_artifact_version_classification_versi");
 
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("ClockVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -5072,13 +5154,13 @@ namespace LuxMap.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_survey_processing_run_administrative_unit_commune_id");
 
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("ExtractorVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_survey_processing_run_artifact_version_extractor_version_id");
 
-                    b.HasOne("LuxMap.Modules.Survey.Entities.ArtifactVersion", null)
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
                         .WithMany()
                         .HasForeignKey("ModelVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -5196,6 +5278,12 @@ namespace LuxMap.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_iot_node_administrative_unit_commune_id");
 
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("FirmwareVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_iot_node_artifact_version_firmware_version_id");
+
                     b.HasOne("LuxMap.Modules.Assets.Entities.ElectricalCabinet", null)
                         .WithMany()
                         .HasForeignKey("CabinetId", "CommuneId")
@@ -5203,6 +5291,31 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_iot_node_electrical_cabinet_cabinet_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.IotNodeFirmware", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_firmware_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("FirmwareVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_firmware_artifact_version_firmware_version_id");
+
+                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId", "CommuneId")
+                        .HasPrincipalKey("NodeId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_firmware_iot_node_node_id_commune_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Telemetry.Lighting.LightingCommand", b =>
@@ -5487,6 +5600,15 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_system_setting_change_system_setting_key");
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.Versions.ArtifactVersion", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_artifact_version_app_user_created_by");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.Feeder", b =>

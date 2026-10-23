@@ -104,3 +104,15 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
   kết nối thử với bí mật đúng (`ReadyDeviceAsync`). Host test phải `ListenAnyIP` — container gọi về qua `host-gateway` trên Linux.
 - **`docker-compose.yml`: biến của service trong profile vẫn bị nội suy khi chạy profile khác** ⇒ dùng `${VAR:-default}`, không
   `:?` — nếu không, `docker compose up` của người có `.env` cũ sẽ gãy. Thiếu `Mqtt__CallbackKey` thì broker từ chối mọi client.
+
+## BE-34 — firmware thiết bị (23/10/2026)
+
+- **Firmware lấy từ heartbeat MQTT** (`firmware_version`): `LightingCommandService.TouchAsync(node, firmware)` ghi dưới **khoá thiết bị**
+  — `iot_node.firmware_version_id` + một dòng `iot_node_firmware` **chỉ khi đổi**. Heartbeat mỗi phút cùng firmware không thêm gì
+  (phá thử: bỏ lượt so → test đỏ).
+- **Không gắn `IAudited` lên `IotNode`.** Guard đòi đúng một audit mỗi `SaveChanges`; heartbeat lưu node mỗi tin nhắn. Lịch sử là bảng
+  bất biến riêng, không phải audit.
+- **`iot_node_firmware` bất biến** (trigger `luxmap_reject_processing_mutation`) và giữ thiết bị bằng FK `Restrict`: teardown phải xoá nó
+  **trước** `iot_node`, trong transaction có `SET LOCAL luxmap.audit_purge = 'on'` (`AssetImportFixture`).
+- **Kênh HTTP chưa ghi firmware** (BE-34 D-6, chờ nhóm IoT): đừng thêm query string — nó lọt vào log; đề xuất là header `X-Firmware-Version`.
+- **Telemetry (IOT-09) khi làm:** mỗi số đo ghi firmware **lúc đo** (FK registry), không suy từ `iot_node.firmware_version_id` hiện tại.

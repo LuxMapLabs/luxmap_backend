@@ -189,6 +189,46 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
         Assert.Equal(9007199254740993L, await Db(db => db.Set<SurveyLuxSample>().Where(x => x.SweepId == id).Select(x => x.ModuleMs).SingleAsync()));
     }
 
+    /// <summary>
+    /// BE-34 D-7: what recorded the session is kept as the files stated it — all five on capture_config's row, the module firmware on
+    /// lux_log's, nothing on gps_track's — and nothing is refused for naming a firmware nobody registered.
+    /// </summary>
+    [Fact]
+    public async Task The_session_provenance_is_kept_on_the_file_that_states_it()
+    {
+        var id = await Create();
+        foreach (var (kind, text) in new[] { ("gps_track", Gps()), ("lux_log", Lux()), ("capture_config", Config()) }) await Raw(id, kind, text);
+
+        var rows = await Db(db => db.Set<SurveyRawFile>().AsNoTracking().Where(x => x.SweepId == id).ToDictionaryAsync(x => x.Kind));
+
+        var config = rows[SurveyRawKind.CaptureConfig];
+        Assert.Equal((12L, 1L, "fixture", "fixture", "0"),
+            (config.ModuleFirmwareVersionId!.Value, config.ProfileId!.Value, config.AppVersion, config.PhoneModel, config.CameraId));
+        var lux = rows[SurveyRawKind.LuxLog];
+        Assert.Equal((12L, (long?)null, (string?)null), (lux.ModuleFirmwareVersionId!.Value, lux.ProfileId, lux.AppVersion));
+        var gps = rows[SurveyRawKind.GpsTrack];
+        Assert.Equal(((long?)null, (string?)null), (gps.ModuleFirmwareVersionId, gps.PhoneModel));
+    }
+
+    /// <summary>
+    /// A provenance label is a label: over 200 characters, or holding a control character (a JSON <c>\u0000</c> is valid JSON but no
+    /// PostgreSQL text), the whole file is refused before anything is stored. 200 emoji are 200 characters, as char_length counts.
+    /// </summary>
+    [Theory]
+    [InlineData("long", 400)]
+    [InlineData("nul", 400)]
+    [InlineData("emoji", 200)]
+    public async Task A_provenance_label_is_at_most_200_characters_and_no_control_character(string label, int status)
+    {
+        var id = await Create();
+        var value = label switch { "long" => new string('p', 201), "nul" => "a\\u0000b", _ => string.Concat(Enumerable.Repeat("😀", 200)) };
+        var config = Config().Replace("\"phone_model\":\"fixture\"", $"\"phone_model\":\"{value}\"", StringComparison.Ordinal);
+
+        await Raw(id, "capture_config", config, status);
+
+        Assert.Equal(status == 200, await Db(db => db.Set<SurveyRawFile>().AnyAsync(x => x.SweepId == id)));
+    }
+
     [Fact]
     public async Task Submit_checks_completeness_and_manifest_then_queues_once_and_freezes_uploads()
     {

@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.17"
+d["info"]["version"] = "1.18"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -50,6 +50,7 @@ d["info"]["description"] = (
     "v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). "
     "v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. "
     "v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. "
+    "v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -208,6 +209,9 @@ SUMMARY = {
     ("get", "/api/v1/admin/system/status"): "[BE-35] Quản trị: job nền, xử lý sweep, đĩa trống, database và dung lượng theo bucket",
     ("get", "/api/v1/admin/settings"): "[BE-33] Quản trị: cấu hình hệ thống — giá trị, mặc định, miền nhận",
     ("put", "/api/v1/admin/settings/{key}"): "[BE-33] Quản trị đổi một cấu hình; có hiệu lực ngay, lưu lịch sử kèm note",
+    ("get", "/api/v1/admin/artifact-versions"): "[BE-34] Quản trị: registry phiên bản (model, thuật toán, firmware), mới nhất trước",
+    ("post", "/api/v1/admin/artifact-versions"): "[BE-34] Quản trị đăng ký trước một firmware (node / module đo sáng), kèm hash nếu có",
+    ("get", "/api/v1/admin/artifact-versions/{id}/usage"): "[BE-34] Kết quả nào do phiên bản này sinh ra: đếm theo loại, theo data_source",
     ("post", "/api/v1/auth/refresh"): "Xoay vòng refresh token (mobile)",
     ("post", "/api/v1/auth/logout"): "Thu hồi refresh token (mobile); luôn 204",
     ("post", "/api/v1/lux-readings"): "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",

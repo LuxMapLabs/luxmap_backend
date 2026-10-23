@@ -1,3 +1,4 @@
+using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 
@@ -63,7 +64,33 @@ public class IotNode : ICommuneScoped
     /// <summary>Written by telemetry ingest (IOT-09). NULL means the device has never reported.</summary>
     public DateTime? LastReportAt { get; set; }
 
+    /// <summary>
+    /// The firmware the device last said it runs (BE-34 D-4) — a <c>node_firmware</c> row of <c>artifact_version</c>. NULL until a
+    /// heartbeat names one. What it ran at an earlier moment is <see cref="IotNodeFirmware"/>, not this column.
+    /// </summary>
+    public long? FirmwareVersionId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
 }
+
+/// <summary>
+/// One change of a device's firmware: from <see cref="FirstSeenAt"/> on, the device said it runs <see cref="FirmwareVersionId"/>
+/// (BE-34 D-4). Append-only — "what did device X run at time T" is the newest row at or before T. Written only when the reported
+/// firmware differs from <see cref="IotNode.FirmwareVersionId"/>, so a heartbeat every minute adds nothing.
+/// </summary>
+public sealed class IotNodeFirmware : ICommuneScoped, IImmutableRecord
+{
+    public long ChangeId { get; set; }
+
+    public required string NodeId { get; set; }
+
+    /// <summary>The device's commune, copied from it by the server.</summary>
+    public required string CommuneId { get; set; }
+
+    public long FirmwareVersionId { get; set; }
+
+    public DateTime FirstSeenAt { get; set; }
+}
+

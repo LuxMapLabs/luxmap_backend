@@ -1,6 +1,7 @@
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Persistence.Versions;
 using LuxMap.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -49,6 +50,32 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
         builder.HasAlternateKey(node => new { node.NodeId, node.CommuneId });
 
         builder.HasCommuneReference(node => node.CommuneId);
+
+        // BE-34 D-4: the firmware it runs now; the history is iot_node_firmware.
+        builder.HasOne<ArtifactVersion>().WithMany().HasForeignKey(node => node.FirmwareVersionId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class IotNodeFirmwareConfiguration : IEntityTypeConfiguration<IotNodeFirmware>
+{
+    public void Configure(EntityTypeBuilder<IotNodeFirmware> builder)
+    {
+        builder.ToTable("iot_node_firmware");
+        builder.HasKey(change => change.ChangeId);
+        builder.Property(change => change.ChangeId).UseIdentityAlwaysColumn();
+        builder.Property(change => change.NodeId).HasColumnType("text");
+
+        // The device and its commune together, like feeder_control: a history row cannot name a commune its device is not in.
+        builder.HasOne<IotNode>().WithMany()
+            .HasForeignKey(change => new { change.NodeId, change.CommuneId })
+            .HasPrincipalKey(node => new { node.NodeId, node.CommuneId })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ArtifactVersion>().WithMany().HasForeignKey(change => change.FirmwareVersionId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(change => new { change.NodeId, change.FirstSeenAt }).HasDatabaseName("ix_iot_node_firmware_node_id_first_seen_at");
+        builder.HasIndex(change => change.FirmwareVersionId);
+        builder.HasCommuneScope();
+        builder.HasCommuneReference(change => change.CommuneId);
     }
 }
 

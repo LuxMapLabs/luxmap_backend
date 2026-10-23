@@ -4,6 +4,7 @@ using System.Text.Json;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Modules.Telemetry.Lighting;
 using LuxMap.Modules.Telemetry.Mqtt;
+using LuxMap.Persistence.Versions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -124,6 +125,51 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
         Assert.NotNull(await LastReportAsync(rig.Node));
     }
 
+    /// <summary>
+    /// BE-34 D-4: the firmware a heartbeat names becomes the device's current firmware, and only a CHANGE adds a history row — a
+    /// heartbeat every minute on the same firmware adds nothing.
+    /// </summary>
+    [Fact]
+    public async Task A_heartbeat_records_the_firmware_and_only_a_change_adds_history()
+    {
+        var rig = await Rigs.RigAsync();
+        var first = "fw-" + Guid.NewGuid().ToString("N")[..8];
+        var second = first + "-b";
+
+        await Send(rig.Node, "heartbeat", new { schema_version = 1, uptime_s = 1, firmware_version = $"  {first} " });
+        await Send(rig.Node, "heartbeat", new { schema_version = 1, uptime_s = 61, firmware_version = first });
+        Assert.Equal([first], await FirmwareHistoryAsync(rig.Node));
+        Assert.Equal(first, await CurrentFirmwareAsync(rig.Node));
+
+        await Send(rig.Node, "heartbeat", new { schema_version = 1, uptime_s = 5, firmware_version = second });
+        await Send(rig.Node, "heartbeat", new { schema_version = 1, uptime_s = 65, firmware_version = second });
+
+        Assert.Equal([first, second], await FirmwareHistoryAsync(rig.Node));
+        Assert.Equal(second, await CurrentFirmwareAsync(rig.Node));
+        var row = await fixture.QueryAsync(db => db.Set<ArtifactVersion>().AsNoTracking().SingleAsync(v => v.Version == second));
+        Assert.Equal((ArtifactComponents.NodeFirmware, (string?)null, (string?)null), (row.Component, row.ArtifactHash, row.CreatedBy));
+    }
+
+    /// <summary>A heartbeat with no firmware, or one that is not a version, still marks the device alive and records no firmware.</summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("   ")]
+    [InlineData("1.0\n2.0")]
+    [InlineData("__101__")]
+    public async Task A_heartbeat_without_a_usable_firmware_marks_alive_and_records_none(string? firmware)
+    {
+        var rig = await Rigs.RigAsync();
+        var value = firmware == "__101__" ? new string('9', 101) : firmware;
+
+        await Send(rig.Node, "heartbeat", new { schema_version = 1, uptime_s = 12, firmware_version = value });
+
+        Assert.NotNull(await LastReportAsync(rig.Node));
+        Assert.Null(await CurrentFirmwareAsync(rig.Node));
+        Assert.Empty(await FirmwareHistoryAsync(rig.Node));
+        if (value is not null)
+            Assert.False(await fixture.QueryAsync(db => db.Set<ArtifactVersion>().AnyAsync(v => v.Version == value || v.Version == value.Trim())));
+    }
+
     /// <summary>Anything that is not a well-formed v1 message on a device's own topic is dropped, changes nothing and is not answered.</summary>
     [Theory]
     [InlineData("ack", """{"schema_version":2,"command_id":"__ID__","seq":__SEQ__,"result":"applied","reported_mode":"off"}""")]
@@ -157,6 +203,16 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
 
     private Task<long> SeqAsync(string commandId)
         => fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().Where(c => c.CommandId == commandId).Select(c => c.Seq).SingleAsync());
+
+    private Task<string?> CurrentFirmwareAsync(string node) => fixture.QueryAsync(db => db.Set<IotNode>().IgnoreQueryFilters()
+        .Where(n => n.NodeId == node)
+        .Select(n => db.Set<ArtifactVersion>().Where(v => v.VersionId == n.FirmwareVersionId).Select(v => v.Version).FirstOrDefault())
+        .SingleAsync());
+
+    private Task<List<string>> FirmwareHistoryAsync(string node) => fixture.QueryAsync(db => db.Set<IotNodeFirmware>().IgnoreQueryFilters()
+        .Where(h => h.NodeId == node).OrderBy(h => h.ChangeId)
+        .Select(h => db.Set<ArtifactVersion>().Where(v => v.VersionId == h.FirmwareVersionId).Select(v => v.Version).Single())
+        .ToListAsync());
 
     private Task<DateTime?> LastReportAsync(string node)
         => fixture.QueryAsync(db => db.Set<IotNode>().IgnoreQueryFilters().Where(n => n.NodeId == node).Select(n => n.LastReportAt).SingleAsync());

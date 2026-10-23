@@ -83,6 +83,10 @@ PLAN = [
     ("app_user", IN_USERS, "user_id"),
     ("app_user_commune", f"{IN_COMMUNES} AND user_id IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})",
      "user_id, commune_id"),
+    # A global registry of versions, no commune: kept whole — every run, and since BE-34 every device's firmware, cites it — except
+    # what a system admin registered by hand when that admin is not copied (created_by is a RESTRICT key to app_user). Before
+    # iot_node, whose firmware_version_id points here.
+    ("artifact_version", f"created_by IS NULL OR created_by IN {COPIED_USERS}", "version_id"),
     ("road_segment", IN_COMMUNES, "segment_id"),
     # CABINET: feeder and iot_node point at the cabinet, so it comes before both.
     ("electrical_cabinet", IN_COMMUNES, "cabinet_id"),
@@ -90,6 +94,8 @@ PLAN = [
     ("pole", IN_COMMUNES, "pole_id"),
     ("fixture", IN_COMMUNES, "fixture_id"),
     ("iot_node", IN_COMMUNES, "node_id"),
+    # BE-34: a device's firmware changes, append-only; holds the device and the registry with RESTRICT.
+    ("iot_node_firmware", IN_COMMUNES, "change_id"),
     ("feeder_control", IN_COMMUNES, "feeder_id"),
     # LIGHT-CTRL 2b: requested_by is a RESTRICT key to app_user, so only the presses of the accounts copied above; a command
     # follows its request. Newest-first is a read order — copy by seq so the identity column's order survives.
@@ -107,8 +113,6 @@ PLAN = [
     ("work_order_segment", IN_COMMUNES, "work_order_id, position"),
     # BE-26: "already reported overdue for this due date" — copied so the target does not tell everyone again.
     ("work_order_overdue_notice", IN_COMMUNES, "work_order_id, due_date"),
-    # A global registry of algorithm / model versions, no commune: kept whole, every run cites it.
-    ("artifact_version", "TRUE", "version_id"),
     # survey_sweep <-> survey_processing_run is a CYCLE (accepted_run_id one way, sweep_id the other); see TWO_PASS.
     ("survey_sweep", IN_COMMUNES, "sweep_id"),
     ("survey_raw_file", KEPT_SWEEPS, "sweep_id, kind"),
@@ -346,6 +350,16 @@ def preflight(src: Db, dst: Db, source_db: str = "luxmap_dev") -> dict[str, list
             continue  # the cycle edge, restored after the parent (TWO_PASS)
         if child in position and parent != child and position.get(parent, -1) >= position[child]:
             raise Refused(f"thứ tự khoá ngoại sai: {child} trỏ tới {parent} nhưng {parent} không đứng trước")
+
+    # BE-34 (Codex P2 review P1): a firmware a NON-copied admin registered is left out of artifact_version (created_by is RESTRICT),
+    # but a kept device or history row may cite it — the COPY would then die on a foreign key half-way. Refuse up front, by name.
+    orphaned = src.run(
+        f"SELECT DISTINCT v.version_id FROM public.artifact_version v WHERE NOT (v.created_by IS NULL OR v.created_by IN {COPIED_USERS})"
+        f" AND (v.version_id IN (SELECT firmware_version_id FROM public.iot_node WHERE {IN_COMMUNES})"
+        f" OR v.version_id IN (SELECT firmware_version_id FROM public.iot_node_firmware WHERE {IN_COMMUNES}))").split()
+    if orphaned:
+        raise Refused(f"artifact_version {orphaned} do Quản trị KHÔNG được chép đăng ký, nhưng thiết bị được chép đang trỏ tới —"
+                      f" chép thêm tài khoản đó hoặc để thiết bị báo firmware ở đích")
 
     columns = {}
     for table in planned:

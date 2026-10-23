@@ -1,28 +1,11 @@
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Persistence.Versions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace LuxMap.Modules.Survey.Configurations;
-
-public sealed class ArtifactVersionConfiguration : IEntityTypeConfiguration<ArtifactVersion>
-{
-    public void Configure(EntityTypeBuilder<ArtifactVersion> b)
-    {
-        b.ToTable("artifact_version", t =>
-        {
-            t.HasCheckConstraint("ck_artifact_version_component", "component IN ('clock_algorithm','association_algorithm','classification_algorithm','cv_model','frame_extractor')");
-            t.HasCheckConstraint("ck_artifact_version_hash", "artifact_hash ~ '^[0-9a-f]{64}$' AND length(version) > 0");
-            t.HasCheckConstraint("ck_artifact_version_metadata", "jsonb_typeof(metadata) = 'object'");
-        });
-        b.HasKey(x => x.VersionId);
-        b.Property(x => x.VersionId).UseIdentityAlwaysColumn();
-        b.Property(x => x.Metadata).HasColumnType("jsonb");
-        b.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
-        b.HasIndex(x => new { x.Component, x.Version }).IsUnique();
-    }
-}
 
 public sealed class SurveyProcessingRunConfiguration : IEntityTypeConfiguration<SurveyProcessingRun>
 {

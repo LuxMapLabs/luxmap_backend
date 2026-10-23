@@ -73,6 +73,14 @@ public sealed class SurveyRawFile
     public required string Sha256 { get; set; }
     public long ByteCount { get; set; }
     public int SchemaVersion { get; set; }
+
+    // BE-34 D-7: what recorded the session, as the file stated it — capture_config carries all five, the lux_log header only the
+    // module firmware. On the file's own row rather than on survey_sweep: an upload does not touch the (audited) sweep.
+    public long? ModuleFirmwareVersionId { get; set; }
+    public long? ProfileId { get; set; }
+    public string? AppVersion { get; set; }
+    public string? PhoneModel { get; set; }
+    public string? CameraId { get; set; }
 }
 
 public sealed class SurveyGpsSample

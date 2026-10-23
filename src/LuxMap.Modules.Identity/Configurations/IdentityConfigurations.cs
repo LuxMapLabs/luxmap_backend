@@ -3,6 +3,7 @@ using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Persistence.Settings;
+using LuxMap.Persistence.Versions;
 using LuxMap.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -52,6 +53,9 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasMany<SystemSettingChange>().WithOne()
             .HasForeignKey(change => change.ChangedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany<ArtifactVersion>().WithOne()
+            .HasForeignKey(version => version.CreatedBy)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(user => user.Username).IsUnique();
