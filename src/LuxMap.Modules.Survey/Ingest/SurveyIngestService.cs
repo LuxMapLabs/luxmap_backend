@@ -174,7 +174,13 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
             new(bytes.LongLength, sha, RawLimit, kind == SurveyRawKind.CaptureConfig ? "application/json" : "application/x-ndjson"), ct);
         db.AddRange(parsed.Gps);
         db.AddRange(parsed.Lux);
-        db.Add(new SurveyRawFile { SweepId = id, Kind = kind, Sha256 = sha, ObjectKey = stored.Key, ByteCount = stored.ByteCount, SchemaVersion = 1 });
+        var p = parsed.Provenance;
+        db.Add(new SurveyRawFile
+        {
+            SweepId = id, Kind = kind, Sha256 = sha, ObjectKey = stored.Key, ByteCount = stored.ByteCount, SchemaVersion = 1,
+            ModuleFirmwareVersionId = p?.ModuleFirmwareVersionId, ProfileId = p?.ProfileId, AppVersion = p?.AppVersion,
+            PhoneModel = p?.PhoneModel, CameraId = p?.CameraId,
+        });
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(kind, sha, stored.ByteCount, 1);

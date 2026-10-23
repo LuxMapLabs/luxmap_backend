@@ -72,7 +72,18 @@ public sealed class SurveyRawFileConfiguration : IEntityTypeConfiguration<Survey
             t.HasCheckConstraint("ck_survey_raw_file_bytes", "byte_count > 0");
             t.HasCheckConstraint("ck_survey_raw_file_hash", "sha256 ~ '^[0-9a-f]{64}$'");
             t.HasCheckConstraint("ck_survey_raw_file_schema", "schema_version = 1");
+            // BE-34: provenance only on the file that states it. Rows stored before BE-34 have none, so absence is allowed.
+            t.HasCheckConstraint("ck_survey_raw_file_provenance",
+                "(kind = 'capture_config' OR (profile_id IS NULL AND app_version IS NULL AND phone_model IS NULL AND camera_id IS NULL))"
+                + " AND (kind <> 'gps_track' OR module_firmware_version_id IS NULL)"
+                + " AND (module_firmware_version_id IS NULL OR module_firmware_version_id >= 1) AND (profile_id IS NULL OR profile_id >= 1)"
+                + $" AND char_length(coalesce(app_version, '')) <= {Ingest.SurveyRawParser.LabelMaxLength}"
+                + $" AND char_length(coalesce(phone_model, '')) <= {Ingest.SurveyRawParser.LabelMaxLength}"
+                + $" AND char_length(coalesce(camera_id, '')) <= {Ingest.SurveyRawParser.LabelMaxLength}");
         });
+        b.Property(x => x.AppVersion).HasColumnType("text");
+        b.Property(x => x.PhoneModel).HasColumnType("text");
+        b.Property(x => x.CameraId).HasColumnType("text");
         b.HasKey(x => new { x.SweepId, x.Kind });
         b.HasContractEnum(x => x.Kind);
         b.HasOne<SurveySweep>().WithMany().HasForeignKey(x => x.SweepId).OnDelete(DeleteBehavior.Restrict);

@@ -8,7 +8,14 @@ using NetTopologySuite.Geometries;
 
 namespace LuxMap.Modules.Survey.Ingest;
 
-public sealed record ParsedSurveyRaw(List<SurveyGpsSample> Gps, List<SurveyLuxSample> Lux);
+/// <summary>
+/// Who and what recorded the session (BE-34 D-7), kept as sent: <c>capture_config</c> carries all five, the <c>lux_log</c> header
+/// only the module firmware. Nothing here is checked against a registry — the app works offline and cannot know server ids.
+/// </summary>
+public sealed record SurveyRawProvenance(long ModuleFirmwareVersionId, long? ProfileId = null, string? AppVersion = null,
+    string? PhoneModel = null, string? CameraId = null);
+
+public sealed record ParsedSurveyRaw(List<SurveyGpsSample> Gps, List<SurveyLuxSample> Lux, SurveyRawProvenance? Provenance = null);
 
 /// <summary>SELF-SIGNED schema v1; validates the ENTIRE file before any database/object write.</summary>
 public static class SurveyRawParser
@@ -32,7 +39,8 @@ public static class SurveyRawParser
                 || utc.UtcDateTime.Ticks / 10 != sweep.UtcAnchor.Ticks / 10 || Number(root, "utc_uncertainty_ms", 1, 0) != sweep.UtcUncertaintyMs)
                 throw Invalid(1, "clock_anchor");
             foreach (var field in new[] { "phone_model", "camera_id", "app_version", "sensor_timestamp_source" }) Text(root, field, 1);
-            Integer(root, "profile_id", 1, 1); Integer(root, "module_firmware_version_id", 1, 1);
+            var provenance = new SurveyRawProvenance(Integer(root, "module_firmware_version_id", 1, 1), Integer(root, "profile_id", 1, 1),
+                Label(root, "app_version"), Label(root, "phone_model"), Label(root, "camera_id"));
             var camera = Property(root, "camera", 1);
             Number(camera, "iso", 1, double.Epsilon); Digits(camera, "exposure_time_ns", 1);
             Number(camera, "aperture", 1, double.Epsilon); Number(camera, "fps", 1, double.Epsilon);
@@ -47,8 +55,9 @@ public static class SurveyRawParser
             Text(mount, "camera_side", 1); Text(mount, "sensor_position", 1);
             Number(mount, "mount_height_m", 1, 0); Number(mount, "angle_deg", 1, -360, 360);
             // Frame timestamp mapping is retained byte-for-byte here; device quality gates belong to P2b.
-            return new(gps, lux);
+            return new(gps, lux, provenance);
         }
+        long? luxFirmware = null;
         using var reader = new StringReader(text);
         using (var header = Document(reader.ReadLine() ?? "", 1))
         {
@@ -56,7 +65,7 @@ public static class SurveyRawParser
             var expected = kind == SurveyRawKind.GpsTrack ? "gps_track" : "lux_log";
             if (Text(header.RootElement, "kind", 1) != expected) throw Invalid(1, "kind");
             if (kind == SurveyRawKind.GpsTrack && Text(header.RootElement, "time_unit", 1) != "ns") throw Invalid(1, "time_unit");
-            if (kind == SurveyRawKind.LuxLog) Integer(header.RootElement, "module_firmware_version_id", 1, 1);
+            if (kind == SurveyRawKind.LuxLog) luxFirmware = Integer(header.RootElement, "module_firmware_version_id", 1, 1);
         }
         var seen = new Dictionary<int, string>();
         var seqs = new HashSet<(int, long)>();
@@ -94,7 +103,7 @@ public static class SurveyRawParser
             }
         }
         if (seen.Count == 0) throw Invalid(2, "sample");
-        return new(gps, lux);
+        return new(gps, lux, luxFirmware is { } module ? new SurveyRawProvenance(module) : null);
     }
 
     private static JsonDocument Document(string text, int line)
@@ -122,6 +131,10 @@ public static class SurveyRawParser
     public static long ParseDigits(string? text, string field, int line = 0)
         => text is { Length: > 0 } && text.All(c => c is >= '0' and <= '9')
             && long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? value : throw Invalid(line, field);
+    /// <summary>Provenance text is a label, not a document: at most <see cref="LabelMaxLength"/> characters, or the file is refused.</summary>
+    private static string Label(JsonElement root, string field)
+        => Text(root, field, 1) is { Length: <= LabelMaxLength } text ? text : throw Invalid(1, field);
+    public const int LabelMaxLength = 200;
     private static long Digits(JsonElement root, string field, int line) => ParseDigits(Text(root, field, line), field, line);
     private static long Integer(JsonElement root, string field, int line, long min = 0, long max = long.MaxValue)
         => Property(root, field, line) is var v && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var n) && n >= min && n <= max

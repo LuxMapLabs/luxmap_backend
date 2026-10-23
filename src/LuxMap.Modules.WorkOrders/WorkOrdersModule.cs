@@ -3,6 +3,7 @@ using LuxMap.Shared.Modularity;
 using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using LuxMap.Shared.Versions;
 
 namespace LuxMap.Modules.WorkOrders;
 
@@ -35,5 +36,9 @@ public sealed class WorkOrdersModule : ILuxMapModule
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "repair_evidence"));
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "work_order_pole_photo"));
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "work_order_pole_photo"));
+
+        // BE-34 — the AI hint on a pole photo, by its bare model version. The row's artifact_version is the same version with
+        // "+{rules}" behind it: counting it too would count each photo twice.
+        services.AddSingleton(new VersionedResultColumn("pole_photo", "work_order_pole_photo", "model_version", VersionReference.Text));
     }
 }

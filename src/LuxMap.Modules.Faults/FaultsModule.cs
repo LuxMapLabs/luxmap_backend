@@ -1,6 +1,7 @@
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using LuxMap.Shared.Versions;
 
 namespace LuxMap.Modules.Faults;
 
@@ -20,5 +21,10 @@ public sealed class FaultsModule : ILuxMapModule
         services.AddScoped<FaultQueryService>();
         services.AddScoped<FaultReviewService>();
         services.AddScoped<FaultReportService>();
+
+        // BE-34 — a CV fault names its model; a fault from a pole photo names "{model}+{rules}". A cluster names its clustering
+        // model — nothing writes one yet (CV-15), registered so it counts the day something does.
+        services.AddSingleton(new VersionedResultColumn("fault", "fault", "detection_model_version", VersionReference.ComposedText, "data_source"));
+        services.AddSingleton(new VersionedResultColumn("fault_cluster", "fault_cluster", "clustering_model_version", VersionReference.Text));
     }
 }

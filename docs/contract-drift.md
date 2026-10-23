@@ -1541,3 +1541,23 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | Mã | Quyết định |
 |---|---|
 | ACN-1 | Thêm **`commune_name`** (chuỗi, luôn có) ngay sau `commune_id` trên bốn dòng kiểm kê — tên **hiện tại** của `administrative_unit`, đọc lúc trả (subquery theo khoá), không lưu lên tài sản: đổi tên xã ở `/admin/communes` là mọi dòng đổi theo |
+
+### BE-34 — registry phiên bản, firmware, "kết quả nào do phiên bản nào" (23/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 23/10/2026 — D-1…D-9 của Phase 1 (`.ai/results/BE-34-p1.md`, bản sửa sau review Codex `-p river`) theo đề xuất. **SELF-SIGNED**, chạm API (chỉ thêm), đã hợp nhất vào **Contract v1.18 mục 4.12**, nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (màn tra cứu phiên bản). WP6 (D-7: ý nghĩa `module_firmware_version_id` / `profile_id`; giới hạn 200 ký tự). Nhóm IoT — Đạt (D-6: header firmware trên kênh HTTP). WP4 (gom cụm CV-15 phải ghi `clustering_model_version`). **Chưa báo** |
+| **Scope** | Persistence (`ArtifactVersion` chuyển từ Survey, `ArtifactRegistry`), Telemetry (`iot_node.firmware_version_id`, `iot_node_firmware`, heartbeat), Survey (nguồn gốc trên `survey_raw_file`), Shared (`VersionedResultColumn`), Admin (3 endpoint); migration `AddVersionTraceability` |
+
+| Mã | Quyết định |
+|---|---|
+| VR-1 | Registry `artifact_version` chuyển **code** xuống `LuxMap.Persistence.Versions`; bảng không đổi. Thêm thành phần `node_firmware`, `lux_module_firmware` |
+| VR-2 | `artifact_hash` nullable **chỉ** cho hai thành phần firmware. ⚠️ CHECK viết `(artifact_hash IS NOT NULL AND artifact_hash ~ …)` — bản đầu thiếu `IS NOT NULL` cho `cv_model` hash NULL lọt (NULL CHECK = qua); bắt được ở phép thử migration |
+| VR-3 | `artifact_version.created_by` (FK `app_user`, Restrict) — người đăng ký tay; server ghi thì NULL |
+| VR-4 | Firmware thiết bị: `iot_node.firmware_version_id` (bản đang chạy) + bảng bất biến `iot_node_firmware` (thiết bị, phiên bản, `first_seen_at`, FK ghép `(node_id, commune_id)`), chỉ ghi khi **đổi**, dưới khoá thiết bị. **Không** `IAudited` trên `IotNode` (guard audit sẽ vỡ mọi heartbeat) |
+| VR-5 | Heartbeat MQTT `firmware_version`: cắt khoảng trắng, 1–100 ký tự, không ký tự điều khiển; sai thì thiết bị vẫn được đánh dấu sống, firmware **không** lưu, log cảnh báo. Kênh HTTP chưa ghi firmware (D-6, chờ Đạt) |
+| VR-6 | `node_offline` **không** ghi firmware vào `detection_model_version` (cột của model CV) — tra qua `iot_node_firmware` tại `detected_at` |
+| VR-7 | Nguồn gốc phiên khảo sát lưu trên **dòng `survey_raw_file`** của file nói ra nó (lệch D-7 "lên sweep": upload không chạm sweep `IAudited`, ghi lên sweep sẽ đòi một audit mỗi lần upload). `capture_config` mang đủ 5, `lux_log` chỉ id firmware module. Không từ chối vì id chưa đăng ký. Ba trường chữ ≤ 200 ký tự, dài hơn → 400 (giới hạn **mới**) |
+| VR-8 | Mỗi module khai cột phiên bản của mình (`VersionedResultColumn`: Id / Text / ComposedText / ViaParent), Admin đếm bằng SQL. Chuỗi ghép khớp khi **bằng** phiên bản hoặc **bắt đầu bằng phiên bản + `+`**, không LIKE. `work_order_pole_photo.artifact_version` cố ý không đếm (cùng ảnh với `model_version`). `VersionedResultColumnTests` đỏ khi một FK tới registry hay cột `*model_version` / `*artifact_version` chưa khai |
+| VR-9 | `Down()` của migration **từ chối có thông điệp** khi registry đã có dòng firmware / đăng ký tay; dựng lại NOT NULL bằng `ALTER` trần (AlterColumn sinh `UPDATE` bị trigger bất biến chặn, kể cả khi 0 dòng) |

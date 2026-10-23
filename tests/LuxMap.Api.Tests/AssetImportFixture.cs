@@ -168,6 +168,9 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                     WHERE commune_id = {CommuneId} OR commune_id = {ForeignCommuneId}
                        OR actor_user_id = {userId} OR actor_user_id = {bothCommunesUserId} OR actor_user_id = {fieldEngineerUserId}
                     """);
+                // BE-34: a device's firmware history is immutable like the audit, and holds the device with RESTRICT.
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM iot_node_firmware WHERE commune_id = {CommuneId} OR commune_id = {ForeignCommuneId}");
                 await transaction.CommitAsync();
             }
 

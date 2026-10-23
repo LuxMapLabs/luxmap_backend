@@ -193,6 +193,15 @@ public static class ErrorCodes
     /// <summary>404 — no system setting has that key (BE-33, <c>PUT /admin/settings/{key}</c>).</summary>
     public const string SettingNotFound = "SETTING_NOT_FOUND";
 
+    /// <summary>404 — no artifact version has that id (BE-34, <c>/admin/artifact-versions/{id}/usage</c>).</summary>
+    public const string ArtifactVersionNotFound = "ARTIFACT_VERSION_NOT_FOUND";
+
+    /// <summary>
+    /// 409 — the component already has this version (BE-34, <c>POST /admin/artifact-versions</c>): registered before, or reported by a
+    /// device first. Registry rows are immutable, so a device-reported row cannot gain a hash afterwards.
+    /// </summary>
+    public const string ArtifactVersionExists = "ARTIFACT_VERSION_EXISTS";
+
     /// <summary>
     /// 409 — the new position of a pole is farther from its own road segment than the survey corridor (POLE-LOCATION).
     /// A survey would never see the pole there again. Nothing was written; moving a pole to another segment is the

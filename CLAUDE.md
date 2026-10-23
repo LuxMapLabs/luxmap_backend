@@ -19,7 +19,7 @@ D-R28 = **proxy streaming qua API** (BE-15 P1, 02/10); D-R25 (`calibration_rig`)
 
 Thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.17** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.18** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
    `docs/openapi/luxmap-v1.5.json` (file SINH — xem `docs/agents/traps/assets.md` mục BE-REVIEW-02 số 8).
 2. **Quyết định đã chốt trong `docs/contract-drift.md` nhưng chưa hợp nhất vào Contract thắng chữ của Contract** (Mỹ ký 20/10/2026).
    Đây là cách repo đang chạy: thiết bị IoT ở tủ điện (I-18), sort mặc định sự cố (P-3), `out_threshold_ratio = null` (D-R22).
@@ -301,6 +301,9 @@ Vi phạm thì hệ thống vẫn chạy, số liệu vẫn ra, nhưng kết qu�
   so **tương đối** giữa cột / đêm theo quy trình đo cố định — không phải lux tuyệt đối, không dùng chấm đạt / không đạt chuẩn chiếu sáng.
 - **`unknown` đếm riêng, không gộp vào `out`.**
 - **Mọi phát hiện tự động ghi kèm phiên bản model / artifact / firmware** (BE-34). Không tái lập được thì không phải kết quả.
+  Registry chung `artifact_version` (`LuxMap.Persistence.Versions`); bảng kết quả mới mang phiên bản → khai `VersionedResultColumn`
+  ở module sở hữu bảng (`VersionedResultColumnTests` đỏ nếu thiếu). Gom cụm (CV-15) và telemetry (IOT-09) khi làm phải ghi phiên bản
+  **lúc sinh ra**, không suy từ bản hiện tại.
 - **Mọi phát hiện tự động và mọi quyết định của người vào audit trail** (D-R13). Cột `confirmed_by` / `resolved_by` trên `fault` chỉ là
   quyết định mới nhất.
 - **Precision / recall báo RIÊNG từng lớp** (ON/OFF của CV; Normal / Dim / Out so với field verification). Con số gộp giấu lớp khó.

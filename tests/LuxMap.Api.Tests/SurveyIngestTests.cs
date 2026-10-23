@@ -189,6 +189,39 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
         Assert.Equal(9007199254740993L, await Db(db => db.Set<SurveyLuxSample>().Where(x => x.SweepId == id).Select(x => x.ModuleMs).SingleAsync()));
     }
 
+    /// <summary>
+    /// BE-34 D-7: what recorded the session is kept as the files stated it — all five on capture_config's row, the module firmware on
+    /// lux_log's, nothing on gps_track's — and nothing is refused for naming a firmware nobody registered.
+    /// </summary>
+    [Fact]
+    public async Task The_session_provenance_is_kept_on_the_file_that_states_it()
+    {
+        var id = await Create();
+        foreach (var (kind, text) in new[] { ("gps_track", Gps()), ("lux_log", Lux()), ("capture_config", Config()) }) await Raw(id, kind, text);
+
+        var rows = await Db(db => db.Set<SurveyRawFile>().AsNoTracking().Where(x => x.SweepId == id).ToDictionaryAsync(x => x.Kind));
+
+        var config = rows[SurveyRawKind.CaptureConfig];
+        Assert.Equal((12L, 1L, "fixture", "fixture", "0"),
+            (config.ModuleFirmwareVersionId!.Value, config.ProfileId!.Value, config.AppVersion, config.PhoneModel, config.CameraId));
+        var lux = rows[SurveyRawKind.LuxLog];
+        Assert.Equal((12L, (long?)null, (string?)null), (lux.ModuleFirmwareVersionId!.Value, lux.ProfileId, lux.AppVersion));
+        var gps = rows[SurveyRawKind.GpsTrack];
+        Assert.Equal(((long?)null, (string?)null), (gps.ModuleFirmwareVersionId, gps.PhoneModel));
+    }
+
+    /// <summary>A provenance label is a label: over 200 characters the whole file is refused, nothing stored.</summary>
+    [Fact]
+    public async Task An_oversized_provenance_label_refuses_the_file()
+    {
+        var id = await Create();
+        var config = Config().Replace("\"phone_model\":\"fixture\"", $"\"phone_model\":\"{new string('p', 201)}\"", StringComparison.Ordinal);
+
+        await Raw(id, "capture_config", config, 400);
+
+        Assert.False(await Db(db => db.Set<SurveyRawFile>().AnyAsync(x => x.SweepId == id)));
+    }
+
     [Fact]
     public async Task Submit_checks_completeness_and_manifest_then_queues_once_and_freezes_uploads()
     {

@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.17 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.18 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -16,17 +16,18 @@
 **v1.14:** 06/10/2026 (BE-25 — `GET /work-orders/agenda`, việc đêm nay của kỹ sư gom theo tuyến) ·
 **v1.15:** 22/10/2026 (BE-35 — `GET /admin/system/status`, giám sát job nền và dung lượng lưu trữ; capability `MonitorSystem`) ·
 **v1.16:** 22/10/2026 (BE-33 — `/admin/settings`, ngưỡng `dim` và ngưỡng offline do Quản trị sửa; capability `ManageSettings`) ·
-**v1.17:** 23/10/2026 (ASSET-COMMUNE-NAME — `commune_name` trên dòng kiểm kê `/assets`).
+**v1.17:** 23/10/2026 (ASSET-COMMUNE-NAME — `commune_name` trên dòng kiểm kê `/assets`) ·
+**v1.18:** 23/10/2026 (BE-34 — `/admin/artifact-versions`, registry phiên bản + "kết quả nào do phiên bản nào"; firmware thiết bị qua heartbeat).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.17, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.18, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (136 operation, cả 136
-`implemented` — đếm lại ở v1.16 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (139 operation, cả 139
+`implemented` — đếm lại ở v1.18 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -143,6 +144,8 @@ client **không** parse.
 | `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
 | `INVALID_ACCOUNT_TOKEN` | 400 | Link mời / đặt lại mật khẩu không tồn tại, hết hạn hoặc đã dùng — một mã (v1.8, mục 4.8) |
 | `SETTING_NOT_FOUND` | 404 | `PUT /admin/settings/{key}` với khoá không có (v1.16, mục 4.11) |
+| `ARTIFACT_VERSION_NOT_FOUND` | 404 | `GET /admin/artifact-versions/{id}/usage` với id không có (v1.18, mục 4.12) |
+| `ARTIFACT_VERSION_EXISTS` | 409 | `POST /admin/artifact-versions` — thành phần đã có phiên bản này (đã đăng ký, hoặc thiết bị báo trước) (v1.18) |
 | `USER_NOT_FOUND` | 404 | `/admin/users/{id}` không tồn tại (v1.8, mục 4.9); `GET /work-orders/agenda`: `assigned_to` không phải kỹ sư hiện trường thuộc xã của người gọi, hoặc kỹ sư hỏi lịch của người khác (v1.14, mục 5.5) |
 | `IDENTIFIER_TAKEN` | 409 | Username hoặc email đã có tài khoản khác dùng, không phân biệt hoa thường (`POST`/`PATCH /admin/users`; v1.8) |
 | `LAST_SYSTEM_ADMIN` | 409 | Thao tác sẽ không còn Quản trị hệ thống nào đăng nhập được (hạ vai trò, khoá; v1.8) |
@@ -245,7 +248,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 | `ReadNotifications` | superior, manager, field_engineer, system_admin | mọi `/notifications*` — chỉ thông báo **của chính người gọi** (v1.10, mục 5.9) |
 | `SyncOffline` | **field_engineer** | `GET /sync/bundle`, `POST /sync/push` (v1.13, mục 5.8) — mỗi thao tác trong hàng chờ **còn** kiểm capability của chính nó |
 | `MonitorSystem` | **system_admin** | `GET /admin/system/status` (v1.15, mục 4.10) — số liệu toàn hệ thống, không chia theo xã |
-| `ManageSettings` | **system_admin** | `GET /admin/settings`, `PUT /admin/settings/{key}` (v1.16, mục 4.11) — cấu hình toàn hệ thống, đổi kết quả nghiên cứu |
+| `ManageSettings` | **system_admin** | `GET /admin/settings`, `PUT /admin/settings/{key}` (v1.16, mục 4.11) — cấu hình toàn hệ thống, đổi kết quả nghiên cứu; `/admin/artifact-versions` (v1.18, mục 4.12) — registry phiên bản |
 
 - `/auth/*` cấp token không cần token.
 - Quản trị hệ thống **đọc** dữ liệu nghiệp vụ qua `*` để vận hành và hỗ trợ, nhưng **không ghi** nghiệp
@@ -610,6 +613,61 @@ restart, không cache.
 - **Không phân loại lại** dữ liệu đã có: sweep đã xử lý / đã công bố giữ ngưỡng của lần xử lý (`luminance_history[].dim_threshold_ratio`,
   mục 5.1); sự cố `node_offline` đã sinh giữ nguyên. Một lần im lặng của thiết bị chỉ sinh **một** `node_offline`, kể cả khi ngưỡng
   đổi giữa chừng.
+
+### 4.12 Registry phiên bản — `/api/v1/admin/artifact-versions` — `implemented` (v1.18, BE-34)
+
+Capability **`ManageSettings`** (chỉ `system_admin`). Endpoint của **web**, **toàn hệ thống**. Một registry chung (ERD Q8) cho mọi thứ
+sinh ra kết quả: thuật toán khảo sát, model CV, bộ cắt frame, **firmware** thiết bị ở tủ điện (`node_firmware`) và module đo sáng trên xe
+(`lux_module_firmware`). Dòng **bất biến** — một kết quả trích dẫn nó.
+
+| `component` | Ai ghi | `artifact_hash` |
+|---|---|---|
+| `clock_algorithm`, `association_algorithm`, `classification_algorithm`, `cv_model`, `frame_extractor` | Server, lúc xử lý sweep | Luôn có (SHA-256) |
+| `node_firmware` | Server, từ heartbeat MQTT (`firmware_version`); hoặc Quản trị đăng ký trước | `null` khi thiết bị tự khai |
+| `lux_module_firmware` | Quản trị đăng ký trước | Tuỳ chọn |
+
+**`GET /admin/artifact-versions?component=&page=&page_size=`** → `200` phân trang, mới nhất trước. Item:
+`{version_id, component, version, artifact_hash|null, metadata{}, created_at, created_by|null}`. `component` lạ → `400`.
+
+**`POST /admin/artifact-versions`** body `{component, version, artifact_hash?, metadata?}` → `201` item.
+
+| Trường | Ghi chú |
+|---|---|
+| `component` | Chỉ `node_firmware` / `lux_module_firmware`; khác → `400 VALIDATION_FAILED` |
+| `version` | 1–100 ký tự sau khi cắt khoảng trắng, không ký tự điều khiển |
+| `artifact_hash` | SHA-256 của binary, hex **chữ thường** 64 ký tự; tuỳ chọn |
+| `metadata` | Object JSON ≤ 4 KB; tuỳ chọn |
+
+Đã có `(component, version)` → `409 ARTIFACT_VERSION_EXISTS` — kể cả khi thiết bị đã báo phiên bản đó trước (dòng đó không có hash và
+không thêm được, vì bất biến). Muốn có hash: đăng ký **trước** khi thiết bị chạy phiên bản đó.
+
+**`GET /admin/artifact-versions/{id}/usage`** → `200`:
+
+```json
+{ "version": { "version_id": 7, "component": "cv_model", "version": "…", "artifact_hash": "…", "metadata": {}, "created_at": "…Z",
+               "created_by": null },
+  "results": [
+    { "result": "survey_run", "count": 12, "by_data_source": null },
+    { "result": "survey_frame", "count": 3400, "by_data_source": { "simulated": 3400 } },
+    { "result": "fault", "count": 5, "by_data_source": { "field": 4, "simulated": 1 } },
+    { "result": "iot_node", "count": 0, "by_data_source": {} }
+  ] }
+```
+
+- `results[]` liệt kê **mọi** loại kết quả hệ thống ghi phiên bản: `survey_run`, `survey_frame`, `detection`, `luminance_baseline`,
+  `survey_pass`, `pole_observation`, `luminance_history`, `fault`, `fault_cluster`, `pole_photo`, `citizen_photo`, `iot_node`,
+  `iot_node_firmware_change`. `0` nghĩa là "không có", không phải "không đếm".
+- `by_data_source` có mặt (object, có thể rỗng) cho loại mang `data_source`; `null` cho loại không mang.
+- `survey_pass`, `pole_observation`, `luminance_history` đếm **qua lần xử lý** (`run_id`) của chúng.
+- Sự cố / ảnh từ model ghi chuỗi `"{model}+{rules}"`: được tính cho model khi chuỗi **bằng** phiên bản hoặc **bắt đầu bằng phiên bản +
+  `+`** — một model khác chỉ trùng phần đầu chuỗi không được tính.
+- `iot_node` = số thiết bị **đang** chạy firmware đó; `iot_node_firmware_change` = số lần một thiết bị chuyển sang nó. "Lúc T thiết bị
+  chạy gì" = dòng lịch sử mới nhất có `first_seen_at ≤ T`.
+- Id không có → `404 ARTIFACT_VERSION_NOT_FOUND`.
+
+**Nguồn gốc phiên khảo sát (D-7).** `module_firmware_version_id`, `profile_id`, `app_version`, `phone_model`, `camera_id` của
+`capture_config` (và `module_firmware_version_id` của header `lux_log`) nay được **lưu nguyên** — không kiểm với registry, không từ chối
+phiên; ý nghĩa của hai id số chốt cùng WP6. Ba trường chữ tối đa **200 ký tự**, dài hơn → `400` (file bị từ chối, không lưu gì).
 ---
 
 ## 5. Endpoint theo resource
@@ -1059,6 +1117,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.18 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-34 — registry phiên bản, firmware** (mục 4.12, drift VR-1…VR-9; D-1…D-9 chốt 23/10 sau review Codex). **Thêm** `GET` / `POST /admin/artifact-versions`, `GET /admin/artifact-versions/{id}/usage` (capability `ManageSettings`), mã lỗi `ARTIFACT_VERSION_NOT_FOUND`, `ARTIFACT_VERSION_EXISTS`. Heartbeat MQTT nay **lưu** `firmware_version` (trước đây bị bỏ). File phiên khảo sát: 5 trường nguồn gốc được lưu; ba trường chữ giới hạn 200 ký tự (mới — trước không giới hạn). Chỉ thêm. Nền tạm tới FW |
 | v1.17 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê** (mục 5.3.1, drift ACN-1; PR #177). **Thêm** `commune_name` cạnh `commune_id` trên dòng cột / tuyến / mạch / tủ điện của `/assets/…`, cả danh sách lẫn chi tiết. Chỉ thêm, không migration. Nền tạm tới FW |
 | v1.16 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33 — cấu hình hệ thống** (mục 4.11, drift SET-1…SET-7; D-1…D-8 chốt 22/10). **Thêm** `GET /admin/settings`, `PUT /admin/settings/{key}`, capability `ManageSettings` (chỉ `system_admin`), mã lỗi `SETTING_NOT_FOUND`, trường `dim_threshold_ratio` trên từng điểm `luminance_history[]` của `GET /map/poles/{pole_id}`. `luminance_baseline.dim_threshold_ratio` giữ nghĩa ngưỡng đang áp, nay đọc từ cấu hình. Chỉ thêm, không đổi gì đã có. "Danh mục loại đèn / loại sự cố / trọng số" của task list **không** làm (enum khoá cứng; P-1). Nền tạm tới FW |
 | v1.15 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-35 — giám sát hệ thống** (mục 4.10, drift SM-1…SM-8; D-1…D-10 chốt 22/10, D-8 bỏ qua). **Thêm** `GET /admin/system/status` và capability `MonitorSystem` (chỉ `system_admin`). Chỉ thêm, không đổi gì đã có. Cảnh báo đĩa gửi **email**, không qua `/notifications`. Nền tạm tới FW |

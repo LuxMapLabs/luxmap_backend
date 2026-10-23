@@ -5,6 +5,7 @@ using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
+using LuxMap.Persistence.Versions;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -272,13 +273,34 @@ public sealed class LightingCommandService(
         return moved;
     }
 
-    /// <summary>M-8: a heartbeat — the control channel is alive. <c>last_report_at</c> only moves forward.</summary>
-    public async Task TouchAsync(string nodeId, CancellationToken ct)
+    /// <summary>
+    /// M-8: a heartbeat — the control channel is alive. <c>last_report_at</c> only moves forward. A heartbeat naming its firmware
+    /// (BE-34 D-4) points the device at that <c>node_firmware</c> row, and a change of firmware adds one history row — under the
+    /// device lock, so two heartbeats at once cannot both record the same change.
+    /// </summary>
+    /// <returns>False when the heartbeat carried a firmware version that is not one (blank, too long, control characters): the
+    /// device is still marked alive, the value is not stored, and the caller says so in its log.</returns>
+    public async Task<bool> TouchAsync(string nodeId, string? firmwareVersion, CancellationToken ct)
     {
+        var firmware = ArtifactRegistry.CleanVersion(firmwareVersion);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await LockDeviceAsync(nodeId, ct);
-        await TouchLockedAsync(nodeId, Now(), ct);
+        var now = Now();
+        await TouchLockedAsync(nodeId, now, ct);
+        if (firmware is not null) await RecordFirmwareLockedAsync(nodeId, firmware, now, ct);
         await transaction.CommitAsync(ct);
+        return firmwareVersion is null || firmware is not null;
+    }
+
+    /// <summary>BE-34 D-4: caller holds the device lock. Nothing is written when the device still runs what it ran.</summary>
+    private async Task RecordFirmwareLockedAsync(string nodeId, string firmware, DateTime now, CancellationToken ct)
+    {
+        var versionId = await ArtifactRegistry.EnsureFirmwareAsync(db, ArtifactComponents.NodeFirmware, firmware, ct);
+        var node = await db.Set<IotNode>().SingleAsync(row => row.NodeId == nodeId, ct);
+        if (node.FirmwareVersionId == versionId) return;
+        node.FirmwareVersionId = versionId;
+        db.Add(new IotNodeFirmware { NodeId = node.NodeId, CommuneId = node.CommuneId, FirmwareVersionId = versionId, FirstSeenAt = now });
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<DeviceCommandBatch> DeliverableAsync(string nodeId, bool markDelivered, bool touch, CancellationToken ct)

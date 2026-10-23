@@ -83,6 +83,10 @@ PLAN = [
     ("app_user", IN_USERS, "user_id"),
     ("app_user_commune", f"{IN_COMMUNES} AND user_id IN (SELECT user_id FROM public.app_user WHERE {IN_USERS})",
      "user_id, commune_id"),
+    # A global registry of versions, no commune: kept whole — every run, and since BE-34 every device's firmware, cites it — except
+    # what a system admin registered by hand when that admin is not copied (created_by is a RESTRICT key to app_user). Before
+    # iot_node, whose firmware_version_id points here.
+    ("artifact_version", f"created_by IS NULL OR created_by IN {COPIED_USERS}", "version_id"),
     ("road_segment", IN_COMMUNES, "segment_id"),
     # CABINET: feeder and iot_node point at the cabinet, so it comes before both.
     ("electrical_cabinet", IN_COMMUNES, "cabinet_id"),
@@ -90,6 +94,8 @@ PLAN = [
     ("pole", IN_COMMUNES, "pole_id"),
     ("fixture", IN_COMMUNES, "fixture_id"),
     ("iot_node", IN_COMMUNES, "node_id"),
+    # BE-34: a device's firmware changes, append-only; holds the device and the registry with RESTRICT.
+    ("iot_node_firmware", IN_COMMUNES, "change_id"),
     ("feeder_control", IN_COMMUNES, "feeder_id"),
     # LIGHT-CTRL 2b: requested_by is a RESTRICT key to app_user, so only the presses of the accounts copied above; a command
     # follows its request. Newest-first is a read order — copy by seq so the identity column's order survives.
@@ -107,8 +113,6 @@ PLAN = [
     ("work_order_segment", IN_COMMUNES, "work_order_id, position"),
     # BE-26: "already reported overdue for this due date" — copied so the target does not tell everyone again.
     ("work_order_overdue_notice", IN_COMMUNES, "work_order_id, due_date"),
-    # A global registry of algorithm / model versions, no commune: kept whole, every run cites it.
-    ("artifact_version", "TRUE", "version_id"),
     # survey_sweep <-> survey_processing_run is a CYCLE (accepted_run_id one way, sweep_id the other); see TWO_PASS.
     ("survey_sweep", IN_COMMUNES, "sweep_id"),
     ("survey_raw_file", KEPT_SWEEPS, "sweep_id, kind"),
