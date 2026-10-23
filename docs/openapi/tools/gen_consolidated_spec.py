@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.16"
+d["info"]["version"] = "1.17"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -49,6 +49,7 @@ d["info"]["description"] = (
     "POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. "
     "v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). "
     "v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. "
+    "v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "

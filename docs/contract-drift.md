@@ -1534,7 +1534,7 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 
 | | |
 |---|---|
-| **Decision maker** | Mỹ (Dylan), 23/10/2026 — yêu cầu trực tiếp. **SELF-SIGNED**, chạm API (chỉ thêm). **Chưa hợp nhất vào Contract** mục 5.3.1 — hợp nhất ở version kế tiếp, sau BE-33 (v1.16 đang chờ merge) để hai nhánh không cùng giành số version |
+| **Decision maker** | Mỹ (Dylan), 23/10/2026 — yêu cầu trực tiếp. **SELF-SIGNED**, chạm API (chỉ thêm), đã hợp nhất vào **Contract v1.17 mục 5.3.1** (23/10, sau khi BE-33 lấy v1.16), nền tạm tới FW kế tiếp |
 | **Consumer** | WP5 (bảng kiểm kê cột / tuyến / mạch / tủ điện). Mobile không dùng `/assets`. **Chưa báo** |
 | **Scope** | `PoleListItem`, `SegmentListItem`, `FeederListItem`, `CabinetListItem` (và chi tiết bọc chúng: `GET /assets/{kind}/{id}`). Không migration. Bản đồ `/map/…` không đổi |
 
