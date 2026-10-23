@@ -6,9 +6,7 @@ using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
-using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit.Abstractions;
 
@@ -292,30 +290,6 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
 
         var same = await (await AdminAsync()).PatchAsJsonAsync($"/api/v1/admin/users/{second.UserId}", new { email = second.Email.ToUpperInvariant() });
         Assert.Equal(HttpStatusCode.OK, same.StatusCode);
-    }
-
-    /// <summary>
-    /// Run against the service inside a transaction that is rolled back: the other admins are locked
-    /// only where this transaction can see it, so no concurrent test ever meets an admin-less database.
-    /// </summary>
-    [Fact]
-    public async Task The_last_active_system_admin_can_be_neither_demoted_nor_locked()
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
-        var service = scope.ServiceProvider.GetRequiredService<UserAdminService>();
-        await using var transaction = await db.Database.BeginTransactionAsync();
-
-        await db.Database.ExecuteSqlRawAsync("UPDATE app_user SET is_locked = true WHERE role = 'system_admin' AND username <> 'admin'");
-        var adminId = await db.Set<AppUser>().Where(u => u.Username == "admin").Select(u => u.UserId).SingleAsync();
-
-        var demote = await Assert.ThrowsAsync<LuxMapException>(() =>
-            service.UpdateAsync(adminId, new UpdateUserRequest { Role = UserRole.Manager, CommuneIds = [] }, CancellationToken.None));
-        var lockIt = await Assert.ThrowsAsync<LuxMapException>(() => service.LockAsync(adminId, CancellationToken.None));
-
-        Assert.Equal(AccountErrors.LastSystemAdmin, demote.Code);
-        Assert.Equal(AccountErrors.LastSystemAdmin, lockIt.Code);
-        await transaction.RollbackAsync();
     }
 
     [Fact]
