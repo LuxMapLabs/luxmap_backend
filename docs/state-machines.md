@@ -292,6 +292,7 @@ Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter
 
 ```mermaid
 flowchart TD
+    S((" ")) --> A
     A["Scheduled job: node_offline (BE-26)"] --> B["Find IoT devices"]
     B --> C{"Has reported before?"}
 
@@ -312,10 +313,13 @@ flowchart TD
     M --> N["Existing fault remains open"]
     N --> O["Manager handles fault"]
 
-    D --> P["End"]
+    D --> P(((" ")))
     F --> P
     K --> P
     O --> P
+
+    style S fill:#000,stroke:#000
+    style P fill:#000,stroke:#000
 ```
 
 - Exactly at the threshold is still `online`.
@@ -340,6 +344,8 @@ stateDiagram-v2
     locked --> invited : Unlock (no password yet)
 ```
 
+- **No closing state, on purpose:** an account is never deleted (there is no DELETE on `/admin/users`), so no `[*]` at the
+  end — `locked` is the furthest an account goes, and it can always be unlocked.
 - No self-registration (D-R11). An admin cannot lock themselves, nor lock / demote the **last** active System Admin.
 - Setting a password needs a link that is **unused and unexpired** (invitation 72 hours, reset 1 hour); otherwise **400
   `INVALID_ACCOUNT_TOKEN`**. A locked account can still use a valid link but **stays `locked`**; unlocking it afterwards
@@ -374,7 +380,12 @@ stateDiagram-v2
     normal --> unknown : sweep accepted — missing / conflicting evidence
     dim --> unknown : sweep accepted — missing / conflicting evidence
     out --> unknown : sweep accepted — missing / conflicting evidence
+    unknown --> [*] : pole deleted (DELETE /assets/poles/{id})<br/>only if nothing was ever published for it
 ```
+
+The only end is **deleting the pole**, and only from `unknown` before anything was published: every publication leaves a row
+that holds the pole with `RESTRICT` (`pole_observation`, `luminance_history`, `work_order_pole_photo`), so a pole with a
+history answers 409 `ASSET_IN_USE`. `pole_current_status` itself cascades with the pole.
 
 The diagram leaves out **self-loops**: a new publication can keep the classification in any of the four states (for
 example an "off" photo on a pole already `out`) — the observation clock still moves forward.
