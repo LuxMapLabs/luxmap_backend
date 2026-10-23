@@ -2,7 +2,8 @@
 
 Drawn from **the code running on `dev`**, not from the specification: first version 14/10/2026, section 10 added
 16/10/2026 after POLE-PHOTO-AI; **re-checked in full against the code on 20/10/2026** (a read-only Codex review, every
-finding verified against the code) and sections 11–13 added. Each section names the files that hold its transition rules:
+finding verified against the code) and sections 11–13 added; 23/10/2026: BE-33 thresholds (sections 7, 9), start / end
+markers, and a meaning-and-example table under each machine. Each section names the files that hold its transition rules:
 whoever changes a rule updates the diagram in the same PR. State names are **wire values** (lowercase snake_case strings) —
 exactly what the API returns; exceptions are stated in each section.
 
@@ -30,7 +31,7 @@ Conventions for every machine below:
 | 4 | Citizen report | `citizen_report.status` | `Citizen/CitizenReviewService.cs`, `PublicReportService.cs` |
 | 5 | QR code on a pole | `qr_code.revoked_at` | `Citizen/QrCodeService.cs` |
 | 6 | ON / OFF / AUTO command | `lighting_command.status` | `Telemetry/Lighting/LightingCommandService.cs`, `Telemetry/Mqtt/MqttLightingHandler.cs` |
-| 7 | IoT device status `node_status` | **not stored**, computed on read | `Telemetry/IotOptions.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs` |
+| 7 | IoT device status `node_status` | **not stored**, computed on read | `Telemetry/NodeSilence.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs`; threshold = system setting `iot_offline_after_minutes` |
 | 8 | User account | `is_locked`, `password_set_at` | `Identity/Accounts/UserAdminService.cs`, `PasswordService.cs` |
 | 9 | Lamp condition at a pole `fixture_status` | `pole_current_status` | `Survey/Processing/Frames/FrameClassification.cs` (classification), `Survey/Review/SurveyReviewService.cs` (sweep review), `ReviewedPolePhotoPublisher.cs` (pole photo confirmation); both write through `PoleStatusPublication.cs` |
 | 10 | Pole photo in a work order (AI ON/OFF) | `work_order_pole_photo.decision`, `cv_state` | `WorkOrders/WorkOrderPolePhotoService.cs`, `Survey/Review/ReviewedPolePhotoPublisher.cs` |
@@ -338,7 +339,9 @@ stateDiagram-v2
 
 ## 7. IoT device — `node_status`
 
-Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter` (default 1 minute) on every read.
+Not stored in the database: computed on every read from `last_report_at` and the system setting
+`iot_offline_after_minutes` (default 60, range 5–1440; the System Admin changes it with `PUT /admin/settings/{key}`, BE-33 —
+it takes effect on the next read, no restart).
 
 ```mermaid
 flowchart TD
@@ -347,10 +350,10 @@ flowchart TD
     B --> C{"Has reported before?"}
 
     C -- "No" --> D["Keep never_reported"]
-    C -- "Yes" --> E{"Silence duration > OfflineAfter?"}
+    C -- "Yes" --> E{"Silence longer than<br/>iot_offline_after_minutes?"}
 
     E -- "No" --> F["No offline fault created"]
-    E -- "Yes" --> G{"Already processed this offline transition?"}
+    E -- "Yes" --> G{"A node_offline already raised<br/>since its last report?"}
 
     G -- "No" --> H["Create one node_offline fault"]
     H --> I["status = detected"]
@@ -373,6 +376,9 @@ flowchart TD
 ```
 
 - Exactly at the threshold is still `online`.
+- **One silence, one fault:** a silence is the time after `last_report_at`, so the duplicate check asks for any `node_offline`
+  of the device detected after its last report — not for one exact `detected_at`. Changing the threshold in the middle of a
+  silence therefore never raises it twice (BE-33 SET-7).
 - The `node_offline` job (BE-26) creates **one** `node_offline` fault (`detected`, `source_channel = iot`) each time a device crosses the threshold. Coming back online **does not** close the fault — the Manager handles it like any other.
 
 
@@ -453,7 +459,7 @@ example an "off" photo on a pole already `out`) — the observation clock still 
 | A video gap (`video_gap`), no CV evidence associated with the pole (`no_detection`, `frame_poor`, `on_off_conflict`, …), or the sweep did not pass the pole (`not_observed`) | `unknown` |
 | CV sees the lamp **off** | `out` |
 | CV sees the lamp **on**, missing baseline / peak lux / trustworthy lux readings | `normal` (brightness not evaluated) |
-| CV sees the lamp **on**, peak lux ÷ the pole's own baseline **< `dim_threshold_ratio`** (default 0.80) | `dim` |
+| CV sees the lamp **on**, peak lux ÷ the pole's own baseline **< `dim_threshold_ratio`** (system setting, default 0.80; each sweep run records the value it used) | `dim` |
 | CV sees the lamp **on**, ratio ≥ threshold | `normal` |
 
 At sweep review each pole is published from its **best observation** (non-`unknown` first, then higher CV confidence —
