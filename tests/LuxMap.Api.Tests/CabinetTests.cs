@@ -52,12 +52,15 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
         string[] expected =
         [
-            "cabinet_id", "external_ref", "cabinet_name", "commune_id", "data_source", "location",
+            "cabinet_id", "external_ref", "cabinet_name", "commune_id", "commune_name", "data_source", "location",
             "feeder_ids", "iot_node_id", "updated_at", "updated_by", "updated_by_name",
         ];
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], Keys(row));
 
         Assert.Equal(externalRef, row.GetProperty("external_ref").GetString());
+        Assert.Equal(await fixture.QueryAsync(db => db.Set<AdministrativeUnit>()
+                .Where(unit => unit.CommuneId == fixture.CommuneId).Select(unit => unit.Name).SingleAsync()),
+            row.GetProperty("commune_name").GetString());
         Assert.Equal("field", row.GetProperty("data_source").GetString());
         Assert.Equal(Lat, row.GetProperty("location").GetProperty("lat").GetDouble(), 6);
         Assert.Equal(Lng, row.GetProperty("location").GetProperty("lng").GetDouble(), 6);

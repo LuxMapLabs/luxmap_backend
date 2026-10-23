@@ -11846,6 +11846,7 @@
           "cabinet_id",
           "cabinet_name",
           "commune_id",
+          "commune_name",
           "data_source",
           "feeder_ids",
           "location",
@@ -11864,6 +11865,9 @@
             "type": "string"
           },
           "commune_id": {
+            "type": "string"
+          },
+          "commune_name": {
             "type": "string"
           },
           "data_source": {
@@ -13621,6 +13625,7 @@
       "FeederListItem": {
         "required": [
           "commune_id",
+          "commune_name",
           "feeder_id",
           "feeder_name",
           "has_geometry",
@@ -13640,6 +13645,9 @@
             "type": "string"
           },
           "commune_id": {
+            "type": "string"
+          },
+          "commune_name": {
             "type": "string"
           },
           "has_geometry": {
@@ -14975,6 +14983,7 @@
       "PoleListItem": {
         "required": [
           "commune_id",
+          "commune_name",
           "data_source",
           "location",
           "near_sensitive_poi",
@@ -15013,6 +15022,9 @@
             "$ref": "#/components/schemas/TopologySource"
           },
           "commune_id": {
+            "type": "string"
+          },
+          "commune_name": {
             "type": "string"
           },
           "data_source": {
@@ -16377,6 +16389,7 @@
       "SegmentListItem": {
         "required": [
           "commune_id",
+          "commune_name",
           "data_source",
           "length_m",
           "pole_count",
@@ -16405,6 +16418,9 @@
             "format": "double"
           },
           "commune_id": {
+            "type": "string"
+          },
+          "commune_name": {
             "type": "string"
           },
           "data_source": {

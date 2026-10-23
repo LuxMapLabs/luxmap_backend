@@ -960,6 +960,10 @@ public sealed class AssetCrudService(
                 .FirstOrDefault(),
             CabinetSource = dbContext.Set<Feeder>().Where(feeder => feeder.FeederId == pole.FeederId).Select(feeder => feeder.CabinetSource).FirstOrDefault(),
             CommuneId = pole.CommuneId,
+
+            // administrative_unit is the scope anchor and never filtered; the asset's own commune_id is a real foreign key, so the
+            // name is always there.
+            CommuneName = dbContext.Set<AdministrativeUnit>().Where(unit => unit.CommuneId == pole.CommuneId).Select(unit => unit.Name).FirstOrDefault()!,
             DataSource = pole.DataSource,
             NearSensitivePoi = pole.NearSensitivePoi,
             Location = new AssetLocation { Lat = pole.Geom.Y, Lng = pole.Geom.X },
@@ -992,6 +996,7 @@ public sealed class AssetCrudService(
             RoadClass = segment.RoadClass,
             LengthM = segment.LengthM,
             CommuneId = segment.CommuneId,
+            CommuneName = dbContext.Set<AdministrativeUnit>().Where(unit => unit.CommuneId == segment.CommuneId).Select(unit => unit.Name).FirstOrDefault()!,
             DataSource = segment.DataSource,
 
             // ⚠️ Counted through the query filter, so it is the number of poles THIS CALLER can see.
@@ -1010,6 +1015,7 @@ public sealed class AssetCrudService(
             ExternalRef = feeder.ExternalRef,
             FeederName = feeder.FeederName,
             CommuneId = feeder.CommuneId,
+            CommuneName = dbContext.Set<AdministrativeUnit>().Where(unit => unit.CommuneId == feeder.CommuneId).Select(unit => unit.Name).FirstOrDefault()!,
             HasGeometry = feeder.Geom != null,
             PoleCount = dbContext.Set<Pole>().Count(pole => pole.FeederId == feeder.FeederId),
 
@@ -1043,6 +1049,7 @@ public sealed class AssetCrudService(
             ExternalRef = cabinet.ExternalRef,
             CabinetName = cabinet.CabinetName,
             CommuneId = cabinet.CommuneId,
+            CommuneName = dbContext.Set<AdministrativeUnit>().Where(unit => unit.CommuneId == cabinet.CommuneId).Select(unit => unit.Name).FirstOrDefault()!,
             DataSource = cabinet.DataSource,
             Location = new AssetLocation { Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X },
 
