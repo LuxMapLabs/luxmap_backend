@@ -48,7 +48,9 @@
     chấm start / end; §9 (trạng thái đèn tại cột) không có end → thêm <code>unknown → [*]</code> khi xoá cột, chỉ được khi chưa từng
     công bố gì (mọi bản ghi công bố giữ cột bằng FK <code>RESTRICT</code>, kiểm trên <code>pg_constraint</code>); §8 (tài khoản)
     không có end vì tài khoản không xoá được → ghi chú, <strong>không</strong> vẽ end giả. §0 là sơ đồ quan hệ, không áp. Render thử
-    bằng mermaid-cli 11.4.2: cả bốn sơ đồ chạm tới đều ra SVG.</p>
+    bằng mermaid-cli 11.4.2: cả bốn sơ đồ chạm tới đều ra SVG. <strong>Theo góp ý của thầy:</strong> mỗi state machine (10 sơ
+    đồ) thêm một bảng ngắn "trạng thái → nghĩa → ví dụ vì sao đi tới đó" (vd. vì sao phiếu bị <code>cancelled</code>, sweep bị
+    <code>returned</code> / <code>failed</code> với mã lỗi thật của worker); ví dụ minh hoạ, luật vẫn là sơ đồ.</p>
   </div>
   <div class="card">
     <strong>Test đỏ ngẫu nhiên — "Quản trị cuối cùng", 23/10/2026</strong>
