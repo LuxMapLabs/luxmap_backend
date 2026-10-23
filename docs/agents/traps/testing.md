@@ -65,3 +65,15 @@ mã nguồn đã đúng (gặp thật ở CITIZEN-QR P2a). `git checkout` cũng 
 ⚠️ **`dotnet test --no-build` sau khi đổi branch chạy bin CŨ.** Gặp thật ở P1: bin build trước khi pull
 TOPO-INFER làm hàng loạt test đỏ `23514 ck_pole_feeder_source_matches_feeder` — trông như lỗi DB, thực ra
 là thiếu code. Build lại trước khi kết luận.
+
+## Test khẳng định "không còn ai khác" chạy MỘT MÌNH (23/10/2026)
+
+Collection xUnit chạy **song song** với nhau, và transaction của test là READ COMMITTED: dòng mà class khác commit **sau** khi
+test đã khoá / lọc vẫn hiện ra ở truy vấn kế tiếp trong cùng transaction. Test nào khẳng định một điều về **toàn bảng** —
+"không còn Quản trị nào hoạt động", "không còn job nào đến hạn" — sẽ đỏ ngẫu nhiên khi một class khác ghi đúng loại dòng đó.
+
+Gặp thật: `The_last_active_system_admin_can_be_neither_demoted_nor_locked` khoá mọi `system_admin` khác rồi đếm, trong lúc
+`SystemMonitoringTests.One_unreachable_admin_…` (collection khác) commit một `system_admin` đang hoạt động — CI run 39919424341.
+Sửa: đưa test vào **`SystemAdminCountCollection`** (`DisableParallelization = true`, chạy sau mọi collection song song).
+Không dùng `RepeatableRead` để né: nó đổi lỗi thành `40001` khi class khác sửa / xoá đúng dòng đang khoá. Phá thử: commit một
+Quản trị từ scope khác **giữa** lệnh khoá và lượt đếm → test đỏ.
