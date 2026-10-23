@@ -121,6 +121,12 @@ public static class LuxMapPolicies
     /// </summary>
     public const string MonitorSystem = "cap:monitor_system";
 
+    /// <summary>
+    /// BE-33 (D-7) — read and change the system settings (dim threshold, device offline threshold). System-wide values that change
+    /// research results, so the system admin only (Phiếu v1.4: "Manage system configurations").
+    /// </summary>
+    public const string ManageSettings = "cap:manage_settings";
+
     /// <summary>Policy name → the roles it admits. Exhaustive: a policy missing here does not exist.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<UserRole>> Matrix { get; } =
         new Dictionary<string, IReadOnlyList<UserRole>>(StringComparer.Ordinal)
@@ -150,5 +156,6 @@ public static class LuxMapPolicies
             [ReadCitizenReports] = [UserRole.Superior, UserRole.Manager, UserRole.SystemAdmin],
             [ReviewCitizenReports] = [UserRole.Manager],
             [MonitorSystem] = [UserRole.SystemAdmin],
+            [ManageSettings] = [UserRole.SystemAdmin],
         };
 }

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Notifications;
 using LuxMap.Modules.Notifications.Entities;
@@ -8,6 +9,7 @@ using LuxMap.Modules.Survey.Processing.Frames;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Serialization;
@@ -53,12 +55,17 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
         await using var db = Context(scope);
         var job = await Claim(db, scope, o, sweepId, ct);
         if (job is null) return false;
+        // BE-33: the dim threshold is a system setting, read once per run. The snapshot keeps it where runs before BE-33 recorded
+        // it (frames.dim_threshold_ratio), so every run answers "which threshold classified this?" the same way.
+        var dimThresholdRatio = (await SystemSettingValues.ReadAsync(db, ct)).DimThresholdRatio;
+        var snapshot = JsonNode.Parse(settings)!;
+        snapshot["frames"]![SurveySettingsSnapshot.DimThresholdRatio] = dimThresholdRatio;
         var sweep = await db.Set<SurveySweep>().SingleAsync(x => x.SweepId == job.SweepId, ct);
         var run = new SurveyProcessingRun
         {
             SweepId = sweep.SweepId, CommuneId = sweep.CommuneId, Attempt = job.Attempt,
             LeaseOwner = job.Token, LeaseExpiresAt = job.Expires, StartedAt = sweep.UpdatedAt,
-            InputHash = sweep.SubmissionRequestHash!, SettingsSnapshot = settings,
+            InputHash = sweep.SubmissionRequestHash!, SettingsSnapshot = snapshot.ToJsonString(),
             ResultState = "succeeded", Stage = "complete"
         };
         FramePipelineResult? media = null;
@@ -97,7 +104,7 @@ public sealed class SurveyProcessor(NpgsqlDataSource dataSource, ModuleAssemblyC
             run.CoverageReason = poles.Length == 0 ? "no_expected_poles" : null;
             if (frames is null) throw new ProcessingFailure("DETECTOR_NOT_CONFIGURED", "detector");
             media = await frames.ProcessAsync(db, sweep, run, results, poles,
-                token => Heartbeat(db, sweep, job, o, token), o.LeaseSeconds, ct);
+                token => Heartbeat(db, sweep, job, o, token), o.LeaseSeconds, dimThresholdRatio, ct);
         }
         catch (ProcessingFailure ex) when (ex.Code == "LEASE_LOST")
         {

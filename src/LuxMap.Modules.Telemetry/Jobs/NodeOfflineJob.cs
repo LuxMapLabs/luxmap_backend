@@ -8,6 +8,7 @@ using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Persistence.Jobs;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -17,22 +18,25 @@ using Npgsql;
 namespace LuxMap.Modules.Telemetry.Jobs;
 
 /// <summary>
-/// BE-26 (D-5…D-8): a device silent for longer than <c>Iot:OfflineAfter</c> — the SAME rule the map reads (<see cref="IotOptions.StatusAt"/>,
+/// BE-26 (D-5…D-8): a device silent for longer than the <c>iot_offline_after_minutes</c> setting — the SAME rule the map reads (<see cref="NodeSilence.StatusAt"/>,
 /// I-3) — gets one <c>node_offline</c> fault per silence, and the commune's Managers are told.
 /// </summary>
 /// <remarks>
 /// <para>
-/// 🔴 <b>A silence is identified by data, not by when the job ran:</b> <c>detected_at = last_report_at + OfflineAfter</c>, the instant it
-/// crossed the threshold. Every instance and every retry computes the same value, so <see cref="FaultOriginNodeConfiguration.OneFaultPerSilence"/>
-/// lets exactly one fault in. A fault rejected or resolved during the same silence is not raised again; the device reporting and falling
-/// silent again moves <c>last_report_at</c>, which is a new silence.
+/// 🔴 <b>A silence is identified by data, not by when the job ran:</b> it is the time after <c>last_report_at</c>, and
+/// <c>detected_at = last_report_at + threshold</c>, the instant it crossed the threshold. The duplicate check asks for ANY
+/// <c>node_offline</c> of the device detected after its last report — not for that exact <c>detected_at</c>: the threshold is a setting
+/// (BE-33), and a change in the middle of a silence would move <c>detected_at</c> and raise the same silence twice (BE-33 D-8).
+/// <see cref="FaultOriginNodeConfiguration.OneFaultPerSilence"/> still stops two passes on the same threshold from both inserting. A
+/// fault rejected or resolved during the same silence is not raised again; the device reporting and falling silent again moves
+/// <c>last_report_at</c>, which is a new silence.
 /// </para>
 /// <para>
 /// A device that never reported raises nothing (D-5: not yet in service — the map shows it). Nothing closes the fault when the device comes
 /// back (D-6): resolving is a person's decision, and there is no system account to sign it.
 /// </para>
 /// </remarks>
-public sealed class NodeOfflineJob(JobContextFactory contexts, IotOptions iot, ILogger<NodeOfflineJob> log) : IScheduledJob
+public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOfflineJob> log) : IScheduledJob
 {
     public string Name => "node_offline";
 
@@ -40,11 +44,14 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, IotOptions iot, I
 
     public async Task RunAsync(DateTime now, string correlationId, CancellationToken ct)
     {
-        // StatusAt: offline when now − last > OfflineAfter, i.e. last < now − OfflineAfter; exactly at the threshold is still online.
-        var cutoff = now - iot.OfflineAfter;
+        TimeSpan offlineAfter;
         List<Silent> silent;
         await using (var scan = contexts.Unscoped())
         {
+            // Read once per pass: the cutoff and every detected_at of this pass use the same threshold.
+            offlineAfter = (await SystemSettingValues.ReadAsync(scan, ct)).IotOfflineAfter;
+            // NodeSilence.StatusAt: offline when now − last > threshold, i.e. last < now − threshold; exactly at it is still online.
+            var cutoff = now - offlineAfter;
             silent = await scan.Set<IotNode>().IgnoreQueryFilters().AsNoTracking()
                 .Where(n => n.LastReportAt != null && n.LastReportAt < cutoff)
                 .OrderBy(n => n.NodeId.Length).ThenBy(n => n.NodeId)
@@ -57,21 +64,22 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, IotOptions iot, I
         {
             await using var db = contexts.Open(commune.Key);
             var audit = JobContextFactory.AuditFor(db, correlationId);
-            foreach (var node in commune) raised += await RaiseAsync(db, audit, node, now, ct) ? 1 : 0;
+            foreach (var node in commune) raised += await RaiseAsync(db, audit, node, offlineAfter, now, ct) ? 1 : 0;
         }
 
         if (raised > 0) log.LogInformation("Raised {Count} node_offline faults ({Correlation}).", raised, correlationId);
     }
 
-    private async Task<bool> RaiseAsync(LuxMapDbContext db, IAuditTrail audit, Silent candidate, DateTime now, CancellationToken ct)
+    private static async Task<bool> RaiseAsync(
+        LuxMapDbContext db, IAuditTrail audit, Silent candidate, TimeSpan offlineAfter, DateTime now, CancellationToken ct)
     {
         // Re-read in the commune's own context: the device may have reported since the scan.
         var node = await db.Set<IotNode>().AsNoTracking().SingleOrDefaultAsync(n => n.NodeId == candidate.NodeId, ct);
         if (node?.LastReportAt != candidate.LastReportAt) return false;
 
-        var detected = candidate.LastReportAt + iot.OfflineAfter;
+        var detected = candidate.LastReportAt + offlineAfter;
         if (await db.Set<Fault>().AnyAsync(f => f.OriginNodeId == node.NodeId && f.FaultType == FaultType.NodeOffline
-                && f.DetectedAt == detected, ct)) return false;
+                && f.DetectedAt > candidate.LastReportAt, ct)) return false;
 
         // The cabinet's point is where the device is (I-9, CABINET); read past the commune filter — a location, not a record to expose.
         var cabinet = await db.Set<ElectricalCabinet>().IgnoreQueryFilters().AsNoTracking()
@@ -79,7 +87,7 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, IotOptions iot, I
         // The same draw the column DEFAULT makes; the id is needed before saving for the audit event. A constant, never input.
         var sql = $"SELECT {PrefixedIds.Fault.DefaultValueSql} AS \"Value\"";
         var faultId = await db.Database.SqlQueryRaw<string>(sql).SingleAsync(ct);
-        var silentFor = (int)Math.Round(iot.OfflineAfter.TotalMinutes);
+        var silentFor = (int)Math.Round(offlineAfter.TotalMinutes);
         var fault = new Fault
         {
             FaultId = faultId, CommuneId = node.CommuneId, OriginNodeId = node.NodeId, Lat = cabinet.Y, Lng = cabinet.X,

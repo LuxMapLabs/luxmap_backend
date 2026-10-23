@@ -3,6 +3,7 @@ using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -83,6 +84,18 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
         Assert.Equal("never_reported", Status(body, never));
         Assert.Equal("online", Status(body, recent));
         Assert.Equal("offline", Status(body, silent));
+    }
+
+    /// <summary>BE-33: the threshold is the <c>iot_offline_after_minutes</c> setting, read at every request — no restart, no cache.</summary>
+    [Fact]
+    public async Task The_map_reads_the_offline_threshold_from_the_setting()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var node = await NewNodeAsync(fixture.CommuneId, lastReportAt: DateTime.UtcNow.AddMinutes(-45));
+
+        Assert.Equal("online", Status(await GetAsync(client, Nodes + Box), node));
+        await fixture.WithSettingAsync(SystemSettingKeys.IotOfflineAfterMinutes, 30, async () =>
+            Assert.Equal("offline", Status(await GetAsync(client, Nodes + Box), node)));
     }
 
     /// <summary>
@@ -241,19 +254,9 @@ public sealed class IotNodeTests(AssetImportFixture fixture)
     {
         var now = new DateTime(2026, 9, 28, 12, 0, 0, DateTimeKind.Utc);
 
-        var status = new IotOptions().StatusAt(now.AddMinutes(-minutesSilent), now);
+        var status = NodeSilence.StatusAt(now.AddMinutes(-minutesSilent), now, TimeSpan.FromMinutes(60));
 
         Assert.Equal(expected, status.ToString());
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-5)]
-    public void A_non_positive_threshold_stops_startup(int minutes)
-    {
-        var options = new IotOptions { OfflineAfter = TimeSpan.FromMinutes(minutes) };
-
-        Assert.Throws<InvalidOperationException>(options.Validate);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────────────────────

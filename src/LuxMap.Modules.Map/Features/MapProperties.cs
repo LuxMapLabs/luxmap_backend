@@ -148,7 +148,7 @@ public sealed record IotNodeProperties
 
     public required NodeRole NodeRole { get; init; }
 
-    /// <summary>Derived from <see cref="LastReportAt"/> and <c>Iot:OfflineAfter</c> (I-3). Never stored.</summary>
+    /// <summary>Derived from <see cref="LastReportAt"/> and the <c>iot_offline_after_minutes</c> setting (I-3, BE-33). Never stored.</summary>
     public required NodeStatus NodeStatus { get; init; }
 
     /// <summary>

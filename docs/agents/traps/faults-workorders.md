@@ -261,13 +261,14 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
   **khoá tự nhiên + unique ở DB** (`pk_work_order_overdue_notice` = (phiếu, hạn); `ux_fault_origin_node_id_detected_at` = (thiết bị,
   lúc vượt ngưỡng)) và bắt đúng tên ràng buộc đó khi đua. Phá thử bỏ lượt bắt ⇒ test đồng thời đỏ. "Kiểm rồi chèn" một mình là sai.
 - **Job quét theo TRẠNG THÁI, không theo khe giờ**: một lượt xử lý mọi thứ đang đến hạn, nên server tắt vài giờ thì lượt đầu bù hết.
-  Mốc của sự kiện lấy từ **dữ liệu** (`last_report_at + OfflineAfter`), không từ lúc job chạy — mọi instance tính ra cùng giá trị.
+  Mốc của sự kiện lấy từ **dữ liệu** (`last_report_at + ngưỡng`), không từ lúc job chạy — mọi instance cùng ngưỡng tính ra cùng
+  giá trị. Ngưỡng là cấu hình đổi được (BE-33), nên kiểm trùng `node_offline` theo lần im lặng (`detected_at > last_report_at`).
 - **Không principal ⇒ `JobContextFactory`**: `Unscoped()` (scope rỗng, chỉ đọc với `IgnoreQueryFilters` để tìm ứng viên — guard
   từ chối mọi lượt ghi ở đó) và `Open(xã)` cho mọi lượt ghi, đọc lại ứng viên **qua filter** trước khi ghi. Không backdoor, không `*`.
   Audit qua `JobContextFactory.AuditFor(db, correlation)`; correlation `job:<tên>:<lease token>`.
 - **Một luật, một biểu thức.** Điều kiện của job dùng cho cả lượt quét lẫn lượt đọc lại (`WorkOrderOverdueJob.OverdueOn`). Bản đầu đọc
   lại bằng một bản sao viết tay — phá thử luật quét thì **không test nào đỏ** vì bản sao che đi. Luật im lặng của thiết bị phải viết
-  lại trong SQL (EF không dịch `IotOptions.StatusAt`), nên test đối chiếu thẳng với `StatusAt` ở **hai phía** ngưỡng.
+  lại trong SQL (EF không dịch `NodeSilence.StatusAt`), nên test đối chiếu thẳng với `StatusAt` ở **hai phía** ngưỡng.
 - 🔴 **Test chạy job với đồng hồ năm 2001 và trồng dữ liệu 2000–2001.** Job quét MỌI xã của DB dùng chung: chạy với giờ thật sẽ ghi dấu
   quá hạn cho phiếu của class khác, và teardown của class đó vấp FK `Restrict`. `LuxMapTestHost.CreateHost` **ép** `Jobs:Enabled=false`
   và từ chối host nào vẫn bật — đừng gỡ để "test worker thật"; test worker dựng `ScheduledJobWorker` trực tiếp với job giả.

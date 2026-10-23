@@ -111,7 +111,7 @@ public sealed class MapQueryPlanTests(AssetSchemaFixture fixture)
     [Fact]
     public async Task The_device_and_cabinet_bbox_queries_can_ride_the_cabinet_gist_index()
     {
-        var service = (LuxMapDbContext db) => new MapQueryService(db, new LuxMap.Modules.Telemetry.IotOptions(), TimeProvider.System, new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System));
+        var service = (LuxMapDbContext db) => new MapQueryService(db, TimeProvider.System, new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System));
 
         var nodes = await fixture.QueryAsync(db => Task.FromResult(
             service(db).IotNodeQuery(new IotNodeMapQuery { Bbox = Box }).ToQueryString()));
@@ -148,7 +148,7 @@ public sealed class MapQueryPlanTests(AssetSchemaFixture fixture)
 
     private Task<string> PoleSqlAsync(PoleMapQuery query)
         => fixture.QueryAsync(db => Task.FromResult(
-            new MapQueryService(db, new LuxMap.Modules.Telemetry.IotOptions(), TimeProvider.System, new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System)).PoleQuery(query).ToQueryString()));
+            new MapQueryService(db, TimeProvider.System, new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System)).PoleQuery(query).ToQueryString()));
 
     private async Task<string> ExplainPoleQueryAsync()
         => await fixture.ExplainAsync(Literal(await PoleSqlAsync()));

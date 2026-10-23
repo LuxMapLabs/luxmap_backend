@@ -68,6 +68,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ReadCitizenReports"] = ("GET", "/api/v1/citizen-reports", ["system_admin", "superior", "manager"]),
         ["ReviewCitizenReports"] = ("POST", "/api/v1/citizen-reports/CRP-0/reject", ["manager"]),
         ["MonitorSystem"] = ("GET", "/api/v1/admin/system/status", ["system_admin"]),
+        ["ManageSettings"] = ("GET", "/api/v1/admin/settings", ["system_admin"]),
     };
 
     private static readonly string[] RetiredRoleValues =

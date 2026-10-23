@@ -1512,6 +1512,24 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | SM-7 | Job **`storage_capacity`** (15 phút): trống dưới **`Monitoring:LowDiskRatio`** (0,15) mở một đợt trong `storage_alert` (`ux_storage_alert_open`: tối đa một đợt mở) và **gửi email** cho mọi `system_admin` đang hoạt động, một lần mỗi đợt; lên lại trên ngưỡng thì đóng đợt. **Lệch đề xuất D-7** (thông báo `storage_low` trong app): `notification.commune_id` bắt buộc và lọc theo xã, đĩa không thuộc xã nào — không thêm type thông báo, §5.9 không đổi. Không gửi được cho **ai** ⇒ job `failing`, lần sau gửi lại; gửi được cho **một số** ⇒ không gửi lại (một địa chỉ hỏng không làm người khác nhận thư mỗi 5 phút), job `failing` kèm username người bị lỡ. Không có Quản trị nào đang hoạt động ⇒ đợt vẫn đánh dấu đã báo, chỉ ghi log |
 | SM-8 | **Giới hạn đã biết:** worker chết thì không job nào báo được (D-8 bỏ qua) — chỉ thấy `stalled` khi có người mở màn. Ngưỡng không có vùng trễ: dung lượng dao động quanh 15 % có thể sinh nhiều đợt / nhiều thư |
 
+### BE-33 — cấu hình hệ thống do Quản trị sửa (22/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 22/10/2026 — D-1…D-8 của Phase 1 (`.ai/results/BE-33-p1.md`) theo đề xuất. **SELF-SIGNED**, chạm API (chỉ thêm), đã hợp nhất vào **Contract v1.16 mục 4.11** (+ một trường ở 5.1), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (màn Quản trị hệ thống; biểu đồ chi tiết cột). Mobile không dùng. **Chưa báo** |
+| **Scope** | Persistence (`system_setting`, `system_setting_change`, `SystemSettingValues`), Admin (endpoint), Survey (snapshot của run), Map (chi tiết cột, bản đồ thiết bị), Telemetry (`NodeSilence`, job `node_offline`); migration `AddSystemSettings`. `IotOptions` và `Frames:DimThresholdRatio` **bị gỡ** |
+
+| Mã | Quyết định |
+|---|---|
+| SET-1 | **Thu phạm vi task list:** chỉ hai khoá `dim_threshold_ratio` (0.50–0.95, mặc định 0.80) và `iot_offline_after_minutes` (5–1440, số nguyên, mặc định 60). "Loại đèn / loại sự cố" **không** thành danh mục sửa được (enum khoá cứng, Contract mục 3.1); "trọng số ưu tiên" chờ công thức CV-16 (P-1) |
+| SET-2 | **Một nguồn:** bảng `system_setting`, migration seed giá trị đang chạy; khoá **ra khỏi appsettings** (`Iot:OfflineAfter`, `SurveyProcessing:Frames:DimThresholdRatio` không còn được đọc). CHECK miền theo từng khoá sinh từ `SystemSettingKeys.All` |
+| SET-3 | **Lịch sử:** `system_setting_change` append-only (trigger `luxmap_reject_processing_mutation` + `IImmutableRecord`), không dùng `audit_event` vì bảng đó bắt buộc `commune_id`. Gửi đúng giá trị đang có → không ghi |
+| SET-4 | **Không cache:** mỗi lượt dùng đọc bảng (chi tiết cột, bản đồ thiết bị, mỗi lượt job, mỗi run khảo sát) |
+| SET-5 | **Ngưỡng `dim` chụp theo run:** đọc lúc claim, ghi vào `settings_snapshot.frames.dim_threshold_ratio` (đúng chỗ run cũ đã ghi). Không phân loại lại dữ liệu đã có |
+| SET-6 | **`GET /map/poles/{pole_id}`:** mỗi điểm `luminance_history[]` thêm `dim_threshold_ratio` của run (chỉ thêm, `null` nếu run không ghi); `luminance_baseline.dim_threshold_ratio` = ngưỡng đang áp, nay từ cấu hình |
+| SET-7 | **Sửa lỗi lộ ra khi ngưỡng offline đổi được:** job `node_offline` kiểm trùng theo **lần im lặng** (`detected_at > last_report_at`), không theo `detected_at` chính xác — trước đây ngưỡng đổi giữa một lần im lặng sẽ sinh sự cố thứ hai. Unique index `ux_fault_origin_node_id_detected_at` giữ nguyên cho hai lượt cùng ngưỡng |
+
 ### ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê (23/10/2026)
 
 | | |

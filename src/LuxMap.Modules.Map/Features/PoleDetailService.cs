@@ -4,9 +4,10 @@ using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Survey.Entities;
-using LuxMap.Modules.Survey.Processing.Frames;
+using LuxMap.Modules.Survey.Processing;
 using LuxMap.Modules.Survey.Review;
 using LuxMap.Persistence;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Http;
@@ -32,7 +33,7 @@ namespace LuxMap.Modules.Map.Features;
 /// </para>
 /// </remarks>
 public sealed class PoleDetailService(
-    LuxMapDbContext db, SurveyFrameOptions surveyOptions, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty)
+    LuxMapDbContext db, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty)
 {
     public const int HistoryPoints = 30;
     public const int RecentFrameCount = 10;
@@ -112,6 +113,7 @@ public sealed class PoleDetailService(
             .Where(b => b.PoleId == poleId)
             .OrderByDescending(b => b.Version)
             .ToListAsync(ct);
+        var dimThresholdRatio = (await SystemSettingValues.ReadAsync(db, ct)).DimThresholdRatio;
 
         return [.. rows
             .GroupBy(b => b.Direction)
@@ -121,7 +123,7 @@ public sealed class PoleDetailService(
             {
                 BaselineValue = b.Value,
                 BaselineWindowNights = b.MemberCount,
-                DimThresholdRatio = surveyOptions.DimThresholdRatio,
+                DimThresholdRatio = dimThresholdRatio,
                 OutThresholdRatio = null,
                 ComputedAt = b.CreatedAt,
                 Direction = b.Direction,
@@ -136,6 +138,10 @@ public sealed class PoleDetailService(
             .ThenByDescending(h => h.SweepId)
             .Take(HistoryPoints)
             .ToListAsync(ct);
+        var runIds = rows.Select(h => h.RunId).Distinct().ToList();
+        var thresholds = (await db.Set<SurveyProcessingRun>().AsNoTracking()
+                .Where(r => runIds.Contains(r.RunId)).Select(r => new { r.RunId, r.SettingsSnapshot }).ToListAsync(ct))
+            .ToDictionary(r => r.RunId, r => SurveySettingsSnapshot.DimThresholdRatioOf(r.SettingsSnapshot));
 
         rows.Reverse();
         return [.. rows.Select(h => new PoleMapHistoryPoint
@@ -145,6 +151,7 @@ public sealed class PoleDetailService(
             NormalizedLuminance = h.BaselineRatio,
             BaselineRatio = h.BaselineRatio,
             ClassifiedAs = h.ClassifiedAs,
+            DimThresholdRatio = thresholds.GetValueOrDefault(h.RunId),
             PeakLux = h.PeakLux,
             ReasonCodes = SurveyPublicationRules.Flags(h.ReasonCodes),
         })];

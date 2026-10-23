@@ -42,6 +42,7 @@ public class CapabilityMatrixTests
         ["cap:read_citizen_reports"] = ["manager", "superior", "system_admin"],
         ["cap:review_citizen_reports"] = ["manager"],
         ["cap:monitor_system"] = ["system_admin"],
+        ["cap:manage_settings"] = ["system_admin"],
     };
 
     [Fact]

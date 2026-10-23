@@ -2,6 +2,7 @@ using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -45,6 +46,12 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         // Declare the principal here so Persistence does not depend on the Identity module.
         builder.HasMany<AuditEvent>().WithOne()
             .HasForeignKey(audit => audit.ActorUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany<SystemSetting>().WithOne()
+            .HasForeignKey(setting => setting.UpdatedBy)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany<SystemSettingChange>().WithOne()
+            .HasForeignKey(change => change.ChangedBy)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(user => user.Username).IsUnique();

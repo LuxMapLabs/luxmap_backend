@@ -5,6 +5,7 @@ using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence;
+using LuxMap.Persistence.Settings;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.GeoJson;
@@ -36,7 +37,7 @@ namespace LuxMap.Modules.Map.Features;
 /// survives — never the other way round.
 /// </para>
 /// </remarks>
-public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, TimeProvider clock, WarrantyCalendar warranty)
+public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider clock, WarrantyCalendar warranty)
 {
     /// <summary>Past this many poles the client is told to zoom in rather than served (section 5.1).</summary>
     public const int MaxPoles = 2000;
@@ -298,6 +299,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
         // One clock reading for the whole response, so two devices with the same last report can
         // never straddle the threshold within one answer.
         var now = clock.GetUtcNow().UtcDateTime;
+        var offlineAfter = (await SystemSettingValues.ReadAsync(dbContext, ct)).IotOfflineAfter;
 
         return new FeatureCollection<IotNodeProperties>
         {
@@ -308,7 +310,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, IotOptions iot, T
                 {
                     NodeId = row.NodeId,
                     NodeRole = row.NodeRole,
-                    NodeStatus = iot.StatusAt(row.LastReportAt, now),
+                    NodeStatus = NodeSilence.StatusAt(row.LastReportAt, now, offlineAfter),
                     PoleId = null,
                     SegmentIds = row.SegmentIds,
                     FeederIds = row.FeederIds,

@@ -19,7 +19,7 @@ D-R28 = **proxy streaming qua API** (BE-15 P1, 02/10); D-R25 (`calibration_rig`)
 
 Thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.15** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.16** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
    `docs/openapi/luxmap-v1.5.json` (file SINH — xem `docs/agents/traps/assets.md` mục BE-REVIEW-02 số 8).
 2. **Quyết định đã chốt trong `docs/contract-drift.md` nhưng chưa hợp nhất vào Contract thắng chữ của Contract** (Mỹ ký 20/10/2026).
    Đây là cách repo đang chạy: thiết bị IoT ở tủ điện (I-18), sort mặc định sự cố (P-3), `out_threshold_ratio = null` (D-R22).
@@ -262,7 +262,8 @@ Vi phạm thì build và test vẫn xanh; chi tiết ở file vùng được tr�
 - **Ranh giới module:** không thêm project reference ngược chiều phụ thuộc; hỏi qua **port** khai ở module cần, module sở hữu hiện thực
   (`IActiveWorkOrderLookup`, `ICabinetDeviceLookup`, `ISurveyCorridor`, `IPolePhotoPublication`, `ISurveyFindingLookup`).
 - **Luật một định nghĩa:** tập trạng thái mở (`FaultStatusSets`), bảo hành (`WarrantyWindow`), ngưỡng hành lang khảo sát
-  (`SurveyProcessing:RouteCorridorM`), ngưỡng offline thiết bị (`IotOptions`) — gọi, không chép.
+  (`SurveyProcessing:RouteCorridorM`), ngưỡng `dim` và ngưỡng offline thiết bị (`system_setting` qua `SystemSettingValues`, luật
+  im lặng ở `NodeSilence`; BE-33) — gọi, không chép.
 - **Kiểm tra nằm trong service** khi có kênh khác controller gọi (sync, MQTT, job): DataAnnotations của controller không chạy ở đó.
 - **Body JSON là `sealed class` + `init`**, không positional record có attribute kiểm tra trên tham số (500 ở request đồng thời đầu tiên).
 - **Swagger:** một schemaId một kiểu .NET qua mọi module; hai `ProducesResponseType` cùng mã thì cái sau **thay** cái trước;

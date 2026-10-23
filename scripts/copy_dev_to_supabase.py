@@ -164,6 +164,8 @@ SKIPPED = {
     "sync_operation": "bộ nhớ gửi lại của hàng chờ offline (BE-43) — điện thoại trỏ vào máy chủ nguồn không đẩy hàng chờ sang đích",
     "storage_reconciliation": "kết quả đối chiếu object của bucket NGUỒN (BE-35) — đích tự đối chiếu ở lượt job đầu tiên",
     "storage_alert": "đợt đĩa đầy của máy NGUỒN (BE-35) — đĩa đích khác, chép sang sẽ chặn thư cảnh báo của đích",
+    "system_setting": "cấu hình của máy NGUỒN (BE-33) — migration ở đích seed giá trị mặc định; Quản trị đích tự đặt lại",
+    "system_setting_change": "lịch sử đổi cấu hình của NGUỒN (BE-33) — không khớp giá trị ở đích, và trỏ tới Quản trị của nguồn",
     "__ef_migrations_history": "đích có lịch sử riêng do migration ghi",
     "spatial_ref_sys": "bảng của PostGIS, extension ở đích tự có",
 }

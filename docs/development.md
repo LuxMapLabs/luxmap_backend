@@ -571,13 +571,9 @@ bị điều khiển 0..n feeder qua rơ-le (bảng `feeder_control`); `segment_
 `controller_node_ids` của `/segments` đều **tính lúc đọc**. Hình dạng là nền tạm, xem
 [drift "BE-14 / IoT"](contract-drift.md).
 
-`node_status` tính từ `last_report_at` so với ngưỡng im lặng, mặc định **1 giờ**. Đổi bằng
-`Iot:OfflineAfter` trong `appsettings.json` hoặc biến môi trường, rồi khởi động lại; giá trị ≤ 0 làm
-app từ chối khởi động:
-
-```bash
-Iot__OfflineAfter=00:30:00 dotnet run --project src/LuxMap.Api
-```
+`node_status` tính từ `last_report_at` so với ngưỡng im lặng, mặc định **60 phút**. Ngưỡng là cấu hình hệ
+thống `iot_offline_after_minutes` (5–1440), Quản trị sửa qua `PUT /api/v1/admin/settings/iot_offline_after_minutes`
+(Contract §4.11, BE-33) — có hiệu lực ngay, không restart. Không còn đọc từ `appsettings.json` / biến môi trường.
 
 ### Kênh MQTT cho thiết bị — LC-12
 
@@ -641,7 +637,7 @@ hồi sinh. P2b-2 duy trì heartbeat trong các bước media dài. Lỗi bất 
 sweep/attempt. Kết thúc ghi run/pass/observation và (từ P2b-2) frame/detection/phân loại,
 chuyển sweep sang `awaiting_review`, trả `coverage_pct` mức đi ngang và `frame_count` thật.
 Chưa công bố trạng thái cột.
-Các giá trị trên chưa được hiệu chỉnh bằng chuyến quay thử; `system_setting` để BE-33.
+Các giá trị trên chưa được hiệu chỉnh bằng chuyến quay thử. Riêng ngưỡng `dim` là cấu hình hệ thống (BE-33, mục dưới).
 
 
 ## Frame và CV mô phỏng — BE-15 P2b-2
@@ -664,7 +660,10 @@ Cấu hình trong `SurveyProcessing:Frames`, được chụp trong `settings_sna
 | `TimeoutSeconds` / `DetectorTimeoutSeconds` | 60 / 30 giây |
 | `BeforeSeconds` / `AfterSeconds` / `FramesPerSecond` | 3 / 0,5 / 5 |
 | `MinimumConfidence` / `MinimumBoxArea` | 0,7 / 0,0001 diện tích chuẩn hoá |
-| `DimThresholdRatio` | 0,80 |
+
+Ngưỡng `dim` **không** nằm ở đây: nó là cấu hình hệ thống `dim_threshold_ratio` (0,50–0,95, mặc định 0,80), Quản trị sửa qua
+`PUT /api/v1/admin/settings/dim_threshold_ratio` (Contract §4.11, BE-33). Run đọc nó lúc được nhận và ghi vào
+`settings_snapshot.frames.dim_threshold_ratio`; đổi ngưỡng không phân loại lại run đã có.
 
 Probe dùng `-show_entries stream=width,height,time_base:stream_side_data=rotation:packet=pts,flags -of json=compact=1`.
 Loại packet có cờ discard `D` (tham chiếu ngoài đoạn hiển thị của edit list MOV/MP4), rồi đọc `packets[].pts`

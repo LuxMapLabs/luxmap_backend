@@ -20,7 +20,7 @@ namespace LuxMap.Modules.Telemetry.Entities;
 /// </para>
 /// <para>
 /// <c>node_status</c> is NOT stored (I-3). It is derived on read from <see cref="LastReportAt"/> and
-/// <see cref="IotOptions.OfflineAfter"/>; a stored status would need a job to flip it to offline,
+/// the <c>iot_offline_after_minutes</c> system setting (<see cref="NodeSilence"/>); a stored status would need a job to flip it to offline,
 /// because a dead device cannot report its own death.
 /// </para>
 /// </remarks>
