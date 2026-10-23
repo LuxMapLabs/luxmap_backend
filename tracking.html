@@ -42,6 +42,17 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>BE-34 — phiên bản firmware và model AI, Phase 1, 23/10/2026</strong>
+    <p><span class="tag t-next">Phase 1 xong · chờ Mỹ chốt D-1…D-9</span> Nhánh <code>docs/BE-34-p1</code>. Registry
+    <code>artifact_version</code> chỉ nhận 5 thành phần của pipeline khảo sát, không có API; firmware <strong>rơi mất ở hai nguồn</strong>:
+    heartbeat MQTT gửi <code>firmware_version</code> nhưng handler bỏ, <code>module_firmware_version_id</code> của file khảo sát bắt buộc
+    nhưng không trỏ vào đâu và không ra cột nào. Phiên bản model nằm ở 8 bảng với 3 dạng (FK / chuỗi / chuỗi ghép).
+    <strong>Codex (<code>-p river</code>) review bản đầu</strong>, Claude kiểm từng P1 với code: 5 đề xuất không an toàn đã sửa
+    (<code>IAudited</code> trên <code>IotNode</code> làm vỡ heartbeat, FK vượt ranh giới module, CHECK hash, ghi firmware vào cột model CV,
+    từ chối phiên khảo sát offline). Bản sửa: registry xuống Persistence, lịch sử firmware append-only, lưu nguồn gốc phiên,
+    API tra cứu "kết quả nào do phiên bản nào". <a href=".ai/results/BE-34-p1.md">Kết quả Phase 1</a>.</p>
+  </div>
+  <div class="card">
     <strong>Sơ đồ trạng thái — chấm start / end, 23/10/2026</strong>
     <p><span class="tag t-done">Đã merge (PR #182, <code>ceef113</code>, 23/10)</span> Rà 14 sơ đồ của
     <code>docs/state-machines.md</code>. Thiếu: §7 (flowchart <code>node_status</code>) không có chấm start, end là hộp chữ → thêm
