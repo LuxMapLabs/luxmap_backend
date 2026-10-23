@@ -51,7 +51,7 @@
   </div>
   <div class="card">
     <strong>BE-33 — cấu hình hệ thống do Quản trị sửa, Phase 2, 22/10/2026</strong>
-    <p><span class="tag t-done">Đã merge (PR #178, <code>ebbe37f</code>, 23/10 — admin merge, vượt review code owner Contract / OpenAPI theo quyết định của Mỹ; Ngọc/Thịnh xác nhận ở FW kế tiếp) · <code>luxmap_dev</code> đã migrate 23/10 (dump trước) · <strong>VPS chưa deploy</strong></span>
+    <p><span class="tag t-done">Đã merge (PR #178, <code>ebbe37f</code>, 23/10 — admin merge, vượt review code owner Contract / OpenAPI theo quyết định của Mỹ; Ngọc/Thịnh xác nhận ở FW kế tiếp) · <code>luxmap_dev</code> đã migrate 23/10 (dump trước) · deploy VPS 23/10 (<code>02aebc4</code>, backup <code>20261023T074008Z</code> trước migration)</span>
     Bảng <code>system_setting</code> (nguồn duy nhất, seed 0.80 / 60) + lịch sử append-only <code>system_setting_change</code>;
     <code>GET</code> / <code>PUT /admin/settings</code>, capability <code>ManageSettings</code> (chỉ Quản trị), mã <code>SETTING_NOT_FOUND</code>.
     Ngưỡng <code>dim</code> đọc lúc claim run và chụp vào <code>settings_snapshot</code>; chi tiết cột trả thêm <code>dim_threshold_ratio</code>
