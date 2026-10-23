@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +46,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
 
         string[] expected =
         [
-            "pole_id", "external_ref", "segment_id", "feeder_id", "commune_id", "data_source",
+            "pole_id", "external_ref", "segment_id", "feeder_id", "commune_id", "commune_name", "data_source",
             "near_sensitive_poi", "location", "active_fixture", "note", "updated_at", "updated_by", "updated_by_name",
             "feeder_source", "cabinet_id", "cabinet_name", "cabinet_source",
         ];
@@ -62,6 +63,31 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
         {
             Assert.DoesNotContain(operational, keys);
         }
+    }
+
+    /// <summary>
+    /// ASSET-COMMUNE-NAME — every inventory row names its commune, list and detail alike, so the table shows "Long Phước" rather
+    /// than <c>COM-001</c> without a second call. The name is the commune's own, read at request time.
+    /// </summary>
+    [Fact]
+    public async Task Every_inventory_row_names_its_commune_in_the_list_and_the_detail()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var segmentId = await NewSegmentAsync(fixture.CommuneId);
+        var feederId = await NewFeederAsync(fixture.CommuneId);
+        var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: feederId);
+        var name = await fixture.QueryAsync(db => db.Set<AdministrativeUnit>()
+            .Where(unit => unit.CommuneId == fixture.CommuneId).Select(unit => unit.Name).SingleAsync());
+
+        foreach (var (url, key, id) in new[] { (Poles, "pole_id", poleId), (Segments, "segment_id", segmentId), (Feeders, "feeder_id", feederId) })
+        {
+            var row = await FindAsync(client, $"{url}?page_size=200", key, id);
+            Assert.Equal((fixture.CommuneId, name), (row.GetProperty("commune_id").GetString(), row.GetProperty("commune_name").GetString()));
+        }
+
+        Assert.Equal(name, (await client.GetFromJsonAsync<JsonElement>($"{Poles}/{poleId}")).GetProperty("pole").GetProperty("commune_name").GetString());
+        Assert.Equal(name, (await client.GetFromJsonAsync<JsonElement>($"{Segments}/{segmentId}")).GetProperty("segment").GetProperty("commune_name").GetString());
+        Assert.Equal(name, (await client.GetFromJsonAsync<JsonElement>($"{Feeders}/{feederId}")).GetProperty("feeder").GetProperty("commune_name").GetString());
     }
 
     /// <summary>Q1 — <c>external_ref</c> IS emitted, although the map is forbidden to.</summary>

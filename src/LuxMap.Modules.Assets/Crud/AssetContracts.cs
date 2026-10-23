@@ -514,6 +514,12 @@ public sealed record PoleListItem
 
     public required string CommuneId { get; init; }
 
+    /// <summary>
+    /// The commune's name now (ASSET-COMMUNE-NAME), read at request time from <c>administrative_unit</c> — so a renamed commune shows
+    /// its new name and an inventory row needs no second call. Never stored on the asset.
+    /// </summary>
+    public required string CommuneName { get; init; }
+
     public required DataSource DataSource { get; init; }
 
     public required bool NearSensitivePoi { get; init; }
@@ -640,6 +646,12 @@ public sealed record SegmentListItem
 
     public required string CommuneId { get; init; }
 
+    /// <summary>
+    /// The commune's name now (ASSET-COMMUNE-NAME), read at request time from <c>administrative_unit</c> — so a renamed commune shows
+    /// its new name and an inventory row needs no second call. Never stored on the asset.
+    /// </summary>
+    public required string CommuneName { get; init; }
+
     public required DataSource DataSource { get; init; }
 
     /// <summary>⚠️ Counted within the CALLER'S commune scope, like every other read.</summary>
@@ -680,6 +692,12 @@ public sealed record FeederListItem
     public required string FeederName { get; init; }
 
     public required string CommuneId { get; init; }
+
+    /// <summary>
+    /// The commune's name now (ASSET-COMMUNE-NAME), read at request time from <c>administrative_unit</c> — so a renamed commune shows
+    /// its new name and an inventory row needs no second call. Never stored on the asset.
+    /// </summary>
+    public required string CommuneName { get; init; }
 
     /// <summary>
     /// Whether a cable route was recorded, rather than the route itself.
@@ -754,6 +772,12 @@ public sealed record CabinetListItem
     public required string CabinetName { get; init; }
 
     public required string CommuneId { get; init; }
+
+    /// <summary>
+    /// The commune's name now (ASSET-COMMUNE-NAME), read at request time from <c>administrative_unit</c> — so a renamed commune shows
+    /// its new name and an inventory row needs no second call. Never stored on the asset.
+    /// </summary>
+    public required string CommuneName { get; init; }
 
     public required DataSource DataSource { get; init; }
 

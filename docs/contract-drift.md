@@ -1511,3 +1511,15 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | SM-6 | Job **`storage_reconciliation`** (ngày một lần): đọc key từ dòng **trước**, rồi liệt kê bucket (ListObjectsV2). Mồ côi = object không dòng nào trỏ tới, cũ hơn **`Monitoring:OrphanGraceHours`** (24); thiếu = dòng trỏ tới object không còn. Mẫu ≤ 20 key mỗi loại, một dòng mỗi bucket trong `storage_reconciliation` (ghi đè). **Chỉ báo cáo, không xoá** — xoá là ticket riêng có chữ ký |
 | SM-7 | Job **`storage_capacity`** (15 phút): trống dưới **`Monitoring:LowDiskRatio`** (0,15) mở một đợt trong `storage_alert` (`ux_storage_alert_open`: tối đa một đợt mở) và **gửi email** cho mọi `system_admin` đang hoạt động, một lần mỗi đợt; lên lại trên ngưỡng thì đóng đợt. **Lệch đề xuất D-7** (thông báo `storage_low` trong app): `notification.commune_id` bắt buộc và lọc theo xã, đĩa không thuộc xã nào — không thêm type thông báo, §5.9 không đổi. Không gửi được cho **ai** ⇒ job `failing`, lần sau gửi lại; gửi được cho **một số** ⇒ không gửi lại (một địa chỉ hỏng không làm người khác nhận thư mỗi 5 phút), job `failing` kèm username người bị lỡ. Không có Quản trị nào đang hoạt động ⇒ đợt vẫn đánh dấu đã báo, chỉ ghi log |
 | SM-8 | **Giới hạn đã biết:** worker chết thì không job nào báo được (D-8 bỏ qua) — chỉ thấy `stalled` khi có người mở màn. Ngưỡng không có vùng trễ: dung lượng dao động quanh 15 % có thể sinh nhiều đợt / nhiều thư |
+
+### ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê (23/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 23/10/2026 — yêu cầu trực tiếp. **SELF-SIGNED**, chạm API (chỉ thêm). **Chưa hợp nhất vào Contract** mục 5.3.1 — hợp nhất ở version kế tiếp, sau BE-33 (v1.16 đang chờ merge) để hai nhánh không cùng giành số version |
+| **Consumer** | WP5 (bảng kiểm kê cột / tuyến / mạch / tủ điện). Mobile không dùng `/assets`. **Chưa báo** |
+| **Scope** | `PoleListItem`, `SegmentListItem`, `FeederListItem`, `CabinetListItem` (và chi tiết bọc chúng: `GET /assets/{kind}/{id}`). Không migration. Bản đồ `/map/…` không đổi |
+
+| Mã | Quyết định |
+|---|---|
+| ACN-1 | Thêm **`commune_name`** (chuỗi, luôn có) ngay sau `commune_id` trên bốn dòng kiểm kê — tên **hiện tại** của `administrative_unit`, đọc lúc trả (subquery theo khoá), không lưu lên tài sản: đổi tên xã ở `/admin/communes` là mọi dòng đổi theo |
