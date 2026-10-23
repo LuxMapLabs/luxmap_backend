@@ -42,8 +42,19 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>Sơ đồ trạng thái — chấm start / end, 23/10/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>docs/state-machine-start-end</code> · chưa push</span> Rà 14 sơ đồ của
+    <code>docs/state-machines.md</code>. Thiếu: §7 (flowchart <code>node_status</code>) không có chấm start, end là hộp chữ → thêm
+    chấm start / end; §9 (trạng thái đèn tại cột) không có end → thêm <code>unknown → [*]</code> khi xoá cột, chỉ được khi chưa từng
+    công bố gì (mọi bản ghi công bố giữ cột bằng FK <code>RESTRICT</code>, kiểm trên <code>pg_constraint</code>); §8 (tài khoản)
+    không có end vì tài khoản không xoá được → ghi chú, <strong>không</strong> vẽ end giả. §0 là sơ đồ quan hệ, không áp. Render thử
+    bằng mermaid-cli 11.4.2: cả bốn sơ đồ chạm tới đều ra SVG. <strong>Theo góp ý của thầy:</strong> mỗi state machine (10 sơ
+    đồ) thêm một bảng ngắn "trạng thái → nghĩa → ví dụ vì sao đi tới đó" (vd. vì sao phiếu bị <code>cancelled</code>, sweep bị
+    <code>returned</code> / <code>failed</code> với mã lỗi thật của worker); ví dụ minh hoạ, luật vẫn là sơ đồ.</p>
+  </div>
+  <div class="card">
     <strong>Test đỏ ngẫu nhiên — "Quản trị cuối cùng", 23/10/2026</strong>
-    <p><span class="tag t-next">Nhánh <code>fix/flaky-last-admin-test</code> · PR mở</span>
+    <p><span class="tag t-done">Đã merge (PR #181, <code>1b8c4bd</code>, 23/10)</span>
     <code>The_last_active_system_admin_can_be_neither_demoted_nor_locked</code> đỏ ở CI của #180 (run 39919424341): nó khoá mọi
     Quản trị khác rồi đếm dưới READ COMMITTED, trong khi <code>SystemMonitoringTests</code> (collection khác, thêm ở BE-35 S-1)
     commit một Quản trị đang hoạt động. Chuyển test sang collection mới <code>SystemAdminCountCollection</code>

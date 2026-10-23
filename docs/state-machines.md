@@ -2,7 +2,8 @@
 
 Drawn from **the code running on `dev`**, not from the specification: first version 14/10/2026, section 10 added
 16/10/2026 after POLE-PHOTO-AI; **re-checked in full against the code on 20/10/2026** (a read-only Codex review, every
-finding verified against the code) and sections 11–13 added. Each section names the files that hold its transition rules:
+finding verified against the code) and sections 11–13 added; 23/10/2026: BE-33 thresholds (sections 7, 9), start / end
+markers, and a meaning-and-example table under each machine. Each section names the files that hold its transition rules:
 whoever changes a rule updates the diagram in the same PR. State names are **wire values** (lowercase snake_case strings) —
 exactly what the API returns; exceptions are stated in each section.
 
@@ -17,6 +18,9 @@ Conventions for every machine below:
   accounts (section 8) and refresh tokens (section 13) belong to no commune, so they are only written to the structured log;
   lamps (section 11) only stamp `updated_by` / `updated_at` on their own row.
 - A closing state (`[*]` at the end) is final: there is no way back; whatever comes next is a **new** record.
+- Under each machine, a short table says what each state means and gives a **real-life example** of why a record ends up
+  there (why a work order is cancelled, why a sweep is returned…). The examples illustrate; the diagram and the bullets
+  under it are the rules.
 
 | # | State machine | Stored in | Transition rules live in |
 |---|---|---|---|
@@ -27,7 +31,7 @@ Conventions for every machine below:
 | 4 | Citizen report | `citizen_report.status` | `Citizen/CitizenReviewService.cs`, `PublicReportService.cs` |
 | 5 | QR code on a pole | `qr_code.revoked_at` | `Citizen/QrCodeService.cs` |
 | 6 | ON / OFF / AUTO command | `lighting_command.status` | `Telemetry/Lighting/LightingCommandService.cs`, `Telemetry/Mqtt/MqttLightingHandler.cs` |
-| 7 | IoT device status `node_status` | **not stored**, computed on read | `Telemetry/IotOptions.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs` |
+| 7 | IoT device status `node_status` | **not stored**, computed on read | `Telemetry/NodeSilence.cs` (`StatusAt`), `Jobs/NodeOfflineJob.cs`; threshold = system setting `iot_offline_after_minutes` |
 | 8 | User account | `is_locked`, `password_set_at` | `Identity/Accounts/UserAdminService.cs`, `PasswordService.cs` |
 | 9 | Lamp condition at a pole `fixture_status` | `pole_current_status` | `Survey/Processing/Frames/FrameClassification.cs` (classification), `Survey/Review/SurveyReviewService.cs` (sweep review), `ReviewedPolePhotoPublisher.cs` (pole photo confirmation); both write through `PoleStatusPublication.cs` |
 | 10 | Pole photo in a work order (AI ON/OFF) | `work_order_pole_photo.decision`, `cv_state` | `WorkOrders/WorkOrderPolePhotoService.cs`, `Survey/Review/ReviewedPolePhotoPublisher.cs` |
@@ -97,6 +101,14 @@ stateDiagram-v2
     end note
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `detected` | Raised, nobody has checked it yet | A night sweep sees POLE-0047 **off**; a cabinet device stops reporting for over an hour; an engineer reports a broken lamp on site |
+| `confirmed` | A Manager agrees it is real | The Manager opens the frame and sees the lamp is dark; an inspection order comes back with `fault_present` |
+| `rejected` | A false alarm, closed for good | The camera was blinded by a truck's headlights; the "silent" device was only unplugged for the testbed demo |
+| `in_progress` | A repair is under way | The engineer presses **start** on the repair order that carries the fault |
+| `resolved` → `verified` | Fixed, then signed off | The engineer replaces the lamp and uploads the `after` photo; the Manager checks it and verifies the order |
+
 - `PATCH /faults/{id}` can **only** do `detected → confirmed | rejected` (`FaultReviewRules.IsReviewTransition`). The three
   later steps are driven by the **repair order**; sending them through `PATCH` → 409 even though the machine allows them.
 - `resolved` and `verified` are written in **the same** work order verify: `resolved_by` is the assigned engineer (time =
@@ -142,6 +154,16 @@ stateDiagram-v2
     cancelled --> [*]
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `open` | Created, nobody assigned | The Manager plans tomorrow's repairs before knowing who is on duty |
+| `assigned` | An engineer has it, not started | Assigned to the night engineer, who has not reached the road yet |
+| `in_progress` | The engineer is working on it | On site: inspecting poles, replacing a lamp, or driving the survey route |
+| `done` | The engineer says it is finished | Report written, `after` photo uploaded — waiting for the Manager |
+| `done` → `in_progress` (**return**) | The Manager is not satisfied | The `after` photo still shows the lamp off; the report does not say which poles were checked |
+| `verified` | Signed off, closed | The Manager accepts the report; repaired faults become `verified` |
+| `cancelled` | Dropped, closed — the `note` says why | An inspection order whose fault the Manager **rejected** as a false alarm before anyone went out; a duplicate order was created by mistake; the commune's own contractor already fixed the lamp; the order named the wrong road. Its faults are released and can join another order |
+
 | Action | Who | From | Extra conditions |
 |---|---|---|---|
 | `assign` / `reassign` / `unassign` / `edit` / `cancel` | Manager | `open`, `assigned`, `in_progress` | the assignee must be an active Field Engineer covering the order's commune (survey order: every commune of its segments), otherwise 409 `ASSIGNEE_NOT_ELIGIBLE`; reassigning to the current assignee changes nothing; `cancel` requires `note` |
@@ -185,6 +207,15 @@ stateDiagram-v2
     failed --> [*]
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `uploading` | Files are still coming in | The phone is uploading the clips and the GPS / lux / camera-settings files after the drive |
+| `queued` → `processing` | Waiting for, then held by, the worker | Another sweep is being processed first; a worker has taken this one |
+| `awaiting_review` | Processed, results ready | Each pole on the route has an ON / OFF / dim result for the Manager to check |
+| `accepted` | The Manager trusts the results | Results are published to the map and faults are raised for dark / dim lamps |
+| `returned` | The Manager does not trust them — re-survey | The video is blurred by rain; half the route was not covered; the car drove the wrong lane |
+| `failed` | Processing could not finish | `GPS_INSUFFICIENT` (fewer than two usable GPS points); `CLOCK_VIDEO_MAPPING` (video and lux log cannot be lined up); `VIDEO_TIMEOUT` repeated until `RETRY_EXHAUSTED` |
+
 | `status` | `processing_status` |
 |---|---|
 | `uploading` | `not_started` |
@@ -225,6 +256,13 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `pending` | Sent by a resident, waiting for a Manager | A resident scans the QR on a dark pole and sends a photo |
+| `accepted` | Real, and new | No open fault on that pole yet → a new `confirmed` fault |
+| `merged` | Real, but already known | The night sweep already raised a fault on that pole; the report is attached to it |
+| `rejected` | Not a fault | A daytime photo of a lamp that is simply off by day; a prank; a photo of a different pole |
+
 - A citizen report **never** becomes a fault by itself — it always goes through a Manager (D-R1).
 - Each decision carries the `submission_count` that was read; a new send in between → 409 `CITIZEN_REPORT_CHANGED`.
   Decided **once**: a second decision → 409 `CITIZEN_REPORT_ALREADY_DECIDED`.
@@ -246,6 +284,11 @@ stateDiagram-v2
     active --> revoked : Manager issues a new code for the same pole (the old one is revoked)
     revoked --> [*]
 ```
+
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `active` | The sticker on the pole works | Printed and stuck on the pole after the code was issued |
+| `revoked` | The code no longer accepts reports | The sticker was torn off or painted over; a photo of the code was shared online and reports came from far away |
 
 - At most **one** `active` code per pole (`ux_qr_code_pole_id_active`). Revoking twice → 409 `QR_CODE_ALREADY_REVOKED`.
 - A `revoked` code can no longer send reports. A send and a revoke take the same `pole` row lock; the send re-checks the
@@ -274,6 +317,14 @@ stateDiagram-v2
     expired --> [*]
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `pending` → `delivered` | Sent, then picked up by the device | The Manager presses OFF; the cabinet device fetches it on its next poll |
+| `applied` | The relay is in the requested mode | The device reports the relay switched OFF |
+| `failed` | The device tried and could not | The relay is stuck; the device reports an `error` |
+| `superseded` | A newer decision replaced it | The Manager pressed OFF then ON before the device acted; the relay was rewired |
+| `expired` | Nobody acted in time | The testbed device lost power or Wi-Fi past `expires_at` |
+
 - Over **HTTP**, an ACK on a command still `pending` → 409 `COMMAND_NOT_DELIVERED` (fetch the command first). Over
   **MQTT**, a valid ACK on a `pending` command moves it to `delivered` first, then applies the result.
 - An ACK must carry the command's `seq`; `applied` must report the requested mode, `failed` must carry an `error` —
@@ -288,18 +339,21 @@ stateDiagram-v2
 
 ## 7. IoT device — `node_status`
 
-Not stored in the database: computed from `last_report_at` and `Iot:OfflineAfter` (default 1 minute) on every read.
+Not stored in the database: computed on every read from `last_report_at` and the system setting
+`iot_offline_after_minutes` (default 60, range 5–1440; the System Admin changes it with `PUT /admin/settings/{key}`, BE-33 —
+it takes effect on the next read, no restart).
 
 ```mermaid
 flowchart TD
+    S((" ")) --> A
     A["Scheduled job: node_offline (BE-26)"] --> B["Find IoT devices"]
     B --> C{"Has reported before?"}
 
     C -- "No" --> D["Keep never_reported"]
-    C -- "Yes" --> E{"Silence duration > OfflineAfter?"}
+    C -- "Yes" --> E{"Silence longer than<br/>iot_offline_after_minutes?"}
 
     E -- "No" --> F["No offline fault created"]
-    E -- "Yes" --> G{"Already processed this offline transition?"}
+    E -- "Yes" --> G{"A node_offline already raised<br/>since its last report?"}
 
     G -- "No" --> H["Create one node_offline fault"]
     H --> I["status = detected"]
@@ -312,13 +366,19 @@ flowchart TD
     M --> N["Existing fault remains open"]
     N --> O["Manager handles fault"]
 
-    D --> P["End"]
+    D --> P(((" ")))
     F --> P
     K --> P
     O --> P
+
+    style S fill:#000,stroke:#000
+    style P fill:#000,stroke:#000
 ```
 
 - Exactly at the threshold is still `online`.
+- **One silence, one fault:** a silence is the time after `last_report_at`, so the duplicate check asks for any `node_offline`
+  of the device detected after its last report — not for one exact `detected_at`. Changing the threshold in the middle of a
+  silence therefore never raises it twice (BE-33 SET-7).
 - The `node_offline` job (BE-26) creates **one** `node_offline` fault (`detected`, `source_channel = iot`) each time a device crosses the threshold. Coming back online **does not** close the fault — the Manager handles it like any other.
 
 
@@ -340,6 +400,14 @@ stateDiagram-v2
     locked --> invited : Unlock (no password yet)
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `invited` | Account exists, no password yet | The System Admin created an account for a new engineer; the invitation email is waiting to be opened |
+| `active` | Can sign in | The engineer set a password from the link |
+| `locked` | Cannot sign in or refresh | The person left the team; a phone with the app signed in was lost |
+
+- **No closing state, on purpose:** an account is never deleted (there is no DELETE on `/admin/users`), so no `[*]` at the
+  end — `locked` is the furthest an account goes, and it can always be unlocked.
 - No self-registration (D-R11). An admin cannot lock themselves, nor lock / demote the **last** active System Admin.
 - Setting a password needs a link that is **unused and unexpired** (invitation 72 hours, reset 1 hour); otherwise **400
   `INVALID_ACCOUNT_TOKEN`**. A locked account can still use a valid link but **stays `locked`**; unlocking it afterwards
@@ -374,7 +442,12 @@ stateDiagram-v2
     normal --> unknown : sweep accepted — missing / conflicting evidence
     dim --> unknown : sweep accepted — missing / conflicting evidence
     out --> unknown : sweep accepted — missing / conflicting evidence
+    unknown --> [*] : pole deleted (DELETE /assets/poles/{id})<br/>only if nothing was ever published for it
 ```
+
+The only end is **deleting the pole**, and only from `unknown` before anything was published: every publication leaves a row
+that holds the pole with `RESTRICT` (`pole_observation`, `luminance_history`, `work_order_pole_photo`), so a pole with a
+history answers 409 `ASSET_IN_USE`. `pole_current_status` itself cascades with the pole.
 
 The diagram leaves out **self-loops**: a new publication can keep the classification in any of the four states (for
 example an "off" photo on a pole already `out`) — the observation clock still moves forward.
@@ -386,7 +459,7 @@ example an "off" photo on a pole already `out`) — the observation clock still 
 | A video gap (`video_gap`), no CV evidence associated with the pole (`no_detection`, `frame_poor`, `on_off_conflict`, …), or the sweep did not pass the pole (`not_observed`) | `unknown` |
 | CV sees the lamp **off** | `out` |
 | CV sees the lamp **on**, missing baseline / peak lux / trustworthy lux readings | `normal` (brightness not evaluated) |
-| CV sees the lamp **on**, peak lux ÷ the pole's own baseline **< `dim_threshold_ratio`** (default 0.80) | `dim` |
+| CV sees the lamp **on**, peak lux ÷ the pole's own baseline **< `dim_threshold_ratio`** (system setting, default 0.80; each sweep run records the value it used) | `dim` |
 | CV sees the lamp **on**, ratio ≥ threshold | `normal` |
 
 At sweep review each pole is published from its **best observation** (non-`unknown` first, then higher CV confidence —
@@ -433,6 +506,12 @@ stateDiagram-v2
     end note
 ```
 
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| awaiting review | Photo received, AI hint attached | The engineer photographs POLE-0012 at night; the AI says **off** |
+| `confirmed` | The Manager agrees with the AI | The photo clearly shows a dark lamp → pole set to `out`, a `lamp_out` fault if none is open |
+| `rejected` | Not usable | Blurred; taken in daylight; the wrong pole is in frame; the AI could not decide (`inconclusive`) |
+
 - Re-sending the same `client_op_id` + the same content → 200, returning **the same** photo and AI result (the model is
   not run again); the same key with different content (photo, pole, capture time, coordinates) → 409
   `IDEMPOTENCY_CONFLICT`.
@@ -463,6 +542,11 @@ stateDiagram-v2
     active --> removed : Manager retires it (PUT /assets/fixtures/{id}/removal)
     removed --> [*]
 ```
+
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| in service | The lamp now on the pole | Recorded at import, or after a replacement |
+| `removed` | Taken down, kept as history | Burnt out and replaced by a new LED; broken in a storm and taken down |
 
 - At most **one** lamp in service per pole (`ux_fixture_pole_id_active`); recording a lamp **in service** on a pole that
   already has one → 409 `POLE_HAS_ACTIVE_FIXTURE`. A lamp recorded with `removed_date` is history and can sit beside the
@@ -521,6 +605,13 @@ stateDiagram-v2
     revoked --> [*]
     expired --> [*]
 ```
+
+| State | Means | Example — why a record ends up here |
+|---|---|---|
+| `valid` | Can be exchanged for a new access token | Just signed in on the phone |
+| `rotated` | Already exchanged | The app refreshed normally; the old token must not be used again |
+| `revoked` | Ended on purpose | Logged out; the account was locked; the password was reset; an old token was reused (possible theft) |
+| `expired` | Ended by time | The phone was not used for longer than the sliding window |
 
 - `revoked_reason`: `rotation`, `logout`, `reuse_detected`, `account_locked`, `password_reset`. A revoked or expired token
   presented again → 401, **nothing** is issued.
