@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.16 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.17 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -15,11 +15,12 @@
 **v1.13:** 06/10/2026 (BE-43 — đồng bộ offline `/sync/bundle` + `/sync/push`; `performed_at?` cho bước của phiếu) ·
 **v1.14:** 06/10/2026 (BE-25 — `GET /work-orders/agenda`, việc đêm nay của kỹ sư gom theo tuyến) ·
 **v1.15:** 22/10/2026 (BE-35 — `GET /admin/system/status`, giám sát job nền và dung lượng lưu trữ; capability `MonitorSystem`) ·
-**v1.16:** 22/10/2026 (BE-33 — `/admin/settings`, ngưỡng `dim` và ngưỡng offline do Quản trị sửa; capability `ManageSettings`).
+**v1.16:** 22/10/2026 (BE-33 — `/admin/settings`, ngưỡng `dim` và ngưỡng offline do Quản trị sửa; capability `ManageSettings`) ·
+**v1.17:** 23/10/2026 (ASSET-COMMUNE-NAME — `commune_name` trên dòng kiểm kê `/assets`).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.16, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.17, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
@@ -690,7 +691,7 @@ là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự t�
 ```jsonc
 // GET /assets/poles → items[]
 { "pole_id": "POLE-0047", "external_ref": "TB-2024-047", "segment_id": "SEG-003",
-  "feeder_id": null, "commune_id": "COM-001", "data_source": "public_imagery",
+  "feeder_id": null, "commune_id": "COM-001", "commune_name": "Long Phước", "data_source": "public_imagery",
   "near_sensitive_poi": true, "location": { "lat": 10.972447, "lng": 106.502058 },
   "active_fixture": { "fixture_id": "FIX-0047", "fixture_type": "led_road_lamp",
                       "power_source": "grid", "lamp_watt": 60,
@@ -702,13 +703,13 @@ là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự t�
 
 // GET /assets/segments → items[]
 { "segment_id": "SEG-003", "external_ref": "DX-03", "segment_name": "Đường liên thôn 3",
-  "road_class": "inter_village", "length_m": 1420, "commune_id": "COM-001",
+  "road_class": "inter_village", "length_m": 1420, "commune_id": "COM-001", "commune_name": "Long Phước",
   "data_source": "public_imagery", "pole_count": 31,
   "updated_at": "…", "updated_by": "USR-002", "updated_by_name": "…" }
 
 // GET /assets/feeders → items[]
 { "feeder_id": "FDR-001", "external_ref": "TĐ-01", "feeder_name": "Tủ điện chợ",
-  "commune_id": "COM-001", "has_geometry": false, "pole_count": 12,
+  "commune_id": "COM-001", "commune_name": "Long Phước", "has_geometry": false, "pole_count": 12,
   "updated_at": "…", "updated_by": "USR-002", "updated_by_name": "…" }
 
 // GET /assets/{kind}/{id} → thêm
@@ -738,6 +739,9 @@ một trường là hai nguồn sự thật cho một câu hỏi, và không gì
   không sửa gì hay nạp lại file y hệt không đụng tới. `null` với dữ liệu hệ thống nạp (seed, bộ mock). Chỉ
   người gần nhất, **không** phải lịch sử. Bóng (`fixture`) cũng lưu `updated_by` nhưng `active_fixture` không
   emit (như `updated_at` của nó).
+- **`commune_name` (v1.17)** — tên **hiện tại** của xã, cạnh `commune_id`, trên dòng cột / tuyến / mạch / tủ điện (danh sách
+  và chi tiết). Đọc lúc trả từ `administrative_unit`, không lưu trên tài sản: đổi tên xã ở `/admin/communes` là mọi dòng đổi
+  theo. Luôn có. **Không** có ở lớp bản đồ `/map/…`.
 - **`location{lat,lng}`, không GeoJSON** — danh sách phân trang, không phải lớp bản đồ; dùng lại đúng
   khuôn mục 5.4 đã publish cho `GET /faults`.
 - **`active_fixture` có trong CẢ danh sách**, không chỉ chi tiết: bảng kiểm kê hiện loại đèn và công
@@ -1055,6 +1059,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.17 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê** (mục 5.3.1, drift ACN-1; PR #177). **Thêm** `commune_name` cạnh `commune_id` trên dòng cột / tuyến / mạch / tủ điện của `/assets/…`, cả danh sách lẫn chi tiết. Chỉ thêm, không migration. Nền tạm tới FW |
 | v1.16 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33 — cấu hình hệ thống** (mục 4.11, drift SET-1…SET-7; D-1…D-8 chốt 22/10). **Thêm** `GET /admin/settings`, `PUT /admin/settings/{key}`, capability `ManageSettings` (chỉ `system_admin`), mã lỗi `SETTING_NOT_FOUND`, trường `dim_threshold_ratio` trên từng điểm `luminance_history[]` của `GET /map/poles/{pole_id}`. `luminance_baseline.dim_threshold_ratio` giữ nghĩa ngưỡng đang áp, nay đọc từ cấu hình. Chỉ thêm, không đổi gì đã có. "Danh mục loại đèn / loại sự cố / trọng số" của task list **không** làm (enum khoá cứng; P-1). Nền tạm tới FW |
 | v1.15 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-35 — giám sát hệ thống** (mục 4.10, drift SM-1…SM-8; D-1…D-10 chốt 22/10, D-8 bỏ qua). **Thêm** `GET /admin/system/status` và capability `MonitorSystem` (chỉ `system_admin`). Chỉ thêm, không đổi gì đã có. Cảnh báo đĩa gửi **email**, không qua `/notifications`. Nền tạm tới FW |
 | v1.14 | 06/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-25 — việc đêm nay của kỹ sư, gom theo tuyến** (mục 5.5, drift BE-25; D-1…D-8 chốt theo đề xuất A). **Thêm** `GET /work-orders/agenda` (`night_of?`, `near?`, `assigned_to?`; capability `ReadWorkOrders`, không capability mới); `USER_NOT_FOUND` dùng thêm cho `assigned_to` không hợp lệ. **Siết** ngày/giờ trên query string thành chỉ ISO 8601 (mục 0) cho mọi endpoint — `scheduled_from` / `scheduled_to` của `GET /work-orders` và `from` / `to` của `GET /lux-readings` trước đây nhận cả `06/10/2026` và đọc sai thành 10/06; nay `400`. Client đã gửi ISO không bị ảnh hưởng. Không đổi trường nào có sẵn, không migration. Chiều đi của tuyến khảo sát (D-7) **tách ticket riêng**. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
