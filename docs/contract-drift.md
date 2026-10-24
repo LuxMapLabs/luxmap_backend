@@ -1561,3 +1561,34 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | VR-7 | Nguồn gốc phiên khảo sát lưu trên **dòng `survey_raw_file`** của file nói ra nó (lệch D-7 "lên sweep": upload không chạm sweep `IAudited`, ghi lên sweep sẽ đòi một audit mỗi lần upload). `capture_config` mang đủ 5, `lux_log` chỉ id firmware module. Không từ chối vì id chưa đăng ký. Ba trường chữ ≤ 200 ký tự (đếm theo Unicode scalar như `char_length`), không ký tự điều khiển / surrogate lẻ, sai → 400 (giới hạn **mới**; `\u0000` hợp lệ trong JSON nhưng không lưu được vào text — Codex review) |
 | VR-8 | Mỗi module khai cột phiên bản của mình (`VersionedResultColumn`: Id / Text / ComposedText / ViaParent), Admin đếm bằng SQL. Chuỗi ghép khớp khi **bằng** phiên bản hoặc **bắt đầu bằng phiên bản + `+`**, không LIKE. `work_order_pole_photo.artifact_version` cố ý không đếm (cùng ảnh với `model_version`). `VersionedResultColumnTests` đỏ khi một FK tới registry hay cột `*model_version` / `*artifact_version` chưa khai |
 | VR-9 | `Down()` của migration **từ chối có thông điệp** khi registry đã có dòng firmware / đăng ký tay; dựng lại NOT NULL bằng `ALTER` trần (AlterColumn sinh `UPDATE` bị trigger bất biến chặn, kể cả khi 0 dòng) |
+
+### SRS-FLOW — chốt luồng nghiệp vụ trước khi viết SRS / SDS (25/10/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 25/10/2026 — trả lời 21 câu hỏi điểm chặn do Claude và Codex (`-p river`, chỉ đọc) soạn từ Phiếu v1.4, `docs/state-machines.md`, drift này; bằng chứng từng câu đã kiểm lại theo dòng. Mục chạm API là **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Consumer** | WP4 (SF-3, SF-18…SF-20), WP5 (SF-5, SF-6, SF-14, SF-16), WP6 (SF-8), nhóm IoT — Đạt (SF-10, SF-11). **Chưa báo** |
+| **Scope** | Chỉ quyết định. Chưa đổi code, chưa migration. Mỗi mục có cột "Việc kéo theo" là ticket chưa mở |
+
+| Mã | Luồng | Quyết định | Chạm API | Việc kéo theo |
+|---|---|---|---|---|
+| SF-1 | Khảo sát | SRS / SDS mô tả khảo sát thực địa là **luồng chính có cổng**: sweep `field` dừng ở `video_clock` (`VIDEO_DEVICE_MAPPING_PENDING`) tới khi xong D-07 (WP6) và có model (WP4). Không viết như đã vận hành | Không | — |
+| SF-2 | Khảo sát | NFR *"review and correct … pole associations"*: **thêm thao tác sửa ghép cột** khi duyệt sweep (Quản lý gán lại quan sát sang cột đúng). Dời cột không thay được việc này | **Có** (thêm) | Ticket BE mới: hình dạng + audit |
+| SF-3 | Khảo sát | `segment_outage` do **BE sinh khi duyệt sweep**: ≥ **N = 3** cột `out` / `dim` liền nhau dọc tuyến (thứ tự `position`) → **một** sự cố cấp đoạn (CV-15, `cluster_id`). N là `system_setting`, cấu hình được. Hiện không gì sinh `segment_outage` | **Có** (ngữ nghĩa) | Ticket BE mới; khoá `system_setting` mới; ghi phiên bản lúc sinh (BE-34, VR-8) |
+| SF-4 | Khảo sát | **D-R21 thành nền chính thức** cho SRS. **D-R24 giữ khung**, chờ số ISO / shutter / WB từ buổi quay thử | Không | Điền số D-R24 sau buổi quay thử |
+| SF-5 | Sự cố | Severity mặc định **giữ**: `lamp_out` = medium, `lamp_dim` = low, gần POI nhạy cảm tăng một bậc; Quản lý sửa tay qua `PATCH /faults/{id}` | Không | Bỏ chữ "tạm" ở dòng severity mục BE-15 |
+| SF-6 | Công dân | Báo cáo `pole_damaged` / `other`: `accept` **mở phiếu kiểm tra** (PC-10), không thêm `fault_type` | **Có** (thêm) | Ticket BE mới (PC-10) |
+| SF-7 | Công dân | Ảnh công dân giữ **90 ngày rồi tự xoá** (đóng phần thời hạn của CQ-9). Ngoại lệ có tên của D-R16 — D-R16 chỉ nói dữ liệu tài sản | Không | Job xoá trên `scheduled_job` (nợ tự xoá ở CQ-9) |
+| SF-8 | Offline | Xung đột `POST /sync/push`: **server thắng**; app hiện thao tác bị bỏ kèm `reason`, tải lại `server_state` | Không | Báo WP6 |
+| SF-9 | IoT | Luật pilot: **offline + OFF bất thường + dòng điện bất thường** (Phiếu mục b, *Operating Condition Analysis*) | **Có** (ngữ nghĩa) | Ticket BE mới: luật OFF / dòng; ngưỡng vào `system_setting` |
+| SF-10 | IoT | Sở hữu: **Đạt** giữ bảng telemetry + ingest (I-11, IOT-09/10); **WP2** giữ luật sinh sự cố (đi qua audit, `FaultStatusSets`, thông báo) | Không | Báo Đạt |
+| SF-11 | IoT | **`runtime_decline` đổi nghĩa**, giữ tên: *bất thường vận hành theo mạch* — OFF ngoài lịch, hoặc dòng lệch ngưỡng; chi tiết ở trường lý do. Hết nghĩa "suy giảm runtime pin" (solar đã bỏ ở v1.6). Không thêm giá trị enum | **Có** (ngữ nghĩa, không BREAKING) | Sửa Contract mục 1 (`:290`, `:294`) ở lần lên version kế tiếp |
+| SF-12 | IoT | Feeder hỗ trợ điều tra bằng **hiển thị topology, người điều tra tay**; không tự gom sự cố theo feeder | Không | — |
+| SF-13 | IoT | Sự cố tủ điện (`node_offline`, `runtime_decline`) **chỉ xử lý online** — thiết bị chỉ có trên testbed. Giữ giới hạn JB-9 | Không | — |
+| SF-14 | Giám sát | Báo cáo của Cấp giám sát: ba thống kê hiện có (ST-1…) **+ lịch sử bảo trì**, xuất CSV | **Có** (thêm) | Ticket BE mới |
+| SF-15 | Quản trị | *"Manage user roles and permissions"* = **gán vai trò + xã cho tài khoản**; ma trận quyền **cố định** (`LuxMapPolicies.Matrix`), SRS công bố ma trận | Không | — |
+| SF-16 | Quản trị | *"Monitor system operation / view system logs"* = `GET /admin/system/status` **+ màn xem audit trail** (lọc thời gian / loại). Log kỹ thuật Serilog xem trên server. Hiện chưa có endpoint đọc `audit_event` | **Có** (thêm) | Ticket BE mới; capability mới cho `system_admin` |
+| SF-17 | NFR | *Processing Turnaround*: phiên nộp trong đêm có kết quả **trước 07:00 sáng hôm sau** | Không | Đo trên VPS khi có sweep `field` |
+| SF-18 | Đánh giá | Kết quả field verification (tấm lọc ND, lux kế, mắt thường cho `out`) lưu **trong phiếu kiểm tra** của hệ thống (`observation` + `LuxReading`), có audit và phiên bản model | Không | Quy trình ghi — kiểm `observation` đủ trường cho D-R23 |
+| SF-19 | Đánh giá | Độ lặp lại: **≥ 3 lượt khác đêm** trên cùng cột, báo **CV%** | Không | — |
+| SF-20 | Đánh giá | Độ chính xác ghép cột: so với **`pole_id` gán tay** trên mẫu video, báo kèm khoảng cách trung bình giữa các cột | Không | Chọn mẫu + người gán |

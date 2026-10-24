@@ -42,6 +42,15 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>SRS-FLOW — chốt luồng nghiệp vụ trước SRS / SDS, 25/10/2026</strong>
+    <p><span class="tag t-next">Đã chốt SF-1…SF-20 · chưa báo WP4 / WP5 / WP6 / Đạt · 7 ticket chưa mở</span>
+    Claude + Codex (<code>-p river</code>, chỉ đọc, ~142k + ~202k token) soát Phiếu v1.4 với code / drift, ra 21 câu điểm chặn; Mỹ trả lời hết.
+    Ghi ở drift mục <em>SRS-FLOW</em>. Ticket kéo theo: sửa ghép cột khi duyệt sweep (SF-2), BE sinh <code>segment_outage</code> khi ≥ 3 cột
+    liền nhau (SF-3), QR <code>pole_damaged</code>/<code>other</code> → phiếu kiểm tra (SF-6), xoá ảnh công dân sau 90 ngày (SF-7), luật IoT OFF
+    bất thường + dòng điện mang <code>runtime_decline</code> đổi nghĩa (SF-9, SF-11), báo cáo lịch sử bảo trì (SF-14), màn xem audit trail (SF-16).
+    Còn chờ nhóm (đề xuất đóng, 3 ngày làm việc): D-R25, D-R27, FR-4, W-8; topology #46 cần duyệt.</p>
+  </div>
+  <div class="card">
     <strong>BE-34 — registry phiên bản, firmware, Phase 2, 24/10/2026</strong>
     <p><span class="tag t-next">PR mở từ <code>feat/BE-34-versions</code> · <code>luxmap_dev</code> / VPS chưa migrate · chưa báo WP5 / WP6 / Đạt / WP4</span>
     Registry <code>artifact_version</code> xuống Persistence, thêm firmware; heartbeat MQTT nay <strong>lưu</strong> firmware (con trỏ trên
