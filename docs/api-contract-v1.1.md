@@ -926,6 +926,11 @@ Không đổi enum `wo_status`; trạng thái phụ `cancellation_request_status
 - Duyệt qua `/assignee` đổi người hoặc `/cancel` hiện có. Bỏ giao, đổi người, cancel, start, complete, verify reset **đủ năm trường**;
   PATCH chỉ reset khi `scheduled_date` hoặc `due_date` thật đổi (kể cả đặt/xóa null). Dời lịch = yêu cầu **hết hiệu lực**,
   không phải duyệt hủy. Assign cùng người, PATCH ngày giống cũ, đổi title/vật tư giữ yêu cầu. Tạo/follow-up mới luôn `none`.
+- **Giao lại kèm ngày khác (v1.20, drift CR-7):** `PUT /work-orders/{id}/assignee` nhận thêm `scheduled_date` và `due_date` **tuỳ chọn**
+  (`YYYY-MM-DD`; vắng = giữ, `null` = xoá; cùng luật với `PATCH`, `scheduled_date` sau `due_date` → `400`). Đổi người và đổi ngày là **một** thao tác,
+  **một** audit `reassigned` (trước / sau mang cả ngày) và mỗi người một thông báo (kỹ sư mới: `work_order_assigned` đã mang hạn mới, không thêm `rescheduled`).
+  Ngày sai → `400`, không đổi gì (kể cả người được giao). Kèm `assigned_to: null` (bỏ giao) → `400`. Cùng người + ngày thật đổi = dời lịch như `PATCH`
+  (audit `details_changed`, thông báo `rescheduled`, hết hiệu lực yêu cầu hủy). Không đổi gì khi thiếu cả hai trường — client cũ không bị ảnh hưởng.
 - Không cooldown; sau bác được xin lại ngay. Thao tác từ màn hình cũ tác động lên **yêu cầu hiện tại**: xmin chỉ xử lý race đang chạy,
   không ngăn vòng xin → bác → xin mới rồi bấm bác từ màn hình cũ. WP5/WP6 nên tải lại trước quyết định; không hứa điều kiện version client.
 - **Online-only:** không có sync op mới. WP6 có thể lưu nháp lý do, hiển thị chưa gửi; không đưa vào `/sync/push`.
@@ -1158,6 +1163,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.20 | 26/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **WO-REASSIGN-DATE — giao lại kèm ngày khác** (mục 5.5, drift CR-7). **Thêm** hai trường tuỳ chọn `scheduled_date`, `due_date` vào body `PUT /work-orders/{id}/assignee`; đổi người + ngày là một thao tác, một audit. Chỉ thêm, client cũ không đổi, không migration, spec vẫn 141 op. Nền tạm tới FW |
 | v1.19 | 26/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **WO-CANCEL-REQUEST** — hai POST xin/bác, năm trường trạng thái phụ, filter pending, hai allowed_actions, hai notification type (mục 5.5, 5.9; drift CR-1…CR-6). Chỉ assigned, online-only; dời lịch thật đổi làm hết hiệu lực; chấp nhận quyết định từ màn hình cũ tác động lên yêu cầu hiện tại. Không đổi wo_status/capability/sync op. 141 operation; nền tạm tới FW, WP5/WP6 chưa xác nhận |
 | v1.18 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-34 — registry phiên bản, firmware** (mục 4.12, drift VR-1…VR-9; D-1…D-9 chốt 23/10 sau review Codex). **Thêm** `GET` / `POST /admin/artifact-versions`, `GET /admin/artifact-versions/{id}/usage` (capability `ManageSettings`), mã lỗi `ARTIFACT_VERSION_NOT_FOUND`, `ARTIFACT_VERSION_EXISTS`. Heartbeat MQTT nay **lưu** `firmware_version` (trước đây bị bỏ). File phiên khảo sát: 5 trường nguồn gốc được lưu; ba trường chữ giới hạn 200 ký tự (mới — trước không giới hạn). Chỉ thêm. Nền tạm tới FW |
 | v1.17 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê** (mục 5.3.1, drift ACN-1; PR #177). **Thêm** `commune_name` cạnh `commune_id` trên dòng cột / tuyến / mạch / tủ điện của `/assets/…`, cả danh sách lẫn chi tiết. Chỉ thêm, không migration. Nền tạm tới FW |

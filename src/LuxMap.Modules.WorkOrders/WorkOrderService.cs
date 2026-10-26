@@ -366,6 +366,11 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     {
         if (!OptionalJson.Present(request.AssignedTo)) throw OptionalJson.Invalid("assigned_to");
         var assigned = OptionalJson.Text(request.AssignedTo, "assigned_to");
+        var due = OptionalJson.Date(request.DueDate, "due_date");
+        var scheduled = OptionalJson.Date(request.ScheduledDate, "scheduled_date");
+        var withDates = OptionalJson.Present(request.DueDate) || OptionalJson.Present(request.ScheduledDate);
+        // Dates ride with a person: taking the order off everyone has nothing to schedule (drift CR-7).
+        if (withDates && assigned is null) throw OptionalJson.Invalid(OptionalJson.Present(request.DueDate) ? "due_date" : "scheduled_date");
         var wo = await Find(id, ct);
         RequireAction(wo, assigned is null ? "unassign" : "assign");
         if (assigned is not null)
@@ -377,7 +382,13 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                 await RequireSurveyAssignee(assigned, segments, ct);
             }
         }
-        if (wo.AssignedTo == assigned) return await Detail(id, ct);
+        if (wo.AssignedTo == assigned)
+            return withDates
+                ? await Patch(id, new PatchWorkOrderRequest { DueDate = request.DueDate, ScheduledDate = request.ScheduledDate }, ct)
+                : await Detail(id, ct);
+        var nextDue = OptionalJson.Present(request.DueDate) ? due : wo.DueDate;
+        var nextScheduled = OptionalJson.Present(request.ScheduledDate) ? scheduled : wo.ScheduledDate;
+        Schedule(nextScheduled, nextDue);
         var before = Snapshot(wo);
         var action = assigned is null ? AuditAction.Unassigned : wo.AssignedTo is null ? AuditAction.Assigned : AuditAction.Reassigned;
         var now = UtcMicrosecondClock.UtcNow();
@@ -387,6 +398,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         wo.AssignedAt = assigned is null ? null : now;
         wo.WoStatus = assigned is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned;
         wo.StartedAt = null;
+        wo.DueDate = nextDue;
+        wo.ScheduledDate = nextScheduled;
         wo.UpdatedAt = now;
         Record(wo, action, before, Snapshot(wo), now);
         Notify(WorkOrderNotices.Assigned(wo), [assigned], now);
