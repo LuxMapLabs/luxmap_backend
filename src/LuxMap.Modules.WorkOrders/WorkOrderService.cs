@@ -53,13 +53,14 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     public async Task<PagedResult<WorkOrderItem>> List(WorkOrderStatus[]? statuses, TaskKind? kind,
         string? assigned, string? segment, string[]? communes, DateOnly? from, DateOnly? to,
-        PageRequest page, CancellationToken ct, string? caseId = null)
+        PageRequest page, CancellationToken ct, string? caseId = null, CancellationRequestStatus? cancellation = null)
     {
         if (from > to) throw OptionalJson.Invalid("scheduled_from");
         var scope = CommuneFilter.Narrow(db.CurrentCommuneScope, communes);
         var query = db.Set<WorkOrder>().AsNoTracking();
         if (scope is not null) query = query.Where(x => scope.Contains(x.CommuneId));
         if (statuses is not null) query = query.Where(x => statuses.Contains(x.WoStatus));
+        if (cancellation is not null) query = query.Where(x => x.CancellationRequestStatus == cancellation);
         if (kind is not null) query = query.Where(x => x.TaskKind == kind);
         if (assigned is not null)
         {
@@ -90,6 +91,9 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             WorkOrderId = wo.WorkOrderId, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
             CreatedAt = wo.CreatedAt, UpdatedAt = wo.UpdatedAt, DueDate = wo.DueDate, ScheduledDate = wo.ScheduledDate,
+            CancellationRequestStatus = wo.CancellationRequestStatus, CancellationRequestNote = wo.CancellationRequestNote,
+            CancellationRequestedAt = wo.CancellationRequestedAt, CancellationRejectNote = wo.CancellationRejectNote,
+            CancellationRejectedAt = wo.CancellationRejectedAt,
             ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
             FaultIds = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.FaultId).ToArray(),
             PriorityScore = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.PriorityScore).DefaultIfEmpty().Max(),
@@ -113,6 +117,9 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             WorkOrderId = id, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
             CreatedAt = wo.CreatedAt, UpdatedAt = wo.UpdatedAt, DueDate = wo.DueDate, ScheduledDate = wo.ScheduledDate,
+            CancellationRequestStatus = wo.CancellationRequestStatus, CancellationRequestNote = wo.CancellationRequestNote,
+            CancellationRequestedAt = wo.CancellationRequestedAt, CancellationRejectNote = wo.CancellationRejectNote,
+            CancellationRejectedAt = wo.CancellationRejectedAt,
             ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
             SegmentIds = await db.Set<WorkOrderSegment>().Where(x => x.WorkOrderId == id).OrderBy(x => x.Position).Select(x => x.SegmentId).ToArrayAsync(ct),
             FaultIds = members.Select(x => x.Fault.FaultId).ToArray(),
@@ -121,7 +128,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             MaterialsNote = wo.MaterialsNote, MaterialsUsed = wo.MaterialsUsed,
             AssignedAt = wo.AssignedAt, StartedAt = wo.StartedAt, CompletedAt = wo.CompletedAt, ClosedAt = wo.ClosedAt,
             AssigneeEligible = wo.AssignedTo is null ? null : await EligibleUsers(wo.CommuneId).AnyAsync(x => x.UserId == wo.AssignedTo, ct),
-            AllowedActions = WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind),
+            AllowedActions = WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind, wo.CancellationRequestStatus),
             Faults = members.Select(x => new WorkOrderFaultDetail(x.Fault.FaultId, x.Fault.PoleId, x.Fault.SegmentId,
                 new(x.Lat, x.Lng), x.Fault.FaultType, x.Fault.FaultStatus, x.Fault.Severity, x.InspectionOutcome)).ToArray(),
         };
@@ -342,6 +349,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         if ((title ?? wo.Title) == wo.Title && nextDue == wo.DueDate && nextScheduled == wo.ScheduledDate
             && nextMaterials == wo.MaterialsNote) return await Detail(id, ct);
         var rescheduled = nextDue != wo.DueDate || nextScheduled != wo.ScheduledDate;
+        if (rescheduled) ResetCancellation(wo);
         wo.Title = title ?? wo.Title;
         wo.DueDate = nextDue;
         wo.ScheduledDate = nextScheduled;
@@ -373,6 +381,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var before = Snapshot(wo);
         var action = assigned is null ? AuditAction.Unassigned : wo.AssignedTo is null ? AuditAction.Assigned : AuditAction.Reassigned;
         var now = UtcMicrosecondClock.UtcNow();
+        ResetCancellation(wo);
         var previous = wo.AssignedTo;
         wo.AssignedTo = assigned;
         wo.AssignedAt = assigned is null ? null : now;
@@ -384,6 +393,58 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         Notify(WorkOrderNotices.Unassigned(wo), [previous], now);
         await Save(id, [], ct);
         return await Detail(id, ct);
+    }
+
+    public async Task<WorkOrderDetail> RequestCancellation(string id, RequestCancellationRequest request, CancellationToken ct)
+    {
+        var reason = CancellationReason(request.Reason, "reason");
+        var wo = await Find(id, ct);
+        if (wo.AssignedTo != ActorId) throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
+        RequireAction(wo, "request_cancellation");
+        var before = Snapshot(wo);
+        var now = UtcMicrosecondClock.UtcNow();
+        wo.CancellationRequestStatus = CancellationRequestStatus.Pending;
+        wo.CancellationRequestNote = reason;
+        wo.CancellationRequestedAt = now;
+        wo.CancellationRejectNote = null;
+        wo.CancellationRejectedAt = null;
+        wo.UpdatedAt = now;
+        Record(wo, AuditAction.CancellationRequested, before, Snapshot(wo), now, reason);
+        Notify(WorkOrderNotices.CancellationRequested(wo, reason), await Notifier.ManagersCoveringAsync(db, [wo.CommuneId], ct), now);
+        await Save(id, [], ct);
+        return await Detail(id, ct);
+    }
+
+    public async Task<WorkOrderDetail> RejectCancellation(string id, RejectCancellationRequest request, CancellationToken ct)
+    {
+        var reason = CancellationReason(request.RejectReason, "reject_reason");
+        var wo = await Find(id, ct);
+        RequireAction(wo, "reject_cancellation");
+        var before = Snapshot(wo);
+        var now = UtcMicrosecondClock.UtcNow();
+        wo.CancellationRequestStatus = CancellationRequestStatus.Rejected;
+        wo.CancellationRejectNote = reason;
+        wo.CancellationRejectedAt = now;
+        wo.UpdatedAt = now;
+        Record(wo, AuditAction.CancellationRejected, before, Snapshot(wo), now, reason);
+        Notify(WorkOrderNotices.CancellationRejected(wo, reason), [wo.AssignedTo], now);
+        await Save(id, [], ct);
+        return await Detail(id, ct);
+    }
+
+    private static string CancellationReason(string? value, string field)
+    {
+        var trimmed = value?.Trim();
+        return trimmed is { Length: >= 1 and <= 500 } ? trimmed : throw OptionalJson.Invalid(field);
+    }
+
+    private static void ResetCancellation(WorkOrder wo)
+    {
+        wo.CancellationRequestStatus = CancellationRequestStatus.None;
+        wo.CancellationRequestNote = null;
+        wo.CancellationRequestedAt = null;
+        wo.CancellationRejectNote = null;
+        wo.CancellationRejectedAt = null;
     }
 
     public async Task<WorkOrderDetail> Act(string id, string action, string? note,
@@ -462,6 +523,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             case "verify": wo.WoStatus = WorkOrderStatus.Verified; wo.ReviewNote = note; wo.ClosedAt = now; break;
             case "cancel": wo.WoStatus = WorkOrderStatus.Cancelled; wo.ReviewNote = note; wo.ClosedAt = now; break;
         }
+        if (action is "start" or "complete" or "verify" or "cancel") ResetCancellation(wo);
         if (wo.ClosedAt is not null) foreach (var link in links) link.ReleasedAt = now;
         wo.UpdatedAt = now;
         var auditAction = action switch
@@ -507,9 +569,10 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     private void RequireAction(WorkOrder wo, string action)
     {
-        if (!WorkOrderRules.Allows(wo.WoStatus, action)) throw Error("INVALID_STATE_TRANSITION", HttpStatusCode.Conflict,
-            ("work_order_id", wo.WorkOrderId), ("wo_status", wo.WoStatus), ("action", action),
-            ("allowed_actions", WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind)));
+        if (!WorkOrderRules.Allows(wo.WoStatus, action, wo.CancellationRequestStatus)) throw Error("INVALID_STATE_TRANSITION", HttpStatusCode.Conflict,
+            ("work_order_id", wo.WorkOrderId), ("wo_status", wo.WoStatus),
+            ("cancellation_request_status", wo.CancellationRequestStatus), ("action", action),
+            ("allowed_actions", WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind, wo.CancellationRequestStatus)));
     }
 
     private static string ValidTitle(string? value)
@@ -564,6 +627,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         string[]? skipped = null, List<WorkOrderFault>? links = null)
         => new(wo.WorkOrderId, wo.Title, wo.TaskKind, wo.WoStatus, wo.AssignedTo, wo.AssignedAt,
             wo.DueDate, wo.ScheduledDate, wo.Note, wo.ReviewNote, wo.ReportNote, wo.MaterialsNote, wo.MaterialsUsed,
+            wo.CancellationRequestStatus, wo.CancellationRequestNote, wo.CancellationRequestedAt,
+            wo.CancellationRejectNote, wo.CancellationRejectedAt,
             wo.ParentWorkOrderId, wo.RootWorkOrderId,
             wo.StartedAt, wo.CompletedAt,
             wo.ClosedAt, wo.CreatedAt, wo.UpdatedAt, wo.CreatedBy, wo.CommuneId, wo.SegmentId, wo.ClusterId,
@@ -574,6 +639,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     private sealed record WorkOrderSnapshot(string WorkOrderId, string Title, TaskKind TaskKind, WorkOrderStatus WoStatus,
         string? AssignedTo, DateTime? AssignedAt, DateOnly? DueDate, DateOnly? ScheduledDate, string? Note,
         string? ReviewNote, string? ReportNote, string? MaterialsNote, string? MaterialsUsed,
+        CancellationRequestStatus CancellationRequestStatus, string? CancellationRequestNote, DateTime? CancellationRequestedAt,
+        string? CancellationRejectNote, DateTime? CancellationRejectedAt,
         string? ParentWorkOrderId, string? RootWorkOrderId, DateTime? StartedAt, DateTime? CompletedAt, DateTime? ClosedAt,
         DateTime CreatedAt, DateTime UpdatedAt, string CreatedBy, string CommuneId, string? SegmentId, string? ClusterId,
         string[]? FaultIds, FaultChange[]? FaultChanges, string[]? FaultSkipped, FaultOutcomeSnapshot[]? FaultOutcomes);

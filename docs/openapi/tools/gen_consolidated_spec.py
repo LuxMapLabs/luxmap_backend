@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.18"
+d["info"]["version"] = "1.19"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -51,6 +51,7 @@ d["info"]["description"] = (
     "v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. "
     "v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. "
     "v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. "
+    "v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -140,6 +141,8 @@ SUMMARY = {
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
+    ("post", "/api/v1/work-orders/{id}/request-cancellation"): "[SELF-SIGNED — CR-1…CR-6] Kỹ sư được giao xin hủy lịch assigned, lý do trim 1…500; chỉ online",
+    ("post", "/api/v1/work-orders/{id}/reject-cancellation"): "[SELF-SIGNED — CR-1…CR-6] Quản lý bác yêu cầu pending, lý do trim 1…500; quyết định trên yêu cầu hiện tại",
     # POLE-PHOTO-AI, PP-1…PP-10 — Mỹ SELF-SIGNED 15/10/2026, nền tạm; WP5/WP6 chưa báo.
     ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
     ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",
@@ -476,6 +479,30 @@ ENUM_CSV = lambda ref: {"type": "string", "description": f"CSV của {ref}"}
 # BE-24 implements the evidence upload; the stub and its hand-written EvidenceUpload schema are gone.
 # BE-15 P2c implements the authenticated JPEG thumbnail endpoint.
 # BE-43 implements GET /sync/bundle and POST /sync/push; the stubs and their hand-written schemas are gone.
+
+# WO-CANCEL-REQUEST CR-1…CR-6: service validation trims BEFORE checking length.
+S["WorkOrderDetail"]["properties"]["allowed_actions"]["description"] = (
+    "Theo vai trò và trạng thái: kỹ sư được giao ở assigned, chưa pending có request_cancellation; "
+    "Quản lý có reject_cancellation khi pending. Pending vẫn cho start; không có approve action mới."
+)
+for schema_name, field in (("RequestCancellationRequest", "reason"), ("RejectCancellationRequest", "reject_reason")):
+    S[schema_name]["required"] = [field]
+    S[schema_name]["properties"][field]["nullable"] = False
+    S[schema_name]["properties"][field]["description"] = "Bắt buộc, trim rồi dài 1…500 UTF-16 code units; kiểm trong service."
+for action in ("request-cancellation", "reject-cancellation"):
+    operation = d["paths"][f"/api/v1/work-orders/{{id}}/{action}"]["post"]
+    operation["description"] = (
+        "Contract v1.19 §5.5, SELF-SIGNED CR-1…CR-6. Chỉ online, không sync op. "
+        "Xin chỉ ở assigned, none/rejected → pending; bác chỉ pending → rejected. "
+        "Màn hình cũ tác động lên yêu cầu hiện tại; xmin chỉ canh race đang chạy."
+    )
+    operation["responses"].update({"400": err("VALIDATION_FAILED — lý do trim 1…500"),
+                                   "404": err("WORK_ORDER_NOT_FOUND — không tồn tại / ngoài xã / không được giao"),
+                                   "409": err("INVALID_STATE_TRANSITION hoặc CONCURRENT_MODIFICATION")})
+for parameter in d["paths"]["/api/v1/work-orders"]["get"].get("parameters", []):
+    if parameter["name"] == "cancellation_request_status":
+        parameter["schema"] = {"$ref": "#/components/schemas/CancellationRequestStatus"}
+        parameter["description"] = "Một trạng thái phụ none/pending/rejected; AND với filter khác. Badge dùng total pending."
 
 # Order paths: implemented first in original order, then the rest as inserted.
 json.dump(d, open(DST, "w"), ensure_ascii=False, indent=2)

@@ -4,6 +4,8 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.WorkOrders.Entities;
 
+public enum CancellationRequestStatus { None, Pending, Rejected }
+
 public enum TaskKind { Inspection, Repair, Survey }
 public enum InspectionOutcome { FaultPresent, FaultAbsent, Inconclusive }
 
@@ -29,6 +31,11 @@ public class WorkOrder : ICommuneScoped, IAssigneeScoped, IAudited
     /// keeps creating valid roots without knowing this column exists.
     /// </remarks>
     public string? RootWorkOrderId { get; set; }
+    public CancellationRequestStatus CancellationRequestStatus { get; set; }
+    public string? CancellationRequestNote { get; set; }
+    public DateTime? CancellationRequestedAt { get; set; }
+    public string? CancellationRejectNote { get; set; }
+    public DateTime? CancellationRejectedAt { get; set; }
     public string? AssignedTo { get; set; }
     public DateTime? AssignedAt { get; set; }
     public required string CreatedBy { get; set; }

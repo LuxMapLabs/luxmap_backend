@@ -18,6 +18,11 @@ public record WorkOrderItem
     public required string CaseId { get; init; }
     public required string[] FaultIds { get; init; }
     public WorkOrderStatus WoStatus { get; init; }
+    public CancellationRequestStatus CancellationRequestStatus { get; init; }
+    public string? CancellationRequestNote { get; init; }
+    public DateTime? CancellationRequestedAt { get; init; }
+    public string? CancellationRejectNote { get; init; }
+    public DateTime? CancellationRejectedAt { get; init; }
     public string? AssignedTo { get; init; }
     public double? PriorityScore { get; init; }
     public DateTime CreatedAt { get; init; }

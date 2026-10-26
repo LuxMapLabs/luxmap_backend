@@ -10828,6 +10828,13 @@
             }
           },
           {
+            "name": "cancellation_request_status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -11425,6 +11432,132 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/work-orders/{id}/request-cancellation": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCancellationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCancellationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCancellationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:execute_work_orders",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/work-orders/{id}/reject-cancellation": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCancellationRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCancellationRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectCancellationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderDetail"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/work-orders/{id}/start": {
       "post": {
         "tags": [
@@ -11931,6 +12064,29 @@
           },
           "wo_status": {
             "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "cancellation_request_status": {
+            "$ref": "#/components/schemas/CancellationRequestStatus"
+          },
+          "cancellation_request_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellation_requested_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancellation_reject_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellation_rejected_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           },
           "assigned_to": {
             "type": "string",
@@ -12517,6 +12673,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "CancellationRequestStatus": {
+        "enum": [
+          "none",
+          "pending",
+          "rejected"
+        ],
+        "type": "string"
       },
       "CitizenPhotoAiHint": {
         "required": [
@@ -15295,6 +15459,8 @@
       },
       "NotificationType": {
         "enum": [
+          "work_order_cancellation_requested",
+          "work_order_cancellation_rejected",
           "work_order_assigned",
           "work_order_unassigned",
           "work_order_rescheduled",
@@ -16424,6 +16590,16 @@
         },
         "additionalProperties": false
       },
+      "RejectCancellationRequest": {
+        "type": "object",
+        "properties": {
+          "reject_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RejectCitizenReportRequest": {
         "type": "object",
         "properties": {
@@ -16689,6 +16865,16 @@
           },
           "client_op_id": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestCancellationRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -18774,6 +18960,29 @@
           "wo_status": {
             "$ref": "#/components/schemas/WorkOrderStatus"
           },
+          "cancellation_request_status": {
+            "$ref": "#/components/schemas/CancellationRequestStatus"
+          },
+          "cancellation_request_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellation_requested_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancellation_reject_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellation_rejected_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
           "assigned_to": {
             "type": "string",
             "nullable": true
@@ -18954,6 +19163,29 @@
           },
           "wo_status": {
             "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "cancellation_request_status": {
+            "$ref": "#/components/schemas/CancellationRequestStatus"
+          },
+          "cancellation_request_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellation_requested_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "cancellation_reject_note": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancellation_rejected_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           },
           "assigned_to": {
             "type": "string",

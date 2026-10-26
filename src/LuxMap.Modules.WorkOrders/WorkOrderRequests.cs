@@ -79,6 +79,16 @@ public sealed class FollowUpWorkOrderRequest
     public string? MaterialsNote { get; init; }
 }
 
+public sealed class RequestCancellationRequest
+{
+    public string? Reason { get; init; }
+}
+
+public sealed class RejectCancellationRequest
+{
+    public string? RejectReason { get; init; }
+}
+
 public sealed class ReviewWorkOrderRequest
 {
     public string? Note { get; init; }

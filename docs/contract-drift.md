@@ -1592,3 +1592,18 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | SF-18 | Đánh giá | Kết quả field verification (tấm lọc ND, lux kế, mắt thường cho `out`) lưu **trong phiếu kiểm tra** của hệ thống (`observation` + `LuxReading`), có audit và phiên bản model | Không | Quy trình ghi — kiểm `observation` đủ trường cho D-R23 |
 | SF-19 | Đánh giá | Độ lặp lại: **≥ 3 lượt khác đêm** trên cùng cột, báo **CV%** | Không | — |
 | SF-20 | Đánh giá | Độ chính xác ghép cột: so với **`pole_id` gán tay** trên mẫu video, báo kèm khoảng cách trung bình giữa các cột | Không | Chọn mẫu + người gán |
+
+
+## WO-CANCEL-REQUEST — kỹ sư xin hủy / từ chối nhận lịch (26/10/2026)
+
+**SELF-SIGNED:** Mỹ (Dylan) ủy quyền Claude chốt D-1…D-14 ngày 26/10. Hợp nhất Contract **v1.19** cùng code;
+WP5 / WP6 chưa xác nhận, nền tạm tới FW kế tiếp. Im lặng 3 ngày làm việc = **ESCALATE** vì chạm API.
+
+| Mã | Quyết định / bề mặt và giới hạn |
+|---|---|
+| CR-1 | Năm cột trên work_order, trạng thái phụ none/pending/rejected, audit giữ lịch sử; không đổi wo_status. Chỉ assigned, cả inspection/repair/survey; không chạm sweep/video/lux/GPS |
+| CR-2 | POST request-cancellation (ExecuteWorkOrders, reason), reject-cancellation (ManageWorkOrders, reject_reason); trim 1…500 UTF-16; sai cạnh 409 INVALID_STATE_TRANSITION. Xin lại sau rejected, không cooldown. Ngoài xã/người không được giao 404 |
+| CR-3 | Cả năm trường trên item/detail/agenda/bundle; filter cancellation_request_status một giá trị, badge từ total pending; hai allowed_actions. Polling 30–60 s, không realtime |
+| CR-4 | Giao lại/bỏ giao/cancel/start/complete/verify reset; PATCH ngày thật đổi reset = hết hiệu lực, không phải duyệt. No-op, title/vật tư giữ. Thông báo xin tới manager hoạt động phủ xã neo; bác tới assignee. Không manager vẫn pending+audit, không fallback. Audit/notices cùng SaveChanges |
+| CR-5 | D-9: màn hình cũ tác động lên yêu cầu hiện tại; xmin chỉ canh race đang chạy, không nhận version/request id của client. Không thêm precondition cho assignee/cancel/reject. WP5/WP6 xác nhận nghĩa dời lịch và giới hạn này ở FW |
+| CR-6 | D-10: online-only, WP6 lưu nháp chưa gửi; không sync op mới/không nới CHECK sync. Start đang chờ phải đẩy trước rồi xét xin; start sau pending reset yêu cầu. Op lạ không tự block các op sau. WP6 xác nhận thứ tự hai kênh và cache generated_at |
