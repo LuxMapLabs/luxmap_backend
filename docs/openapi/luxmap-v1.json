@@ -12294,7 +12294,9 @@
           "assigned_to": {
             "type": "string",
             "nullable": true
-          }
+          },
+          "due_date": { },
+          "scheduled_date": { }
         },
         "additionalProperties": false
       },

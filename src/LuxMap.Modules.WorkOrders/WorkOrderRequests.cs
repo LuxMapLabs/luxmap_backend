@@ -42,6 +42,12 @@ public sealed class PatchWorkOrderRequest
 public sealed class AssignWorkOrderRequest
 {
     public JsonElement AssignedTo { get; init; }
+
+    /// <summary>Optional new due date, applied with the (re)assignment in one step. Absent keeps it; null clears it (drift CR-7).</summary>
+    public JsonElement DueDate { get; init; }
+
+    /// <summary>Optional new working day, applied with the (re)assignment in one step. Absent keeps it; null clears it (drift CR-7).</summary>
+    public JsonElement ScheduledDate { get; init; }
 }
 
 public sealed class CompleteWorkOrderRequest
