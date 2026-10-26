@@ -42,6 +42,19 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>WO-CANCEL-REQUEST — kỹ sư xin hủy / từ chối nhận lịch, Phase 2, 26/10/2026</strong>
+    <p><span class="tag t-next">PR mở từ <code>feat/WO-CANCEL-REQUEST</code> · <code>luxmap_dev</code> / VPS chưa migrate · chưa báo WP5 / WP6</span>
+    Hai POST <code>/work-orders/{id}/request-cancellation</code> và <code>/reject-cancellation</code>; năm trường trạng thái phụ trên <code>work_order</code>
+    (<code>none|pending|rejected</code>, <code>wo_status</code> không đổi); chỉ xin khi <code>assigned</code>, lý do 1…500 ký tự, online-only; lọc
+    <code>cancellation_request_status</code>, hai <code>allowed_actions</code> mới; hai <code>NotificationType</code> + hai <code>AuditAction</code> mới.
+    Reset cờ ở giao lại / bỏ giao, <code>cancel</code>, <code>start</code>, <code>complete</code>, <code>verify</code> và <code>PATCH</code> đổi ngày thật sự.
+    Migration <code>AddWorkOrderCancellationRequests</code> chỉ thêm (CHECK trạng thái phụ, nới <code>ck_notification_type</code> và <code>ck_audit_event_action</code>,
+    <code>Down()</code> từ chối khi đã có dữ liệu mới). Contract <strong>v1.19</strong>, drift CR-1…CR-6, spec 139 → <strong>141</strong> op.
+    Codex (<code>gpt-6.1-sol</code> medium, CLI tương tác) làm; Claude chạy lại độc lập: build <code>-warnaserror</code> 0 warning, toàn suite
+    <strong>1.214 API + 384 + 45 + 54 pass</strong>, 2 skip (MQTT, có từ trước), exit 0; 23 phá thử đều đỏ rồi xanh.
+    <a href=".ai/results/WO-CANCEL-REQUEST-p2.md">Kết quả Phase 2</a>.</p>
+  </div>
+  <div class="card">
     <strong>WO-CANCEL-REQUEST + BE-29 + BE-30 — Phase 1 và quyết định, 26/10/2026</strong>
     <p><span class="tag t-next">Chưa báo WP5 / WP6 · PR docs chưa mở · Phase 2 của WO-CANCEL chờ PR này merge</span>
     Codex (<code>gpt-6.1-sol</code> medium, ba lượt chỉ-đọc ngoài file kết quả) khảo sát; Mỹ ủy quyền Claude chốt D-item, đã kiểm với code.
