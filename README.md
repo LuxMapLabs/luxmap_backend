@@ -110,8 +110,3 @@ terminal bị bỏ qua: không có chế độ chạy test trên database có s�
 | Muốn xoá sạch database dev | `docker compose down -v && docker compose up -d` — **mất toàn bộ dữ liệu**, rồi làm lại bước 5 |
 
 Mọi chi tiết khác (CI, xuất OpenAPI, xác thực, phân quyền, luồng khảo sát): [`docs/development.md`](docs/development.md).
-
-
-Phiếu công việc: xin hủy / từ chối lịch và bác yêu cầu được mô tả tại
-[Contract v1.19 §5.5](docs/api-contract-v1.1.md#55-phiếu-công-việc--implemented-theo-drift-be-23--wo-1wo-12-và-be-25-be-21be-25).
-Hai thao tác chỉ online; mobile lưu nháp lý do khi mất mạng (không gửi qua sync push).
