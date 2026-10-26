@@ -285,3 +285,13 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
 - **BE-35 (drift SM-3, SM-4):** `last_error` xoá khi lần sau thành công, nhưng `last_failed_at` **giữ** và `consecutive_failures` về 0 —
   đọc "job có lỗi gần đây không" ở `last_failed_at`, không ở `last_error`. `GET /admin/system/status` gọi job `stalled` khi đến hạn quá
   `PollSeconds + LeaseSeconds` mà không ai giữ lease; job mới chỉ cần đăng ký `IScheduledJob` là tự hiện trên màn đó.
+
+
+## WO-CANCEL-REQUEST — reset là một phần của hành động gốc (26/10/2026)
+
+`ResetCancellation` xóa đủ năm trường trong audit event của Assign/Act/PATCH, không stage event thứ hai.
+Phải nhận diện no-op trước reset: cùng assignee hoặc ngày không đổi không kết thúc yêu cầu. PATCH title/materials giữ nguyên.
+`start` (kể cả sync gọi service) làm hết hiệu lực pending; xin/bác chỉ online, không thêm op giả vào hàng chờ.
+Cả ItemsAsync lẫn Detail phải chiếu năm trường; agenda kế thừa item, bundle gọi Detail.
+Rollback AddWorkOrderCancellationRequests từ chối khi có trạng thái phụ/lý do hoặc enum audit/notification mới;
+rollback ứng dụng có thể giữ schema cộng thêm, không sửa/xóa audit để ép Down.

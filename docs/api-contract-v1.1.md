@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.18 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.19 (BẢN HỢP NHẤT)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -17,17 +17,18 @@
 **v1.15:** 22/10/2026 (BE-35 — `GET /admin/system/status`, giám sát job nền và dung lượng lưu trữ; capability `MonitorSystem`) ·
 **v1.16:** 22/10/2026 (BE-33 — `/admin/settings`, ngưỡng `dim` và ngưỡng offline do Quản trị sửa; capability `ManageSettings`) ·
 **v1.17:** 23/10/2026 (ASSET-COMMUNE-NAME — `commune_name` trên dòng kiểm kê `/assets`) ·
-**v1.18:** 23/10/2026 (BE-34 — `/admin/artifact-versions`, registry phiên bản + "kết quả nào do phiên bản nào"; firmware thiết bị qua heartbeat).
+**v1.18:** 23/10/2026 (BE-34 — `/admin/artifact-versions`, registry phiên bản + "kết quả nào do phiên bản nào"; firmware thiết bị qua heartbeat) ·
+**v1.19:** 26/10/2026 (WO-CANCEL-REQUEST — xin hủy / từ chối lịch, SELF-SIGNED).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.18, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.19, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (139 operation, cả 139
-`implemented` — đếm lại ở v1.18 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (141 operation, cả 141
+`implemented` — đếm lại ở v1.19 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -900,6 +901,37 @@ DUPLICATE_OP`**; `404 POLE_NOT_FOUND`; `400 LOCATION_REQUIRED` / `FAULT_TYPE_NOT
   - `distance_m` đo tới **tuyến**, không tới chỗ cần làm: phiếu ở cuối một tuyến dài vẫn "gần" khi kỹ sư đứng đầu tuyến (D-4).
   - Offline: **không** có trong `/sync/bundle` (mục 5.8) — app gom từ gói theo đúng các luật trên.
 
+#### Xin hủy / từ chối nhận lịch — v1.19, WO-CANCEL-REQUEST (`SELF-SIGNED`)
+
+Mỹ ủy quyền chốt D-1…D-14 ngày 26/10/2026; nền tạm tới FW kế tiếp, WP5 / WP6 còn phải xác nhận.
+Không đổi enum `wo_status`; trạng thái phụ `cancellation_request_status = none | pending | rejected`.
+
+- `POST /api/v1/work-orders/{id}/request-cancellation` — `ExecuteWorkOrders`, body `{ "reason": "Xe hỏng" }`.
+  Chỉ kỹ sư đang được giao, phiếu `assigned` (inspection / repair / survey), `none|rejected → pending`.
+- `POST /api/v1/work-orders/{id}/reject-cancellation` — `ManageWorkOrders`, body `{ "reject_reason": "Vui lòng tiếp tục" }`.
+  Chỉ khi `pending → rejected`; giữ nguyên trạng thái phiếu, người được giao và ngày.
+- Cả hai trả `200 WorkOrderDetail`. Lý do bắt buộc, trim rồi dài **1…500 ký tự UTF-16**; thiếu/null/trắng/quá dài →
+  `400 VALIDATION_FAILED`. Sai cạnh, kể cả xin/bác lặp → `409 INVALID_STATE_TRANSITION`;
+  race → `409 CONCURRENT_MODIFICATION`, hoặc `404 WORK_ORDER_NOT_FOUND` khi mất quyền thấy phiếu sau giao lại.
+  Ngoài xã / kỹ sư không được giao → `404`; sai capability → `403 ROLE_FORBIDDEN`.
+- Item, detail, agenda và work order trong bundle đều thêm đủ năm trường: `cancellation_request_status` (mặc định `none`),
+  `cancellation_request_note`, `cancellation_requested_at`, `cancellation_reject_note`, `cancellation_rejected_at`.
+  Bốn trường sau nullable, thời điểm server ISO UTC `Z`; mọi người đọc được phiếu đọc được lý do. Trường do server quản lý.
+  `pending` có note/at, chưa có reject note/at; `rejected` có đủ bốn; `none` có bốn trường null. Audit giữ lịch sử các vòng xin/bác/reset.
+- `GET /work-orders?cancellation_request_status=pending` — một giá trị, vắng = tất cả; sai → `400`.
+  AND với các filter hiện có, giữ phân trang/sort. Badge lấy `total` pending, không dùng unread count và không giới hạn ngày
+  nếu cần đếm cả phiếu tương lai / không ngày. Polling 30–60 s khi app mở (mục 5.9), không realtime.
+- `allowed_actions` của detail thêm `request_cancellation` cho người được giao ở `assigned`, chưa pending;
+  `reject_cancellation` cho Quản lý khi pending. Pending vẫn có `start`; không có action approve mới.
+- Duyệt qua `/assignee` đổi người hoặc `/cancel` hiện có. Bỏ giao, đổi người, cancel, start, complete, verify reset **đủ năm trường**;
+  PATCH chỉ reset khi `scheduled_date` hoặc `due_date` thật đổi (kể cả đặt/xóa null). Dời lịch = yêu cầu **hết hiệu lực**,
+  không phải duyệt hủy. Assign cùng người, PATCH ngày giống cũ, đổi title/vật tư giữ yêu cầu. Tạo/follow-up mới luôn `none`.
+- Không cooldown; sau bác được xin lại ngay. Thao tác từ màn hình cũ tác động lên **yêu cầu hiện tại**: xmin chỉ xử lý race đang chạy,
+  không ngăn vòng xin → bác → xin mới rồi bấm bác từ màn hình cũ. WP5/WP6 nên tải lại trước quyết định; không hứa điều kiện version client.
+- **Online-only:** không có sync op mới. WP6 có thể lưu nháp lý do, hiển thị chưa gửi; không đưa vào `/sync/push`.
+  Đẩy start đang chờ trước rồi đánh giá xin; server đã `in_progress` sẽ từ chối. Start sau pending làm hết hiệu lực yêu cầu.
+  Op lạ không tạo `BLOCKED_BY_EARLIER_OP` cho các thao tác sau. Bundle chỉ là bản chụp tại `generated_at`.
+
 ### 5.6 IoT, sweep, ảnh — `[NOT IMPLEMENTED]`
 
 - **`GET /api/v1/iot-nodes`** — `bbox` bắt buộc → `FeatureCollection`; `properties` theo
@@ -1030,6 +1062,12 @@ ngoài `SyncOffline`.
 
 ### 5.9 Thông báo trong ứng dụng — `/api/v1/notifications` — `implemented` (v1.10, BE-27)
 
+**v1.19 (WO-CANCEL-REQUEST):** thêm `work_order_cancellation_requested` (entity `work_order`) tới mọi Quản lý
+đang hoạt động, đã đặt mật khẩu và phủ **xã neo** của phiếu; `work_order_cancellation_rejected` tới kỹ sư được giao.
+Lý do tiếng Việt trong thông báo; title/body cắt an toàn 200/1000 ký tự. Không có Quản lý phù hợp vẫn lưu pending + audit,
+không fallback vai khác. Thông báo và audit lưu cùng giao dịch nghiệp vụ; bên thua race không để lại dòng.
+Giao lại/hủy/dời lịch dùng thông báo hiện có. Polling 30–60 s, không cam kết push tức thời.
+
 Mỗi thông báo là **của một người**. Server sinh khi sự kiện xảy ra, **trong cùng giao dịch** với thay đổi
 đó: thao tác thất bại hay thua tranh chấp thì không có thông báo. Client **polling**: gọi
 `unread-count` mỗi 30–60 giây khi app mở, tải danh sách khi người dùng mở chuông. Một kênh push (Firebase)
@@ -1060,6 +1098,8 @@ thêm sau sẽ đọc cùng dữ liệu — bốn endpoint này giữ nguyên.
 
 | `type` | Khi nào | Ai nhận | `entity_type` |
 |---|---|---|---|
+| `work_order_cancellation_requested` | Kỹ sư xin hủy / từ chối lịch assigned | Quản lý phủ xã neo | `work_order` |
+| `work_order_cancellation_rejected` | Quản lý bác yêu cầu pending | Kỹ sư đang được giao | `work_order` |
 | `work_order_assigned` | Tạo phiếu có người được giao; giao; giao lại | Kỹ sư **mới** được giao | `work_order` |
 | `work_order_unassigned` | Bỏ giao; giao lại cho người khác | Kỹ sư **cũ** | `work_order` |
 | `work_order_rescheduled` | Đổi `due_date` / `scheduled_date` (đổi tên phiếu thì không) | Kỹ sư được giao | `work_order` |
@@ -1118,6 +1158,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.19 | 26/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **WO-CANCEL-REQUEST** — hai POST xin/bác, năm trường trạng thái phụ, filter pending, hai allowed_actions, hai notification type (mục 5.5, 5.9; drift CR-1…CR-6). Chỉ assigned, online-only; dời lịch thật đổi làm hết hiệu lực; chấp nhận quyết định từ màn hình cũ tác động lên yêu cầu hiện tại. Không đổi wo_status/capability/sync op. 141 operation; nền tạm tới FW, WP5/WP6 chưa xác nhận |
 | v1.18 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-34 — registry phiên bản, firmware** (mục 4.12, drift VR-1…VR-9; D-1…D-9 chốt 23/10 sau review Codex). **Thêm** `GET` / `POST /admin/artifact-versions`, `GET /admin/artifact-versions/{id}/usage` (capability `ManageSettings`), mã lỗi `ARTIFACT_VERSION_NOT_FOUND`, `ARTIFACT_VERSION_EXISTS`. Heartbeat MQTT nay **lưu** `firmware_version` (trước đây bị bỏ). File phiên khảo sát: 5 trường nguồn gốc được lưu; ba trường chữ giới hạn 200 ký tự (mới — trước không giới hạn). Chỉ thêm. Nền tạm tới FW |
 | v1.17 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **ASSET-COMMUNE-NAME — tên xã trên dòng kiểm kê** (mục 5.3.1, drift ACN-1; PR #177). **Thêm** `commune_name` cạnh `commune_id` trên dòng cột / tuyến / mạch / tủ điện của `/assets/…`, cả danh sách lẫn chi tiết. Chỉ thêm, không migration. Nền tạm tới FW |
 | v1.16 | 22/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-33 — cấu hình hệ thống** (mục 4.11, drift SET-1…SET-7; D-1…D-8 chốt 22/10). **Thêm** `GET /admin/settings`, `PUT /admin/settings/{key}`, capability `ManageSettings` (chỉ `system_admin`), mã lỗi `SETTING_NOT_FOUND`, trường `dim_threshold_ratio` trên từng điểm `luminance_history[]` của `GET /map/poles/{pole_id}`. `luminance_baseline.dim_threshold_ratio` giữ nghĩa ngưỡng đang áp, nay đọc từ cấu hình. Chỉ thêm, không đổi gì đã có. "Danh mục loại đèn / loại sự cố / trọng số" của task list **không** làm (enum khoá cứng; P-1). Nền tạm tới FW |

@@ -37,6 +37,18 @@ public sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
         builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
         builder.HasContractEnum(x => x.TaskKind);
         builder.HasContractEnum(x => x.WoStatus);
+        builder.HasContractEnum(x => x.CancellationRequestStatus);
+        builder.Property(x => x.CancellationRequestStatus).HasDefaultValue(CancellationRequestStatus.None);
+        builder.ToTable(table => table.HasCheckConstraint("ck_work_order_cancellation_request_state", """
+            (cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL
+                AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)
+            OR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL
+                AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL
+                AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)
+                    OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL
+                        AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500
+                        AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))
+            """));
         builder.HasCommuneScope();
         builder.HasCommuneReference(x => x.CommuneId);
         builder.HasOne<RoadSegment>().WithMany().HasForeignKey(x => x.SegmentId).OnDelete(DeleteBehavior.Restrict);

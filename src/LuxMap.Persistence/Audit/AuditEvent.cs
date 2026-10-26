@@ -38,6 +38,7 @@ public enum AuditActorKind
 public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport, Pole }
 public enum AuditAction
 {
+    CancellationRequested, CancellationRejected,
     Created, Assigned, Reassigned, Unassigned, Started, Completed, Verified,
     Returned, Cancelled, DetailsChanged,
 

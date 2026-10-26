@@ -5,6 +5,8 @@ namespace LuxMap.Modules.Notifications.Entities;
 /// <summary>What happened, as the wire value a client switches on (BE-27).</summary>
 public enum NotificationType
 {
+    WorkOrderCancellationRequested,
+    WorkOrderCancellationRejected,
     WorkOrderAssigned,
     WorkOrderUnassigned,
     WorkOrderRescheduled,

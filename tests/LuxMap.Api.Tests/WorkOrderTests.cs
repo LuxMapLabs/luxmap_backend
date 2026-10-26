@@ -492,6 +492,7 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
 
         var repair = await Send("manager", "POST", "/" + inspect + "/follow-up",
             new { task_kind = "repair", assigned_to = users["a"].UserId, note = "Go and fix it" }, 201);
+        CancellationState(repair, "none");
         var repairId = repair.GetProperty("work_order_id").GetString()!;
         await PlantAfterPhoto(repairId);
         Assert.Equal("repair", repair.GetProperty("task_kind").GetString());

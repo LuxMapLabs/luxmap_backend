@@ -19,7 +19,7 @@ D-R28 = **proxy streaming qua API** (BE-15 P1, 02/10); D-R25 (`calibration_rig`)
 
 Thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.18** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.19** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
    `docs/openapi/luxmap-v1.5.json` (file SINH — xem `docs/agents/traps/assets.md` mục BE-REVIEW-02 số 8).
 2. **Quyết định đã chốt trong `docs/contract-drift.md` nhưng chưa hợp nhất vào Contract thắng chữ của Contract** (Mỹ ký 20/10/2026).
    Đây là cách repo đang chạy: thiết bị IoT ở tủ điện (I-18), sort mặc định sự cố (P-3), `out_threshold_ratio = null` (D-R22).

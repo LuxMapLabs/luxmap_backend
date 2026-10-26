@@ -7,6 +7,14 @@ namespace LuxMap.Modules.WorkOrders;
 /// <summary>The Vietnamese text of every work-order notice (BE-27, D-2: the server writes it once for web and Android).</summary>
 internal static class WorkOrderNotices
 {
+    public static NotificationMessage CancellationRequested(WorkOrder wo, string reason)
+        => Message(NotificationType.WorkOrderCancellationRequested, wo, $"Phiếu {wo.WorkOrderId} có yêu cầu xin hủy",
+            $"{Line(wo)}. Kỹ sư xin hủy / từ chối nhận lịch. Lý do: {reason}");
+
+    public static NotificationMessage CancellationRejected(WorkOrder wo, string reason)
+        => Message(NotificationType.WorkOrderCancellationRejected, wo, $"Yêu cầu xin hủy phiếu {wo.WorkOrderId} bị bác bỏ",
+            $"{Line(wo)}. Quản lý bác bỏ yêu cầu. Lý do: {reason}");
+
     public static NotificationMessage Assigned(WorkOrder wo) => Message(NotificationType.WorkOrderAssigned, wo,
         $"Bạn được giao phiếu {Kind(wo.TaskKind)} {wo.WorkOrderId}",
         wo.DueDate is { } due ? $"{Line(wo)}. Hạn {Notifier.Date(due)}." : $"{Line(wo)}.");

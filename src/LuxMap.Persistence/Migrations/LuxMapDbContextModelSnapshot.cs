@@ -1662,7 +1662,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_notification_title_length", "char_length(title) BETWEEN 1 AND 200");
 
-                            t.HasCheckConstraint("ck_notification_type", "\"type\" IN ('work_order_assigned', 'work_order_unassigned', 'work_order_rescheduled', 'work_order_returned', 'work_order_cancelled', 'work_order_completed', 'work_order_verified', 'survey_returned', 'survey_ready_for_review', 'survey_processing_failed', 'fault_reported', 'citizen_report_received', 'work_order_overdue')");
+                            t.HasCheckConstraint("ck_notification_type", "\"type\" IN ('work_order_cancellation_requested', 'work_order_cancellation_rejected', 'work_order_assigned', 'work_order_unassigned', 'work_order_rescheduled', 'work_order_returned', 'work_order_cancelled', 'work_order_completed', 'work_order_verified', 'survey_returned', 'survey_ready_for_review', 'survey_processing_failed', 'fault_reported', 'citizen_report_received', 'work_order_overdue')");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -3581,6 +3581,29 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("assigned_to");
 
+                    b.Property<string>("CancellationRejectNote")
+                        .HasColumnType("text")
+                        .HasColumnName("cancellation_reject_note");
+
+                    b.Property<DateTime?>("CancellationRejectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancellation_rejected_at");
+
+                    b.Property<string>("CancellationRequestNote")
+                        .HasColumnType("text")
+                        .HasColumnName("cancellation_request_note");
+
+                    b.Property<string>("CancellationRequestStatus")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("none")
+                        .HasColumnName("cancellation_request_status");
+
+                    b.Property<DateTime?>("CancellationRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancellation_requested_at");
+
                     b.Property<DateTime?>("ClosedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("closed_at");
@@ -3715,6 +3738,10 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_work_order_assigned_at_matches", "(assigned_to IS NULL) = (assigned_at IS NULL)");
 
                             t.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
+
+                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
+
+                            t.HasCheckConstraint("ck_work_order_cancellation_request_status", "\"cancellation_request_status\" IN ('none', 'pending', 'rejected')");
 
                             t.HasCheckConstraint("ck_work_order_chain_complete", "(parent_work_order_id IS NULL) = (root_work_order_id IS NULL)");
 
@@ -4218,7 +4245,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("audit_event", null, t =>
                         {
-                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated')");
+                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('cancellation_requested', 'cancellation_rejected', 'created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated')");
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 
