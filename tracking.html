@@ -42,6 +42,18 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>WO-CANCEL-REQUEST + BE-29 + BE-30 — Phase 1 và quyết định, 26/10/2026</strong>
+    <p><span class="tag t-next">Chưa báo WP5 / WP6 · PR docs chưa mở · Phase 2 của WO-CANCEL chờ PR này merge</span>
+    Codex (<code>gpt-6.1-sol</code> medium, ba lượt chỉ-đọc ngoài file kết quả) khảo sát; Mỹ ủy quyền Claude chốt D-item, đã kiểm với code.
+    <strong>WO-CANCEL-REQUEST</strong> (kỹ sư xin hủy lịch, Quản lý duyệt / bác): D-1…D-14 chốt — năm cột trên <code>work_order</code>, chỉ xin khi <code>assigned</code>,
+    online-only, lý do 1…500 ký tự, hai <code>NotificationType</code> + hai <code>AuditAction</code> mới trong một migration; dời lịch thật sự cũng reset cờ (WP5 / WP6 xác nhận).
+    Phase 2 làm sau khi PR docs merge. <strong>BE-29</strong>: heatmap <em>không cần endpoint mới</em> (<code>/map/poles</code> đã trả <code>fixture_status</code>);
+    "nút giao / cầu chưa có đèn" tách <strong>BE-29b</strong>, chờ nguồn dữ liệu. <strong>BE-30</strong> tạm dừng: loại đèn chỉ còn
+    <code>led_road_lamp</code>, không có cột nhà cung cấp, <code>install_date</code> là ngày tạm (FX-1). Kết quả:
+    <code>.ai/results/WO-CANCEL-REQUEST-p1.md</code>, <code>BE-29-p1.md</code>, <code>BE-30-p1.md</code>.
+    Lượt Codex đầu của WO-CANCEL chết vì <q>Selected model is at capacity</q> (phía OpenAI); chạy lại bằng <code>codex</code> tương tác trong cmux.</p>
+  </div>
+  <div class="card">
     <strong>SRS-FLOW — chốt luồng nghiệp vụ trước SRS / SDS, 25/10/2026</strong>
     <p><span class="tag t-next">Đã chốt SF-1…SF-20 · chưa báo WP4 / WP5 / WP6 / Đạt · 7 ticket chưa mở</span>
     Claude + Codex (<code>-p river</code>, chỉ đọc, ~142k + ~202k token) soát Phiếu v1.4 với code / drift, ra 21 câu điểm chặn; Mỹ trả lời hết.
