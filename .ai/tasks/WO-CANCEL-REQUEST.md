@@ -74,3 +74,34 @@ Khảo sát, đánh giá đề xuất FE, đề xuất thiết kế, ghi D-item.
 ## Phase 1 dừng ở đâu
 
 Khảo sát xong thì **dừng hẳn**, ghi `.ai/results/WO-CANCEL-REQUEST-p1.md`, chờ Mỹ chốt D-item. Không viết code, kể cả khi đã rõ phải sửa gì.
+
+---
+
+## Phase 2 — hiện thực (26/10/2026)
+
+Nguồn quyết định: **mục "Quyết định D-1…D-14" ở cuối `.ai/results/WO-CANCEL-REQUEST-p1.md`** (đã chốt). Phần "KHÔNG ĐƯỢC làm" bên trên về code / migration / Contract
+**hết hiệu lực cho Phase 2**, nhưng mọi ràng buộc còn lại giữ nguyên. Branch: `feat/WO-CANCEL-REQUEST` (worktree riêng, đã tạo từ `origin/dev`).
+
+### Làm
+
+1. **Entity + migration (một migration duy nhất).** Năm cột trên `work_order` theo D-1 (`cancellation_request_status` mặc định `none` đi qua `HasContractEnum` + CHECK; note / at / reject_note / rejected_at nullable),
+   nới `ck_notification_type` và `ck_audit_event_action` bằng **toàn bộ giá trị cũ + giá trị mới** (D-12). **Đọc `Up()` / `Down()` do EF sinh TRƯỚC khi apply**; bỏ mọi `DropIndex` / `DropColumn` /
+   `AlterColumn` không có chủ đích; `IsRowVersion` sinh `AddColumn xmin` thì bỏ; `Down()` đối xứng và từ chối hẹp CHECK khi đã có dữ liệu mới (trap `migrations.md`). Bảng không mới nên không đụng `copy_dev_to_supabase.py` — kiểm lại.
+2. **Hai endpoint** trong `WorkOrdersController` + `WorkOrderService`: `POST /work-orders/{id}/request-cancellation` (`ExecuteWorkOrders`, body `{reason}`) và `POST /work-orders/{id}/reject-cancellation`
+   (`ManageWorkOrders`, body `{reject_reason}`). Body là `sealed class` + `init`. Lý do **trim, 1…500 ký tự, kiểm trong service** (D-7). Sai trạng thái → 409 `INVALID_STATE_TRANSITION`; người không được giao / ngoài xã → 404 (query filter có sẵn).
+3. **Máy trạng thái D-2 / D-5 / D-13:** chỉ `assigned` được xin; `none|rejected → pending`, `pending` lặp → 409; reject chỉ khi `pending`. Reset đủ năm trường, **trong cùng audit event của hành động gốc**, ở: `Assign` đổi người và bỏ giao
+   (không reset khi cùng người — no-op giữ), `cancel`, `start`, `complete`, `verify`, `PATCH` khi `scheduled_date` / `due_date` **thật sự đổi**. `PATCH` chỉ đổi title / vật tư thì giữ. Tạo phiếu / follow-up mới: `none`, không sao chép từ cha.
+4. **Đọc (D-6, D-7):** năm trường vào item, detail, agenda, bundle; `GET /work-orders?cancellation_request_status=` (WireEnum.ParseCsv); `allowed_actions` thêm `request_cancellation` (kỹ sư được giao, `assigned`, chưa `pending`) và `reject_cancellation` (Quản lý, đang `pending`).
+5. **Thông báo + audit (D-4, D-11, D-12):** `NotificationType.WorkOrderCancellationRequested` / `WorkOrderCancellationRejected` (wire `work_order_cancellation_requested` / `…_rejected`), văn bản tiếng Việt trong `WorkOrderNotices`, qua `Notifier.Stage` cùng `SaveChanges`,
+   `Notifier.Clip`; yêu cầu → `Notifier.ManagersCoveringAsync(db, [wo.CommuneId])`, bác → kỹ sư được giao; không Quản lý nào phủ xã thì vẫn lưu, không fallback. `AuditAction.CancellationRequested` / `CancellationRejected`, đúng **một** `AuditEvent` mỗi `SaveChanges`, `Snapshot` có đủ năm trường.
+6. **Không làm:** sync op mới / `ck_sync_operation_op_type` (D-10, online-only); `in_progress` (D-3); cooldown (D-5); realtime (D-8); điều kiện chống màn hình cũ (D-9).
+7. **Contract / drift / spec / docs (D-14), cùng PR:** Contract **v1.19** `SELF-SIGNED` (mục 5.5, 5.9, 0, changelog — giữ giọng các bản trước), drift entry `WO-CANCEL-REQUEST` CR-1…CR-6 (kể cả giới hạn màn hình cũ D-9 và online-only D-10), xuất `luxmap-v1.json` → `gen_consolidated_spec.py` → lint
+   (`.ai/context/commands.md`), spec 139 → 141 op; cập nhật trap `faults-workorders.md` nếu có bẫy mới; README / docs nếu đổi bề mặt. Không đụng `tracking.html` (Claude cập nhật sau).
+8. **Test (khuôn ở mục "Kế hoạch Phase 2" của p1):** `LuxMapTestHost` (container PostGIS riêng lượt chạy; không `luxmap_dev`); không ghim ID bằng literal; tiền tố tài khoản riêng, teardown theo thứ tự FK; **`RoleCapabilityMatrixTests` / `CapabilityPolicyCoverageTests` đỏ nếu thiếu — kiểm lại**;
+   mỗi chốt mới **phá thử**: phá → test đỏ → khôi phục bằng `cp` / `touch` (không `mv`) → xanh; đọc **mã thoát** của `dotnet test`.
+
+### Cách chạy
+
+- `dotnet build --disable-build-servers` (hoặc `MSBUILDDISABLENODEREUSE=1`) với `-warnaserror` như repo; `dotnet test --disable-build-servers`. **Chỉ một lượt `dotnet test` tại một thời điểm.** Docker đang chạy; nếu sandbox chặn Docker thì dừng và ghi rõ, đừng giả vờ test xanh.
+- Ghi `.ai/results/WO-CANCEL-REQUEST-p2.md`: đã làm gì, output thật (migration `Up()` / `Down()`, `dotnet test` mã thoát và số pass / skip, mỗi lần phá thử), D-item phát sinh (nếu có thì **dừng ở chỗ đó và ghi**, đừng tự chọn).
+- Commit theo Conventional Commits (`feat(WO-CANCEL-REQUEST): …`), một thay đổi logic một commit, stage theo đường dẫn tường minh (không `git add -A`), **không push**, không thêm trailer `Co-Authored-By`.
