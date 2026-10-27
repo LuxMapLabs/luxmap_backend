@@ -42,6 +42,13 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>OPS-OFFSITE-BACKUP — sao lưu ra S3, 26/10/2026</strong>
+    <p><span class="tag t-next">PR mở từ <code>feat/OPS-OFFSITE-S3-BACKUP</code> · chỉ deploy/docs · chưa chạy thử với S3 thật</span>
+    <code>deploy/backup-offsite.sh</code> chép <code>/var/backups/luxmap</code> lên bucket S3 bằng <code>mc mirror</code> (một chiều, không <code>--remove</code>); bốn biến
+    <code>OFFSITE_S3_*</code> qua <code>.env</code> và compose, để trống thì script từ chối chạy. <code>vps.md</code> mục "Sao lưu ra ngoài (S3)": versioning, SSE,
+    IAM không có <code>DeleteObject</code>, lifecycle chỉ chuyển lớp, cron 03:45, cách khôi phục ảnh. Cần Mỹ tạo bucket + IAM key trước khi bật cron.</p>
+  </div>
+  <div class="card">
     <strong>WO-REASSIGN-DATE — giao lại kèm ngày khác, 26/10/2026</strong>
     <p><span class="tag t-next">PR mở từ <code>feat/WO-REASSIGN-DATE</code> · không migration · chưa báo WP5</span>
     Nhánh 1a của luồng duyệt xin hủy: <code>PUT /work-orders/{id}/assignee</code> nhận thêm <code>scheduled_date</code> / <code>due_date</code> <strong>tuỳ chọn</strong>

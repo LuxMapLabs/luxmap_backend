@@ -173,8 +173,7 @@ env -i HOME=$HOME PATH=/usr/bin:/bin /bin/sh -c 'cd /opt/luxmap/deploy && ./back
 tail -1 /var/backups/luxmap/backup.log      # backup <stamp>: … database, … objects
 ```
 
-⚠️ Bản sao lưu nằm **trên cùng đĩa** với dữ liệu — chép thêm ra ngoài định kỳ (`rsync` về máy nhóm, hoặc snapshot đĩa của
-nhà cung cấp). Khôi phục DB:
+⚠️ Bản sao lưu nằm **trên cùng đĩa** với dữ liệu — chép ra ngoài bằng mục "Sao lưu ra ngoài" ngay dưới. Khôi phục DB:
 
 ```bash
 docker compose stop api
@@ -182,6 +181,36 @@ docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" "$POSTGRES_DB"
 docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error' < /var/backups/luxmap/db/luxmap-<stamp>.dump
 docker compose start api
 ```
+
+### Sao lưu ra ngoài (S3)
+
+`deploy/backup-offsite.sh` chép `/var/backups/luxmap` (DB + bốn bucket ảnh) lên một bucket S3 bằng `mc mirror`. Một chiều và
+chỉ thêm: không có `--remove`, nên bucket vẫn giữ các dump mà `backup.sh` đã xoá ở máy (D-R16: không xoá ảnh hay dữ liệu
+sự cố — hạn giữ dump đặt bằng lifecycle rule của bucket, không đặt ở script). Cỡ 50 GB tốn cỡ vài USD mỗi tháng.
+
+1. Tạo bucket (vd. `ap-southeast-1`), bật **Versioning** và mã hoá phía server (SSE-S3), chặn truy cập công khai. Lifecycle rule
+   chỉ **chuyển lớp** (vd. sang Standard-IA sau 30 ngày), không đặt hạn xoá.
+2. Tạo IAM user riêng cho việc này, chỉ có `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` trên bucket đó — **không** có
+   `s3:DeleteObject`: máy chủ bị xâm nhập cũng không xoá được bản sao của chính nó.
+3. Điền bốn dòng `OFFSITE_S3_*` trong `deploy/.env` (`chmod 600`, không gửi qua chat). Để trống thì script từ chối chạy.
+4. Chạy một lần tay rồi xem kết quả trên S3, sau đó đặt cron **sau** `backup.sh` (03:45 giờ Việt Nam):
+
+```bash
+cd /opt/luxmap/deploy && ./backup-offsite.sh
+( crontab -l 2>/dev/null; echo '45 20 * * * cd /opt/luxmap/deploy && ./backup-offsite.sh >> /var/backups/luxmap/backup-offsite.log 2>&1' ) | crontab -
+```
+
+Lần đầu upload cả 50 GB mất vài giờ; các đêm sau chỉ đẩy phần mới. Khôi phục ảnh từ S3 (đĩa mới, MinIO đã chạy), ví dụ bucket `luxmap-survey`:
+
+```bash
+docker compose run --rm --no-deps -T --entrypoint /bin/sh minio-mc -c '
+  mc alias set offsite "$OFFSITE_S3_ENDPOINT" "$OFFSITE_S3_ACCESS_KEY" "$OFFSITE_S3_SECRET_KEY" >/dev/null
+  mc alias set luxmap http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" >/dev/null
+  mc mirror --overwrite "offsite/$OFFSITE_S3_BUCKET/luxmap/objects/luxmap-survey" luxmap/luxmap-survey'
+```
+
+Dump DB: tải `luxmap/db/luxmap-<stamp>.dump` về `/var/backups/luxmap/db/` rồi `pg_restore` như trên. Thử khôi phục ra thư mục khác
+một lần sau khi cài, đừng đợi đến lúc mất đĩa mới biết bản sao đọc được hay không.
 
 ## 9. Cập nhật phiên bản
 
