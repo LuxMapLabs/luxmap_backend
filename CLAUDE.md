@@ -318,7 +318,7 @@ Vi phạm thì hệ thống vẫn chạy, số liệu vẫn ra, nhưng kết qu�
 
 - .NET modular monolith, ASP.NET Core Web API, `/api/v1`. PostgreSQL + **PostGIS** (không pgvector); EF Core + Npgsql + NetTopologySuite
   (`Point`, `LineString`).
-- Object store S3 (MinIO local, `AWSSDK.S3`), ảnh qua ImageSharp **3.x** (4.x đòi license key). Video qua ffmpeg / ffprobe.
+- Object store S3 (MinIO local, `AWSSDK.S3`), ảnh qua ImageSharp **3.1.12** (từ 3.2.0 trở đi đòi license key lúc build). Video qua ffmpeg / ffprobe.
 - Model YOLO ONNX (`Microsoft.ML.OnnxRuntime`). MQTT (`MQTTnet`, broker EMQX, tuỳ chọn). Mail SMTP (MailKit). Serilog, Swagger + JWT.
 - **Job nền: bảng `scheduled_job` + lease trên DB** (BE-26), không Hangfire. Redis có trong compose nhưng chưa có consumer.
 - Test tích hợp: Testcontainers + PostGIS thật.
