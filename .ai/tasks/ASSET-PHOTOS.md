@@ -2,7 +2,7 @@
 ticket: ASSET-PHOTOS
 title: Ảnh cho tủ điện + cột, và trạng thái mạch điện (control + power_state)
 status: ready
-phase: 1
+phase: 2
 owner: codex
 branch: docs/ASSET-PHOTOS-p1
 contract_refs:
@@ -88,3 +88,43 @@ Khảo sát, đánh giá, đề xuất thiết kế, ghi D-item. Kết quả: `.
 ## Phase 1 dừng ở đâu
 
 Khảo sát xong thì **dừng hẳn**, ghi `.ai/results/ASSET-PHOTOS-p1.md` (D-item đánh số, mỗi D-item có phương án + đề xuất của Codex), chờ Mỹ chốt. Không viết code, kể cả khi đã rõ phải sửa gì.
+
+---
+
+## Phase 2-B — trạng thái mạch điện (28/10/2026)
+
+Nguồn quyết định: **mục "Quyết định D-01…D-12" ở cuối `.ai/results/ASSET-PHOTOS-p1.md`** (đã chốt; phần B là D-07, D-08, D-09, D-10, D-11, D-12). Phần "KHÔNG ĐƯỢC làm" bên trên về code / Contract
+**hết hiệu lực cho Phase 2-B**, nhưng mọi ràng buộc còn lại giữ nguyên. **Phần A (ảnh tài sản) KHÔNG nằm trong lượt này** — PR sau. Branch: `feat/ASSET-FEEDER-STATE` (worktree riêng, đã tạo từ `origin/dev`).
+
+### Làm
+
+1. **Không migration, không cột mới, không `HasContractEnum` / CHECK** (D-08: tính lúc đọc). Nếu thấy bắt buộc phải có migration thì **dừng và ghi D-item**, đừng tự thêm.
+2. **Enum `FeederPowerState`** = `On | Off | Unknown`, JSON chuỗi `on|off|unknown` qua options chung, đặt ở chỗ mọi module cần dùng mà không tạo vòng tham chiếu. **Một hàm duy nhất** quyết định giá trị
+   (luật một định nghĩa) — bước này nó trả `Unknown` vô điều kiện (kể cả mode `on` và node online); cả Assets và Map gọi nó, không chép. Không bao giờ suy `power_state` từ `control_mode`.
+3. **`GET /assets/feeders` (item) và chi tiết mạch:** thêm `control` (`{node_id, relay_no, control_mode, mode_reported_at}` hoặc `null` khi mạch chưa nối rơ-le; có rơ-le chưa báo thì `control_mode` và `mode_reported_at` đều `null`;
+   node offline vẫn giữ mode / time lịch sử) và `power_state`. Không đưa hai trường vào `PUT` / `POST` / import. Chi tiết dùng lại item (`feeder`).
+4. **`GET /map/cabinets`:** **giữ nguyên `feeder_ids[]`**, thêm `feeders[] {feeder_id, relay_no, control_mode, mode_reported_at, power_state}` — **mọi feeder của tủ** (kể cả không rơ-le: `relay_no`, `control_mode`, `mode_reported_at` = `null`,
+   `power_state` = `unknown`), cùng phạm vi xã và cùng thứ tự với `feeder_ids`; tủ không feeder → `[]` ở cả hai key. Lấy `feeder_ids` từ cùng tập kết quả để không lệch.
+5. **Không đụng** `/map/poles`, `/map/segments`, sync bundle, `PUT /assets/iot-nodes/{id}/relays/{n}`, telemetry / ingest, capability, `system_setting`.
+6. **Truy vấn (D-08, ngoại lệ đã chốt):** Assets **không** tham chiếu Telemetry. Assets: một **port do Assets khai** (theo `ICabinetDeviceLookup`), Telemetry hiện thực, **một truy vấn control theo lô cho cả page** — không N+1, query filter xã của `feeder_control` / `iot_node` giữ nguyên,
+   không `IgnoreQueryFilters`, không SQL raw bỏ scope. Map đã tham chiếu Telemetry: LEFT JOIN trực tiếp, thiếu rơ-le vẫn giữ feeder (không INNER JOIN). Giữ `count + page` sẵn có.
+   Kiểu `control_mode` ở port: **không tạo enum thứ hai trùng nghĩa** `FeederControlMode`; nếu phải dời kiểu về `LuxMap.Shared` thì giữ nguyên tên wire `on|off|auto` và ghi lý do vào p2.
+7. **Contract / drift / spec / docs, cùng PR:**
+   - Contract: nâng **heading và changelog lên v1.21 `SELF-SIGNED`** — heading hiện vẫn v1.19 và `info.version` của spec vẫn 1.19 dù changelog có v1.20 (sót của PR #190; sửa luôn, nêu rõ trong p2). Mục 5.3.1 (feeder), 5.6 (phân biệt `control_mode` = chế độ thiết bị **báo lại**, không phải đo điện), mô tả Map cabinets (CAB-8/11),
+     changelog v1.21 ghi rõ chỉ phần B đã hiện thực, phần ảnh tài sản (A) chưa; `CLAUDE.md` dòng "bản hợp nhất v…" đồng bộ.
+   - Drift: entry mới (mã do Codex chọn, **không dùng lại CAB / LC / CB / CR**; đủ Decision / Decision maker / Date / Scope; Mỹ **ủy quyền Claude chốt 28/10**), ghi: `power_state` luôn `unknown` tới khi có telemetry đo điện; "có dòng tải" ≠ "có điện áp";
+     bốn câu hỏi firmware ở D-09 là việc còn mở; WP5 phải hiện nhãn "Chưa có dữ liệu điện", cấm `== 'on' ? 'Có điện' : 'Mất điện'`; `control_mode` kèm `mode_reported_at`; client sinh từ spec coi `control` / `mode_reported_at` là nullable (SPEC-NULLABLE, `$ref` trần).
+   - Spec: `dotnet swagger tofile` → `gen_consolidated_spec.py` → redocly lint (`.ai/context/commands.md`); **141 op giữ nguyên**, lint baseline 9 warning không tăng; kiểm schema viết tay đè trong generator; không sửa JSON sinh bằng tay.
+   - Trap `docs/agents/traps/iot-lighting.md` hoặc `assets.md` nếu có bẫy mới. Không đụng `tracking.html`, `docs/tasks-backend.csv`, `.ai/tasks/current.md` (Claude cập nhật sau).
+8. **Test (khuôn D-12):** `LuxMapTestHost` (container PostGIS riêng lượt chạy; không `luxmap_dev`); không ghim ID bằng literal; tiền tố tài khoản riêng, teardown theo thứ tự FK `Restrict` (`feeder_control` / `iot_node` trước `feeder` và xã).
+   - `FeederStateTests`: item / detail / `control` null, rơ-le chưa báo, `on` / `off` / `auto` đều `power_state = unknown`; map liệt kê mọi feeder kể cả không rơ-le, giữ `feeder_ids` và thứ tự; hai xã, cùng tủ; **không** thêm field vào `/map/poles`, `/map/segments`, bundle.
+   - `FeederStateQueryTests`: số câu SQL **không tăng** từ 1 → 200 feeder (tìm kỹ thuật đếm SQL đã có trong repo, ví dụ interceptor; không có thì nêu cách khác); SQL của cabinet bbox vẫn dùng GIST 4326 (`EXPLAIN` từ SQL EF thật).
+   - `OpenApiSpecTests` và ba test capability sẵn có: schema mới, enum chuỗi, nullable, additive, 141 op.
+   - **Phá thử mỗi chốt:** ánh xạ `mode → power` (cho `on` thành `on`) → test đỏ; INNER JOIN làm mất feeder không rơ-le → đỏ; query trong `foreach` → số câu SQL đỏ; bỏ `feeder_ids` → đỏ. Khôi phục bằng `cp` / `touch` (không `mv`), đọc **mã thoát** của `dotnet test`.
+
+### Cách chạy
+
+- `dotnet build --disable-build-servers` với `-warnaserror` như repo (`dotnet restore LuxMap.slnx -warnaserror` phải qua; ImageSharp advisory đã được tắt ở #193); `dotnet test --disable-build-servers`. **Chỉ một lượt `dotnet test` tại một thời điểm.**
+  Nếu sandbox chặn Docker / mạng / ghi ngoài worktree thì **dừng ở chỗ đó và ghi rõ** — đừng giả vờ test xanh; Claude sẽ tự chạy test độc lập.
+- Ghi `.ai/results/ASSET-PHOTOS-p2b.md`: đã làm gì, output thật (SQL đếm, `dotnet test` mã thoát và số pass / skip, mỗi lần phá thử, số op spec trước / sau), D-item phát sinh (nếu có thì **dừng ở đó và ghi**, đừng tự chọn).
+- Commit theo Conventional Commits (`feat(ASSET-PHOTOS): …`), một thay đổi logic một commit, stage theo đường dẫn tường minh (không `git add -A`), **không push**, không thêm trailer `Co-Authored-By`.
