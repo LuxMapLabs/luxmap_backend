@@ -736,3 +736,25 @@ CabinetProperties ['cabinet_id', 'cabinet_name', 'commune_id', 'feeder_ids', 'io
 IotNodeRelay ['relay_no', 'feeder_id', 'control_mode', 'mode_reported_at']
 PoleMapDetail ['pole_id', 'segment_id', 'segment_name', 'commune_id', 'location', 'fixture', 'current_status', 'iot_node', 'luminance_baseline', 'luminance_baselines', 'luminance_history', 'runtime_history', 'open_faults', 'recent_frames', 'note']
 ```
+
+---
+
+## Quyết định D-01…D-12 — chốt 28/10/2026
+
+Mỹ (Dylan) đồng ý bảng đề xuất Claude đưa ra sau khi đọc báo cáo (28/10); Claude đã kiểm lại với code hai điểm nền (`ErrorCodes.AssetInUse = "ASSET_IN_USE"`,
+`StorageBucket.Evidence` có thật). **Theo đề xuất của Codex không đổi.** Mọi thứ chạm bề mặt API là `SELF-SIGNED`, nền tạm tới FW kế tiếp; WP5 / WP6 / BE2 chưa được báo.
+
+| # | Chốt | Lý do / điều kiện |
+|---|---|---|
+| D-01 | **Hai bảng** ảnh cột / ảnh tủ, FK thật `Restrict` tới cha, prefix `PAP` / `CAP` (tối thiểu 6 chữ số), `commune_id` + `data_source` suy từ cha | Chỉ hai loại tài sản; không XOR, không trigger đa hình. Không dùng lại `work_order_pole_photo` / `PPH` |
+| D-02 | Dùng **`StorageBucket.Evidence`**, khoá theo ID, không theo hash, không có xã trong key; thumbnail 320 / q80 bỏ EXIF/XMP/IPTC | Không đổi "đủ 4 bucket". 320 / q80 chờ WP5 / WP6 xác nhận |
+| D-03 | 5 endpoint mỗi loại (`POST`, `GET` list, `original`, `thumbnail`, `DELETE`), capability mới `UploadAssetPhotos` = `[manager, field_engineer]`, tối đa 10 ảnh chưa ẩn, 1 file, ≤ 16 MiB, ≤ 40 triệu pixel, chỉ JPEG theo magic bytes | Đọc `ReadNetwork`, xoá `ManageAssets` |
+| D-04 | Summary (`photo_count`, `cover_photo` = ảnh chưa ẩn đầu tiên) ở danh sách và `/map/cabinets`; `asset_photos[]` ở chi tiết và `/map/poles/{id}`; giữ nguyên `recent_frames[]`; **không** thêm gì vào `/map/poles`, `/map/segments` | Chưa có API đặt ảnh bìa |
+| D-05 | **`DELETE` = ẩn**, giữ row, key, bytes; không API purge / restore. Cột / tủ còn bất kỳ ảnh nào (kể cả ẩn) → xoá cha **409 `ASSET_IN_USE`**. Audit dùng action sẵn có `Created` / `DetailsChanged` + hai entity type mới (nới `ck_audit_event_entity_type`) | ⚠️ Hệ quả đã nêu với Mỹ: tài sản đã có ảnh không xoá được nữa; WP5 phải có thông điệp trước khi nhận ảnh đầu tiên |
+| D-06 | **Online-only** ở bản đầu; không sync op, không đổi bundle | Cần offline thì ticket riêng (WP6 xác nhận) |
+| D-07 | Hiện trạng đúng như ticket; `power_state` mọi nơi = `unknown` | Telemetry đo điện chưa có |
+| D-08 | `control` + `power_state` trên `FeederListItem`; `feeders[]` (mọi feeder của tủ, có `mode_reported_at`) trên `/map/cabinets`, giữ `feeder_ids[]`; enum `FeederPowerState`, **tính lúc đọc, không cột, không migration**; một truy vấn control theo lô qua port Assets-owned (không N+1) | Chấp nhận ngoại lệ: không phải "đúng một SQL" mà là một batch bổ sung, vì Assets không tham chiếu Telemetry |
+| D-09 | `unknown` vô điều kiện bản đầu (kể cả mode `on` và node online); FE hiện "Chưa có dữ liệu điện", cấm `== 'on' ? 'Có điện' : 'Mất điện'`. Nghĩa "có điện" (có dòng tải hay có điện áp) chốt cùng firmware, không chốt ở P2-B | Bốn câu hỏi gửi BE2 / firmware qua Mỹ ở D-09 |
+| D-10 | Bàn giao shape trước, giữ `unknown` tới khi ingest được kiểm chứng | BE2 – Đạt, WP5, WP6 chưa xác nhận |
+| D-11 | Ghi drift mới + Contract **v1.21 `SELF-SIGNED`**; rà luôn heading Contract và `info.version` của spec (đang v1.19 dù changelog có v1.20 — sót của PR #190, sửa ở P2-B); spec 141 → 151 op sau cả A + B | Không ghi 151 khi mới merge B |
+| D-12 | **Hai PR vào `dev`: B trước** (0 migration), rồi A (1 migration: hai bảng + sequence + index + FK + CHECK + nới `ck_audit_event_entity_type`; `Down()` từ chối khi đã có dữ liệu) | Không package mới. Ngưỡng / telemetry thật là PR IOT-09/10 sau này |
