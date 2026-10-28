@@ -50,6 +50,7 @@ public sealed class TelemetryModule : ILuxMapModule
             services.AddSingleton<Mqtt.IMqttBrokerAdmin, Mqtt.NoMqttBrokerAdmin>();
         }
         services.AddScoped<ICabinetDeviceLookup, CabinetDeviceLookup>();
+        services.AddScoped<IFeederControlLookup, FeederControlLookup>();
         services.AddScoped<Registry.IotNodeRegistryService>();
     }
 }

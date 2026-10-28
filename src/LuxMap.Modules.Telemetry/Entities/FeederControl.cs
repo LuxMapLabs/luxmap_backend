@@ -1,4 +1,5 @@
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Telemetry.Entities;
 
@@ -52,15 +53,4 @@ public class FeederControl : ICommuneScoped
     /// a newer mode. NULL until the first acknowledged command.
     /// </summary>
     public long? ModeSeq { get; set; }
-}
-
-/// <summary>
-/// on | off | auto — the relay state a device reports (I-6, I-12). Storage-only for now: no
-/// endpoint emits it until the lighting-control ticket (D-R7).
-/// </summary>
-public enum FeederControlMode
-{
-    On,
-    Off,
-    Auto,
 }

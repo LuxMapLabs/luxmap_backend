@@ -23,6 +23,29 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### FPS-1 — trạng thái mạch (ASSET-PHOTOS chỉ Phase 2-B)
+
+| | |
+|---|---|
+| **Decision** | Thêm `control` + `power_state` trên item/detail `/assets/feeders`; thêm `feeders[]` trên `/map/cabinets`, giữ `feeder_ids[]` cùng tập/cùng thứ tự. Không migration; `power_state` tính lúc đọc qua một hàm chung, **luôn unknown** đến khi có telemetry đo điện được kiểm chứng, không suy từ control_mode/node online. Contract v1.21, 141 operation; phần A ảnh tài sản chưa hiện thực. |
+| **Decision maker** | **Mỹ (Dylan), ủy quyền Claude chốt 28/10** · `SELF-SIGNED`, nền tạm tới FW kế tiếp; WP5/WP6/BE2 chưa xác nhận |
+| **Date** | 28/10/2026 |
+| **Scope** | Assets-owned port, một truy vấn control theo lô cho page, giữ count + page; Telemetry hiện thực với filter xã của control/node. Map LEFT JOIN giữ mọi feeder. Enum FeederControlMode dời về Shared giữ wire on/off/auto, không tham chiếu Assets → Telemetry. Không đổi ingest, capability, settings, sync, map poles/segments. |
+
+WP5 phải hiển thị **“Chưa có dữ liệu điện”**, cấm `== 'on' ? 'Có điện' : 'Mất điện'`.
+`control_mode` là chế độ thiết bị báo lại, luôn đọc cùng `mode_reported_at`; node offline vẫn giữ lịch sử.
+Chưa nối relay → control null; chưa báo → mode/time null. **Có dòng tải ≠ có điện áp**; chưa chốt nghĩa đo điện.
+Client sinh từ spec coi `control` / `mode_reported_at` nullable (SPEC-NULLABLE, `$ref` trần).
+
+Bốn câu hỏi firmware/BE2 còn mở (D-09, qua Mỹ, chưa gửi):
+1. Sensor dòng/áp từng relay ở trước/sau relay, RMS AC hay tức thời, đơn vị/độ phân giải/nhiễu/sàn đo, hay chỉ tổng node?
+2. Tải 0A nhưng có áp: FE cần dòng tải, relay đóng hay điện áp? Ngưỡng, biên bằng ngưỡng và hysteresis theo đo testbed nào?
+3. Payload node/relay/reading_time UTC/firmware/schema_version/data_source, chu kỳ từng relay so heartbeat, replay/SNTP/lỗi/thiếu/out-of-order?
+4. Sau tháo/nối relay, mapping epoch/snapshot/thời điểm đo/nhận nào ngăn số đo feeder cũ áp sang feeder mới?
+
+Chỉ thêm trường đọc, client cũ không đổi. Rollback code/spec/docs bỏ các trường thêm; không đổi schema/dữ liệu.
+Đồng bộ heading Contract và info.version v1.19 bị sót ở #190 dù changelog đã có v1.20.
+
 ### JSON-ENUM — enum trong body JSON chỉ nhận chuỗi (04/10/2026)
 
 | | |

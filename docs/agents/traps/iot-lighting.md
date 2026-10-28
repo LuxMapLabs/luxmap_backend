@@ -116,3 +116,12 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
   **trước** `iot_node`, trong transaction có `SET LOCAL luxmap.audit_purge = 'on'` (`AssetImportFixture`).
 - **Kênh HTTP chưa ghi firmware** (BE-34 D-6, chờ nhóm IoT): đừng thêm query string — nó lọt vào log; đề xuất là header `X-Firmware-Version`.
 - **Telemetry (IOT-09) khi làm:** mỗi số đo ghi firmware **lúc đo** (FK registry), không suy từ `iot_node.firmware_version_id` hiện tại.
+
+## ASSET-PHOTOS Phase 2-B — đọc trạng thái mạch (FPS-1)
+
+- `FeederControlMode` ở Shared để port Assets dùng cùng kiểu với Telemetry, wire vẫn on/off/auto. Assets không tham chiếu Telemetry.
+- `FeederPower.State()` là định nghĩa duy nhất, hiện trả Unknown vô điều kiện. Mode/heartbeat online không phải phép đo điện.
+- 🔴 `FeederPowerState.Unknown` **khai đầu** để là giá trị mặc định của CLR: `FeederRow` dựng `FeederListItem` mà không gán `PowerState`; đặt `On` đầu thì mọi
+  đường quên gán sẽ nói "có điện" (`FeederPowerTests`). Đừng sắp lại thứ tự enum.
+- Inventory lấy control một batch cho page qua `IFeederControlLookup`, giữ filter xã control/node. Map LEFT JOIN giữ feeder chưa nối relay;
+  `feeders[]` và `feeder_ids[]` phải lấy cùng tập có thứ tự. Không thêm dữ liệu vận hành vào write/import hay bundle.
