@@ -113,15 +113,16 @@ Tình trạng pull image và test S3 thật theo `tracking.html`; không suy tr�
   `The_thumbnail_carries_no_gps_so_a_widely_served_object_cannot_leak_capture_locations`; test đó
   **không phải chuyện dọn dẹp metadata**, đừng xoá khi refactor.
 
-- 🔴 **Năm advisory của ImageSharp 3.1.12 đang được TẮT theo mã (08/10/2026, `Directory.Build.props`)** — bản vá chỉ có ở
-  4.1.2, mà 4.x cần license key (gạch dưới). Chấp nhận được **CHỈ VÌ** mọi lần decode đi qua cấu hình chỉ-JPEG
+- 🔴 **Sáu advisory của ImageSharp 3.1.12 đang được TẮT theo mã (`Directory.Build.props`; năm cái 08/10/2026, cái thứ sáu `GHSA-v76p-62qx-wwq2` —
+  decoder TIFF fax — 28/10/2026 khi audit lúc restore bắt đầu báo nó và CI đỏ ở `-warnaserror`)** — mọi bản vá (3.2.0, 4.1.2) đều đòi license
+  key lúc build, nên chưa nâng được (gạch dưới). Chấp nhận được **CHỈ VÌ** mọi lần decode đi qua cấu hình chỉ-JPEG
   (`ThumbnailFactory.JpegOnly`, sau kiểm `FF D8 FF`): TIFF / histogram / ICC không có đường tới. `Image.Load(stream)` không kèm
-  `DecoderOptions` dùng `Configuration.Default` (mọi codec) và **phá đúng tiền đề đó** — `JpegOnlyDecodeTests` đỏ. Lên 4.1.2 thì
-  gỡ khối suppress.
-- **Ghim ImageSharp ở 3.x.** Từ 4.x, task validate lúc build đòi `SixLaborsLicenseKey`, và
+  `DecoderOptions` dùng `Configuration.Default` (mọi codec) và **phá đúng tiền đề đó** — `JpegOnlyDecodeTests` đỏ. Có license thì nâng
+  bản đã vá và gỡ khối suppress; advisory mới sau đó thì nâng bản, không tắt thêm.
+- **Ghim ImageSharp ở 3.1.12.** Từ 3.2.0 (đã thử 28/10/2026) và 4.x, task validate lúc build đòi `SixLaborsLicenseKey`, và
   `ContinueOnError="$(Configuration.StartsWith('Debug'))"` nghĩa là Debug chỉ cảnh báo còn
-  **Release/CI/deploy GÃY**. Điều khoản Split License không đổi; chỉ khác cái cổng kiểm key. Muốn lên
-  4.x phải **xin key TRƯỚC**. Đã đưa vào FW-00.
+  **Release/CI/deploy GÃY**. Điều khoản Split License không đổi; chỉ khác cái cổng kiểm key. Muốn nâng
+  lên bản đã vá phải **xin key TRƯỚC**. Đã đưa vào FW-00.
 
 **Giới hạn kiểm chứng:** `MissingObjectTests` và `SurveyIngestTests` dùng `FakeS3`, không canh đường MinIO thật.
 Tiến độ test S3 thật theo `tracking.html` (BE-36 D-7); một lần kiểm tay không thay regression test.
