@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.19 (BẢN HỢP NHẤT)
+# LuxMap — API Contract v1.21 (BẢN HỢP NHẤT, SELF-SIGNED)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -18,11 +18,13 @@
 **v1.16:** 22/10/2026 (BE-33 — `/admin/settings`, ngưỡng `dim` và ngưỡng offline do Quản trị sửa; capability `ManageSettings`) ·
 **v1.17:** 23/10/2026 (ASSET-COMMUNE-NAME — `commune_name` trên dòng kiểm kê `/assets`) ·
 **v1.18:** 23/10/2026 (BE-34 — `/admin/artifact-versions`, registry phiên bản + "kết quả nào do phiên bản nào"; firmware thiết bị qua heartbeat) ·
-**v1.19:** 26/10/2026 (WO-CANCEL-REQUEST — xin hủy / từ chối lịch, SELF-SIGNED).
+**v1.19:** 26/10/2026 (WO-CANCEL-REQUEST — xin hủy / từ chối lịch, SELF-SIGNED) ·
+**v1.20:** 26/10/2026 (WO-REASSIGN-DATE — giao lại kèm ngày khác, SELF-SIGNED) ·
+**v1.21:** 28/10/2026 (ASSET-PHOTOS phần B — trạng thái mạch, SELF-SIGNED; phần A, ảnh tài sản, chưa hiện thực).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.19, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.21, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
@@ -748,6 +750,21 @@ là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự t�
 
 #### 5.3.1 Hình dạng khi ĐỌC (v1.7, BE-12b)
 
+**v1.21 — trạng thái mạch (SELF-SIGNED, drift FPS-1).** `GET /assets/feeders` và
+`GET /assets/feeders/{id}` (trong `feeder`) thêm `control` và `power_state` chỉ khi đọc.
+`control = {node_id, relay_no, control_mode, mode_reported_at}`; chưa nối rơ-le → `null`;
+đã nối nhưng chưa báo → hai trường mode/time đều `null`. Node offline vẫn giữ mode/time lịch sử.
+`power_state` là enum chuỗi `on | off | unknown`, **hiện luôn `unknown`**, kể cả mode `on` và node online;
+không suy đo điện từ chế độ. Không lưu cột, không thêm vào POST/PUT/import.
+
+`GET /api/v1/map/cabinets` (CAB-8/11) giữ nguyên `feeder_ids[]`, thêm
+`feeders[] {feeder_id, relay_no, control_mode, mode_reported_at, power_state}`: mọi mạch của tủ
+trong phạm vi xã, cùng thứ tự `created_at, length(id), id` với `feeder_ids[]`, lấy từ cùng tập kết quả.
+Không rơ-le → relay/mode/time `null`, power `unknown`; không mạch → cả hai mảng `[]`.
+Không thêm vào `/map/poles`, `/map/segments` hay sync bundle. FE hiện **“Chưa có dữ liệu điện”**
+cho `unknown`, không gộp vào `off`. Client sinh từ spec phải coi `control` / `mode_reported_at` là nullable
+(hạn chế SPEC-NULLABLE: object/enum nullable có thể được sinh thành `$ref` trần).
+
 ```jsonc
 // GET /assets/poles → items[]
 { "pole_id": "POLE-0047", "external_ref": "TB-2024-047", "segment_id": "SEG-003",
@@ -770,6 +787,8 @@ là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự t�
 // GET /assets/feeders → items[]
 { "feeder_id": "FDR-001", "external_ref": "TĐ-01", "feeder_name": "Tủ điện chợ",
   "commune_id": "COM-001", "commune_name": "Long Phước", "has_geometry": false, "pole_count": 12,
+  "control": { "node_id": "NODE-001", "relay_no": 1, "control_mode": "on", "mode_reported_at": "2026-10-28T08:00:00Z" },
+  "power_state": "unknown",
   "updated_at": "…", "updated_by": "USR-002", "updated_by_name": "…" }
 
 // GET /assets/{kind}/{id} → thêm
@@ -938,6 +957,12 @@ Không đổi enum `wo_status`; trạng thái phụ `cancellation_request_status
   Op lạ không tạo `BLOCKED_BY_EARLIER_OP` cho các thao tác sau. Bundle chỉ là bản chụp tại `generated_at`.
 
 ### 5.6 IoT, sweep, ảnh — `[NOT IMPLEMENTED]`
+
+**v1.21 (phần trạng thái mạch đã hiện thực, FPS-1):** `control_mode` (`on | off | auto`) là
+chế độ **thiết bị báo lại**, đi cùng `mode_reported_at`, không phải phép đo điện và không phải lệnh mong muốn.
+`power_state` hiện luôn `unknown` đến khi ingest telemetry đo điện được kiểm chứng. Có dòng tải khác có điện áp;
+nghĩa on/off, sensor từng relay, freshness, ngưỡng và mapping khi nối lại còn chờ firmware/BE2 (FPS-1).
+
 
 - **`GET /api/v1/iot-nodes`** — `bbox` bắt buộc → `FeatureCollection`; `properties` theo
   `mock-iot-nodes.geojson`: `node_id, node_role, node_status, pole_id, segment_id, battery_pct,
@@ -1163,6 +1188,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.21 | 28/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **ASSET-PHOTOS chỉ phần B** (FPS-1): `control` + `power_state` trên feeder inventory, `feeders[]` trên map cabinets giữ `feeder_ids[]`; power luôn unknown đến khi có telemetry đo điện. Additive, không migration/capability/sync. **Phần A ảnh tài sản chưa hiện thực**. 141 operation giữ nguyên. Đồng bộ heading/info.version đang sót v1.19 dù đã có changelog v1.20 (#190). Nền tạm tới FW; WP5/WP6/BE2 chưa xác nhận |
 | v1.20 | 26/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **WO-REASSIGN-DATE — giao lại kèm ngày khác** (mục 5.5, drift CR-7). **Thêm** hai trường tuỳ chọn `scheduled_date`, `due_date` vào body `PUT /work-orders/{id}/assignee`; đổi người + ngày là một thao tác, một audit. Chỉ thêm, client cũ không đổi, không migration, spec vẫn 141 op. Nền tạm tới FW |
 | v1.19 | 26/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **WO-CANCEL-REQUEST** — hai POST xin/bác, năm trường trạng thái phụ, filter pending, hai allowed_actions, hai notification type (mục 5.5, 5.9; drift CR-1…CR-6). Chỉ assigned, online-only; dời lịch thật đổi làm hết hiệu lực; chấp nhận quyết định từ màn hình cũ tác động lên yêu cầu hiện tại. Không đổi wo_status/capability/sync op. 141 operation; nền tạm tới FW, WP5/WP6 chưa xác nhận |
 | v1.18 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-34 — registry phiên bản, firmware** (mục 4.12, drift VR-1…VR-9; D-1…D-9 chốt 23/10 sau review Codex). **Thêm** `GET` / `POST /admin/artifact-versions`, `GET /admin/artifact-versions/{id}/usage` (capability `ManageSettings`), mã lỗi `ARTIFACT_VERSION_NOT_FOUND`, `ARTIFACT_VERSION_EXISTS`. Heartbeat MQTT nay **lưu** `firmware_version` (trước đây bị bỏ). File phiên khảo sát: 5 trường nguồn gốc được lưu; ba trường chữ giới hạn 200 ký tự (mới — trước không giới hạn). Chỉ thêm. Nền tạm tới FW |
