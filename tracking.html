@@ -42,6 +42,13 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>ASSET-PHOTOS — ảnh tủ điện + cột, trạng thái mạch, Phase 1, 28/10/2026</strong>
+    <p><span class="tag t-next">Phase 1 xong · D-01…D-12 chốt 28/10 theo đề xuất · Phase 2-B (mạch) rồi 2-A (ảnh)</span> Nhánh <code>docs/ASSET-PHOTOS-p1</code>. Yêu cầu của FE 27/10.
+    <strong>Ảnh:</strong> hai bảng (<code>PAP</code> / <code>CAP</code>), bucket <code>Evidence</code>, <code>DELETE</code> = ẩn (cha còn ảnh → 409 <code>ASSET_IN_USE</code>), capability mới <code>UploadAssetPhotos</code>, online-only, 10 op mỗi.
+    <strong>Mạch:</strong> <code>control</code> + <code>power_state</code> trên <code>/assets/feeders</code>, <code>feeders[]</code> trên <code>/map/cabinets</code>, không migration; <code>power_state</code> luôn <code>unknown</code> tới khi có telemetry đo điện
+    (chưa có bảng / ingest, IOT-09/10 của BE2). Chờ: bốn câu hỏi firmware qua Mỹ. FE: <code>/auth/me</code> đã có <code>communes[]</code> + <code>map_bounds</code> (COMMUNE-BBOX, đã ở VPS). Spec 141 → 151. Contract v1.21 SELF-SIGNED ở Phase 2.</p>
+  </div>
+  <div class="card">
     <strong>OPS-OFFSITE-BACKUP — sao lưu ra S3, 26/10/2026</strong>
     <p><span class="tag t-next">PR mở từ <code>feat/OPS-OFFSITE-S3-BACKUP</code> · chỉ deploy/docs · chưa chạy thử với S3 thật</span>
     <code>deploy/backup-offsite.sh</code> chép <code>/var/backups/luxmap</code> lên bucket S3 bằng <code>mc mirror</code> (một chiều, không <code>--remove</code>); bốn biến
