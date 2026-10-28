@@ -685,6 +685,10 @@ public sealed record SegmentDetail
 /// </remarks>
 public sealed record FeederListItem
 {
+    public FeederControlSnapshot? Control { get; init; }
+
+    public FeederPowerState PowerState { get; init; }
+
     public required string FeederId { get; init; }
 
     public string? ExternalRef { get; init; }

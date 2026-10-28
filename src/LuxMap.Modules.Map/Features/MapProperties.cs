@@ -185,6 +185,19 @@ public sealed record CabinetProperties
     /// <summary>Feeders leaving from this cabinet that the caller can see, in id order; <c>[]</c> when none.</summary>
     public required IReadOnlyList<string> FeederIds { get; init; }
 
+    /// <summary>Every visible feeder, in the same order as feeder_ids, including unconnected feeders.</summary>
+    public required IReadOnlyList<CabinetFeederState> Feeders { get; init; }
+
     /// <summary>The device mounted in the cabinet, or <c>null</c>.</summary>
     public string? IotNodeId { get; init; }
+}
+
+/// <summary>A cabinet feeder with its last reported mode and measured power availability.</summary>
+public sealed record CabinetFeederState
+{
+    public required string FeederId { get; init; }
+    public short? RelayNo { get; init; }
+    public FeederControlMode? ControlMode { get; init; }
+    public DateTime? ModeReportedAt { get; init; }
+    public FeederPowerState PowerState { get; init; }
 }

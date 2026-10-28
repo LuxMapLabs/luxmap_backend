@@ -379,13 +379,18 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                 cabinet.CabinetName,
                 cabinet.CommuneId,
                 cabinet.Geom,
-                FeederIds = dbContext.Set<Feeder>()
-                    .Where(feeder => feeder.CabinetId == cabinet.CabinetId)
-                    .OrderBy(feeder => feeder.CreatedAt)
-                    .ThenBy(feeder => feeder.FeederId.Length)
-                    .ThenBy(feeder => feeder.FeederId)
-                    .Select(feeder => feeder.FeederId)
-                    .ToList(),
+                Feeders = (from feeder in dbContext.Set<Feeder>()
+                           join control in dbContext.Set<FeederControl>() on feeder.FeederId equals control.FeederId into reports
+                           from control in reports.DefaultIfEmpty()
+                           where feeder.CabinetId == cabinet.CabinetId
+                           orderby feeder.CreatedAt, feeder.FeederId.Length, feeder.FeederId
+                           select new CabinetFeederState
+                           {
+                               FeederId = feeder.FeederId,
+                               RelayNo = control == null ? null : control.RelayNo,
+                               ControlMode = control == null ? null : control.ControlMode,
+                               ModeReportedAt = control == null ? null : control.ModeReportedAt,
+                           }).ToList(),
                 IotNodeId = dbContext.Set<IotNode>()
                     .Where(node => node.CabinetId == cabinet.CabinetId)
                     .Select(node => node.NodeId)
@@ -403,7 +408,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                     CabinetId = row.CabinetId,
                     CabinetName = row.CabinetName,
                     CommuneId = row.CommuneId,
-                    FeederIds = row.FeederIds,
+                    FeederIds = [.. row.Feeders.Select(feeder => feeder.FeederId)],
+                    Feeders = [.. row.Feeders.Select(feeder => feeder with { PowerState = FeederPower.State() })],
                     IotNodeId = row.IotNodeId,
                 },
             })],

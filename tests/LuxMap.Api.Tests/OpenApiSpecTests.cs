@@ -32,6 +32,31 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Feeder_state_is_additive_read_only_and_uses_string_enums()
+    {
+        Assert.Equal(new[] { "unknown", "on", "off" }, Schema("FeederPowerState").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal("string", Schema("FeederPowerState").GetProperty("type").GetString());
+        Assert.Equal(new[] { "on", "off", "auto" }, Schema("FeederControlMode").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        var item = Schema("FeederListItem").GetProperty("properties");
+        Assert.True(item.TryGetProperty("control", out var control));
+        Assert.EndsWith("/FeederControlSnapshot", control.GetProperty("$ref").GetString()); // SPEC-NULLABLE baseline
+        Assert.True(item.TryGetProperty("power_state", out _));
+        var report = Schema("FeederControlSnapshot").GetProperty("properties");
+        Assert.True(report.GetProperty("mode_reported_at").GetProperty("nullable").GetBoolean());
+        var cabinet = Schema("CabinetProperties").GetProperty("properties");
+        Assert.True(cabinet.TryGetProperty("feeder_ids", out _));
+        Assert.True(cabinet.TryGetProperty("feeders", out _));
+        Assert.True(Schema("CabinetFeederState").GetProperty("properties").GetProperty("relay_no").GetProperty("nullable").GetBoolean());
+        foreach (var name in new[] { "PoleProperties", "SegmentProperties", "BundlePoleProperties" })
+        {
+            // Bundle inherits pole properties through allOf; neither surface gains electrical fields.
+            if (!Spec.GetProperty("components").GetProperty("schemas").TryGetProperty(name, out var schema)) continue;
+            Assert.DoesNotContain("power_state", schema.GetRawText());
+            Assert.DoesNotContain("control_mode", schema.GetRawText());
+        }
+    }
+
+    [Fact]
     public void Every_operation_publishes_its_client_surface()
     {
         var operations = Spec.GetProperty("paths").EnumerateObject()

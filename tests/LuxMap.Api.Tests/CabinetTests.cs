@@ -306,7 +306,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(Lat, coordinates[1].GetDouble(), 6);
 
         var properties = feature.GetProperty("properties");
-        Assert.Equal(["cabinet_id", "cabinet_name", "commune_id", "feeder_ids", "iot_node_id"], Keys(properties));
+        Assert.Equal(["cabinet_id", "cabinet_name", "commune_id", "feeder_ids", "feeders", "iot_node_id"], Keys(properties));
         Assert.Equal([feederId], Strings(properties.GetProperty("feeder_ids")));
         Assert.Equal(JsonValueKind.Null, properties.GetProperty("iot_node_id").ValueKind);
     }

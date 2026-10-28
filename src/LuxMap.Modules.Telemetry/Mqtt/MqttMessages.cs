@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Modules.Telemetry.Lighting;
+using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Telemetry.Mqtt;
 

@@ -29,7 +29,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// </remarks>
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
-    WarrantyCalendar warranty, ISurveyCorridor corridor, IAuditTrail audit)
+    WarrantyCalendar warranty, ISurveyCorridor corridor, IAuditTrail audit, IFeederControlLookup controls)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -41,9 +41,20 @@ public sealed class AssetCrudService(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
         => ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, ct);
 
-    public Task<PagedResult<FeederListItem>> ListFeedersAsync(
+    public async Task<PagedResult<FeederListItem>> ListFeedersAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, ct);
+    {
+        var result = await ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, ct);
+        var reports = await controls.ControlsAsync([.. result.Items.Select(item => item.FeederId)], ct);
+        return result with
+        {
+            Items = [.. result.Items.Select(item => item with
+            {
+                Control = reports.GetValueOrDefault(item.FeederId),
+                PowerState = FeederPower.State(),
+            })],
+        };
+    }
 
     public async Task<PagedResult<PoleListItem>> ListPolesAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
@@ -147,7 +158,11 @@ public sealed class AssetCrudService(
 
         return new FeederDetail
         {
-            Feeder = item,
+            Feeder = item with
+            {
+                Control = (await controls.ControlsAsync([feederId], ct)).GetValueOrDefault(feederId),
+                PowerState = FeederPower.State(),
+            },
 
             // Null, not an empty string. Branch C surveyed no cable routes, so "no route recorded"
             // is the normal case and must stay distinguishable from a route that happens to be empty.
