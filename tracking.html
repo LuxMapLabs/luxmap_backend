@@ -42,6 +42,13 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card">
+    <strong>ASSET-PHOTOS Phase 2-B — trạng thái mạch điện, 28/10/2026</strong>
+    <p><span class="tag t-next">PR mở từ <code>feat/ASSET-FEEDER-STATE</code> · không migration · chưa báo WP5</span>
+    <code>control</code> + <code>power_state</code> trên <code>/assets/feeders</code>, <code>feeders[]</code> trên <code>/map/cabinets</code> (giữ <code>feeder_ids[]</code>); một truy vấn control theo lô qua port
+    <code>IFeederControlLookup</code>; <code>power_state</code> luôn <code>unknown</code> tới khi có telemetry đo điện. Contract <strong>v1.21</strong> (sửa luôn heading / <code>info.version</code> đang sót ở v1.19), drift FPS-1,
+    spec vẫn 141 op, lint 9 warning. Bắt được lỗi enum mặc định <code>On</code> khi rà code. 5 phá thử đều đỏ đúng test; toàn bộ test xanh. Việc mở: bốn câu hỏi firmware, phần A (ảnh) là PR sau.</p>
+  </div>
+  <div class="card">
     <strong>ASSET-PHOTOS — ảnh tủ điện + cột, trạng thái mạch, Phase 1, 28/10/2026</strong>
     <p><span class="tag t-next">Phase 1 xong · D-01…D-12 chốt 28/10 theo đề xuất · Phase 2-B (mạch) rồi 2-A (ảnh)</span> Nhánh <code>docs/ASSET-PHOTOS-p1</code>. Yêu cầu của FE 27/10.
     <strong>Ảnh:</strong> hai bảng (<code>PAP</code> / <code>CAP</code>), bucket <code>Evidence</code>, <code>DELETE</code> = ẩn (cha còn ảnh → 409 <code>ASSET_IN_USE</code>), capability mới <code>UploadAssetPhotos</code>, online-only, 10 op mỗi.
