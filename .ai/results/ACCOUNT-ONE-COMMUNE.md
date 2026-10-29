@@ -188,3 +188,19 @@ Spec xuất từ code không đổi nội dung JSON so với HEAD (XML-doc khôn
 - ⚠️ 11 test liên xã được giữ với Skip tường minh để Mỹ quyết theo D-6b; hai test MQTT đã Skip từ trước.
 - 📌 Backup DB trước deploy là bắt buộc; Down không phục hồi assignment đã xóa. Cần ticket riêng nếu xử lý từng phần tuyến liên xã.
 - Commit dự kiến để Claude dùng: `feat(identity): restrict scoped accounts to one commune`.
+
+
+## Nhóm A — bật lại (29/10/2026, Claude)
+
+Sáu test chốt 409 liên xã trong bảng D-6b đã bật lại, không đổi thân test, chỉ đổi người gọi sang
+`AssetImportFixture.LegacyTwoCommuneClientAsync()`: token ký trực tiếp mang `[CommuneId, ForeignCommuneId]` cho manager
+của xã nhà — đúng trạng thái của token cấp trước ACCT-1 trong tối đa 60 phút. Tài khoản vẫn một xã (DB từ chối dòng thứ hai).
+
+| Test | Chốt được phá thử |
+|---|---|
+| `PoleWriteTests` ×2, `AssetReplaceAndDeleteTests` "moved onto a feeder" | `RequireFeederInCommuneAsync` tắt → 3 đỏ |
+| `CabinetTests.A_cabinet_of_another_commune_cannot_feed_the_feeder` | `RequireCabinetInCommuneAsync` tắt → đỏ |
+| `AssetImportTests` "feeder in another commune per row", `CabinetTests.Import_refuses_per_row…` | hai điều kiện trong `AssetImportService` tắt → cả 2 đỏ |
+
+Khôi phục bằng `cp`; 6 test xanh lại. Full suite exit 0: API 1.233 pass, **7 Skip** = 5 chờ Mỹ (nhóm B: `The_upsert_key_is_the_COMPOSITE…`,
+`An_engineer_of_several_communes…`; nhóm C: `A_pole_may_sit_on_a_segment_owned_by_another_commune` và hai test ảnh cột liên xã) + 2 MQTT có sẵn.

@@ -49,7 +49,10 @@
     <p>Build sạch; toàn bộ suite exit 0: <strong>1.712 pass, 0 fail, 13 Skip</strong> (11 D-6b + 2 MQTT có sẵn).
     PostGIS Testcontainers chạy được; hai lượt phá thử đều đỏ, đã khôi phục bằng cp. Spec v1.22 hợp lệ, giữ 9 warning như baseline.
     11 kịch bản API cần một tài khoản nhiều xã được giữ với Skip để Mỹ quyết (D-6b); danh sách và đề xuất ở
-    <code>.ai/results/ACCOUNT-ONE-COMMUNE.md</code>. Không add/commit/push theo yêu cầu; Claude sẽ commit.</p>
+    <code>.ai/results/ACCOUNT-ONE-COMMUNE.md</code>.</p>
+    <p><strong>Nhóm A (6 test chốt 409 liên xã) đã bật lại 29/10:</strong> chạy bằng token ký trực tiếp mang hai xã
+    (<code>LegacyTwoCommuneClientAsync</code>, mô phỏng token cũ ≤ 60 phút). Còn <strong>5 Skip</strong> chờ Mỹ
+    (nhóm B xoá, nhóm C chờ quyết sản phẩm liên xã); full suite exit 0, API 1.233 pass + 7 Skip.</p>
     <p>Giới hạn liên xã: processor hiện có thể trả <code>JOB_SCOPE_INVALID</code> cho cả job khi tuyến chứa cột xã khác;
     đã kiểm và ghi <a href="docs/contract-drift.md">ACCT-1</a>. Chưa sửa tính năng theo D-5. Backup DB trước deploy; Down không phục hồi dòng gán đã xóa.</p>
     <p class="muted">Phạm vi file: Identity/Accounts, configuration/entity, migration/snapshot, fixture/test,
