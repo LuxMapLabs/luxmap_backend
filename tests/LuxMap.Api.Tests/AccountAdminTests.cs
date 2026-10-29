@@ -95,8 +95,10 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
     }
 
     [Theory]
-    [InlineData("field_engineer", null, "This role needs at least one commune.")]
-    [InlineData("manager", new string[0], "This role needs at least one commune.")]
+    [InlineData("field_engineer", null, "This role needs exactly one commune.")]
+    [InlineData("manager", new string[0], "This role needs exactly one commune.")]
+    [InlineData("superior", new[] { "COM-A", "COM-B" }, "This role needs exactly one commune.")]
+    [InlineData("manager", new[] { "COM-A", "COM-A" }, "This role needs exactly one commune.")]
     [InlineData("superior", new[] { "COM-NOPE" }, "Unknown commune(s): COM-NOPE.")]
     public async Task A_scoped_role_needs_communes_that_exist(string role, string[]? communes, string message)
     {
@@ -108,6 +110,77 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
         Assert.Equal(ErrorCodes.ValidationFailed, error.GetProperty("code").GetString());
         Assert.Equal("commune_ids", error.GetProperty("details").GetProperty("field").GetString());
         Assert.Equal(message, error.GetProperty("message").GetString());
+    }
+
+    [Theory]
+    [InlineData("superior")]
+    [InlineData("manager")]
+    [InlineData("field_engineer")]
+    public async Task Create_and_patch_reject_zero_or_multiple_entries_before_writing(string role)
+    {
+        var home = await factory.SeededCommuneIdAsync();
+        var account = await CreateFieldEngineerAsync();
+        var admin = await AdminAsync();
+        foreach (var communes in new[] { Array.Empty<string>(), new[] { home, home } })
+        {
+            var username = AccountTestFactory.NewUsername();
+            var created = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Invalid scope", role, commune_ids = communes });
+            var patched = await admin.PatchAsJsonAsync($"/api/v1/admin/users/{account.UserId}", new { role, commune_ids = communes });
+            foreach (var response in new[] { created, patched })
+            {
+                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+                var error = (await Json(response)).GetProperty("error");
+                Assert.Equal(ErrorCodes.ValidationFailed, error.GetProperty("code").GetString());
+                Assert.Equal("commune_ids", error.GetProperty("details").GetProperty("field").GetString());
+            }
+            Assert.False(await factory.QueryAsync(db => db.Set<AppUser>().AnyAsync(u => u.Username == username)));
+            Assert.Equal([home], await factory.QueryAsync(db => db.Set<AppUserCommune>()
+                .Where(x => x.UserId == account.UserId).Select(x => x.CommuneId).ToArrayAsync()));
+        }
+        var unknown = await admin.PatchAsJsonAsync($"/api/v1/admin/users/{account.UserId}", new { commune_ids = new[] { "COM-MISSING" } });
+        Assert.Equal(HttpStatusCode.BadRequest, unknown.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_database_rejects_a_second_commune_even_without_the_service()
+    {
+        var account = await CreateFieldEngineerAsync();
+        await factory.QueryAsync(async db =>
+        {
+            var commune = new AdministrativeUnit { Name = "Second assignment " + Guid.NewGuid() };
+            db.Add(commune); await db.SaveChangesAsync();
+            try
+            {
+                db.Add(new AppUserCommune { UserId = account.UserId, CommuneId = commune.CommuneId });
+                var exception = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+                var postgres = Assert.IsType<PostgresException>(exception.InnerException);
+                Assert.Equal("23505", postgres.SqlState);
+                Assert.Equal("ux_app_user_commune_user_id", postgres.ConstraintName);
+            }
+            finally
+            {
+                db.ChangeTracker.Clear();
+                // Also cleans up when sabotage deliberately removes the unique index.
+                var rows = await db.Set<AppUserCommune>().Where(x => x.UserId == account.UserId && x.CommuneId == commune.CommuneId).ToListAsync();
+                db.RemoveRange(rows); db.Remove(commune); await db.SaveChangesAsync();
+            }
+            return 0;
+        });
+    }
+
+    [Fact]
+    public async Task An_admin_rejects_even_an_empty_assignment_array_on_create_and_patch()
+    {
+        var username = AccountTestFactory.NewUsername();
+        var response = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Admin scope", role = "system_admin", commune_ids = Array.Empty<string>() });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var account = await CreateFieldEngineerAsync();
+        var admin = await AdminAsync();
+        foreach (var communes in new[] { Array.Empty<string>(), new[] { await factory.SeededCommuneIdAsync() } })
+        {
+            var patch = await admin.PatchAsJsonAsync($"/api/v1/admin/users/{account.UserId}", new { role = "system_admin", commune_ids = communes });
+            Assert.Equal(HttpStatusCode.BadRequest, patch.StatusCode);
+        }
     }
 
     [Fact]
@@ -248,12 +321,13 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
             async Task<HttpResponseMessage> Patch(object body)
                 => await admin.PatchAsJsonAsync($"/api/v1/admin/users/{account.UserId}", body);
 
-            var both = await Json(await Patch(new { commune_ids = new[] { second, home } }));
-            Assert.Equal(new[] { home, second }.Order(StringComparer.Ordinal), both.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
+            var changed = await Json(await Patch(new { commune_ids = new[] { second } }));
+            Assert.Equal([second], changed.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
+            Assert.Equal(HttpStatusCode.OK, (await Patch(new { commune_ids = new[] { second } })).StatusCode);
 
             var manager = await Json(await Patch(new { role = "manager", full_name = "Đổi tên" }));
             Assert.Equal("manager", manager.GetProperty("role").GetString());
-            Assert.Equal(2, manager.GetProperty("commune_ids").GetArrayLength());
+            Assert.Equal([second], manager.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
             Assert.Equal("Đổi tên", manager.GetProperty("full_name").GetString());
 
             var promoted = await Json(await Patch(new { role = "system_admin" }));

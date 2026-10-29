@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.21 (BẢN HỢP NHẤT, SELF-SIGNED)
+# LuxMap — API Contract v1.22 (BẢN HỢP NHẤT, SELF-SIGNED)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -20,11 +20,12 @@
 **v1.18:** 23/10/2026 (BE-34 — `/admin/artifact-versions`, registry phiên bản + "kết quả nào do phiên bản nào"; firmware thiết bị qua heartbeat) ·
 **v1.19:** 26/10/2026 (WO-CANCEL-REQUEST — xin hủy / từ chối lịch, SELF-SIGNED) ·
 **v1.20:** 26/10/2026 (WO-REASSIGN-DATE — giao lại kèm ngày khác, SELF-SIGNED) ·
-**v1.21:** 28/10/2026 (ASSET-PHOTOS phần B — trạng thái mạch, SELF-SIGNED; phần A, ảnh tài sản, chưa hiện thực).
+**v1.21:** 28/10/2026 (ASSET-PHOTOS phần B — trạng thái mạch, SELF-SIGNED; phần A, ảnh tài sản, chưa hiện thực) ·
+**v1.22:** 29/10/2026 (ACCOUNT-ONE-COMMUNE — mỗi tài khoản đúng một xã, trừ Quản trị hệ thống; ACCT-1).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
-⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.21, cố ý** — cùng lý lẽ D-1 đã áp cho chính
+⚠️ **Tên file spec `luxmap-v1.5.json` GIỮ NGUYÊN ở v1.6 – v1.22, cố ý** — cùng lý lẽ D-1 đã áp cho chính
 tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đã viết sẵn. Lần đổi `luxmap-v1.4.json` →
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
@@ -207,9 +208,9 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 
 | Vai trò | Giá trị enum `user_role` | Thay cho (≤ v1.6) | Phạm vi địa bàn |
 |---|---|---|---|
-| Cấp giám sát (Superior) | `superior` | `management_agency` | Một **tập xã** qua gán xã (có thể nhiều xã). **Chỉ đọc** |
-| Quản lý (Manager) | `manager` | `maintenance_engineer` | Đúng các xã trong claim |
-| Kỹ sư hiện trường (Field Engineer) | `field_engineer` | `field_crew` | Đúng các xã trong claim |
+| Cấp giám sát (Superior) | `superior` | `management_agency` | Mỗi tài khoản **đúng một xã**. **Chỉ đọc** |
+| Quản lý (Manager) | `manager` | `maintenance_engineer` | Mỗi tài khoản **đúng một xã** |
+| Kỹ sư hiện trường (Field Engineer) | `field_engineer` | `field_crew` | Mỗi tài khoản **đúng một xã** |
 | Quản trị hệ thống (System Admin) | `system_admin` | `administrator` | Toàn hệ thống, `*` |
 
 - **Không có role Tổ khảo sát riêng** — khảo sát đêm, kiểm tra và sửa chữa đều là Kỹ sư hiện trường.
@@ -218,7 +219,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
   vào `source_channel` (v1.7, D-R1). Chưa có endpoint.
 - **Không có tự đăng ký.** Tài khoản do **Quản trị hệ thống** tạo, gán vai trò và gán xã (v1.7, D-R11);
   người dùng nhận **email mời** và tự đặt mật khẩu (v1.8, mục 4.8 – 4.9). `POST /auth/register` **đã gỡ** ở v1.8.
-- Cấp giám sát không có cấp "huyện" riêng: phạm vi của họ là danh sách xã được gán (v1.7, D-R3).
+- Cấp giám sát không có cấp "huyện" riêng: mỗi tài khoản chỉ giữ một xã (v1.22, ACCT-1 thay D-R3). Muốn xem nhiều xã phải dùng nhiều tài khoản.
 
 **Quy tắc địa bàn**
 
@@ -226,7 +227,7 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
   `COMMUNE_FORBIDDEN`** (kể cả khi chỉ một trong nhiều giá trị sai). Truy cập trực tiếp tài nguyên
   ngoài phạm vi → **404**, không 403 (403 sẽ lộ rằng nó tồn tại). `GET /sync/bundle` chỉ đóng gói
   dữ liệu trong phạm vi claim.
-- Tài khoản chưa được gán xã có `commune_ids: []`, đăng nhập được nhưng **không thấy gì**.
+- `superior`, `manager`, `field_engineer` bắt buộc đúng một xã; `system_admin` không có dòng gán xã, claim `["*"]`. Mảng rỗng chỉ còn là trạng thái dữ liệu cũ/lỗi, đọc vẫn đóng phạm vi và không thấy dữ liệu.
 
 **Quy tắc vai trò (v1.7, D-R5 — thay D-14 của v1.4)**
 
@@ -412,7 +413,7 @@ Hằng số của API, không đổi theo môi trường. Giá trị là chuỗi
 |---|---|---|
 | `sub` | chuỗi | `USR-001` |
 | `role` | chuỗi đơn (mục 3.1 `user_role`) | `manager` |
-| `commune_ids` | luôn là mảng | `["COM-001"]` · Quản trị hệ thống `["*"]` |
+| `commune_ids` | luôn là mảng, đúng một phần tử | `["COM-001"]` · Quản trị hệ thống `["*"]` |
 | `iss` / `aud` | chuỗi | `luxmap-api` / `luxmap-clients` |
 
 ### 4.6 Ràng buộc triển khai web
@@ -438,7 +439,7 @@ một cách, chỉ refresh token là khác nhau, nên **không có** `/auth/web/
 | Trường | Ghi chú |
 |---|---|
 | `role` | Giá trị `user_role` mục 3.1 |
-| `commune_ids` | Mảng, **có thể rỗng** với tài khoản chưa được gán xã. Quản trị hệ thống: `["*"]` |
+| `commune_ids` | Mảng **đúng một xã**. Quản trị hệ thống: `["*"]`; dữ liệu cũ thiếu xã vẫn đọc được mảng rỗng, không có quyền địa bàn |
 
 🔴 **Đọc từ DATABASE, không phải từ claim trong token.** Đây là lý do endpoint tồn tại thay vì để FE
 tự giải mã JWT:
@@ -520,10 +521,10 @@ Capability **`ManageUsers`** (chỉ `system_admin`, mục 2). Endpoint của **w
 
 Luật:
 
-- **Xã:** `superior` / `manager` / `field_engineer` cần **ít nhất một** `commune_id` tồn tại;
-  `system_admin` **không** nhận `commune_ids` (gửi → `400`) và tự có phạm vi `["*"]`.
+- **Xã:** `superior` / `manager` / `field_engineer` cần **đúng một phần tử** trong `commune_ids`, là xã tồn tại; 0 hoặc ≥ 2 phần tử (kể cả trùng) → `400 VALIDATION_FAILED`, `details.field = "commune_ids"`;
+  `system_admin` **không** nhận `commune_ids` (kể cả `[]`, gửi → `400 VALIDATION_FAILED`) và tự có phạm vi `["*"]`.
 - `PATCH` không có `commune_ids`: lên `system_admin` thì bỏ hết xã; chuyển giữa ba vai trò kia thì giữ xã;
-  **rời `system_admin` thì bắt buộc gửi `commune_ids`**. `username` **không bao giờ đổi**.
+  **rời `system_admin` thì bắt buộc gửi `commune_ids`**. Gửi `commune_ids` là **thay xã duy nhất**; gửi lại xã hiện tại là no-op. `username` **không bao giờ đổi**.
 - Đổi vai trò / xã **không** đá phiên đang mở: có hiệu lực ở lần refresh kế tiếp, chậm tối đa 60 phút.
 - **Khoá** thu hồi **mọi** refresh token; access token đã cấp còn chạy tới hết hạn (≤ 60 phút).
   Không tự khoá chính mình (`409 CANNOT_LOCK_SELF`); không khoá hay hạ vai trò Quản trị cuối cùng còn
@@ -1158,6 +1159,9 @@ vẫn hiển thị `title`/`body` với biểu tượng mặc định, **không*
 
 ## 7. Chưa chốt (chưa chặn FE)
 
+Phạm vi claim `commune_ids` đã chốt ở v1.22 (ACCT-1), xem mục 2 và 4.9: giữ kiểu mảng,
+mỗi tài khoản không phải Quản trị đúng một xã; Quản trị `["*"]`, không có dòng gán xã.
+
 Vector tile khi vượt ~5000 cột; realtime khi sweep xong (giai đoạn 1 polling). (Lưu ảnh dài hạn đã
 chốt ở v1.7 — mục 3.3.)
 
@@ -1188,6 +1192,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.22 | 29/10/2026 | **Mỹ (Dylan), quyết định 29/10** | **ACCOUNT-ONE-COMMUNE (ACCT-1)**: mỗi tài khoản superior/manager/field_engineer đúng một xã; system_admin không gán xã. Giữ commune_ids[] trên request/response/JWT; siết số phần tử. UNIQUE user_id, migration giữ xã gán sớm nhất (hòa → ordinal commune_id), Down không khôi phục dòng bị xóa. Thay D-R3 nhiều xã; không đổi capability/endpoint |
 | v1.21 | 28/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **ASSET-PHOTOS chỉ phần B** (FPS-1): `control` + `power_state` trên feeder inventory, `feeders[]` trên map cabinets giữ `feeder_ids[]`; power luôn unknown đến khi có telemetry đo điện. Additive, không migration/capability/sync. **Phần A ảnh tài sản chưa hiện thực**. 141 operation giữ nguyên. Đồng bộ heading/info.version đang sót v1.19 dù đã có changelog v1.20 (#190). Nền tạm tới FW; WP5/WP6/BE2 chưa xác nhận |
 | v1.20 | 26/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **WO-REASSIGN-DATE — giao lại kèm ngày khác** (mục 5.5, drift CR-7). **Thêm** hai trường tuỳ chọn `scheduled_date`, `due_date` vào body `PUT /work-orders/{id}/assignee`; đổi người + ngày là một thao tác, một audit. Chỉ thêm, client cũ không đổi, không migration, spec vẫn 141 op. Nền tạm tới FW |
 | v1.19 | 26/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **WO-CANCEL-REQUEST** — hai POST xin/bác, năm trường trạng thái phụ, filter pending, hai allowed_actions, hai notification type (mục 5.5, 5.9; drift CR-1…CR-6). Chỉ assigned, online-only; dời lịch thật đổi làm hết hiệu lực; chấp nhận quyết định từ màn hình cũ tác động lên yêu cầu hiện tại. Không đổi wo_status/capability/sync op. 141 operation; nền tạm tới FW, WP5/WP6 chưa xác nhận |

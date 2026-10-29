@@ -35,8 +35,8 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     private string[] poles = [];
     private string? parallelRoad;
     private string userId = null!, orderId = null!;
-    /// <summary>BE-27: a manager holding both communes of the job, and one holding only the anchor.</summary>
-    private string bothManager = null!, anchorManager = null!;
+    /// <summary>BE-27: one manager of the job commune and one of a different commune.</summary>
+    private string homeManager = null!, foreignManager = null!;
     private sealed class Scope(string[] communes) : ICommuneScopeAccessor
     {
         public CommuneScope ScopeValue { get; } = CommuneScope.ForCommunes(communes);
@@ -62,18 +62,18 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         var user = new AppUser { Username = "processing" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = "Test engineer",
             PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = UserRole.FieldEngineer };
         db.Add(user); await db.SaveChangesAsync(); userId = user.UserId;
-        db.AddRange(new AppUserCommune { UserId = user.UserId, CommuneId = a }, new AppUserCommune { UserId = user.UserId, CommuneId = b });
+        db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = a });
         var managers = new[] { "both", "anchor" }.Select(name => new AppUser { Username = "processing" + Guid.NewGuid().ToString("N"),
             Email = Guid.NewGuid() + "@example.invalid", FullName = name, PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3",
             PasswordSetAt = DateTime.UtcNow, Role = UserRole.Manager }).ToArray();
-        db.AddRange(managers); await db.SaveChangesAsync(); bothManager = managers[0].UserId; anchorManager = managers[1].UserId;
-        db.AddRange(new AppUserCommune { UserId = bothManager, CommuneId = a }, new AppUserCommune { UserId = bothManager, CommuneId = b },
-            new AppUserCommune { UserId = anchorManager, CommuneId = a });
+        db.AddRange(managers); await db.SaveChangesAsync(); homeManager = managers[0].UserId; foreignManager = managers[1].UserId;
+        db.AddRange(new AppUserCommune { UserId = homeManager, CommuneId = a },
+            new AppUserCommune { UserId = foreignManager, CommuneId = b });
         var route = new RoadSegment { CommuneId = a, SegmentName = "Curve", RoadClass = RoadClass.InterVillage,
             DataSource = DataSource.Simulated, LengthM = 999, Geom = new LineString([new(108,16), new(108.0005,16.00002), new(108.001,16)]) { SRID = 4326 } };
         db.Add(route); await db.SaveChangesAsync(); road = route.SegmentId;
         var assets = new[] { new Pole { CommuneId = a, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00025,16.00004) { SRID = 4326 } },
-            new Pole { CommuneId = b, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00075,15.99998) { SRID = 4326 } } };
+            new Pole { CommuneId = a, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108.00075,15.99998) { SRID = 4326 } } };
         db.AddRange(assets); await db.SaveChangesAsync(); poles = assets.Select(x => x.PoleId).ToArray();
         var now = DateTime.UtcNow;
         var order = new WorkOrder { CommuneId = a, CreatedBy = user.UserId, AssignedTo = user.UserId, AssignedAt = now,
@@ -123,7 +123,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM notification WHERE commune_id = {a} OR commune_id = {b}");
-        var accounts = new[] { userId, bothManager, anchorManager };
+        var accounts = new[] { userId, homeManager, foreignManager };
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE user_id = ANY({accounts})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user WHERE user_id = ANY({accounts})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM administrative_unit WHERE commune_id = {a} OR commune_id = {b}");
@@ -172,9 +172,9 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
             $"DELETE FROM detection WHERE sweep_id = {sweep}"));
         Assert.Equal("55000", error.SqlState);
 
-        // BE-27: only the manager who can review the WHOLE run (both communes) is told; the engineer is not.
+        // BE-27: only the manager of the job commune is told; the engineer is not.
         var notice = Assert.Single(await Notices(db));
-        Assert.Equal((bothManager, NotificationType.SurveyReadyForReview, a, $"Khảo sát {sweep} chờ duyệt"),
+        Assert.Equal((homeManager, NotificationType.SurveyReadyForReview, a, $"Khảo sát {sweep} chờ duyệt"),
             (notice.RecipientUserId, notice.Type, notice.CommuneId, notice.Title));
     }
 
@@ -207,8 +207,8 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal(SweepProcessingStatus.Succeeded, item.ProcessingStatus);
         Assert.Equal(poles.Order(), (await db.Set<PoleObservation>().Where(x => poles.Contains(x.PoleId)).Select(x => x.PoleId).ToArrayAsync()).Order());
         var audit = await db.Set<AuditEvent>().Where(x => x.Action == AuditAction.Completed && x.EntityId == sweep).ToArrayAsync();
-        Assert.Equal(2, audit.Length);
-        Assert.Equal(new[] { a, b }.Order(), audit.Select(x => x.CommuneId).Order());
+        Assert.Single(audit);
+        Assert.Equal([a], audit.Select(x => x.CommuneId));
         Assert.All(audit, x => Assert.Equal(AuditActorKind.Cv, x.ActorKind));
     }
 
@@ -241,18 +241,34 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal(SweepProcessingStatus.Failed, (await verify.Set<SurveySweep>().SingleAsync(x => x.SweepId == sweep)).ProcessingStatus);
         Assert.Empty(await verify.Set<PoleObservation>().Where(x => poles.Contains(x.PoleId)).ToArrayAsync());
         var notices = await Notices(verify);
-        Assert.Equal(new[] { bothManager, userId }.Order(), notices.Select(n => n.RecipientUserId).Order());
+        Assert.Equal(new[] { homeManager, userId }.Order(), notices.Select(n => n.RecipientUserId).Order());
         Assert.All(notices, n => Assert.Equal((NotificationType.SurveyProcessingFailed, $"Phiếu {orderId}. Mã lỗi: CLOCK_INSUFFICIENT."), (n.Type, n.Body)));
     }
 
     [Fact]
     public async Task Revoked_commune_permission_fails_job_without_writing_foreign_results()
     {
-        await using (var db = Db()) await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE commune_id = {b}");
+        await using (var db = Db()) await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE user_id = {userId}");
         Assert.True(await Processor().ProcessOneAsync(sweepId: sweep));
         await using var verify = Db();
         Assert.Equal("JOB_SCOPE_INVALID", (await verify.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep)).ErrorCode);
         Assert.Empty(await verify.Set<PoleObservation>().Where(x => poles.Contains(x.PoleId)).ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task A_foreign_pole_on_the_route_fails_the_existing_job_scope_check()
+    {
+        await using (var db = Db())
+        {
+            db.Add(new Pole { CommuneId = b, SegmentId = road, DataSource = DataSource.Simulated,
+                Geom = new Point(108.0006, 16) { SRID = 4326 } });
+            await db.SaveChangesAsync();
+        }
+        Assert.True(await Processor().ProcessOneAsync(sweepId: sweep));
+        await using var verify = Db();
+        var run = await verify.Set<SurveyProcessingRun>().SingleAsync(x => x.SweepId == sweep);
+        Assert.Equal("JOB_SCOPE_INVALID", run.ErrorCode);
+        Assert.Empty(await verify.Set<PoleObservation>().Where(x => x.RunId == run.RunId).ToArrayAsync());
     }
 
     [Fact]
@@ -299,7 +315,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal("succeeded",run.ResultState);
         Assert.True(run.LeaseExpiresAt > run.StartedAt.AddSeconds(120));
         Assert.True(await db.Set<AuditEvent>().AnyAsync(x => x.EntityId == sweep && x.Action == AuditAction.DetailsChanged));
-        Assert.Equal(2,await db.Set<AuditEvent>().CountAsync(x => x.EntityId == sweep && x.Action == AuditAction.Completed));
+        Assert.Equal(1,await db.Set<AuditEvent>().CountAsync(x => x.EntityId == sweep && x.Action == AuditAction.Completed));
     }
 
     [Fact]

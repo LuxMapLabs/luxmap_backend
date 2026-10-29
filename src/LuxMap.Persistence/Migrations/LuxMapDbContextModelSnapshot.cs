@@ -1504,6 +1504,10 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_app_user_commune_commune_id");
 
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_app_user_commune_user_id");
+
                     b.ToTable("app_user_commune", (string)null);
                 });
 

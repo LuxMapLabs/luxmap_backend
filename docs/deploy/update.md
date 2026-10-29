@@ -28,6 +28,13 @@ Host vps
 
 ## A. Cập nhật backend
 
+**ACCOUNT-ONE-COMMUNE (ACCT-1): phải có bản sao lưu DB hoàn tất trước khi deploy.** Migration
+`AccountsSingleCommune` xóa các dòng gán xã dư, chỉ giữ `assigned_at` sớm nhất (hòa → mã xã ordinal nhỏ nhất).
+`deploy.sh` đã chạy `deploy/backup.sh` trước migration: xác nhận dump trong `/var/backups/luxmap/db` và sao chép
+ra ngoài máy chủ; nếu backup lỗi thì dừng. Giữ log deploy có `NOTICE` từng `(user_id, commune_id)` bị xóa để đối soát.
+`Down()` chỉ bỏ UNIQUE, không khôi phục dòng đã xóa; muốn phục hồi gán xã phải khôi phục dump trước migration
+(xem vps.md mục 8), không chỉ quay lui code. Không bỏ qua bước backup khi chạy migration bằng tay.
+
 ```bash
 ssh vps
 cd /opt/luxmap

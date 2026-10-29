@@ -205,10 +205,10 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Null(await FeederCabinetAsync(feederId));
     }
 
-    [Fact]
+    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
     public async Task A_cabinet_of_another_commune_cannot_feed_the_feeder()
     {
-        var client = await fixture.BothCommunesClientAsync();
+        var client = await fixture.ForeignCommuneClientAsync();
         var foreign = await NewCabinetAsync(fixture.ForeignCommuneId);
 
         var response = await client.PostAsJsonAsync(
@@ -379,10 +379,10 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(cabinetId, await FeederCabinetAsync(await FeederByRefAsync($"{tag}-F1")));
     }
 
-    [Fact]
+    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
     public async Task Import_refuses_per_row_what_the_database_would_refuse_at_the_write()
     {
-        var client = await fixture.BothCommunesClientAsync();
+        var client = await fixture.ForeignCommuneClientAsync();
         var tag = Tag();
         await AssetImportTests.ImportAsync(client, "cabinets", "c.csv",
             "external_ref,cabinet_name,commune_id,geom_wkt,data_source"

@@ -19,7 +19,7 @@ D-R28 = **proxy streaming qua API** (BE-15 P1, 02/10); D-R25 (`calibration_rig`)
 
 Thứ tự ưu tiên khi mâu thuẫn:
 
-1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.21** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
+1. **`docs/api-contract-v1.1.md`** — bản hợp nhất **v1.22** (tên file giữ để liên kết cũ còn đúng); bản máy đọc là
    `docs/openapi/luxmap-v1.5.json` (file SINH — xem `docs/agents/traps/assets.md` mục BE-REVIEW-02 số 8).
 2. **Quyết định đã chốt trong `docs/contract-drift.md` nhưng chưa hợp nhất vào Contract thắng chữ của Contract** (Mỹ ký 20/10/2026).
    Đây là cách repo đang chạy: thiết bị IoT ở tủ điện (I-18), sort mặc định sự cố (P-3), `out_threshold_ratio = null` (D-R22).
@@ -216,7 +216,7 @@ Chi tiết và lý do: `docs/agents/traps/commune-scope.md`.
 
 | Vai trò | `user_role` | Tài khoản demo |
 |---|---|---|
-| **Cấp giám sát** — bản đồ, thống kê, báo cáo; **chỉ đọc** | `superior` | `agency` |
+| **Cấp giám sát** — bản đồ, thống kê, báo cáo một xã mỗi tài khoản; **chỉ đọc** | `superior` | `agency` |
 | **Quản lý** — tài sản, giao việc, duyệt sự cố / khảo sát / ảnh, điều khiển đèn testbed | `manager` | `engineer` |
 | **Kỹ sư hiện trường** — khảo sát đêm, kiểm tra, sửa chữa | `field_engineer` | `crew` |
 | **Quản trị hệ thống** — tài khoản, vai trò, cấu hình, xã | `system_admin` | `admin` |

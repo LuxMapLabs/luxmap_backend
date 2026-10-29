@@ -67,7 +67,7 @@ public class AppUser
 
 /// <summary>
 /// The user-to-commune join table backing the <c>commune_ids</c> claim of Contract section 7.
-/// Many-to-many because a managing authority can cover several communes.
+/// A unique user_id limits each scoped account to one commune (ACCT-1).
 /// </summary>
 public class AppUserCommune
 {

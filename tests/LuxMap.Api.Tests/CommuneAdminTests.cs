@@ -170,34 +170,20 @@ public class CommuneAdminTests(AccountTestFactory factory) : IClassFixture<Accou
     }
 
     /// <summary>
-    /// The map opens on the box around the user's communes. A commune without a frame is listed (with a null frame) but adds
-    /// nothing to the box.
+    /// The map opens on the assigned commune's frame. System-wide aggregation is tested separately.
     /// </summary>
     [Fact]
     public async Task Auth_me_lists_the_users_communes_with_frames_and_the_box_around_them()
     {
         var admin = await AdminAsync();
         var phuoc = await CreateAsync(admin, LongPhuoc);
-        var binh = await CreateAsync(admin, LongBinh);
-        var bare = await CreateAsync(admin, null);
-        var manager = await ManagerAsync(admin, phuoc, binh, bare);
-
+        var manager = await ManagerAsync(admin, phuoc);
         var me = await Json(await manager.GetAsync("/api/v1/auth/me"));
-
-        var communes = me.GetProperty("communes").EnumerateArray().ToList();
-        Assert.Equal([phuoc, binh, bare], communes.Select(c => c.GetProperty("commune_id").GetString()!));
-        Assert.Equal(me.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()).Order(),
-            communes.Select(c => c.GetProperty("commune_id").GetString()).Order());
-        Assert.Equal(JsonValueKind.Null, communes[2].GetProperty("bbox").ValueKind);
-        Assert.Equal(10.52, communes[0].GetProperty("center").GetProperty("lat").GetDouble(), 9);
-
-        var bounds = me.GetProperty("map_bounds");
-        var box = bounds.GetProperty("bbox");
-        Assert.Equal((107.20, 10.48, 107.36, 10.60),
-            (box.GetProperty("min_lng").GetDouble(), box.GetProperty("min_lat").GetDouble(),
-             box.GetProperty("max_lng").GetDouble(), box.GetProperty("max_lat").GetDouble()));
-        Assert.Equal(10.54, bounds.GetProperty("center").GetProperty("lat").GetDouble(), 9);
-        Assert.Equal(107.28, bounds.GetProperty("center").GetProperty("lng").GetDouble(), 9);
+        var commune = Assert.Single(me.GetProperty("communes").EnumerateArray());
+        Assert.Equal(phuoc, commune.GetProperty("commune_id").GetString());
+        Assert.Equal([phuoc], me.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
+        Assert.Equal(10.52, commune.GetProperty("center").GetProperty("lat").GetDouble(), 9);
+        Assert.Equal(commune.GetProperty("bbox").GetRawText(), me.GetProperty("map_bounds").GetProperty("bbox").GetRawText());
     }
 
     [Fact]

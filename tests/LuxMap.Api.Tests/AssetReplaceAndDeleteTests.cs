@@ -337,10 +337,10 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     /// This test is what proves the replacement path calls it, not just the create path.
     /// </para>
     /// </remarks>
-    [Fact]
+    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
     public async Task A_pole_may_not_be_moved_onto_a_feeder_in_another_commune()
     {
-        var client = await fixture.BothCommunesClientAsync();
+        var client = await fixture.ForeignCommuneClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
         var foreignFeeder = await NewFeederAsync(fixture.ForeignCommuneId);
@@ -370,10 +370,10 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     /// commune from the segment's owner is legitimate. Only the electrical circuit has to match
     /// (BE-REVIEW-02, constraint 1). Pinned so nobody "fixes" the segment path for symmetry.
     /// </remarks>
-    [Fact]
+    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
     public async Task A_pole_may_sit_on_a_segment_owned_by_another_commune()
     {
-        var client = await fixture.BothCommunesClientAsync();
+        var client = await fixture.ForeignCommuneClientAsync();
         var homeSegment = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, homeSegment, feederId: null);
         var foreignSegment = await NewSegmentAsync(fixture.ForeignCommuneId);

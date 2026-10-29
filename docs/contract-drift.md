@@ -23,6 +23,34 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+
+### ACCT-1 — mỗi tài khoản thuộc đúng một xã (29/10/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | `superior`, `manager`, `field_engineer`: mỗi tài khoản đúng một xã. `system_admin`: không có dòng gán xã, `HasSystemWideScope`, claim `["*"]`. Thay D-R3 nhiều xã; muốn giám sát nhiều xã dùng nhiều tài khoản. |
+| **Decision maker** | Mỹ, chốt 29/10/2026; D-1…D-6 đã chốt theo ủy quyền. |
+| **Date** | 29/10/2026 |
+| **Scope** | Contract v1.22 §2, §4.9, §7; Identity, migration `AccountsSingleCommune`; không đổi capability hoặc logic scope của module khác. |
+
+- **D-1:** Giữ bảng `app_user_commune`, thêm UNIQUE `user_id` tên `ux_app_user_commune_user_id` trong EF model và migration.
+- **D-2:** Giữ `commune_ids[]` trên request, response, JWT. Vai trò thường phải gửi đúng một phần tử (không gộp trùng trước khi kiểm); admin không gửi mảng, kể cả `[]`.
+- **D-3:** PATCH thay xã duy nhất; không gửi thì giữ xã khi đổi giữa vai trò thường; lên admin bỏ xã; rời admin bắt buộc gửi xã.
+- **D-4:** Migration giữ xã có `assigned_at` sớm nhất, hòa thì `commune_id COLLATE "C"` (ordinal) nhỏ nhất; `RAISE NOTICE` từng cặp bị xóa trước khi tạo UNIQUE. `Down()` chỉ bỏ index, không phục hồi dòng đã xóa; bắt buộc sao lưu trước deploy.
+- **D-5:** Giữ danh sách scope, guard/filter, `Notifier`, `SurveyProcessor`, `WorkOrder*` như cũ.
+- **D-6:** Kiểm thử tài khoản/DB/migration; giữ rõ các kịch bản nhiều xã không còn tới được để Mỹ quyết, không xóa âm thầm.
+
+**Hệ quả (không tự sửa tính năng):**
+
+- Tuyến liên xã (ERD Q7, S-Q7, SC-5): phiếu của Quản lý xã A không chứa được tuyến/cột xã B ngoài scope; không xử lý và báo rõ trong độ phủ. Dữ liệu Nguyễn Xiển & Phước Thiện 28/09 qua Long Phước và Long Bình chỉ phủ phần xã của người giao. Điều kiện SC-5 giữ nguyên; run cũ nhiều xã có thể không còn mở được bởi tài khoản thường.
+- **Giới hạn hiện thực cần Mỹ biết:** `SurveyProcessor.Claim` gom xã của mọi cột cùng nguồn trên tuyến rồi `ValidateAssignee` đòi người được giao có đủ mọi xã. Vì vậy tuyến có cột cùng nguồn xã B hiện làm **cả job thất bại `JOB_SCOPE_INVALID`**, chưa có cơ chế xử lý riêng phần xã A và ghi phần B vào độ phủ. ACCT-1 không sửa processor theo D-5; cần ticket riêng nếu muốn xử lý từng phần.
+- Cấp giám sát chỉ xem thống kê/bảo hành một xã mỗi tài khoản.
+- `POST /faults` không có cột (R-6): nhánh nhiều xã phải chỉ định `commune_id` không còn xảy ra với người thường; giữ logic phòng vệ/claim cũ.
+- Thông báo và giao việc theo xã giữ nguyên thuật toán, chỉ ít người nhận hơn.
+- Token đã cấp giữ snapshot cũ đến lần cấp lại (tối đa 60 phút), không tự thu hồi phiên.
+
+**Đối chiếu ticket:** ticket ghi `VALIDATION_ERROR`; Contract và `ErrorCodes.ValidationFailed` đã publish là `VALIDATION_FAILED`. Giữ mã Contract, lỗi số phần tử chỉ `details.field = "commune_ids"` (cộng correlation id theo middleware).
+
 ### FPS-1 — trạng thái mạch (ASSET-PHOTOS chỉ Phase 2-B)
 
 | | |

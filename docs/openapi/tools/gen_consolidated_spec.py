@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.21"
+d["info"]["version"] = "1.22"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -54,6 +54,7 @@ d["info"]["description"] = (
     "v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. "
     "v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. "
     "v1.21 (ASSET-PHOTOS phần B, SELF-SIGNED — FPS-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A ảnh tài sản chưa hiện thực. "
+    "v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -505,6 +506,18 @@ for parameter in d["paths"]["/api/v1/work-orders"]["get"].get("parameters", []):
     if parameter["name"] == "cancellation_request_status":
         parameter["schema"] = {"$ref": "#/components/schemas/CancellationRequestStatus"}
         parameter["description"] = "Một trạng thái phụ none/pending/rejected; AND với filter khác. Badge dùng total pending."
+
+# ACCT-1: arrays remain on the wire; cardinality depends on the resulting role.
+for name in ("CreateUserRequest", "UpdateUserRequest"):
+    S[name]["properties"]["commune_ids"]["description"] = (
+        "ACCT-1, v1.22: superior/manager/field_engineer phải có đúng một phần tử là xã tồn tại; "
+        "0 hoặc >=2 (kể cả trùng) trả 400 VALIDATION_FAILED, details.field=commune_ids. "
+        "system_admin không gửi trường này, kể cả mảng rỗng. PATCH vắng trường giữ xã hiện tại "
+        "giữa vai trò thường; lên admin bỏ xã, rời admin bắt buộc gửi xã."
+    )
+S["UserAccountItem"]["properties"]["commune_ids"]["description"] = (
+    'Mảng đúng một xã; system_admin trả ["*"], không có dòng gán xã.'
+)
 
 # Order paths: implemented first in original order, then the rest as inserted.
 json.dump(d, open(DST, "w"), ensure_ascii=False, indent=2)

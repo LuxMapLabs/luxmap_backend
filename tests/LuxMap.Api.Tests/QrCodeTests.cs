@@ -174,7 +174,7 @@ public sealed class QrCodeTests(AssetImportFixture factory)
     public async Task Another_communes_pole_and_code_do_not_exist_for_the_caller()
     {
         var foreignPole = await PlantPoleAsync(factory.ForeignCommuneId);
-        var both = await factory.BothCommunesClientAsync();
+        var both = await factory.ForeignCommuneClientAsync();
         var foreignCode = await Read(await both.PostAsJsonAsync(Codes, new { pole_id = foreignPole }));
         var manager = await factory.ManagerClientAsync();
 

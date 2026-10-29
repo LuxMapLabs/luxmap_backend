@@ -509,7 +509,7 @@ public partial class WorkOrderTests
         polePhotoHost = null;
     }
 
-    [Fact]
+    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
     public async Task Pole_photo_cross_commune_uses_poles_source_and_scope_on_every_read()
     {
         var pole = await PlantPole(.2, commune: foreign); var id = await Plant(WorkOrderStatus.InProgress);

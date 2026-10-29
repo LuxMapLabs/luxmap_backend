@@ -56,7 +56,7 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
             db.AddRange(communes);
             await db.SaveChangesAsync();
             home = communes[0].CommuneId; foreign = communes[1].CommuneId;
-            foreach (var (key, role) in new[] { ("manager", UserRole.Manager), ("engineer", UserRole.FieldEngineer), ("superior", UserRole.Superior) })
+            foreach (var (key, role) in new[] { ("manager", UserRole.Manager), ("engineer", UserRole.FieldEngineer), ("superior", UserRole.Superior), ("foreign_superior", UserRole.Superior) })
             {
                 var user = new AppUser
                 {
@@ -67,11 +67,8 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
                 users[key] = user; db.Add(user);
             }
             await db.SaveChangesAsync();
-            foreach (var user in users.Values)
-            {
-                db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = home });
-                if (user.Role == UserRole.Superior) db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = foreign });
-            }
+            foreach (var (key, user) in users)
+                db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = key == "foreign_superior" ? foreign : home });
             var roads = new[] { home, foreign }.Select(c => new RoadSegment
             {
                 CommuneId = c, SegmentName = "Warranty road", RoadClass = RoadClass.InterVillage, DataSource = DataSource.Simulated,
@@ -245,7 +242,7 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
 
         Assert.Equal([field], Ids(await Get("manager", "warranty")).Intersect([field, rig, abroad]));
         Assert.Equal([rig], Ids(await Get("manager", $"warranty?commune_id={home}&data_source=calibration_rig")));
-        Assert.Contains(abroad, Ids(await Get("superior", $"warranty?commune_id={foreign}")));
+        Assert.Contains(abroad, Ids(await Get("foreign_superior", $"warranty?commune_id={foreign}")));
 
         var forbidden = await clients["manager"].GetAsync($"/api/v1/statistics/warranty?commune_id={foreign}");
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);

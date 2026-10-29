@@ -69,6 +69,8 @@ public sealed class AppUserCommuneConfiguration : IEntityTypeConfiguration<AppUs
     {
         builder.ToTable("app_user_commune");
         builder.HasKey(assignment => new { assignment.UserId, assignment.CommuneId });
+        builder.HasIndex(assignment => assignment.UserId).IsUnique()
+            .HasDatabaseName("ux_app_user_commune_user_id");
 
         builder.Property(assignment => assignment.UserId).HasColumnType("text");
         builder.HasCommuneReference(assignment => assignment.CommuneId);

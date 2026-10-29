@@ -20,7 +20,7 @@ namespace LuxMap.Modules.Identity.Accounts;
 
 /// <summary>
 /// Accounts as a system admin manages them (BE-33a, D-R11): create with an emailed invitation, read,
-/// change role / communes / contact details, lock and unlock, resend the invitation.
+/// change role / commune / contact details, lock and unlock, resend the invitation.
 /// </summary>
 /// <remarks>
 /// Not written to <c>audit_event</c>: that table requires a commune and an account belongs to none
@@ -238,33 +238,38 @@ public sealed class UserAdminService(
 
     private static void ReplaceCommunes(AppUser user, IReadOnlyList<string> communes, DateTime now)
     {
-        // A diff, not clear-and-add: removing and re-adding the same composite key in one SaveChanges
-        // conflicts in the change tracker.
-        foreach (var gone in user.CommuneAssignments.Where(assignment => !communes.Contains(assignment.CommuneId)).ToList())
+        var current = user.CommuneAssignments.SingleOrDefault();
+        var commune = communes.SingleOrDefault();
+        if (current?.CommuneId == commune)
         {
-            user.CommuneAssignments.Remove(gone);
+            return;
         }
 
-        foreach (var added in communes.Except(CurrentCommunes(user), StringComparer.Ordinal))
+        if (current is not null)
         {
-            user.CommuneAssignments.Add(new AppUserCommune { UserId = user.UserId, CommuneId = added, AssignedAt = now });
+            user.CommuneAssignments.Remove(current);
+        }
+
+        if (commune is not null)
+        {
+            user.CommuneAssignments.Add(new AppUserCommune { UserId = user.UserId, CommuneId = commune, AssignedAt = now });
         }
     }
 
-    /// <summary>D-8: a system admin covers every commune and takes none; every other role needs at least one that exists.</summary>
+    /// <summary>D-8: a system admin covers every commune and takes none; every other role needs exactly one that exists (ACCT-1).</summary>
     private async Task<IReadOnlyList<string>> ValidCommunesAsync(UserRole role, IReadOnlyList<string>? requested, CancellationToken ct)
     {
-        var communes = (requested ?? []).Select(commune => commune.Trim()).Distinct(StringComparer.Ordinal).ToList();
+        var communes = (requested ?? []).Select(commune => commune?.Trim() ?? "").ToList();
         if (role == UserRole.SystemAdmin)
         {
-            return communes.Count == 0
+            return requested is null
                 ? []
                 : throw Invalid("commune_ids", "A system admin covers every commune; send no commune_ids.");
         }
 
-        if (communes.Count == 0)
+        if (communes.Count != 1)
         {
-            throw Invalid("commune_ids", "This role needs at least one commune.");
+            throw Invalid("commune_ids", "This role needs exactly one commune.");
         }
 
         var known = await db.Set<AdministrativeUnit>()

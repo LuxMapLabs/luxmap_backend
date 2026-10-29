@@ -28,26 +28,18 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
 
     public string ManagerUsername { get; private set; } = null!;
 
-    /// <summary>
-    /// A manager whose scope covers BOTH communes.
-    /// </summary>
-    /// <remarks>
-    /// Exists for exactly one question: when the query filter admits rows from two communes at once,
-    /// is the upsert key the composite <c>(commune_id, external_ref)</c> or the code alone? With the
-    /// single-commune account the filter hides the other row before the key is ever consulted, so
-    /// that account cannot tell the two implementations apart.
-    /// </remarks>
-    public string BothCommunesUsername { get; private set; } = null!;
+    /// <summary>A second manager scoped only to the foreign commune (ACCT-1).</summary>
+    public string ForeignCommuneUsername { get; private set; } = null!;
 
     /// <summary>
-    /// The password of the two accounts this fixture creates — borrowed from <c>.env</c>, exactly as
+    /// The password of the scoped accounts this fixture creates — borrowed from <c>.env</c>, exactly as
     /// BE-06 reads it, so it is never a literal in the test source.
     /// </summary>
     public string AccountPassword { get; } = AuthTestExtensions.SeedPassword("SEED_ADMIN_PASSWORD");
 
     private string userId = null!;
 
-    private string bothCommunesUserId = null!;
+    private string foreignCommuneUserId = null!;
 
     /// <summary>A field engineer in <see cref="CommuneId"/> only — the role that writes pole notes on site (POLE-NOTE).</summary>
     public string FieldEngineerUsername { get; private set; } = null!;
@@ -111,12 +103,12 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
             db.Set<AppUserCommune>().Add(new AppUserCommune { UserId = userId, CommuneId = CommuneId });
             await db.SaveChangesAsync();
 
-            BothCommunesUsername = $"be12b-{Guid.NewGuid():N}"[..20];
+            ForeignCommuneUsername = $"be12b-{Guid.NewGuid():N}"[..20];
             var wide = new AppUser
             {
-                Username = BothCommunesUsername,
-                Email = $"{BothCommunesUsername}@luxmap.local",
-                FullName = "BE-12a manager over two communes",
+                Username = ForeignCommuneUsername,
+                Email = $"{ForeignCommuneUsername}@luxmap.local",
+                FullName = "BE-12a manager of the foreign commune",
                 Role = UserRole.Manager,
                 HasSystemWideScope = false,
                 PasswordHash = string.Empty,
@@ -127,10 +119,9 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
             db.Set<AppUser>().Add(wide);
             await db.SaveChangesAsync();
 
-            bothCommunesUserId = wide.UserId;
-            db.Set<AppUserCommune>().AddRange(
-                new AppUserCommune { UserId = bothCommunesUserId, CommuneId = CommuneId },
-                new AppUserCommune { UserId = bothCommunesUserId, CommuneId = ForeignCommuneId });
+            foreignCommuneUserId = wide.UserId;
+            db.Set<AppUserCommune>().Add(
+                new AppUserCommune { UserId = foreignCommuneUserId, CommuneId = ForeignCommuneId });
             await db.SaveChangesAsync();
 
             FieldEngineerUsername = $"be12e-{Guid.NewGuid():N}"[..20];
@@ -166,7 +157,7 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 await db.Database.ExecuteSqlInterpolatedAsync($"""
                     DELETE FROM audit_event
                     WHERE commune_id = {CommuneId} OR commune_id = {ForeignCommuneId}
-                       OR actor_user_id = {userId} OR actor_user_id = {bothCommunesUserId} OR actor_user_id = {fieldEngineerUserId}
+                       OR actor_user_id = {userId} OR actor_user_id = {foreignCommuneUserId} OR actor_user_id = {fieldEngineerUserId}
                     """);
                 // BE-34: a device's firmware history is immutable like the audit, and holds the device with RESTRICT.
                 await db.Database.ExecuteSqlInterpolatedAsync(
@@ -241,11 +232,11 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
         return client;
     }
 
-    /// <summary>An <see cref="HttpClient"/> for the manager scoped to BOTH communes.</summary>
-    public async Task<HttpClient> BothCommunesClientAsync()
+    /// <summary>An <see cref="HttpClient"/> for a second manager, scoped only to the foreign commune.</summary>
+    public async Task<HttpClient> ForeignCommuneClientAsync()
     {
         var client = CreateClient();
-        var tokens = await (await client.PostLoginAsync(BothCommunesUsername, AccountPassword)).ReadTokensAsync();
+        var tokens = await (await client.PostLoginAsync(ForeignCommuneUsername, AccountPassword)).ReadTokensAsync();
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }
@@ -284,7 +275,7 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
 
         foreach (var (name, value) in new (string, object)[]
                  {
-                     ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", bothCommunesUserId), ("e", fieldEngineerUserId),
+                     ("c", CommuneId), ("f", ForeignCommuneId), ("u", userId), ("w", foreignCommuneUserId), ("e", fieldEngineerUserId),
                      ("h", issuedTokenHashes.ToArray()),
                  })
         {

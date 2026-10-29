@@ -85,27 +85,13 @@ public class AuthenticationTests(ScopeTestFixture factory, ITestOutputHelper out
     }
 
     [Fact]
-    public async Task Multi_valued_commune_ids_are_all_readable()
+    public void Multi_valued_commune_ids_are_all_readable()
     {
-        await factory.AssignCommuneAsync("agency", factory.SecondCommune);
-        try
-        {
-            var client = await AuthenticatedAsync("agency", "SEED_AGENCY_PASSWORD");
-            var root = JsonDocument.Parse(await client.GetStringAsync("/api/v1/_scope/whoami")).RootElement;
-
-            var communes = root.GetProperty("commune_ids").EnumerateArray().Select(v => v.GetString()).ToArray();
-            output.WriteLine($"  commune_ids read back: [{string.Join(", ", communes)}]");
-
-            // FindAll, not FindFirst — FindFirst would only see the first element.
-            Assert.Equal(2, communes.Length);
-            Assert.Contains(factory.InScopeCommune, communes);
-            Assert.Contains(factory.SecondCommune, communes);
-        }
-        finally
-        {
-            await factory.RemoveAllCommunesAsync("agency");
-            await factory.AssignCommuneAsync("agency", factory.InScopeCommune);
-        }
+        var principal = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            new[] { new System.Security.Claims.Claim("commune_ids", "COM-A"),
+                new System.Security.Claims.Claim("commune_ids", "COM-B") }, "unit"));
+        var scope = Authorization.CommuneScopeAccessor.FromPrincipal(principal);
+        Assert.Equal(["COM-A", "COM-B"], scope.CommuneIds);
     }
 
     [Fact]

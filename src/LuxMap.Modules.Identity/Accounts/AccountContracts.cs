@@ -26,7 +26,7 @@ public sealed class CreateUserRequest
     [Required]
     public UserRole? Role { get; init; }
 
-    /// <summary>At least one for superior / manager / field_engineer; must be absent or empty for system_admin (D-8).</summary>
+    /// <summary>Exactly one for superior / manager / field_engineer; must be absent for system_admin (ACCT-1).</summary>
     public IReadOnlyList<string>? CommuneIds { get; init; }
 }
 
@@ -45,7 +45,7 @@ public sealed class UpdateUserRequest
 
     public UserRole? Role { get; init; }
 
-    /// <summary>Replaces the whole assignment list when present.</summary>
+    /// <summary>Sets the single assigned commune when present (ACCT-1).</summary>
     public IReadOnlyList<string>? CommuneIds { get; init; }
 }
 
@@ -81,7 +81,7 @@ public sealed class ForgotPasswordRequest
 /// One account as the admin screens see it.
 /// </summary>
 /// <param name="Role">A Contract section 3.1 <c>user_role</c> string.</param>
-/// <param name="CommuneIds">The assigned communes, or <c>["*"]</c> for a system admin — the same answer as <c>GET /auth/me</c>.</param>
+/// <param name="CommuneIds">The single assigned commune, or <c>["*"]</c> for a system admin — the same answer as <c>GET /auth/me</c>.</param>
 /// <param name="Status"><c>invited</c> (no password yet), <c>active</c> or <c>locked</c>; derived when read, never stored (D-13).</param>
 public sealed record UserAccountItem(
     string UserId,

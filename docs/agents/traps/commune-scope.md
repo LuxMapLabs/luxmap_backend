@@ -2,6 +2,8 @@
 
 Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi sửa entity mang `commune_id`, query filter, `CommuneWriteGuard`, FK cascade, backdoor. Luật chung cho mọi ticket nằm ở `CLAUDE.md`.
 
+**ACCT-1 (29/10/2026):** mỗi tài khoản thường chỉ có một xã; admin dùng `*`, không gán xã. Giữ `CommuneScope.CommuneIds` dạng danh sách cho guard/filter và token cũ; không rút về giá trị đơn.
+
 ## Hai quy tắc chốt ở BE-09 — entity và quyền ghi
 
 **1. Khi nào denormalize `commune_id` và implement `ICommuneScoped`.**

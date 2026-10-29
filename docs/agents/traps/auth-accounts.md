@@ -22,7 +22,7 @@ cho mọi endpoint viết sau.
 > (`CurrentUserTests.It_is_not_declared_anonymous_even_though_its_four_siblings_are`). Kiểm bằng phá
 > hoại: trả `[AllowAnonymous]` về cấp class thì test hành vi **vẫn xanh**, test metadata **đỏ**.
 
-**Cấp giám sát xem nhiều xã theo danh sách xã được gán, không có cấp huyện** (D-R3, Contract §2); quyền vẫn theo capability + địa bàn.
+**Mỗi tài khoản superior / manager / field_engineer thuộc đúng một xã** (ACCT-1, Contract v1.22 §2; thay D-R3). `system_admin` không gán xã, claim `["*"]`. `commune_ids` vẫn là mảng; kiểm số phần tử trước khi gộp trùng, UNIQUE `user_id` là chốt DB. Quyền vẫn theo capability + địa bàn.
 
 ## BE-33a — tài khoản do Quản trị tạo, mời qua email (05/10/2026)
 
