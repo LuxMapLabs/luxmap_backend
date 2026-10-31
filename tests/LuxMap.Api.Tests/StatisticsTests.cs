@@ -39,7 +39,7 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
             db.AddRange(communes);
             await db.SaveChangesAsync();
             home = communes[0].CommuneId; foreign = communes[1].CommuneId;
-            foreach (var (key, role) in new[] { ("manager", UserRole.Manager), ("engineer", UserRole.FieldEngineer), ("superior", UserRole.Superior) })
+            foreach (var (key, role) in new[] { ("manager", UserRole.Manager), ("engineer", UserRole.FieldEngineer), ("superior", UserRole.Superior), ("foreign_superior", UserRole.Superior) })
             {
                 var user = new AppUser
                 {
@@ -50,11 +50,8 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
                 users[key] = user; db.Add(user);
             }
             await db.SaveChangesAsync();
-            foreach (var user in users.Values)
-            {
-                db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = home });
-                if (user.Role == UserRole.Superior) db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = foreign });
-            }
+            foreach (var (key, user) in users)
+                db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = key == "foreign_superior" ? foreign : home });
             var roads = new[] { home, home, foreign }.Select(c => new RoadSegment
             {
                 CommuneId = c, SegmentName = "Stats road", RoadClass = RoadClass.InterVillage, DataSource = DataSource.Simulated,
@@ -137,7 +134,8 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         var body = await Get("superior", "fixture-status?group_by=segment,commune");
 
         Assert.Equal(["data_source", "commune_id", "segment_id"], Strings(body.GetProperty("group_by")));
-        var rows = body.GetProperty("rows").EnumerateArray()
+        var foreignBody = await Get("foreign_superior", "fixture-status?group_by=segment,commune");
+        var rows = body.GetProperty("rows").EnumerateArray().Concat(foreignBody.GetProperty("rows").EnumerateArray())
             .Select(r => (r.GetProperty("commune_id").GetString(), r.GetProperty("segment_id").GetString(), r.GetProperty("pole_count").GetInt32()))
             .ToArray();
         // Expected order follows the ID rule (length, then ordinal) — never insert order: EF does not keep the
@@ -145,7 +143,9 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         var expected = new (string?, string?, int)[] { (home, road, 2), (home, otherRoad, 1), (foreign, foreignRoad, 1) }
             .OrderBy(r => r.Item1!.Length).ThenBy(r => r.Item1, StringComparer.Ordinal)
             .ThenBy(r => r.Item2!.Length).ThenBy(r => r.Item2, StringComparer.Ordinal).ToArray();
-        Assert.Equal(expected, rows);
+        // Each account receives its own ordered response; concatenating responses has no global order.
+        Assert.Equal(expected.Where(r => r.Item1 == home), rows.Where(r => r.Item1 == home));
+        Assert.Equal(expected.Where(r => r.Item1 == foreign), rows.Where(r => r.Item1 == foreign));
     }
 
     [Fact]
@@ -251,7 +251,8 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         var body = await Get("superior", "repair-timeliness?group_by=commune");
 
         Assert.Equal(["commune_id"], Strings(body.GetProperty("group_by")));
-        var rows = body.GetProperty("rows").EnumerateArray()
+        var foreignBody = await Get("foreign_superior", "repair-timeliness?group_by=commune");
+        var rows = body.GetProperty("rows").EnumerateArray().Concat(foreignBody.GetProperty("rows").EnumerateArray())
             .ToDictionary(r => r.GetProperty("commune_id").GetString()!);
         Assert.Equal(2, rows[home].GetProperty("open_overdue").GetInt32());
         Assert.Equal(1, rows[foreign].GetProperty("open_overdue").GetInt32());

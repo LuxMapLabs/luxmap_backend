@@ -49,7 +49,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
             home = communes[0].CommuneId;
             foreign = communes[1].CommuneId;
 
-            foreach (var (key, role) in new[] { ("manager", UserRole.Manager), ("a", UserRole.FieldEngineer), ("b", UserRole.FieldEngineer) })
+            foreach (var (key, role) in new[] { ("manager", UserRole.Manager), ("foreign_manager", UserRole.Manager), ("a", UserRole.FieldEngineer), ("b", UserRole.FieldEngineer) })
             {
                 var user = new AppUser
                 {
@@ -62,12 +62,8 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
             }
 
             await db.SaveChangesAsync();
-            foreach (var user in users.Values)
-            {
-                db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = home });
-            }
-
-            db.Add(new AppUserCommune { UserId = users["manager"].UserId, CommuneId = foreign });
+            foreach (var (key, user) in users)
+                db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = key == "foreign_manager" ? foreign : home });
 
             var roads = new[] { home, foreign }.Select(commune => new RoadSegment
             {
@@ -168,7 +164,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
             var error = JsonDocument.Parse(await missing.Content.ReadAsStringAsync()).RootElement.GetProperty("error");
             Assert.Equal(("FAULT_NOT_FOUND", id), (error.GetProperty("code").GetString(), error.GetProperty("details").GetProperty("fault_id").GetString()));
         }
-        Assert.Equal(HttpStatusCode.OK, (await clients["manager"].GetAsync($"{Route}/{theirs}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await clients["foreign_manager"].GetAsync($"{Route}/{theirs}")).StatusCode);
     }
 
     [Fact]
@@ -282,7 +278,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
         Assert.Equal(outOfScope.GetRawText(), unknown.GetRawText());
 
         // The manager, who holds both communes, does see it.
-        Assert.Single(Ids(await GetAsync("manager", $"?pole_id={foreignPole}")));
+        Assert.Single(Ids(await GetAsync("foreign_manager", $"?pole_id={foreignPole}")));
     }
 
     [Fact]

@@ -27,7 +27,7 @@ gọn hơn đề xuất gốc (32 bảng mới → 22). Nguồn phạm vi: [Phi�
 | Q4 | **Baseline có phiên bản** + bảng thành viên (lượt nào tạo nên nó) — lượt đang đánh giá không được nằm trong baseline của chính nó | Phiếu dòng 59; BE-15 câu hỏi mở 4 |
 | Q5 | Kết quả chỉ **công bố** (ghi `luminance_history`, `pole_current_status`, sinh fault) **sau khi Quản lý chấp nhận phiên** | `.ai/tasks/BE-15.md` (flow 30/09); Phiếu dòng 91 |
 | Q6 | Phiếu khảo sát = `work_order.task_kind = 'survey'` + **`work_order_segment` có thứ tự**; một phiếu nhiều sweep (khảo sát lại) | FR-1, BE-15 |
-| Q7 | **Tuyến liên xã:** phiếu neo vào **một xã**, nhưng được chứa tuyến/cột của các xã khác **trong phạm vi của người tạo**; kết quả theo cột mang **xã của cột**. Cột ngoài phạm vi → không xử lý, báo rõ trong độ phủ | Dữ liệu thật 28/09: Nguyễn Xiển & Phước Thiện chạy qua cả Long Phước và Long Bình. Claude quyết (Codex nghiêng "một phiếu một xã" — chia tuyến thực tế sẽ cắt ngang các đoạn đường) |
+| Q7 | **Tuyến liên xã:** phiếu neo vào **một xã**, nhưng được chứa tuyến/cột của các xã khác **trong phạm vi của người tạo**; kết quả theo cột mang **xã của cột**. Cột ngoài phạm vi → không xử lý, báo rõ trong độ phủ. **ACCT-1 (29/10): tài khoản thường chỉ một xã, nên phạm vi cho phép chỉ còn xã của người giao; giữ mô hình/logic Q7 cho dữ liệu cũ. Giới hạn hiện thực: processor có thể từ chối cả job `JOB_SCOPE_INVALID` khi tuyến có cột cùng nguồn xã khác, xem ACCT-1** | Dữ liệu thật 28/09: Nguyễn Xiển & Phước Thiện chạy qua cả Long Phước và Long Bình. Claude quyết (Codex nghiêng "một phiếu một xã" — chia tuyến thực tế sẽ cắt ngang các đoạn đường) |
 | Q8 | **Một registry phiên bản chung `artifact_version`** (model CV, thuật toán ghép, gom cụm, firmware module/node, profile) — không hai bảng | BE-34; Codex nghiêng "registry tối thiểu". ✅ **Hiện thực 23/10/2026** (BE-34, migration `AddVersionTraceability`, drift VR-1…VR-9): thêm `node_firmware`, `lux_module_firmware`; code ở `LuxMap.Persistence.Versions`; lịch sử firmware thiết bị ở `iot_node_firmware` |
 | Q9 | Cấu hình (ngưỡng dim, ngưỡng offline, …) ở **`system_setting`** key/value có audit; mỗi run **chụp lại** giá trị đã dùng | BE-33, Phiếu dòng 157; đơn giản hơn bảng config có version. ✅ **Hiện thực 22/10/2026** (migration `AddSystemSettings`, drift SET-1…SET-7): hai khoá; "audit" là bảng append-only riêng `system_setting_change` vì `audit_event` bắt buộc `commune_id` |
 | Q10 | **Thêm `electrical_cabinet`** (tủ điện): `feeder.cabinet_id` nullable, `iot_node.cabinet_id` **bắt buộc** (≤ 1 thiết bị / trụ), `iot_node.geom` **bỏ** — toạ độ thuộc trụ. ✅ **Hiện thực 07/10/2026** (migration `AddElectricalCabinet`, drift CAB-1…CAB-8; Mỹ sửa 3 điểm của bản đầu: `cabinet_id` của node bắt buộc, `geom` của trụ bắt buộc, trụ ↔ node `0..1`) | Phiếu dòng 215/239 liệt kê *electrical cabinets* là tài sản được quản lý; Claude quyết, Mỹ chốt 07/10 |
@@ -69,7 +69,9 @@ erDiagram
         text user_id PK "HIỆN CÓ"
     }
     app_user_commune {
-        text user_id PK "HIỆN CÓ"
+        text user_id PK,UK "ACCT-1: mỗi tài khoản tối đa một dòng"
+        text commune_id PK,FK "xã duy nhất của tài khoản thường"
+        timestamptz assigned_at "migration giữ lần gán sớm nhất"
     }
 
     electrical_cabinet {

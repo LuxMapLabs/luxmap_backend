@@ -100,19 +100,18 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
     }
 
     /// <summary>
-    /// A road MAY carry poles from another commune, and the listing must show them.
+    /// A road may carry poles from another commune; each manager sees only their own.
     /// </summary>
     /// <remarks>
     /// <c>road_class = inter_commune</c> means the road runs BETWEEN communes (BE-REVIEW-02,
     /// constraint 1), so this is correct data rather than a leak. The asymmetry with the feeder rule
     /// is the design, and this test is what stops someone "fixing" the segment path for symmetry.
-    /// The caller here holds both communes; a single-commune caller would still only see their own,
-    /// because the filter applies to <c>pole</c> on its own.
+    /// The caller has one commune (ACCT-1); the filter applies to <c>pole</c> on its own.
     /// </remarks>
     [Fact]
-    public async Task A_road_may_carry_poles_from_another_commune_and_they_are_listed()
+    public async Task A_shared_road_lists_only_poles_of_the_callers_commune()
     {
-        var client = await fixture.BothCommunesClientAsync();
+        var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
 
         var here = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
@@ -122,9 +121,9 @@ public sealed class TopologyQueryTests(AssetImportFixture fixture)
         var ids = page.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("pole_id").GetString()).ToList();
 
-        Assert.Equal(2, page.GetProperty("total").GetInt32());
+        Assert.Equal(1, page.GetProperty("total").GetInt32());
         Assert.Contains(here, ids);
-        Assert.Contains(across, ids);
+        Assert.DoesNotContain(across, ids);
     }
 
     // ⚠️ Two tests stood here until 22/09/2026 — one pinning that power_source came from the lamp

@@ -107,32 +107,6 @@ public sealed class ScopeTestFixture : LuxMapTestHost, IAsyncLifetime
         return await query(scope.ServiceProvider.GetRequiredService<LuxMapDbContext>());
     }
 
-    /// <summary>Assigns a commune to a seeded user so the commune_ids claim holds several values.</summary>
-    public async Task AssignCommuneAsync(string username, string communeId)
-    {
-        await using var scope = Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
-        var userId = await db.Set<AppUser>().Where(u => u.Username == username)
-            .Select(u => u.UserId).SingleAsync();
-
-        if (!await db.Set<AppUserCommune>().AnyAsync(a => a.UserId == userId && a.CommuneId == communeId))
-        {
-            db.Set<AppUserCommune>().Add(new AppUserCommune { UserId = userId, CommuneId = communeId });
-            await db.SaveChangesAsync();
-        }
-    }
-
-    public async Task RemoveAllCommunesAsync(string username)
-    {
-        await using var scope = Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
-        var userId = await db.Set<AppUser>().Where(u => u.Username == username)
-            .Select(u => u.UserId).SingleAsync();
-        #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
-        await db.Set<AppUserCommune>().Where(a => a.UserId == userId).ExecuteDeleteAsync();
-        #pragma warning restore RS0030
-    }
-
     private static async Task<string> EnsureCommuneAsync(LuxMapDbContext db, string name)
     {
         var existing = await db.Set<AdministrativeUnit>().FirstOrDefaultAsync(u => u.Name == name);

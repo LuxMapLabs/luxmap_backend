@@ -58,7 +58,6 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
             foreach (var user in users.Values)
             {
                 db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = home });
-                if (user.Role is UserRole.Manager or UserRole.Superior) db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = foreign });
             }
             var roads = new[] { home, foreign }.Select(c => new RoadSegment
             {
@@ -264,13 +263,9 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
                 accepted ? null : "FAULT_STATUS_NOT_ELIGIBLE");
         }
         var homeFault = await Fault(); var foreignFault = await Fault(commune: foreign);
-        await Send("manager", "POST", "", new { task_kind = "inspection", title = "Mixed", fault_ids = new[] { homeFault, foreignFault } }, 409, "CROSS_COMMUNE_REFERENCE");
+        await Send("manager", "POST", "", new { task_kind = "inspection", title = "Mixed", fault_ids = new[] { homeFault, foreignFault } }, 404, "FAULT_NOT_FOUND");
         await Send("manager", "POST", "", new { task_kind = "inspection", title = "Invalid", fault_ids = new[] { "FAULT-missing" } }, 404, "FAULT_NOT_FOUND");
         await Send("manager", "POST", "", new { task_kind = "inspection", title = "Own field", segment_id = segment, commune_id = home }, 400, "SERVER_OWNED_FIELD");
-        // Remove the manager's second commune, then obtain a fresh token for an actual out-of-scope lookup.
-        await Db(async db => { await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM app_user_commune WHERE user_id = {users["manager"].UserId} AND commune_id = {foreign}"); return 0; });
-        var token = await (await clients["manager"].PostLoginAsync(users["manager"].Username, factory.AccountPassword)).ReadTokensAsync();
-        clients["manager"].DefaultRequestHeaders.Authorization = new("Bearer", token.AccessToken);
         await Send("manager", "POST", "", new { task_kind = "inspection", title = "Foreign", fault_ids = new[] { foreignFault } }, 404, "FAULT_NOT_FOUND");
     }
 
@@ -910,7 +905,8 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         var manager = (await PolesOf(id)).GetProperty("items").EnumerateArray().Select(x => x.GetProperty("pole_id").GetString()!);
 
         Assert.Equal([mine], engineer);
-        Assert.Equal([mine, theirs], manager); // the manager is scoped to both communes
+        Assert.Equal([mine], manager);
+        Assert.DoesNotContain(theirs, manager);
     }
 
     [Fact]
@@ -1348,8 +1344,8 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         Assert.Equal(JsonValueKind.Null, engineer.GetProperty("segment_name").ValueKind);
         Assert.Equal(home, engineer.GetProperty("commune_id").GetString());
         Assert.Equal(16.003, engineer.GetProperty("location").GetProperty("lat").GetDouble(), 9); // the pole, not the road
-        Assert.Equal("WO test road", manager.GetProperty("segment_name").GetString()); // the manager covers both communes
-        Assert.Equal(foreign, manager.GetProperty("commune_id").GetString());
+        Assert.Equal(JsonValueKind.Null, manager.GetProperty("segment_name").ValueKind);
+        Assert.Equal(home, manager.GetProperty("commune_id").GetString());
     }
 
     [Fact]

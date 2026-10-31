@@ -77,37 +77,20 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
     /// the test cannot be satisfied by an implementation that returns either source alone.
     /// </remarks>
     [Fact]
-    public async Task A_commune_assigned_after_sign_in_shows_up_without_signing_in_again()
+    public async Task A_commune_replaced_after_sign_in_shows_up_without_signing_in_again()
     {
-        await factory.RemoveAllCommunesAsync("agency");
-        await factory.AssignCommuneAsync("agency", factory.InScopeCommune);
-
+        var (username, password) = await NewThrowawayUserAsync();
         try
         {
-            var client = await AuthenticatedAsync("agency", "SEED_AGENCY_PASSWORD");
+            await SetCommuneAsync(username, factory.InScopeCommune);
+            var client = await AuthenticatedAsync(username, password);
             var token = client.DefaultRequestHeaders.Authorization!.Parameter!;
-
-            var before = await CommunesAsync(client);
-            Assert.Equal([factory.InScopeCommune], before);
-
-            // An administrator grants a second commune. The token in hand is untouched.
-            await factory.AssignCommuneAsync("agency", factory.SecondCommune);
-
-            var after = await CommunesAsync(client);
-            output.WriteLine($"  trước: [{string.Join(", ", before)}] · sau: [{string.Join(", ", after)}]");
-
-            Assert.Equal(2, after.Length);
-            Assert.Contains(factory.SecondCommune, after);
-
-            // The other half: the claim inside that SAME token is still stale, which is precisely why
-            // reading it would have been wrong.
+            Assert.Equal([factory.InScopeCommune], await CommunesAsync(client));
+            await SetCommuneAsync(username, factory.SecondCommune);
+            Assert.Equal([factory.SecondCommune], await CommunesAsync(client));
             Assert.Equal([factory.InScopeCommune], CommuneClaimsOf(token));
         }
-        finally
-        {
-            await factory.RemoveAllCommunesAsync("agency");
-            await factory.AssignCommuneAsync("agency", factory.InScopeCommune);
-        }
+        finally { await DeleteUserAsync(username); }
     }
 
     [Fact]
@@ -119,29 +102,23 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
     }
 
     /// <summary>
-    /// An account with no commune yet answers 200 with an EMPTY list, never 403.
+    /// A legacy account without an assignment answers 200 with an empty list.
     /// </summary>
     /// <remarks>
-    /// That is the state every self-registered account starts in, and the front end has to be able to
-    /// read it to show "waiting for an administrator". Refusing the call would leave it guessing.
+    /// The account API requires one commune; this pins fail-closed compatibility for legacy rows.
     /// </remarks>
     [Fact]
     public async Task An_account_with_no_commune_still_gets_its_profile_with_an_empty_list()
     {
-        await factory.RemoveAllCommunesAsync("crew");
-
+        // Compatibility for a legacy row; the account API no longer permits this state.
+        var (username, password) = await NewThrowawayUserAsync();
         try
         {
-            var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
-            var response = await client.GetAsync(Route);
-
-            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var client = await AuthenticatedAsync(username, password);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(Route)).StatusCode);
             Assert.Empty(await CommunesAsync(client));
         }
-        finally
-        {
-            await factory.AssignCommuneAsync("crew", factory.InScopeCommune);
-        }
+        finally { await DeleteUserAsync(username); }
     }
 
     [Fact]
@@ -269,6 +246,16 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
 
         return (username, password);
     }
+
+    private Task SetCommuneAsync(string username, string commune)
+        => factory.QueryAsync(async db =>
+        {
+            var user = await db.Set<AppUser>().Include(u => u.CommuneAssignments).SingleAsync(u => u.Username == username);
+            db.RemoveRange(user.CommuneAssignments);
+            await db.SaveChangesAsync();
+            db.Add(new AppUserCommune { UserId = user.UserId, CommuneId = commune });
+            return await db.SaveChangesAsync();
+        });
 
     private Task DeleteUserAsync(string username)
         => factory.QueryAsync(async db =>

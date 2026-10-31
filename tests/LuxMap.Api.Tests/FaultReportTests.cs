@@ -42,8 +42,8 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
             var communes = new[] { "home", "second", "outside" }.Select(n => new AdministrativeUnit { Name = $"Report {n} {Guid.NewGuid():N}" }).ToArray();
             db.AddRange(communes); await db.SaveChangesAsync();
             (home, second, outside) = (communes[0].CommuneId, communes[1].CommuneId, communes[2].CommuneId);
-            foreach (var (key, role, scope) in new[] { ("crew", UserRole.FieldEngineer, new[] { home }), ("multi", UserRole.FieldEngineer, new[] { home, second }),
-                         ("other", UserRole.FieldEngineer, new[] { home }), ("manager", UserRole.Manager, new[] { home, second }) })
+            foreach (var (key, role, scope) in new[] { ("crew", UserRole.FieldEngineer, new[] { home }), ("multi", UserRole.FieldEngineer, new[] { home }),
+                         ("other", UserRole.FieldEngineer, new[] { home }), ("manager", UserRole.Manager, new[] { home }) })
             {
                 var user = new AppUser { Username = "report" + Guid.NewGuid().ToString("N"), Email = Guid.NewGuid() + "@example.invalid", FullName = key,
                     PasswordHash = "", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow, Role = role };
@@ -189,7 +189,7 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
         Assert.Equal(home, await Db(db => db.Set<Fault>().IgnoreQueryFilters().Where(f => f.FaultId == faultId).Select(f => f.CommuneId).SingleAsync()));
     }
 
-    [Fact]
+    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
     public async Task An_engineer_of_several_communes_names_one_and_only_one_inside_their_scope()
     {
         object Body(string? commune) => new { client_op_id = Guid.NewGuid(), fault_type = "lamp_out", note = "A lamp not on the map",

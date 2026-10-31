@@ -170,8 +170,8 @@ public sealed class PoleDetailEndpointTests(AssetImportFixture fixture)
             Assert.Equal(ErrorCodes.PoleNotFound, (await ReadAsync(response)).GetProperty("error").GetProperty("code").GetString());
         }
 
-        // The manager scoped to both communes does see it.
-        var both = await (await fixture.BothCommunesClientAsync()).GetAsync(Url(foreignPole));
+        // The second manager, scoped to the foreign commune, does see it.
+        var both = await (await fixture.ForeignCommuneClientAsync()).GetAsync(Url(foreignPole));
         Assert.Equal(HttpStatusCode.OK, both.StatusCode);
     }
 

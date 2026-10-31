@@ -45,25 +45,11 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
     [Fact]
     public async Task Commune_id_inside_the_scope_narrows_the_result()
     {
-        await factory.AssignCommuneAsync("agency", factory.SecondCommune);
-        try
-        {
-            var client = await AuthenticatedAsync("agency", "SEED_AGENCY_PASSWORD");
-
-            var all = await CommunesSeenAsync(client);
-            var narrowed = await CommunesSeenAsync(client, $"?commune_id={factory.SecondCommune}");
-
-            output.WriteLine($"  claim with 2 communes → sees [{string.Join(", ", all)}]");
-            output.WriteLine($"  narrowed to 1 commune → sees [{string.Join(", ", narrowed)}]");
-
-            Assert.Equal(2, all.Length);
-            Assert.Equal([factory.SecondCommune], narrowed);
-        }
-        finally
-        {
-            await factory.RemoveAllCommunesAsync("agency");
-            await factory.AssignCommuneAsync("agency", factory.InScopeCommune);
-        }
+        var client = await AuthenticatedAsync("admin", "SEED_ADMIN_PASSWORD");
+        var all = await CommunesSeenAsync(client);
+        var narrowed = await CommunesSeenAsync(client, $"?commune_id={factory.SecondCommune}");
+        Assert.Equal(3, all.Length);
+        Assert.Equal([factory.SecondCommune], narrowed);
     }
 
     [Fact]
@@ -111,22 +97,15 @@ public class CommuneScopeTests(ScopeTestFixture factory, ITestOutputHelper outpu
     [Fact]
     public async Task Empty_commune_claim_sees_nothing()
     {
-        await factory.RemoveAllCommunesAsync("crew");
-        try
-        {
-            var client = await AuthenticatedAsync("crew", "SEED_CREW_PASSWORD");
-            var seen = await CommunesSeenAsync(client);
-
-            output.WriteLine($"  empty commune_ids claim → sees {seen.Length} commune(s)");
-            Assert.Empty(seen);
-
-            var lookup = await client.GetAsync($"/api/v1/_scope/probes/{factory.InScopeProbeId}");
-            Assert.Equal(HttpStatusCode.NotFound, lookup.StatusCode);
-        }
-        finally
-        {
-            await factory.AssignCommuneAsync("crew", factory.InScopeCommune);
-        }
+        // Defence against a malformed token, without changing a shared seeded account.
+        var crew = new AppUser { UserId = "USR-004", Role = UserRole.FieldEngineer, Username = "crew", Email = "crew@example.invalid",
+            FullName = "Empty claim", PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm };
+        var token = factory.Services.GetRequiredService<AccessTokenIssuer>().Issue(crew, []).Token;
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        Assert.Empty(await CommunesSeenAsync(client));
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.GetAsync($"/api/v1/_scope/probes/{factory.InScopeProbeId}")).StatusCode);
     }
 
     [Fact]

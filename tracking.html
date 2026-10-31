@@ -41,6 +41,21 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="account-one-commune">
+    <strong>ACCOUNT-ONE-COMMUNE — mỗi tài khoản một xã, 29/10/2026</strong>
+    <span class="tag t-block">Triển khai xong · chờ review D-6b</span>
+    <p>Đã thêm UNIQUE <code>app_user_commune.user_id</code>, migration giữ xã gán sớm nhất và NOTICE dòng xóa;
+    validation/PATCH giữ mảng <code>commune_ids</code>. Contract v1.22, drift ACCT-1, ERD, hướng dẫn backup đã cập nhật.</p>
+    <p>Build sạch; toàn bộ suite exit 0: <strong>1.712 pass, 0 fail, 13 Skip</strong> (11 D-6b + 2 MQTT có sẵn).
+    PostGIS Testcontainers chạy được; hai lượt phá thử đều đỏ, đã khôi phục bằng cp. Spec v1.22 hợp lệ, giữ 9 warning như baseline.
+    11 kịch bản API cần một tài khoản nhiều xã được giữ với Skip để Mỹ quyết (D-6b); danh sách và đề xuất ở
+    <code>.ai/results/ACCOUNT-ONE-COMMUNE.md</code>. Không add/commit/push theo yêu cầu; Claude sẽ commit.</p>
+    <p>Giới hạn liên xã: processor hiện có thể trả <code>JOB_SCOPE_INVALID</code> cho cả job khi tuyến chứa cột xã khác;
+    đã kiểm và ghi <a href="docs/contract-drift.md">ACCT-1</a>. Chưa sửa tính năng theo D-5. Backup DB trước deploy; Down không phục hồi dòng gán đã xóa.</p>
+    <p class="muted">Phạm vi file: Identity/Accounts, configuration/entity, migration/snapshot, fixture/test,
+    Contract/spec và tài liệu liên quan. Commit dự kiến: <code>feat(identity): restrict scoped accounts to one commune</code>.</p>
+  </div>
+
   <div class="card">
     <strong>ASSET-PHOTOS Phase 2-B — trạng thái mạch điện, 28/10/2026</strong>
     <p><span class="tag t-next">PR mở từ <code>feat/ASSET-FEEDER-STATE</code> · không migration · chưa báo WP5</span>
