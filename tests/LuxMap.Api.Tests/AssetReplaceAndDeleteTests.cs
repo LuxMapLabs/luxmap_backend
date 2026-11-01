@@ -337,10 +337,10 @@ public sealed class AssetReplaceAndDeleteTests(AssetImportFixture fixture)
     /// This test is what proves the replacement path calls it, not just the create path.
     /// </para>
     /// </remarks>
-    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
+    [Fact]
     public async Task A_pole_may_not_be_moved_onto_a_feeder_in_another_commune()
     {
-        var client = await fixture.ForeignCommuneClientAsync();
+        var client = await fixture.LegacyTwoCommuneClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
         var poleId = await NewPoleAsync(fixture.CommuneId, segmentId, feederId: null);
         var foreignFeeder = await NewFeederAsync(fixture.ForeignCommuneId);

@@ -241,6 +241,29 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
         return client;
     }
 
+    /// <summary>
+    /// A manager whose SIGNED TOKEN still names both communes — what an account assigned to several communes
+    /// before ACCT-1 holds until it is reissued (at most 60 minutes). Accounts can no longer be given two
+    /// communes (the database refuses it), so the token is signed directly; the user row itself keeps its one.
+    /// </summary>
+    /// <remarks>
+    /// Exists for the cross-commune guards (409 <c>CROSS_COMMUNE_REFERENCE</c>): they only fire when the caller
+    /// can see both rows, and they stay as the second line of defence if a scope is ever widened again.
+    /// </remarks>
+    public Task<HttpClient> LegacyTwoCommuneClientAsync()
+    {
+        var manager = new AppUser
+        {
+            UserId = userId, Role = UserRole.Manager, Username = ManagerUsername, Email = $"{ManagerUsername}@luxmap.local",
+            FullName = "Legacy two-commune token", PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+        };
+        var token = Services.GetRequiredService<Modules.Identity.Auth.AccessTokenIssuer>()
+            .Issue(manager, [CommuneId, ForeignCommuneId]).Token;
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+        return Task.FromResult(client);
+    }
+
     /// <summary>An <see cref="HttpClient"/> for the field engineer of <see cref="CommuneId"/>.</summary>
     public async Task<HttpClient> FieldEngineerClientAsync()
     {

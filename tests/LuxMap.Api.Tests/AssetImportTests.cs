@@ -363,10 +363,10 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     /// SAME file with a feeder in the pole's own commune goes through — a check that refused every
     /// feeder would pass the first half and never be noticed.
     /// </remarks>
-    [Fact(Skip = "ACCT-1 / D-6b: requires a multi-commune account; awaiting My review.")]
+    [Fact]
     public async Task A_pole_whose_feeder_sits_in_another_commune_is_refused_per_row_and_the_same_commune_goes_through()
     {
-        var client = await fixture.ForeignCommuneClientAsync();
+        var client = await fixture.LegacyTwoCommuneClientAsync();
         var tag = Tag();
 
         var segments = await ImportAsync(client, "segments", "segments.csv",
