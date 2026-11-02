@@ -1659,3 +1659,46 @@ WP5 / WP6 chưa xác nhận, nền tạm tới FW kế tiếp. Im lặng 3 ngày
 | CR-5 | D-9: màn hình cũ tác động lên yêu cầu hiện tại; xmin chỉ canh race đang chạy, không nhận version/request id của client. Không thêm precondition cho assignee/cancel/reject. WP5/WP6 xác nhận nghĩa dời lịch và giới hạn này ở FW |
 | CR-6 | D-10: online-only, WP6 lưu nháp chưa gửi; không sync op mới/không nới CHECK sync. Start đang chờ phải đẩy trước rồi xét xin; start sau pending reset yêu cầu. Op lạ không tự block các op sau. WP6 xác nhận thứ tự hai kênh và cache generated_at |
 | CR-7 | Giao lại kèm ngày khác (Mỹ yêu cầu 26/10, nhánh 1a của luồng duyệt): `PUT /assignee` nhận thêm `scheduled_date` / `due_date` tuỳ chọn, atomic với đổi người, một audit `reassigned`. Ngày sai hoặc kèm bỏ giao → 400, không đổi gì. Cùng người + ngày thật đổi = dời lịch (`details_changed`, `rescheduled`, reset yêu cầu). Chỉ thêm; không migration; Contract **v1.20** `SELF-SIGNED`, WP5 xác nhận ở FW kế tiếp |
+
+
+## AI-DAYNIGHT — gate ngày/đêm cho API thử ảnh (02/11/2026)
+
+- **Decision:** người dùng xác nhận trong task: `day` → JSON string `"day"`, confidence thấp →
+  JSON string `"unknown"`; `night` → response YOLO hiện hành, không đổi DTO detection.
+- **Decision maker:** người yêu cầu tích hợp, xác nhận trực tiếp trong task ngày 02/11/2026.
+- **Date:** 02/11/2026.
+- **Scope:** chỉ `POST /api/v1/ai/detect`, giữ policy ReviewSurveys và JPEG-only. Không đổi detector
+  khảo sát, Citizen hoặc ảnh cột. AI-1 vẫn là endpoint nền tạm; cần thông báo consumer về union response 200.
+- Model `daynight.onnx`: float32 `images[1,3,224,224]` → `output0[1,2]`, metadata
+  `{0: 'day', 1: 'night'}`, đầu ra đã Softmax. Không có lớp unknown; unknown là backend abstention
+  nếu xác suất lớn nhất < `Ai:DayNight:ConfidenceThreshold` (mặc định 0.7), hoặc hòa điểm.
+- Không coi unknown là bộ phát hiện ảnh ngoài phân phối: model hai lớp vẫn có thể tự tin trên ảnh không phù hợp.
+- Tiền xử lý theo training mặc định YOLO11n-cls do người dùng cung cấp và `classify_transforms` của Ultralytics:
+  RGB, resize cạnh ngắn 224 bilinear, center crop 224, chia 255, mean=0/std=1. ImageSharp không được
+  khẳng định bit-identical với Pillow; chưa có ảnh/reference tensor từ notebook để đo parity số học.
+- Nguồn tra pipeline: https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/data/augment.py
+  (đã tra 02/11/2026; tag 8.4.198 ghi trong metadata chưa lấy được qua công cụ web).
+
+
+### AI-DAYNIGHT-PERCENT (02/11/2026)
+
+Người dùng yêu cầu trực tiếp bổ sung phần trăm cho nhánh day: HTTP 200 JSON
+`{"classification":"day","confidence_percent":99.56}`. Confidence là xác suất softmax
+của lớp day nhân 100, làm tròn hai chữ số thập phân; không phải độ chính xác trên tập test.
+Nhánh unknown vẫn JSON string; night giữ AiDetectResponse. Chỉ áp POST /api/v1/ai/detect.
+
+
+### AI-DAYNIGHT-UNKNOWN-PERCENT (02/11/2026)
+
+Theo yêu cầu trực tiếp của người dùng, unknown cũng trả object như day:
+`{"classification":"unknown","confidence_percent":62.35}`. Giá trị là max(P(day), P(night))
+nhân 100, làm tròn hai chữ số; không phải xác suất của lớp unknown (model không có lớp này).
+Thay thế nhánh unknown dạng chuỗi của AI-DAYNIGHT-PERCENT; night không đổi.
+
+
+### AI-DAYNIGHT-NIGHT-PERCENT (02/11/2026)
+
+Người dùng yêu cầu nhánh night cũng trả classification và confidence_percent từ model ngày/đêm,
+đồng thời giữ model_version, width, height, count, detections của YOLO. Phần trăm cấp response
+là P(night) nhân 100 làm tròn hai chữ số; confidence bên trong từng detection vẫn là score YOLO
+0..1. Day/unknown không đổi. OpenAPI dùng anyOf vì schema object nhỏ là tập con của object night.

@@ -155,7 +155,7 @@ SUMMARY = {
     ("patch", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/review"): "[TẠM — PHOTO-REVIEW PP-11…PP-15] Người được giao sửa nhãn on/off trước quyết định, phiếu in_progress; khác AI phải có note; không công bố",
     ("post", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/decision"): "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history",
     # AI-1 — model YOLO ON / OFF (PR #118 làm lại sau review), SELF-SIGNED.
-    ("post", "/api/v1/ai/detect"): "[TẠM — AI-1] Chạy model YOLO trên một ảnh JPEG (Quản lý): normal = sáng, out = tắt, bbox theo pixel; không ghi gì",
+    ("post", "/api/v1/ai/detect"): "[TẠM — AI-1] Phân loại JPEG: day/unknown trả object kèm confidence_percent; night kèm classification/confidence_percent và kết quả YOLO normal/out, bbox; không ghi gì",
     # LIGHT-CTRL 2b — lệnh ON / OFF / AUTO + kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW).
     ("get", "/api/v1/lighting/preview"): "[TẠM — LIGHT-CTRL] Xem trước một lần bấm: rơ-le sẽ đổi, mạch bị loại kèm lý do, tuyến bị ảnh hưởng; không ghi",
     ("post", "/api/v1/lighting/commands"): "[TẠM — LIGHT-CTRL] Bấm ON / OFF / AUTO cho một mạch hoặc một tuyến — 202; cùng client_op_id → 200; không còn rơ-le nào → 409 NO_CONTROLLABLE_RELAY",

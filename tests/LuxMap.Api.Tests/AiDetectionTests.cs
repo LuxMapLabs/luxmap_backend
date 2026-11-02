@@ -166,8 +166,18 @@ public sealed class AiDetectionTests(ScopeTestFixture factory)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        Assert.Equal(["count", "detections", "height", "model_version", "width"],
+        using var input = new MemoryStream(NightImage(800, 600));
+        var classification = await factory.Services.GetRequiredService<IDayNightClassifier>().ClassifyAsync(input, CancellationToken.None);
+        if (classification.Classification != "night")
+        {
+            Assert.Equal(classification.Classification, body.GetProperty("classification").GetString());
+            Assert.Equal(Math.Round(classification.Confidence * 100d, 2), body.GetProperty("confidence_percent").GetDouble());
+            return;
+        }
+        Assert.Equal(["classification", "confidence_percent", "count", "detections", "height", "model_version", "width"],
             body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal("night", body.GetProperty("classification").GetString());
+        Assert.Equal(Math.Round(classification.Confidence * 100d, 2), body.GetProperty("confidence_percent").GetDouble());
         Assert.Equal((800, 600), (body.GetProperty("width").GetInt32(), body.GetProperty("height").GetInt32()));
         Assert.Equal(body.GetProperty("count").GetInt32(), body.GetProperty("detections").GetArrayLength());
         Assert.Equal(factory.Services.GetRequiredService<YoloOnOffDetector>().Artifact.Version, body.GetProperty("model_version").GetString());

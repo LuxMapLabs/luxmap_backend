@@ -1,0 +1,8 @@
+namespace LuxMap.Modules.AI.DTOs;
+
+/// <summary>Day/unknown decision; confidence is max(day, night) as a percentage from 0 to 100.</summary>
+public sealed record AiClassificationResponse
+{
+    public required string Classification { get; init; }
+    public required double ConfidencePercent { get; init; }
+}

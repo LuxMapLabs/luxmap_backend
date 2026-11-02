@@ -1111,21 +1111,18 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Day/unknown object with confidence_percent, or the night classification with confidence_percent and YOLO detection fields.",
             "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
-                }
-              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AiDetectResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AiClassificationResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -12137,8 +12134,27 @@
         },
         "additionalProperties": false
       },
+      "AiClassificationResponse": {
+        "required": [
+          "classification",
+          "confidence_percent"
+        ],
+        "type": "object",
+        "properties": {
+          "classification": {
+            "type": "string"
+          },
+          "confidence_percent": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "AiDetectResponse": {
         "required": [
+          "classification",
+          "confidence_percent",
           "count",
           "detections",
           "height",
@@ -12147,6 +12163,13 @@
         ],
         "type": "object",
         "properties": {
+          "classification": {
+            "type": "string"
+          },
+          "confidence_percent": {
+            "type": "number",
+            "format": "double"
+          },
           "model_version": {
             "type": "string"
           },
