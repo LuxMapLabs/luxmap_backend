@@ -60,6 +60,19 @@
   </div>
 
   <div class="card">
+    <strong>POLE-SEGMENT-NULL — cột chưa thuộc tuyến, PR 2a (schema), 02/11/2026</strong>
+    <p><span class="tag t-next">PR 2a xong, chưa push · 2b–2e chưa làm · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    Mỹ chốt nullable cho <code>pole.segment_id</code> và D-1…D-14 (theo đề xuất Phase 1). Lộ trình tuần tự, <strong>nút bật ở cuối</strong>:
+    2a schema → 2b phiếu / khảo sát / sự cố → 2c đọc (assets, map, thống kê, lighting) → 2d sync (cần WP6) → 2e POST / PUT / import / bộ lọc.
+    Phase 1 tìm ra rủi ro chính: <code>WorkOrderPoleService.Targets</code> so <code>w.SegmentId == p.SegmentId</code> sẽ khớp <code>null == null</code> và
+    kéo mọi cột chưa tuyến vào phiếu không có tuyến (xử lý ở 2b). PR 2a: migration <code>PoleSegmentNullable</code> (<code>Up</code> chỉ bỏ NOT NULL,
+    <code>Down</code> từ chối khi còn cột null), hành vi API không đổi, mục drift POLE-SEGMENT-NULL (SELF-SIGNED). Codex làm, không chạy được test
+    trong sandbox; Claude chạy lại: build 0 warning, <strong>1.235 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước), 2 phá thử đều đỏ rồi xanh.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p1.md">Phase 1</a> · <a href=".ai/results/POLE-SEGMENT-NULL-p2a.md">Kết quả 2a</a> ·
+    <a href=".ai/reviews/POLE-SEGMENT-NULL-2a-by-claude.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>ASSET-PHOTOS Phase 2-B — trạng thái mạch điện, 28/10/2026</strong>
     <p><span class="tag t-next">PR mở từ <code>feat/ASSET-FEEDER-STATE</code> · không migration · chưa báo WP5</span>
     <code>control</code> + <code>power_state</code> trên <code>/assets/feeders</code>, <code>feeders[]</code> trên <code>/map/cabinets</code> (giữ <code>feeder_ids[]</code>); một truy vấn control theo lô qua port
