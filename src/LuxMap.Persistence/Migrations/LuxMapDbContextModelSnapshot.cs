@@ -484,7 +484,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnName("note");
 
                     b.Property<string>("SegmentId")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("segment_id");
 
@@ -4556,7 +4555,6 @@ namespace LuxMap.Persistence.Migrations
                         .WithMany("Poles")
                         .HasForeignKey("SegmentId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_pole_road_segment_segment_id");
 
                     b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)

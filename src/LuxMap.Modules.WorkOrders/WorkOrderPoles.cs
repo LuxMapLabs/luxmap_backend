@@ -105,7 +105,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
         var rows = await Targets(id).AsNoTracking()
             .Select(p => new
             {
-                p.PoleId, p.SegmentId, p.Geom, p.NearSensitivePoi,
+                p.PoleId, SegmentId = p.SegmentId!, p.Geom, p.NearSensitivePoi,
                 p.Note,
                 Status = db.Set<PoleCurrentStatus>().Where(s => s.PoleId == p.PoleId)
                     .Select(s => new { s.FixtureStatus, s.StatusConfidence, s.LastSeenAt }).FirstOrDefault(),
