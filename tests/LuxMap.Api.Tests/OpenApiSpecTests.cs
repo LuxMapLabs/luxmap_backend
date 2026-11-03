@@ -42,6 +42,50 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     }
 
     [Fact]
+    public void Pole_segment_read_properties_are_nullable_without_weakening_segment_identity()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "docs/openapi/luxmap-v1.5.json")))
+            directory = directory.Parent;
+        Assert.NotNull(directory);
+        using var consolidated = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory.FullName, "docs/openapi/luxmap-v1.5.json")));
+        foreach (var document in new[] { Spec, consolidated.RootElement })
+        {
+            JsonElement Schema(string name) => document.GetProperty("components").GetProperty("schemas").GetProperty(name);
+            foreach (var (name, field) in new[]
+            {
+                ("PoleListItem", "segment_id"), ("PoleDetail", "segment_name"), ("TopologyPole", "segment_id"),
+                ("PoleProperties", "segment_id"), ("SyncPoleProperties", "segment_id"),
+                ("PoleMapDetail", "segment_id"), ("PoleMapDetail", "segment_name"),
+                ("WarrantyItem", "segment_id"), ("PublicQrInfo", "segment_name"), ("CitizenReportPole", "segment_id"),
+            })
+            {
+                var property = Schema(name).GetProperty("properties").GetProperty(field);
+                Assert.True(property.GetProperty("nullable").GetBoolean(), $"{name}.{field}");
+                Assert.False(property.TryGetProperty("$ref", out _));
+            }
+            foreach (var name in new[] { "SegmentProperties", "SegmentListItem", "SegmentCoverage" })
+            {
+                var id = Schema(name).GetProperty("properties").GetProperty("segment_id");
+                Assert.False(id.TryGetProperty("nullable", out var nullable) && nullable.GetBoolean(), name);
+            }
+            foreach (var name in new[] { "IotNodeProperties", "SyncBundle" })
+            {
+                var items = Schema(name).GetProperty("properties").GetProperty("segment_ids").GetProperty("items");
+                Assert.False(items.TryGetProperty("nullable", out var nullable) && nullable.GetBoolean());
+            }
+            var operation = document.GetProperty("paths").GetProperty("/api/v1/map/cabinets/{cabinetId}/topology").GetProperty("get");
+            Assert.True(operation.GetProperty("responses").TryGetProperty("409", out _));
+            if (operation.TryGetProperty("summary", out var summary))
+                Assert.Contains("POLE_SEGMENT_REQUIRED", summary.GetString());
+            if (document.GetProperty("components").GetProperty("schemas").TryGetProperty("SegmentId", out var identity))
+                Assert.False(identity.TryGetProperty("nullable", out var nullableIdentity) && nullableIdentity.GetBoolean());
+            foreach (var name in new[] { "LightingPreview", "LightingRequestResult" })
+                Assert.True(Schema(name).GetProperty("properties").GetProperty("unassigned_segment_pole_count").GetProperty("nullable").GetBoolean());
+        }
+    }
+
+    [Fact]
     public void Feeder_state_is_additive_read_only_and_uses_string_enums()
     {
         Assert.Equal(new[] { "unknown", "on", "off" }, Schema("FeederPowerState").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));

@@ -14,8 +14,8 @@ namespace LuxMap.Modules.Map.Features;
 public sealed record PoleMapDetail
 {
     public required string PoleId { get; init; }
-    public required string SegmentId { get; init; }
-    public required string SegmentName { get; init; }
+    public required string? SegmentId { get; init; }
+    public required string? SegmentName { get; init; }
     public required string CommuneId { get; init; }
     public required PoleMapLocation Location { get; init; }
 

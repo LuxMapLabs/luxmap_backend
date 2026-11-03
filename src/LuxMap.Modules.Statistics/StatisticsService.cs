@@ -65,6 +65,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
                     p.DataSource,
                     CommuneId = byCommune ? p.CommuneId : null,
                     SegmentId = bySegment ? p.SegmentId : null,
+                    UnassignedSegment = p.SegmentId == null,
                     Status = (FixtureStatus?)s.FixtureStatus,
                 })
             .GroupBy(x => new { x.DataSource, x.CommuneId, x.SegmentId })
@@ -79,6 +80,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
                 Out = g.Count(x => x.Status == FixtureStatus.Out),
                 Unknown = g.Count(x => x.Status == null || x.Status == FixtureStatus.Unknown),
                 NeverSurveyed = g.Count(x => x.Status == null),
+                UnassignedSegmentPoleCount = g.Count(x => x.UnassignedSegment),
             })
             .ToListAsync(ct);
 
@@ -90,6 +92,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
             Rows = groups
                 .OrderBy(r => r.DataSource)
                 .ThenBy(r => r.CommuneId?.Length).ThenBy(r => r.CommuneId, StringComparer.Ordinal)
+                .ThenBy(r => r.SegmentId == null)
                 .ThenBy(r => r.SegmentId?.Length).ThenBy(r => r.SegmentId, StringComparer.Ordinal)
                 .ToArray(),
         };

@@ -31,7 +31,7 @@ public sealed record FixtureStatusRow
     /// <summary><c>null</c> unless grouped by <c>commune</c>.</summary>
     public required string? CommuneId { get; init; }
 
-    /// <summary><c>null</c> unless grouped by <c>segment</c>.</summary>
+    /// <summary><c>null</c> for the unassigned group, or when not grouped by <c>segment</c>.</summary>
     public required string? SegmentId { get; init; }
 
     public required int PoleCount { get; init; }
@@ -44,6 +44,9 @@ public sealed record FixtureStatusRow
 
     /// <summary>The part of <see cref="Unknown"/> never covered by a sweep. A subset, not a fifth bucket (drift ST-2).</summary>
     public required int NeverSurveyed { get; init; }
+
+    /// <summary>Poles in this group with no assigned segment; included in pole_count and the status buckets.</summary>
+    public required int UnassignedSegmentPoleCount { get; init; }
 }
 
 /// <summary><c>GET /statistics/repair-timeliness</c>: repair work orders finished in the nights <c>from</c>..<c>to</c>.</summary>
@@ -101,7 +104,7 @@ public sealed record WarrantyList
 public sealed record WarrantyItem
 {
     public required string PoleId { get; init; }
-    public required string SegmentId { get; init; }
+    public required string? SegmentId { get; init; }
     public required string CommuneId { get; init; }
 
     /// <summary>The POLE's provenance — the dimension every statistic splits by (drift ST-1).</summary>

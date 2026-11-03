@@ -50,6 +50,7 @@ public sealed class LightingCommandService(
             Excluded = plan.Excluded,
             AffectedSegmentIds = plan.AffectedSegmentIds,
             UncontrollablePoleCount = plan.UncontrollablePoleCount,
+            UnassignedSegmentPoleCount = plan.UnassignedSegmentPoleCount,
         };
     }
 
@@ -187,7 +188,7 @@ public sealed class LightingCommandService(
         }
 
         await transaction.CommitAsync(ct);
-        return (await ResultAsync(requestId, ct), false);
+        return ((await ResultAsync(requestId, ct)) with { UnassignedSegmentPoleCount = plan.UnassignedSegmentPoleCount }, false);
     }
 
     /// <summary>Commands in the caller's communes, newest first (by <c>seq</c>, never by the text id).</summary>
@@ -662,11 +663,13 @@ public sealed class LightingCommandService(
         var switched = relays.Select(relay => relay.FeederId).ToArray();
         var left = excluded.Select(exclusion => exclusion.FeederId).ToArray();
         var uncontrollable = await scope.CountAsync(pole => pole.FeederId == null || left.Contains(pole.FeederId), ct);
-        var affected = (await db.Set<Pole>().Where(pole => pole.FeederId != null && switched.Contains(pole.FeederId))
-                .Select(pole => pole.SegmentId!).Distinct().ToListAsync(ct))
+        var affectedPoles = db.Set<Pole>().Where(pole => pole.FeederId != null && switched.Contains(pole.FeederId));
+        var unassigned = await affectedPoles.CountAsync(pole => pole.SegmentId == null, ct);
+        var affected = (await affectedPoles.Select(pole => pole.SegmentId).Where(id => id != null)
+                .Distinct().ToListAsync(ct)).OfType<string>()
             .OrderBy(id => id.Length).ThenBy(id => id, StringComparer.Ordinal).ToArray();
 
-        return new Plan(kind, feederId ?? segmentId!, communeId, relays, excluded, affected, uncontrollable);
+        return new Plan(kind, feederId ?? segmentId!, communeId, relays, excluded, affected, uncontrollable, unassigned);
     }
 
     private async Task<LightingRequestResult?> ReplayAsync(Guid key, string hash, string actorId, CancellationToken ct)
@@ -709,6 +712,7 @@ public sealed class LightingCommandService(
             Excluded = JsonSerializer.Deserialize<LightingExclusion[]>(request.Excluded, LuxMapJsonOptions.Default) ?? [],
             AffectedSegmentIds = request.AffectedSegmentIds,
             UncontrollablePoleCount = request.UncontrollablePoleCount,
+            UnassignedSegmentPoleCount = null,
         };
     }
 
@@ -769,5 +773,6 @@ public sealed class LightingCommandService(
         IReadOnlyList<PlannedRelay> Relays,
         IReadOnlyList<LightingExclusion> Excluded,
         IReadOnlyList<string> AffectedSegmentIds,
-        int UncontrollablePoleCount);
+        int UncontrollablePoleCount,
+        int UnassignedSegmentPoleCount);
 }

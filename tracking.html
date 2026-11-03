@@ -60,8 +60,21 @@
   </div>
 
   <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2c (bề mặt đọc), 03/11/2026</strong>
+    <p><span class="tag t-next">PR 2c xong, chưa push · 2d–2e chưa làm · chưa báo WP4 / WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) review</span>
+    Mọi bề mặt đọc trả <code>null</code> thật cho cột chưa tuyến: inventory, bản đồ, chi tiết cột, cột theo mạch, bảo hành, QR và duyệt báo cáo công dân.
+    Sơ đồ nhánh cabinet gặp cột chưa tuyến trả <strong>409 <code>POLE_SEGMENT_REQUIRED</code></strong> (kèm tối đa 100 <code>pole_ids</code> + <code>pole_count</code>).
+    Thống kê: <code>unassigned_segment_pole_count</code> theo từng dòng, nhóm <code>segment_id: null</code> đứng cuối. Lighting: <code>affected_segment_ids</code> không còn null,
+    thêm <code>unassigned_segment_pole_count</code> ở preview / lệnh mới (không lưu bền → đọc lại lệnh cũ là <code>null</code>, D-18). Một thay đổi cho cả cột CÓ tuyến:
+    <code>segment_name</code> của tuyến liên xã bị ẩn bởi phạm vi xã đổi từ <code>""</code> sang <code>null</code> (D-19).
+    Codex viết code, test, OpenAPI rồi dừng vì báo hết hạn mức (CLI vẫn từ chối dù trang hạn mức còn 100%); Claude đọc diff, viết file kết quả và chạy lại:
+    build 0 warning, sau rebase lên dev <strong>1.249 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước), OpenAPI sinh lại bằng lệnh chuẩn khớp bản đã gộp, 6 phá thử đỏ đúng lý do.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2c.md">Kết quả 2c</a> · <a href=".ai/reviews/POLE-SEGMENT-NULL-2c-by-claude.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-SEGMENT-NULL — PR 2b (lớp bảo vệ nghiệp vụ), 03/11/2026</strong>
-    <p><span class="tag t-next">PR 2b xong, chưa push · 2c–2e chưa làm · chưa báo WP4 / WP5 / WP6</span>
+    <p><span class="tag t-done">PR 2b đã merge (#199, 03/11/2026) · chưa báo WP4 / WP5 / WP6</span>
     Sửa lỗi <code>null == null</code> ở <code>WorkOrderPoleService.Targets</code>: phiếu không có tuyến từng kéo mọi cột chưa tuyến của xã vào danh sách cột,
     vào quyền upload ảnh và vào phiếu khảo sát (3 test đỏ khi bỏ điều kiện: 5 cột thay vì 4, upload 201 thay vì 409). <code>GET /work-orders/{id}/poles</code>:
     <code>segment_id</code> / <code>position</code> nullable, nhóm chưa tuyến xếp cuối. Dời cột chưa tuyến không còn 500, audit không dựng khoảng cách tuyến giả.

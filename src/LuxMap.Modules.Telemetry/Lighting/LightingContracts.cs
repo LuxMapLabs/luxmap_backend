@@ -49,6 +49,9 @@ public sealed record LightingPreview
 
     /// <summary>Poles of the target that no command reaches: no feeder, or a feeder that is excluded.</summary>
     public required int UncontrollablePoleCount { get; init; }
+
+    /// <summary>Unassigned poles reached by the switched feeders; null when read from a stored request (not recorded).</summary>
+    public required int? UnassignedSegmentPoleCount { get; init; }
 }
 
 /// <summary><c>POST /lighting/commands</c>: exactly one of <c>feeder_id</c> / <c>segment_id</c>.</summary>
@@ -92,6 +95,9 @@ public sealed record LightingRequestResult
     public required IReadOnlyList<string> AffectedSegmentIds { get; init; }
 
     public required int UncontrollablePoleCount { get; init; }
+
+    /// <summary>Unassigned poles reached by the switched feeders; null when read from a stored request (not recorded).</summary>
+    public required int? UnassignedSegmentPoleCount { get; init; }
 }
 
 /// <summary>One command and where it stands.</summary>
