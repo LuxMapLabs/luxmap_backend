@@ -60,8 +60,19 @@
   </div>
 
   <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2d (sync bundle), 03/11/2026</strong>
+    <p><span class="tag t-next">PR 2d xong, chưa push · 2e chưa làm · chờ WP6 xác nhận quy tắc thay cache (D-20) · không chạm <code>luxmap-v1.json</code> nên không cần CODEOWNERS</span>
+    Gói offline mặc định nay mang cả <strong>cột chưa tuyến</strong> (<code>segment_id: null</code>) mà phiếu mở của kỹ sư còn giữ sự cố, cùng sự cố mở và phiếu đó. Trước đây một phiếu
+    sửa / kiểm tra chỉ có việc ở cột chưa tuyến không vào gói offline. Không kéo mọi cột chưa tuyến của xã; <code>segment_ids[]</code> không bao giờ có <code>null</code>
+    (có thể rỗng); gói nêu tuyến giữ nguyên; không thêm trường metadata. Ba điều kiện cùng cần: phiếu còn <code>assigned</code> / <code>in_progress</code>, liên kết sự cố chưa giải phóng, và việc là của chính người gọi.
+    Codex <code>gpt-6.1-sol</code> vẫn báo hết hạn mức dù đã đăng nhập lại hai tài khoản → Claude viết, Codex <code>-p river</code> review (APPROVE WITH NITS, không P1/P2; hai khoảng trống test do Codex chỉ ra đã vá).
+    Build 0 warning, <strong>1.256 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước), 7 phá thử đỏ đúng test.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2d.md">Kết quả 2d</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-SEGMENT-NULL — PR 2c (bề mặt đọc), 03/11/2026</strong>
-    <p><span class="tag t-next">PR 2c xong, chưa push · 2d–2e chưa làm · chưa báo WP4 / WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) review</span>
+    <p><span class="tag t-done">PR 2c đã merge (#200, 03/11/2026, admin bỏ qua CODEOWNERS review) · chưa báo WP4 / WP5 / WP6</span>
     Mọi bề mặt đọc trả <code>null</code> thật cho cột chưa tuyến: inventory, bản đồ, chi tiết cột, cột theo mạch, bảo hành, QR và duyệt báo cáo công dân.
     Sơ đồ nhánh cabinet gặp cột chưa tuyến trả <strong>409 <code>POLE_SEGMENT_REQUIRED</code></strong> (kèm tối đa 100 <code>pole_ids</code> + <code>pole_count</code>).
     Thống kê: <code>unassigned_segment_pole_count</code> theo từng dòng, nhóm <code>segment_id: null</code> đứng cuối. Lighting: <code>affected_segment_ids</code> không còn null,
