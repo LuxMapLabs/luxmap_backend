@@ -3329,6 +3329,13 @@
             }
           },
           {
+            "name": "unassigned_segment",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -16254,8 +16261,7 @@
         "required": [
           "commune_id",
           "data_source",
-          "geom_wkt",
-          "segment_id"
+          "geom_wkt"
         ],
         "type": "object",
         "properties": {
@@ -16266,8 +16272,8 @@
           },
           "segment_id": {
             "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "feeder_id": {
             "maxLength": 32,
@@ -21296,9 +21302,9 @@
             "nullable": true
           },
           "segment_id": {
-            "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "description": "The pole's road segment, or null for a pole that is on no segment yet (POLE-SEGMENT-NULL). The key is REQUIRED: omitting it is a 400, so a form written before this change cannot silently unassign a pole.",
+            "nullable": true
           },
           "feeder_id": {
             "maxLength": 32,

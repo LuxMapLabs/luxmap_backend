@@ -793,9 +793,13 @@ def main() -> int:
     print(f"{len(files)} ảnh, {len(rejected)} bị loại -> {len(groups)} nhóm cột")
     print(f"poles.csv: {len(pole_rows)} dòng · review.csv: {len(reviews)} ca cần xem · "
           f"{len(suggestions)} gợi ý gộp · kết quả ở {out}")
-    if any(not row[0] or not row[1] or not row[3] for row in pole_rows):
-        print("⚠️  poles.csv còn ô bắt buộc để trống (external_ref / segment_external_ref / commune_id) "
+    if any(not row[0] or not row[3] for row in pole_rows):
+        print("⚠️  poles.csv còn ô bắt buộc để trống (external_ref / commune_id) "
               "— điền trước khi import.")
+    unassigned = sum(1 for row in pole_rows if not row[1])
+    if unassigned:
+        print(f"ℹ️  {unassigned} cột chưa có segment_external_ref — import sẽ để chúng chưa phân tuyến "
+              "(khảo sát đêm không ghé tới khi có tuyến; nạp lại file có tuyến để gán).")
     return 0
 
 

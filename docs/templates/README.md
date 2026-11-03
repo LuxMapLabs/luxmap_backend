@@ -75,13 +75,14 @@ Cũng ở bản v2: `poles.csv` tham chiếu bằng `segment_external_ref` / `fe
 
 **Mỗi lần gọi nạp đúng một loại file**, nên khi nạp `poles.csv` thì các tuyến đã nằm sẵn trong DB
 và đã có mã thật. Nạp sai thứ tự không hỏng dữ liệu — nó **hỏng ở bước kiểm tra**: mọi dòng pole sẽ
-báo `segment_external_ref` không khớp gì cả, và không dòng nào được ghi.
+báo `segment_external_ref` không khớp gì cả, và không dòng nào được ghi. (Chỉ áp cho dòng **có điền** ô đó — từ POLE-SEGMENT-NULL cột được phép
+chưa thuộc tuyến nào, xem "Cột chưa tuyến" bên dưới.)
 
 Lý do là **khoá ngoại**, không phải sở thích:
 
 | Bước | Vì sao phải trước | Ràng buộc thật |
 |---|---|---|
-| 1. `segments` | `pole.segment_id` **NOT NULL** — không có tuyến thì không tạo được cột | `fk_pole_road_segment_segment_id` |
+| 1. `segments` | `pole.segment_id` **nullable** (POLE-SEGMENT-NULL): cột có thể chưa tuyến, nhưng nếu dòng cột **điền** `segment_external_ref` thì tuyến phải có sẵn | `fk_pole_road_segment_segment_id` |
 | 2. `cabinets` | `feeder.cabinet_id` **nullable**, nhưng nếu điền thì trụ phải tồn tại **và cùng xã với mạch** (CABINET, CAB-7) | `fk_feeder_electrical_cabinet_cabinet_id_commune_id` |
 | 3. `feeders` | `pole.feeder_id` **nullable**, nhưng nếu điền thì tủ điện phải tồn tại **và cùng xã với cột** | `fk_pole_feeder_feeder_id_commune_id` |
 | 4. `poles` | `fixture.pole_id` **NOT NULL** | `fk_fixture_pole_pole_id` |
@@ -165,6 +166,16 @@ Mỗi cột, tuyến, tủ điện, bóng ghi **người sửa gần nhất** (`
 bằng form hay bằng import đều tính. Màn kiểm kê hiện cả tên người đó. Chỉ dòng **thật sự đổi** mới được đóng
 dấu: nạp lại y nguyên một file thì các dòng đó vào `unchanged` trong kết quả, không đổi người hay giờ.
 Chỉ giữ người **gần nhất**, không giữ lịch sử từng lượt nạp.
+
+### Cột chưa tuyến (POLE-SEGMENT-NULL)
+
+Khu vực mới có thể nhập **cột và tủ điện trước**, tuyến bổ sung sau (từ OSM, GPS track của xe khảo sát hoặc vẽ tay):
+
+- `segment_external_ref` để trống hoặc bỏ hẳn cột ⇒ cột mới được tạo **chưa phân tuyến** (`segment_id: null` ở API). Khảo sát đêm không ghé cột đó cho tới khi có tuyến.
+- Nạp lại file với ô trống **không** tháo tuyến của cột đã có. Muốn tháo: `PUT /assets/poles/{id}` với `"segment_id": null` (khoá bắt buộc, giá trị `null`).
+- Muốn gán tuyến sau: điền `segment_external_ref` rồi nạp lại file (trùng `external_ref` ⇒ cập nhật), hoặc `PUT` với mã tuyến.
+- Lọc cột chưa tuyến: `GET /api/v1/assets/poles?unassigned_segment=true` (khác với `feeders/poles?unassigned=true`, vốn là "chưa gán mạch").
+- Gõ nhầm mã tuyến **vẫn là lỗi dòng**, không biến thành chưa tuyến.
 
 ### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 
@@ -271,7 +282,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
 | `external_ref` | **Có** | text | Mã cột của đơn vị quản lý. `fixtures.csv` trỏ về bằng `pole_external_ref`. Trùng trong cùng xã → **UPDATE** |
-| `segment_external_ref` | **Có** | text | Khớp `external_ref` trong `segments.csv`. Không khớp → lỗi theo dòng |
+| `segment_external_ref` | **Không** | text | Khớp `external_ref` trong `segments.csv`. **Điền mà không khớp → lỗi theo dòng** (không bao giờ rơi về "chưa tuyến"). Để trống hoặc không có cột: cột **mới** chưa thuộc tuyến nào; cột **đã có** (trùng `external_ref`) giữ nguyên tuyến |
 | `feeder_source` | Không | `verified` / `inferred` | Nguồn gốc của quan hệ cột → mạch (TOPO-INFER). Xem mục "Nhãn nguồn gốc" bên dưới |
 | `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. Để trống = cột chưa gán mạch. ⚠️ Trước Contract v1.6 ô này để trống với cột solar; đèn solar nay đã hết nên **mọi cột đều nên có tủ điện** |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |

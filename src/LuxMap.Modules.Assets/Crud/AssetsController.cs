@@ -151,8 +151,10 @@ public sealed class AssetsController(
     [ProducesResponseType<PagedResult<PoleListItem>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<PagedResult<PoleListItem>>> ListPolesAsync(
-        [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
-        => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), ct));
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "unassigned_segment")] bool unassignedSegment,
+        PageQuery page, CancellationToken ct)
+        => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), unassignedSegment, ct));
 
     /// <summary>One pole, with its geometry as WKT and its segment's name resolved.</summary>
     /// <remarks>

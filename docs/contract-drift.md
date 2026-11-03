@@ -1197,8 +1197,7 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | **Chạm API** | **Có** |
 | **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract |
 
-**Chưa có hiệu lực với client cho tới PR 2e.** PR 2a chỉ nới schema/entity; POST/PUT/import vẫn bắt buộc tuyến,
-DTO/bộ lọc/OpenAPI và hành vi API giữ nguyên. PR 2b bảo vệ nghiệp vụ; 2c các bề mặt đọc; 2d sync; 2e mới bật writer.
+**API ĐỌC có hiệu lực từ PR 2b–2d; API GHI (tạo / sửa / nhập cột chưa tuyến) có hiệu lực từ PR 2e.** PR 2a chỉ nới schema/entity (POST/PUT/import vẫn bắt buộc tuyến cho tới 2e); 2b bảo vệ nghiệp vụ; 2c các bề mặt đọc; 2d sync; 2e bật writer.
 
 **PR 2b đã làm:** D-1, D-5, D-7, D-8 (khảo sát); D-14 chưa dùng. `WorkOrderPole.segment_id` / `position` nullable;
 POST/PUT/import vẫn bắt buộc tuyến. Đã review và chạy test độc lập (03/11/2026).
@@ -1219,6 +1218,12 @@ và các sự cố MỞ trên những cột đó (như với cột trên tuyến
 Không kéo mọi cột chưa tuyến của xã; `segment_ids[]` không bao giờ có `null` (một phiếu chỉ có việc ở cột chưa tuyến vẫn ra gói với `segment_ids: []`); gói **nêu tuyến** chỉ đúng các tuyến ấy.
 **Không thêm trường metadata mới:** gói vẫn là bản chụp đầy đủ, client thay cache; cột được gán tuyến thì lần sau nằm dưới tuyến, phiếu đổi người/đóng thì cột rời gói.
 **Chờ WP6 xác nhận** quy tắc thay cache (cột `segment_id: null` thay cùng phần còn lại) trước khi coi D-4 xong với client. `/sync/push` không đổi hành vi (đã THÊM test: `fault_report` cho cột chưa tuyến vào bình thường và replay đúng).
+
+**PR 2e đã làm: D-2, D-11** (03/11/2026; Codex hết hạn mức nên Claude viết, review bằng profile `river`). NÚT BẬT: `POST /assets/poles` nhận `segment_id` vắng hoặc `null` ⇒ cột chưa tuyến (chuỗi rỗng/trắng vẫn 400, mã không tồn tại vẫn 404).
+`PUT /assets/poles/{id}`: khoá `segment_id` **vẫn bắt buộc** (thiếu ⇒ 400 `VALIDATION_FAILED`, `details.field = segment_id`) nhưng nhận `null` rõ ràng — cách DUY NHẤT tháo cột khỏi tuyến; client cũ gửi chuỗi vẫn chạy. Import (`poles.csv` / `.geojson`): `segment_external_ref` **không còn bắt buộc** ở header;
+ô trống/vắng ⇒ cột mới chưa tuyến, cột đã có GIỮ tuyến; mã điền mà không khớp vẫn là lỗi dòng. `GET /assets/poles?unassigned_segment=true` (lọc trước tổng và phân trang; `false` = không lọc; giá trị khác bool ⇒ 400; không đổi nghĩa `feeders/poles?unassigned=true`).
+OpenAPI: `CreatePoleRequest.segment_id` thành tuỳ chọn, `UpdatePoleRequest.segment_id` `nullable` + vẫn trong `required`, thêm query `unassigned_segment`. **Chạm `luxmap-v1.json` (CODEOWNERS).** Mock giữ nguyên (D-11 A); thêm ví dụ cột chưa tuyến vào `docs/templates/poles.example.csv`, sửa cảnh báo "ô bắt buộc" của `photos_to_poles.py`.
+**Phải báo WP5** (form tạo / sửa cột: tuyến tuỳ chọn, nút "bỏ tuyến" gửi `null`, bộ lọc "chưa phân tuyến", mã `POLE_SEGMENT_REQUIRED` ở sơ đồ nhánh), **WP4** (cột chưa tuyến không vào khảo sát; không suy tuyến), **WP6** (D-20 — gói offline). **Chưa báo.**
 
 | Mã | Quyết định |
 |---|---|

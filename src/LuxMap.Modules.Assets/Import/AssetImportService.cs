@@ -95,7 +95,7 @@ public sealed class AssetImportService(
         ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "geom_wkt", "commune_id", "data_source"],
         ImportKind.Cabinets => ["external_ref", "cabinet_name", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Feeders => ["external_ref", "feeder_name", "commune_id"],
-        ImportKind.Poles => ["external_ref", "segment_external_ref", "commune_id", "geom_wkt", "data_source"],
+        ImportKind.Poles => ["external_ref", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Fixtures => ["pole_external_ref", "fixture_type", "power_source", "lamp_watt", "install_date", "data_source"],
         _ => [],
     };
@@ -380,7 +380,10 @@ public sealed class AssetImportService(
                 reader.Fail("note", $"A note is at most {PoleNoteInput.MaxLength} characters; this one has {note.Length}.");
             }
 
-            var segment = Resolve(reader, segments, "segment_external_ref", required: true);
+            // POLE-SEGMENT-NULL D-2: the cell is optional. Blank or a missing column leaves a NEW pole on no segment and KEEPS an
+            // existing pole's segment (only PUT null takes a pole off its segment). A reference that matches nothing is still a row
+            // error — Resolve reports it — so a typo can never turn into "no segment".
+            var segment = Resolve(reader, segments, "segment_external_ref", required: false);
 
             // Nullable on purpose: a solar_all_in_one pole is connected to no circuit at all.
             var feeder = Resolve(reader, feeders, "feeder_external_ref", required: false);
@@ -421,7 +424,11 @@ public sealed class AssetImportService(
 
             if (pole is not null)
             {
-                pole.SegmentId = segment!.Id;
+                if (segment is not null)
+                {
+                    pole.SegmentId = segment.Id;
+                }
+
                 TopologyLink.ApplyPoleFeeder(dbContext, pole, feeder?.Id, feederSource);
                 pole.Geom = geometry!;
                 pole.NearSensitivePoi = nearPoi;
@@ -434,7 +441,7 @@ public sealed class AssetImportService(
             var created = new Pole
             {
                 ExternalRef = externalRef,
-                SegmentId = segment!.Id,
+                SegmentId = segment?.Id,
                 FeederId = feeder?.Id,
                 FeederSource = feederSource,
                 CommuneId = communeId!,
