@@ -1203,6 +1203,16 @@ DTO/bộ lọc/OpenAPI và hành vi API giữ nguyên. PR 2b bảo vệ nghiệp
 **PR 2b đã làm:** D-1, D-5, D-7, D-8 (khảo sát); D-14 chưa dùng. `WorkOrderPole.segment_id` / `position` nullable;
 POST/PUT/import vẫn bắt buộc tuyến. Đã review và chạy test độc lập (03/11/2026).
 
+**PR 2c đã làm: D-3, D-6, D-9, D-10, D-14** (03/11/2026, đã review và chạy test độc lập).
+Các quan hệ cột → tuyến ở inventory/topology list, map/detail, warranty và citizen/QR trả JSON null khi chưa tuyến;
+QR vẫn hợp lệ. `FixtureStatusRow.unassigned_segment_pole_count` đếm riêng cột chưa tuyến, nhóm segment null đứng cuối
+trong cùng nguồn/xã; CSV thêm cột đếm ở cuối. Lighting lọc null khỏi `affected_segment_ids`, thêm
+`unassigned_segment_pole_count` vào preview và kết quả tạo mới; **không lưu bền**, đọc lại/replay request trả null.
+Cabinet topology gặp cột chưa tuyến trả **409 `POLE_SEGMENT_REQUIRED`**, details có `operation: "cabinet_topology"`,
+`pole_ids` tối đa 100 theo `created_at, length(pole_id), pole_id`, `pole_count` là tổng.
+`SyncPoleProperties.segment_id` nullable theo lớp cha `PoleProperties`; **logic/scope bundle giữ nguyên, thuộc PR 2d**.
+OpenAPI chỉ nới quan hệ đọc cột → tuyến, không nới PK tuyến, phần tử `segment_ids[]` hay request POST/PUT/import.
+
 | Mã | Quyết định |
 |---|---|
 | D-1 | Phiếu inspection/repair: vẫn hiện cột mang sự cố của phiếu; cột chưa tuyến có `segment_id: null`, `position: null`, xếp nhóm cuối theo `created_at, length(pole_id), pole_id`. **Chặn `null == null`** ở `WorkOrderPoleService.Targets` (`w.SegmentId == p.SegmentId`). Cùng predicate cho danh sách và ảnh. Survey không nhận cột chưa tuyến |

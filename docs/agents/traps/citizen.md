@@ -78,3 +78,8 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
 - Test model chỉ canh hợp đồng, không chứng minh accuracy: xem `docs/agents/traps/survey.md`, mục AI-1.
 - Teardown: `citizen_photo` → `citizen_submission` → `citizen_report` **trước `fault`** — báo cáo đã chấp nhận / gộp giữ sự cố bằng
   `Restrict`. Rollback `AddCitizenReview`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
+
+## POLE-SEGMENT-NULL PR 2c — QR không phụ thuộc tuyến
+
+QR vẫn neo cột/xã khi cột chưa tuyến: lookup hợp lệ trả `segment_name: null`, không coi là QR invalid.
+Chi tiết báo cáo có `pole.segment_id: null`; giữ nguyên quyền xã và luồng duyệt.

@@ -118,11 +118,8 @@ public sealed class AssetCrudService(
         {
             Pole = item,
 
-            // A pole always has a segment — NOT NULL with a real foreign key — so a missing name
-            // would mean the segment sits in another commune and the filter hid it. That happens on
-            // an inter_commune road and is legitimate, so the id still identifies it; the label is
-            // simply not this caller's to see.
-            SegmentName = extra.SegmentName ?? string.Empty,
+            // No segment, or an inter-commune road hidden by scope: keep the name null.
+            SegmentName = extra.SegmentName,
             GeomWkt = Wkt(extra.Geom),
             CreatedAt = extra.CreatedAt,
         };
@@ -876,7 +873,7 @@ public sealed class AssetCrudService(
             .Select(pole => new TopologyPole
             {
                 PoleId = pole.PoleId,
-                SegmentId = pole.SegmentId!,
+                SegmentId = pole.SegmentId,
                 FeederId = pole.FeederId,
                 FeederSource = pole.FeederSource,
                 // EPSG:4326 straight off the column. 3405 never leaves the SQL tree (BE-10, rule 3).
@@ -963,7 +960,7 @@ public sealed class AssetCrudService(
         {
             PoleId = pole.PoleId,
             ExternalRef = pole.ExternalRef,
-            SegmentId = pole.SegmentId!,
+            SegmentId = pole.SegmentId,
             FeederId = pole.FeederId,
             FeederSource = pole.FeederSource,
 

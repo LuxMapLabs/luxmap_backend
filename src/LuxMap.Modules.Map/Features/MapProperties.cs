@@ -24,7 +24,7 @@ public record PoleProperties
 {
     public required string PoleId { get; init; }
 
-    public required string SegmentId { get; init; }
+    public required string? SegmentId { get; init; }
 
     /// <summary>
     /// <c>unknown</c> when no status row exists, which is the CORRECT answer rather than a placeholder.

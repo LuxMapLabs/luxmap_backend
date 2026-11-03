@@ -7561,6 +7561,26 @@
           }
         ],
         "responses": {
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -13076,7 +13096,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "location": {
             "$ref": "#/components/schemas/ReportPoint"
@@ -14394,6 +14415,7 @@
           "out",
           "pole_count",
           "segment_id",
+          "unassigned_segment_pole_count",
           "unknown"
         ],
         "type": "object",
@@ -14430,6 +14452,10 @@
             "format": "int32"
           },
           "never_surveyed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unassigned_segment_pole_count": {
             "type": "integer",
             "format": "int32"
           }
@@ -15094,6 +15120,7 @@
           "target_id",
           "target_kind",
           "targets",
+          "unassigned_segment_pole_count",
           "uncontrollable_pole_count"
         ],
         "type": "object",
@@ -15125,6 +15152,11 @@
           "uncontrollable_pole_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "unassigned_segment_pole_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -15141,6 +15173,7 @@
           "requested_by",
           "target_id",
           "target_kind",
+          "unassigned_segment_pole_count",
           "uncontrollable_pole_count"
         ],
         "type": "object",
@@ -15191,6 +15224,11 @@
           "uncontrollable_pole_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "unassigned_segment_pole_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -15644,7 +15682,8 @@
             "$ref": "#/components/schemas/PoleListItem"
           },
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "geom_wkt": {
             "type": "string"
@@ -15678,7 +15717,8 @@
             "nullable": true
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "feeder_id": {
             "type": "string",
@@ -15848,10 +15888,12 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "type": "string"
@@ -16383,7 +16425,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "fixture_status": {
             "$ref": "#/components/schemas/FixtureStatus"
@@ -16507,7 +16550,8 @@
         "type": "object",
         "properties": {
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_name": {
             "type": "string"
@@ -18155,7 +18199,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "fixture_status": {
             "$ref": "#/components/schemas/FixtureStatus"
@@ -18372,7 +18417,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "feeder_id": {
             "type": "string",
@@ -18749,7 +18795,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "type": "string"

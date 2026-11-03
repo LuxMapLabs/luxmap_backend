@@ -125,3 +125,10 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
   đường quên gán sẽ nói "có điện" (`FeederPowerTests`). Đừng sắp lại thứ tự enum.
 - Inventory lấy control một batch cho page qua `IFeederControlLookup`, giữ filter xã control/node. Map LEFT JOIN giữ feeder chưa nối relay;
   `feeders[]` và `feeder_ids[]` phải lấy cùng tập có thứ tự. Không thêm dữ liệu vận hành vào write/import hay bundle.
+
+## POLE-SEGMENT-NULL PR 2c — cột chưa tuyến trong mạch
+
+- `affected_segment_ids` chỉ có ID tuyến thật, không null/trùng. Chưa tuyến không đồng nghĩa không điều khiển được:
+  `uncontrollable_pole_count` vẫn dựa trên mạch/rơ-le.
+- `unassigned_segment_pole_count` đếm cột chưa tuyến trong các mạch thực sự được điều khiển, tính lúc lập kế hoạch.
+  Không có cột lưu bền: preview/tạo mới trả số, đọc lại hoặc replay request trả null (không ghi lại), không suy từ tài sản hiện tại.

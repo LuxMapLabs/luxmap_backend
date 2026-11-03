@@ -385,7 +385,7 @@ public sealed record TopologyPole
 {
     public required string PoleId { get; init; }
 
-    public required string SegmentId { get; init; }
+    public required string? SegmentId { get; init; }
 
     /// <summary>Null for a pole on no circuit — a fact, not a missing value.</summary>
     public string? FeederId { get; init; }
@@ -487,7 +487,7 @@ public sealed record PoleListItem
 
     public string? ExternalRef { get; init; }
 
-    public required string SegmentId { get; init; }
+    public required string? SegmentId { get; init; }
 
     /// <summary><c>null</c> when the pole is not wired to a circuit yet.</summary>
     public string? FeederId { get; init; }
@@ -622,7 +622,7 @@ public sealed record PoleDetail
     public required PoleListItem Pole { get; init; }
 
     /// <summary>Resolved for display. The list omits it: one join per row for a label.</summary>
-    public required string SegmentName { get; init; }
+    public required string? SegmentName { get; init; }
 
     /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first — what a <c>PUT</c> body wants back.</summary>
     public required string GeomWkt { get; init; }

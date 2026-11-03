@@ -407,7 +407,7 @@ public sealed class CitizenReviewService(
             FaultId = item.FaultId, DecidedBy = item.DecidedBy, DecidedAt = item.DecidedAt, DecisionNote = item.DecisionNote,
             Pole = new CitizenReportPole
             {
-                PoleId = pole.PoleId, SegmentId = pole.SegmentId!, Location = new ReportPoint(pole.Geom.Y, pole.Geom.X),
+                PoleId = pole.PoleId, SegmentId = pole.SegmentId, Location = new ReportPoint(pole.Geom.Y, pole.Geom.X),
                 FixtureStatus = status?.FixtureStatus ?? FixtureStatus.Unknown, LastSeenAt = status?.LastSeenAt,
             },
             OpenFaults = openFaults,
