@@ -295,3 +295,13 @@ Phải nhận diện no-op trước reset: cùng assignee hoặc ngày không đ
 Cả ItemsAsync lẫn Detail phải chiếu năm trường; agenda kế thừa item, bundle gọi Detail.
 Rollback AddWorkOrderCancellationRequests từ chối khi có trạng thái phụ/lý do hoặc enum audit/notification mới;
 rollback ứng dụng có thể giữ schema cộng thêm, không sửa/xóa audit để ép Down.
+
+## POLE-SEGMENT-NULL — target cột của phiếu (PR 2b)
+
+- **`null == null` trong LINQ không có nghĩa "cùng tuyến".** EF bù ngữ nghĩa null: phiếu inspection/repair không tuyến có thể khớp
+  mọi cột chưa tuyến trong xã. `WorkOrderPoleService.Targets` chặn `p.SegmentId != null` cho cả hai nhánh theo tuyến; nhánh
+  `WorkOrderFault` vẫn giữ cột được giao qua sự cố. Danh sách cột và upload ảnh dùng đúng predicate này, kể cả lượt kiểm lại dưới khoá.
+- Cột chưa tuyến của phiếu xếp **nhóm cuối**, theo `created_at, length(pole_id), pole_id`; `segment_id` và `position` đều null.
+  Không cho `position = 0` hay nhét null vào dictionary tuyến. Cột có tuyến vẫn đánh số dọc đường trước khi phân trang.
+- **Để CV-15:** hiện không có writer gom cụm trong `src/`; seed mock không phải pipeline. Khi viết writer `fault_cluster`,
+  phải từ chối cột chưa tuyến theo D-8, giữ schema cụm bắt buộc tuyến; không suy tuyến gần nhất, không viết lại cụm/snapshot cũ khi gán tuyến cột.

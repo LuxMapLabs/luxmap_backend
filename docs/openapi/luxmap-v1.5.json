@@ -22054,11 +22054,13 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "position": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "location": {
             "$ref": "#/components/schemas/WorkOrderLocation"

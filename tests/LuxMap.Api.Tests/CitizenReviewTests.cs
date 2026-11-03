@@ -80,6 +80,38 @@ public sealed class CitizenReviewTests(AssetImportFixture factory) : IAsyncLifet
     }
 
     [Fact]
+    public async Task Citizen_accept_on_unassigned_pole_keeps_location_commune_source_and_audits()
+    {
+        var (pole, report) = await FiledAsync("lamp_out");
+        await factory.QueryAsync(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var row = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.PoleId == pole);
+            row.SegmentId = null; await db.SaveChangesAsync(); return 0;
+        });
+        var manager = await ManagerAsync();
+        var response = await manager.PostAsJsonAsync($"{Queue}/{report}/accept",
+            new { submission_count = 1, fault_type = "lamp_out", severity = "high" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var faultId = (await Read(response)).GetProperty("fault_id").GetString()!;
+        var fault = await factory.QueryAsync(db => db.Set<Fault>().IgnoreQueryFilters().SingleAsync(f => f.FaultId == faultId));
+        Assert.Null(fault.SegmentId);
+        Assert.Equal(pole, fault.PoleId);
+        Assert.Equal(factory.CommuneId, fault.CommuneId);
+        Assert.Equal(DataSource.Field, fault.DataSource);
+        Assert.Equal(SourceChannel.FieldReport, fault.SourceChannel);
+        Assert.Equal(FaultStatus.Confirmed, fault.FaultStatus);
+        var detail = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/faults/{faultId}");
+        Assert.Equal(11.405, detail.GetProperty("location").GetProperty("lat").GetDouble());
+        Assert.Equal(107.505, detail.GetProperty("location").GetProperty("lng").GetDouble());
+        var events = await factory.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters()
+            .Where(e => e.EntityId == faultId || e.EntityId == report && e.Action == AuditAction.Accepted).ToArrayAsync());
+        Assert.Equal(2, events.Length);
+        Assert.Contains(events, e => e.EntityType == AuditEntityType.Fault && e.Action == AuditAction.Created);
+        Assert.Contains(events, e => e.EntityType == AuditEntityType.CitizenReport && e.Action == AuditAction.Accepted);
+    }
+
+    [Fact]
     public async Task A_report_is_decided_once()
     {
         var (_, report) = await FiledAsync("lamp_out");

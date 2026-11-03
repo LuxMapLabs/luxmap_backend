@@ -148,6 +148,31 @@ public sealed class PoleLocationTests(AssetImportFixture fixture)
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Relocating_unassigned_pole_follows_explicit_policy()
+    {
+        var pole = await fixture.QueryAsync(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var row = new Pole { CommuneId = fixture.CommuneId, DataSource = DataSource.PublicImagery,
+                Geom = new Point(PoleLng, Lat) { SRID = 4326 } };
+            db.Add(row); await db.SaveChangesAsync(); return row.PoleId;
+        });
+        var response = await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(LocationUrl(pole),
+            new { lat = Lat + 400 * DegreesPerMetre, lng = PoleLng });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await Json(response);
+        Assert.InRange(body.GetProperty("moved_m").GetDouble(), 380, 420);
+        Assert.Equal(Lat + 400 * DegreesPerMetre, (await StoredAsync(pole)).Lat);
+        var audit = Assert.Single(await AuditsAsync(pole));
+        Assert.Equal(AuditAction.Relocated, audit.Action);
+        Assert.Equal(fixture.CommuneId, audit.CommuneId);
+        var after = JsonDocument.Parse(audit.AfterState!).RootElement;
+        Assert.Equal(JsonValueKind.Null, after.GetProperty("segment_id").ValueKind);
+        Assert.Equal(JsonValueKind.Null, after.GetProperty("segment_distance_m").ValueKind);
+        Assert.Equal(body.GetProperty("moved_m").GetDouble(), after.GetProperty("moved_m").GetDouble());
+    }
+
     private Task<Stored> StoredAsync(string poleId)
         => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().Where(p => p.PoleId == poleId)
             .Select(p => new Stored(p.Geom.Y, p.Geom.X, p.UpdatedBy, p.UpdatedAt)).SingleAsync());

@@ -724,7 +724,7 @@ public sealed class AssetCrudService(
             .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom, target)).SingleAsync(ct);
         // Unfiltered on purpose: an inter_commune segment may belong to another commune than its pole (BE-REVIEW-02
         // constraint 1). Only a distance leaves the query, never the segment.
-        var offSegment = await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
+        double? offSegment = pole.SegmentId is null ? null : await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
             .Where(segment => segment.SegmentId == pole.SegmentId)
             .Select(segment => SpatialFunctions.DistanceMeters(segment.Geom, target)).SingleAsync(ct);
 
@@ -732,7 +732,7 @@ public sealed class AssetCrudService(
         pole.Geom = target;
         if (AssetStamp.Touch(dbContext, pole, actor))
         {
-            if (offSegment > corridor.RouteCorridorM)
+            if (offSegment is { } distance && distance > corridor.RouteCorridorM)
             {
                 throw new LuxMapException(ErrorCodes.PoleOffSegment, HttpStatusCode.Conflict,
                     $"That position is {offSegment:0.#} m from the pole's road segment; a survey only sees poles within "
@@ -740,13 +740,13 @@ public sealed class AssetCrudService(
                     new Dictionary<string, object?>
                     {
                         ["pole_id"] = pole.PoleId, ["segment_id"] = pole.SegmentId,
-                        ["distance_m"] = Math.Round(offSegment, 1), ["corridor_m"] = corridor.RouteCorridorM,
+                        ["distance_m"] = Math.Round(distance, 1), ["corridor_m"] = corridor.RouteCorridorM,
                     });
             }
 
             audit.Record(new AuditChange(pole.UpdatedAt, AuditActorKind.User, actor.UserId, actor.Role, pole.CommuneId,
                 AuditEntityType.Pole, pole.PoleId, AuditAction.Relocated, before,
-                new { lat, lng, moved_m = Math.Round(moved, 2), pole.SegmentId, segment_distance_m = Math.Round(offSegment, 2) }));
+                new { lat, lng, moved_m = Math.Round(moved, 2), pole.SegmentId, segment_distance_m = offSegment is { } measured ? (double?)Math.Round(measured, 2) : null }));
         }
         else
         {

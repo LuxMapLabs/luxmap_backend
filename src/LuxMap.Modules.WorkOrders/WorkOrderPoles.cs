@@ -20,10 +20,10 @@ namespace LuxMap.Modules.WorkOrders;
 public sealed record WorkOrderPole
 {
     public required string PoleId { get; init; }
-    public required string SegmentId { get; init; }
+    public required string? SegmentId { get; init; }
 
-    /// <summary>1-based place along its segment, in the direction the segment's line is drawn.</summary>
-    public int Position { get; init; }
+    /// <summary>1-based place along its segment; null when the pole has no segment.</summary>
+    public int? Position { get; init; }
 
     public required WorkOrderLocation Location { get; init; }
 
@@ -77,8 +77,8 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
     private static readonly FaultStatus[] OpenStatuses = [.. FaultStatusSets.Open];
 
     internal IQueryable<Pole> Targets(string id) => db.Set<Pole>().Where(p =>
-        db.Set<WorkOrder>().Any(w => w.WorkOrderId == id && w.SegmentId == p.SegmentId)
-        || db.Set<WorkOrderSegment>().Any(s => s.WorkOrderId == id && s.SegmentId == p.SegmentId)
+        (p.SegmentId != null && (db.Set<WorkOrder>().Any(w => w.WorkOrderId == id && w.SegmentId == p.SegmentId)
+            || db.Set<WorkOrderSegment>().Any(s => s.WorkOrderId == id && s.SegmentId == p.SegmentId)))
         || (from link in db.Set<WorkOrderFault>() join fault in db.Set<Fault>() on link.FaultId equals fault.FaultId
             where link.WorkOrderId == id && fault.PoleId == p.PoleId select link).Any());
 
@@ -105,7 +105,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
         var rows = await Targets(id).AsNoTracking()
             .Select(p => new
             {
-                p.PoleId, SegmentId = p.SegmentId!, p.Geom, p.NearSensitivePoi,
+                p.PoleId, p.SegmentId, p.CreatedAt, p.Geom, p.NearSensitivePoi,
                 p.Note,
                 Status = db.Set<PoleCurrentStatus>().Where(s => s.PoleId == p.PoleId)
                     .Select(s => new { s.FixtureStatus, s.StatusConfidence, s.LastSeenAt }).FirstOrDefault(),
@@ -118,7 +118,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
 
         // Geometry for every road a returned pole stands on — including roads reached only through the
         // order's faults, whose poles would otherwise all project to 0 and sort by ID.
-        var roadIds = rows.Select(r => r.SegmentId).Distinct().ToArray();
+        var roadIds = rows.Select(r => r.SegmentId).OfType<string>().Distinct().ToArray();
         // 🔴 Unfiltered ON PURPOSE, and only for ordering. An inter_commune road belongs to another commune,
         // so the commune filter hides it from this caller even though THEIR poles stand on it; with the
         // geometry missing every pole would project to 0 and sort by id. The poles above already passed the
@@ -131,17 +131,21 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
             .Select(r => new
             {
                 Row = r,
-                SegmentOrder = segmentIds.IndexOf(r.SegmentId) is var at and >= 0 ? at : int.MaxValue,
-                Along = lines.TryGetValue(r.SegmentId, out var line) ? line.Project(r.Geom.Coordinate) : 0d,
+                SegmentOrder = r.SegmentId is { } segment && segmentIds.IndexOf(segment) is var at and >= 0 ? at : int.MaxValue,
+                Along = r.SegmentId is { } road && lines.TryGetValue(road, out var line) ? line.Project(r.Geom.Coordinate) : 0d,
             })
-            .OrderBy(x => x.SegmentOrder).ThenBy(x => x.Row.SegmentId.Length).ThenBy(x => x.Row.SegmentId, StringComparer.Ordinal)
-            .ThenBy(x => x.Along).ThenBy(x => x.Row.PoleId.Length).ThenBy(x => x.Row.PoleId, StringComparer.Ordinal)
+            .OrderBy(x => x.Row.SegmentId is null)
+            .ThenBy(x => x.SegmentOrder).ThenBy(x => x.Row.SegmentId?.Length).ThenBy(x => x.Row.SegmentId, StringComparer.Ordinal)
+            .ThenBy(x => x.Along).ThenBy(x => x.Row.SegmentId is null ? x.Row.CreatedAt : default)
+            .ThenBy(x => x.Row.PoleId.Length).ThenBy(x => x.Row.PoleId, StringComparer.Ordinal)
             .ToList();
 
         var positions = new Dictionary<string, int>();
         var all = ordered.Select(x =>
         {
-            var position = positions[x.Row.SegmentId] = positions.GetValueOrDefault(x.Row.SegmentId) + 1;
+            int? position = x.Row.SegmentId is { } segment
+                ? positions[segment] = positions.GetValueOrDefault(segment) + 1
+                : null;
             var r = x.Row;
             return new WorkOrderPole
             {

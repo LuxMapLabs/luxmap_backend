@@ -1200,6 +1200,9 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 **Chưa có hiệu lực với client cho tới PR 2e.** PR 2a chỉ nới schema/entity; POST/PUT/import vẫn bắt buộc tuyến,
 DTO/bộ lọc/OpenAPI và hành vi API giữ nguyên. PR 2b bảo vệ nghiệp vụ; 2c các bề mặt đọc; 2d sync; 2e mới bật writer.
 
+**PR 2b đã làm:** D-1, D-5, D-7, D-8 (khảo sát); D-14 chưa dùng. `WorkOrderPole.segment_id` / `position` nullable;
+POST/PUT/import vẫn bắt buộc tuyến. Đã review và chạy test độc lập (03/11/2026).
+
 | Mã | Quyết định |
 |---|---|
 | D-1 | Phiếu inspection/repair: vẫn hiện cột mang sự cố của phiếu; cột chưa tuyến có `segment_id: null`, `position: null`, xếp nhóm cuối theo `created_at, length(pole_id), pole_id`. **Chặn `null == null`** ở `WorkOrderPoleService.Targets` (`w.SegmentId == p.SegmentId`). Cùng predicate cho danh sách và ảnh. Survey không nhận cột chưa tuyến |

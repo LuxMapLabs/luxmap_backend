@@ -32,6 +32,16 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Work_order_pole_segment_and_position_allow_explicit_null()
+    {
+        var properties = Schema("WorkOrderPole").GetProperty("properties");
+        Assert.True(properties.GetProperty("segment_id").GetProperty("nullable").GetBoolean());
+        Assert.True(properties.GetProperty("position").GetProperty("nullable").GetBoolean());
+        Assert.Equal("string", properties.GetProperty("segment_id").GetProperty("type").GetString());
+        Assert.Equal("integer", properties.GetProperty("position").GetProperty("type").GetString());
+    }
+
+    [Fact]
     public void Feeder_state_is_additive_read_only_and_uses_string_enums()
     {
         Assert.Equal(new[] { "unknown", "on", "off" }, Schema("FeederPowerState").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
