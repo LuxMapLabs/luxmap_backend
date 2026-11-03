@@ -17,11 +17,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.Sync;
 
-/// <summary><c>GET /sync/bundle</c> — the offline package for some roads (BE-43 D-1, D-2, D-3).</summary>
+/// <summary><c>GET /sync/bundle</c> — the offline package for some roads (BE-43 D-1, D-2, D-3; POLE-SEGMENT-NULL D-4).</summary>
 /// <remarks>
 /// Every part is read by the service that owns it — the map layers, the fault list, the work order detail —
 /// so the bundle can never describe a pole, a fault or an order differently from its own endpoint. All reads
 /// go through the commune filter; the work orders also through the assignee filter.
+/// <para>
+/// A pole with no segment (<c>segment_id: null</c>) is packed only in the default bundle, and only when one of the caller's open
+/// orders holds a fault on it — with that fault and that order. <c>segment_ids</c> never contains <c>null</c>; a bundle that names
+/// segments holds exactly those segments' content.
+/// </para>
 /// </remarks>
 public sealed class SyncBundleService(
     LuxMapDbContext db,
@@ -46,9 +51,11 @@ public sealed class SyncBundleService(
         var generatedAt = UtcMicrosecondClock.UtcNow();
 
         var segmentIds = requested is { Count: > 0 } ? await NamedSegmentsAsync(requested, ct) : await MySegmentsAsync(ct);
-        var poles = await map.PolesOnSegmentsAsync(segmentIds, ct);
+        // POLE-SEGMENT-NULL D-4: tonight's work also holds poles that stand on no segment. Named segments stay exactly what was asked.
+        var unassignedPoleIds = requested is { Count: > 0 } ? [] : await MyUnassignedPolesAsync(ct);
+        var poles = await map.PolesOnSegmentsAsync(segmentIds, unassignedPoleIds, ct);
         var notes = await db.Set<Pole>().AsNoTracking()
-            .Where(pole => segmentIds.Contains(pole.SegmentId))
+            .Where(pole => segmentIds.Contains(pole.SegmentId) || unassignedPoleIds.Contains(pole.PoleId))
             .Select(pole => new { pole.PoleId, pole.Note })
             .ToDictionaryAsync(pole => pole.PoleId, pole => pole.Note, StringComparer.Ordinal, ct);
 
@@ -65,8 +72,8 @@ public sealed class SyncBundleService(
                     Properties = new SyncPoleProperties(feature.Properties, notes.GetValueOrDefault(feature.Properties.PoleId)),
                 })],
             },
-            OpenFaults = await faults.OpenOnSegmentsAsync(segmentIds, ct),
-            WorkOrders = await WorkOrdersAsync(segmentIds, ct),
+            OpenFaults = await faults.OpenOnSegmentsAsync(segmentIds, unassignedPoleIds, ct),
+            WorkOrders = await WorkOrdersAsync(segmentIds, unassignedPoleIds, ct),
         };
 
         await transaction.CommitAsync(ct);
@@ -115,10 +122,27 @@ public sealed class SyncBundleService(
             .ToListAsync(ct);
     }
 
-    /// <summary>The caller's open orders touching these segments, oldest first, each read as its own detail.</summary>
-    private async Task<WorkOrderDetail[]> WorkOrdersAsync(IReadOnlyList<string> segmentIds, CancellationToken ct)
+    /// <summary>
+    /// POLE-SEGMENT-NULL D-4 — the poles with no segment that the caller's open orders reach through a fault they still hold,
+    /// oldest first. Never every unassigned pole of the commune: a pole is in the bundle only because tonight's work names it.
+    /// </summary>
+    private async Task<string[]> MyUnassignedPolesAsync(CancellationToken ct)
+    {
+        var mine = MyOpenOrders();
+        var links = db.Set<WorkOrderFault>().Where(link => link.ReleasedAt == null && mine.Any(wo => wo.WorkOrderId == link.WorkOrderId));
+        return await db.Set<Pole>()
+            .Where(pole => pole.SegmentId == null
+                && db.Set<Fault>().Any(fault => fault.PoleId == pole.PoleId && links.Any(link => link.FaultId == fault.FaultId)))
+            .OrderBy(pole => pole.CreatedAt).ThenBy(pole => pole.PoleId.Length).ThenBy(pole => pole.PoleId)
+            .Select(pole => pole.PoleId)
+            .ToArrayAsync(ct);
+    }
+
+    /// <summary>The caller's open orders touching these segments (or holding a fault on one of the unassigned poles), oldest first, each read as its own detail.</summary>
+    private async Task<WorkOrderDetail[]> WorkOrdersAsync(IReadOnlyList<string> segmentIds, IReadOnlyCollection<string> unassignedPoleIds, CancellationToken ct)
     {
         var onSegments = db.Set<Fault>().Where(fault => (fault.SegmentId != null && segmentIds.Contains(fault.SegmentId))
+            || (fault.PoleId != null && unassignedPoleIds.Contains(fault.PoleId))
             || db.Set<Pole>().Any(pole => pole.PoleId == fault.PoleId && segmentIds.Contains(pole.SegmentId)));
 
         var ids = await MyOpenOrders()

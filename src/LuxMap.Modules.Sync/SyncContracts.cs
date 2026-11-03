@@ -20,19 +20,22 @@ public sealed record SyncBundle
     /// <summary>When the snapshot was taken — what a phone shows as "data as of".</summary>
     public required DateTime GeneratedAt { get; init; }
 
-    /// <summary>The segments actually packed: the ones asked for, or those of the caller's open work orders.</summary>
+    /// <summary>The segments actually packed: the ones asked for, or those of the caller's open work orders. Never holds <c>null</c>.</summary>
     public required IReadOnlyList<string> SegmentIds { get; init; }
 
     /// <summary>Same properties as <c>GET /map/segments</c>, in the order of <see cref="SegmentIds"/>.</summary>
     public required FeatureCollection<SegmentProperties> Segments { get; init; }
 
-    /// <summary>Same properties as <c>GET /map/poles</c> plus the pole's <c>note</c>, in id order.</summary>
+    /// <summary>
+    /// Same properties as <c>GET /map/poles</c> plus the pole's <c>note</c>, in id order. A pole with <c>segment_id: null</c> is
+    /// there only because an open order of the caller holds a fault on it (default bundle); it replaces with the rest of the cache.
+    /// </summary>
     public required FeatureCollection<SyncPoleProperties> Poles { get; init; }
 
-    /// <summary>Open faults on these segments or their poles, each an item of <c>GET /faults</c>, default order.</summary>
+    /// <summary>Open faults on these segments or their poles — and, in the default bundle, on the unassigned poles above — each an item of <c>GET /faults</c>, default order.</summary>
     public required IReadOnlyList<FaultItem> OpenFaults { get; init; }
 
-    /// <summary>The caller's open work orders (<c>assigned</c>, <c>in_progress</c>) touching these segments, as details.</summary>
+    /// <summary>The caller's open work orders (<c>assigned</c>, <c>in_progress</c>) touching these segments or holding a fault on an unassigned pole above, as details.</summary>
     public required IReadOnlyList<WorkOrderDetail> WorkOrders { get; init; }
 }
 

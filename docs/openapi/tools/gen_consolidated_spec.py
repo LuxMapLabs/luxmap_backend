@@ -136,7 +136,7 @@ SUMMARY = {
     ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
-    ("get", "/api/v1/sync/bundle"): "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Không có since",
+    ("get", "/api/v1/sync/bundle"): "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Gói mặc định (vắng segment_id) còn kèm cột CHƯA TUYẾN (segment_id null) mà phiếu mở của tôi giữ sự cố, cùng sự cố và phiếu đó; segment_ids không bao giờ chứa null; gói nêu tuyến thì chỉ đúng các tuyến ấy [POLE-SEGMENT-NULL D-4]. Không có since",
     ("post", "/api/v1/sync/push"): "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id",
     ("put", "/api/v1/assets/poles/{poleId}/note"): "[POLE-NOTE] Kỹ sư hiện trường / Quản lý ghi hoặc xoá ghi chú của cột (≤ 1000 ký tự; null hay rỗng = xoá)",
     ("put", "/api/v1/assets/poles/{poleId}/location"): "[POLE-LOCATION] Kỹ sư hiện trường / Quản lý dời cột tới vị trí thật ({lat, lng}); quá 25 m khỏi tuyến của cột → 409 POLE_OFF_SEGMENT; mỗi lần dời ghi audit",
