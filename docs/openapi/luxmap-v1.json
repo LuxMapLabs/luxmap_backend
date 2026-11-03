@@ -13594,6 +13594,7 @@
           "segment_id": {
             "maxLength": 32,
             "type": "string",
+            "description": "The pole's road segment. OPTIONAL: absent or null creates a pole that is on no segment yet; a blank string is a 400; an id that does not exist (or is out of scope) is a 404.",
             "nullable": true
           },
           "feeder_id": {
@@ -18592,6 +18593,7 @@
             "nullable": true
           },
           "segment_id": {
+            "maxLength": 32,
             "type": "string",
             "description": "The pole's road segment, or null for a pole that is on no segment yet (POLE-SEGMENT-NULL). The key is REQUIRED: omitting it is a 400, so a form written before this change cannot silently unassign a pole.",
             "nullable": true

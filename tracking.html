@@ -60,8 +60,18 @@
   </div>
 
   <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2e (nút bật: ghi cột chưa tuyến), 03/11/2026</strong>
+    <p><span class="tag t-next">PR #202 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) hoặc merge admin · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    PR cuối của ticket. <code>POST /assets/poles</code>: <code>segment_id</code> vắng hoặc <code>null</code> ⇒ cột chưa tuyến (chuỗi trắng 400, mã lạ 404). <code>PUT</code>: khoá <code>segment_id</code> vẫn bắt buộc
+    (thiếu = 400, để form cũ không lặng lẽ tháo tuyến) nhưng nhận <code>null</code> — cách duy nhất để tháo. Import CSV / GeoJSON: <code>segment_external_ref</code> không còn bắt buộc; ô trống tạo cột mới chưa tuyến, cột đã có
+    giữ tuyến; mã gõ sai hoặc ô GeoJSON dạng object/array vẫn là lỗi dòng. <code>GET /assets/poles?unassigned_segment=true</code> lọc trước tổng và phân trang. Review <code>river</code> bắt được một regression thật ở import GeoJSON
+    (object/array bị đọc thành "chưa tuyến") — đã vá, có test + phá thử. Một test khảo sát (<code>SurveyIngestTests.Concurrent_create…</code>) chập chờn ở lượt chạy đầy đủ, không liên quan cột.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2e.md">Kết quả 2e</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-SEGMENT-NULL — PR 2d (sync bundle), 03/11/2026</strong>
-    <p><span class="tag t-next">PR 2d xong, chưa push · 2e chưa làm · chờ WP6 xác nhận quy tắc thay cache (D-20) · không chạm <code>luxmap-v1.json</code> nên không cần CODEOWNERS</span>
+    <p><span class="tag t-done">PR 2d đã merge (#201, 03/11/2026) · chờ WP6 xác nhận quy tắc thay cache (D-20)</span>
     Gói offline mặc định nay mang cả <strong>cột chưa tuyến</strong> (<code>segment_id: null</code>) mà phiếu mở của kỹ sư còn giữ sự cố, cùng sự cố mở và phiếu đó. Trước đây một phiếu
     sửa / kiểm tra chỉ có việc ở cột chưa tuyến không vào gói offline. Không kéo mọi cột chưa tuyến của xã; <code>segment_ids[]</code> không bao giờ có <code>null</code>
     (có thể rỗng); gói nêu tuyến giữ nguyên; không thêm trường metadata. Ba điều kiện cùng cần: phiếu còn <code>assigned</code> / <code>in_progress</code>, liên kết sự cố chưa giải phóng, và việc là của chính người gọi.

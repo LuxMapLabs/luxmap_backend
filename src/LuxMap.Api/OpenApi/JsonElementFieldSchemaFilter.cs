@@ -75,6 +75,13 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
             return;
         }
 
+        // POLE-SEGMENT-NULL: a plain nullable string on create, so the spec has to say what absent / null / blank mean.
+        if (context.Type == typeof(CreatePoleRequest) && concrete.Properties.TryGetValue("segment_id", out var created) && created is OpenApiSchema segment)
+        {
+            segment.Description = "The pole's road segment. OPTIONAL: absent or null creates a pole that is on no segment yet; "
+                + "a blank string is a 400; an id that does not exist (or is out of scope) is a 404.";
+        }
+
         foreach (var ((type, name), description) in Fields)
         {
             if (type == context.Type && concrete.Properties.TryGetValue(name, out var property) && property is OpenApiSchema field)
@@ -84,6 +91,7 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
                 if (RequiredKeys.Contains((type, name)))
                 {
                     (concrete.Required ??= new HashSet<string>()).Add(name);
+                    field.MaxLength = 32;
                 }
             }
         }

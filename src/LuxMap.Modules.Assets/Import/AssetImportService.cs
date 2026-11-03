@@ -34,7 +34,8 @@ namespace LuxMap.Modules.Assets.Import;
 /// all four kinds in a single transaction would mean resolving references to rows whose IDs do not
 /// exist yet, and the load order in <c>docs/templates/README.md</c> would have to become code.
 /// Ordering is instead enforced by the reference check itself: importing poles before segments fails
-/// every row with a clear message naming the missing <c>segment_external_ref</c>.
+/// every row that FILLS <c>segment_external_ref</c> with a clear message naming it (a blank cell is a pole on no
+/// segment yet — POLE-SEGMENT-NULL D-2).
 /// </para>
 /// </remarks>
 public sealed class AssetImportService(
@@ -693,6 +694,14 @@ public sealed class AssetImportService(
     private static ReferencedAsset? Resolve(
         ImportRowReader reader, Dictionary<string, List<ReferencedAsset>> index, string column, bool required)
     {
+        // The indexer reads a GeoJSON object / array as "empty". For an optional reference an empty cell MEANS something (a new pole
+        // is left on no segment, an existing one keeps it), so a malformed value must fail here instead of being taken for that decision.
+        if (reader.Row.IsNonScalar(column))
+        {
+            reader.Fail(column, "Expected a text reference (an external_ref); got an object or an array.");
+            return null;
+        }
+
         var value = required ? reader.Required(column) : reader.Optional(column);
         if (value is null)
         {

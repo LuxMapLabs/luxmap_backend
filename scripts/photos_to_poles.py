@@ -20,7 +20,8 @@ WHAT COMES OUT, in <output-folder>:
                      per NEW photo group only. Matched/ambiguous groups never update assets.
                      `data_source` is always `field`. `segment_external_ref`,
                      `commune_id` and `external_ref` are left blank unless given on the command line —
-                     the import rejects blank required cells, so a person fills them before importing.
+                     the import rejects a blank `external_ref` / `commune_id`, so a person fills those before
+                     importing; a blank `segment_external_ref` is valid (the pole is imported on no segment yet).
                      Coordinates are where the PHOTOGRAPHER stood, not the pole: a few metres off.
   position_updates.csv  Matched external_ref, old/proposed coordinates, distance and photo count.
                      HUMAN REVIEW ONLY, never an import file.

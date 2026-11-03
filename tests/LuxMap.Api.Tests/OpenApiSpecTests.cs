@@ -39,6 +39,10 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.DoesNotContain("segment_id", Required("CreatePoleRequest"));
         Assert.Contains("segment_id", Required("UpdatePoleRequest"));
         Assert.True(Schema("UpdatePoleRequest").GetProperty("properties").GetProperty("segment_id").GetProperty("nullable").GetBoolean());
+        Assert.Equal(32, Schema("UpdatePoleRequest").GetProperty("properties").GetProperty("segment_id").GetProperty("maxLength").GetInt32());
+        var created = Schema("CreatePoleRequest").GetProperty("properties").GetProperty("segment_id");
+        Assert.True(created.GetProperty("nullable").GetBoolean());
+        Assert.Contains("OPTIONAL", created.GetProperty("description").GetString());
 
         var parameters = Spec.GetProperty("paths").GetProperty("/api/v1/assets/poles").GetProperty("get").GetProperty("parameters").EnumerateArray();
         var filter = Assert.Single(parameters, p => p.GetProperty("name").GetString() == "unassigned_segment");

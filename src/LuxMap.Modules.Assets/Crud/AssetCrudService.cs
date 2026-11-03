@@ -288,13 +288,15 @@ public sealed class AssetCrudService(
 
     public async Task<string> CreatePoleAsync(CreatePoleRequest request, CancellationToken ct)
     {
+        // First, so a malformed segment_id is a 400 before any lookup (a duplicate ref or a commune outside the scope must not hide it).
+        var segmentId = request.ReadSegmentId();
+
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
         await RejectDuplicateRefAsync<Pole>(communeId, request.ExternalRef, ct);
 
         // Read through the query filter: a segment outside the caller's scope is simply not there,
         // which is the 404 Contract section 7 asks for rather than a 403 that would confirm it exists.
         // No segment (POLE-SEGMENT-NULL D-2) is a legitimate pole; a named one must still exist.
-        var segmentId = request.ReadSegmentId();
         if (segmentId is not null)
         {
             await RequireAsync<RoadSegment>(segment => segment.SegmentId == segmentId, "road segment", ct);

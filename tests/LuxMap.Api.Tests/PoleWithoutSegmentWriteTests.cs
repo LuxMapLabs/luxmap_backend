@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -187,6 +186,68 @@ public sealed class PoleWithoutSegmentWriteTests(AssetImportFixture fixture)
         Assert.Equal(2, result.GetProperty("inserted").GetInt32());
         var stored = await Stored(tag);
         Assert.Equal(new string?[] { null, null }, new[] { stored[$"{tag}-G1"], stored[$"{tag}-G2"] });
+    }
+
+    [Fact]
+    public async Task A_geojson_segment_reference_that_is_an_object_an_array_or_a_typo_is_a_row_error_never_no_segment()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var tag = Tag();
+        var commune = fixture.CommuneId;
+        await AssetImportTests.ImportAsync(client, "segments", "segments.csv",
+            SegmentHeader + $"\n{tag}-S1,Road,inter_village,100,\"LINESTRING(106.4900 10.9700, 106.4950 10.9705)\",{commune},public_imagery");
+        var road = await fixture.QueryAsync(db => db.Set<RoadSegment>().IgnoreQueryFilters().Where(s => s.ExternalRef == $"{tag}-S1").Select(s => s.SegmentId).SingleAsync());
+        await AssetImportTests.ImportAsync(client, "poles", "poles.csv", PoleHeader
+            + $"\n{tag}-P1,{tag}-S1,,{commune},POINT(106.490 10.970),false,public_imagery");
+        Assert.Equal(road, (await Stored(tag))[$"{tag}-P1"]);
+
+        object Feature(string name, object? reference, double lng) => new
+        {
+            type = "Feature", geometry = new { type = "Point", coordinates = new[] { lng, 10.97 } },
+            properties = new Dictionary<string, object?>
+            {
+                ["external_ref"] = $"{tag}-{name}", ["commune_id"] = commune, ["data_source"] = "public_imagery", ["segment_external_ref"] = reference,
+            },
+        };
+        var body = JsonSerializer.Serialize(new
+        {
+            type = "FeatureCollection",
+            features = new[]
+            {
+                Feature("P1", new { }, 106.490),                  // an EXISTING pole: an object must not read as "blank = keep"
+                Feature("N1", Array.Empty<string>(), 106.491),     // a NEW pole: an array must not read as "no segment"
+                Feature("N2", new { code = "x" }, 106.492),
+                Feature("N3", $"{tag}-TYPO", 106.493),             // a typo is still a row error in GeoJSON
+            },
+        });
+
+        var result = await AssetImportTests.ImportAsync(client, "poles", "poles.geojson", body);
+
+        Assert.Equal(4, result.GetProperty("failed").GetInt32());
+        Assert.Equal(0, result.GetProperty("inserted").GetInt32());
+        Assert.All(result.GetProperty("rows").EnumerateArray(), row => Assert.Equal("segment_external_ref", row.GetProperty("column").GetString()));
+        var stored = await Stored(tag);
+        Assert.Equal(road, stored[$"{tag}-P1"]);
+        Assert.Equal(new[] { $"{tag}-P1" }, stored.Keys.ToArray());
+    }
+
+    [Fact]
+    public async Task Create_reports_a_malformed_segment_before_it_looks_anything_else_up()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var tag = Tag();
+        var taken = Create(segment: null);
+        taken["external_ref"] = $"{tag}-DUP";
+        Assert.Equal(HttpStatusCode.Created, (await Post(client, taken)).StatusCode);
+
+        // The ref is already used (409) AND the segment is blank (400): the body is wrong first.
+        var both = Create(segment: "   ");
+        both["external_ref"] = $"{tag}-DUP";
+        var refused = await Post(client, both);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+        Assert.Equal("VALIDATION_FAILED", await ErrorCode(refused));
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(client, Create(segment: new string('S', 33)))).StatusCode);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────────────────────────────
