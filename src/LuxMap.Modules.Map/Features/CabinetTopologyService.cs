@@ -87,7 +87,7 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
         var feederIds = feeders.Select(feeder => feeder.FeederId).ToArray();
         var poles = await db.Set<Pole>().AsNoTracking()
             .Where(pole => pole.FeederId != null && feederIds.Contains(pole.FeederId))
-            .Select(pole => new { pole.PoleId, FeederId = pole.FeederId!, pole.SegmentId, pole.Geom, pole.FeederSource })
+            .Select(pole => new { pole.PoleId, FeederId = pole.FeederId!, SegmentId = pole.SegmentId!, pole.Geom, pole.FeederSource })
             .ToListAsync(ct);
 
         var segmentIds = poles.Select(pole => pole.SegmentId).Distinct().ToArray();

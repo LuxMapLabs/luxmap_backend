@@ -1188,6 +1188,40 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 `PUT` feeder vắng `cabinet_id` = giữ), IOT-09 / Đạt (testbed: tạo trụ trước, thiết bị gắn vào trụ, rơ-le mang `cabinet_id`).
 **Chưa báo.**
 
+## POLE-SEGMENT-NULL — cột chưa phân tuyến (02/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Cho phép `pole.segment_id` null = chưa phân tuyến; không dùng tuyến giả, không giao khảo sát, thống kê đếm riêng và thao tác không hỗ trợ phải từ chối rõ. Triển khai tuần tự PR 2a–2e: schema trước, bảo vệ consumer trước khi bật writer |
+| **Decision maker** | **Mỹ**, 02/11/2026 — chấp nhận D-1…D-14 của Phase 1 đã review |
+| **Chạm API** | **Có** |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract |
+
+**Chưa có hiệu lực với client cho tới PR 2e.** PR 2a chỉ nới schema/entity; POST/PUT/import vẫn bắt buộc tuyến,
+DTO/bộ lọc/OpenAPI và hành vi API giữ nguyên. PR 2b bảo vệ nghiệp vụ; 2c các bề mặt đọc; 2d sync; 2e mới bật writer.
+
+| Mã | Quyết định |
+|---|---|
+| D-1 | Phiếu inspection/repair: vẫn hiện cột mang sự cố của phiếu; cột chưa tuyến có `segment_id: null`, `position: null`, xếp nhóm cuối theo `created_at, length(pole_id), pole_id`. **Chặn `null == null`** ở `WorkOrderPoleService.Targets` (`w.SegmentId == p.SegmentId`). Cùng predicate cho danh sách và ảnh. Survey không nhận cột chưa tuyến |
+| D-2 | POST: vắng hoặc `null` = chưa tuyến. PUT: vẫn bắt buộc có key `segment_id` nhưng nhận `null` rõ ràng. Import: ô trống ở cột MỚI = null; ô trống/thiếu cột ở cột ĐÃ CÓ = giữ tuyến; muốn tháo tuyến dùng PUT `null`. Header `segment_external_ref` optional. Bộ lọc `unassigned_segment=true` trên `GET /assets/poles` (không đổi nghĩa `unassigned` của feeder). `segment_external_ref` có giá trị nhưng không khớp → VẪN lỗi dòng, không rơi về null |
+| D-3 | `GET /map/cabinets/{id}/topology`: có cột chưa tuyến → từ chối kèm `pole_ids` (không bịa cạnh) |
+| D-4 | `GET /sync/bundle` mặc định gồm cả cột / sự cố / phiếu chưa tuyến của phiếu mở được giao; không kéo mọi cột chưa tuyến của xã; không thêm `null` vào `segment_ids[]`; metadata scope + eviction chốt với WP6 |
+| D-5 | Dời cột chưa tuyến: cho phép, không đo hành lang, audit không dựng `segment_distance` giả |
+| D-6 | `segment_name: null` (FE tự hiện "Chưa phân tuyến"); `PublicQrInfo` cũng null, QR không bị coi là invalid |
+| D-7 | Gán / tháo tuyến chỉ đổi cột; fault, history, cluster, snapshot cũ giữ nguyên |
+| D-8 | Cột chưa tuyến không thuộc target khảo sát; cluster nhận cột chưa tuyến → từ chối, không nới `fault_cluster` |
+| D-9 | Thống kê: nhóm chưa tuyến riêng + số đếm riêng; không gộp vào tuyến khác hay `out`; không thêm giá trị enum |
+| D-10 | Lighting: lọc `null` khỏi `affected_segment_ids`; thêm đếm cột chưa tuyến bị ảnh hưởng; `uncontrollable_pole_count` không tăng vì chưa tuyến |
+| D-11 | Giữ mock cũ; thêm ví dụ/fixture chưa tuyến riêng; sửa cảnh báo "bắt buộc" của `photos_to_poles.py` |
+| D-12 | `Down()`: từ chối khi còn `pole.segment_id IS NULL` (preflight + `SET NOT NULL` trong transaction); không xoá/gán/default ngầm |
+| D-13 | Chưa thêm `segment_source` |
+| D-14 | 400 `VALIDATION_FAILED` cho input sai; 409 với mã mới **`POLE_SEGMENT_REQUIRED`** (`details.pole_ids` + thao tác bị chặn) cho trạng thái chưa tuyến. Không trả 404 như thể cột không tồn tại |
+
+**Phải báo:** WP5 (form, bộ lọc, nullable model, map/QR/topology/thống kê/lighting và lỗi);
+WP6 (nullable model, phiếu/ảnh, bundle scope + eviction/cache — xác nhận trước merge PR 2d);
+WP4 (target khảo sát/cluster không nhận cột chưa tuyến; giữ snapshot/sự kiện cũ, không suy tuyến).
+**Chưa báo.**
+
 ## TOPO-INFER — nhãn nguồn gốc cho topology + sơ đồ nhánh của trụ (07/10/2026)
 
 | | |

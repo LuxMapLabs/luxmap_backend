@@ -876,7 +876,7 @@ public sealed class AssetCrudService(
             .Select(pole => new TopologyPole
             {
                 PoleId = pole.PoleId,
-                SegmentId = pole.SegmentId,
+                SegmentId = pole.SegmentId!,
                 FeederId = pole.FeederId,
                 FeederSource = pole.FeederSource,
                 // EPSG:4326 straight off the column. 3405 never leaves the SQL tree (BE-10, rule 3).
@@ -963,7 +963,7 @@ public sealed class AssetCrudService(
         {
             PoleId = pole.PoleId,
             ExternalRef = pole.ExternalRef,
-            SegmentId = pole.SegmentId,
+            SegmentId = pole.SegmentId!,
             FeederId = pole.FeederId,
             FeederSource = pole.FeederSource,
 

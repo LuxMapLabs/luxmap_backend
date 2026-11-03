@@ -152,7 +152,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                 Properties = new PoleProperties
                 {
                     PoleId = row.PoleId,
-                    SegmentId = row.SegmentId,
+                    SegmentId = row.SegmentId!,
 
                     // No status row means the latest sweep never covered this pole, which is what
                     // `unknown` MEANS (section 3.1) — not a stand-in for missing data.

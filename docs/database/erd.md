@@ -39,6 +39,12 @@ gọn hơn đề xuất gốc (32 bảng mới → 22). Nguồn phạm vi: [Phi�
 | Q16 | `external_ref` tạm → mã kiểm kê thật: **cập nhật trên cùng ID** theo bảng ánh xạ đã duyệt, không alias | D-R10; Codex phương án A |
 | Q17 | `administrative_unit` thêm **ranh giới nullable** (nguồn OSM, đã dùng thật ở khảo sát 28/09) — để suy xã cho sự cố không có cột | BE-18 quy tắc 2 ghi "chưa có nguồn ranh giới" — nay đã có |
 
+**POLE-SEGMENT-NULL (Mỹ, 02/11/2026):** `pole.segment_id` nullable, quan hệ cột → tuyến optional;
+null nghĩa là chưa phân tuyến. Giữ FK đơn `Restrict`, index và xã bắt buộc; không thêm `segment_source`,
+không nới `fault_cluster` hay target khảo sát. PR 2a chỉ nới schema, chưa có hiệu lực với client tới PR 2e.
+Rollback từ chối khi còn cột null, không xoá/gán/default ngầm (D-12).
+Quyết định đầy đủ: [POLE-SEGMENT-NULL](../contract-drift.md#pole-segment-null--cột-chưa-phân-tuyến-02112026).
+
 **Chờ người khác, không phải quyết định của backend:** gói telemetry nhiều relay và khoá chống trùng (nhóm IoT —
 Đạt, IOT-09/10); giao thức ACK lệnh điều khiển (D-R7); phương pháp ground truth `dim`/`out` (D-R23 — WP4/FO, bảng
 `field_verification` dưới đây đủ chung cho mọi phương pháp); thuật toán gộp lượt và tính baseline (WP4, sau thử
@@ -91,7 +97,7 @@ erDiagram
     }
     pole {
         text pole_id PK "HIỆN CÓ"
-        text segment_id FK
+        text segment_id FK "nullable — POLE-SEGMENT-NULL"
         text feeder_id FK
     }
     fixture {
@@ -297,7 +303,7 @@ erDiagram
 
     electrical_cabinet ||--o{ feeder : "cấp"
     electrical_cabinet ||--o| iot_node : "đặt tại (≤ 1)"
-    road_segment ||--o{ pole : ""
+    road_segment |o--o{ pole : "chưa phân tuyến khi null"
     feeder ||--o{ pole : ""
     pole ||--o{ fixture : ""
     pole ||--|| pole_current_status : ""

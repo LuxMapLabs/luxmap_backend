@@ -663,7 +663,7 @@ public sealed class LightingCommandService(
         var left = excluded.Select(exclusion => exclusion.FeederId).ToArray();
         var uncontrollable = await scope.CountAsync(pole => pole.FeederId == null || left.Contains(pole.FeederId), ct);
         var affected = (await db.Set<Pole>().Where(pole => pole.FeederId != null && switched.Contains(pole.FeederId))
-                .Select(pole => pole.SegmentId).Distinct().ToListAsync(ct))
+                .Select(pole => pole.SegmentId!).Distinct().ToListAsync(ct))
             .OrderBy(id => id.Length).ThenBy(id => id, StringComparer.Ordinal).ToArray();
 
         return new Plan(kind, feederId ?? segmentId!, communeId, relays, excluded, affected, uncontrollable);
