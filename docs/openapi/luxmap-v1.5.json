@@ -3326,6 +3326,13 @@
             }
           },
           {
+            "name": "unassigned_segment",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -3393,7 +3400,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
+        "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1); unassigned_segment=true chỉ lấy cột CHƯA TUYẾN, lọc trước tổng và phân trang [POLE-SEGMENT-NULL]",
         "operationId": "getAssetsPoles",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -3521,7 +3528,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Tạo cột; 201 + Location, không body",
+        "summary": "Tạo cột; 201 + Location, không body. segment_id vắng hoặc null = cột chưa tuyến [POLE-SEGMENT-NULL]",
         "operationId": "postAssetsPoles",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -3750,7 +3757,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
+        "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột. Khoá segment_id BẮT BUỘC (thiếu = 400); null = tháo cột khỏi tuyến [POLE-SEGMENT-NULL]",
         "operationId": "putAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -9072,6 +9079,26 @@
           }
         ],
         "responses": {
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -9141,7 +9168,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source hiện ở tooltip của cạnh (TI-7). Sơ đồ logic, không phải tuyến cáp",
+        "summary": "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source hiện ở tooltip của cạnh (TI-7). Sơ đồ logic, không phải tuyến cáp; cột chưa tuyến → 409 POLE_SEGMENT_REQUIRED (operation=cabinet_topology, pole_ids tối đa 100, pole_count)",
         "operationId": "getMapCabinetsCabinetidTopology",
         "x-luxmap-status": "implemented"
       }
@@ -11736,7 +11763,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Không có since",
+        "summary": "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Gói mặc định (vắng segment_id) còn kèm cột CHƯA TUYẾN (segment_id null) mà phiếu mở của tôi giữ sự cố, cùng sự cố và phiếu đó; segment_ids không bao giờ chứa null; gói nêu tuyến thì chỉ đúng các tuyến ấy [POLE-SEGMENT-NULL D-4]. Không có since",
         "operationId": "getSyncBundle",
         "x-luxmap-status": "implemented"
       }
@@ -15778,7 +15805,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "location": {
             "$ref": "#/components/schemas/ReportPoint"
@@ -16256,8 +16284,7 @@
         "required": [
           "commune_id",
           "data_source",
-          "geom_wkt",
-          "segment_id"
+          "geom_wkt"
         ],
         "type": "object",
         "properties": {
@@ -16268,8 +16295,9 @@
           },
           "segment_id": {
             "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "description": "The pole's road segment. OPTIONAL: absent or null creates a pole that is on no segment yet; a blank string is a 400; an id that does not exist (or is out of scope) is a 404.",
+            "nullable": true
           },
           "feeder_id": {
             "maxLength": 32,
@@ -17097,6 +17125,7 @@
           "out",
           "pole_count",
           "segment_id",
+          "unassigned_segment_pole_count",
           "unknown"
         ],
         "type": "object",
@@ -17133,6 +17162,10 @@
             "format": "int32"
           },
           "never_surveyed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unassigned_segment_pole_count": {
             "type": "integer",
             "format": "int32"
           }
@@ -17797,6 +17830,7 @@
           "target_id",
           "target_kind",
           "targets",
+          "unassigned_segment_pole_count",
           "uncontrollable_pole_count"
         ],
         "type": "object",
@@ -17828,6 +17862,11 @@
           "uncontrollable_pole_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "unassigned_segment_pole_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -17844,6 +17883,7 @@
           "requested_by",
           "target_id",
           "target_kind",
+          "unassigned_segment_pole_count",
           "uncontrollable_pole_count"
         ],
         "type": "object",
@@ -17894,6 +17934,11 @@
           "uncontrollable_pole_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "unassigned_segment_pole_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -18347,7 +18392,8 @@
             "$ref": "#/components/schemas/PoleListItem"
           },
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "geom_wkt": {
             "type": "string"
@@ -18381,7 +18427,8 @@
             "nullable": true
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "feeder_id": {
             "type": "string",
@@ -18551,10 +18598,12 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "type": "string"
@@ -19093,7 +19142,13 @@
             "$ref": "#/components/schemas/PoleId"
           },
           "segment_id": {
-            "$ref": "#/components/schemas/SegmentId"
+            "type": "string",
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SegmentId"
+              }
+            ]
           },
           "fixture_status": {
             "$ref": "#/components/schemas/FixtureStatus"
@@ -19221,7 +19276,8 @@
         "type": "object",
         "properties": {
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_name": {
             "type": "string"
@@ -20883,7 +20939,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "fixture_status": {
             "$ref": "#/components/schemas/FixtureStatus"
@@ -21100,7 +21157,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "feeder_id": {
             "type": "string",
@@ -21269,8 +21327,9 @@
           },
           "segment_id": {
             "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "description": "The pole's road segment, or null for a pole that is on no segment yet (POLE-SEGMENT-NULL). The key is REQUIRED: omitting it is a 400, so a form written before this change cannot silently unassign a pole.",
+            "nullable": true
           },
           "feeder_id": {
             "maxLength": 32,
@@ -21479,7 +21538,8 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "type": "string"
@@ -22077,11 +22137,13 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "position": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "location": {
             "$ref": "#/components/schemas/WorkOrderLocation"

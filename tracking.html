@@ -60,6 +60,65 @@
   </div>
 
   <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2e (nút bật: ghi cột chưa tuyến), 03/11/2026</strong>
+    <p><span class="tag t-next">PR #202 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) hoặc merge admin · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    PR cuối của ticket. <code>POST /assets/poles</code>: <code>segment_id</code> vắng hoặc <code>null</code> ⇒ cột chưa tuyến (chuỗi trắng 400, mã lạ 404). <code>PUT</code>: khoá <code>segment_id</code> vẫn bắt buộc
+    (thiếu = 400, để form cũ không lặng lẽ tháo tuyến) nhưng nhận <code>null</code> — cách duy nhất để tháo. Import CSV / GeoJSON: <code>segment_external_ref</code> không còn bắt buộc; ô trống tạo cột mới chưa tuyến, cột đã có
+    giữ tuyến; mã gõ sai hoặc ô GeoJSON dạng object/array vẫn là lỗi dòng. <code>GET /assets/poles?unassigned_segment=true</code> lọc trước tổng và phân trang. Review <code>river</code> bắt được một regression thật ở import GeoJSON
+    (object/array bị đọc thành "chưa tuyến") — đã vá, có test + phá thử. Một test khảo sát (<code>SurveyIngestTests.Concurrent_create…</code>) chập chờn ở lượt chạy đầy đủ, không liên quan cột.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2e.md">Kết quả 2e</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2d (sync bundle), 03/11/2026</strong>
+    <p><span class="tag t-done">PR 2d đã merge (#201, 03/11/2026) · chờ WP6 xác nhận quy tắc thay cache (D-20)</span>
+    Gói offline mặc định nay mang cả <strong>cột chưa tuyến</strong> (<code>segment_id: null</code>) mà phiếu mở của kỹ sư còn giữ sự cố, cùng sự cố mở và phiếu đó. Trước đây một phiếu
+    sửa / kiểm tra chỉ có việc ở cột chưa tuyến không vào gói offline. Không kéo mọi cột chưa tuyến của xã; <code>segment_ids[]</code> không bao giờ có <code>null</code>
+    (có thể rỗng); gói nêu tuyến giữ nguyên; không thêm trường metadata. Ba điều kiện cùng cần: phiếu còn <code>assigned</code> / <code>in_progress</code>, liên kết sự cố chưa giải phóng, và việc là của chính người gọi.
+    Codex <code>gpt-6.1-sol</code> vẫn báo hết hạn mức dù đã đăng nhập lại hai tài khoản → Claude viết, Codex <code>-p river</code> review (APPROVE WITH NITS, không P1/P2; hai khoảng trống test do Codex chỉ ra đã vá).
+    Build 0 warning, <strong>1.256 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước), 7 phá thử đỏ đúng test.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2d.md">Kết quả 2d</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2c (bề mặt đọc), 03/11/2026</strong>
+    <p><span class="tag t-done">PR 2c đã merge (#200, 03/11/2026, admin bỏ qua CODEOWNERS review) · chưa báo WP4 / WP5 / WP6</span>
+    Mọi bề mặt đọc trả <code>null</code> thật cho cột chưa tuyến: inventory, bản đồ, chi tiết cột, cột theo mạch, bảo hành, QR và duyệt báo cáo công dân.
+    Sơ đồ nhánh cabinet gặp cột chưa tuyến trả <strong>409 <code>POLE_SEGMENT_REQUIRED</code></strong> (kèm tối đa 100 <code>pole_ids</code> + <code>pole_count</code>).
+    Thống kê: <code>unassigned_segment_pole_count</code> theo từng dòng, nhóm <code>segment_id: null</code> đứng cuối. Lighting: <code>affected_segment_ids</code> không còn null,
+    thêm <code>unassigned_segment_pole_count</code> ở preview / lệnh mới (không lưu bền → đọc lại lệnh cũ là <code>null</code>, D-18). Một thay đổi cho cả cột CÓ tuyến:
+    <code>segment_name</code> của tuyến liên xã bị ẩn bởi phạm vi xã đổi từ <code>""</code> sang <code>null</code> (D-19).
+    Codex viết code, test, OpenAPI rồi dừng vì báo hết hạn mức (CLI vẫn từ chối dù trang hạn mức còn 100%); Claude đọc diff, viết file kết quả và chạy lại:
+    build 0 warning, sau rebase lên dev <strong>1.249 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước), OpenAPI sinh lại bằng lệnh chuẩn khớp bản đã gộp, 6 phá thử đỏ đúng lý do.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2c.md">Kết quả 2c</a> · <a href=".ai/reviews/POLE-SEGMENT-NULL-2c-by-claude.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2b (lớp bảo vệ nghiệp vụ), 03/11/2026</strong>
+    <p><span class="tag t-done">PR 2b đã merge (#199, 03/11/2026) · chưa báo WP4 / WP5 / WP6</span>
+    Sửa lỗi <code>null == null</code> ở <code>WorkOrderPoleService.Targets</code>: phiếu không có tuyến từng kéo mọi cột chưa tuyến của xã vào danh sách cột,
+    vào quyền upload ảnh và vào phiếu khảo sát (3 test đỏ khi bỏ điều kiện: 5 cột thay vì 4, upload 201 thay vì 409). <code>GET /work-orders/{id}/poles</code>:
+    <code>segment_id</code> / <code>position</code> nullable, nhóm chưa tuyến xếp cuối. Dời cột chưa tuyến không còn 500, audit không dựng khoảng cách tuyến giả.
+    <code>fault_cluster</code> chưa có writer nên ghi thành việc cho CV-15; mã <code>POLE_SEGMENT_REQUIRED</code> chưa có chỗ dùng → vào 2c.
+    Codex làm, không chạy được test trong sandbox; Claude chạy lại: build 0 warning, <strong>1.243 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước),
+    OpenAPI sinh lại bằng lệnh chuẩn giống từng byte, 3 phá thử đều đỏ đúng lý do.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2b.md">Kết quả 2b</a> · <a href=".ai/reviews/POLE-SEGMENT-NULL-2b-by-claude.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-SEGMENT-NULL — cột chưa thuộc tuyến, PR 2a (schema), 02/11/2026</strong>
+    <p><span class="tag t-done">PR 2a đã merge (#198, 03/11/2026) · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    Mỹ chốt nullable cho <code>pole.segment_id</code> và D-1…D-14 (theo đề xuất Phase 1). Lộ trình tuần tự, <strong>nút bật ở cuối</strong>:
+    2a schema → 2b phiếu / khảo sát / sự cố → 2c đọc (assets, map, thống kê, lighting) → 2d sync (cần WP6) → 2e POST / PUT / import / bộ lọc.
+    Phase 1 tìm ra rủi ro chính: <code>WorkOrderPoleService.Targets</code> so <code>w.SegmentId == p.SegmentId</code> sẽ khớp <code>null == null</code> và
+    kéo mọi cột chưa tuyến vào phiếu không có tuyến (xử lý ở 2b). PR 2a: migration <code>PoleSegmentNullable</code> (<code>Up</code> chỉ bỏ NOT NULL,
+    <code>Down</code> từ chối khi còn cột null), hành vi API không đổi, mục drift POLE-SEGMENT-NULL (SELF-SIGNED). Codex làm, không chạy được test
+    trong sandbox; Claude chạy lại: build 0 warning, <strong>1.235 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước), 2 phá thử đều đỏ rồi xanh.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p1.md">Phase 1</a> · <a href=".ai/results/POLE-SEGMENT-NULL-p2a.md">Kết quả 2a</a> ·
+    <a href=".ai/reviews/POLE-SEGMENT-NULL-2a-by-claude.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>ASSET-PHOTOS Phase 2-B — trạng thái mạch điện, 28/10/2026</strong>
     <p><span class="tag t-next">PR mở từ <code>feat/ASSET-FEEDER-STATE</code> · không migration · chưa báo WP5</span>
     <code>control</code> + <code>power_state</code> trên <code>/assets/feeders</code>, <code>feeders[]</code> trên <code>/map/cabinets</code> (giữ <code>feeder_ids[]</code>); một truy vấn control theo lô qua port

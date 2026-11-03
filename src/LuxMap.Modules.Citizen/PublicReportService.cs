@@ -30,7 +30,7 @@ public sealed record PublicReportInput(
 /// <summary>What the public page learns about a code: enough to show the citizen they scanned the right pole, nothing more (D-4).</summary>
 public sealed record PublicQrInfo
 {
-    public required string SegmentName { get; init; }
+    public required string? SegmentName { get; init; }
     public required string CommuneName { get; init; }
 }
 
@@ -69,7 +69,7 @@ public sealed partial class PublicReportService(
             .Select(p => new PublicQrInfo
             {
                 SegmentName = db.Set<RoadSegment>().IgnoreQueryFilters()
-                    .Where(s => s.SegmentId == p.SegmentId).Select(s => s.SegmentName).First(),
+                    .Where(s => s.SegmentId == p.SegmentId).Select(s => s.SegmentName).FirstOrDefault(),
                 CommuneName = db.Set<AdministrativeUnit>()
                     .Where(u => u.CommuneId == p.CommuneId).Select(u => u.Name).First(),
             })

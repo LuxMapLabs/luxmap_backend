@@ -141,6 +141,43 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     }
 
     [Fact]
+    public async Task Survey_publication_after_unassigning_a_pole_keeps_the_old_snapshot_and_nullable_fault()
+    {
+        var capture = await Plant(1, state: "off");
+        string snapshot;
+        await using (var db = Db())
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            snapshot = await db.Set<SurveyProcessingRun>().Where(r => r.RunId == capture.Run).Select(r => r.GisSnapshot).SingleAsync();
+            var pole = await db.Set<Pole>().SingleAsync(p => p.PoleId == poles[0]);
+            pole.SegmentId = null; await db.SaveChangesAsync();
+        }
+        await Accept(capture);
+        await using (var db = Db())
+        {
+            var fault = await db.Set<Fault>().SingleAsync(f => f.PoleId == poles[0]);
+            Assert.Null(fault.SegmentId);
+            Assert.Equal(a, fault.CommuneId);
+            Assert.Equal(DataSource.Simulated, fault.DataSource);
+            Assert.Equal(SourceChannel.Cv, fault.SourceChannel);
+            Assert.NotNull(fault.OriginObservationId);
+            Assert.Single(await db.Set<AuditEvent>().Where(e => e.EntityType == AuditEntityType.Fault && e.EntityId == fault.FaultId).ToArrayAsync());
+            var history = await db.Set<LuminanceHistory>().SingleAsync(h => h.PoleId == poles[0] && h.SweepId == capture.Id);
+            var pole = await db.Set<Pole>().SingleAsync(p => p.PoleId == poles[0]);
+            using (db.EnterUnscopedSystemWriteBackdoor())
+            {
+                pole.SegmentId = road; await db.SaveChangesAsync();
+            }
+            db.ChangeTracker.Clear();
+            Assert.Null((await db.Set<Fault>().SingleAsync(f => f.FaultId == fault.FaultId)).SegmentId);
+            Assert.Equal(snapshot, await db.Set<SurveyProcessingRun>().Where(r => r.RunId == capture.Run).Select(r => r.GisSnapshot).SingleAsync());
+            var preserved = await db.Set<LuminanceHistory>().SingleAsync(h => h.PoleId == poles[0] && h.SweepId == capture.Id);
+            Assert.Equal(history.ClassifiedAs, preserved.ClassifiedAs);
+            Assert.Equal(history.RunId, preserved.RunId);
+        }
+    }
+
+    [Fact]
     public async Task Late_and_equal_capture_only_add_history_and_do_not_create_historical_faults()
     {
         var late = await Plant(1, state: "off"); var newer = await Plant(2); var equal = await Plant(2, state: "off");

@@ -35,6 +35,9 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
         [(typeof(SetPoleNoteRequest), "note")] =
             "The engineer's note on this pole, at most 1000 characters; null or blank clears it. "
             + "The key is REQUIRED: omitting it is a 400, so an empty body cannot silently clear it.",
+        [(typeof(UpdatePoleRequest), "segment_id")] =
+            "The pole's road segment, or null for a pole that is on no segment yet (POLE-SEGMENT-NULL). "
+            + "The key is REQUIRED: omitting it is a 400, so a form written before this change cannot silently unassign a pole.",
         [(typeof(UpdatePoleRequest), "note")] =
             "The engineer's note. OPTIONAL and the one field this full replacement keeps when absent: "
             + "leave the key out to keep the note, send null or blank to clear it, text (at most 1000 characters) to overwrite it.",
@@ -50,6 +53,9 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
             "The feeder this relay switches — it must leave from the device's own cabinet (CAB-4) — or null to unwire the relay. "
             + "The key is REQUIRED: omitting it is a 400, so an empty body cannot silently unwire a relay.",
     };
+
+    /// <summary>Keys that must be PRESENT (null is a legal value): listed in <c>required</c>, as they were while the field was a plain [Required] string.</summary>
+    private static readonly HashSet<(Type Type, string Property)> RequiredKeys = [(typeof(UpdatePoleRequest), "segment_id")];
 
     private const string FeederSource =
         "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved "
@@ -69,12 +75,24 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
             return;
         }
 
+        // POLE-SEGMENT-NULL: a plain nullable string on create, so the spec has to say what absent / null / blank mean.
+        if (context.Type == typeof(CreatePoleRequest) && concrete.Properties.TryGetValue("segment_id", out var created) && created is OpenApiSchema segment)
+        {
+            segment.Description = "The pole's road segment. OPTIONAL: absent or null creates a pole that is on no segment yet; "
+                + "a blank string is a 400; an id that does not exist (or is out of scope) is a 404.";
+        }
+
         foreach (var ((type, name), description) in Fields)
         {
             if (type == context.Type && concrete.Properties.TryGetValue(name, out var property) && property is OpenApiSchema field)
             {
                 field.Type = JsonSchemaType.String | JsonSchemaType.Null;
                 field.Description = description;
+                if (RequiredKeys.Contains((type, name)))
+                {
+                    (concrete.Required ??= new HashSet<string>()).Add(name);
+                    field.MaxLength = 32;
+                }
             }
         }
     }

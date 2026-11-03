@@ -195,7 +195,7 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
         builder.HasKey(pole => pole.PoleId);
 
         builder.Property(pole => pole.PoleId).HasPrefixedId(PrefixedIds.Pole);
-        builder.Property(pole => pole.SegmentId).HasColumnType("text").IsRequired();
+        builder.Property(pole => pole.SegmentId).HasColumnType("text");
         builder.HasExternalRef("pole");
         builder.Property(pole => pole.FeederId).HasColumnType("text");
         builder.Property(pole => pole.Geom).HasColumnType(GeometryColumns.Point).IsRequired();

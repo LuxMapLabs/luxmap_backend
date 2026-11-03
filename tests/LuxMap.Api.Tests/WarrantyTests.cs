@@ -305,7 +305,7 @@ public sealed class WarrantyTests(AssetImportFixture factory) : IAsyncLifetime
         await Plant(home, road, DataSource.Field, 1);
 
         var status = await Lines(await clients["manager"].GetAsync($"/api/v1/statistics/fixture-status?commune_id={home}&format=csv"));
-        Assert.Equal(["data_source,commune_id,segment_id,pole_count,normal,dim,out,unknown,never_surveyed", "field,,,1,0,0,0,1,1"], status);
+        Assert.Equal(["data_source,commune_id,segment_id,pole_count,normal,dim,out,unknown,never_surveyed,unassigned_segment_pole_count", "field,,,1,0,0,0,1,1,0"], status);
 
         var repairs = await Lines(await clients["manager"].GetAsync($"/api/v1/statistics/repair-timeliness?commune_id={home}&format=csv"));
         Assert.Equal(["commune_id,completed,on_time,late,no_due_date,on_time_rate,open_overdue"], repairs);

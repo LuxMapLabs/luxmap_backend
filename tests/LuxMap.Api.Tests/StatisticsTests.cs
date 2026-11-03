@@ -107,7 +107,7 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         AssertRow(rows[1], "public_imagery", poles: 1, normal: 1, dim: 0, @out: 0, unknown: 0, neverSurveyed: 0);
         Assert.Equal(JsonValueKind.Null, rows[0].GetProperty("commune_id").ValueKind);
         Assert.Equal(JsonValueKind.Null, rows[0].GetProperty("segment_id").ValueKind);
-        Assert.Equal(new[] { "commune_id", "data_source", "dim", "never_surveyed", "normal", "out", "pole_count", "segment_id", "unknown" },
+        Assert.Equal(new[] { "commune_id", "data_source", "dim", "never_surveyed", "normal", "out", "pole_count", "segment_id", "unassigned_segment_pole_count", "unknown" },
             rows[0].EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
     }
 

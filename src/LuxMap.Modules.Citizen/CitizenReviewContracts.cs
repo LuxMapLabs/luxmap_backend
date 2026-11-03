@@ -69,7 +69,7 @@ public sealed record CitizenReportDetail : CitizenReportItem
 public sealed record CitizenReportPole
 {
     public required string PoleId { get; init; }
-    public required string SegmentId { get; init; }
+    public required string? SegmentId { get; init; }
     public required ReportPoint Location { get; init; }
 
     /// <summary>From the last published survey; <c>unknown</c> when none covered the pole.</summary>

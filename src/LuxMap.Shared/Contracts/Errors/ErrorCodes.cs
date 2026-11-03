@@ -207,6 +207,8 @@ public static class ErrorCodes
     /// A survey would never see the pole there again. Nothing was written; moving a pole to another segment is the
     /// full asset edit.
     /// </summary>
+    public const string PoleSegmentRequired = "POLE_SEGMENT_REQUIRED";
+
     public const string PoleOffSegment = "POLE_OFF_SEGMENT";
 
     /// <summary>

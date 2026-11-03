@@ -87,10 +87,31 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
         var feederIds = feeders.Select(feeder => feeder.FeederId).ToArray();
         var poles = await db.Set<Pole>().AsNoTracking()
             .Where(pole => pole.FeederId != null && feederIds.Contains(pole.FeederId))
-            .Select(pole => new { pole.PoleId, FeederId = pole.FeederId!, pole.SegmentId, pole.Geom, pole.FeederSource })
+            .Select(pole => new { pole.PoleId, FeederId = pole.FeederId!, pole.SegmentId, pole.Geom, pole.FeederSource, pole.CreatedAt })
             .ToListAsync(ct);
 
-        var segmentIds = poles.Select(pole => pole.SegmentId).Distinct().ToArray();
+        var unassigned = poles.Where(pole => pole.SegmentId == null).ToArray();
+        if (unassigned.Length > 0)
+        {
+            throw new LuxMapException(ErrorCodes.PoleSegmentRequired, HttpStatusCode.Conflict,
+                "Assign a segment to every pole before building the cabinet topology.",
+                new Dictionary<string, object?>
+                {
+                    ["operation"] = "cabinet_topology",
+                    ["pole_ids"] = unassigned.OrderBy(pole => pole.CreatedAt)
+                        .ThenBy(pole => pole.PoleId.Length).ThenBy(pole => pole.PoleId, StringComparer.Ordinal)
+                        .Take(100).Select(pole => pole.PoleId).ToArray(),
+                    ["pole_count"] = unassigned.Length,
+                });
+        }
+
+        // The guard above establishes this invariant before any dictionary lookup or branch is built.
+        var assigned = poles.Select(pole => new
+        {
+            pole.PoleId, pole.FeederId, pole.Geom, pole.FeederSource,
+            SegmentId = pole.SegmentId ?? throw new InvalidOperationException("Unassigned pole passed the topology guard."),
+        }).ToArray();
+        var segmentIds = assigned.Select(pole => pole.SegmentId).Distinct().ToArray();
         var roads = (await db.Set<RoadSegment>().AsNoTracking().IgnoreQueryFilters()
                 .Where(segment => segmentIds.Contains(segment.SegmentId))
                 .Select(segment => new { segment.SegmentId, segment.CreatedAt, segment.Geom })
@@ -104,7 +125,7 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
         {
             // A road missing here was deleted after its poles were read (a pole cannot outlive its segment — RESTRICT), so
             // its poles are gone too: skip them rather than answer 500 on a concurrent delete (Codex review P2).
-            var bySegment = poles
+            var bySegment = assigned
                 .Where(pole => pole.FeederId == feeder.FeederId && roads.ContainsKey(pole.SegmentId))
                 .GroupBy(pole => pole.SegmentId, StringComparer.Ordinal)
                 .OrderBy(group => roads[group.Key].CreatedAt)

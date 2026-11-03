@@ -119,3 +119,10 @@ client nhận URL mà mở ra 404 — hoặc tệ hơn, thấy frame của xã k
   (`ix_administrative_unit_name` unique).
 - 🔴 **Đọc mã thoát của `dotnet test`, không chỉ dòng `Passed!`.** Lỗi teardown collection in `[Test Collection Cleanup Failure …]` và trả
   mã 1, trong khi dòng tổng vẫn ghi `Failed: 0` — CI đỏ ở #140 vì đúng chỗ này, lượt chạy local bỏ sót vì chỉ lọc dòng tổng.
+
+## POLE-SEGMENT-NULL PR 2c — đọc cột chưa tuyến
+
+- Hàng map vẫn tồn tại với `properties.segment_id: null`; chi tiết có `segment_name: null`. Không thêm INNER JOIN
+  road để lấy nhãn: sẽ làm cột chưa tuyến biến mất. Tổng cột toàn xã có thể lớn hơn tổng pole_count của các tuyến.
+- Cabinet topology kiểm cột chưa tuyến trước khi dựng cạnh/dictionary: `ContainsKey(null)` ném lỗi, không phải nhánh rỗng.
+  Từ chối 409 `POLE_SEGMENT_REQUIRED` kèm operation, tối đa 100 pole_ids có thứ tự và tổng pole_count.

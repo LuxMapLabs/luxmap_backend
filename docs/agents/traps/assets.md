@@ -415,3 +415,13 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   đường ghi cột (form, import, ghi chú, sync, seeder, fixture) kèm audit — quyết định riêng. Hệ quả: sửa `geom` qua form đầy đủ / import chưa có vết.
 - Thứ tự: kiểm có cột **qua filter** (404) → `FOR UPDATE` → đọc lại → đo → `AssetStamp.Touch` (không đổi ⇒ không audit). Rollback
   `AuditPoleRelocation`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
+
+## POLE-SEGMENT-NULL — ghi cột chưa tuyến (PR 2e)
+
+- **`UpdatePoleRequest.SegmentId` là `JsonElement`, không phải `string?` + `[Required]`.** `[Required]` từ chối `null`, mà `null` là cách DUY NHẤT tháo cột khỏi tuyến; còn đọc khoá vắng như `null` sẽ để
+  một form cũ lặng lẽ tháo tuyến của cả cột. Mẫu giống `SetPoleFeederRequest.feeder_id`: đọc qua `ReadSegmentId()` ở ĐẦU service (400 trước mọi tra cứu), schema OpenAPI do `JsonElementFieldSchemaFilter`
+  khai `nullable` + giữ trong `required`. `CreatePoleRequest.SegmentId` là `string?` tuỳ chọn: vắng/`null` ⇒ chưa tuyến, chuỗi rỗng/trắng ⇒ 400 (đừng "chuẩn hoá" thành `null`).
+- **Import:** `segment_external_ref` không còn trong `RequiredColumns(Poles)`. Ô trống/vắng ⇒ cột MỚI chưa tuyến, cột ĐÃ CÓ giữ tuyến (chỉ `PUT … null` tháo); mã điền mà không khớp vẫn là lỗi dòng qua `Resolve`
+  — đừng đổi chỗ đó để "tha" cho mã sai. `required: false` của `Resolve` chỉ nói ô được phép trống, không nói mã sai được phép qua.
+- **Bộ lọc `unassigned_segment`** áp trước `CountAsync` và phân trang (`ListAsync` nhận `Expression<Func<TEntity,bool>>? filter`); `false` là không lọc, không phải "chỉ cột đã có tuyến". Khác `feeders/poles?unassigned=true` (chưa gán MẠCH).
+

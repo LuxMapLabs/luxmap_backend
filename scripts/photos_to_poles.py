@@ -20,7 +20,8 @@ WHAT COMES OUT, in <output-folder>:
                      per NEW photo group only. Matched/ambiguous groups never update assets.
                      `data_source` is always `field`. `segment_external_ref`,
                      `commune_id` and `external_ref` are left blank unless given on the command line —
-                     the import rejects blank required cells, so a person fills them before importing.
+                     the import rejects a blank `external_ref` / `commune_id`, so a person fills those before
+                     importing; a blank `segment_external_ref` is valid (the pole is imported on no segment yet).
                      Coordinates are where the PHOTOGRAPHER stood, not the pole: a few metres off.
   position_updates.csv  Matched external_ref, old/proposed coordinates, distance and photo count.
                      HUMAN REVIEW ONLY, never an import file.
@@ -793,9 +794,13 @@ def main() -> int:
     print(f"{len(files)} ảnh, {len(rejected)} bị loại -> {len(groups)} nhóm cột")
     print(f"poles.csv: {len(pole_rows)} dòng · review.csv: {len(reviews)} ca cần xem · "
           f"{len(suggestions)} gợi ý gộp · kết quả ở {out}")
-    if any(not row[0] or not row[1] or not row[3] for row in pole_rows):
-        print("⚠️  poles.csv còn ô bắt buộc để trống (external_ref / segment_external_ref / commune_id) "
+    if any(not row[0] or not row[3] for row in pole_rows):
+        print("⚠️  poles.csv còn ô bắt buộc để trống (external_ref / commune_id) "
               "— điền trước khi import.")
+    unassigned = sum(1 for row in pole_rows if not row[1])
+    if unassigned:
+        print(f"ℹ️  {unassigned} cột chưa có segment_external_ref — import sẽ để chúng chưa phân tuyến "
+              "(khảo sát đêm không ghé tới khi có tuyến; nạp lại file có tuyến để gán).")
     return 0
 
 

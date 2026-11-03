@@ -34,7 +34,8 @@ namespace LuxMap.Modules.Assets.Import;
 /// all four kinds in a single transaction would mean resolving references to rows whose IDs do not
 /// exist yet, and the load order in <c>docs/templates/README.md</c> would have to become code.
 /// Ordering is instead enforced by the reference check itself: importing poles before segments fails
-/// every row with a clear message naming the missing <c>segment_external_ref</c>.
+/// every row that FILLS <c>segment_external_ref</c> with a clear message naming it (a blank cell is a pole on no
+/// segment yet — POLE-SEGMENT-NULL D-2).
 /// </para>
 /// </remarks>
 public sealed class AssetImportService(
@@ -95,7 +96,7 @@ public sealed class AssetImportService(
         ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "geom_wkt", "commune_id", "data_source"],
         ImportKind.Cabinets => ["external_ref", "cabinet_name", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Feeders => ["external_ref", "feeder_name", "commune_id"],
-        ImportKind.Poles => ["external_ref", "segment_external_ref", "commune_id", "geom_wkt", "data_source"],
+        ImportKind.Poles => ["external_ref", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Fixtures => ["pole_external_ref", "fixture_type", "power_source", "lamp_watt", "install_date", "data_source"],
         _ => [],
     };
@@ -380,7 +381,10 @@ public sealed class AssetImportService(
                 reader.Fail("note", $"A note is at most {PoleNoteInput.MaxLength} characters; this one has {note.Length}.");
             }
 
-            var segment = Resolve(reader, segments, "segment_external_ref", required: true);
+            // POLE-SEGMENT-NULL D-2: the cell is optional. Blank or a missing column leaves a NEW pole on no segment and KEEPS an
+            // existing pole's segment (only PUT null takes a pole off its segment). A reference that matches nothing is still a row
+            // error — Resolve reports it — so a typo can never turn into "no segment".
+            var segment = Resolve(reader, segments, "segment_external_ref", required: false);
 
             // Nullable on purpose: a solar_all_in_one pole is connected to no circuit at all.
             var feeder = Resolve(reader, feeders, "feeder_external_ref", required: false);
@@ -421,7 +425,11 @@ public sealed class AssetImportService(
 
             if (pole is not null)
             {
-                pole.SegmentId = segment!.Id;
+                if (segment is not null)
+                {
+                    pole.SegmentId = segment.Id;
+                }
+
                 TopologyLink.ApplyPoleFeeder(dbContext, pole, feeder?.Id, feederSource);
                 pole.Geom = geometry!;
                 pole.NearSensitivePoi = nearPoi;
@@ -434,7 +442,7 @@ public sealed class AssetImportService(
             var created = new Pole
             {
                 ExternalRef = externalRef,
-                SegmentId = segment!.Id,
+                SegmentId = segment?.Id,
                 FeederId = feeder?.Id,
                 FeederSource = feederSource,
                 CommuneId = communeId!,
@@ -686,6 +694,14 @@ public sealed class AssetImportService(
     private static ReferencedAsset? Resolve(
         ImportRowReader reader, Dictionary<string, List<ReferencedAsset>> index, string column, bool required)
     {
+        // The indexer reads a GeoJSON object / array as "empty". For an optional reference an empty cell MEANS something (a new pole
+        // is left on no segment, an existing one keeps it), so a malformed value must fail here instead of being taken for that decision.
+        if (reader.Row.IsNonScalar(column))
+        {
+            reader.Fail(column, "Expected a text reference (an external_ref); got an object or an array.");
+            return null;
+        }
+
         var value = required ? reader.Required(column) : reader.Optional(column);
         if (value is null)
         {

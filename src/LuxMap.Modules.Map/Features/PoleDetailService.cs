@@ -76,7 +76,7 @@ public sealed class PoleDetailService(
         {
             PoleId = pole.PoleId,
             SegmentId = pole.SegmentId,
-            SegmentName = pole.SegmentName ?? string.Empty,
+            SegmentName = pole.SegmentName,
             CommuneId = pole.CommuneId,
             Location = new PoleMapLocation(pole.Geom.Y, pole.Geom.X),
             Fixture = fixture?.Detail is { } lamp
