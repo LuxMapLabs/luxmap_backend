@@ -60,8 +60,20 @@
   </div>
 
   <div class="card">
+    <strong>POLE-SEGMENT-NULL — PR 2b (lớp bảo vệ nghiệp vụ), 03/11/2026</strong>
+    <p><span class="tag t-next">PR 2b xong, chưa push · 2c–2e chưa làm · chưa báo WP4 / WP5 / WP6</span>
+    Sửa lỗi <code>null == null</code> ở <code>WorkOrderPoleService.Targets</code>: phiếu không có tuyến từng kéo mọi cột chưa tuyến của xã vào danh sách cột,
+    vào quyền upload ảnh và vào phiếu khảo sát (3 test đỏ khi bỏ điều kiện: 5 cột thay vì 4, upload 201 thay vì 409). <code>GET /work-orders/{id}/poles</code>:
+    <code>segment_id</code> / <code>position</code> nullable, nhóm chưa tuyến xếp cuối. Dời cột chưa tuyến không còn 500, audit không dựng khoảng cách tuyến giả.
+    <code>fault_cluster</code> chưa có writer nên ghi thành việc cho CV-15; mã <code>POLE_SEGMENT_REQUIRED</code> chưa có chỗ dùng → vào 2c.
+    Codex làm, không chạy được test trong sandbox; Claude chạy lại: build 0 warning, <strong>1.243 API + 386 + 45 + 54 pass</strong>, 7 skip (có từ trước),
+    OpenAPI sinh lại bằng lệnh chuẩn giống từng byte, 3 phá thử đều đỏ đúng lý do.
+    <a href=".ai/results/POLE-SEGMENT-NULL-p2b.md">Kết quả 2b</a> · <a href=".ai/reviews/POLE-SEGMENT-NULL-2b-by-claude.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-SEGMENT-NULL — cột chưa thuộc tuyến, PR 2a (schema), 02/11/2026</strong>
-    <p><span class="tag t-next">PR 2a xong, chưa push · 2b–2e chưa làm · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    <p><span class="tag t-done">PR 2a đã merge (#198, 03/11/2026) · <code>luxmap_dev</code> / VPS chưa migrate</span>
     Mỹ chốt nullable cho <code>pole.segment_id</code> và D-1…D-14 (theo đề xuất Phase 1). Lộ trình tuần tự, <strong>nút bật ở cuối</strong>:
     2a schema → 2b phiếu / khảo sát / sự cố → 2c đọc (assets, map, thống kê, lighting) → 2d sync (cần WP6) → 2e POST / PUT / import / bộ lọc.
     Phase 1 tìm ra rủi ro chính: <code>WorkOrderPoleService.Targets</code> so <code>w.SegmentId == p.SegmentId</code> sẽ khớp <code>null == null</code> và
