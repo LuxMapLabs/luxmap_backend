@@ -32,6 +32,25 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Pole_segment_is_optional_on_create_a_required_nullable_key_on_update_and_the_list_has_the_filter()
+    {
+        string?[] Required(string schema) => [.. Schema(schema).GetProperty("required").EnumerateArray().Select(x => x.GetString())];
+
+        Assert.DoesNotContain("segment_id", Required("CreatePoleRequest"));
+        Assert.Contains("segment_id", Required("UpdatePoleRequest"));
+        Assert.True(Schema("UpdatePoleRequest").GetProperty("properties").GetProperty("segment_id").GetProperty("nullable").GetBoolean());
+        Assert.Equal(32, Schema("UpdatePoleRequest").GetProperty("properties").GetProperty("segment_id").GetProperty("maxLength").GetInt32());
+        var created = Schema("CreatePoleRequest").GetProperty("properties").GetProperty("segment_id");
+        Assert.True(created.GetProperty("nullable").GetBoolean());
+        Assert.Contains("OPTIONAL", created.GetProperty("description").GetString());
+
+        var parameters = Spec.GetProperty("paths").GetProperty("/api/v1/assets/poles").GetProperty("get").GetProperty("parameters").EnumerateArray();
+        var filter = Assert.Single(parameters, p => p.GetProperty("name").GetString() == "unassigned_segment");
+        Assert.Equal("query", filter.GetProperty("in").GetString());
+        Assert.Equal("boolean", filter.GetProperty("schema").GetProperty("type").GetString());
+    }
+
+    [Fact]
     public void Work_order_pole_segment_and_position_allow_explicit_null()
     {
         var properties = Schema("WorkOrderPole").GetProperty("properties");

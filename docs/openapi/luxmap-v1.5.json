@@ -3329,6 +3329,13 @@
             }
           },
           {
+            "name": "unassigned_segment",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -3396,7 +3403,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1)",
+        "summary": "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1); unassigned_segment=true chỉ lấy cột CHƯA TUYẾN, lọc trước tổng và phân trang [POLE-SEGMENT-NULL]",
         "operationId": "getAssetsPoles",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -3524,7 +3531,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Tạo cột; 201 + Location, không body",
+        "summary": "Tạo cột; 201 + Location, không body. segment_id vắng hoặc null = cột chưa tuyến [POLE-SEGMENT-NULL]",
         "operationId": "postAssetsPoles",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -3753,7 +3760,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột",
+        "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột. Khoá segment_id BẮT BUỘC (thiếu = 400); null = tháo cột khỏi tuyến [POLE-SEGMENT-NULL]",
         "operationId": "putAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -16254,8 +16261,7 @@
         "required": [
           "commune_id",
           "data_source",
-          "geom_wkt",
-          "segment_id"
+          "geom_wkt"
         ],
         "type": "object",
         "properties": {
@@ -16266,8 +16272,9 @@
           },
           "segment_id": {
             "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "description": "The pole's road segment. OPTIONAL: absent or null creates a pole that is on no segment yet; a blank string is a 400; an id that does not exist (or is out of scope) is a 404.",
+            "nullable": true
           },
           "feeder_id": {
             "maxLength": 32,
@@ -21297,8 +21304,9 @@
           },
           "segment_id": {
             "maxLength": 32,
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "description": "The pole's road segment, or null for a pole that is on no segment yet (POLE-SEGMENT-NULL). The key is REQUIRED: omitting it is a 400, so a form written before this change cannot silently unassign a pole.",
+            "nullable": true
           },
           "feeder_id": {
             "maxLength": 32,

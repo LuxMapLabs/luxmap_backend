@@ -104,9 +104,22 @@ public sealed record CreatePoleRequest
     [MaxLength(64)]
     public string? ExternalRef { get; init; }
 
-    [Required]
+    /// <summary>
+    /// The pole's road segment. OPTIONAL since POLE-SEGMENT-NULL (D-2): absent or <c>null</c> creates a pole that is on no segment yet
+    /// ("chưa phân tuyến"), which surveys do not visit until it is given one. A blank string is a 400, and an id that does not
+    /// exist (or is out of the caller's scope) is a 404 as before.
+    /// </summary>
     [MaxLength(32)]
     public string? SegmentId { get; init; }
+
+    /// <summary>The segment id, or <c>null</c> when the pole has none. Blank is a 400 — never silently read as "no segment".</summary>
+    public string? ReadSegmentId() => SegmentId is { } id && string.IsNullOrWhiteSpace(id)
+        ? throw new LuxMapException(
+            ErrorCodes.ValidationFailed,
+            HttpStatusCode.BadRequest,
+            "segment_id must be a segment id, or null / absent for a pole that is on no segment yet.",
+            new Dictionary<string, object?> { ["field"] = "segment_id" })
+        : SegmentId;
 
     /// <summary>Null for a <c>solar_all_in_one</c> pole — it is on no circuit at all.</summary>
     [MaxLength(32)]
@@ -309,9 +322,29 @@ public sealed record UpdatePoleRequest
     [MaxLength(64)]
     public string? ExternalRef { get; init; }
 
-    [Required]
-    [MaxLength(32)]
-    public string? SegmentId { get; init; }
+    /// <summary>
+    /// The pole's road segment, or <c>null</c> for a pole that is on no segment (POLE-SEGMENT-NULL D-2). A <see cref="JsonElement"/> like
+    /// <c>SetPoleFeederRequest.feeder_id</c>: the KEY is required so a form written before this change cannot silently unassign a pole;
+    /// <c>null</c> is the one way to take a pole off its segment. Read through <see cref="ReadSegmentId"/>.
+    /// </summary>
+    public JsonElement SegmentId { get; init; }
+
+    /// <summary>The segment id, or <c>null</c> to leave the pole on no segment. Throws a 400 when the key was not sent or is not a segment id.</summary>
+    public string? ReadSegmentId() => SegmentId.ValueKind switch
+    {
+        JsonValueKind.Null => null,
+        JsonValueKind.String when SegmentId.GetString() is { Length: > 0 and <= 32 } id && !string.IsNullOrWhiteSpace(id) => id,
+        JsonValueKind.Undefined => throw new LuxMapException(
+            ErrorCodes.ValidationFailed,
+            HttpStatusCode.BadRequest,
+            "segment_id is required. Send null for a pole that is on no segment yet.",
+            new Dictionary<string, object?> { ["field"] = "segment_id", ["reason"] = "missing" }),
+        _ => throw new LuxMapException(
+            ErrorCodes.ValidationFailed,
+            HttpStatusCode.BadRequest,
+            "segment_id must be a segment id (at most 32 characters), or null for a pole that is on no segment.",
+            new Dictionary<string, object?> { ["field"] = "segment_id" }),
+    };
 
     /// <summary>
     /// Null for a <c>solar_all_in_one</c> pole — it is on no circuit at all.

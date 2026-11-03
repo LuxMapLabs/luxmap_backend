@@ -39,12 +39,12 @@ public sealed class AssetCrudService(
 
     public Task<PagedResult<SegmentListItem>> ListSegmentsAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, ct);
+        => ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, null, ct);
 
     public async Task<PagedResult<FeederListItem>> ListFeedersAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
     {
-        var result = await ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, ct);
+        var result = await ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, null, ct);
         var reports = await controls.ControlsAsync([.. result.Items.Select(item => item.FeederId)], ct);
         return result with
         {
@@ -56,10 +56,15 @@ public sealed class AssetCrudService(
         };
     }
 
+    /// <param name="unassignedSegment">
+    /// <c>true</c> keeps only poles that are on no segment (POLE-SEGMENT-NULL D-2); <c>false</c> is no restriction. Applied BEFORE the
+    /// total and the page, so <c>total</c> counts the filtered set. Unrelated to <c>feeders/poles?unassigned=true</c>, which is about circuits.
+    /// </param>
     public async Task<PagedResult<PoleListItem>> ListPolesAsync(
-        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
+        IReadOnlyList<string>? communes, PageRequest page, bool unassignedSegment, CancellationToken ct)
     {
-        var result = await ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, ct);
+        System.Linq.Expressions.Expression<Func<Pole, bool>>? onlyUnassigned = unassignedSegment ? pole => pole.SegmentId == null : null;
+        var result = await ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, onlyUnassigned, ct);
         var window = warranty.Window();
         return result with { Items = [.. result.Items.Select(item => WithWarranty(item, window))] };
     }
@@ -72,7 +77,7 @@ public sealed class AssetCrudService(
     public async Task<PagedResult<CabinetListItem>> ListCabinetsAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
     {
-        var result = await ListAsync(communes, page, (ElectricalCabinet cabinet) => cabinet.CabinetId, CabinetRow, ct);
+        var result = await ListAsync(communes, page, (ElectricalCabinet cabinet) => cabinet.CabinetId, CabinetRow, null, ct);
         var mounted = await devices.DevicesAsync([.. result.Items.Select(item => item.CabinetId)], ct);
 
         return result with
@@ -283,12 +288,19 @@ public sealed class AssetCrudService(
 
     public async Task<string> CreatePoleAsync(CreatePoleRequest request, CancellationToken ct)
     {
+        // First, so a malformed segment_id is a 400 before any lookup (a duplicate ref or a commune outside the scope must not hide it).
+        var segmentId = request.ReadSegmentId();
+
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
         await RejectDuplicateRefAsync<Pole>(communeId, request.ExternalRef, ct);
 
         // Read through the query filter: a segment outside the caller's scope is simply not there,
         // which is the 404 Contract section 7 asks for rather than a 403 that would confirm it exists.
-        await RequireAsync<RoadSegment>(segment => segment.SegmentId == request.SegmentId, "road segment", ct);
+        // No segment (POLE-SEGMENT-NULL D-2) is a legitimate pole; a named one must still exist.
+        if (segmentId is not null)
+        {
+            await RequireAsync<RoadSegment>(segment => segment.SegmentId == segmentId, "road segment", ct);
+        }
 
         await RequireFeederInCommuneAsync(request.FeederId, communeId, ct);
 
@@ -298,7 +310,7 @@ public sealed class AssetCrudService(
         var pole = new Pole
         {
             ExternalRef = request.ExternalRef,
-            SegmentId = request.SegmentId!,
+            SegmentId = segmentId,
             FeederId = request.FeederId,
             FeederSource = feederSource,
             CommuneId = communeId,
@@ -466,12 +478,18 @@ public sealed class AssetCrudService(
     /// </remarks>
     public async Task UpdatePoleAsync(string poleId, UpdatePoleRequest request, CancellationToken ct)
     {
+        // First, so a body that leaves the key out is a 400 before anything is looked up. null = take the pole off its segment.
+        var segmentId = request.ReadSegmentId();
+
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
 
         await RejectDuplicateRefAsync<Pole>(pole.CommuneId, request.ExternalRef, ct, pole.ExternalRef);
 
         // Through the query filter: a segment the caller cannot see is not there, so this is a 404.
-        await RequireAsync<RoadSegment>(segment => segment.SegmentId == request.SegmentId, "road segment", ct);
+        if (segmentId is not null)
+        {
+            await RequireAsync<RoadSegment>(segment => segment.SegmentId == segmentId, "road segment", ct);
+        }
 
         await RequireFeederInCommuneAsync(request.FeederId, pole.CommuneId, ct);
 
@@ -480,7 +498,7 @@ public sealed class AssetCrudService(
             TopologyLink.Read(request.FeederSource, FeederSourceField), FeederSourceField, "feeder_id");
 
         pole.ExternalRef = request.ExternalRef;
-        pole.SegmentId = request.SegmentId!;
+        pole.SegmentId = segmentId;
         TopologyLink.ApplyPoleFeeder(dbContext, pole, request.FeederId, feederSource);
         pole.Geom = Read<Point>(request.GeomWkt);
         pole.NearSensitivePoi = request.NearSensitivePoi;
@@ -898,6 +916,7 @@ public sealed class AssetCrudService(
         PageRequest page,
         System.Linq.Expressions.Expression<Func<TEntity, string>> id,
         System.Linq.Expressions.Expression<Func<TEntity, TItem>> projection,
+        System.Linq.Expressions.Expression<Func<TEntity, bool>>? filter,
         CancellationToken ct)
         where TEntity : class, ICommuneScoped
     {
@@ -906,6 +925,12 @@ public sealed class AssetCrudService(
         if (communes is not null)
         {
             query = query.Where(entity => communes.Contains(entity.CommuneId));
+        }
+
+        // Before the count and the page: `total` is the size of the filtered set.
+        if (filter is not null)
+        {
+            query = query.Where(filter);
         }
 
         // The id's LENGTH, as an expression over the same parameter, so the tiebreaker below can
