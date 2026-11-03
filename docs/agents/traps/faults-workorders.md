@@ -303,5 +303,11 @@ rollback ứng dụng có thể giữ schema cộng thêm, không sửa/xóa aud
   `WorkOrderFault` vẫn giữ cột được giao qua sự cố. Danh sách cột và upload ảnh dùng đúng predicate này, kể cả lượt kiểm lại dưới khoá.
 - Cột chưa tuyến của phiếu xếp **nhóm cuối**, theo `created_at, length(pole_id), pole_id`; `segment_id` và `position` đều null.
   Không cho `position = 0` hay nhét null vào dictionary tuyến. Cột có tuyến vẫn đánh số dọc đường trước khi phân trang.
+- **Sync bundle (PR 2d, D-4):** cột chưa tuyến chỉ vào gói **mặc định**, và chỉ khi phiếu mở của người gọi còn giữ sự cố trên nó (`work_order_fault.released_at IS NULL`); gói
+  nêu `segment_id` thì chỉ đúng các tuyến ấy. Tập cột này tính một chỗ (`SyncBundleService.MyUnassignedPolesAsync`) rồi truyền vào ba nơi đọc (cột, sự cố mở, phiếu) — đừng viết lại điều kiện ở từng nơi.
+  `segment_ids[]` không bao giờ chứa `null`; một phiếu chỉ có việc ở cột chưa tuyến vẫn ra gói với `segment_ids: []`. Ba điều kiện cùng cần và mỗi cái có test riêng:
+  phiếu còn mở (`done` giữ nguyên liên kết sự cố nên chỉ trạng thái phiếu loại được nó — `A_finished_order_stops_packing…`), liên kết chưa giải phóng (`A_released_fault_link_stops_packing…`
+  khi phiếu vẫn mở), và cột phải gắn với việc của CHÍNH người gọi (lấy mọi cột `segment_id IS NULL` của xã làm gói phình và lộ cột của việc người khác —
+  `Without_segments_the_bundle_also_packs_the_unassigned_poles_my_open_orders_hold_faults_on`). Sự cố mở trên cột được đóng gói vào gói như với cột trên tuyến, kể cả sự cố do phiếu người khác giữ.
 - **Để CV-15:** hiện không có writer gom cụm trong `src/`; seed mock không phải pipeline. Khi viết writer `fault_cluster`,
   phải từ chối cột chưa tuyến theo D-8, giữ schema cụm bắt buộc tuyến; không suy tuyến gần nhất, không viết lại cụm/snapshot cũ khi gán tuyến cột.

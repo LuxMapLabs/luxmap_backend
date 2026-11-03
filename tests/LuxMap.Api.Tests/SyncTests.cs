@@ -156,6 +156,138 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
         await ExpectErrorAsync("a", $"{Bundle}?{tooMany}", HttpStatusCode.BadRequest, "VALIDATION_FAILED");
     }
 
+    // ── Bundle: poles with no segment (POLE-SEGMENT-NULL D-4) ───────────────────────────────────────────
+
+    [Fact]
+    public async Task Without_segments_the_bundle_also_packs_the_unassigned_poles_my_open_orders_hold_faults_on()
+    {
+        var held = await UnassignedPoleAsync();
+        var unrelated = await UnassignedPoleAsync();      // same commune, no order of anyone's names it
+        var otherEngineers = await UnassignedPoleAsync();
+        var fault = await UnassignedFaultAsync(held, FaultStatus.Confirmed);
+        var theirFault = await UnassignedFaultAsync(otherEngineers, FaultStatus.Confirmed);
+        var repair = await CreateOrderAsync("repair", users["a"], faults: [fault]);
+        var onRoad = await CreateOrderAsync("inspection", users["a"], road: road1);
+        await CreateOrderAsync("repair", users["b"], faults: [theirFault]);
+        await NoteAsync(held, "Cột chưa có tuyến, gần ngã ba");
+
+        var bundle = await GetAsync("a", Bundle);
+
+        Assert.Equal([road1], Strings(bundle.GetProperty("segment_ids")));   // never null, never a made-up id
+        var poles = bundle.GetProperty("poles").GetProperty("features").EnumerateArray().Select(f => f.GetProperty("properties")).ToArray();
+        // created_at first (the two road poles share a transaction, the unassigned one is later), then width-safe id order.
+        Assert.Equal([.. IdOrder(pole1, pole2), held], poles.Select(p => p.GetProperty("pole_id").GetString()!));
+        var packed = poles.Single(p => p.GetProperty("pole_id").GetString() == held);
+        Assert.Equal(JsonValueKind.Null, packed.GetProperty("segment_id").ValueKind);
+        Assert.Equal("Cột chưa có tuyến, gần ngã ba", packed.GetProperty("note").GetString());
+        Assert.DoesNotContain(poles, p => p.GetProperty("pole_id").GetString() == unrelated);
+        Assert.DoesNotContain(poles, p => p.GetProperty("pole_id").GetString() == otherEngineers);
+        Assert.Equal([fault], bundle.GetProperty("open_faults").EnumerateArray().Select(f => f.GetProperty("fault_id").GetString()!));
+        Assert.Equal(IdOrder(repair, onRoad), IdOrder([.. bundle.GetProperty("work_orders").EnumerateArray()
+            .Select(o => o.GetProperty("work_order_id").GetString()!)]));
+    }
+
+    [Fact]
+    public async Task An_order_whose_only_work_is_an_unassigned_pole_still_makes_a_bundle()
+    {
+        var held = await UnassignedPoleAsync();
+        var fault = await UnassignedFaultAsync(held, FaultStatus.Confirmed);
+        var repair = await CreateOrderAsync("repair", users["a"], faults: [fault]);
+
+        var bundle = await GetAsync("a", Bundle);
+
+        Assert.Empty(bundle.GetProperty("segment_ids").EnumerateArray());
+        Assert.Empty(bundle.GetProperty("segments").GetProperty("features").EnumerateArray());
+        Assert.Equal([held], bundle.GetProperty("poles").GetProperty("features").EnumerateArray()
+            .Select(f => f.GetProperty("properties").GetProperty("pole_id").GetString()!));
+        Assert.Equal([fault], bundle.GetProperty("open_faults").EnumerateArray().Select(f => f.GetProperty("fault_id").GetString()!));
+        Assert.Equal([repair], bundle.GetProperty("work_orders").EnumerateArray().Select(o => o.GetProperty("work_order_id").GetString()!));
+    }
+
+    [Fact]
+    public async Task Named_segments_never_pack_unassigned_poles_or_the_orders_that_hold_only_them()
+    {
+        var held = await UnassignedPoleAsync();
+        var fault = await UnassignedFaultAsync(held, FaultStatus.Confirmed);
+        await CreateOrderAsync("repair", users["a"], faults: [fault]);
+
+        var bundle = await GetAsync("a", $"{Bundle}?segment_id={road1}");
+
+        Assert.Equal([road1], Strings(bundle.GetProperty("segment_ids")));
+        Assert.Equal(IdOrder(pole1, pole2), bundle.GetProperty("poles").GetProperty("features").EnumerateArray()
+            .Select(f => f.GetProperty("properties").GetProperty("pole_id").GetString()!));
+        Assert.Empty(bundle.GetProperty("open_faults").EnumerateArray());
+        Assert.Empty(bundle.GetProperty("work_orders").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_finished_order_stops_packing_its_unassigned_pole_even_though_its_fault_link_is_still_held()
+    {
+        // done waits on the Manager and keeps its fault links; only the order's own status says the engineer is finished.
+        var held = await UnassignedPoleAsync();
+        var fault = await UnassignedFaultAsync(held, FaultStatus.Detected);
+        var order = await CreateOrderAsync("inspection", users["a"], faults: [fault]);
+        Assert.Single((await GetAsync("a", Bundle)).GetProperty("poles").GetProperty("features").EnumerateArray());
+
+        var pushed = await PushAsync("a",
+            Op("work_order_start", new { work_order_id = order, performed_at = DateTime.UtcNow }),
+            Op("work_order_complete", new
+            {
+                work_order_id = order, report_note = "Đã kiểm tra cột chưa phân tuyến",
+                fault_outcomes = new[] { new { fault_id = fault, outcome = "fault_present" } },
+            }));
+        Assert.Empty(pushed.GetProperty("rejected").EnumerateArray());
+        Assert.Empty(pushed.GetProperty("conflicts").EnumerateArray());
+        Assert.Equal(WorkOrderStatus.Done, await Db(db => db.Set<WorkOrder>().IgnoreQueryFilters().Where(w => w.WorkOrderId == order).Select(w => w.WoStatus).SingleAsync()));
+        Assert.Null(await Db(db => db.Set<WorkOrderFault>().IgnoreQueryFilters().Where(l => l.WorkOrderId == order).Select(l => l.ReleasedAt).SingleAsync()));
+
+        var bundle = await GetAsync("a", Bundle);
+        Assert.Empty(bundle.GetProperty("poles").GetProperty("features").EnumerateArray());
+        Assert.Empty(bundle.GetProperty("work_orders").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_released_fault_link_stops_packing_its_unassigned_pole_while_the_order_stays_open()
+    {
+        var held = await UnassignedPoleAsync();
+        var fault = await UnassignedFaultAsync(held, FaultStatus.Confirmed);
+        var onRoad = await CreateOrderAsync("inspection", users["a"], road: road1);
+        var repair = await CreateOrderAsync("repair", users["a"], faults: [fault]);
+        Assert.Contains(held, (await GetAsync("a", Bundle)).GetProperty("poles").GetProperty("features").EnumerateArray()
+            .Select(f => f.GetProperty("properties").GetProperty("pole_id").GetString()));
+
+        await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var link = await db.Set<WorkOrderFault>().IgnoreQueryFilters().SingleAsync(l => l.WorkOrderId == repair);
+            link.ReleasedAt = link.LinkedAt.AddSeconds(1);
+            await db.SaveChangesAsync();
+            return 0;
+        });
+
+        var bundle = await GetAsync("a", Bundle);
+        Assert.Equal(IdOrder(pole1, pole2), IdOrder([.. bundle.GetProperty("poles").GetProperty("features").EnumerateArray()
+            .Select(f => f.GetProperty("properties").GetProperty("pole_id").GetString()!)]));
+        Assert.DoesNotContain(repair, bundle.GetProperty("work_orders").EnumerateArray().Select(o => o.GetProperty("work_order_id").GetString()));
+        Assert.Contains(onRoad, bundle.GetProperty("work_orders").EnumerateArray().Select(o => o.GetProperty("work_order_id").GetString()));
+    }
+
+    [Fact]
+    public async Task A_cancelled_order_stops_packing_its_unassigned_pole()
+    {
+        var held = await UnassignedPoleAsync();
+        var fault = await UnassignedFaultAsync(held, FaultStatus.Confirmed);
+        var repair = await CreateOrderAsync("repair", users["a"], faults: [fault]);
+        Assert.Single((await GetAsync("a", Bundle)).GetProperty("poles").GetProperty("features").EnumerateArray());
+
+        await SendAsync("manager", HttpMethod.Post, $"/api/v1/work-orders/{repair}/cancel", new { note = "Huỷ vì trùng việc" }, HttpStatusCode.OK);
+
+        var bundle = await GetAsync("a", Bundle);
+        Assert.Empty(bundle.GetProperty("poles").GetProperty("features").EnumerateArray());
+        Assert.Empty(bundle.GetProperty("open_faults").EnumerateArray());
+        Assert.Empty(bundle.GetProperty("work_orders").EnumerateArray());
+    }
+
     // ── Push ────────────────────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -196,6 +328,28 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal(WorkOrderStatus.Done, stored.WoStatus);
         Assert.Equal(new DateTime(startedAt.Ticks / 10 * 10, DateTimeKind.Utc), stored.StartedAt);
         Assert.Equal("Cột nghiêng nhẹ", await Db(db => db.Set<Pole>().IgnoreQueryFilters().Where(p => p.PoleId == pole2).Select(p => p.Note).SingleAsync()));
+    }
+
+    [Fact]
+    public async Task A_fault_report_on_an_unassigned_pole_syncs_like_any_other_and_replays()
+    {
+        var pole = await UnassignedPoleAsync();
+        var batch = new[] { Op("fault_report", new { pole_id = pole, fault_type = "lamp_out", note = "Đèn tắt, cột chưa phân tuyến" }) };
+
+        var first = await PushAsync("a", batch);
+        Assert.Empty(first.GetProperty("rejected").EnumerateArray());
+        Assert.Empty(first.GetProperty("conflicts").EnumerateArray());
+        var faultId = first.GetProperty("applied")[0].GetProperty("id").GetString()!;
+        Assert.StartsWith("FAULT-", faultId);
+
+        var stored = await Db(db => db.Set<Fault>().IgnoreQueryFilters().AsNoTracking().SingleAsync(f => f.FaultId == faultId));
+        Assert.Null(stored.SegmentId);
+        Assert.Equal(pole, stored.PoleId);
+        Assert.Equal(home, stored.CommuneId);
+
+        var second = await PushAsync("a", batch);
+        Assert.True(second.GetProperty("applied")[0].GetProperty("replayed").GetBoolean());
+        Assert.Equal(faultId, second.GetProperty("applied")[0].GetProperty("id").GetString());
     }
 
     [Fact]
@@ -404,6 +558,30 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
             new { task_kind = kind, title = "Sync test order", fault_ids = faults, segment_id = road, assigned_to = assignee.UserId }, HttpStatusCode.Created);
         return created.GetProperty("work_order_id").GetString()!;
     }
+
+    private Task<string> UnassignedPoleAsync()
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var pole = new Pole { CommuneId = home, DataSource = DataSource.Simulated, Geom = new Point(108.003, 16.003) { SRID = 4326 } };
+            db.Add(pole);
+            await db.SaveChangesAsync();
+            return pole.PoleId;
+        });
+
+    private Task<string> UnassignedFaultAsync(string poleId, FaultStatus status)
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var fault = new Fault
+            {
+                CommuneId = home, PoleId = poleId, SegmentId = null, FaultStatus = status, FaultType = FaultType.LampOut,
+                Severity = Severity.Medium, SourceChannel = SourceChannel.Cv, DataSource = DataSource.Simulated, DetectedAt = DateTime.UtcNow,
+            };
+            db.Add(fault);
+            await db.SaveChangesAsync();
+            return fault.FaultId;
+        });
 
     private Task NoteAsync(string poleId, string note)
         => SendAsync("a", HttpMethod.Put, $"/api/v1/assets/poles/{poleId}/note", new { note }, HttpStatusCode.OK);

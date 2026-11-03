@@ -11759,7 +11759,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Không có since",
+        "summary": "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Gói mặc định (vắng segment_id) còn kèm cột CHƯA TUYẾN (segment_id null) mà phiếu mở của tôi giữ sự cố, cùng sự cố và phiếu đó; segment_ids không bao giờ chứa null; gói nêu tuyến thì chỉ đúng các tuyến ấy [POLE-SEGMENT-NULL D-4]. Không có since",
         "operationId": "getSyncBundle",
         "x-luxmap-status": "implemented"
       }

@@ -80,11 +80,13 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
     /// <summary>
     /// Every pole on the given segments, in id order — the offline bundle's pole layer (BE-43). Same
     /// properties as the bbox layer, from the same projection; no data_source default and no size limit,
-    /// because the caller named the roads (at most twenty).
+    /// because the caller named the roads (at most twenty). <paramref name="extraPoleIds"/> adds poles that
+    /// stand on no segment (POLE-SEGMENT-NULL D-4); a pole is never pulled in just for having no segment.
     /// </summary>
-    public Task<FeatureCollection<PoleProperties>> PolesOnSegmentsAsync(IReadOnlyCollection<string> segmentIds, CancellationToken ct)
+    public Task<FeatureCollection<PoleProperties>> PolesOnSegmentsAsync(
+        IReadOnlyCollection<string> segmentIds, IReadOnlyCollection<string> extraPoleIds, CancellationToken ct)
         => ProjectPolesAsync(dbContext.Set<Pole>().AsNoTracking()
-            .Where(pole => segmentIds.Contains(pole.SegmentId))
+            .Where(pole => segmentIds.Contains(pole.SegmentId) || extraPoleIds.Contains(pole.PoleId))
             .OrderBy(pole => pole.CreatedAt).ThenBy(pole => pole.PoleId.Length).ThenBy(pole => pole.PoleId), ct);
 
     /// <summary>The given segments, in the order asked — the offline bundle's segment layer (BE-43).</summary>

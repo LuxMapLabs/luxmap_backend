@@ -1213,6 +1213,13 @@ Cabinet topology gặp cột chưa tuyến trả **409 `POLE_SEGMENT_REQUIRED`**
 `SyncPoleProperties.segment_id` nullable theo lớp cha `PoleProperties`; **logic/scope bundle giữ nguyên, thuộc PR 2d**.
 OpenAPI chỉ nới quan hệ đọc cột → tuyến, không nới PK tuyến, phần tử `segment_ids[]` hay request POST/PUT/import.
 
+**PR 2d đã làm: D-4** (03/11/2026, đã chạy test độc lập; Codex hết hạn mức nên review bằng profile `river`). `GET /sync/bundle` **mặc định** (không `segment_id`) kèm các cột
+chưa tuyến mà phiếu mở của kỹ sư còn giữ sự cố (`work_order_fault.released_at IS NULL` **và** phiếu `assigned`/`in_progress` — phiếu `done` giữ liên kết nhưng không còn trong gói), cùng phiếu đó
+và các sự cố MỞ trên những cột đó (như với cột trên tuyến: kể cả sự cố do phiếu người khác giữ, `active_work_order_id` cho biết ai); cột chưa tuyến có `properties.segment_id: null`.
+Không kéo mọi cột chưa tuyến của xã; `segment_ids[]` không bao giờ có `null` (một phiếu chỉ có việc ở cột chưa tuyến vẫn ra gói với `segment_ids: []`); gói **nêu tuyến** chỉ đúng các tuyến ấy.
+**Không thêm trường metadata mới:** gói vẫn là bản chụp đầy đủ, client thay cache; cột được gán tuyến thì lần sau nằm dưới tuyến, phiếu đổi người/đóng thì cột rời gói.
+**Chờ WP6 xác nhận** quy tắc thay cache (cột `segment_id: null` thay cùng phần còn lại) trước khi coi D-4 xong với client. `/sync/push` không đổi hành vi (đã THÊM test: `fault_report` cho cột chưa tuyến vào bình thường và replay đúng).
+
 | Mã | Quyết định |
 |---|---|
 | D-1 | Phiếu inspection/repair: vẫn hiện cột mang sự cố của phiếu; cột chưa tuyến có `segment_id: null`, `position: null`, xếp nhóm cuối theo `created_at, length(pole_id), pole_id`. **Chặn `null == null`** ở `WorkOrderPoleService.Targets` (`w.SegmentId == p.SegmentId`). Cùng predicate cho danh sách và ảnh. Survey không nhận cột chưa tuyến |

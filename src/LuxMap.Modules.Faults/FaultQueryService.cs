@@ -94,14 +94,17 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
     /// <summary>
     /// Every OPEN fault (<c>FaultStatusSets.Open</c>) on the given segments or on a pole standing on them, in
     /// the list's default order — the offline bundle's fault list (BE-43). No data_source default: the caller
-    /// named the roads, rig roads included.
+    /// named the roads, rig roads included. <paramref name="extraPoleIds"/> adds the open faults of poles that
+    /// stand on no segment (POLE-SEGMENT-NULL D-4).
     /// </summary>
-    public async Task<FaultItem[]> OpenOnSegmentsAsync(IReadOnlyCollection<string> segmentIds, CancellationToken ct)
+    public async Task<FaultItem[]> OpenOnSegmentsAsync(
+        IReadOnlyCollection<string> segmentIds, IReadOnlyCollection<string> extraPoleIds, CancellationToken ct)
     {
         FaultStatus[] open = [.. FaultStatusSets.Open];
         var poles = db.Set<Pole>().Where(pole => segmentIds.Contains(pole.SegmentId)).Select(pole => pole.PoleId);
         var faults = db.Set<Fault>().AsNoTracking().Where(fault => open.Contains(fault.FaultStatus)
-            && ((fault.SegmentId != null && segmentIds.Contains(fault.SegmentId)) || (fault.PoleId != null && poles.Contains(fault.PoleId))));
+            && ((fault.SegmentId != null && segmentIds.Contains(fault.SegmentId))
+                || (fault.PoleId != null && (poles.Contains(fault.PoleId) || extraPoleIds.Contains(fault.PoleId)))));
         var rows = await Order(Locate(faults), FaultSort.Default).ToListAsync(ct);
         return await ToItemsAsync(rows, ct);
     }
