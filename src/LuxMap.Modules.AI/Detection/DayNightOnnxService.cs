@@ -1,4 +1,8 @@
 using System.Net;
+using System.Text;
+using System.Text.Json;
+using LuxMap.Modules.Survey.Processing.Frames;
+using LuxMap.Shared.Serialization;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using LuxMap.Infrastructure.Storage;
@@ -13,10 +17,13 @@ using SixLabors.ImageSharp.Processing;
 
 namespace LuxMap.Modules.AI.Detection;
 
-public sealed record DayNightResult(string Classification, float Confidence);
+public enum DayNightClassification { Day, Night, Unknown }
+
+public sealed record DayNightResult(DayNightClassification Classification, float Confidence);
 
 public interface IDayNightClassifier
 {
+    MediaArtifact Artifact { get; }
     Task<DayNightResult> ClassifyAsync(Stream jpeg, CancellationToken ct);
 }
 
@@ -40,15 +47,15 @@ public sealed partial class DayNightOnnxService : IDayNightClassifier, IDisposab
         var path = Path.IsPathRooted(options.ModelPath) ? options.ModelPath : Path.Combine(AppContext.BaseDirectory, options.ModelPath);
         if (!File.Exists(path))
         {
-            throw new InvalidOperationException($"{DayNightOptions.SectionName}:ModelPath â€” no model at {path}.");
+            throw new InvalidOperationException($"{DayNightOptions.SectionName}:ModelPath - no model at {path}.");
         }
 
         var bytes = File.ReadAllBytes(path);
-        Sha256 = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        if (options.ModelSha256 is { Length: > 0 } pinned && !string.Equals(pinned, Sha256, StringComparison.OrdinalIgnoreCase))
+        var modelSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        if (options.ModelSha256 is { Length: > 0 } pinned && !string.Equals(pinned, modelSha256, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"{DayNightOptions.SectionName}:ModelSha256 pins {pinned}, but {path} is {Sha256}. A model change must change the pin too.");
+                $"{DayNightOptions.SectionName}:ModelSha256 pins {pinned}, but {path} is {modelSha256}. A model change must change the pin too.");
         }
 
         session = new InferenceSession(bytes);
@@ -62,11 +69,28 @@ public sealed partial class DayNightOnnxService : IDayNightClassifier, IDisposab
             throw;
         }
 
+        var metadata = JsonSerializer.Serialize(new
+        {
+            provider = "onnxruntime",
+            model_sha256 = modelSha256,
+            classes = new Dictionary<int, string> { [0] = "day", [1] = "night" },
+            input_shape = new[] { 1, 3, InputSize, InputSize },
+            output_shape = new[] { 1, 2 },
+            resize = "shortest_edge_224_bilinear_triangle_no_compand_floor_dimensions",
+            crop = "center_224_round_to_even",
+            mean = new[] { 0, 0, 0 },
+            std = new[] { 1, 1, 1 },
+            exif_orientation = true,
+            confidence_threshold = options.ConfidenceThreshold,
+            unknown_rule = "tie_or_max_probability_below_threshold",
+        }, LuxMapJsonOptions.Default);
+        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(metadata)));
+        Artifact = new MediaArtifact("daynight-" + hash[..16], hash, metadata);
         gate = new SemaphoreSlim(options.MaxConcurrency);
     }
 
-    /// <summary>SHA-256 of the model file actually loaded.</summary>
-    public string Sha256 { get; }
+    /// <summary>Identity of the model and its inference settings.</summary>
+    public MediaArtifact Artifact { get; }
 
     public DayNightOptions Options => options;
 
@@ -147,13 +171,13 @@ public sealed partial class DayNightOnnxService : IDayNightClassifier, IDisposab
         gate.Dispose();
     }
 
-    public static string Classify(float day, float night, float threshold)
+    public static DayNightClassification Classify(float day, float night, float threshold)
     {
         if (!float.IsFinite(day) || !float.IsFinite(night) || day < 0 || night < 0
             || day > 1 || night > 1 || Math.Abs(day + night - 1) > 0.001f)
             throw new InvalidOperationException("Day/night output must contain two softmax probabilities.");
-        if (day == night || Math.Max(day, night) < threshold) return "unknown";
-        return day > night ? "day" : "night";
+        if (day == night || Math.Max(day, night) < threshold) return DayNightClassification.Unknown;
+        return day > night ? DayNightClassification.Day : DayNightClassification.Night;
     }
 
     // Ultralytics classify_transforms: shortest-edge resize, center crop, RGB / 255;

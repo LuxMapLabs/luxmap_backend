@@ -1463,6 +1463,7 @@
         "tags": [
           "Ai"
         ],
+        "summary": "[Web] [TẠM — AI-1] Gate ngày/đêm cho API thử tay: union day/unknown/night có confidence_percent và daynight_model_version; chỉ night kèm YOLO; không ghi DB",
         "requestBody": {
           "content": {
             "multipart/form-data": {
@@ -1489,7 +1490,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
+                  "oneOf": [
                     {
                       "$ref": "#/components/schemas/AiDetectResponse"
                     },
@@ -1566,8 +1567,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
-        "x-luxmap-client": "shared",
-        "summary": "[TẠM — AI-1] Phân loại JPEG: day/unknown trả object kèm confidence_percent; night kèm classification/confidence_percent và kết quả YOLO normal/out, bbox; không ghi gì",
+        "x-luxmap-client": "web",
         "operationId": "postAiDetect",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift AI-1 (SELF-SIGNED, nền tạm tới FW)"
@@ -14844,25 +14844,34 @@
       "AiClassificationResponse": {
         "required": [
           "classification",
-          "confidence_percent"
+          "confidence_percent",
+          "daynight_model_version"
         ],
         "type": "object",
         "properties": {
           "classification": {
+            "enum": [
+              "day",
+              "unknown"
+            ],
             "type": "string"
           },
           "confidence_percent": {
-            "type": "number",
-            "format": "double"
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "daynight_model_version": {
+            "type": "string"
           }
-        },
-        "additionalProperties": false
+        }
       },
       "AiDetectResponse": {
         "required": [
           "classification",
           "confidence_percent",
           "count",
+          "daynight_model_version",
           "detections",
           "height",
           "model_version",
@@ -14871,11 +14880,18 @@
         "type": "object",
         "properties": {
           "classification": {
+            "enum": [
+              "night"
+            ],
             "type": "string"
           },
           "confidence_percent": {
-            "type": "number",
-            "format": "double"
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "daynight_model_version": {
+            "type": "string"
           },
           "model_version": {
             "type": "string"
@@ -14898,8 +14914,7 @@
               "$ref": "#/components/schemas/DetectionResult"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ApiError": {
         "type": "object",
@@ -16569,6 +16584,14 @@
           "public_imagery",
           "calibration_rig",
           "simulated"
+        ],
+        "type": "string"
+      },
+      "DayNightClassification": {
+        "enum": [
+          "day",
+          "night",
+          "unknown"
         ],
         "type": "string"
       },

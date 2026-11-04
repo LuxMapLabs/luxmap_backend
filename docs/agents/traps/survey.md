@@ -158,3 +158,12 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
   registry — app chạy offline, không biết id của server. Ý nghĩa hai id số chưa chốt với WP6.
 - **`AlterColumn` sang NOT NULL trên bảng bất biến** sinh `UPDATE … WHERE … IS NULL` trước — trigger statement-level chặn kể cả 0 dòng. Dùng
   `ALTER TABLE … SET NOT NULL` trần sau khi đã chứng minh không còn NULL (`AddVersionTraceability.Down`).
+
+## AI-DAYNIGHT — gate thử tay (03/11/2026)
+
+- DayNightOnnxService chỉ gate `/ai/detect`, không gate survey/Citizen/ảnh cột. Model có day/night;
+  unknown là abstention, không phải OOD. Day/unknown không resolve YOLO.
+- Ba nhánh đều có classification, confidence_percent, daynight_model_version; chỉ night có các trường YOLO.
+- MediaArtifact băm model + mapping + preprocessing + threshold/unknown rule. Endpoint không ghi DB.
+- Shape HTTP kiểm bằng stub classifier; thứ tự lớp kiểm riêng bằng JPEG fixture với model thật.
+  Không rẽ nhánh assert theo output model thật. Drift AI-DAYNIGHT là nền tạm tới FW.

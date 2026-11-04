@@ -33,6 +33,7 @@ public sealed class AiController(IDayNightClassifier dayNight) : ControllerBase
     /// day/unknown object with confidence_percent without YOLO; night includes classification confidence and lamp detections.
     /// </summary>
     [HttpPost("detect")]
+    [ClientSurface(ClientSurface.Web)]
     [Authorize(Policy = LuxMapPolicies.ReviewSurveys)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxUploadBytes)]
@@ -51,10 +52,11 @@ public sealed class AiController(IDayNightClassifier dayNight) : ControllerBase
         await using var buffer = new MemoryStream();
         await image.CopyToAsync(buffer, ct);
         var classification = await dayNight.ClassifyAsync(buffer, ct);
-        if (classification.Classification != "night")
+        if (classification.Classification != DayNightClassification.Night)
             return Ok(new AiClassificationResponse
             {
                 Classification = classification.Classification,
+                DaynightModelVersion = dayNight.Artifact.Version,
                 ConfidencePercent = Math.Round(classification.Confidence * 100d, 2),
             });
 
@@ -66,6 +68,7 @@ public sealed class AiController(IDayNightClassifier dayNight) : ControllerBase
         return Ok(new AiDetectResponse
         {
             Classification = classification.Classification,
+            DaynightModelVersion = dayNight.Artifact.Version,
             ConfidencePercent = Math.Round(classification.Confidence * 100d, 2),
             ModelVersion = detector.Artifact.Version,
             Width = result.Width,

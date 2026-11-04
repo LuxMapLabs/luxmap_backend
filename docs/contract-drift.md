@@ -1299,9 +1299,9 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 
 | Mã | Quyết định | Chạm API |
 |---|---|---|
-| **AI-1** | `POST /api/v1/ai/detect` (multipart, trường `image`) → `{model_version, width, height, count, detections[]{class_id, class_name: normal \| out, confidence, bounding_box{x1, y1, x2, y2, width, height}}}` — bbox **pixel** của ảnh đã xoay theo EXIF. Chỉ **Quản lý** (`ReviewSurveys`); JPEG theo magic bytes, khác → **415 `UNSUPPORTED_IMAGE_FORMAT`**; thiếu file → 400; > 40 MP → 400. Route không phiên bản `/api/ai/...` của #118 **bỏ**. Endpoint chỉ để thử model bằng tay — **không ghi gì** | Có (endpoint mới) |
+| **AI-1** | `POST /api/v1/ai/detect` (multipart, trường `image`) → `{model_version, width, height, count, detections[]{class_id, class_name: normal \| out, confidence, bounding_box{x1, y1, x2, y2, width, height}}}` — **response superseded by AI-DAYNIGHT**; bbox **pixel** của ảnh đã xoay theo EXIF. Chỉ **Quản lý** (`ReviewSurveys`); JPEG theo magic bytes, khác → **415 `UNSUPPORTED_IMAGE_FORMAT`**; thiếu file → 400; > 40 MP → 400. Route không phiên bản `/api/ai/...` của #118 **bỏ**. Endpoint chỉ để thử model bằng tay — **không ghi gì** | Có (endpoint mới) |
 | **AI-2** | Cùng model là **detector của pipeline khảo sát** khi `SurveyProcessing:Frames:Detector = yolo` (BE-15 §6): `normal → on`, `out → off` (CV chỉ quyết ON/OFF — Phiếu v1.4), bbox chuẩn hoá top-left. `artifact_version` = băm của **file model + ngưỡng + tiền xử lý + ánh xạ lớp** ⇒ đổi ngưỡng là phiên bản mới (BE-34). Mặc định vẫn `unconfigured` | Không |
-| **AI-3** | Model `best.onnx` (10,6 MB) **nằm trong git tạm**, ghim SHA-256 ở `Ai:ModelSha256` — file khác mã ghim ⇒ không khởi động. Chuyển LFS / MinIO khi đổi model lần đầu | Không |
+| **AI-3** | Cả `best.onnx` và `daynight.onnx` nằm trong git tạm, ghim SHA-256 lần lượt ở `Ai:ModelSha256` và `Ai:DayNight:ModelSha256`; sai pin từ chối nạp model khi dùng lần đầu. Chuyển LFS / MinIO là follow-up | Không |
 
 **Phải báo:** người viết #118 (vì sao đổi), WP4 (ánh xạ lớp normal/out → on/off, ngưỡng 0.25 / 0.45, resize bilinear — cần mẫu chuẩn để đối chiếu với Ultralytics), WP5 (endpoint thử model chỉ cho Quản lý).
 
@@ -1720,44 +1720,25 @@ WP5 / WP6 chưa xác nhận, nền tạm tới FW kế tiếp. Im lặng 3 ngày
 | CR-7 | Giao lại kèm ngày khác (Mỹ yêu cầu 26/10, nhánh 1a của luồng duyệt): `PUT /assignee` nhận thêm `scheduled_date` / `due_date` tuỳ chọn, atomic với đổi người, một audit `reassigned`. Ngày sai hoặc kèm bỏ giao → 400, không đổi gì. Cùng người + ngày thật đổi = dời lịch (`details_changed`, `rescheduled`, reset yêu cầu). Chỉ thêm; không migration; Contract **v1.20** `SELF-SIGNED`, WP5 xác nhận ở FW kế tiếp |
 
 
-## AI-DAYNIGHT — gate ngày/đêm cho API thử ảnh (02/11/2026)
+## AI-DAYNIGHT — gate ngày/đêm cho API thử ảnh (03/11/2026)
 
-- **Decision:** người dùng xác nhận trong task: `day` → JSON string `"day"`, confidence thấp →
-  JSON string `"unknown"`; `night` → response YOLO hiện hành, không đổi DTO detection.
-- **Decision maker:** người yêu cầu tích hợp, xác nhận trực tiếp trong task ngày 02/11/2026.
-- **Date:** 02/11/2026.
-- **Scope:** chỉ `POST /api/v1/ai/detect`, giữ policy ReviewSurveys và JPEG-only. Không đổi detector
-  khảo sát, Citizen hoặc ảnh cột. AI-1 vẫn là endpoint nền tạm; cần thông báo consumer về union response 200.
-- Model `daynight.onnx`: float32 `images[1,3,224,224]` → `output0[1,2]`, metadata
-  `{0: 'day', 1: 'night'}`, đầu ra đã Softmax. Không có lớp unknown; unknown là backend abstention
-  nếu xác suất lớn nhất < `Ai:DayNight:ConfidenceThreshold` (mặc định 0.7), hoặc hòa điểm.
-- Không coi unknown là bộ phát hiện ảnh ngoài phân phối: model hai lớp vẫn có thể tự tin trên ảnh không phù hợp.
-- Tiền xử lý theo training mặc định YOLO11n-cls do người dùng cung cấp và `classify_transforms` của Ultralytics:
-  RGB, resize cạnh ngắn 224 bilinear, center crop 224, chia 255, mean=0/std=1. ImageSharp không được
-  khẳng định bit-identical với Pillow; chưa có ảnh/reference tensor từ notebook để đo parity số học.
-- Nguồn tra pipeline: https://raw.githubusercontent.com/ultralytics/ultralytics/main/ultralytics/data/augment.py
-  (đã tra 02/11/2026; tag 8.4.198 ghi trong metadata chưa lấy được qua công cụ web).
-
-
-### AI-DAYNIGHT-PERCENT (02/11/2026)
-
-Người dùng yêu cầu trực tiếp bổ sung phần trăm cho nhánh day: HTTP 200 JSON
-`{"classification":"day","confidence_percent":99.56}`. Confidence là xác suất softmax
-của lớp day nhân 100, làm tròn hai chữ số thập phân; không phải độ chính xác trên tập test.
-Nhánh unknown vẫn JSON string; night giữ AiDetectResponse. Chỉ áp POST /api/v1/ai/detect.
-
-
-### AI-DAYNIGHT-UNKNOWN-PERCENT (02/11/2026)
-
-Theo yêu cầu trực tiếp của người dùng, unknown cũng trả object như day:
-`{"classification":"unknown","confidence_percent":62.35}`. Giá trị là max(P(day), P(night))
-nhân 100, làm tròn hai chữ số; không phải xác suất của lớp unknown (model không có lớp này).
-Thay thế nhánh unknown dạng chuỗi của AI-DAYNIGHT-PERCENT; night không đổi.
-
-
-### AI-DAYNIGHT-NIGHT-PERCENT (02/11/2026)
-
-Người dùng yêu cầu nhánh night cũng trả classification và confidence_percent từ model ngày/đêm,
-đồng thời giữ model_version, width, height, count, detections của YOLO. Phần trăm cấp response
-là P(night) nhân 100 làm tròn hai chữ số; confidence bên trong từng detection vẫn là score YOLO
-0..1. Day/unknown không đổi. OpenAPI dùng anyOf vì schema object nhỏ là tập con của object night.
+- **Decision:** gate chỉ áp cho endpoint thử tay `POST /api/v1/ai/detect`. `day` và `unknown` trả
+  `{classification, confidence_percent, daynight_model_version}`; `night` có thêm `model_version`,
+  `width`, `height`, `count`, `detections` của YOLO. Day/unknown không có các trường YOLO, kể cả null/[];
+  night có `detections: []` nghĩa là YOLO đã chạy nhưng không tìm thấy đèn.
+- **Decision maker:** **Mỹ**, ngày chốt **03/11/2026**.
+- **Chạm API:** Có: response 200 của `POST /ai/detect` đổi thành union. OpenAPI `oneOf` với hai schema
+  có enum classification rời nhau `[day, unknown]` và `[night]`; confidence_percent giới hạn 0..100.
+- **Nền:** **SELF-SIGNED, nền tạm tới FW**. Không đổi version Contract.
+- **Consumer cần báo:** WP5 (web). WP6 và WP4 không dùng endpoint này theo AI-1.
+- Model float32 `[1,3,224,224]` → `[1,2]`, metadata `{0: 'day', 1: 'night'}`, output đã softmax.
+  Unknown là backend abstention khi max(P(day),P(night)) dưới ngưỡng 0.7 (cấu hình trong khoảng mở 0..1)
+  hoặc hòa điểm; không phải lớp model hay bộ phát hiện ảnh ngoài phân phối.
+- `confidence_percent` là max(P(day),P(night)) × 100, làm tròn hai chữ số, không phải độ chính xác tập test.
+  Confidence của từng detection vẫn là score YOLO 0..1.
+- `daynight_model_version` lấy từ MediaArtifact băm model SHA-256, class mapping, input/output shape,
+  tiền xử lý và ngưỡng/quy tắc unknown. Đổi ngưỡng là đổi version. `model_version` ở night vẫn là YOLO.
+- Tiền xử lý: xoay EXIF, RGB /255, resize cạnh ngắn 224 bilinear, center crop224, mean=0/std=1.
+  Kiểm shape/class metadata khi nạp. Không khẳng định ImageSharp bit-identical với Pillow.
+- Endpoint **không ghi DB**, không đăng ký artifact_version. Policy ReviewSurveys và JPEG-only giữ nguyên.
+  **Pipeline khảo sát KHÔNG đổi**; Citizen và ảnh cột cũng không qua gate này.

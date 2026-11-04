@@ -24,7 +24,8 @@ public sealed record DayNightOptions
 
     public void Validate()
     {
-        if (!float.IsFinite(ConfidenceThreshold) || ConfidenceThreshold is < 0 or > 1
+        if (!float.IsFinite(ConfidenceThreshold) || ConfidenceThreshold is <= 0 or >= 1
+            || (ModelSha256 is not null && (ModelSha256.Length != 64 || !ModelSha256.All(Uri.IsHexDigit)))
             || MaxConcurrency is < 1 or > 16 || MaxPixels <= 0 || string.IsNullOrWhiteSpace(ModelPath))
         {
             throw new InvalidOperationException($"Invalid {SectionName} options.");
