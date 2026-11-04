@@ -222,3 +222,30 @@ Codex (`-p river`, chỉ đọc) review bản này; toàn văn ở scratchpad ph
 - **D-8:** loại khỏi thống kê hiện trường theo **cả** `capture_config = not_verified` **và** `data_source != field`.
 - **D-12:** thêm trần orphan theo user/ngày; mobile không retry vô hạn với 400/415.
 - **Ba mục Mỹ nên cân kỹ nhất (theo Codex, tôi đồng ý):** D-4 (luật sai tạo `lamp_out` Confirmed giả), D-1 (đổi sau migration/drift/WP5-6 là đắt nhất), D-3 (ngân sách thời gian chưa đo).
+
+## Số liệu clip thật (04/11/2026) — 15 file iPhone trong `Videos/` (chỉ đọc, `ffprobe`/`ffmpeg`)
+
+Lệnh: `ffprobe -show_entries stream=…,format=…` cho từng file; độ sáng bằng `ffmpeg -skip_frame nokey -vf scale=160:-2,signalstats` (chỉ keyframe, `YAVG`/1023 cho 10-bit). Frame mẫu: trích tại 60% thời lượng, xem bằng mắt. `IMG_0458(1).MOV` là bản sao byte-giống `IMG_0458.MOV` (cùng 261 438 540 B). **Đây là clip quay khảo sát đường bằng iPhone (tháng 9), không phải clip "một đèn"**; chỉ ba clip ngắn gần với hình dạng của tính năng này.
+
+| File | Thời lượng | MB | Codec / fps | Bitrate |
+|---|---|---|---|---|
+| `IMG_0464` | 1,9 s | 1,7 | HEVC 30 | 7,3 Mbps |
+| `IMG_0457` | 4,2 s | 7,6 | HEVC 30 | 15,2 |
+| `IMG_5757` | 5,1 s | 10,2 | HEVC 60 | 16,8 |
+| `IMG_0463` / `0459` / `0462` / `0465` | 35–45 s | 67–88 | HEVC 30 | 14–17 |
+| `export`, `export 2` | 39 s, 75 s | 22,7; 44,8 | H.264 30 | 5,0 |
+| `IMG_0467` / `0466` | 83 s / 85 s | 168 / 106 | HEVC 24 / **120** | 17,1 / 10,5 |
+| `IMG_0458`, `0460` | 148 s | 249 | HEVC 30 | 14,1 |
+| `IMG_0461` | **372 s** | **764** | HEVC 30 | 17,2 |
+
+**Phát hiện ảnh hưởng thiết kế:**
+
+1. **Độ dài.** 11/15 clip dài 35–372 s, vượt trần 30 s đề xuất; `IMG_0461` (764 MB) còn vượt cả trần 300 MiB của sweep (`SurveyIngestService.ClipLimit`). Các clip ngắn thật chỉ **1,9 / 4,2 / 5,1 s** — **cả ba thấp hơn sàn 6 s** mà bản đối chiếu Codex đề xuất (cộng "bỏ 2 s đầu" thì còn < 4 s). Sàn 6 s phải hạ (đề xuất tạm 3 s) hoặc bỏ luật "bỏ 2 s đầu" cho clip ngắn.
+2. **HDR.** 12/12 clip iPhone là **HEVC Main 10, HLG (`arib-std-b67`), BT.2020, `yuv420p10le`, có side data**; chỉ hai file `export*` là SDR H.264 (BT.709). D-R24 yêu cầu **tắt HDR**, và R-3 đã bỏ kiểm cấu hình quay ⇒ clip HDR **sẽ** vào hệ thống. `FfmpegFrameExtractor` ép `-pix_fmt yuvj420p` không có bước ánh xạ tông (`:150`); ffmpeg Homebrew trên máy này **không có `zscale`** nên tôi không dựng được ảnh đối chứng đã tone-map. Frame ép thẳng vẫn nhìn bình thường bằng mắt, nhưng **chưa biết YOLO phản ứng ra sao** với HLG bị coi như SDR. ⇒ thêm vào Pha 2: kiểm `color_transfer`/`pix_fmt` bằng ffprobe và (a) từ chối, (b) ghi `hdr = true` vào snapshot, hoặc (c) tone-map khi VPS có `zscale` (chưa kiểm). Cần Mỹ chọn → **D-14**.
+3. **Cổng "ban ngày" 0,45 chạm vào cảnh đêm.** Độ sáng keyframe trung vị 0,13–0,37 (đều là đêm), nhưng **tối đa** theo keyframe đạt **0,47** (`IMG_0457`), 0,49 (`IMG_0461`), 0,43 (`IMG_0458`) — ngưỡng `Citizen:DaylightMeanLuma = 0,45` (`YoloSingleLampPhotoHinter.cs:19,47`) có thể loại frame cảnh đêm có đèn sáng gần ống kính. Điều Codex nêu cho chạng vạng xảy ra **cả ban đêm**. (Xấp xỉ: 160 px, keyframe, chưa qua đúng đường thumbnail của server.) ⇒ ảnh hưởng thẳng `decided ≥ 0,6×sampled`.
+4. **Khung hình không phải "một đèn ở giữa".** Ba frame mẫu: (a) `IMG_0457` phố có nhà cao tầng, đèn đường nhỏ ở mép trái, nhiều đèn cửa sổ và đèn xe; (b) `IMG_5757` gần như tối hoàn toàn, **không thấy đèn**; (c) `IMG_0464` quầng sáng đèn ở **góc trên trái**, sát mép. ⇒ cổng không gian "tâm box ở 50% giữa khung" của Codex sẽ **loại đúng trường hợp (c)**; và (b) cho thấy cần mã lý do `NO_LAMP`. Không có clip nào trong bộ này là một đèn rõ nét, nên **không thể dùng bộ này để chốt ngưỡng đồng thuận** (D-4).
+5. **Định dạng:** cả 15 file là `qt  ` (QuickTime MOV của iPhone), xoay `-90` (dọc) hoặc `-180` (hai file `export`). Extractor đã xử lý bội số 90 và đổi width/height (`FfmpegFrameExtractor.cs:98-103`); sampler mới phải giữ nguyên. Chưa có clip **Android MP4** nào — mục "chưa kiểm chứng" ở trên vẫn đúng.
+6. **Tốc độ khung thay đổi:** 24 / 30 / 60 / 120 fps. Lấy mẫu phải theo **thời gian (PTS)**, không theo chỉ số frame; extractor hiện chọn theo PTS thật (`SelectFrames`, `:185-197`) — giữ cách đó.
+7. **Dung lượng:** 15 file ≈ 4,4 GB cho ~30 phút hình (ở bitrate 14–17 Mbps). Khớp ước tính p1 (≈ 1,9 MB/s): ổ 40 GB của VPS đầy sau khoảng 5–6 giờ quay nếu giữ nguyên tất cả — cap 30 s/clip là cần thiết, không phải tuỳ chọn.
+
+**D-14 (mới):** clip HDR HLG 10-bit — từ chối / chấp nhận có cờ `hdr` / tone-map. Khuyến nghị: **chấp nhận và ghi cờ** ở Pha 2 đầu tiên (không chặn kỹ sư vì cấu hình mặc định của iPhone là HDR), kèm một việc đo: so YOLO trên cùng frame có và không tone-map khi có `zscale`; tới khi đo xong, loại clip `hdr` khỏi thống kê hiện trường như D-8.
