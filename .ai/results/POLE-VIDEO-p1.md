@@ -22,7 +22,7 @@ Nền: `origin/dev` @ `c0f4a03`. R-1…R-4 là quyết định của Mỹ (04/11
 | Quyền, người được giao, `in_progress`, tập cột WO-12 | **Có, nguyên** | `WorkOrderPolePhotoService.cs:33-54` (`Order`, `Target`, `Writable`); `WorkOrderPoles.cs:79-83` (`Targets`) |
 | Idempotency `(uploaded_by, client_op_id)` | **Có** | unique `ux_pole_photo_user_operation` ở `WorkOrderPolePhotoConfiguration.cs:45`; replay `WorkOrderPolePhotoService.cs:89-98` |
 | Review của kỹ sư (`PATCH …/review`) và quyết định Quản lý (`POST …/decision`) | **Có, nguyên** — chúng chỉ đọc `cv_state/final_cv_state` của dòng ảnh | `WorkOrderPolePhotoService.cs:186-214`, `216-248`; controller `WorkOrderPolePhotosController.cs:75-90` |
-| Công bố trạng thái cột + tạo `lamp_out` | **Có, nguyên** | `ReviewedPolePhotoPublisher.cs:20-85`, đăng ký `SurveyModule.cs:39`. `fault.origin_pole_photo_id` là FK ghép tới **dòng ảnh** (`WorkOrderPolePhotoConfiguration.cs:54-57`, CHECK `ck_fault_pole_photo_source`) — nên dòng ảnh **phải tồn tại**, đây là lý do chọn D-1 |
+| Công bố trạng thái cột + tạo `lamp_out` | **Có, nguyên** | `ReviewedPolePhotoPublisher.cs:20-78`, đăng ký `SurveyModule.cs:39`. `fault.origin_pole_photo_id` là FK ghép tới **dòng ảnh** (`WorkOrderPolePhotoConfiguration.cs:54-57`, CHECK `ck_fault_pole_photo_source`) — nên dòng ảnh **phải tồn tại**, đây là lý do chọn D-1 |
 | Gợi ý AI một đèn | **Có, gọi theo từng frame** | `ISingleLampPhotoHinter.HintAsync(photo, thumbnail)` (`SingleLampPhotoHints.cs:7-10`); luật: đúng 1 detection, ảnh không quá sáng ⇒ on/off + confidence, ngoài ra `inconclusive` (`YoloSingleLampPhotoHinter.cs:44-58`) |
 | Đọc JPEG + sinh thumbnail | **Có** | `images.ReadAsync(buffer, MaxUploadBytes, MaxPixels)` (`WorkOrderPolePhotoService.cs:102`) cho frame đại diện |
 | Upload thân thô stream sang S3, kiểm hash/`ftyp` | **Có (khuôn)** | `SweepsController.cs:31-40`; `SurveyIngestService.cs:108-130`; `MultipartUpload.cs:42` (`ftyp` ở byte 4–8) |
@@ -47,13 +47,13 @@ Mỗi frame đi qua hinter ⇒ `on | off | inconclusive`. Đề xuất (con số
 3. Nhãn đa số trong `decided`; nếu **tỉ lệ đồng thuận < 0,7 ⇒ `inconclusive`** (đèn nhấp nháy hoặc detector lẫn).
 4. `confidence` = **trung vị** confidence của các frame đồng thuận (không lấy max — một frame tốt không đủ để tin cả clip).
 5. `inconclusive` ⇒ `confidence = null` (khớp `ck_pole_photo_ai`, `YoloSingleLampPhotoHinter.cs:47`).
-6. `artifact_version` = `<artifact hinter>;pv-<hash 12 ký tự của bộ tham số trên>`, theo cách `cq-` đã làm (`YoloSingleLampPhotoHinter.cs:82`), để đổi tham số là đổi phiên bản và tái lập được (BE-34).
+6. `model_version` = của hinter (CHECK `ck_pole_photo_ai` đòi non-blank); `artifact_version` = `<artifact hinter>+pv-<hash 12 ký tự của MỌI tham số: fps, max frame, bỏ đầu, decided tối thiểu, ngưỡng đồng thuận>`, đúng dạng `{version}+{rules}` ở `YoloSingleLampPhotoHinter.cs:31,82`, để đổi tham số là đổi phiên bản và tái lập được (BE-34).
 
 Không viết luật on/off thứ hai: nhãn từng frame **chính là** luật ảnh của Citizen/PP.
 
 ## 3. Lưu gì, giữ gì (liên quan câu "mỗi video giữ vài ảnh")
 
-- **Clip gốc**: bucket `luxmap-video`, nguyên byte, key `pole-videos/{photo_id}/{sha256}.mp4` (hash trong key như sweep, `SurveyIngestService.cs:119`). Giữ theo D-R16.
+- **Clip gốc**: bucket `luxmap-video`, nguyên byte, key `pole-videos/{work_order_id}/{client_op_id}/{sha256}.mp4` (khoá theo yêu cầu + hash, ổn định khi retry — **không** dùng `photo_id` vì nó sinh mới mỗi lần thử, `WorkOrderPolePhotoService.cs:104-105`; khuôn `SurveyIngestService.cs:119`). Giữ theo D-R16.
 - **Frame đại diện**: **một** frame — frame confidence cao nhất trong nhóm đồng thuận (nếu `inconclusive`: frame giữa clip) — lưu **làm ảnh của dòng `work_order_pole_photo`**
   (original nguyên byte + thumbnail sạch, `luxmap-evidence`), nên `thumbnail_url`/`original_url` hiện có vẫn đúng.
 - **Các frame khác chỉ dùng để suy luận rồi bỏ**; không có bảng `survey_frame` cho luồng này. Nếu sau cần thêm ảnh: trích lại từ clip đã giữ. 1–3 ảnh là D-5.
@@ -87,7 +87,7 @@ không có đường nào gắn `field` lên dữ liệu testbed. **Không hard-
 - D-R24 là luật của **phiên** khảo sát (từ chối phiên sai cấu hình). Clip một đèn không phải phiên ⇒ không đụng luật đó, **nhưng phải ghi drift** để không ai hiểu nhầm clip này là dữ liệu có kiểm soát.
 - Rủi ro kỹ thuật: auto-exposure/EIS/HDR có thể làm ON/OFF sai (đèn cháy sáng hoặc tối đen). Được giảm bởi: (a) nhãn chỉ là **gợi ý**, trạng thái cột chỉ đổi sau khi Quản lý xác nhận
   (`DecideAsync`, `WorkOrderPolePhotoService.cs:216-248`); (b) luật `decided ≥ 3` và đồng thuận ≥ 0,7 ở mục 2; (c) kỹ sư có thể sửa nhãn kèm ghi chú (PP-12).
-- Chỉ ON/OFF, không `dim` (R-2): `ReviewedPolePhotoPublisher.cs:50-53` đã giữ `dim`/`normal` khi ảnh nói `on` — luật y nguyên cho clip.
+- Chỉ ON/OFF, không `dim` (R-2): `ReviewedPolePhotoPublisher.cs:41-43` đã giữ `dim`/`normal` khi ảnh nói `on` — luật y nguyên cho clip.
 - Thống kê: `Statistics` **không đọc** `work_order_pole_photo` (grep tên bảng/entity trong `src/LuxMap.Modules.Statistics` không ra kết quả) ⇒ chưa có gì để loại. Ghi vào drift: precision/recall chính thức **không** lấy dòng có `video`.
 - Snapshot nguồn gốc của nhãn (`LabelSnapshot`, `IPolePhotoPublication.cs:12-17`) thêm `media = "video"`, `capture_config = "not_verified"`.
 
@@ -122,7 +122,7 @@ không có đường nào gắn `field` lên dữ liệu testbed. **Không hard-
 ## 9. Xác nhận và xem clip
 
 `/review` và `/decision` tái dùng nguyên (mục 1). Người duyệt phải **xem được clip**: thêm `GET …/{photo_id}/video` proxy qua API (BE-11 quy tắc 1), `Cache-Control: no-store`
-(khuôn `Media`, `WorkOrderPolePhotosController.cs:67-72`). **Vướng:** `IObjectStore.OpenAsync` trả luồng không tua được (`ObjectStorage.cs:154-156`); trình phát di động/web cần **Range** để tua
+(khuôn `Media`, `WorkOrderPolePhotosController.cs:67-72`). **Vướng:** `IObjectStore.OpenAsync` trả luồng không tua được (`S3ObjectStore.cs:74-83` trả `response.ResponseStream`); trình phát di động/web cần **Range** để tua
 MP4 có `moov` ở cuối. Hoặc trả full stream (không tua, tải trọn clip), hoặc thêm `OpenRangeAsync` vào `IObjectStore` (D-9).
 
 ## 10. Bề mặt API đề xuất
@@ -182,3 +182,43 @@ Chạy **toàn bộ** `dotnet test` đọc mã thoát, build `-warnaserror`, `--
 - Thời gian suy luận YOLO trên frame 1080p và tổng thời gian request trên VPS 2 vCore (cấm dựng harness ở Pha 1).
 - Hành vi ffmpeg/ffprobe với MP4 H.264 từ máy Android quay thật (chỉ đo MOV HEVC của iPhone; `ftyp` của file đó là `qt  ` — vẫn qua kiểm `ftyp` nhưng khai `Content-Type: video/mp4`; WP6 là Android).
 - Chưa mở `docs/api-contract-v1.1.md` để đối chiếu từng chữ; mọi tham chiếu bề mặt lấy từ code và drift.
+
+## Review độc lập của Codex (04/11/2026) — đối chiếu
+
+Codex (`-p river`, chỉ đọc) review bản này; toàn văn ở scratchpad phiên, đã **kiểm lại từng điểm dưới đây với code**. Đã sửa ngay trong file: 3 dẫn chứng lệch, `model_version`, dạng `artifact_version`, key clip.
+
+**Đúng, đổi khuyến nghị / bổ sung vào Pha 2:**
+
+| Điểm | Kiểm chứng | Tác động |
+|---|---|---|
+| Key clip theo `photo_id` không ổn định khi retry | `photo_id` lấy `nextval` mỗi lần thử (`WorkOrderPolePhotoService.cs:104-105`); sweep dùng id phiên cố định (`SurveyIngestService.cs:119`) | Đã sửa mục 3: key theo `(work_order, client_op_id, sha)` |
+| **D-1: phương án C tốt hơn A** — thêm cột nullable vào chính `work_order_pole_photo` | `StoredObjectColumn` nhận tên cột tuỳ ý (`ObjectInventory.cs:26`, `Original()` chỉ là lối tắt); bảng con **không** được `CommuneWriteGuard` canh (guard chỉ thấy entity `ICommuneScoped`, `WorkOrderPolePhoto.cs:8`) | **Đổi khuyến nghị D-1 sang C** (bỏ bảng, FK, PLAN, guard hở). Giá: bảng thêm ~9 cột + CHECK all-or-none; `byte_count`/`width`/`height` của dòng vẫn mô tả **frame**, clip ở `video_bytes` — ghi rõ trong drift (BE-35, thống kê dung lượng) |
+| `ck_pole_photo_sizes` (`byte_count ≤ 16 MiB`) mới là lý do cấp code clip không nằm trong dòng ảnh | `WorkOrderPolePhotoConfiguration.cs:20` | Thêm vào lý do của D-1 |
+| CHECK DB trùng tham số cấu hình (`≤30000 ms`, `≤12`) và clip 30,0 s có thể ra 30001 ms | Hai định nghĩa một con số — luật "một định nghĩa" của `CLAUDE.md` | CHECK chỉ giữ bất biến (`on+off = decided ≤ sampled`, `video_bytes > 0`); trần do service ép |
+| `captured_at` không có biên; máy sai giờ tương lai làm mọi quan sát thật sau đó `not_newer` im lặng | `WorkOrderPolePhotoService.cs:62-65` chỉ kiểm định dạng; `SurveyPublicationRules.cs:82` `IsNewer` | Thêm biên `now−7 ngày … now+5 phút` → 400. **Cũng đúng với ảnh hiện có** (nợ có sẵn; mở drift riêng) |
+| Sau stream phải **kiểm lại** `Writable`/người được giao/`Target` trong transaction ngắn; huỷ/giao lại giữa chừng sinh clip mồ côi | khuôn `WorkOrderPolePhotoService.cs:118-126`; p1 mục 7 chưa nói tường minh | Thêm vào D-12: cửa sổ mồ côi là "object đã hoàn tất mà row bị từ chối" (lỗi giữa stream thì `MultipartUpload.cs:59-75` đã abort) |
+| `confidence` dòng ảnh = trung vị 12 frame, khác nghĩa với confidence một ảnh, mà publisher đẩy thẳng vào `StatusConfidence` | `ReviewedPolePhotoPublisher.cs:31,43` | Lưu `frame_confidence_min/median/max` cạnh nhãn; loại dòng có clip khỏi mọi hiệu chuẩn confidence của ảnh |
+| `extractor_version_id` ở cột clip nhưng `LabelSnapshot` không mang | `IPolePhotoPublication.cs:12-17` | Thêm phiên bản extractor vào snapshot (BE-34) |
+| Caddy: guard chỉ chạy khi có `Content-Length`; PUT chunked lọt | `Caddyfile:35,41`; sweep cũng trả 400 khi thiếu `Content-Length` (`SurveyIngestService.cs:111`); drift DEP-2 (`contract-drift.md:1510`) đã biết dạng này | Chấp nhận 400 như sweep **hoặc** thêm luật Caddy chặn `Transfer-Encoding: chunked` ở route này |
+| `TemporaryBytesPerClip` 400 MiB, semaphore sampler (1 slot) + semaphore AI (2) có thể chặn đầu hàng | `FfmpegFrameExtractor.cs:25,64`; `AiOptions.cs:22` | Sampler có `PoleVideoOptions` riêng (quota, timeout, slot); quy định thứ tự lấy slot; 2 clip đồng thời ≈ 584 MiB tạm trên ổ 40 GB |
+| `/review` chỉ nhận `on\|off`, clip `inconclusive` chỉ còn `/decision reject` | `WorkOrderPolePhotoService.cs:188` | Ghi cho WP5 để không vẽ nút sai |
+| `ExtractedFrame` nằm ở Survey (`FfmpegFrameExtractor.cs:11`) | — | D-11: định nghĩa DTO của port ở `Shared` |
+
+**Đúng nhưng phải cân với chi phí (không đổi con số ngay):**
+- **D-4 yếu.** Lập luận thống kê đúng: 12 frame cùng một clip **không độc lập** (phơi sáng cố định gây lỗi tương quan, đồng thuận ≈ 1,0 mà vẫn sai); 1 fps alias với đèn chập chờn chu kỳ ~1 s; bỏ 0,5 s đầu không đủ cho đèn vừa cấp điện (LED 0,5–2 s, HPS lâu hơn); `decided ≥ 3` có thể lấy từ 3 frame tối nhất khi 9/12 frame bị loại vì ban ngày.
+  Đề xuất của Codex: ≥4 fps, sàn clip 6 s, `decided ≥ 0,6×sampled`, frame đầu và cuối phải cùng nhãn, trần confidence 0,9, bỏ 2 s đầu. **Tôi nhận** sàn 6 s, `decided ≥ 0,6×sampled`, luật "đầu = cuối", bỏ 2 s đầu, và trả `daylight_frames`/`median_luma` cho người duyệt.
+  **Chưa nhận** "≥4 fps" và trần 0,9: 4 fps × 30 s = 120 lần suy luận trong một request, mà suy luận **chưa đo**; số này chỉ chốt được sau khi đo Pha 2 và thử trên clip thật. Giữ làm tham số cấu hình, mặc định lấy sau đo.
+- **Detector bỏ sót đèn thứ hai** ⇒ nhãn tự tin về đèn sai (`YoloSingleLampPhotoHinter.cs:47` chỉ kiểm `Count != 1`). Cổng không gian "tâm box ở 50% giữa khung" rẻ nhưng cần clip thật để biết có cắt nhầm đèn đúng; ghi vào D-4, không tự thêm.
+- **Buộc xem clip trước khi `confirm` nhãn `off`** (vì publisher tạo `lamp_out` ở trạng thái `Confirmed` ngay, `ReviewedPolePhotoPublisher.cs:62-68`): đây là quyết định sản phẩm, **chuyển thành D-13**. Nếu chọn có, D-9 không còn lựa chọn A (không Range): 100 MiB qua 4G mất 1–3 phút.
+- Thiếu mã lý do (`MULTIPLE_LAMPS`, `TOO_DARK`…) trong response để WP6 gợi ý quay lại — thêm vào PV-2.
+
+**Không đổi / đã sẵn có:** nhận xét "ghép khoá `client_op_id` dùng chung với ảnh" đúng (`WorkOrderPolePhotoConfiguration.cs:45` không có `work_order_id`) nhưng UUID va chạm cố ý mới gây 409 — ghi một dòng vào drift, không đổi thiết kế. FK ghép 3 cột cho bảng con là thừa — nay vô nghĩa vì D-1 đổi sang C.
+
+**D-item sau review:**
+- **D-1 → C** (cột nullable trong dòng ảnh, `StoredObjectColumn` cho `video_object_key`/`video_bytes`). A chỉ còn lợi nếu muốn giữ bảng ảnh "sạch".
+- **D-4 → mở lại**, chốt sau khi có vài clip thật; mặc định tạm: sàn 6 s, bỏ 2 s đầu, `decided ≥ 0,6×sampled`, đầu = cuối, đồng thuận ≥ 0,7; fps/trần confidence chờ đo.
+- **D-9 và D-13 gắn với nhau:** buộc xem clip trước `confirm off` ⇒ phải có Range (hoặc chấp nhận tải trọn clip).
+- **D-3:** chốt trước ngưỡng chuyển sang nền, ví dụ tổng request > 20 s ở 2 vCore. 30 s là trần **clip**, không phải trần request.
+- **D-8:** loại khỏi thống kê hiện trường theo **cả** `capture_config = not_verified` **và** `data_source != field`.
+- **D-12:** thêm trần orphan theo user/ngày; mobile không retry vô hạn với 400/415.
+- **Ba mục Mỹ nên cân kỹ nhất (theo Codex, tôi đồng ý):** D-4 (luật sai tạo `lamp_out` Confirmed giả), D-1 (đổi sau migration/drift/WP5-6 là đắt nhất), D-3 (ngân sách thời gian chưa đo).
