@@ -60,6 +60,16 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — đã chốt D-1…D-4, D-9, D-13, D-14; sẵn sàng Pha 2, 04/11/2026</strong>
+    <p><span class="tag t-next">Chưa bắt đầu Pha 2 · PR #204 (tài liệu) · chưa báo WP4 / WP5 / WP6</span>
+    Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột: chỉ ON/OFF, bỏ qua cấu hình quay, <code>data_source</code> lấy từ cột.
+    Đã chốt: cột clip nằm thẳng trong <code>work_order_pole_photo</code>; suy luận đồng bộ; luật nhãn với số tạm; phát clip có Range;
+    Quản lý phải mở clip trước mọi <code>confirm</code> (409 nếu chưa); clip HDR HLG được nhận và gắn cờ <code>hdr</code>.
+    Còn chờ đo: fps lấy mẫu, ngưỡng ban ngày, ngưỡng chuyển sang nền.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a> · <a href=".ai/results/POLE-VIDEO-p1.md">Kết quả Pha 1</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-SEGMENT-NULL — PR 2e (nút bật: ghi cột chưa tuyến), 03/11/2026</strong>
     <p><span class="tag t-next">PR #202 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) hoặc merge admin · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
     PR cuối của ticket. <code>POST /assets/poles</code>: <code>segment_id</code> vắng hoặc <code>null</code> ⇒ cột chưa tuyến (chuỗi trắng 400, mã lạ 404). <code>PUT</code>: khoá <code>segment_id</code> vẫn bắt buộc
