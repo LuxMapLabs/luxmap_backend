@@ -60,11 +60,12 @@
   </div>
 
   <div class="card">
-    <strong>POLE-VIDEO — ra đề (Pha 1 chưa chạy), 04/11/2026</strong>
-    <p><span class="tag t-todo">Chờ giao Pha 1 · chưa có code · chưa báo WP4 / WP5 / WP6</span>
-    Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột (PP-1…PP-15): chỉ ON/OFF, bỏ qua cấu hình quay (D-R24), <code>data_source = field</code>.
-    Backend hiện chỉ nhận video qua phiên khảo sát (sweep), không hợp cho clip một đèn. Mỹ chốt R-1…R-4; Pha 1 phải trả lời 11 câu và nêu D-item (luật tổng hợp nhãn, giữ 1–3 ảnh bằng chứng, cap clip, cột testbed).
-    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài</a>.</p>
+    <strong>POLE-VIDEO — Pha 1 xong, chờ Mỹ chốt 12 D-item, 04/11/2026</strong>
+    <p><span class="tag t-block">Chờ chốt D-item · chưa có code · chưa báo WP4 / WP5 / WP6</span>
+    Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột (PP-1…PP-15): chỉ ON/OFF, bỏ qua cấu hình quay (D-R24), <code>data_source</code> lấy từ cột.
+    Khuyến nghị: một dòng ảnh (frame đại diện) cộng một bảng con giữ clip gốc; upload <code>PUT</code> thân thô (multipart của ảnh đệm cả body vào RAM nên không dùng được);
+    <code>WorkOrders</code> không gọi được <code>Survey</code> nên cần port lấy mẫu frame. Đo: 4 frame từ clip HEVC 1080p 4,2 s mất 1,9 s; chưa đo suy luận.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài</a> · <a href=".ai/results/POLE-VIDEO-p1.md">Kết quả Pha 1</a>.</p>
   </div>
 
   <div class="card">
