@@ -59,6 +59,9 @@ public enum AuditAction
 
     /// <summary>POLE-LOCATION: a pole was moved to a corrected position — the old and new coordinates are the before / after.</summary>
     Relocated,
+
+    /// <summary>POLE-VIDEO D-13: a Manager opened a pole video clip before deciding on it.</summary>
+    Viewed,
 }
 
 /// <summary>Marks business entities whose writes require one audit event per SaveChanges.</summary>

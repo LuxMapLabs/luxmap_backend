@@ -3,6 +3,7 @@ using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Persistence.Versions;
 using LuxMap.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -24,6 +25,12 @@ public sealed class WorkOrderPolePhotoConfiguration : IEntityTypeConfiguration<W
             t.HasCheckConstraint("ck_pole_photo_review_note", "review_note IS NULL OR (char_length(review_note) BETWEEN 1 AND 2000 AND btrim(review_note, E' \\t\\n\\r\\f' || chr(11)) <> '')");
             t.HasCheckConstraint("ck_pole_photo_review_note_required", "final_cv_state IS NULL OR final_cv_state IS NOT DISTINCT FROM cv_state OR review_note IS NOT NULL");
             t.HasCheckConstraint("ck_pole_photo_decision", "(decision IS NULL AND decided_by IS NULL AND decided_at IS NULL AND decision_note IS NULL AND NOT status_applied AND status_reason IS NULL) OR (decision IS NOT NULL AND decision IN ('confirm','reject') AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND status_reason IS NOT NULL AND (decision <> 'confirm' OR (COALESCE(final_cv_state, cv_state) IS NOT NULL AND COALESCE(final_cv_state, cv_state) IN ('on','off'))) AND (NOT status_applied OR decision = 'confirm'))");
+            // POLE-VIDEO D-1: clip columns are all-or-none; ceilings (duration, frame cap) are service settings, so only invariants live here.
+            t.HasCheckConstraint("ck_pole_photo_video_complete", "(video_object_key IS NULL AND video_sha256 IS NULL AND video_bytes IS NULL AND video_duration_ms IS NULL AND video_sampled_frames IS NULL AND video_on_frames IS NULL AND video_off_frames IS NULL AND video_daylight_frames IS NULL AND video_median_luma IS NULL AND video_hdr IS NULL AND video_extractor_version_id IS NULL) OR (video_object_key IS NOT NULL AND video_sha256 IS NOT NULL AND video_bytes IS NOT NULL AND video_duration_ms IS NOT NULL AND video_sampled_frames IS NOT NULL AND video_on_frames IS NOT NULL AND video_off_frames IS NOT NULL AND video_daylight_frames IS NOT NULL AND video_median_luma IS NOT NULL AND video_hdr IS NOT NULL AND video_extractor_version_id IS NOT NULL)");
+            t.HasCheckConstraint("ck_pole_photo_video_values", "video_object_key IS NULL OR (btrim(video_object_key) <> '' AND video_sha256 ~ '^[0-9a-f]{64}$' AND video_bytes > 0 AND video_duration_ms > 0 AND video_sampled_frames > 0 AND video_on_frames >= 0 AND video_off_frames >= 0 AND video_daylight_frames >= 0 AND video_on_frames + video_off_frames + video_daylight_frames <= video_sampled_frames AND video_median_luma BETWEEN 0 AND 1 AND video_median_luma <> 'NaN'::float8)");
+            t.HasCheckConstraint("ck_pole_photo_video_confidence", "(video_confidence_min IS NULL AND video_confidence_median IS NULL AND video_confidence_max IS NULL AND (video_object_key IS NULL OR video_on_frames + video_off_frames = 0)) OR (video_object_key IS NOT NULL AND video_on_frames + video_off_frames > 0 AND video_confidence_min IS NOT NULL AND video_confidence_median IS NOT NULL AND video_confidence_max IS NOT NULL AND video_confidence_min BETWEEN 0 AND 1 AND video_confidence_median BETWEEN 0 AND 1 AND video_confidence_max BETWEEN 0 AND 1 AND video_confidence_min <> 'NaN'::float8 AND video_confidence_median <> 'NaN'::float8 AND video_confidence_max <> 'NaN'::float8 AND video_confidence_min <= video_confidence_median AND video_confidence_median <= video_confidence_max)");
+            t.HasCheckConstraint("ck_pole_photo_video_reason", "video_reason_code IS NULL OR (video_object_key IS NOT NULL AND btrim(video_reason_code) <> '')");
+            t.HasCheckConstraint("ck_pole_photo_video_viewed", "(video_viewed_by IS NULL AND video_viewed_at IS NULL) OR (video_viewed_by IS NOT NULL AND video_viewed_at IS NOT NULL AND video_object_key IS NOT NULL)");
         });
         b.HasKey(x => x.PhotoId);
         b.HasAlternateKey(x => new { x.PhotoId, x.PoleId, x.CommuneId });
@@ -39,6 +46,12 @@ public sealed class WorkOrderPolePhotoConfiguration : IEntityTypeConfiguration<W
         b.HasOne<AppUser>().WithMany().HasForeignKey(x => x.ReviewedBy).OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pole_photo_reviewed_by");
         b.HasIndex(x => x.ReviewedBy).HasDatabaseName("ix_pole_photo_reviewed_by");
+        b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.VideoExtractorVersionId).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pole_photo_video_extractor_version");
+        b.HasIndex(x => x.VideoExtractorVersionId).HasDatabaseName("ix_pole_photo_video_extractor_version");
+        b.HasOne<AppUser>().WithMany().HasForeignKey(x => x.VideoViewedBy).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pole_photo_video_viewed_by");
+        b.HasIndex(x => x.VideoViewedBy).HasDatabaseName("ix_pole_photo_video_viewed_by");
         b.HasIndex(x => x.CommuneId);
         b.HasIndex(x => new { x.WorkOrderId, x.CapturedAt, x.UploadedAt });
         b.HasIndex(x => new { x.PoleId, x.CapturedAt });

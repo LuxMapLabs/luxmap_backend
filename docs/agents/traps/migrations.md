@@ -102,6 +102,14 @@ Các cột đo hiện có (`PeakLux`, `BaselineRatio`, confidence) đã có CHEC
 `pole_current_status.status_confidence` có `ck_pole_current_status_confidence_range` hữu hạn `0..1`;
 `normalized_luminance` của detail là DTO tương thích từ ratio. Cột mới phải có CHECK từ migration đầu, không dựa tên DTO.
 
+## CHECK nhiều nhánh: toán hạng NULL làm cả nhánh thành NULL — và CHECK cho NULL đi qua
+
+Postgres chỉ từ chối hàng khi CHECK trả `false`; **`NULL` là đạt**. Một nhánh dạng
+`(key IS NOT NULL AND on_frames > 0 AND conf BETWEEN 0 AND 1)` mà `conf` là NULL cho `true AND true AND NULL` = **NULL**, và cả biểu thức
+`nhánh1 OR nhánh2` thành NULL thay vì false ⇒ hàng vi phạm **lọt**. Mỗi cột mà nhánh cần có giá trị phải được viết **tường minh**
+`col IS NOT NULL` trong chính nhánh đó. Gặp thật ở POLE-VIDEO PV-a (`ck_pole_photo_video_confidence`): hàng có frame bỏ phiếu mà không có
+confidence được nhận; chỉ lộ vì test thử đúng tổ hợp đó (`PoleVideoMigrationTests`). Test CHECK phải có **cả ca thiếu từng cột**, không chỉ ca sai giá trị.
+
 ## Rollback dựng lại CHECK cũ
 
 `Down()` dựng CHECK hẹp hơn sẽ gãy nếu đã ghi giá trị mới; audit append-only còn không cho xoá để lách.
