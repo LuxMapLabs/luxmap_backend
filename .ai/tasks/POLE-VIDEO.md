@@ -2,7 +2,7 @@
 ticket: POLE-VIDEO
 title: Kỹ sư quay một clip ngắn chứa MỘT đèn trong phiếu → AI phân loại ON/OFF, LƯU kết quả gắn pole_id + work_order_id
 status: ready
-phase: 1
+phase: 1-decided
 owner: —
 branch: feat/POLE-VIDEO
 depends_on:
@@ -79,3 +79,21 @@ Mọi khẳng định về code phải kèm `đường/dẫn:dòng`; output lệ
 - Không commit, không push, không `git add -A`.
 - Không mở rộng sweep / `POST /sweeps`; không thêm `dim`; không đổi enum `fixture_status`.
 - Không tự chọn phương án kiến trúc: chỗ mơ hồ ⇒ D-item.
+
+---
+
+## Quyết định của Mỹ — 04/11/2026 (đáp D-item của `.ai/results/POLE-VIDEO-p1.md`)
+
+Nền **SELF-SIGNED**; chạm bề mặt API ⇒ nền tạm cho tới FW kế tiếp.
+
+| D | Chốt |
+|---|---|
+| **D-1** | **Phương án C**: thêm cột nullable vào chính `work_order_pole_photo` (clip: `video_object_key`, `video_sha256`, `video_bytes`, `duration_ms`, bốn bộ đếm frame, `extractor_version_id`, min/median/max confidence theo frame), một CHECK all-or-none; khai `StoredObjectColumn` cho `video_object_key`/`video_bytes`. `byte_count`/`width`/`height` của dòng **vẫn mô tả frame**, không phải clip — ghi rõ ở drift. Không bảng con |
+| **D-3** | **Phương án A**: suy luận **đồng bộ** trong request. Còn phải chốt ngưỡng chuyển sang nền (đề xuất p1: tổng request > 20 s ở 2 vCore) — đo ở Pha 2, Mỹ chốt số |
+| **D-13** | **Có**: Quản lý **phải xem clip** trước khi `confirm` nhãn `off` (vì xác nhận `off` tạo `lamp_out` ở trạng thái `Confirmed` ngay, `ReviewedPolePhotoPublisher.cs:62-68`). |
+
+**Hệ quả suy ra (xin Mỹ xác nhận, chưa phải quyết định):**
+- **D-9 → B**: cần phát clip có **Range** (thêm đọc theo khoảng vào `IObjectStore`); tải trọn 100 MiB qua 4G không chấp nhận được khi xem là bắt buộc.
+- **Cách ép "đã xem" ở server** (Pha 2 phải đề xuất, Mỹ chốt): ghi nhận lượt xem (`video_viewed_by/at`, có audit) khi người có `ReviewSurveys` mở `GET …/video`; `confirm` nhãn hiệu lực `off` mà chưa có lượt xem ⇒ **409** (mã đề xuất `POLE_VIDEO_NOT_VIEWED`). Câu hỏi mở: có áp cho `on` không (p1 chỉ nêu `off`, vì `on` không tạo sự cố nhưng có thể đổi `out → normal`); lượt xem có cần chạm tới cuối/đủ tỉ lệ clip không.
+
+**Chưa chốt — giữ khuyến nghị của p1 cho tới khi Mỹ nói khác:** D-2 (PUT thân thô), D-4 (mở lại, chờ clip thật + số đo suy luận), D-5, D-6, D-7, D-8, D-10, D-11, D-12. Pha 2 **không bắt đầu** trước khi D-4 có tham số tạm được ghi lại.
