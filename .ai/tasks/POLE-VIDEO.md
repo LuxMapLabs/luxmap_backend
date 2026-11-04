@@ -96,4 +96,16 @@ Nền **SELF-SIGNED**; chạm bề mặt API ⇒ nền tạm cho tới FW kế t
 - **D-9 → B**: cần phát clip có **Range** (thêm đọc theo khoảng vào `IObjectStore`); tải trọn 100 MiB qua 4G không chấp nhận được khi xem là bắt buộc.
 - **Cách ép "đã xem" ở server** (Pha 2 phải đề xuất, Mỹ chốt): ghi nhận lượt xem (`video_viewed_by/at`, có audit) khi người có `ReviewSurveys` mở `GET …/video`; `confirm` nhãn hiệu lực `off` mà chưa có lượt xem ⇒ **409** (mã đề xuất `POLE_VIDEO_NOT_VIEWED`). Câu hỏi mở: có áp cho `on` không (p1 chỉ nêu `off`, vì `on` không tạo sự cố nhưng có thể đổi `out → normal`); lượt xem có cần chạm tới cuối/đủ tỉ lệ clip không.
 
-**Chưa chốt — giữ khuyến nghị của p1 cho tới khi Mỹ nói khác:** D-2 (PUT thân thô), D-4 (mở lại, chờ clip thật + số đo suy luận), D-5, D-6, D-7, D-8, D-10, D-11, D-12. Pha 2 **không bắt đầu** trước khi D-4 có tham số tạm được ghi lại.
+**Chưa chốt — giữ khuyến nghị của p1 cho tới khi Mỹ nói khác:** D-2 (PUT thân thô), D-5, D-6, D-7, D-8, D-10, D-11, D-12, và **D-14** (clip HDR HLG, mục mới ở cuối p1). D-4, D-9, D-13 đã chốt ở mục dưới.
+
+## Quyết định bổ sung — 04/11/2026 (D-4, D-9, D-13)
+
+Mỹ đồng ý toàn bộ đề xuất. Nền **SELF-SIGNED**, chạm bề mặt API ⇒ nền tạm.
+
+| D | Chốt |
+|---|---|
+| **D-4** | Luật nhãn clip với **số tạm** (đặt ở `appsettings` section `PoleVideo`, mọi số nằm trong `artifact_version`, chỉnh sau khi có số đo + clip một đèn thật): nhãn từng frame dùng nguyên luật ảnh một đèn; **có nhãn ≥ 60 % số frame lấy mẫu**; **đồng thuận ≥ 70 %** trong số có nhãn, không thì `inconclusive`; **frame đầu và frame cuối phải cùng nhãn**, lệch ⇒ `inconclusive`; confidence = **trung vị** các frame đồng thuận; **sàn clip 3 s** (dưới ⇒ 400 `VIDEO_TOO_SHORT`), trần 30 s; **bỏ 1 s đầu chỉ khi clip > 6 s**; frame đại diện = frame **gần trung vị confidence** (không phải max). Response trả mã lý do khi không kết luận (`NO_LAMP`, `MULTIPLE_LAMPS`, `TOO_BRIGHT`) và số frame ban ngày / độ sáng trung vị để người duyệt thấy. **Chưa chốt, chờ đo/clip thật:** fps lấy mẫu (4 fps × 30 s = 120 lần suy luận trong một request — suy luận chưa đo), ngưỡng ban ngày `Citizen:DaylightMeanLuma` 0,45 (clip thật có keyframe đêm đạt 0,47–0,49), trần confidence 0,9 và cổng không gian "tâm box" của Codex (loại nhầm đèn sát mép khung như `IMG_0464`) |
+| **D-9** | **Phương án B**: phát clip **có Range** — thêm đọc theo khoảng vào `IObjectStore` (S3 `ByteRange`), `GET …/{photo_id}/video` trả `206`/`Accept-Ranges`/`Content-Range`, kiểm quyền theo xã **mỗi request**, `Cache-Control: no-store`, vẫn proxy qua API (BE-11 quy tắc 1) |
+| **D-13** | Chốt chi tiết: luật xem áp cho **mọi `confirm`** (`on` lẫn `off`); `reject` **không** cần xem. "Đã xem" = người **đang quyết định** (không phải người khác) đã mở `GET …/video` **thành công ít nhất một lần**; server ghi `video_viewed_by/at` + audit; thiếu ⇒ **409 `POLE_VIDEO_NOT_VIEWED`**. Đây là rào cản, không chứng minh người đó thật sự đã xem; bản chặt (cộng dồn đủ ~80 % byte qua Range) để sau nếu cần |
+
+**Pha 2 phải làm thêm vì các quyết định trên:** cột `video_viewed_by`, `video_viewed_at` (thuộc D-1 C, có CHECK cặp-hoặc-không); capability `ReadWorkOrders` đủ cho `GET …/video` nhưng ghi lượt xem chỉ tính khi người đó có `ReviewSurveys`; test: confirm thiếu lượt xem 409, người khác xem không thay được, reject không cần xem, Range 206 đúng đoạn và 416 khi sai đoạn, quyền xã kiểm mỗi request, audit đúng một event mỗi `SaveChanges`.
