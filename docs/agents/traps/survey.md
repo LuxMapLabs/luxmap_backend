@@ -158,3 +158,26 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
   registry — app chạy offline, không biết id của server. Ý nghĩa hai id số chưa chốt với WP6.
 - **`AlterColumn` sang NOT NULL trên bảng bất biến** sinh `UPDATE … WHERE … IS NULL` trước — trigger statement-level chặn kể cả 0 dòng. Dùng
   `ALTER TABLE … SET NOT NULL` trần sau khi đã chứng minh không còn NULL (`AddVersionTraceability.Down`).
+
+## POLE-VIDEO PV-b — lấy mẫu frame cho clip một đèn (04/11/2026, nền tạm theo D-4)
+
+- **Port `IClipFrameSampler` ở `LuxMap.Shared.Media`, Survey hiện thực** (`FfmpegClipFrameSampler`): `WorkOrders` không tham chiếu được Survey
+  (`Survey.csproj` trỏ `WorkOrders`). Lỗi ra là **`LuxMapException`** (400 `VIDEO_TOO_SHORT` / `VIDEO_TOO_LONG` / `VIDEO_INVALID` /
+  `VIDEO_ROTATION_UNSUPPORTED` / `VIDEO_DIMENSIONS`; 503 `VIDEO_PROCESSING_BUSY` / `_TIMEOUT` / `_UNAVAILABLE`; 500 `VIDEO_STORAGE_MISMATCH`),
+  `ProcessingFailure` chỉ là kiểu của worker khảo sát và bị dịch ở biên sampler. Huỷ do người gọi **không** bị dịch.
+- **Các bước ffmpeg dùng chung nằm ở `FfmpegClipTools`** (tải + kiểm hash/quota, probe PTS, cắt batch, dọn thư mục tạm); extractor khảo sát và
+  sampler đều gọi nó. Sửa một chỗ là đổi cả hai — chạy `SurveyFrameMediaTests` **và** `PoleVideoSamplerTests`. Thứ tự kiểm của extractor cũ
+  (đồng hồ time base **trước** rotation/kích thước) được giữ bằng callback `checkTimeBase`.
+- **Không dùng `ClipClock`**: clip một đèn không có đồng hồ GPS. Frame chọn theo **thời gian hiển thị thật** (PTS), rải đều trên phần dùng được của
+  clip — mỗi mốc là giữa một khoảng, lấy frame gần nhất, không lặp. Độ dài clip = frame đầu → hết frame cuối; ngoài `[MinimumSeconds,
+  MaximumSeconds + DurationGraceSeconds]` bị từ chối **sau probe, trước khi cắt** (không tốn ffmpeg). Bỏ giây đầu **chỉ** khi clip dài hơn
+  `SkipLeadingOnlyAboveSeconds` (clip ngắn thật chỉ 1,9–5,1 s).
+- **Slot và thư mục tạm riêng** (`PoleVideo:MaximumConcurrentClips`, `TempRoot`), không dùng chung với worker khảo sát — nếu dùng chung, request upload
+  xếp hàng sau cả đêm xử lý. Chờ slot quá `SlotWaitSeconds` ⇒ 503 `VIDEO_PROCESSING_BUSY` (middleware xoá header nên không có `Retry-After`).
+- **HDR chỉ được ĐỌC, không tone-map**: `ClipInfo.Hdr` = `color_transfer` là `arib-std-b67` (HLG) hoặc `smpte2084` (PQ). Frame vẫn cắt bằng
+  `-pix_fmt yuvj420p` như khảo sát; ffmpeg Homebrew không có `zscale`, chưa kiểm VPS (D-14). 12/12 clip iPhone thật là HLG.
+- **Tham số là tạm** (`PoleVideo:*`, mặc định 1 fps, ≤ 12 frame, 3–30 s, bỏ 1 s đầu khi > 6 s): `PoleVideoOptions.IsValid()` + `ValidateOnStart` — sai ⇒ dừng
+  khởi động với "Invalid PoleVideo options". Luật gộp nhãn (≥ 60 % frame có nhãn, đồng thuận ≥ 70 %, đầu = cuối…) thuộc PV-c và phải đưa **mọi** tham số
+  lấy mẫu vào `artifact_version` của nhãn.
+- Test sinh clip bằng `ffmpeg -f lavfi` lúc chạy (độ sáng tăng 20/giây để một frame tự nói nó ở đâu trong clip); HDR dùng `setparams` — cờ
+  `-color_trc` của encoder **không** ghi vào file khi bộ lọc đã gắn thuộc tính màu "chưa xác định".

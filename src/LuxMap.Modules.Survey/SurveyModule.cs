@@ -35,6 +35,10 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SurveyProcessingOptions>>().Value.Frames);
         services.AddSingleton<LuxMap.Modules.Assets.ISurveyCorridor, SurveyCorridor>();
         services.AddSingleton<IFrameExtractor, FfmpegFrameExtractor>();
+        // POLE-VIDEO PV-b: the sampler WorkOrders asks for through the Shared port; options are its own section.
+        services.AddOptions<LuxMap.Shared.Media.PoleVideoOptions>().Bind(configuration.GetSection(LuxMap.Shared.Media.PoleVideoOptions.SectionName))
+            .Validate(o => o.IsValid(), "Invalid PoleVideo options.").ValidateOnStart();
+        services.AddSingleton<LuxMap.Shared.Media.IClipFrameSampler, FfmpegClipFrameSampler>();
         services.AddScoped<Review.SurveyReviewService>();
         services.AddScoped<LuxMap.Modules.WorkOrders.IPolePhotoPublication, Review.ReviewedPolePhotoPublisher>();
         services.AddScoped<LuxMap.Modules.WorkOrders.ISurveyFindingLookup, Review.SurveyFindingLookup>();
