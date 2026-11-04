@@ -64,6 +64,7 @@ QR_KEPT = (f"{IN_COMMUNES} AND created_by IN {COPIED_USERS} AND (revoked_by IS N
 POLE_PHOTO_KEPT = (f"{IN_COMMUNES} AND uploaded_by IN {COPIED_USERS}"
                    f" AND (decided_by IS NULL OR decided_by IN {COPIED_USERS})"
                    f" AND (reviewed_by IS NULL OR reviewed_by IN {COPIED_USERS})"
+                   f" AND (video_viewed_by IS NULL OR video_viewed_by IN {COPIED_USERS})"
                    f" AND pole_id IN (SELECT pole_id FROM public.pole WHERE {IN_COMMUNES})"
                    f" AND work_order_id IN (SELECT work_order_id FROM public.work_order WHERE {IN_COMMUNES})")
 

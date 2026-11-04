@@ -36,9 +36,13 @@ public sealed class WorkOrdersModule : ILuxMapModule
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "repair_evidence"));
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "work_order_pole_photo"));
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "work_order_pole_photo"));
+        // POLE-VIDEO D-1: the clip lives in the video bucket, named by the same row's video_* columns.
+        services.AddSingleton(new StoredObjectColumn(StorageBucket.Video, "work_order_pole_photo", "video_object_key", "video_bytes"));
 
         // BE-34 — the AI hint on a pole photo, by its bare model version. The row's artifact_version is the same version with
         // "+{rules}" behind it: counting it too would count each photo twice.
         services.AddSingleton(new VersionedResultColumn("pole_photo", "work_order_pole_photo", "model_version", VersionReference.Text));
+        // POLE-VIDEO: the extractor that cut the frames of a clip.
+        services.AddSingleton(new VersionedResultColumn("pole_video_extractor", "work_order_pole_photo", "video_extractor_version_id", VersionReference.Id, "data_source"));
     }
 }
