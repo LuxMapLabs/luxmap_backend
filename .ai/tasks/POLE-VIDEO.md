@@ -2,7 +2,7 @@
 ticket: POLE-VIDEO
 title: Kỹ sư quay một clip ngắn chứa MỘT đèn trong phiếu → AI phân loại ON/OFF, LƯU kết quả gắn pole_id + work_order_id
 status: ready
-phase: 1-decided
+phase: 2-ready
 owner: —
 branch: feat/POLE-VIDEO
 depends_on:
@@ -96,7 +96,7 @@ Nền **SELF-SIGNED**; chạm bề mặt API ⇒ nền tạm cho tới FW kế t
 - **D-9 → B**: cần phát clip có **Range** (thêm đọc theo khoảng vào `IObjectStore`); tải trọn 100 MiB qua 4G không chấp nhận được khi xem là bắt buộc.
 - **Cách ép "đã xem" ở server** (Pha 2 phải đề xuất, Mỹ chốt): ghi nhận lượt xem (`video_viewed_by/at`, có audit) khi người có `ReviewSurveys` mở `GET …/video`; `confirm` nhãn hiệu lực `off` mà chưa có lượt xem ⇒ **409** (mã đề xuất `POLE_VIDEO_NOT_VIEWED`). Câu hỏi mở: có áp cho `on` không (p1 chỉ nêu `off`, vì `on` không tạo sự cố nhưng có thể đổi `out → normal`); lượt xem có cần chạm tới cuối/đủ tỉ lệ clip không.
 
-**Chưa chốt — giữ khuyến nghị của p1 cho tới khi Mỹ nói khác:** D-2 (PUT thân thô), D-5, D-6, D-7, D-8, D-10, D-11, D-12, và **D-14** (clip HDR HLG, mục mới ở cuối p1). D-4, D-9, D-13 đã chốt ở mục dưới.
+**Chưa chốt — giữ khuyến nghị của p1 cho tới khi Mỹ nói khác:** D-2 (PUT thân thô), D-5, D-6, D-7, D-8, D-10, D-11, D-12, D-4, D-9, D-13 đã chốt ở mục dưới; **D-14** đã chốt ở mục cuối.
 
 ## Quyết định bổ sung — 04/11/2026 (D-4, D-9, D-13)
 
@@ -109,3 +109,11 @@ Mỹ đồng ý toàn bộ đề xuất. Nền **SELF-SIGNED**, chạm bề mặ
 | **D-13** | Chốt chi tiết: luật xem áp cho **mọi `confirm`** (`on` lẫn `off`); `reject` **không** cần xem. "Đã xem" = người **đang quyết định** (không phải người khác) đã mở `GET …/video` **thành công ít nhất một lần**; server ghi `video_viewed_by/at` + audit; thiếu ⇒ **409 `POLE_VIDEO_NOT_VIEWED`**. Đây là rào cản, không chứng minh người đó thật sự đã xem; bản chặt (cộng dồn đủ ~80 % byte qua Range) để sau nếu cần |
 
 **Pha 2 phải làm thêm vì các quyết định trên:** cột `video_viewed_by`, `video_viewed_at` (thuộc D-1 C, có CHECK cặp-hoặc-không); capability `ReadWorkOrders` đủ cho `GET …/video` nhưng ghi lượt xem chỉ tính khi người đó có `ReviewSurveys`; test: confirm thiếu lượt xem 409, người khác xem không thay được, reject không cần xem, Range 206 đúng đoạn và 416 khi sai đoạn, quyền xã kiểm mỗi request, audit đúng một event mỗi `SaveChanges`.
+
+## Quyết định bổ sung — 04/11/2026 (D-14)
+
+| D | Chốt |
+|---|---|
+| **D-14** | **Chấp nhận clip HDR HLG và gắn cờ `hdr`.** Không từ chối upload (cấu hình mặc định của iPhone là HDR; 12/12 clip thật trong `Videos/` là HLG 10-bit BT.2020). Pha 2: ffprobe đọc `pix_fmt` + `color_transfer` (HLG `arib-std-b67` hoặc PQ `smpte2084` ⇒ `hdr = true`), lưu cờ ở cột clip (thuộc D-1 C) và đưa vào `LabelSnapshot` cùng `capture_config = not_verified`; hiện ở `PolePhotoItem.video`. Tone-map khi trích frame **chưa làm**: `zscale` chưa kiểm trên ffmpeg của VPS — việc đo (YOLO trên cùng frame có / không tone-map) để sau. Khi có thống kê dùng clip, lọc theo `hdr` như D-8 (hiện `Statistics` không đọc bảng này) |
+
+Ticket sẵn sàng cho **Pha 2**; kế hoạch chia PR (PV-a…PV-d), test và phá thử ở `.ai/results/POLE-VIDEO-p1.md` mục 11. Tham số D-4 còn chờ đo là fps lấy mẫu và ngưỡng ban ngày; ngưỡng chuyển sang nền (D-3) chốt sau khi đo.
