@@ -61,12 +61,22 @@
 
   <div class="card">
     <strong>POLE-VIDEO — PV-a (lược đồ clip một đèn), 04/11/2026</strong>
-    <p><span class="tag t-next">PR chờ mở · migration <code>AddPoleVideoColumns</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa có endpoint · chưa báo WP4 / WP5 / WP6</span>
+    <p><span class="tag t-next">PR #205 · migration <code>AddPoleVideoColumns</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa có endpoint · chưa báo WP4 / WP5 / WP6</span>
     D-1 (C): 17 cột <code>video_*</code> nullable, tất cả-hoặc-không, ngay trong <code>work_order_pole_photo</code> (clip gốc, đếm frame, trải confidence, độ sáng, cờ <code>hdr</code>, phiên bản extractor, mã lý do, lượt mở clip của người quyết định)
     cùng audit <code>viewed</code> (D-13). <code>byte_count</code>/<code>width</code>/<code>height</code> của dòng vẫn mô tả <b>frame</b>; clip ở <code>video_bytes</code>. Khai <code>StoredObjectColumn</code> (bucket video) và <code>VersionedResultColumn</code>; script sao chép DB thêm bộ lọc <code>video_viewed_by</code>.
     Test viết chính CHECK lộ một lỗi thật: nhánh CHECK có toán hạng NULL cho NULL nên hàng sai lọt — đã sửa, ghi bẫy vào <code>traps/migrations.md</code>. Toàn bộ test xanh; <code>Down()</code> từ chối khi đã có clip hoặc audit <code>viewed</code>.
     <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a>.</p>
     <p class="muted">Commit: <code>feat(workorders): add pole video columns to work_order_pole_photo</code>. Kế tiếp: PV-b (port lấy mẫu frame).</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-VIDEO — đã chốt D-1…D-4, D-9, D-13, D-14; sẵn sàng Pha 2, 04/11/2026</strong>
+    <p><span class="tag t-next">Chưa bắt đầu Pha 2 · PR #204 (tài liệu) · chưa báo WP4 / WP5 / WP6</span>
+    Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột: chỉ ON/OFF, bỏ qua cấu hình quay, <code>data_source</code> lấy từ cột.
+    Đã chốt: cột clip nằm thẳng trong <code>work_order_pole_photo</code>; suy luận đồng bộ; luật nhãn với số tạm; phát clip có Range;
+    Quản lý phải mở clip trước mọi <code>confirm</code> (409 nếu chưa); clip HDR HLG được nhận và gắn cờ <code>hdr</code>.
+    Còn chờ đo: fps lấy mẫu, ngưỡng ban ngày, ngưỡng chuyển sang nền.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a> · <a href=".ai/results/POLE-VIDEO-p1.md">Kết quả Pha 1</a>.</p>
   </div>
 
   <div class="card">
