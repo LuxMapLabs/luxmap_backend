@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Asp.Versioning;
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
@@ -12,7 +13,8 @@ namespace LuxMap.Modules.WorkOrders;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/work-orders/{id}/pole-photos")]
-public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService photos) : ControllerBase
+public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService photos, IAuthorizationService authorization,
+    ICorrelationIdAccessor correlation) : ControllerBase
 {
     /// <summary>Upload one pole photo; optional AI, no status change until a Manager confirms.</summary>
     [HttpPost]
@@ -71,6 +73,32 @@ public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService phot
         return File(stream, "image/jpeg");
     }
 
+    /// <summary>
+    /// The clip behind a pole photo, with HTTP ranges so a player can seek (POLE-VIDEO D-9). Through the API like every other byte:
+    /// commune scope applies, nothing is cached. A Manager opening a clip that is not decided yet is recorded (D-13).
+    /// </summary>
+    [HttpGet("{photo_id}/video")]
+    [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
+    [ProducesResponseType(typeof(FileResult), 200, "video/mp4")]
+    [ProducesResponseType(typeof(FileResult), 206, "video/mp4")]
+    [ProducesResponseType(typeof(ApiErrorResponse), 404)]
+    [ProducesResponseType(typeof(ApiErrorResponse), 416)]
+    [ProducesResponseType(typeof(ApiErrorResponse), 503)]
+    public async Task<IActionResult> Video(string id, [FromRoute(Name = "photo_id")] string photoId, CancellationToken ct)
+    {
+        var recordView = (await authorization.AuthorizeAsync(User, LuxMapPolicies.ReviewSurveys)).Succeeded;
+        var video = await photos.OpenVideoAsync(id, photoId, HttpContext, recordView, ct);
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.AcceptRanges = "bytes";
+        if (!video.Unsatisfiable) return new PoleVideoResult(video);
+        // Written here, not thrown: the exception middleware clears the response, Content-Range included.
+        Response.Headers.ContentRange = $"bytes */{video.Total}";
+        // No [Produces] on this action: it replaces the content type of an ObjectResult and would turn this JSON body into a 406.
+        return new ObjectResult(ApiErrorResponse.Create("RANGE_NOT_SATISFIABLE", "The requested range lies outside the clip.",
+            new Dictionary<string, object?> { ["correlation_id"] = correlation.CorrelationId, ["size"] = video.Total }))
+        { StatusCode = StatusCodes.Status416RangeNotSatisfiable };
+    }
+
     /// <summary>Assignee reviews ON/OFF before a Manager decides; changed labels require a note.</summary>
     [HttpPatch("{photo_id}/review")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
@@ -89,3 +117,19 @@ public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService phot
     public Task<PolePhotoItem> Decide(string id, [FromRoute(Name = "photo_id")] string photoId,
         PolePhotoDecisionRequest request, CancellationToken ct) => photos.DecideAsync(id, photoId, request, ct);
 }
+
+/// <summary>200 with the whole clip or 206 with the asked range; the store already holds exactly those bytes, so this only copies.</summary>
+internal sealed class PoleVideoResult(PoleVideoRead video) : IActionResult
+{
+    public async Task ExecuteResultAsync(ActionContext context)
+    {
+        var response = context.HttpContext.Response;
+        await using var body = video.Body!;
+        response.StatusCode = video.Partial ? StatusCodes.Status206PartialContent : StatusCodes.Status200OK;
+        response.ContentType = "video/mp4";
+        response.ContentLength = video.To - video.From + 1;
+        if (video.Partial) response.Headers.ContentRange = $"bytes {video.From}-{video.To}/{video.Total}";
+        await body.CopyToAsync(response.Body, context.HttpContext.RequestAborted);
+    }
+}
+

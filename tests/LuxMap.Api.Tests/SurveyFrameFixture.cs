@@ -47,6 +47,8 @@ internal sealed class SurveyFrameFixture : IObjectStore, IDisposable
     private static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     public Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult<Stream>(new MemoryStream(objects[(bucket, key)], false));
+    public Task<Stream> OpenRangeAsync(StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
     public Task<bool> ExistsAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult(objects.ContainsKey((bucket, key)));
     public async Task<StoredImage> StoreImageAsync(StorageBucket bucket, string id, Stream content, CancellationToken cancellationToken = default)

@@ -152,6 +152,7 @@ SUMMARY = {
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO] Kết quả AI và quyết định đã lưu; quyền qua phiếu và xã của ảnh",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail"): "[TẠM — POLE-PHOTO] JPEG thumbnail bỏ metadata, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/original"): "[TẠM — POLE-PHOTO] JPEG gốc nguyên byte, proxy có kiểm quyền, no-store",
+    ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/video"): "[TẠM — POLE-VIDEO PV-c1] Clip MP4 của ảnh cột, proxy có kiểm quyền, no-store; hỗ trợ Range (206, 416 kèm Content-Range). Quản lý mở clip chưa quyết được ghi nhận một lần (audit viewed)",
     ("patch", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/review"): "[TẠM — PHOTO-REVIEW PP-11…PP-15] Người được giao sửa nhãn on/off trước quyết định, phiếu in_progress; khác AI phải có note; không công bố",
     ("post", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/decision"): "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history",
     # AI-1 — model YOLO ON / OFF (PR #118 làm lại sau review), SELF-SIGNED.
