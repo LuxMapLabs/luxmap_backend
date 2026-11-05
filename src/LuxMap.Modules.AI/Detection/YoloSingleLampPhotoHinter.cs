@@ -6,9 +6,6 @@ using LuxMap.Shared.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace LuxMap.Modules.AI.Detection;
 
@@ -28,7 +25,8 @@ public sealed class YoloSingleLampPhotoHinter(IServiceProvider services, IConfig
             var luma = await MeanLumaAsync(thumbnail, ct);
             var result = await model.DetectAsync(photo, ct);
             var (label, confidence) = Classify(result.Detections, luma, daylightLuma);
-            return new SingleLampPhotoHint(label, confidence, detector.Artifact.Version, $"{detector.Artifact.Version}+{rules}");
+            return new SingleLampPhotoHint(label, confidence, detector.Artifact.Version, $"{detector.Artifact.Version}+{rules}",
+                label == "inconclusive" ? Reason(result.Detections, luma, daylightLuma) : null);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
@@ -59,21 +57,18 @@ public sealed class YoloSingleLampPhotoHinter(IServiceProvider services, IConfig
     }
 
     /// <summary>Mean luma (0..1) of a JPEG thumbnail, decoded only through the JPEG-only configuration.</summary>
-    public static async Task<double> MeanLumaAsync(Stream thumbnail, CancellationToken ct)
+    public static Task<double> MeanLumaAsync(Stream thumbnail, CancellationToken ct) => JpegLuma.MeanAsync(thumbnail, ct);
+
+    /// <summary>
+    /// Why <see cref="Classify"/> gave no verdict, or null when it gave one: a photo too bright to judge (daylight) first, then no lamp
+    /// (or one the model cannot name), then more than one lamp.
+    /// </summary>
+    public static string? Reason(IReadOnlyList<DetectionResult> detections, double meanLuma, double daylightLuma)
     {
-        thumbnail.Position = 0;
-        await JpegMagicBytes.EnsureJpegAsync(thumbnail, ct);
-        thumbnail.Position = 0;
-        using var image = await Image.LoadAsync<L8>(new DecoderOptions { Configuration = ThumbnailFactory.JpegOnly }, thumbnail, ct);
-        long sum = 0;
-        image.ProcessPixelRows(rows =>
-        {
-            for (var y = 0; y < rows.Height; y++)
-            {
-                foreach (var pixel in rows.GetRowSpan(y)) sum += pixel.PackedValue;
-            }
-        });
-        return sum / (255.0 * image.Width * image.Height);
+        if (meanLuma > daylightLuma) return "too_bright";
+        if (detections.Count > 1) return "multiple_lamps";
+        if (detections.Count == 0) return "no_lamp";
+        return detections[0].ClassName is "normal" or "out" && double.IsFinite(detections[0].Confidence) ? null : "no_lamp";
     }
 
     private static string RulesVersion(double daylightLuma)

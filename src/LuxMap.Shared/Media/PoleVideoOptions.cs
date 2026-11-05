@@ -21,6 +21,14 @@ public sealed class PoleVideoOptions
     public double MaximumSeconds { get; set; } = 30;
     public double DurationGraceSeconds { get; set; } = .5;
 
+    /// <summary>
+    /// The verdict (D-4): at least this fraction of the sampled frames must say ON or OFF, and at least <see cref="MinimumAgreement"/> of those
+    /// must say the same thing, or the clip gives no verdict. Read by the pole-video verdict, with the sampling numbers above, into the
+    /// artifact version of every result.
+    /// </summary>
+    public double MinimumDecidedFraction { get; set; } = .6;
+    public double MinimumAgreement { get; set; } = .7;
+
     /// <summary>Separate from the survey extractor so a request never waits behind a night's processing.</summary>
     public int MaximumConcurrentClips { get; set; } = 1;
     public double SlotWaitSeconds { get; set; } = 30;
@@ -36,6 +44,7 @@ public sealed class PoleVideoOptions
         && double.IsFinite(MinimumSeconds) && MinimumSeconds > 0
         && double.IsFinite(MaximumSeconds) && MaximumSeconds > MinimumSeconds
         && double.IsFinite(DurationGraceSeconds) && DurationGraceSeconds >= 0
+        && MinimumDecidedFraction is > 0 and <= 1 && MinimumAgreement is > .5 and <= 1
         && MaximumConcurrentClips is >= 1 and <= 8
         && double.IsFinite(SlotWaitSeconds) && SlotWaitSeconds > 0
         && double.IsFinite(TimeoutSeconds) && TimeoutSeconds > 0

@@ -181,3 +181,17 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
   lấy mẫu vào `artifact_version` của nhãn.
 - Test sinh clip bằng `ffmpeg -f lavfi` lúc chạy (độ sáng tăng 20/giây để một frame tự nói nó ở đâu trong clip); HDR dùng `setparams` — cờ
   `-color_trc` của encoder **không** ghi vào file khi bộ lọc đã gắn thuộc tính màu "chưa xác định".
+
+## POLE-VIDEO PV-c2 — upload clip một đèn và nhãn của clip (05/11/2026, nền tạm, drift PV-4…PV-9)
+
+- **Kết quả là MỘT dòng `work_order_pole_photo`** (D-1 C): frame đại diện là ảnh, cột `video_*` mang clip. Mọi thứ về sau (review, quyết định, công bố, sự cố `origin_pole_photo_id`) là của ảnh;
+  đừng thêm đường ghi thứ hai. `byte_count` / `width` / `height` của dòng vẫn là của **frame**; dung lượng clip là `video_bytes`.
+- **Thứ tự của `UploadVideoAsync` quan trọng:** kiểm tra metadata → phiếu / cột / replay **trước** khi nhận 100 MB → stream clip (khoá object theo phiếu + `client_op_id` + hash) → lấy mẫu và chấm
+  (không giữ khoá) → ghi frame đại diện → **mới** mở giao dịch: khoá phiếu → kiểm lại quyền, trạng thái, replay → khoá cột → kiểm lại cột → ghi. Bỏ bước kiểm lại thì phiếu đóng giữa lúc upload vẫn nhận clip.
+- **Luật nhãn nằm ở `PoleVideoVerdict` (thuần, không I/O)**; mọi con số đọc từ `PoleVideoOptions` và vào `PoleVideoVerdict.RulesVersion`. Thêm tham số ảnh hưởng nhãn mà không đưa vào hash = kết quả không tái lập được.
+  Đổi **logic** (không phải số) thì tăng `RulesRevision`.
+- **Độ sáng frame không đến từ model:** `ValidatedJpeg.MeanLuma` (tính từ thumbnail bởi `JpegLuma`, một định nghĩa dùng chung với cổng ban ngày của AI), nên clip vẫn có `video_median_luma` khi model không dùng được —
+  CHECK `ck_pole_photo_video_complete` đòi cột này cùng các cột clip.
+- **Hỏi model một lần khi nó vắng:** hint null ở frame nào thì không hỏi frame sau, và **cả clip** không có nhãn (một nhãn dựa trên nửa số frame là nhãn không ai kiểm được).
+- **Test host trong bộ nhớ không đo được `Content-Length` vắng** (TestServer tự đo thân): ca "chunked ⇒ 400" kiểm ở mức service. Test sinh clip bằng `ffmpeg -f lavfi` lúc chạy; `HintStub.PerCall` cho từng frame một câu trả lời.
+- **Caddy chặn 100 MiB riêng route PUT clip** (`@pole_video_too_large`), đứng **trước** guard 300 MiB chung; `PolePhotoProxyTests` kiểm cả hai chiều (413 ở route này, không ở clip khảo sát).
