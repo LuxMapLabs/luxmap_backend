@@ -117,3 +117,13 @@ Mỹ đồng ý toàn bộ đề xuất. Nền **SELF-SIGNED**, chạm bề mặ
 | **D-14** | **Chấp nhận clip HDR HLG và gắn cờ `hdr`.** Không từ chối upload (cấu hình mặc định của iPhone là HDR; 12/12 clip thật trong `Videos/` là HLG 10-bit BT.2020). Pha 2: ffprobe đọc `pix_fmt` + `color_transfer` (HLG `arib-std-b67` hoặc PQ `smpte2084` ⇒ `hdr = true`), lưu cờ ở cột clip (thuộc D-1 C) và đưa vào `LabelSnapshot` cùng `capture_config = not_verified`; hiện ở `PolePhotoItem.video`. Tone-map khi trích frame **chưa làm**: `zscale` chưa kiểm trên ffmpeg của VPS — việc đo (YOLO trên cùng frame có / không tone-map) để sau. Khi có thống kê dùng clip, lọc theo `hdr` như D-8 (hiện `Statistics` không đọc bảng này) |
 
 Ticket sẵn sàng cho **Pha 2**; kế hoạch chia PR (PV-a…PV-d), test và phá thử ở `.ai/results/POLE-VIDEO-p1.md` mục 11. Tham số D-4 còn chờ đo là fps lấy mẫu và ngưỡng ban ngày; ngưỡng chuyển sang nền (D-3) chốt sau khi đo.
+
+## Chia PR của PV-c — 04/11/2026 (Mỹ chốt)
+
+PV-c chia **ba PR** (mỗi PR chờ cha merge nếu phụ thuộc, không xếp chồng):
+
+| PR | Nội dung | Phụ thuộc |
+|---|---|---|
+| **PV-c1** | `IObjectStore.OpenRangeAsync`; `GET …/pole-photos/{photo_id}/video` có Range (200 / 206 / 416); ghi lượt xem `video_viewed_by/at` + audit `viewed` (D-9, D-13); OpenAPI; drift PV-1…PV-3 | PV-a (đã merge) |
+| **PV-c2** | `PUT …/pole-videos/{client_op_id}`: stream clip, sampler (PV-b), luật gộp nhãn (D-4), idempotency, khối `video` trong `PolePhotoItem`, Caddy; drift tiếp | PV-b |
+| **PV-c3** | `confirm` phải kèm lượt xem của chính người quyết, 409 `POLE_VIDEO_NOT_VIEWED` (D-13); `reject` không cần | PV-c1 |

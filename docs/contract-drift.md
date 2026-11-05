@@ -1719,6 +1719,17 @@ WP5 / WP6 chưa xác nhận, nền tạm tới FW kế tiếp. Im lặng 3 ngày
 | CR-6 | D-10: online-only, WP6 lưu nháp chưa gửi; không sync op mới/không nới CHECK sync. Start đang chờ phải đẩy trước rồi xét xin; start sau pending reset yêu cầu. Op lạ không tự block các op sau. WP6 xác nhận thứ tự hai kênh và cache generated_at |
 | CR-7 | Giao lại kèm ngày khác (Mỹ yêu cầu 26/10, nhánh 1a của luồng duyệt): `PUT /assignee` nhận thêm `scheduled_date` / `due_date` tuỳ chọn, atomic với đổi người, một audit `reassigned`. Ngày sai hoặc kèm bỏ giao → 400, không đổi gì. Cùng người + ngày thật đổi = dời lịch (`details_changed`, `rescheduled`, reset yêu cầu). Chỉ thêm; không migration; Contract **v1.20** `SELF-SIGNED`, WP5 xác nhận ở FW kế tiếp |
 
+## POLE-VIDEO — clip một đèn gắn vào ảnh cột (04/11/2026)
+
+**Mỹ SELF-SIGNED 04/11/2026**, theo D-1…D-14 trong `.ai/tasks/POLE-VIDEO.md`. Các mục chạm API ⇒ **nền tạm, chờ FW xác nhận**; WP5 / WP6 **chưa báo**; Contract văn bản giữ nguyên.
+Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `docs/database/erd.md`; ticket chia ba PR (PV-c1 đọc clip + ghi lượt xem, PV-c2 upload + luật nhãn, PV-c3 buộc xem trước khi xác nhận). Mục dưới thêm dần theo từng PR.
+
+| Mã | Quyết định / bề mặt client (nền tạm) |
+|---|---|
+| **PV-1** | `GET /api/v1/work-orders/{id}/pole-photos/{photo_id}/video` (PV-c1, D-9): MP4 của ảnh cột **qua API** (BE-11 quy tắc 1), `Cache-Control: no-store`, `Accept-Ranges: bytes`. Quyền `ReadWorkOrders` (như `/original`); phạm vi phiếu và xã của ảnh kiểm như `/original`. Ảnh **không có clip** ⇒ **404 `POLE_VIDEO_NOT_FOUND`** |
+| **PV-2** | Range (RFC 9110 §14): **một** khoảng `bytes=a-b` / `a-` / `-n` ⇒ **206** + `Content-Range: bytes a-b/size` + `Content-Length` đúng đoạn (cắt `b` về cuối clip); store chỉ đọc đúng đoạn (`IObjectStore.OpenRangeAsync`, S3 `ByteRange`). Không có `Range`, đơn vị khác `bytes`, nhiều khoảng hoặc sai cú pháp (kể cả `5-3`) ⇒ **bỏ qua**, trả **200** cả clip. Khoảng bắt đầu sau cuối clip hoặc `-0` ⇒ **416** + `Content-Range: bytes */size` + lỗi `RANGE_NOT_SATISFIABLE` (`details.size`, `details.correlation_id`). Chưa hỗ trợ `If-Range`, `HEAD` |
+| **PV-3** | Lượt mở clip của **người có `ReviewSurveys` (Quản lý)** được ghi (D-13): lần đầu họ mở một clip **chưa quyết** ⇒ `video_viewed_by/at` + **một** audit `viewed` (`AuditAction.Viewed`, entity `work_order`); các request Range của cùng người đó sau đó, hay người khác không có quyền quyết (kỹ sư, giám sát, quản trị), hay clip đã quyết, **không** ghi. Cột chỉ giữ **người mở gần nhất**: hai Quản lý luân phiên mở thì người trước mất dấu (luật buộc xem ở PV-c3 sẽ đòi đúng người quyết). Đây là rào cản, không chứng minh có xem. Ghi xong mới stream; object thiếu (503 `STORAGE_OBJECT_MISSING`) thì **không** ghi |
+
 ### POLE-VIDEO PV-c2 — upload clip một đèn, kết quả là một ảnh cột (05/11/2026)
 
 **Mỹ SELF-SIGNED 04/11/2026** (D-2, D-3, D-4, D-5, D-6, D-7, D-8, D-14 trong `.ai/tasks/POLE-VIDEO.md`). Chạm API ⇒ **nền tạm, chờ FW xác nhận**; WP5 / WP6 **chưa báo**; Contract văn bản giữ nguyên. PV-1…PV-3 (đọc clip, Range, lượt xem) ở mục POLE-VIDEO PV-c1.

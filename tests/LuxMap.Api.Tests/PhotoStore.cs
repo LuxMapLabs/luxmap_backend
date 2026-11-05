@@ -25,6 +25,16 @@ internal sealed class PhotoStore : IObjectStore
     public Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult<Stream>(new MemoryStream(Objects[(bucket, key)], false));
 
+    /// <summary>Counts range reads and keeps the last range asked for, so a test can prove the API asked for the bytes it sent.</summary>
+    public int RangeReads { get; private set; }
+    public (long From, long To)? LastRange { get; private set; }
+
+    public Task<Stream> OpenRangeAsync(StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default)
+    {
+        RangeReads++; LastRange = (from, to);
+        return Task.FromResult<Stream>(new MemoryStream(Objects[(bucket, key)][(int)from..((int)to + 1)], false));
+    }
+
     public Task<bool> ExistsAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult(Objects.ContainsKey((bucket, key)));
 

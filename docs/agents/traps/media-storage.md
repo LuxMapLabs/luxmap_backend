@@ -126,3 +126,16 @@ Tình trạng pull image và test S3 thật theo `tracking.html`; không suy tr�
 
 **Giới hạn kiểm chứng:** `MissingObjectTests` và `SurveyIngestTests` dùng `FakeS3`, không canh đường MinIO thật.
 Tiến độ test S3 thật theo `tracking.html` (BE-36 D-7); một lần kiểm tay không thay regression test.
+
+## POLE-VIDEO PV-c1 — phát clip có Range (04/11/2026, nền tạm, drift PV-1…PV-3)
+
+- **`IObjectStore.OpenRangeAsync(bucket, key, from, to)`** — byte **bao gồm cả hai đầu**, S3 `ByteRange`. Người gọi biết kích thước (`video_bytes` trên dòng) và giữ đoạn
+  trong đó; một đoạn S3 không đáp ứng được (416 / `InvalidRange`) nghĩa là object không đúng cỡ dòng khai ⇒ cùng trạng thái "cần sửa kho" như object thiếu
+  (503 `STORAGE_OBJECT_MISSING`). Store giả trong test phải cắt đúng đoạn (`PhotoStore`, `InMemoryObjectStore`) hoặc `NotSupportedException`.
+- **Phân tích `Range` tự viết** (`PoleVideoRange`): `RangeHelper` của ASP.NET là `internal`. Quy tắc RFC 9110: một khoảng được tôn trọng, mọi thứ khó hiểu (đơn vị khác,
+  nhiều khoảng, `5-3`) bị **bỏ qua** và trả cả clip; chỉ khoảng bắt đầu sau cuối clip hoặc `-0` là 416.
+- 🔴 **`[Produces("…")]` trên action thay content type của MỌI `ObjectResult`** — thân lỗi JSON của 416 thành **406**. Action trả media dùng
+  `[ProducesResponseType(typeof(FileResult), 200, "video/mp4")]` thay cho `[Produces]`.
+- **Lỗi cần header riêng (`Content-Range: bytes */size`) tự ghi, không ném**: `ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` (cùng lý do `Retry-After`).
+- Ghi lượt xem (`video_viewed_by/at`) khoá **chỉ dòng ảnh** (khoá cuối trong thứ tự phiếu → cột → ảnh nên không đảo thứ tự); nhiều request Range đồng thời của một player thấy dòng đã
+  đánh dấu và không ghi thêm. Mở object **trước** khi ghi lượt xem để clip thiếu không được tính là đã xem.
