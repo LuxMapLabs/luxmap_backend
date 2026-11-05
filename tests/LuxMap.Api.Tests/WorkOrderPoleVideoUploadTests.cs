@@ -300,6 +300,7 @@ public partial class WorkOrderTests
         var (order, pole) = await ClipTarget();
         var upload = await PutClip(order, pole, await PoleVideoTestClips.MakeAsync(4, encode: PoleVideoTestClips.Hlg));
         var photo = upload.Body.GetProperty("photo_id").GetString()!;
+        using (await GetVideo(order, photo)) { }                 // PV-c3: a Manager confirms a clip only after opening it
         var decision = await PoleDecision(order, photo);
         Assert.True(decision.GetProperty("status_applied").GetBoolean());
         var fault = await Db(db => db.Set<Fault>().IgnoreQueryFilters().SingleAsync(f => f.OriginPolePhotoId == photo));
