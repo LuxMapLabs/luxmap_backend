@@ -167,3 +167,40 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
 - MediaArtifact băm model + mapping + preprocessing + threshold/unknown rule. Endpoint không ghi DB.
 - Shape HTTP kiểm bằng stub classifier; thứ tự lớp kiểm riêng bằng JPEG fixture với model thật.
   Không rẽ nhánh assert theo output model thật. Drift AI-DAYNIGHT là nền tạm tới FW.
+
+## POLE-VIDEO PV-b — lấy mẫu frame cho clip một đèn (04/11/2026, nền tạm theo D-4)
+
+- **Port `IClipFrameSampler` ở `LuxMap.Shared.Media`, Survey hiện thực** (`FfmpegClipFrameSampler`): `WorkOrders` không tham chiếu được Survey
+  (`Survey.csproj` trỏ `WorkOrders`). Lỗi ra là **`LuxMapException`** (400 `VIDEO_TOO_SHORT` / `VIDEO_TOO_LONG` / `VIDEO_INVALID` /
+  `VIDEO_ROTATION_UNSUPPORTED` / `VIDEO_DIMENSIONS`; 503 `VIDEO_PROCESSING_BUSY` / `_TIMEOUT` / `_UNAVAILABLE`; 500 `VIDEO_STORAGE_MISMATCH`),
+  `ProcessingFailure` chỉ là kiểu của worker khảo sát và bị dịch ở biên sampler. Huỷ do người gọi **không** bị dịch.
+- **Các bước ffmpeg dùng chung nằm ở `FfmpegClipTools`** (tải + kiểm hash/quota, probe PTS, cắt batch, dọn thư mục tạm); extractor khảo sát và
+  sampler đều gọi nó. Sửa một chỗ là đổi cả hai — chạy `SurveyFrameMediaTests` **và** `PoleVideoSamplerTests`. Thứ tự kiểm của extractor cũ
+  (đồng hồ time base **trước** rotation/kích thước) được giữ bằng callback `checkTimeBase`.
+- **Không dùng `ClipClock`**: clip một đèn không có đồng hồ GPS. Frame chọn theo **thời gian hiển thị thật** (PTS), rải đều trên phần dùng được của
+  clip — mỗi mốc là giữa một khoảng, lấy frame gần nhất, không lặp. Độ dài clip = frame đầu → hết frame cuối; ngoài `[MinimumSeconds,
+  MaximumSeconds + DurationGraceSeconds]` bị từ chối **sau probe, trước khi cắt** (không tốn ffmpeg). Bỏ giây đầu **chỉ** khi clip dài hơn
+  `SkipLeadingOnlyAboveSeconds` (clip ngắn thật chỉ 1,9–5,1 s).
+- **Slot và thư mục tạm riêng** (`PoleVideo:MaximumConcurrentClips`, `TempRoot`), không dùng chung với worker khảo sát — nếu dùng chung, request upload
+  xếp hàng sau cả đêm xử lý. Chờ slot quá `SlotWaitSeconds` ⇒ 503 `VIDEO_PROCESSING_BUSY` (middleware xoá header nên không có `Retry-After`).
+- **HDR chỉ được ĐỌC, không tone-map**: `ClipInfo.Hdr` = `color_transfer` là `arib-std-b67` (HLG) hoặc `smpte2084` (PQ). Frame vẫn cắt bằng
+  `-pix_fmt yuvj420p` như khảo sát; ffmpeg Homebrew không có `zscale`, chưa kiểm VPS (D-14). 12/12 clip iPhone thật là HLG.
+- **Tham số là tạm** (`PoleVideo:*`, mặc định 1 fps, ≤ 12 frame, 3–30 s, bỏ 1 s đầu khi > 6 s): `PoleVideoOptions.IsValid()` + `ValidateOnStart` — sai ⇒ dừng
+  khởi động với "Invalid PoleVideo options". Luật gộp nhãn (≥ 60 % frame có nhãn, đồng thuận ≥ 70 %, đầu = cuối…) thuộc PV-c và phải đưa **mọi** tham số
+  lấy mẫu vào `artifact_version` của nhãn.
+- Test sinh clip bằng `ffmpeg -f lavfi` lúc chạy (độ sáng tăng 20/giây để một frame tự nói nó ở đâu trong clip); HDR dùng `setparams` — cờ
+  `-color_trc` của encoder **không** ghi vào file khi bộ lọc đã gắn thuộc tính màu "chưa xác định".
+
+## POLE-VIDEO PV-c2 — upload clip một đèn và nhãn của clip (05/11/2026, nền tạm, drift PV-4…PV-9)
+
+- **Kết quả là MỘT dòng `work_order_pole_photo`** (D-1 C): frame đại diện là ảnh, cột `video_*` mang clip. Mọi thứ về sau (review, quyết định, công bố, sự cố `origin_pole_photo_id`) là của ảnh;
+  đừng thêm đường ghi thứ hai. `byte_count` / `width` / `height` của dòng vẫn là của **frame**; dung lượng clip là `video_bytes`.
+- **Thứ tự của `UploadVideoAsync` quan trọng:** kiểm tra metadata → phiếu / cột / replay **trước** khi nhận 100 MB → stream clip (khoá object theo phiếu + `client_op_id` + hash) → lấy mẫu và chấm
+  (không giữ khoá) → ghi frame đại diện → **mới** mở giao dịch: khoá phiếu → kiểm lại quyền, trạng thái, replay → khoá cột → kiểm lại cột → ghi. Bỏ bước kiểm lại thì phiếu đóng giữa lúc upload vẫn nhận clip.
+- **Luật nhãn nằm ở `PoleVideoVerdict` (thuần, không I/O)**; mọi con số đọc từ `PoleVideoOptions` và vào `PoleVideoVerdict.RulesVersion`. Thêm tham số ảnh hưởng nhãn mà không đưa vào hash = kết quả không tái lập được.
+  Đổi **logic** (không phải số) thì tăng `RulesRevision`.
+- **Độ sáng frame không đến từ model:** `ValidatedJpeg.MeanLuma` (tính từ thumbnail bởi `JpegLuma`, một định nghĩa dùng chung với cổng ban ngày của AI), nên clip vẫn có `video_median_luma` khi model không dùng được —
+  CHECK `ck_pole_photo_video_complete` đòi cột này cùng các cột clip.
+- **Hỏi model một lần khi nó vắng:** hint null ở frame nào thì không hỏi frame sau, và **cả clip** không có nhãn (một nhãn dựa trên nửa số frame là nhãn không ai kiểm được).
+- **Test host trong bộ nhớ không đo được `Content-Length` vắng** (TestServer tự đo thân): ca "chunked ⇒ 400" kiểm ở mức service. Test sinh clip bằng `ffmpeg -f lavfi` lúc chạy; `HintStub.PerCall` cho từng frame một câu trả lời.
+- **Caddy chặn 100 MiB riêng route PUT clip** (`@pole_video_too_large`), đứng **trước** guard 300 MiB chung; `PolePhotoProxyTests` kiểm cả hai chiều (413 ở route này, không ở clip khảo sát).

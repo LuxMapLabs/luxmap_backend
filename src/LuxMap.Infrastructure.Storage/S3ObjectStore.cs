@@ -89,6 +89,27 @@ public sealed class S3ObjectStore(IAmazonS3 client, ILogger<S3ObjectStore> logge
         }
     }
 
+    public async Task<Stream> OpenRangeAsync(
+        StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(from);
+        ArgumentOutOfRangeException.ThrowIfLessThan(to, from);
+        try
+        {
+            var response = await client.GetObjectAsync(
+                new GetObjectRequest { BucketName = StorageKeys.NameOf(bucket), Key = key, ByteRange = new ByteRange(from, to) },
+                cancellationToken);
+            return response.ResponseStream;
+        }
+        // A range the object cannot satisfy means the object is not the size its row says: the same repair-required state as a missing one.
+        catch (AmazonS3Exception exception) when (exception.StatusCode is System.Net.HttpStatusCode.NotFound
+            or System.Net.HttpStatusCode.RequestedRangeNotSatisfiable || exception.ErrorCode is "NoSuchKey" or "InvalidRange")
+        {
+            throw new LuxMap.Shared.Http.LuxMapException("STORAGE_OBJECT_MISSING",
+                System.Net.HttpStatusCode.ServiceUnavailable, "Stored media is unavailable; storage repair is required.");
+        }
+    }
+
     public async Task<bool> ExistsAsync(
         StorageBucket bucket, string key, CancellationToken cancellationToken = default)
     {

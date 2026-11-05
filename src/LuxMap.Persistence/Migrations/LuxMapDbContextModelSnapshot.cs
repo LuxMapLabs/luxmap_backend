@@ -4000,6 +4000,74 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("uploaded_by");
 
+                    b.Property<long?>("VideoBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("video_bytes");
+
+                    b.Property<double?>("VideoConfidenceMax")
+                        .HasColumnType("double precision")
+                        .HasColumnName("video_confidence_max");
+
+                    b.Property<double?>("VideoConfidenceMedian")
+                        .HasColumnType("double precision")
+                        .HasColumnName("video_confidence_median");
+
+                    b.Property<double?>("VideoConfidenceMin")
+                        .HasColumnType("double precision")
+                        .HasColumnName("video_confidence_min");
+
+                    b.Property<int?>("VideoDaylightFrames")
+                        .HasColumnType("integer")
+                        .HasColumnName("video_daylight_frames");
+
+                    b.Property<int?>("VideoDurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("video_duration_ms");
+
+                    b.Property<long?>("VideoExtractorVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("video_extractor_version_id");
+
+                    b.Property<bool?>("VideoHdr")
+                        .HasColumnType("boolean")
+                        .HasColumnName("video_hdr");
+
+                    b.Property<double?>("VideoMedianLuma")
+                        .HasColumnType("double precision")
+                        .HasColumnName("video_median_luma");
+
+                    b.Property<string>("VideoObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("video_object_key");
+
+                    b.Property<int?>("VideoOffFrames")
+                        .HasColumnType("integer")
+                        .HasColumnName("video_off_frames");
+
+                    b.Property<int?>("VideoOnFrames")
+                        .HasColumnType("integer")
+                        .HasColumnName("video_on_frames");
+
+                    b.Property<string>("VideoReasonCode")
+                        .HasColumnType("text")
+                        .HasColumnName("video_reason_code");
+
+                    b.Property<int?>("VideoSampledFrames")
+                        .HasColumnType("integer")
+                        .HasColumnName("video_sampled_frames");
+
+                    b.Property<string>("VideoSha256")
+                        .HasColumnType("text")
+                        .HasColumnName("video_sha256");
+
+                    b.Property<DateTime?>("VideoViewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("video_viewed_at");
+
+                    b.Property<string>("VideoViewedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("video_viewed_by");
+
                     b.Property<int>("Width")
                         .HasColumnType("integer")
                         .HasColumnName("width");
@@ -4023,6 +4091,12 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasIndex("ReviewedBy")
                         .HasDatabaseName("ix_pole_photo_reviewed_by");
+
+                    b.HasIndex("VideoExtractorVersionId")
+                        .HasDatabaseName("ix_pole_photo_video_extractor_version");
+
+                    b.HasIndex("VideoViewedBy")
+                        .HasDatabaseName("ix_pole_photo_video_viewed_by");
 
                     b.HasIndex("PoleId", "CapturedAt")
                         .HasDatabaseName("ix_work_order_pole_photo_pole_id_captured_at");
@@ -4053,6 +4127,16 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_pole_photo_review_note_required", "final_cv_state IS NULL OR final_cv_state IS NOT DISTINCT FROM cv_state OR review_note IS NOT NULL");
 
                             t.HasCheckConstraint("ck_pole_photo_sizes", "byte_count BETWEEN 1 AND 16777216 AND thumbnail_bytes > 0 AND width > 0 AND height > 0 AND width::bigint * height <= 40000000");
+
+                            t.HasCheckConstraint("ck_pole_photo_video_complete", "(video_object_key IS NULL AND video_sha256 IS NULL AND video_bytes IS NULL AND video_duration_ms IS NULL AND video_sampled_frames IS NULL AND video_on_frames IS NULL AND video_off_frames IS NULL AND video_daylight_frames IS NULL AND video_median_luma IS NULL AND video_hdr IS NULL AND video_extractor_version_id IS NULL) OR (video_object_key IS NOT NULL AND video_sha256 IS NOT NULL AND video_bytes IS NOT NULL AND video_duration_ms IS NOT NULL AND video_sampled_frames IS NOT NULL AND video_on_frames IS NOT NULL AND video_off_frames IS NOT NULL AND video_daylight_frames IS NOT NULL AND video_median_luma IS NOT NULL AND video_hdr IS NOT NULL AND video_extractor_version_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pole_photo_video_confidence", "(video_confidence_min IS NULL AND video_confidence_median IS NULL AND video_confidence_max IS NULL AND (video_object_key IS NULL OR video_on_frames + video_off_frames = 0)) OR (video_object_key IS NOT NULL AND video_on_frames + video_off_frames > 0 AND video_confidence_min IS NOT NULL AND video_confidence_median IS NOT NULL AND video_confidence_max IS NOT NULL AND video_confidence_min BETWEEN 0 AND 1 AND video_confidence_median BETWEEN 0 AND 1 AND video_confidence_max BETWEEN 0 AND 1 AND video_confidence_min <> 'NaN'::float8 AND video_confidence_median <> 'NaN'::float8 AND video_confidence_max <> 'NaN'::float8 AND video_confidence_min <= video_confidence_median AND video_confidence_median <= video_confidence_max)");
+
+                            t.HasCheckConstraint("ck_pole_photo_video_reason", "video_reason_code IS NULL OR (video_object_key IS NOT NULL AND btrim(video_reason_code) <> '')");
+
+                            t.HasCheckConstraint("ck_pole_photo_video_values", "video_object_key IS NULL OR (btrim(video_object_key) <> '' AND video_sha256 ~ '^[0-9a-f]{64}$' AND video_bytes > 0 AND video_duration_ms > 0 AND video_sampled_frames > 0 AND video_on_frames >= 0 AND video_off_frames >= 0 AND video_daylight_frames >= 0 AND video_on_frames + video_off_frames + video_daylight_frames <= video_sampled_frames AND video_median_luma BETWEEN 0 AND 1 AND video_median_luma <> 'NaN'::float8)");
+
+                            t.HasCheckConstraint("ck_pole_photo_video_viewed", "(video_viewed_by IS NULL AND video_viewed_at IS NULL) OR (video_viewed_by IS NOT NULL AND video_viewed_at IS NOT NULL AND video_object_key IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_work_order_pole_photo_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
                         });
@@ -4248,7 +4332,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("audit_event", null, t =>
                         {
-                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('cancellation_requested', 'cancellation_rejected', 'created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated')");
+                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('cancellation_requested', 'cancellation_rejected', 'created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated', 'viewed')");
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 
@@ -5555,6 +5639,18 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_work_order_pole_photo_app_user_uploaded_by");
+
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VideoExtractorVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pole_photo_video_extractor_version");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("VideoViewedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pole_photo_video_viewed_by");
 
                     b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
                         .WithMany()

@@ -25,11 +25,35 @@ internal sealed class PhotoStore : IObjectStore
     public Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult<Stream>(new MemoryStream(Objects[(bucket, key)], false));
 
+    /// <summary>Counts range reads and keeps the last range asked for, so a test can prove the API asked for the bytes it sent.</summary>
+    public int RangeReads { get; private set; }
+    public (long From, long To)? LastRange { get; private set; }
+
+    public Task<Stream> OpenRangeAsync(StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default)
+    {
+        RangeReads++; LastRange = (from, to);
+        return Task.FromResult<Stream>(new MemoryStream(Objects[(bucket, key)][(int)from..((int)to + 1)], false));
+    }
+
     public Task<bool> ExistsAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult(Objects.ContainsKey((bucket, key)));
 
-    public Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content, StreamUpload upload, CancellationToken cancellationToken = default)
-        => throw new NotSupportedException();
+    /// <summary>Keeps a clip as the S3 adapter would accept it: size, the MP4 signature, the declared length and the declared SHA-256 all checked.</summary>
+    public async Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content, StreamUpload upload, CancellationToken cancellationToken = default)
+    {
+        if (DuringWrite is { } during) await during();
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        var bytes = buffer.ToArray();
+        if (bytes.Length > upload.MaxBytes) throw new LuxMap.Shared.Http.LuxMapException("UPLOAD_TOO_LARGE", System.Net.HttpStatusCode.RequestEntityTooLarge, "Too large.");
+        if (upload.RequireMp4 && (bytes.Length < 12 || !bytes.AsSpan(4, 4).SequenceEqual("ftyp"u8)))
+            throw new LuxMap.Shared.Http.LuxMapException("UNSUPPORTED_VIDEO_FORMAT", System.Net.HttpStatusCode.UnsupportedMediaType, "Not an MP4.");
+        if (bytes.Length != upload.ExpectedBytes) throw new LuxMap.Shared.Http.LuxMapException("CONTENT_LENGTH_MISMATCH", System.Net.HttpStatusCode.BadRequest, "Length.");
+        var sha = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));
+        if (sha != upload.ExpectedSha256) throw new LuxMap.Shared.Http.LuxMapException("HASH_MISMATCH", System.Net.HttpStatusCode.BadRequest, "Hash.");
+        Objects[(bucket, key)] = bytes;
+        return new(key, bytes.Length, sha);
+    }
 
     /// <summary>A small but real JPEG; <paramref name="shade"/> makes two photos differ byte for byte.</summary>
     public static byte[] Jpeg(byte shade = 90)

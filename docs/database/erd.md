@@ -59,6 +59,18 @@ FK tới work_order, pole + commune, uploaded_by/decided_by; `fault.origin_pole_
 không ghi luminance_history/baseline. Q5 mở thêm nguồn **ảnh đã duyệt**, Q11 thêm nguồn ảnh cho fault; Q8 giữ registry survey,
 ảnh dùng chuỗi model/artifact như Citizen theo D-10 đợt đầu. Chi tiết drift PP-1…PP-10; migration AddWorkOrderPolePhotos.
 
+## Bổ sung POLE-VIDEO PV-a (04/11/2026, Mỹ SELF-SIGNED, nền tạm)
+
+D-1 phương án C: clip một đèn nằm **trong chính dòng `work_order_pole_photo`** — 17 cột `video_*` nullable, tất cả-hoặc-không
+(`ck_pole_photo_video_complete`): clip gốc (`video_object_key` / `video_sha256` / `video_bytes` / `video_duration_ms`, bucket `luxmap-video`),
+đếm frame (`video_sampled_frames`, `video_on_frames`, `video_off_frames`, `video_daylight_frames`), trải confidence
+(`video_confidence_min/median/max`, vắng khi không frame nào bỏ phiếu), `video_median_luma`, cờ `video_hdr` (D-14),
+`video_extractor_version_id` (FK `artifact_version`, BE-34), `video_reason_code`, và lượt mở clip của người quyết định
+(`video_viewed_by/at`, D-13). **`byte_count` / `width` / `height` của dòng vẫn mô tả FRAME đại diện** (cap 16 MiB của
+`ck_pole_photo_sizes`); dung lượng clip là `video_bytes` — thống kê dung lượng phải cộng cả hai (đã khai `StoredObjectColumn` cho
+`video_object_key`). Trần thời lượng / số frame là cấu hình dịch vụ, không ở CHECK. Thêm `audit_event.action = 'viewed'`.
+Migration `AddPoleVideoColumns` (chỉ thêm; `Down()` từ chối khi đã có clip hoặc audit `viewed`). Chưa có endpoint — PV-b/PV-c.
+
 
 ## ERD
 

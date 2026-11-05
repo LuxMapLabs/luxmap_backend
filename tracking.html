@@ -60,6 +60,55 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — PV-c2 (upload clip một đèn + luật nhãn), 05/11/2026</strong>
+    <p><span class="tag t-next">PR #208 · đổi API (thêm PUT + khối <code>video</code>) · không migration · chưa báo WP5 / WP6</span>
+    <code>PUT /work-orders/{id}/pole-videos/{client_op_id}</code>: MP4 thô stream sang kho (≤ 100 MiB, Caddy chặn riêng route), sampler (PV-b) cắt ≤ 12 frame, AI chấm từng frame, <code>PoleVideoVerdict</code> gộp nhãn (≥ 60 % frame có nhãn, đồng thuận ≥ 70 %, đầu = cuối, trung vị confidence);
+    kết quả là <b>một ảnh cột</b> (frame đại diện) mang khối <code>video</code> — review, quyết định, công bố, sự cố dùng nguyên. Replay không đọc / chấm / ghi lại; kiểm lại phiếu sau khi nhận clip; <code>captured_at</code> có biên (7 ngày / +5 phút).
+    Model vắng ⇒ vẫn 201, <code>ai_status = unavailable</code>. Audit quyết định mang <code>media = video</code>, <code>capture_config = not_verified</code>, <code>hdr</code>. Drift <b>PV-4…PV-9</b>; OpenAPI xuất lại.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): accept a pole video, judge its frames and record one photo</code>. Số tham số D-4 vẫn tạm: chưa đo suy luận và chưa có clip một đèn thật.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-VIDEO — PV-c1 (đọc clip có Range + ghi lượt xem), 04/11/2026</strong>
+    <p><span class="tag t-next">PR #207 đã merge (05/11/2026, quyền admin) · đổi API (thêm 1 endpoint) · không migration · chưa báo WP5 / WP6</span>
+    <code>GET /work-orders/{id}/pole-photos/{photo_id}/video</code>: 200 cả clip, 206 đúng đoạn, 416 kèm <code>Content-Range</code>; <code>IObjectStore.OpenRangeAsync</code> (S3 <code>ByteRange</code>) nên server không đọc cả clip để tua.
+    Quản lý mở clip chưa quyết lần đầu ⇒ <code>video_viewed_by/at</code> + một audit <code>viewed</code>; kỹ sư / giám sát / quản trị không ghi. Drift <b>PV-1…PV-3</b>; OpenAPI xuất lại.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): serve pole video with HTTP ranges and record manager views</code>. Kế tiếp: PV-c3 (buộc xem trước confirm) sau PV-c1; PV-c2 (upload + luật nhãn) sau PV-b.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-VIDEO — PV-b (lấy mẫu frame cho clip một đèn), 04/11/2026</strong>
+    <p><span class="tag t-next">PR #206 đã merge (05/11/2026) · chưa có endpoint, chưa ai gọi port · không migration · không đổi API · chưa báo WP4 / WP5 / WP6</span>
+    Port <code>IClipFrameSampler</code> ở <code>LuxMap.Shared.Media</code>, Survey hiện thực (<code>WorkOrders</code> không tham chiếu được Survey). Frame rải đều theo thời gian hiển thị thật,
+    sàn 3 s / trần 30 s (+0,5 s dung sai), bỏ 1 s đầu chỉ khi clip &gt; 6 s; slot và thư mục tạm riêng; lỗi ra là <code>LuxMapException</code> (400 / 503). Cờ <code>Hdr</code> đọc từ <code>color_transfer</code> (HLG/PQ), chưa tone-map.
+    Các bước ffmpeg dùng chung tách thành <code>FfmpegClipTools</code> (extractor khảo sát đổi theo, 24 test media giữ nguyên xanh). Tham số <code>PoleVideo:*</code> tạm, sai ⇒ dừng khởi động.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a>.</p>
+    <p class="muted">Commit: <code>refactor(survey)…</code> + <code>feat(survey): add pole video frame sampler</code>. Kế tiếp: PV-c (endpoint PUT / GET video có Range, luật nhãn, Caddy, OpenAPI).</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-VIDEO — PV-a (lược đồ clip một đèn), 04/11/2026</strong>
+    <p><span class="tag t-next">PR #205 · migration <code>AddPoleVideoColumns</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa có endpoint · chưa báo WP4 / WP5 / WP6</span>
+    D-1 (C): 17 cột <code>video_*</code> nullable, tất cả-hoặc-không, ngay trong <code>work_order_pole_photo</code> (clip gốc, đếm frame, trải confidence, độ sáng, cờ <code>hdr</code>, phiên bản extractor, mã lý do, lượt mở clip của người quyết định)
+    cùng audit <code>viewed</code> (D-13). <code>byte_count</code>/<code>width</code>/<code>height</code> của dòng vẫn mô tả <b>frame</b>; clip ở <code>video_bytes</code>. Khai <code>StoredObjectColumn</code> (bucket video) và <code>VersionedResultColumn</code>; script sao chép DB thêm bộ lọc <code>video_viewed_by</code>.
+    Test viết chính CHECK lộ một lỗi thật: nhánh CHECK có toán hạng NULL cho NULL nên hàng sai lọt — đã sửa, ghi bẫy vào <code>traps/migrations.md</code>. Toàn bộ test xanh; <code>Down()</code> từ chối khi đã có clip hoặc audit <code>viewed</code>.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): add pole video columns to work_order_pole_photo</code>. Kế tiếp: PV-b (port lấy mẫu frame).</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-VIDEO — đã chốt D-1…D-4, D-9, D-13, D-14; sẵn sàng Pha 2, 04/11/2026</strong>
+    <p><span class="tag t-next">Chưa bắt đầu Pha 2 · PR #204 (tài liệu) · chưa báo WP4 / WP5 / WP6</span>
+    Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột: chỉ ON/OFF, bỏ qua cấu hình quay, <code>data_source</code> lấy từ cột.
+    Đã chốt: cột clip nằm thẳng trong <code>work_order_pole_photo</code>; suy luận đồng bộ; luật nhãn với số tạm; phát clip có Range;
+    Quản lý phải mở clip trước mọi <code>confirm</code> (409 nếu chưa); clip HDR HLG được nhận và gắn cờ <code>hdr</code>.
+    Còn chờ đo: fps lấy mẫu, ngưỡng ban ngày, ngưỡng chuyển sang nền.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a> · <a href=".ai/results/POLE-VIDEO-p1.md">Kết quả Pha 1</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-SEGMENT-NULL — PR 2e (nút bật: ghi cột chưa tuyến), 03/11/2026</strong>
     <p><span class="tag t-next">PR #202 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) hoặc merge admin · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
     PR cuối của ticket. <code>POST /assets/poles</code>: <code>segment_id</code> vắng hoặc <code>null</code> ⇒ cột chưa tuyến (chuỗi trắng 400, mã lạ 404). <code>PUT</code>: khoá <code>segment_id</code> vẫn bắt buộc

@@ -53,6 +53,10 @@ public sealed class InMemoryObjectStore : IObjectStore
         StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult<Stream>(new MemoryStream(objects[(bucket, key)], writable: false));
 
+    public Task<Stream> OpenRangeAsync(
+        StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default)
+        => Task.FromResult<Stream>(new MemoryStream(objects[(bucket, key)][(int)from..((int)to + 1)], writable: false));
+
     public Task<bool> ExistsAsync(
         StorageBucket bucket, string key, CancellationToken cancellationToken = default)
         => Task.FromResult(objects.ContainsKey((bucket, key)));

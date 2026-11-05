@@ -94,6 +94,24 @@ public static class ArtifactRegistry
         => version?.Trim() is { Length: > 0 and <= VersionMaxLength } trimmed && !trimmed.Any(char.IsControl) ? trimmed : null;
 
     /// <summary>
+    /// The row of <paramref name="component"/> at <paramref name="version"/> carrying <paramref name="hash"/> (a model, an extractor, an algorithm).
+    /// <c>ON CONFLICT DO NOTHING</c>, so two writers at once end on the same row. Returns the id and the hash the ROW holds — the caller compares it
+    /// with its own: a version string that already names a different artifact is a conflict only the caller can word.
+    /// </summary>
+    public static async Task<(long VersionId, string? Hash)> EnsureAsync(
+        LuxMapDbContext db, string component, string version, string hash, string metadata, CancellationToken ct)
+    {
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO artifact_version (component, version, artifact_hash, metadata, created_at)
+            VALUES ({component}, {version}, {hash}, {metadata}::jsonb, now())
+            ON CONFLICT (component, version) DO NOTHING
+            """, ct);
+        var row = await db.Set<ArtifactVersion>().Where(x => x.Component == component && x.Version == version)
+            .Select(x => new { x.VersionId, x.ArtifactHash }).SingleAsync(ct);
+        return (row.VersionId, row.ArtifactHash);
+    }
+
+    /// <summary>
     /// The row of <paramref name="component"/> at <paramref name="version"/>, inserted with no hash when nobody registered it
     /// first. <c>ON CONFLICT DO NOTHING</c>, so two writers at once both end on the same row.
     /// </summary>

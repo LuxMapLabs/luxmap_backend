@@ -155,6 +155,14 @@ public interface IObjectStore
     Task<Stream> OpenAsync(
         StorageBucket bucket, string key, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Opens bytes <paramref name="from"/> to <paramref name="to"/> INCLUSIVE of an object (an HTTP range), so a player can seek in a
+    /// clip without the API reading all of it (POLE-VIDEO D-9). The caller knows the object's size and keeps the range inside it;
+    /// the caller disposes the stream.
+    /// </summary>
+    Task<Stream> OpenRangeAsync(
+        StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default);
+
     Task<bool> ExistsAsync(
         StorageBucket bucket, string key, CancellationToken cancellationToken = default);
 }
