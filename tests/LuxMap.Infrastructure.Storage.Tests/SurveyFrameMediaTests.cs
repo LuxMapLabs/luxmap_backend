@@ -530,14 +530,4 @@ public sealed class SurveyFrameMediaTests
             return new LocalMediaProcessRunner().RunAsync(executable, args, timeoutSeconds, ct, checkOutput);
         }
     }
-
-    private sealed class ClipStore(byte[] bytes, bool block = false) : IObjectStore
-    {
-        public async Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
-        { if (block) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); return new MemoryStream(bytes, false); }
-        public Task<Stream> OpenRangeAsync(StorageBucket bucket, string key, long from, long to, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<bool> ExistsAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoredImage> StoreImageAsync(StorageBucket bucket, string id, Stream content, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<StoredObject> StoreStreamAsync(StorageBucket bucket, string key, Stream content, StreamUpload upload, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    }
 }
