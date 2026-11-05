@@ -21,10 +21,15 @@ public sealed class FfmpegClipFrameSampler(IObjectStore store, SurveyFrameOption
     private readonly SemaphoreSlim slots = new(sampling.Value.MaximumConcurrentClips);
     public void Dispose() => slots.Dispose();
 
+    // The tools do not change while the process runs; hashing ffmpeg's binary on every request would cost more than cutting the frames.
+    // Only a success is remembered — a missing ffmpeg must be noticed again once it is installed.
+    private ClipSamplerArtifact? described;
+
     public async Task<ClipSamplerArtifact> DescribeAsync(CancellationToken ct)
     {
+        if (described is { } known) return known;
         var artifact = await Translate(() => clip.DescribeAsync(ct));
-        return new(artifact.Version, artifact.Hash, artifact.Metadata);
+        return described = new(artifact.Version, artifact.Hash, artifact.Metadata);
     }
 
     public async Task<ClipInfo> SampleAsync(ClipSampleRequest request, Func<SampledFrame, CancellationToken, Task> consume, CancellationToken ct)

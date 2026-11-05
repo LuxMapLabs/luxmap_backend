@@ -30,7 +30,8 @@ public sealed class OriginalJpegReader : IOriginalJpegReader
                 throw new LuxMapException("VALIDATION_FAILED", HttpStatusCode.BadRequest, "Photo exceeds the pixel limit.");
             buffer.Position = 0;
             var thumbnail = await ThumbnailFactory.CreateAsync(buffer, ct);
-            return new(buffer.ToArray(), thumbnail, info.Width, info.Height);
+            using var thumbnailStream = new MemoryStream(thumbnail, writable: false);
+            return new(buffer.ToArray(), thumbnail, info.Width, info.Height, await JpegLuma.MeanAsync(thumbnailStream, ct));
         }
         catch (ImageFormatException)
         {

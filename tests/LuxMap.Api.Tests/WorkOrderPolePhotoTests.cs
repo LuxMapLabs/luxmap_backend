@@ -37,11 +37,13 @@ public partial class WorkOrderTests
         public SingleLampPhotoHint? Result = new("off", 0.91, "model-test-v1", "model-test-v1+cq-legacy");
         public int Calls;
         public Func<Task>? DuringInference;
+        /// <summary>When set, the answer for the n-th call (from 0) instead of <see cref="Result"/> — a clip asks once per frame.</summary>
+        public Func<int, SingleLampPhotoHint?>? PerCall;
         public async Task<SingleLampPhotoHint?> HintAsync(Stream photo, Stream thumbnail, CancellationToken ct)
         {
-            Interlocked.Increment(ref Calls);
+            var call = Interlocked.Increment(ref Calls) - 1;
             if (DuringInference is { } action) await action();
-            return Result;
+            return PerCall is { } each ? each(call) : Result;
         }
     }
     private async Task<HttpClient> PoleClient(string who = "a")

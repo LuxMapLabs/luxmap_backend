@@ -60,6 +60,16 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — PV-c2 (upload clip một đèn + luật nhãn), 05/11/2026</strong>
+    <p><span class="tag t-next">PR chờ mở · đổi API (thêm PUT + khối <code>video</code>) · không migration · chưa báo WP5 / WP6</span>
+    <code>PUT /work-orders/{id}/pole-videos/{client_op_id}</code>: MP4 thô stream sang kho (≤ 100 MiB, Caddy chặn riêng route), sampler (PV-b) cắt ≤ 12 frame, AI chấm từng frame, <code>PoleVideoVerdict</code> gộp nhãn (≥ 60 % frame có nhãn, đồng thuận ≥ 70 %, đầu = cuối, trung vị confidence);
+    kết quả là <b>một ảnh cột</b> (frame đại diện) mang khối <code>video</code> — review, quyết định, công bố, sự cố dùng nguyên. Replay không đọc / chấm / ghi lại; kiểm lại phiếu sau khi nhận clip; <code>captured_at</code> có biên (7 ngày / +5 phút).
+    Model vắng ⇒ vẫn 201, <code>ai_status = unavailable</code>. Audit quyết định mang <code>media = video</code>, <code>capture_config = not_verified</code>, <code>hdr</code>. Drift <b>PV-4…PV-9</b>; OpenAPI xuất lại.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): accept a pole video, judge its frames and record one photo</code>. Số tham số D-4 vẫn tạm: chưa đo suy luận và chưa có clip một đèn thật.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-VIDEO — PV-b (lấy mẫu frame cho clip một đèn), 04/11/2026</strong>
     <p><span class="tag t-next">PR chờ mở · chưa có endpoint, chưa ai gọi port · không migration · không đổi API · chưa báo WP4 / WP5 / WP6</span>
     Port <code>IClipFrameSampler</code> ở <code>LuxMap.Shared.Media</code>, Survey hiện thực (<code>WorkOrders</code> không tham chiếu được Survey). Frame rải đều theo thời gian hiển thị thật,

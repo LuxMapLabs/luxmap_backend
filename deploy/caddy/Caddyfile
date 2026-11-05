@@ -38,6 +38,17 @@
 			header Content-Type application/json
 			respond `{"error":{"code":"UPLOAD_TOO_LARGE","message":"Upload exceeds the endpoint limit.","details":{}}}` 413
 		}
+		# POLE-VIDEO D-6: a pole clip is at most 100 MiB (WorkOrderPolePhotoService.MaxClipBytes = 104857600) — below the 300 MiB guard
+		# that follows, so without this a clip of 100-300 MiB would get the API's early 413 and the same proxy 502.
+		@pole_video_too_large {
+			method PUT
+			path /api/v1/work-orders/*/pole-videos/*
+			expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 104857600`
+		}
+		handle @pole_video_too_large {
+			header Content-Type application/json
+			respond `{"error":{"code":"UPLOAD_TOO_LARGE","message":"Upload exceeds the endpoint limit.","details":{}}}` 413
+		}
 		@too_large expression `{http.request.header.Content-Length} != "" && int({http.request.header.Content-Length}) > 314572800`
 		handle @too_large {
 			header Content-Type application/json
