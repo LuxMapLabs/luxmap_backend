@@ -60,8 +60,17 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — PV-c1 (đọc clip có Range + ghi lượt xem), 04/11/2026</strong>
+    <p><span class="tag t-next">PR #207 · đổi API (thêm 1 endpoint) · không migration · chưa báo WP5 / WP6</span>
+    <code>GET /work-orders/{id}/pole-photos/{photo_id}/video</code>: 200 cả clip, 206 đúng đoạn, 416 kèm <code>Content-Range</code>; <code>IObjectStore.OpenRangeAsync</code> (S3 <code>ByteRange</code>) nên server không đọc cả clip để tua.
+    Quản lý mở clip chưa quyết lần đầu ⇒ <code>video_viewed_by/at</code> + một audit <code>viewed</code>; kỹ sư / giám sát / quản trị không ghi. Drift <b>PV-1…PV-3</b>; OpenAPI xuất lại.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): serve pole video with HTTP ranges and record manager views</code>. Kế tiếp: PV-c3 (buộc xem trước confirm) sau PV-c1; PV-c2 (upload + luật nhãn) sau PV-b.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-VIDEO — PV-b (lấy mẫu frame cho clip một đèn), 04/11/2026</strong>
-    <p><span class="tag t-next">PR chờ mở · chưa có endpoint, chưa ai gọi port · không migration · không đổi API · chưa báo WP4 / WP5 / WP6</span>
+    <p><span class="tag t-next">PR #206 đã merge (05/11/2026) · chưa có endpoint, chưa ai gọi port · không migration · không đổi API · chưa báo WP4 / WP5 / WP6</span>
     Port <code>IClipFrameSampler</code> ở <code>LuxMap.Shared.Media</code>, Survey hiện thực (<code>WorkOrders</code> không tham chiếu được Survey). Frame rải đều theo thời gian hiển thị thật,
     sàn 3 s / trần 30 s (+0,5 s dung sai), bỏ 1 s đầu chỉ khi clip &gt; 6 s; slot và thư mục tạm riêng; lỗi ra là <code>LuxMapException</code> (400 / 503). Cờ <code>Hdr</code> đọc từ <code>color_transfer</code> (HLG/PQ), chưa tone-map.
     Các bước ffmpeg dùng chung tách thành <code>FfmpegClipTools</code> (extractor khảo sát đổi theo, 24 test media giữ nguyên xanh). Tham số <code>PoleVideo:*</code> tạm, sai ⇒ dừng khởi động.
