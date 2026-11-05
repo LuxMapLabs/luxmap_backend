@@ -7,15 +7,26 @@ public enum PolePhotoLabelSource { Ai, Engineer }
 public sealed record PolePhotoPublication(string PhotoId, string WorkOrderId, string PoleId, string CommuneId,
     DataSource DataSource, string EffectiveCvState, PolePhotoLabelSource LabelSource,
     string? AiCvState, double? AiConfidence, string? AiModelVersion, string? AiArtifactVersion,
-    string? ReviewedBy, DateTime? ReviewedAt, string? ReviewNote, DateTime CapturedAt, DateTime Now)
+    string? ReviewedBy, DateTime? ReviewedAt, string? ReviewNote, DateTime CapturedAt, DateTime Now, PoleVideoProvenance? Video = null)
 {
     public object LabelSnapshot => new
     {
         effective_cv_state = EffectiveCvState, label_source = LabelSource == PolePhotoLabelSource.Engineer ? "engineer" : "ai",
         label_changed = LabelSource == PolePhotoLabelSource.Engineer, ReviewedBy, ReviewedAt, ReviewNote,
         ai_hint = new { cv_state = AiCvState, confidence = AiConfidence, model_version = AiModelVersion, artifact_version = AiArtifactVersion },
+        media = Video is null ? "photo" : "video",
+        video = Video is null ? null : new
+        {
+            capture_config = "not_verified", hdr = Video.Hdr, extractor_version_id = Video.ExtractorVersionId, reason_code = Video.ReasonCode,
+        },
     };
 }
+
+/// <summary>
+/// What a label that came from a clip says about how the clip was taken (POLE-VIDEO D-8, D-14): no capture configuration was checked, and the
+/// source may be HDR. Carried into the audit trail of the decision so a later statistic can leave such results out.
+/// </summary>
+public sealed record PoleVideoProvenance(bool Hdr, long ExtractorVersionId, string? ReasonCode);
 public sealed record PolePhotoPublicationResult(bool StatusApplied, string StatusReason);
 
 /// <summary>Survey owns publication. Caller holds work-order → pole → photo locks and a transaction.</summary>

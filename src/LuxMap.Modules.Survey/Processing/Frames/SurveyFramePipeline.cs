@@ -176,14 +176,9 @@ public sealed class SurveyFramePipeline(IObjectStore store, IFrameExtractor extr
 
     public static async Task<long> RegisterArtifact(LuxMapDbContext db, string component, MediaArtifact artifact, CancellationToken ct)
     {
-        await db.Database.ExecuteSqlInterpolatedAsync($"""
-            INSERT INTO artifact_version (component, version, artifact_hash, metadata, created_at)
-            VALUES ({component}, {artifact.Version}, {artifact.Hash}, {artifact.Metadata}::jsonb, now())
-            ON CONFLICT (component, version) DO NOTHING
-            """, ct);
-        var row = await db.Set<ArtifactVersion>().SingleAsync(x => x.Component == component && x.Version == artifact.Version, ct);
-        if (row.ArtifactHash != artifact.Hash) throw new ProcessingFailure("ARTIFACT_VERSION_CONFLICT", "artifact");
-        return row.VersionId;
+        var (versionId, hash) = await ArtifactRegistry.EnsureAsync(db, component, artifact.Version, artifact.Hash, artifact.Metadata, ct);
+        if (hash != artifact.Hash) throw new ProcessingFailure("ARTIFACT_VERSION_CONFLICT", "artifact");
+        return versionId;
     }
 
     public static async Task<T> WithHeartbeat<T>(Func<CancellationToken, Task<T>> operation,

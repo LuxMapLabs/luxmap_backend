@@ -13,17 +13,19 @@ using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
+using LuxMap.Shared.Media;
 using LuxMap.Shared.Serialization;
 using LuxMap.Shared.Storage;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace LuxMap.Modules.WorkOrders;
 
 public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurrentActorAccessor actor,
     IObjectStore store, IOriginalJpegReader images, ISingleLampPhotoHinter hinter, IAuditTrail audit,
-    WorkOrderPoleService poles, IPolePhotoPublication publication)
+    WorkOrderPoleService poles, IPolePhotoPublication publication, IClipFrameSampler sampler, IOptions<PoleVideoOptions> videoOptions)
 {
     public const long MaxUploadBytes = 16 * 1024 * 1024;
     public const long MaxRequestBytes = 17 * 1024 * 1024;
@@ -53,20 +55,48 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict);
     }
 
+    /// <summary>The photo (or clip) already stored for this user's operation: the same request again is a replay, a different one is a conflict.</summary>
+    private async Task<PolePhotoItem?> ReplayAsync(string id, string actorId, Guid op, string hash, CancellationToken ct)
+    {
+        var row = await db.Set<WorkOrderPolePhoto>().AsNoTracking().SingleOrDefaultAsync(p => p.UploadedBy == actorId && p.ClientOpId == op, ct);
+        if (row is null) return null;
+        if (row.RequestHash != hash) throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
+        // Scope on the photo is independent of its parent on inter-commune roads.
+        await Order(id, true, ct);
+        return Item(row);
+    }
+
+    /// <summary>A hint the model port may return: a state, a confidence exactly when it is on or off, versions that say what produced it.</summary>
+    private static void ValidateHint(SingleLampPhotoHint? hint)
+    {
+        if (hint is not null && (hint.CvState is not ("on" or "off" or "inconclusive")
+            || (hint.CvState == "inconclusive") != (hint.Confidence is null)
+            || hint.Confidence is { } c && (!double.IsFinite(c) || c is < 0 or > 1)
+            || string.IsNullOrWhiteSpace(hint.ModelVersion) || string.IsNullOrWhiteSpace(hint.ArtifactVersion)))
+            throw new InvalidOperationException("Invalid single-lamp hint.");
+    }
+
+    /// <summary>A full ISO 8601 timestamp that names its offset or Z, as UTC to the microsecond.</summary>
+    private static DateTime ParseCapturedAt(string? value)
+    {
+        if (value is null || !Timestamp().IsMatch(value)
+            || !DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var captured))
+            throw OptionalJson.Invalid("captured_at");
+        return new(captured.Ticks / 10 * 10, DateTimeKind.Utc);
+    }
+
+    private static double ParseCoordinate(string? value, string name, double limit)
+        => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var n)
+            && double.IsFinite(n) && Math.Abs(n) <= limit ? (n == 0 ? 0 : n) : throw OptionalJson.Invalid(name);
+
     public async Task<(PolePhotoItem Item, bool Created)> UploadAsync(string id, string? poleId, IFormFile? photo,
         string? capturedAt, string? lat, string? lng, string? clientOpId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(poleId)) throw OptionalJson.Invalid("pole_id");
         if (photo is null || photo.Length == 0) throw OptionalJson.Invalid("photo");
         if (photo.Length > MaxUploadBytes) throw Error("UPLOAD_TOO_LARGE", HttpStatusCode.RequestEntityTooLarge);
-        if (capturedAt is null || !Timestamp().IsMatch(capturedAt)
-            || !DateTime.TryParse(capturedAt, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var captured))
-            throw OptionalJson.Invalid("captured_at");
-        captured = new(captured.Ticks / 10 * 10, DateTimeKind.Utc);
-        double Coordinate(string? value, string name, double limit)
-            => double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var n)
-                && double.IsFinite(n) && Math.Abs(n) <= limit ? (n == 0 ? 0 : n) : throw OptionalJson.Invalid(name);
-        var latitude = Coordinate(lat, "lat", 90); var longitude = Coordinate(lng, "lng", 180);
+        var captured = ParseCapturedAt(capturedAt);
+        var latitude = ParseCoordinate(lat, "lat", 90); var longitude = ParseCoordinate(lng, "lng", 180);
         if (!Guid.TryParse(clientOpId, out var op) || op == Guid.Empty) throw OptionalJson.Invalid("client_op_id");
         var actorId = ActorId;
         await Order(id, true, ct);
@@ -86,15 +116,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         {
             id, poleId, captured, latitude, longitude, sha256 = Convert.ToHexStringLower(SHA256.HashData(buffer.ToArray())),
         }, LuxMapJsonOptions.Default)));
-        async Task<PolePhotoItem?> Replay()
-        {
-            var row = await db.Set<WorkOrderPolePhoto>().AsNoTracking().SingleOrDefaultAsync(p => p.UploadedBy == actorId && p.ClientOpId == op, ct);
-            if (row is null) return null;
-            if (row.RequestHash != hash) throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
-            // Scope on the photo is independent of its parent on inter-commune roads.
-            await Order(id, true, ct);
-            return Item(row);
-        }
+        Task<PolePhotoItem?> Replay() => ReplayAsync(id, actorId, op, hash, ct);
         if (await Replay() is { } replay) return (replay, false);
         Writable(await Order(id, true, ct));
         var target = await Target(id, poleId, ct);
@@ -108,11 +130,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         original.Position = 0;
         using var thumbnail = new MemoryStream(image.Thumbnail, false);
         var hint = await hinter.HintAsync(original, thumbnail, ct);
-        if (hint is not null && (hint.CvState is not ("on" or "off" or "inconclusive")
-            || (hint.CvState == "inconclusive") != (hint.Confidence is null)
-            || hint.Confidence is { } c && (!double.IsFinite(c) || c is < 0 or > 1)
-            || string.IsNullOrWhiteSpace(hint.ModelVersion) || string.IsNullOrWhiteSpace(hint.ArtifactVersion)))
-            throw new InvalidOperationException("Invalid single-lamp hint.");
+        ValidateHint(hint);
 
         // No locks across storage, image decode or model inference. Global order: order → pole → photo.
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -232,7 +250,8 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         var now = UtcMicrosecondClock.UtcNow();
         var input = new PolePhotoPublication(row.PhotoId, id, row.PoleId, row.CommuneId, row.DataSource,
             effective!, row.FinalCvState is not null && row.FinalCvState != row.CvState ? PolePhotoLabelSource.Engineer : PolePhotoLabelSource.Ai,
-            row.CvState, row.Confidence, row.ModelVersion, row.ArtifactVersion, row.ReviewedBy, row.ReviewedAt, row.ReviewNote, row.CapturedAt, now);
+            row.CvState, row.Confidence, row.ModelVersion, row.ArtifactVersion, row.ReviewedBy, row.ReviewedAt, row.ReviewNote, row.CapturedAt, now,
+            row.VideoObjectKey is null ? null : new(row.VideoHdr!.Value, row.VideoExtractorVersionId!.Value, row.VideoReasonCode));
         var result = request.Decision == "confirm"
             ? await publication.PublishAsync(input, ct)
             : new PolePhotoPublicationResult(false, "rejected");
@@ -253,7 +272,10 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         return new(p.PhotoId, p.WorkOrderId, p.PoleId, p.DataSource, p.CapturedAt, p.Lat, p.Lng, p.UploadedBy, p.UploadedAt,
             p.CvState is null ? "unavailable" : "available", p.CvState, p.Confidence, p.ModelVersion, p.ArtifactVersion,
             p.AnalyzedAt, p.FinalCvState, p.ReviewNote, p.ReviewedBy, p.ReviewedAt, p.Decision, p.DecidedBy, p.DecidedAt, p.DecisionNote, p.StatusApplied, p.StatusReason,
-            path + "/thumbnail", path + "/original");
+            path + "/thumbnail", path + "/original", p.VideoObjectKey is null ? null : new(p.VideoDurationMs!.Value, p.VideoBytes!.Value, p.VideoSha256!,
+                p.VideoSampledFrames!.Value, p.VideoOnFrames!.Value, p.VideoOffFrames!.Value, p.VideoDaylightFrames!.Value, p.VideoConfidenceMin,
+                p.VideoConfidenceMedian, p.VideoConfidenceMax, p.VideoMedianLuma!.Value, p.VideoHdr!.Value, p.VideoReasonCode,
+                p.VideoViewedBy, p.VideoViewedAt, path + "/video"));
     }
 
     [GeneratedRegex(@"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,7})?(Z|[+-][0-9]{2}:[0-9]{2})$")]

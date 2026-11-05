@@ -60,8 +60,18 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — PV-c2 (upload clip một đèn + luật nhãn), 05/11/2026</strong>
+    <p><span class="tag t-next">PR #208 · đổi API (thêm PUT + khối <code>video</code>) · không migration · chưa báo WP5 / WP6</span>
+    <code>PUT /work-orders/{id}/pole-videos/{client_op_id}</code>: MP4 thô stream sang kho (≤ 100 MiB, Caddy chặn riêng route), sampler (PV-b) cắt ≤ 12 frame, AI chấm từng frame, <code>PoleVideoVerdict</code> gộp nhãn (≥ 60 % frame có nhãn, đồng thuận ≥ 70 %, đầu = cuối, trung vị confidence);
+    kết quả là <b>một ảnh cột</b> (frame đại diện) mang khối <code>video</code> — review, quyết định, công bố, sự cố dùng nguyên. Replay không đọc / chấm / ghi lại; kiểm lại phiếu sau khi nhận clip; <code>captured_at</code> có biên (7 ngày / +5 phút).
+    Model vắng ⇒ vẫn 201, <code>ai_status = unavailable</code>. Audit quyết định mang <code>media = video</code>, <code>capture_config = not_verified</code>, <code>hdr</code>. Drift <b>PV-4…PV-9</b>; OpenAPI xuất lại.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): accept a pole video, judge its frames and record one photo</code>. Số tham số D-4 vẫn tạm: chưa đo suy luận và chưa có clip một đèn thật.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-VIDEO — PV-c1 (đọc clip có Range + ghi lượt xem), 04/11/2026</strong>
-    <p><span class="tag t-next">PR #207 · đổi API (thêm 1 endpoint) · không migration · chưa báo WP5 / WP6</span>
+    <p><span class="tag t-next">PR #207 đã merge (05/11/2026, quyền admin) · đổi API (thêm 1 endpoint) · không migration · chưa báo WP5 / WP6</span>
     <code>GET /work-orders/{id}/pole-photos/{photo_id}/video</code>: 200 cả clip, 206 đúng đoạn, 416 kèm <code>Content-Range</code>; <code>IObjectStore.OpenRangeAsync</code> (S3 <code>ByteRange</code>) nên server không đọc cả clip để tua.
     Quản lý mở clip chưa quyết lần đầu ⇒ <code>video_viewed_by/at</code> + một audit <code>viewed</code>; kỹ sư / giám sát / quản trị không ghi. Drift <b>PV-1…PV-3</b>; OpenAPI xuất lại.
     <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
