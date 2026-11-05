@@ -60,6 +60,16 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — PV-b (lấy mẫu frame cho clip một đèn), 04/11/2026</strong>
+    <p><span class="tag t-next">PR chờ mở · chưa có endpoint, chưa ai gọi port · không migration · không đổi API · chưa báo WP4 / WP5 / WP6</span>
+    Port <code>IClipFrameSampler</code> ở <code>LuxMap.Shared.Media</code>, Survey hiện thực (<code>WorkOrders</code> không tham chiếu được Survey). Frame rải đều theo thời gian hiển thị thật,
+    sàn 3 s / trần 30 s (+0,5 s dung sai), bỏ 1 s đầu chỉ khi clip &gt; 6 s; slot và thư mục tạm riêng; lỗi ra là <code>LuxMapException</code> (400 / 503). Cờ <code>Hdr</code> đọc từ <code>color_transfer</code> (HLG/PQ), chưa tone-map.
+    Các bước ffmpeg dùng chung tách thành <code>FfmpegClipTools</code> (extractor khảo sát đổi theo, 24 test media giữ nguyên xanh). Tham số <code>PoleVideo:*</code> tạm, sai ⇒ dừng khởi động.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + quyết định</a>.</p>
+    <p class="muted">Commit: <code>refactor(survey)…</code> + <code>feat(survey): add pole video frame sampler</code>. Kế tiếp: PV-c (endpoint PUT / GET video có Range, luật nhãn, Caddy, OpenAPI).</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-VIDEO — PV-a (lược đồ clip một đèn), 04/11/2026</strong>
     <p><span class="tag t-next">PR #205 · migration <code>AddPoleVideoColumns</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa có endpoint · chưa báo WP4 / WP5 / WP6</span>
     D-1 (C): 17 cột <code>video_*</code> nullable, tất cả-hoặc-không, ngay trong <code>work_order_pole_photo</code> (clip gốc, đếm frame, trải confidence, độ sáng, cờ <code>hdr</code>, phiên bản extractor, mã lý do, lượt mở clip của người quyết định)
