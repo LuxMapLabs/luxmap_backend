@@ -20,6 +20,10 @@ public sealed class AIModule : ILuxMapModule
         var options = configuration.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
         options.Validate();
 
+        var dayNight = configuration.GetSection(DayNightOptions.SectionName).Get<DayNightOptions>() ?? new DayNightOptions();
+        dayNight.Validate();
+        services.AddSingleton(dayNight);
+        services.AddSingleton<IDayNightClassifier, DayNightOnnxService>();
         services.AddSingleton(options);
         services.AddSingleton<LuxMap.Shared.AI.ISingleLampPhotoHinter, YoloSingleLampPhotoHinter>();
         services.AddSingleton<YoloModel>();

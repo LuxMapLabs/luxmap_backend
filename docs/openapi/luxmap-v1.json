@@ -1089,6 +1089,7 @@
         "tags": [
           "Ai"
         ],
+        "summary": "[Web] DetectAsync",
         "requestBody": {
           "content": {
             "multipart/form-data": {
@@ -1111,21 +1112,18 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Day/unknown object with confidence_percent, or the night classification with confidence_percent and YOLO detection fields.",
             "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
-                }
-              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AiDetectResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AiClassificationResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -1175,7 +1173,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
-        "x-luxmap-client": "shared"
+        "x-luxmap-client": "web"
       }
     },
     "/api/v1/assets/import/{kind}": {
@@ -12519,9 +12517,37 @@
         },
         "additionalProperties": false
       },
+      "AiClassificationResponse": {
+        "required": [
+          "classification",
+          "confidence_percent",
+          "daynight_model_version"
+        ],
+        "type": "object",
+        "properties": {
+          "classification": {
+            "enum": [
+              "day",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "confidence_percent": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "daynight_model_version": {
+            "type": "string"
+          }
+        }
+      },
       "AiDetectResponse": {
         "required": [
+          "classification",
+          "confidence_percent",
           "count",
+          "daynight_model_version",
           "detections",
           "height",
           "model_version",
@@ -12529,6 +12555,20 @@
         ],
         "type": "object",
         "properties": {
+          "classification": {
+            "enum": [
+              "night"
+            ],
+            "type": "string"
+          },
+          "confidence_percent": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "daynight_model_version": {
+            "type": "string"
+          },
           "model_version": {
             "type": "string"
           },
@@ -12550,8 +12590,7 @@
               "$ref": "#/components/schemas/DetectionResult"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ApiError": {
         "type": "object",
@@ -14221,6 +14260,14 @@
           "public_imagery",
           "calibration_rig",
           "simulated"
+        ],
+        "type": "string"
+      },
+      "DayNightClassification": {
+        "enum": [
+          "day",
+          "night",
+          "unknown"
         ],
         "type": "string"
       },

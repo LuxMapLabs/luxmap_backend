@@ -1463,6 +1463,7 @@
         "tags": [
           "Ai"
         ],
+        "summary": "[Web] [TẠM — AI-1] Gate ngày/đêm cho API thử tay: union day/unknown/night có confidence_percent và daynight_model_version; chỉ night kèm YOLO; không ghi DB",
         "requestBody": {
           "content": {
             "multipart/form-data": {
@@ -1485,21 +1486,18 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Day/unknown object with confidence_percent, or the night classification with confidence_percent and YOLO detection fields.",
             "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
-                }
-              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AiDetectResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AiDetectResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AiClassificationResponse"
+                    }
+                  ]
                 }
               }
             }
@@ -1569,8 +1567,7 @@
         "x-luxmap-roles": [
           "manager"
         ],
-        "x-luxmap-client": "shared",
-        "summary": "[TẠM — AI-1] Chạy model YOLO trên một ảnh JPEG (Quản lý): normal = sáng, out = tắt, bbox theo pixel; không ghi gì",
+        "x-luxmap-client": "web",
         "operationId": "postAiDetect",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift AI-1 (SELF-SIGNED, nền tạm tới FW)"
@@ -15247,9 +15244,37 @@
         },
         "additionalProperties": false
       },
+      "AiClassificationResponse": {
+        "required": [
+          "classification",
+          "confidence_percent",
+          "daynight_model_version"
+        ],
+        "type": "object",
+        "properties": {
+          "classification": {
+            "enum": [
+              "day",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "confidence_percent": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "daynight_model_version": {
+            "type": "string"
+          }
+        }
+      },
       "AiDetectResponse": {
         "required": [
+          "classification",
+          "confidence_percent",
           "count",
+          "daynight_model_version",
           "detections",
           "height",
           "model_version",
@@ -15257,6 +15282,20 @@
         ],
         "type": "object",
         "properties": {
+          "classification": {
+            "enum": [
+              "night"
+            ],
+            "type": "string"
+          },
+          "confidence_percent": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          },
+          "daynight_model_version": {
+            "type": "string"
+          },
           "model_version": {
             "type": "string"
           },
@@ -15278,8 +15317,7 @@
               "$ref": "#/components/schemas/DetectionResult"
             }
           }
-        },
-        "additionalProperties": false
+        }
       },
       "ApiError": {
         "type": "object",
@@ -16949,6 +16987,14 @@
           "public_imagery",
           "calibration_rig",
           "simulated"
+        ],
+        "type": "string"
+      },
+      "DayNightClassification": {
+        "enum": [
+          "day",
+          "night",
+          "unknown"
         ],
         "type": "string"
       },

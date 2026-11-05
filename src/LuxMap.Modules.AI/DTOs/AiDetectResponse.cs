@@ -1,3 +1,5 @@
+using LuxMap.Modules.AI.Detection;
+
 namespace LuxMap.Modules.AI.DTOs;
 
 /// <summary>
@@ -6,6 +8,13 @@ namespace LuxMap.Modules.AI.DTOs;
 /// </summary>
 public sealed record AiDetectResponse
 {
+    /// <summary>Day/night classifier decision; night is the only branch that runs lamp detection.</summary>
+    public required DayNightClassification Classification { get; init; }
+
+    /// <summary>Day/night model confidence, 0-100 percent, rounded to two decimal places; not lamp confidence.</summary>
+    public required double ConfidencePercent { get; init; }
+    public required string DaynightModelVersion { get; init; }
+
     /// <summary>The model's <c>artifact_version</c> — the same value the survey pipeline records on each detection.</summary>
     public required string ModelVersion { get; init; }
 

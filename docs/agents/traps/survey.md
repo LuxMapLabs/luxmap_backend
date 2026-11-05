@@ -159,6 +159,15 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
 - **`AlterColumn` sang NOT NULL trên bảng bất biến** sinh `UPDATE … WHERE … IS NULL` trước — trigger statement-level chặn kể cả 0 dòng. Dùng
   `ALTER TABLE … SET NOT NULL` trần sau khi đã chứng minh không còn NULL (`AddVersionTraceability.Down`).
 
+## AI-DAYNIGHT — gate thử tay (03/11/2026)
+
+- DayNightOnnxService chỉ gate `/ai/detect`, không gate survey/Citizen/ảnh cột. Model có day/night;
+  unknown là abstention, không phải OOD. Day/unknown không resolve YOLO.
+- Ba nhánh đều có classification, confidence_percent, daynight_model_version; chỉ night có các trường YOLO.
+- MediaArtifact băm model + mapping + preprocessing + threshold/unknown rule. Endpoint không ghi DB.
+- Shape HTTP kiểm bằng stub classifier; thứ tự lớp kiểm riêng bằng JPEG fixture với model thật.
+  Không rẽ nhánh assert theo output model thật. Drift AI-DAYNIGHT là nền tạm tới FW.
+
 ## POLE-VIDEO PV-b — lấy mẫu frame cho clip một đèn (04/11/2026, nền tạm theo D-4)
 
 - **Port `IClipFrameSampler` ở `LuxMap.Shared.Media`, Survey hiện thực** (`FfmpegClipFrameSampler`): `WorkOrders` không tham chiếu được Survey

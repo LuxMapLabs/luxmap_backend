@@ -32,6 +32,29 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Manual_ai_detection_has_a_disjoint_web_union()
+    {
+        var operation = Spec.GetProperty("paths").GetProperty("/api/v1/ai/detect").GetProperty("post");
+        Assert.Equal("web", operation.GetProperty("x-luxmap-client").GetString());
+        var response = operation.GetProperty("responses").GetProperty("200").GetProperty("content")
+            .GetProperty("application/json").GetProperty("schema");
+        Assert.False(response.TryGetProperty("anyOf", out _));
+        var refs = response.GetProperty("oneOf").EnumerateArray().Select(x => x.GetProperty("$ref").GetString()).Order().ToArray();
+        Assert.Equal(new[] { "#/components/schemas/AiClassificationResponse", "#/components/schemas/AiDetectResponse" }, refs);
+        foreach (var name in new[] { "AiClassificationResponse", "AiDetectResponse" })
+        {
+            var schema = Schema(name);
+            Assert.False(schema.TryGetProperty("additionalProperties", out var additional) && additional.ValueKind == JsonValueKind.False);
+            var properties = schema.GetProperty("properties");
+            Assert.Equal(name == "AiDetectResponse" ? new[] { "night" } : new[] { "day", "unknown" },
+                properties.GetProperty("classification").GetProperty("enum").EnumerateArray().Select(x => x.GetString()));
+            Assert.Equal(0, properties.GetProperty("confidence_percent").GetProperty("minimum").GetInt32());
+            Assert.Equal(100, properties.GetProperty("confidence_percent").GetProperty("maximum").GetInt32());
+            Assert.Contains("daynight_model_version", schema.GetProperty("required").EnumerateArray().Select(x => x.GetString()));
+        }
+    }
+
+    [Fact]
     public void Pole_segment_is_optional_on_create_a_required_nullable_key_on_update_and_the_list_has_the_filter()
     {
         string?[] Required(string schema) => [.. Schema(schema).GetProperty("required").EnumerateArray().Select(x => x.GetString())];

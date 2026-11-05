@@ -30,4 +30,7 @@
     <ProjectReference Include="..\..\src\LuxMap.Persistence\LuxMap.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures/AI/*.jpg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

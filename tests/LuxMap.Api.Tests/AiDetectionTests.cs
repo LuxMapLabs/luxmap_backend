@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -159,18 +161,35 @@ public sealed class AiDetectionTests(ScopeTestFixture factory)
 
     // ── The endpoint ───────────────────────────────────────────────────────────────────────────
 
-    [Fact]
-    public async Task A_manager_gets_the_detections_and_the_model_version()
+    [Theory]
+    [InlineData("day")]
+    [InlineData("unknown")]
+    [InlineData("night")]
+    public async Task A_manager_gets_the_exact_classification_union(string label)
     {
-        var response = await (await ClientAsync("engineer", "SEED_ENGINEER_PASSWORD")).PostAsync(Detect, Upload(NightImage(800, 600)));
-
+        var stub = new DayNightTests.Stub(label);
+        using var host = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.Replace(ServiceDescriptor.Singleton<IDayNightClassifier>(stub))));
+        using var client = host.CreateClient();
+        var tokens = await client.LoginAsync("engineer", "SEED_ENGINEER_PASSWORD");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await client.PostAsync(Detect, Upload(NightImage(800, 600)));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
-        Assert.Equal(["count", "detections", "height", "model_version", "width"],
-            body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToArray());
-        Assert.Equal((800, 600), (body.GetProperty("width").GetInt32(), body.GetProperty("height").GetInt32()));
-        Assert.Equal(body.GetProperty("count").GetInt32(), body.GetProperty("detections").GetArrayLength());
-        Assert.Equal(factory.Services.GetRequiredService<YoloOnOffDetector>().Artifact.Version, body.GetProperty("model_version").GetString());
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var body = json.RootElement;
+        string[] expected = label == "night"
+            ? ["classification", "confidence_percent", "count", "daynight_model_version", "detections", "height", "model_version", "width"]
+            : ["classification", "confidence_percent", "daynight_model_version"];
+        Assert.Equal(expected, body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal).ToArray());
+        Assert.Equal(label, body.GetProperty("classification").GetString());
+        Assert.Equal(label == "unknown" ? 62.35 : 99.56, body.GetProperty("confidence_percent").GetDouble());
+        Assert.Equal(stub.Artifact.Version, body.GetProperty("daynight_model_version").GetString());
+        if (label == "night")
+        {
+            Assert.Equal((800, 600), (body.GetProperty("width").GetInt32(), body.GetProperty("height").GetInt32()));
+            Assert.Equal(body.GetProperty("count").GetInt32(), body.GetProperty("detections").GetArrayLength());
+            Assert.Equal(host.Services.GetRequiredService<YoloOnOffDetector>().Artifact.Version, body.GetProperty("model_version").GetString());
+        }
     }
 
     [Fact]

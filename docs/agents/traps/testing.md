@@ -77,3 +77,11 @@ Gặp thật: `The_last_active_system_admin_can_be_neither_demoted_nor_locked` k
 Sửa: đưa test vào **`SystemAdminCountCollection`** (`DisableParallelization = true`, chạy sau mọi collection song song).
 Không dùng `RepeatableRead` để né: nó đổi lỗi thành `40001` khi class khác sửa / xoá đúng dòng đang khoá. Phá thử: commit một
 Quản trị từ scope khác **giữa** lệnh khoá và lượt đếm → test đỏ.
+
+## AI-DAYNIGHT — response union và fixture model (03/11/2026)
+
+Test HTTP dùng stub IDayNightClassifier đăng ký trong LuxMapTestHost cho day/unknown/night;
+assert đúng tập key và Artifact.Version. Day/unknown không có key YOLO; night giữ model_version YOLO.
+Test model thật dùng hai JPEG nhỏ, nhãn cố định day/night, mặc định threshold0.7; không rẽ nhánh theo
+output thật và không hạ ngưỡng để xanh. Nguồn ảnh ghi trong `.ai/results/AI-DAYNIGHT.md`.
+Test OpenAPI kiểm oneOf, enum rời nhau, khoảng confidence, consumer web; artifact thay ngưỡng phải đổi version.

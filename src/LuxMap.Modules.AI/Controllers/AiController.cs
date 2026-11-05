@@ -7,6 +7,7 @@ using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace LuxMap.Modules.AI.Controllers;
 
@@ -21,16 +22,18 @@ namespace LuxMap.Modules.AI.Controllers;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/ai")]
-public sealed class AiController(YoloModel model, YoloOnOffDetector detector) : ControllerBase
+public sealed class AiController(IDayNightClassifier dayNight) : ControllerBase
 {
     /// <summary>A phone photo is a few MB; the same ceiling as evidence uploads.</summary>
     public const long MaxUploadBytes = 16 * 1024 * 1024;
 
     /// <summary>
     /// Detects lamps in a JPEG (form field <c>image</c>): <c>normal</c> = ON, <c>out</c> = OFF, boxes in pixels. JPEG by magic
-    /// bytes only — anything else is 415, whatever its Content-Type says.
+    /// bytes only — anything else is 415, whatever its Content-Type says. Day or low-confidence images return the JSON
+    /// day/unknown object with confidence_percent without YOLO; night includes classification confidence and lamp detections.
     /// </summary>
     [HttpPost("detect")]
+    [ClientSurface(ClientSurface.Web)]
     [Authorize(Policy = LuxMapPolicies.ReviewSurveys)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxUploadBytes)]
@@ -38,7 +41,7 @@ public sealed class AiController(YoloModel model, YoloOnOffDetector detector) : 
     [ProducesResponseType<AiDetectResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status415UnsupportedMediaType)]
-    public async Task<ActionResult<AiDetectResponse>> DetectAsync(IFormFile? image, CancellationToken ct)
+    public async Task<IActionResult> DetectAsync(IFormFile? image, CancellationToken ct)
     {
         if (image is null || image.Length == 0)
         {
@@ -48,10 +51,25 @@ public sealed class AiController(YoloModel model, YoloOnOffDetector detector) : 
 
         await using var buffer = new MemoryStream();
         await image.CopyToAsync(buffer, ct);
+        var classification = await dayNight.ClassifyAsync(buffer, ct);
+        if (classification.Classification != DayNightClassification.Night)
+            return Ok(new AiClassificationResponse
+            {
+                Classification = classification.Classification,
+                DaynightModelVersion = dayNight.Artifact.Version,
+                ConfidencePercent = Math.Round(classification.Confidence * 100d, 2),
+            });
+
+        // Resolve only for night: day/unknown must not load or run YOLO.
+        var model = HttpContext.RequestServices.GetRequiredService<YoloModel>();
+        var detector = HttpContext.RequestServices.GetRequiredService<YoloOnOffDetector>();
         var result = await model.DetectAsync(buffer, ct);
 
         return Ok(new AiDetectResponse
         {
+            Classification = classification.Classification,
+            DaynightModelVersion = dayNight.Artifact.Version,
+            ConfidencePercent = Math.Round(classification.Confidence * 100d, 2),
             ModelVersion = detector.Artifact.Version,
             Width = result.Width,
             Height = result.Height,
