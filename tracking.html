@@ -60,6 +60,15 @@
   </div>
 
   <div class="card">
+    <strong>POLE-VIDEO — PV-c3 (xác nhận clip phải sau khi đã mở), 05/11/2026</strong>
+    <p><span class="tag t-next">PR chờ mở · đổi hành vi API (thêm 409) · không migration · chưa báo WP5</span>
+    <code>POST …/pole-photos/{photo_id}/decision</code> với <code>confirm</code> trên ảnh có clip: người quyết định phải là người mở clip gần nhất, không thì <b>409 <code>POLE_VIDEO_NOT_VIEWED</code></b> (kèm <code>photo_id</code>, <code>video_url</code>) và không có gì được ghi.
+    Áp cho cả <code>on</code> lẫn <code>off</code>; <code>reject</code> và ảnh thường không đổi; thứ tự: đã quyết → không có nhãn → chưa xem; kỹ sư sửa nhãn không thay lượt xem. Drift <b>PV-10</b>.
+    <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
+    <p class="muted">Commit: <code>feat(workorders): require the deciding manager to open a clip before confirming it</code>. Với PV-c3, ticket POLE-VIDEO xong toàn bộ phần code; còn đo số D-4 trên clip thật và báo WP5 / WP6.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-VIDEO — PV-c1 (đọc clip có Range + ghi lượt xem), 04/11/2026</strong>
     <p><span class="tag t-next">PR #207 · đổi API (thêm 1 endpoint) · không migration · chưa báo WP5 / WP6</span>
     <code>GET /work-orders/{id}/pole-photos/{photo_id}/video</code>: 200 cả clip, 206 đúng đoạn, 416 kèm <code>Content-Range</code>; <code>IObjectStore.OpenRangeAsync</code> (S3 <code>ByteRange</code>) nên server không đọc cả clip để tua.

@@ -154,7 +154,7 @@ SUMMARY = {
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/original"): "[TẠM — POLE-PHOTO] JPEG gốc nguyên byte, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/video"): "[TẠM — POLE-VIDEO PV-c1] Clip MP4 của ảnh cột, proxy có kiểm quyền, no-store; hỗ trợ Range (206, 416 kèm Content-Range). Quản lý mở clip chưa quyết được ghi nhận một lần (audit viewed)",
     ("patch", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/review"): "[TẠM — PHOTO-REVIEW PP-11…PP-15] Người được giao sửa nhãn on/off trước quyết định, phiếu in_progress; khác AI phải có note; không công bố",
-    ("post", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/decision"): "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history",
+    ("post", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/decision"): "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history. Ảnh có clip: xác nhận (on lẫn off) chỉ sau khi CHÍNH Quản lý đó đã mở clip — chưa thì 409 POLE_VIDEO_NOT_VIEWED (PV-10); bác không cần xem",
     # AI-1 — model YOLO ON / OFF (PR #118 làm lại sau review), SELF-SIGNED.
     ("post", "/api/v1/ai/detect"): "[TẠM — AI-1] Chạy model YOLO trên một ảnh JPEG (Quản lý): normal = sáng, out = tắt, bbox theo pixel; không ghi gì",
     # LIGHT-CTRL 2b — lệnh ON / OFF / AUTO + kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW).
