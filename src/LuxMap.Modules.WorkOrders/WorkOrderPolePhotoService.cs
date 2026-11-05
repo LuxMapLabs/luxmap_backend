@@ -247,6 +247,11 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         var effective = row.FinalCvState ?? row.CvState;
         if (request.Decision == "confirm" && effective is not ("on" or "off"))
             throw Error("POLE_PHOTO_INCONCLUSIVE", HttpStatusCode.Conflict);
+        // POLE-VIDEO D-13: a Manager confirms a clip only after opening it themselves — an OFF confirmation raises a lamp_out at once, an ON one can clear
+        // one. Rejecting needs no viewing. The column keeps the LATEST person to open the clip, so someone who opened it before a colleague did must open it again.
+        if (request.Decision == "confirm" && row.VideoObjectKey is not null && row.VideoViewedBy != ActorId)
+            throw new LuxMapException("POLE_VIDEO_NOT_VIEWED", HttpStatusCode.Conflict, "Open the clip before confirming it.",
+                new Dictionary<string, object?> { ["photo_id"] = photoId, ["video_url"] = $"/api/v1/work-orders/{id}/pole-photos/{photoId}/video" });
         var now = UtcMicrosecondClock.UtcNow();
         var input = new PolePhotoPublication(row.PhotoId, id, row.PoleId, row.CommuneId, row.DataSource,
             effective!, row.FinalCvState is not null && row.FinalCvState != row.CvState ? PolePhotoLabelSource.Engineer : PolePhotoLabelSource.Ai,

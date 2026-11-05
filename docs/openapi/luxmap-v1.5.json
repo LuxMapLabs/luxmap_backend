@@ -13100,7 +13100,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history",
+        "summary": "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history. Ảnh có clip: xác nhận (on lẫn off) chỉ sau khi CHÍNH Quản lý đó đã mở clip — chưa thì 409 POLE_VIDEO_NOT_VIEWED (PV-10); bác không cần xem",
         "operationId": "postWorkOrdersIdPolePhotosPhotoIdDecision",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
