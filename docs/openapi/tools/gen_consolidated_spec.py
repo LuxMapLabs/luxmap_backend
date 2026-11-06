@@ -281,6 +281,8 @@ SUMMARY[("get", "/api/v1/statistics/citizen-feedback")] = (
     "[TẠM — STAT-CITIZEN ST-13] Hạng mục CitizenReport theo trạng thái và night_of; data_source luôn nhóm đầu, cột chưa tuyến vẫn đếm, resolution_rate gồm rejected; format=csv")
 SUMMARY[("get", "/api/v1/statistics/fixture-status")] = (
     "[TẠM — BE-28] Số cột theo fixture_status, mỗi nhóm một dòng; data_source luôn là một chiều nhóm, never_surveyed là tập con của unknown")
+SUMMARY[("get", "/api/v1/statistics/work-orders")] = (
+    "[TẠM — STAT-WO ST-12] Đếm phiếu theo wo_status và task_kind; lọc scheduled_date không cửa sổ mặc định, tuyến gồm target survey; format=csv")
 SUMMARY[("get", "/api/v1/statistics/repair-timeliness")] = (
     "[TẠM — BE-28] Phiếu sửa chữa xong trong các đêm from..to: đúng hạn / trễ / không hạn, on_time_rate; open_overdue tính tới hiện tại")
 SUMMARY[("post", "/api/v1/qr-codes")] = (
@@ -306,6 +308,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics/citizen-feedback": "drift ST-13 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/qr-codes": "drift CITIZEN-QR CQ-1, CQ-10 (SELF-SIGNED, nền tạm tới FW)",

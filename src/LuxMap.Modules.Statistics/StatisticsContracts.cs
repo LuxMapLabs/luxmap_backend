@@ -1,3 +1,4 @@
+using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Statistics;
@@ -125,6 +126,38 @@ public sealed record WarrantyItem
 
     /// <summary>Days from today to the expiry: 0 = ends today, negative = expired; <c>null</c> when unknown.</summary>
     public required int? DaysRemaining { get; init; }
+}
+
+/// <summary>Dimensions accepted by work-order counts only; the existing statistics keep their own dimensions.</summary>
+public enum WorkOrderStatisticsDimension { Commune, TaskKind }
+
+/// <summary><c>GET /statistics/work-orders</c>: raw work-order counts by status (drift ST-12).</summary>
+public sealed record WorkOrderStatusStatistics
+{
+    public required DateTime AsOf { get; init; }
+
+    /// <summary>Requested dimensions in input order, or empty when ungrouped.</summary>
+    public required IReadOnlyList<string> GroupBy { get; init; }
+
+    public required IReadOnlyList<WorkOrderStatusRow> Rows { get; init; }
+}
+
+/// <summary>One group. The six status counts sum to <see cref="Total"/>.</summary>
+public sealed record WorkOrderStatusRow
+{
+    /// <summary><c>null</c> unless grouped by commune.</summary>
+    public required string? CommuneId { get; init; }
+
+    /// <summary><c>null</c> unless grouped by task_kind.</summary>
+    public required TaskKind? TaskKind { get; init; }
+
+    public required int Open { get; init; }
+    public required int Assigned { get; init; }
+    public required int InProgress { get; init; }
+    public required int Done { get; init; }
+    public required int Verified { get; init; }
+    public required int Cancelled { get; init; }
+    public required int Total { get; init; }
 }
 
 /// <summary>Grouping dimensions specific to citizen feedback (ST-13).</summary>

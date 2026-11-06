@@ -39,6 +39,14 @@ public sealed record WarrantyQuery(
 public sealed record RepairTimelinessQuery(
     IReadOnlyList<StatisticsDimension> GroupBy,
     IReadOnlyList<string>? CommuneIds,
+    string? SegmentId,
+    DateOnly? From,
+    DateOnly? To);
+
+public sealed record WorkOrderStatusQuery(
+    IReadOnlyList<WorkOrderStatisticsDimension> GroupBy,
+    IReadOnlyList<string>? CommuneIds,
+    string? SegmentId,
     DateOnly? From,
     DateOnly? To);
 
@@ -179,9 +187,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
 
         var now = clock.GetUtcNow();
         var tonight = nights.NightOf(now);
-        foreach (var (field, night) in new[] { ("from", query.From), ("to", query.To) })
-            if (night is { } given && (given < EarliestNight || given > LatestNight))
-                throw Invalid(field, $"{field} must be between {EarliestNight:yyyy-MM-dd} and {LatestNight:yyyy-MM-dd}.");
+        ValidateDateBounds(query.From, query.To);
         var to = query.To ?? tonight;
         var from = query.From ?? to.AddDays(-(DefaultNights - 1));
         if (from > to) throw Invalid("from", "from must not be after to.");
@@ -189,6 +195,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
         var byCommune = query.GroupBy.Contains(StatisticsDimension.Commune);
         var repairs = db.Set<WorkOrder>().Where(w => w.TaskKind == TaskKind.Repair);
         if (query.CommuneIds is { } communes) repairs = repairs.Where(w => communes.Contains(w.CommuneId));
+        if (query.SegmentId is { } segment) repairs = repairs.Where(w => w.SegmentId == segment);
 
         // Nights are a local-time notion, so the window is turned into UTC bounds here and the per-order
         // night is worked out in memory — through the SAME NightOf the agenda uses (drift ST-5).
@@ -241,6 +248,52 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
             AsOf = now.UtcDateTime,
             GroupBy = Dimensions(query.GroupBy, withDataSource: false),
             Rows = rows.OrderBy(r => r.CommuneId?.Length).ThenBy(r => r.CommuneId, StringComparer.Ordinal).ToArray(),
+        };
+    }
+
+    /// <summary>ST-12 — counts per work order, with optional inclusive scheduled-date bounds and no default window.</summary>
+    public async Task<WorkOrderStatusStatistics> WorkOrdersAsync(WorkOrderStatusQuery query, CancellationToken ct)
+    {
+        ValidateDateBounds(query.From, query.To);
+        var byCommune = query.GroupBy.Contains(WorkOrderStatisticsDimension.Commune);
+        var byTaskKind = query.GroupBy.Contains(WorkOrderStatisticsDimension.TaskKind);
+        var orders = db.Set<WorkOrder>().AsQueryable();
+        if (query.CommuneIds is { } communes) orders = orders.Where(w => communes.Contains(w.CommuneId));
+        if (query.SegmentId is { } segment)
+            orders = orders.Where(w => w.SegmentId == segment || db.Set<WorkOrderSegment>()
+                .Any(s => s.WorkOrderId == w.WorkOrderId && s.SegmentId == segment));
+        // Nullable comparisons exclude unscheduled orders whenever either bound is supplied.
+        if (query.From is { } from) orders = orders.Where(w => w.ScheduledDate >= from);
+        if (query.To is { } to) orders = orders.Where(w => w.ScheduledDate <= to);
+
+        var groups = await orders
+            .GroupBy(w => new
+            {
+                CommuneId = byCommune ? w.CommuneId : null,
+                TaskKind = byTaskKind ? (TaskKind?)w.TaskKind : null,
+            })
+            .Select(g => new WorkOrderStatusRow
+            {
+                CommuneId = g.Key.CommuneId,
+                TaskKind = g.Key.TaskKind,
+                Open = g.Count(w => w.WoStatus == WorkOrderStatus.Open),
+                Assigned = g.Count(w => w.WoStatus == WorkOrderStatus.Assigned),
+                InProgress = g.Count(w => w.WoStatus == WorkOrderStatus.InProgress),
+                Done = g.Count(w => w.WoStatus == WorkOrderStatus.Done),
+                Verified = g.Count(w => w.WoStatus == WorkOrderStatus.Verified),
+                Cancelled = g.Count(w => w.WoStatus == WorkOrderStatus.Cancelled),
+                Total = g.Count(),
+            })
+            .ToListAsync(ct);
+
+        return new WorkOrderStatusStatistics
+        {
+            AsOf = clock.GetUtcNow().UtcDateTime,
+            GroupBy = query.GroupBy.Select(WireEnum.Name).ToArray(),
+            // Only aggregated rows leave SQL. TaskKind's declaration order is inspection, repair, survey.
+            Rows = groups.OrderBy(r => r.CommuneId?.Length).ThenBy(r => r.CommuneId, StringComparer.Ordinal)
+                .ThenBy(r => r.TaskKind == TaskKind.Repair ? 0 : r.TaskKind == TaskKind.Inspection ? 1 : 2)
+                .ToArray(),
         };
     }
 
