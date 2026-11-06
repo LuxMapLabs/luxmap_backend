@@ -30,6 +30,7 @@ public sealed record WarrantyQuery(
 public sealed record RepairTimelinessQuery(
     IReadOnlyList<StatisticsDimension> GroupBy,
     IReadOnlyList<string>? CommuneIds,
+    string? SegmentId,
     DateOnly? From,
     DateOnly? To);
 
@@ -120,6 +121,7 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
         var byCommune = query.GroupBy.Contains(StatisticsDimension.Commune);
         var repairs = db.Set<WorkOrder>().Where(w => w.TaskKind == TaskKind.Repair);
         if (query.CommuneIds is { } communes) repairs = repairs.Where(w => communes.Contains(w.CommuneId));
+        if (query.SegmentId is { } segment) repairs = repairs.Where(w => w.SegmentId == segment);
 
         // Nights are a local-time notion, so the window is turned into UTC bounds here and the per-order
         // night is worked out in memory — through the SAME NightOf the agenda uses (drift ST-5).
