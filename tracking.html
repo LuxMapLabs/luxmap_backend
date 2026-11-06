@@ -41,6 +41,22 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="stat-citizen">
+    <strong>STAT-CITIZEN — thống kê phản ánh QR, 06/11/2026</strong>
+    <p><span class="tag t-done">Xong · chờ Mỹ duyệt push</span>
+    <code>GET /statistics/citizen-feedback</code> đếm CitizenReport theo bốn trạng thái; nhóm nguồn/xã/tuyến,
+    giữ cột chưa tuyến, lọc <code>night_of</code>, tỉ lệ gồm rejected, CSV theo W-5. Drift ST-13 SELF-SIGNED;
+    không migration. File: <code>src/LuxMap.Modules.Statistics/{StatisticsContracts,StatisticsController,StatisticsService}.cs</code>,
+    <code>LuxMap.Modules.Statistics.csproj</code>, <code>tests/LuxMap.Api.Tests/StatisticsTests.cs</code>,
+    <code>docs/contract-drift.md</code>, <code>docs/openapi/tools/gen_consolidated_spec.py</code>,
+    <code>tracking.html</code>, <code>.ai/results/STAT-CITIZEN.md</code>.</p>
+    <p class="muted">Test: StatisticsTests 34 xanh (19 test mới, gồm các case 400); bốn phá thử (bỏ nhóm <code>segment_id</code> null,
+    bỏ lọc <code>calibration_rig</code>, bỏ lọc <code>night_of</code>, bỏ <code>rejected</code> khỏi tỉ lệ) làm đỏ đúng test, khôi phục bằng cp;
+    toàn suite exit 0 (386 + 45 + 80 + 1396 test, 7 skipped sẵn có). Lượt full đầu có 1 test đỏ ngoài phạm vi
+    (<code>WorkOrderTests.Parallel_attempts_of_one_operation_end_on_one_row</code>, race <code>Dictionary</code> trong chính test) — chạy riêng 3/3 xanh, lượt full sau xanh.
+    OpenAPI sinh lại, lint hợp lệ (10 warning nền).
+    Commit: <code>feat(statistics): add citizen feedback statistics</code>. Chưa push.</p>
+  </div>
   <div class="card" id="account-one-commune">
     <strong>ACCOUNT-ONE-COMMUNE — mỗi tài khoản một xã, 29/10/2026</strong>
     <span class="tag t-block">Triển khai xong · chờ review D-6b</span>

@@ -126,3 +126,39 @@ public sealed record WarrantyItem
     /// <summary>Days from today to the expiry: 0 = ends today, negative = expired; <c>null</c> when unknown.</summary>
     public required int? DaysRemaining { get; init; }
 }
+
+/// <summary>Grouping dimensions specific to citizen feedback (ST-13).</summary>
+public enum CitizenFeedbackDimension
+{
+    Commune,
+    Segment,
+}
+
+/// <summary>Citizen queue items by status; data_source is always the first grouping dimension (ST-13).</summary>
+public sealed record CitizenFeedbackStatistics
+{
+    public required DateTime AsOf { get; init; }
+    public required IReadOnlyList<string> GroupBy { get; init; }
+    public required IReadOnlyList<CitizenFeedbackRow> Rows { get; init; }
+}
+
+/// <summary>One nonempty group of CitizenReport items, never individual submissions.</summary>
+public sealed record CitizenFeedbackRow
+{
+    public required DataSource DataSource { get; init; }
+
+    /// <summary>Null unless grouped by commune.</summary>
+    public required string? CommuneId { get; init; }
+
+    /// <summary>Null unless grouped by segment; when grouped, null means poles without an assigned segment.</summary>
+    public required string? SegmentId { get; init; }
+
+    public required int Pending { get; init; }
+    public required int Accepted { get; init; }
+    public required int Merged { get; init; }
+    public required int Rejected { get; init; }
+    public required int Total { get; init; }
+
+    /// <summary>(accepted + merged + rejected) / total, rounded to 4 decimals away from zero; never null.</summary>
+    public required double ResolutionRate { get; init; }
+}

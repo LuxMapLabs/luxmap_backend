@@ -1,6 +1,7 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Warranty;
+using LuxMap.Modules.Citizen.Entities;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
@@ -19,6 +20,14 @@ public sealed record FixtureStatusQuery(
     IReadOnlyList<string>? CommuneIds,
     string? SegmentId,
     IReadOnlyList<DataSource>? DataSources);
+
+public sealed record CitizenFeedbackQuery(
+    IReadOnlyList<CitizenFeedbackDimension> GroupBy,
+    IReadOnlyList<string>? CommuneIds,
+    string? SegmentId,
+    IReadOnlyList<DataSource>? DataSources,
+    DateOnly? From,
+    DateOnly? To);
 
 public sealed record WarrantyQuery(
     IReadOnlyList<WarrantyStatus>? Statuses,
@@ -96,6 +105,71 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
                 .ThenBy(r => r.SegmentId?.Length).ThenBy(r => r.SegmentId, StringComparer.Ordinal)
                 .ToArray(),
         };
+    }
+
+    /// <summary>ST-13: count queue items by night_of, retaining poles without a segment.</summary>
+    public async Task<CitizenFeedbackStatistics> CitizenFeedbackAsync(CitizenFeedbackQuery query, CancellationToken ct)
+    {
+        ValidateDateBounds(query.From, query.To);
+        var byCommune = query.GroupBy.Contains(CitizenFeedbackDimension.Commune);
+        var bySegment = query.GroupBy.Contains(CitizenFeedbackDimension.Segment);
+        var reports = db.Set<CitizenReport>().AsQueryable();
+        if (query.CommuneIds is { } communes) reports = reports.Where(r => communes.Contains(r.CommuneId));
+        reports = query.DataSources is { Count: > 0 } sources
+            ? reports.Where(r => sources.Contains(r.DataSource))
+            : reports.Where(r => r.DataSource != DataSource.CalibrationRig);
+        if (query.From is { } from) reports = reports.Where(r => r.NightOf >= from);
+        if (query.To is { } to) reports = reports.Where(r => r.NightOf <= to);
+
+        var poles = db.Set<Pole>().AsQueryable();
+        if (query.SegmentId is { } segmentId) poles = poles.Where(p => p.SegmentId == segmentId);
+        var groups = await (
+                from r in reports
+                join p in poles on r.PoleId equals p.PoleId
+                select new
+                {
+                    r.DataSource,
+                    CommuneId = byCommune ? r.CommuneId : null,
+                    SegmentId = bySegment ? p.SegmentId : null,
+                    r.Status,
+                })
+            .GroupBy(r => new { r.DataSource, r.CommuneId, r.SegmentId })
+            .Select(g => new
+            {
+                g.Key.DataSource, g.Key.CommuneId, g.Key.SegmentId,
+                Pending = g.Count(r => r.Status == CitizenReportStatus.Pending),
+                Accepted = g.Count(r => r.Status == CitizenReportStatus.Accepted),
+                Merged = g.Count(r => r.Status == CitizenReportStatus.Merged),
+                Rejected = g.Count(r => r.Status == CitizenReportStatus.Rejected),
+                Total = g.Count(),
+            })
+            .ToListAsync(ct);
+
+        return new CitizenFeedbackStatistics
+        {
+            AsOf = clock.GetUtcNow().UtcDateTime,
+            GroupBy = new[] { "data_source" }.Concat(query.GroupBy.Distinct()
+                .Select(d => d == CitizenFeedbackDimension.Commune ? "commune_id" : "segment_id")).ToArray(),
+            Rows = groups.OrderBy(r => r.DataSource)
+                .ThenBy(r => r.CommuneId?.Length).ThenBy(r => r.CommuneId, StringComparer.Ordinal)
+                .ThenBy(r => r.SegmentId == null)
+                .ThenBy(r => r.SegmentId?.Length).ThenBy(r => r.SegmentId, StringComparer.Ordinal)
+                .Select(r => new CitizenFeedbackRow
+                {
+                    DataSource = r.DataSource, CommuneId = r.CommuneId, SegmentId = r.SegmentId,
+                    Pending = r.Pending, Accepted = r.Accepted, Merged = r.Merged, Rejected = r.Rejected, Total = r.Total,
+                    ResolutionRate = Math.Round((double)(r.Accepted + r.Merged + r.Rejected) / r.Total,
+                        4, MidpointRounding.AwayFromZero),
+                }).ToArray(),
+        };
+    }
+
+    private static void ValidateDateBounds(DateOnly? from, DateOnly? to)
+    {
+        foreach (var (field, night) in new[] { ("from", from), ("to", to) })
+            if (night is { } given && (given < EarliestNight || given > LatestNight))
+                throw Invalid(field, $"{field} must be between {EarliestNight:yyyy-MM-dd} and {LatestNight:yyyy-MM-dd}.");
+        if (from > to) throw Invalid("from", "from must not be after to.");
     }
 
     public async Task<RepairTimelinessStatistics> RepairTimelinessAsync(RepairTimelinessQuery query, CancellationToken ct)
