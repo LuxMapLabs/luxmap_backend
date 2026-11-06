@@ -8825,6 +8825,13 @@
             }
           },
           {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "from",
             "in": "query",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
