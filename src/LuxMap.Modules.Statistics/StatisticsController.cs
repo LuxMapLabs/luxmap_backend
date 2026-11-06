@@ -49,6 +49,42 @@ public sealed class StatisticsController(StatisticsService service, ICommuneScop
         return csv ? Csv(body.Rows, "fixture-status", body.AsOf) : body;
     }
 
+    /// <summary>Citizen feedback queue items by status (ST-13).</summary>
+    /// <remarks>
+    /// Optional inclusive from/to bounds filter night_of, with no default window. data_source is the pole's
+    /// provenance recorded on CitizenReport; calibration_rig is excluded unless explicitly requested.
+    /// data_source always groups first, followed by group_by=commune,segment in request order.
+    /// segment_id is null when not grouping by segment, or means unassigned poles when grouping by segment.
+    /// resolution_rate = (accepted + merged + rejected) / total, rounded to 4 decimals away from zero.
+    /// Counts CitizenReport items, never individual submissions; format=csv exports rows only.
+    /// </remarks>
+    [HttpGet("citizen-feedback")]
+    [Authorize(Policy = LuxMapPolicies.ReadStatistics)]
+    [ProducesResponseType<CitizenFeedbackStatistics>(StatusCodes.Status200OK, "application/json")]
+    [CsvExport]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status413PayloadTooLarge)]
+    public async Task<ActionResult<CitizenFeedbackStatistics>> CitizenFeedbackAsync(
+        [FromQuery(Name = "group_by")] string? groupBy,
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "segment_id")] string? segmentId,
+        [FromQuery(Name = "data_source")] string? dataSource,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] string? format,
+        CancellationToken ct)
+    {
+        var csv = CsvExport.IsRequested(format);
+        var body = await service.CitizenFeedbackAsync(
+            new CitizenFeedbackQuery(
+                WireEnum.ParseCsv<CitizenFeedbackDimension>(groupBy, "group_by") ?? [],
+                CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
+                string.IsNullOrWhiteSpace(segmentId) ? null : segmentId.Trim(),
+                WireEnum.ParseCsv<DataSource>(dataSource, "data_source"), from, to), ct);
+        return csv ? Csv(body.Rows, "citizen-feedback", body.AsOf) : body;
+    }
+
     /// <summary>Repair work orders finished in the nights <c>from</c>..<c>to</c>, on time or late, plus those overdue now.</summary>
     /// <remarks>
     /// Nights, not calendar days: a repair finished at 01:00 belongs to the night before, like the agenda. Both

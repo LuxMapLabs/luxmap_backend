@@ -1,6 +1,7 @@
-using System.Net;
-using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Citizen.Entities;
+using LuxMap.Modules.Faults.Entities;
+using LuxMap.Modules.Identity.Auth;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
@@ -10,6 +11,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
+using System.Net;
+using System.Text;
+using System.Text.Json;
 
 namespace LuxMap.Api.Tests;
 
@@ -76,7 +80,7 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
     {
         await Db(async db =>
         {
-            foreach (var table in new[] { "work_order_segment", "work_order", "pole", "road_segment" })
+            foreach (var table in new[] { "citizen_submission", "citizen_report", "qr_code", "work_order_segment", "work_order", "fault", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);
@@ -496,6 +500,231 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
                 row.GetProperty("late").GetInt32(), row.GetProperty("no_due_date").GetInt32(), row.GetProperty("open_overdue").GetInt32()));
         Assert.Equal(rate, row.GetProperty("on_time_rate").GetDouble());
     }
+
+    // ---- citizen-feedback (ST-13) -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Citizen_items_count_each_status_once_and_keep_sources_separate()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2020, 1, 1), CitizenReportStatus.Pending, submissions: 2);
+        foreach (var status in new[] { CitizenReportStatus.Accepted, CitizenReportStatus.Accepted,
+                     CitizenReportStatus.Merged, CitizenReportStatus.Rejected })
+            await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), status);
+        await PlantCitizen(home, road, DataSource.PublicImagery, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(home, road, DataSource.Simulated, new(2026, 9, 10), CitizenReportStatus.Pending);
+
+        var body = await Get("superior", "citizen-feedback");
+        Assert.Equal(["data_source"], Strings(body.GetProperty("group_by")));
+        Assert.EndsWith("Z", body.GetProperty("as_of").GetString());
+        var rows = body.GetProperty("rows").EnumerateArray().ToArray();
+        // Each provenance remains a separate row, in enum order.
+        Assert.Equal(["field", "public_imagery", "simulated"], rows.Select(r => r.GetProperty("data_source").GetString()));
+        AssertCitizenRow(rows[0], 1, 2, 1, 1, 5, 0.8);
+        AssertCitizenRow(rows[1], 1, 0, 0, 0, 1, 0);
+        AssertCitizenRow(rows[2], 1, 0, 0, 0, 1, 0);
+        Assert.Equal(JsonValueKind.Null, rows[0].GetProperty("commune_id").ValueKind);
+        Assert.Equal(JsonValueKind.Null, rows[0].GetProperty("segment_id").ValueKind);
+        Assert.Equal(new[] { "accepted", "commune_id", "data_source", "merged", "pending", "rejected", "resolution_rate", "segment_id", "total" },
+            rows[0].EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task Citizen_segment_groups_keep_unassigned_poles_last_without_losing_the_commune_total()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(home, otherRoad, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Rejected);
+        await PlantCitizen(home, null, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        var rows = (await Get("superior", "citizen-feedback?group_by=segment")).GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Equal(3, rows.Length);
+        Assert.Equal(new[] { road, otherRoad }.OrderBy(x => x.Length).ThenBy(x => x, StringComparer.Ordinal),
+            rows.Take(2).Select(r => r.GetProperty("segment_id").GetString()));
+        Assert.Equal(JsonValueKind.Null, rows[2].GetProperty("segment_id").ValueKind);
+        AssertCitizenRow(rows[2], 1, 0, 0, 0, 1, 0);
+        Assert.Equal(3, rows.Sum(r => r.GetProperty("total").GetInt32()));
+        Assert.Equal(3, (await Get("superior", "citizen-feedback")).GetProperty("rows")[0].GetProperty("total").GetInt32());
+    }
+
+    [Fact]
+    public async Task Citizen_groups_cover_two_visible_communes_and_preserve_requested_dimension_order()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(foreign, foreignRoad, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Rejected);
+        // Legacy multi-commune JWT, without changing the one-commune account rule (ACCT-1).
+        using var scope = factory.Services.CreateScope();
+        var token = scope.ServiceProvider.GetRequiredService<AccessTokenIssuer>().Issue(users["superior"], [home, foreign]);
+        clients["superior"].DefaultRequestHeaders.Authorization = new("Bearer", token.Token);
+        var body = await Get("superior", $"citizen-feedback?group_by=commune,segment&commune_id={home}&commune_id={foreign}");
+        Assert.Equal(["data_source", "commune_id", "segment_id"], Strings(body.GetProperty("group_by")));
+        var rows = body.GetProperty("rows").EnumerateArray().ToArray();
+        var expected = new (string?, string?)[] { (home, road), (foreign, foreignRoad) }
+            .OrderBy(x => x.Item1!.Length).ThenBy(x => x.Item1, StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, rows.Select(r => (r.GetProperty("commune_id").GetString(), r.GetProperty("segment_id").GetString())));
+        Assert.Equal([1, 1], rows.Select(r => r.GetProperty("total").GetInt32()));
+        var reversed = await Get("superior", "citizen-feedback?group_by=segment,commune");
+        Assert.Equal(["data_source", "segment_id", "commune_id"], Strings(reversed.GetProperty("group_by")));
+    }
+
+    [Fact]
+    public async Task Citizen_calibration_rig_requires_an_explicit_source_filter()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(home, road, DataSource.CalibrationRig, new(2026, 9, 10), CitizenReportStatus.Rejected);
+        var rows = (await Get("superior", "citizen-feedback")).GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Equal("field", Assert.Single(rows).GetProperty("data_source").GetString());
+        var rig = Assert.Single((await Get("superior", "citizen-feedback?data_source=calibration_rig")).GetProperty("rows").EnumerateArray());
+        Assert.Equal("calibration_rig", rig.GetProperty("data_source").GetString());
+        AssertCitizenRow(rig, 0, 0, 0, 1, 1, 1);
+        var both = await Get("superior", "citizen-feedback?data_source=calibration_rig,field");
+        // Alphabetic sorting would put calibration_rig first; enum sorting puts field first.
+        Assert.Equal(["field", "calibration_rig"], both.GetProperty("rows").EnumerateArray().Select(r => r.GetProperty("data_source").GetString()));
+    }
+
+    [Fact]
+    public async Task Citizen_date_bounds_use_night_of_inclusively_with_no_default_window()
+    {
+        // Plant time is now; night_of deliberately differs, so created_at filtering cannot pass.
+        foreach (var day in new[] { 9, 10, 11, 12 })
+            await PlantCitizen(home, road, DataSource.Field, new(2026, 9, day), CitizenReportStatus.Pending);
+        var path = "citizen-feedback?from=2026-09-10&to=2026-09-11";
+        AssertCitizenRow(Assert.Single((await Get("superior", path)).GetProperty("rows").EnumerateArray()), 2, 0, 0, 0, 2, 0);
+        Assert.Equal(3, (await Get("superior", "citizen-feedback?from=2026-09-10")).GetProperty("rows")[0].GetProperty("total").GetInt32());
+        Assert.Equal(3, (await Get("superior", "citizen-feedback?to=2026-09-11")).GetProperty("rows")[0].GetProperty("total").GetInt32());
+        Assert.Equal(4, (await Get("superior", "citizen-feedback")).GetProperty("rows")[0].GetProperty("total").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("from=1999-12-31", "from")]
+    [InlineData("from=2100-01-01", "from")]
+    [InlineData("to=1999-12-31", "to")]
+    [InlineData("to=2100-01-01", "to")]
+    [InlineData("from=2026-09-11&to=2026-09-10", "from")]
+    [InlineData("format=xml", "format")]
+    public async Task Citizen_invalid_bounds_and_format_name_the_field(string query, string field)
+    {
+        var response = await clients["superior"].GetAsync("/api/v1/statistics/citizen-feedback?" + query);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("error");
+        Assert.Equal(ErrorCodes.ValidationFailed, error.GetProperty("code").GetString());
+        Assert.Equal(field, error.GetProperty("details").GetProperty("field").GetString());
+    }
+
+    [Theory]
+    [InlineData("from=10/09/2026")]
+    [InlineData("to=invalid")]
+    [InlineData("group_by=data_source")]
+    [InlineData("group_by=task_kind")]
+    [InlineData("data_source=testbed")]
+    public async Task Citizen_malformed_queries_are_validation_errors(string query)
+    {
+        var response = await clients["superior"].GetAsync("/api/v1/statistics/citizen-feedback?" + query);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(ErrorCodes.ValidationFailed, await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Citizen_segment_filter_uses_the_pole_and_trims_blank_values()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 11), CitizenReportStatus.Pending);
+        await PlantCitizen(home, null, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        var row = Assert.Single((await Get("superior", $"citizen-feedback?segment_id=%20{road}%20")).GetProperty("rows").EnumerateArray());
+        AssertCitizenRow(row, 2, 0, 0, 0, 2, 0);
+        Assert.Equal(3, (await Get("superior", "citizen-feedback?segment_id=%20%20")).GetProperty("rows")[0].GetProperty("total").GetInt32());
+        Assert.Empty((await Get("superior", $"citizen-feedback?segment_id={otherRoad}")).GetProperty("rows").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Citizen_statistics_enforce_commune_scope_and_read_statistics_capability()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(foreign, foreignRoad, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Rejected);
+        AssertCitizenRow(Assert.Single((await Get("manager", "citizen-feedback")).GetProperty("rows").EnumerateArray()), 1, 0, 0, 0, 1, 0);
+        foreach (var (who, path, code) in new[]
+                 {
+                     ("manager", $"citizen-feedback?commune_id={foreign}", ErrorCodes.CommuneForbidden),
+                     ("engineer", "citizen-feedback", ErrorCodes.RoleForbidden),
+                 })
+        {
+            var response = await clients[who].GetAsync("/api/v1/statistics/" + path);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            Assert.Contains(code, await response.Content.ReadAsStringAsync());
+        }
+    }
+
+    [Fact]
+    public async Task Citizen_csv_has_json_columns_bom_crlf_and_rounded_rate()
+    {
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 10), CitizenReportStatus.Pending);
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 11), CitizenReportStatus.Pending);
+        await PlantCitizen(home, road, DataSource.Field, new(2026, 9, 12), CitizenReportStatus.Rejected);
+        Assert.Equal(0.3333, (await Get("superior", "citizen-feedback")).GetProperty("rows")[0].GetProperty("resolution_rate").GetDouble());
+        var response = await clients["superior"].GetAsync("/api/v1/statistics/citizen-feedback?format=csv");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal(new byte[] { 0xef, 0xbb, 0xbf }, bytes.Take(3));
+        Assert.Equal("data_source,commune_id,segment_id,pending,accepted,merged,rejected,total,resolution_rate\r\n"
+            + "field,,,2,0,0,1,3,0.3333\r\n", Encoding.UTF8.GetString(bytes[3..]));
+    }
+
+    private static void AssertCitizenRow(JsonElement row, int pending, int accepted, int merged, int rejected, int total, double rate)
+    {
+        Assert.Equal((pending, accepted, merged, rejected, total),
+            (row.GetProperty("pending").GetInt32(), row.GetProperty("accepted").GetInt32(), row.GetProperty("merged").GetInt32(),
+                row.GetProperty("rejected").GetInt32(), row.GetProperty("total").GetInt32()));
+        Assert.Equal(rate, row.GetProperty("resolution_rate").GetDouble());
+    }
+
+    private Task PlantCitizen(string commune, string? segment, DataSource source, DateOnly night,
+        CitizenReportStatus status, int submissions = 0)
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var now = DateTime.UtcNow;
+            var pole = new Pole { CommuneId = commune, SegmentId = segment, DataSource = source, Geom = new Point(108, 16) { SRID = 4326 } };
+            db.Add(pole);
+            await db.SaveChangesAsync();
+            Fault? fault = null;
+            if (status is CitizenReportStatus.Accepted or CitizenReportStatus.Merged)
+            {
+                fault = new Fault
+                {
+                    PoleId = pole.PoleId, CommuneId = commune, SegmentId = segment, DataSource = source,
+                    FaultType = FaultType.LampOut, FaultStatus = FaultStatus.Detected, Severity = Severity.Medium,
+                    SourceChannel = SourceChannel.Cv, DetectedAt = now, CreatedAt = now, UpdatedAt = now,
+                };
+                db.Add(fault);
+                await db.SaveChangesAsync();
+            }
+            var report = new CitizenReport
+            {
+                PoleId = pole.PoleId, CommuneId = commune, DataSource = source, NightOf = night, Status = status,
+                CreatedAt = now, LastSubmittedAt = now, FaultId = fault?.FaultId,
+                DecidedBy = status == CitizenReportStatus.Pending ? null : users["manager"].UserId,
+                DecidedAt = status == CitizenReportStatus.Pending ? null : now,
+                DecisionNote = status == CitizenReportStatus.Rejected ? "Stats rejection" : null,
+            };
+            db.Add(report);
+            await db.SaveChangesAsync();
+            if (submissions > 0)
+            {
+                var qr = new QrCode
+                {
+                    PoleId = pole.PoleId, CommuneId = commune, Code = Guid.NewGuid().ToString("N")[..16],
+                    CreatedBy = users["manager"].UserId, CreatedAt = now,
+                };
+                db.Add(qr);
+                await db.SaveChangesAsync();
+                for (var i = 0; i < submissions; i++)
+                    db.Add(new CitizenSubmission
+                    {
+                        ReportId = report.ReportId, PoleId = pole.PoleId, CommuneId = commune, QrId = qr.QrId,
+                        ClientOpId = Guid.NewGuid(), RequestHash = new string('a', 64), Kind = CitizenReportKind.LampOut, ReceivedAt = now,
+                    });
+                await db.SaveChangesAsync();
+            }
+            return 0;
+        });
 
     // ---- helpers ------------------------------------------------------------------------------------------
 

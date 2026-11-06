@@ -277,6 +277,8 @@ for suffix, summary in [("thumbnail", "Thumbnail JPEG của ảnh phiếu — pr
                         ("original", "Ảnh gốc nguyên byte của phiếu — proxy qua API; quyền theo phiếu cha")]:
     SUMMARY[("get", "/api/v1/evidence/{evidence_id}/" + suffix)] = "[TẠM — BE-24] " + summary
 
+SUMMARY[("get", "/api/v1/statistics/citizen-feedback")] = (
+    "[TẠM — STAT-CITIZEN ST-13] Hạng mục CitizenReport theo trạng thái và night_of; data_source luôn nhóm đầu, cột chưa tuyến vẫn đếm, resolution_rate gồm rejected; format=csv")
 SUMMARY[("get", "/api/v1/statistics/fixture-status")] = (
     "[TẠM — BE-28] Số cột theo fixture_status, mỗi nhóm một dòng; data_source luôn là một chiều nhóm, never_surveyed là tập con của unknown")
 SUMMARY[("get", "/api/v1/statistics/work-orders")] = (
@@ -307,6 +309,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
 
 SECTION = {
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
+    "/api/v1/statistics/citizen-feedback": "drift ST-13 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/qr-codes": "drift CITIZEN-QR CQ-1, CQ-10 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/public": "drift CITIZEN-QR P2b PB-1…PB-8 (SELF-SIGNED, nền tạm tới FW)",
