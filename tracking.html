@@ -41,15 +41,30 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="stat-wo">
+    <strong>STAT-WO — cơ cấu phiếu công việc, 06/11/2026</strong>
+    <span class="tag t-next">PR #211 · CI xanh</span>
+    <p>GET <code>/statistics/work-orders</code>: sáu trạng thái thô, nhóm xã / task_kind,
+    lọc scheduled_date tùy chọn và tuyến trực tiếp hoặc target survey qua EXISTS. ReadStatistics; CSV theo W-5.
+    ST-12 SELF-SIGNED, nền tạm tới FW. Không có cửa sổ mặc định; có bound thì loại phiếu chưa lên lịch.</p>
+    <p>Test: StatisticsTests 33 xanh (18 test mới, gồm các case 400); ba phá thử (bỏ nhánh <code>work_order_segment</code>, bỏ lọc
+    <code>scheduled_date</code>, cho phiếu NULL lọt qua bound) làm đỏ đúng một test mỗi lần, khôi phục bằng cp;
+    toàn bộ suite exit 0 (386 + 45 + 80 + 1395 test, 7 skipped sẵn có). OpenAPI sinh lại, lint hợp lệ (10 warning nền).
+    Chi tiết tại <code>.ai/results/STAT-WO.md</code>.</p>
+    <p class="muted">File: StatisticsContracts/Service/Controller.cs, StatisticsTests.cs, contract-drift.md,
+    OpenAPI + generator, tracking.html, ticket/results STAT-WO.
+    Commit: <code>feat(statistics): count work orders by status and task kind</code>. PR #211.</p>
+  </div>
+
   <div class="card" id="stat-segment">
     <strong>STAT-SEGMENT — lọc đúng hạn sửa chữa theo tuyến, 06/11/2026</strong>
-    <span class="tag t-done">Xong · chờ Mỹ duyệt push</span>
+    <span class="tag t-done">Đã merge · PR #210</span>
     <p><code>GET /statistics/repair-timeliness?segment_id=…</code> lọc theo tuyến của phiếu, chung cho số hoàn thành và mở quá hạn;
     trim, bỏ lọc khi rỗng; NULL không khớp, ngoài scope / không có dữ liệu trả <code>rows: []</code>. ST-11 là cộng thêm / SELF-SIGNED.</p>
     <p>Test: StatisticsTests 18 xanh; phá bộ lọc → 3 test mới đỏ, khôi phục bằng cp; toàn bộ suite exit 0 (386 + 45 + 80 + 1380 test, 7 skipped sẵn có). Hai OpenAPI sinh lại, lint exit 0 (10 warning nền — số của Codex).</p>
     <p class="muted">Files: <code>StatisticsController.cs</code>, <code>StatisticsService.cs</code>, <code>StatisticsTests.cs</code>,
     <code>docs/contract-drift.md</code>, hai OpenAPI, <code>tracking.html</code>, <code>.ai/results/STAT-SEGMENT.md</code>.
-    Commit: <code>feat(statistics): filter repair timeliness by segment</code>. Chưa push.</p>
+    Commit: <code>feat(statistics): filter repair timeliness by segment</code>. Đã merge vào <code>dev</code>.</p>
   </div>
 
   <div class="card" id="account-one-commune">
