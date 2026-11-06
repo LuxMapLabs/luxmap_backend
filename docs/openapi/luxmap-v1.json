@@ -8939,6 +8939,151 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/statistics/work-orders": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "name": "group_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderStatusStatistics"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "description": "format=csv: UTF-8 with BOM, CRLF, one row per item, columns spelled as in the JSON body; at most 10 000 rows (else 413 EXPORT_TOO_LARGE)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_statistics",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/statistics/warranty": {
       "get": {
         "tags": [
@@ -19970,6 +20115,86 @@
           "cancelled"
         ],
         "type": "string"
+      },
+      "WorkOrderStatusRow": {
+        "required": [
+          "assigned",
+          "cancelled",
+          "commune_id",
+          "done",
+          "in_progress",
+          "open",
+          "task_kind",
+          "total",
+          "verified"
+        ],
+        "type": "object",
+        "properties": {
+          "commune_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "assigned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "in_progress": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "verified": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cancelled": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderStatusStatistics": {
+        "required": [
+          "as_of",
+          "group_by",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "group_by": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderStatusRow"
+            }
+          }
+        },
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

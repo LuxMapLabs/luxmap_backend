@@ -41,6 +41,20 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="stat-wo">
+    <strong>STAT-WO — cơ cấu phiếu công việc, 06/11/2026</strong>
+    <span class="tag t-done">Xong · chờ Mỹ duyệt push</span>
+    <p>GET <code>/statistics/work-orders</code>: sáu trạng thái thô, nhóm xã / task_kind,
+    lọc scheduled_date tùy chọn và tuyến trực tiếp hoặc target survey qua EXISTS. ReadStatistics; CSV theo W-5.
+    ST-12 SELF-SIGNED, nền tạm tới FW. Không có cửa sổ mặc định; có bound thì loại phiếu chưa lên lịch.</p>
+    <p>Test: StatisticsTests 33 xanh (18 test mới, gồm các case 400); ba phá thử (bỏ nhánh <code>work_order_segment</code>, bỏ lọc
+    <code>scheduled_date</code>, cho phiếu NULL lọt qua bound) làm đỏ đúng một test mỗi lần, khôi phục bằng cp;
+    toàn bộ suite exit 0 (386 + 45 + 80 + 1395 test, 7 skipped sẵn có). OpenAPI sinh lại, lint hợp lệ (10 warning nền).
+    Chi tiết tại <code>.ai/results/STAT-WO.md</code>.</p>
+    <p class="muted">File: StatisticsContracts/Service/Controller.cs, StatisticsTests.cs, contract-drift.md,
+    OpenAPI + generator, tracking.html, ticket/results STAT-WO.
+    Commit: <code>feat(statistics): count work orders by status and task kind</code>. Chưa push.</p>
+  </div>
   <div class="card" id="account-one-commune">
     <strong>ACCOUNT-ONE-COMMUNE — mỗi tài khoản một xã, 29/10/2026</strong>
     <span class="tag t-block">Triển khai xong · chờ review D-6b</span>

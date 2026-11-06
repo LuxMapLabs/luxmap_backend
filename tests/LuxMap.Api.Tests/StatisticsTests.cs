@@ -8,12 +8,13 @@ using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
 
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// BE-28 — <c>/statistics/fixture-status</c> and <c>/statistics/repair-timeliness</c>. Every class run gets its own two
+/// BE-28 / ST-12 — fixture-status, repair-timeliness and work-order statistics. Every class run gets its own two
 /// communes, so each figure below is an EXACT count of what the test planted — "figures match a manual count" is the
 /// ticket's acceptance criterion.
 /// </summary>
@@ -75,7 +76,7 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
     {
         await Db(async db =>
         {
-            foreach (var table in new[] { "work_order", "pole", "road_segment" })
+            foreach (var table in new[] { "work_order_segment", "work_order", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
                 await db.Database.ExecuteSqlRawAsync(sql, home, foreign);
@@ -166,6 +167,12 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData("work-orders?group_by=segment")]
+    [InlineData("work-orders?format=xml")]
+    [InlineData("work-orders?from=30/09/2026")]
+    [InlineData("work-orders?to=2026-02-30")]
+    [InlineData("fixture-status?group_by=task_kind")]
+    [InlineData("repair-timeliness?group_by=task_kind")]
     [InlineData("fixture-status?group_by=road")]
     [InlineData("fixture-status?data_source=testbed")]
     [InlineData("repair-timeliness?group_by=segment")]
@@ -271,6 +278,170 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Empty(body.GetProperty("rows").EnumerateArray());
     }
 
+    // ---- work-orders (ST-12) ------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Work_order_counts_include_all_kinds_and_six_statuses_without_an_outer_total()
+    {
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Open, null, null);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Assigned, null, null);
+        await PlantOrder(home, TaskKind.Inspection, WorkOrderStatus.InProgress, null, null);
+        await PlantOrder(home, TaskKind.Inspection, WorkOrderStatus.Done, null, Local(2026, 9, 1, 20));
+        await PlantOrder(home, TaskKind.Survey, WorkOrderStatus.Verified, null, Local(2026, 9, 1, 20));
+        await PlantOrder(home, TaskKind.Survey, WorkOrderStatus.Cancelled, null, null);
+
+        var body = await Get("superior", "work-orders");
+        Assert.Equal(new[] { "as_of", "group_by", "rows" }, body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+        Assert.EndsWith("Z", body.GetProperty("as_of").GetString());
+        Assert.Empty(Strings(body.GetProperty("group_by")));
+        var row = Assert.Single(body.GetProperty("rows").EnumerateArray());
+        AssertOrderRow(row, null, null, 1, 1, 1, 1, 1, 1, 6);
+        Assert.Equal(new[] { "assigned", "cancelled", "commune_id", "done", "in_progress", "open", "task_kind", "total", "verified" },
+            row.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+
+        var grouped = await Get("superior", "work-orders?group_by=task_kind");
+        Assert.Equal(["task_kind"], Strings(grouped.GetProperty("group_by")));
+        var rows = grouped.GetProperty("rows").EnumerateArray().ToArray();
+        Assert.Equal(3, rows.Length);
+        AssertOrderRow(rows[0], null, "repair", 1, 1, 0, 0, 0, 0, 2);
+        AssertOrderRow(rows[1], null, "inspection", 0, 0, 1, 1, 0, 0, 2);
+        AssertOrderRow(rows[2], null, "survey", 0, 0, 0, 0, 1, 1, 2);
+    }
+
+    [Fact]
+    public async Task Work_order_groups_cover_two_visible_communes_and_preserve_requested_dimension_order()
+    {
+        await PlantOrder(home, TaskKind.Survey, WorkOrderStatus.Open, null, null);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Cancelled, null, null);
+        await PlantOrder(foreign, TaskKind.Inspection, WorkOrderStatus.Assigned, null, null);
+        await PlantOrder(foreign, TaskKind.Repair, WorkOrderStatus.Open, null, null);
+        // A signed legacy token can still name two communes (ACCT-1); never create an invalid two-commune account.
+        using var client = factory.CreateClient();
+        var token = factory.Services.GetRequiredService<LuxMap.Modules.Identity.Auth.AccessTokenIssuer>()
+            .Issue(users["manager"], [home, foreign]).Token;
+        client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+        foreach (var dimensions in new[] { "commune,task_kind", "task_kind,commune" })
+        {
+            var response = await client.GetAsync("/api/v1/statistics/work-orders?group_by=" + dimensions);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+            Assert.Equal(dimensions.Split(','), Strings(body.GetProperty("group_by")));
+            var rows = body.GetProperty("rows").EnumerateArray().ToArray();
+            var communes = new[] { home, foreign }.OrderBy(c => c.Length).ThenBy(c => c, StringComparer.Ordinal).ToArray();
+            Assert.Equal(4, rows.Length);
+            for (var i = 0; i < communes.Length; i++)
+            {
+                if (communes[i] == home)
+                {
+                    AssertOrderRow(rows[i * 2], home, "repair", 0, 0, 0, 0, 0, 1, 1);
+                    AssertOrderRow(rows[i * 2 + 1], home, "survey", 1, 0, 0, 0, 0, 0, 1);
+                }
+                else
+                {
+                    AssertOrderRow(rows[i * 2], foreign, "repair", 1, 0, 0, 0, 0, 0, 1);
+                    AssertOrderRow(rows[i * 2 + 1], foreign, "inspection", 0, 1, 0, 0, 0, 0, 1);
+                }
+            }
+        }
+        var narrowed = await client.GetAsync($"/api/v1/statistics/work-orders?commune_id={home}&commune_id={foreign}");
+        Assert.Equal(HttpStatusCode.OK, narrowed.StatusCode);
+        var total = JsonDocument.Parse(await narrowed.Content.ReadAsStringAsync()).RootElement.GetProperty("rows")[0].GetProperty("total").GetInt32();
+        Assert.Equal(4, total);
+    }
+
+    [Fact]
+    public async Task Work_order_dates_are_inclusive_and_either_bound_excludes_unscheduled_orders()
+    {
+        foreach (var date in new DateOnly?[] { null, new(2026, 8, 31), new(2026, 9, 1), new(2026, 9, 30), new(2026, 10, 1) })
+            await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Open, null, null, scheduled: date);
+        foreach (var (query, count) in new[]
+        {
+            ("", 5), ("?from=2026-09-01&to=2026-09-30", 2),
+            ("?from=2026-09-01", 3), ("?to=2026-09-30", 3),
+            ("?from=2026-09-01&to=2026-09-01", 1),
+            ("?from=2000-01-01&to=2099-12-31", 4),
+        })
+        {
+            var body = await Get("manager", "work-orders" + query);
+            AssertOrderRow(Assert.Single(body.GetProperty("rows").EnumerateArray()), null, null, count, 0, 0, 0, 0, 0, count);
+        }
+    }
+
+    [Theory]
+    [InlineData("from=2026-09-30&to=2026-09-01", "from")]
+    [InlineData("from=1999-12-31", "from")]
+    [InlineData("to=2100-01-01", "to")]
+    [InlineData("from=9999-12-31", "from")]
+    [InlineData("to=0001-01-01", "to")]
+    public async Task Work_order_date_validation_names_the_invalid_field(string query, string field)
+    {
+        var response = await clients["superior"].GetAsync("/api/v1/statistics/work-orders?" + query);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("error");
+        Assert.Equal(ErrorCodes.ValidationFailed, error.GetProperty("code").GetString());
+        Assert.Equal(field, error.GetProperty("details").GetProperty("field").GetString());
+    }
+
+    [Fact]
+    public async Task Work_order_segment_filter_matches_direct_and_survey_targets_without_multiplying_orders()
+    {
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Open, null, null);
+        await PlantOrder(home, TaskKind.Survey, WorkOrderStatus.Assigned, null, null, targets: [road, otherRoad]);
+        var first = await Get("superior", $"work-orders?segment_id=%20{road}%20");
+        AssertOrderRow(Assert.Single(first.GetProperty("rows").EnumerateArray()), null, null, 1, 1, 0, 0, 0, 0, 2);
+        var second = await Get("superior", $"work-orders?segment_id={otherRoad}");
+        AssertOrderRow(Assert.Single(second.GetProperty("rows").EnumerateArray()), null, null, 0, 1, 0, 0, 0, 0, 1);
+        var all = await Get("superior", "work-orders?segment_id=%20%20");
+        AssertOrderRow(Assert.Single(all.GetProperty("rows").EnumerateArray()), null, null, 1, 1, 0, 0, 0, 0, 2);
+        var empty = await Get("superior", "work-orders?segment_id=SEG-no-orders");
+        Assert.Empty(empty.GetProperty("rows").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Work_order_statistics_enforce_scope_and_refuse_field_engineers()
+    {
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Open, null, null);
+        await PlantOrder(foreign, TaskKind.Survey, WorkOrderStatus.Cancelled, null, null);
+        var body = await Get("manager", "work-orders?group_by=commune");
+        AssertOrderRow(Assert.Single(body.GetProperty("rows").EnumerateArray()), home, null, 1, 0, 0, 0, 0, 0, 1);
+        var refused = await clients["manager"].GetAsync($"/api/v1/statistics/work-orders?commune_id={foreign}");
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.Contains(ErrorCodes.CommuneForbidden, await refused.Content.ReadAsStringAsync());
+        var engineer = await clients["engineer"].GetAsync("/api/v1/statistics/work-orders");
+        Assert.Equal(HttpStatusCode.Forbidden, engineer.StatusCode);
+        Assert.Contains(ErrorCodes.RoleForbidden, await engineer.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Work_order_csv_uses_the_json_columns_and_raw_counts()
+    {
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Open, null, null);
+        var response = await clients["superior"].GetAsync("/api/v1/statistics/work-orders?format=csv&group_by=task_kind");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType!.MediaType);
+        Assert.StartsWith("work-orders-", response.Content.Headers.ContentDisposition!.FileNameStar);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal(new byte[] { 0xef, 0xbb, 0xbf }, bytes[..3]);
+        Assert.Equal("commune_id,task_kind,open,assigned,in_progress,done,verified,cancelled,total\r\n,repair,1,0,0,0,0,0,1\r\n",
+            System.Text.Encoding.UTF8.GetString(bytes[3..]));
+    }
+
+    [Fact]
+    public async Task Empty_work_order_statistics_have_no_synthetic_zero_row()
+    {
+        var body = await Get("superior", "work-orders");
+        Assert.Empty(body.GetProperty("rows").EnumerateArray());
+    }
+
+    private static void AssertOrderRow(JsonElement row, string? commune, string? kind,
+        int open, int assigned, int inProgress, int done, int verified, int cancelled, int total)
+    {
+        Assert.Equal(commune, row.GetProperty("commune_id").GetString());
+        Assert.Equal(kind, row.GetProperty("task_kind").GetString());
+        Assert.Equal(new[] { open, assigned, inProgress, done, verified, cancelled, total },
+            new[] { "open", "assigned", "in_progress", "done", "verified", "cancelled", "total" }.Select(key => row.GetProperty(key).GetInt32()));
+    }
+
     // ---- helpers ------------------------------------------------------------------------------------------
 
     /// <summary>Tonight by the agenda's rule, worked out independently: local date, minus one before 12:00.</summary>
@@ -325,23 +496,33 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
             return 0;
         });
 
-    private Task PlantOrder(string commune, TaskKind kind, WorkOrderStatus status, DateOnly? due, DateTime? completed)
+    private Task PlantOrder(string commune, TaskKind kind, WorkOrderStatus status, DateOnly? due, DateTime? completed,
+        DateOnly? scheduled = null, string[]? targets = null)
         => Db(async db =>
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
             var now = DateTime.UtcNow;
             var assigned = status is not (WorkOrderStatus.Open or WorkOrderStatus.Cancelled);
-            db.Add(new WorkOrder
+            var order = new WorkOrder
             {
-                CommuneId = commune, TaskKind = kind, Title = "Stats order", WoStatus = status, DueDate = due,
+                CommuneId = commune, TaskKind = kind, Title = "Stats order", WoStatus = status, DueDate = due, ScheduledDate = scheduled,
                 SegmentId = kind == TaskKind.Survey ? null : (commune == home ? road : foreignRoad),
                 CreatedBy = users["manager"].UserId, CreatedAt = now, UpdatedAt = now,
                 AssignedTo = assigned ? users["engineer"].UserId : null, AssignedAt = assigned ? now : null,
                 StartedAt = status is WorkOrderStatus.InProgress or WorkOrderStatus.Done or WorkOrderStatus.Verified ? now : null,
                 CompletedAt = completed, ReportNote = completed is null ? null : "Planted as finished",
                 ClosedAt = status is WorkOrderStatus.Verified or WorkOrderStatus.Cancelled ? now : null,
-            });
+            };
+            db.Add(order);
             await db.SaveChangesAsync();
+            if (targets is not null)
+            {
+                db.AddRange(targets.Select((segment, position) => new WorkOrderSegment
+                {
+                    WorkOrderId = order.WorkOrderId, CommuneId = commune, SegmentId = segment, Position = position,
+                }));
+                await db.SaveChangesAsync();
+            }
             return 0;
         });
 }

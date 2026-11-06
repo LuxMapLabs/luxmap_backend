@@ -80,6 +80,42 @@ public sealed class StatisticsController(StatisticsService service, ICommuneScop
         return csv ? Csv(body.Rows, "repair-timeliness", body.AsOf) : body;
     }
 
+    /// <summary>Work orders by raw status, optionally grouped by commune and task kind (SELF-SIGNED, ST-12).</summary>
+    /// <remarks>
+    /// Optional inclusive <c>from</c>/<c>to</c> bounds filter <c>scheduled_date</c>; either bound excludes
+    /// unscheduled orders. Without bounds, all orders count, including unscheduled ones; there is no default window.
+    /// <c>segment_id</c> matches the order's segment OR a work_order_segment target. A survey with several targets
+    /// counts once for each matching segment query, so adding figures across segment queries can count it repeatedly.
+    /// <c>group_by</c> accepts commune and task_kind, in input order. Only populated groups are returned.
+    /// </remarks>
+    [HttpGet("work-orders")]
+    [Authorize(Policy = LuxMapPolicies.ReadStatistics)]
+    [ProducesResponseType<WorkOrderStatusStatistics>(StatusCodes.Status200OK, "application/json")]
+    [CsvExport]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status413PayloadTooLarge)]
+    public async Task<ActionResult<WorkOrderStatusStatistics>> WorkOrdersAsync(
+        [FromQuery(Name = "group_by")] string? groupBy,
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "segment_id")] string? segmentId,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] string? format,
+        CancellationToken ct)
+    {
+        var csv = CsvExport.IsRequested(format);
+        var body = await service.WorkOrdersAsync(
+            new WorkOrderStatusQuery(
+                WireEnum.ParseCsv<WorkOrderStatisticsDimension>(groupBy, "group_by") ?? [],
+                CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
+                string.IsNullOrWhiteSpace(segmentId) ? null : segmentId.Trim(),
+                from,
+                to),
+            ct);
+        return csv ? Csv(body.Rows, "work-orders", body.AsOf) : body;
+    }
+
     /// <summary>Poles with the warranty of their lamp in service, soonest expiry first (BE-31, drift W-4).</summary>
     /// <remarks>
     /// <c>warranty_status</c> is worked out against today in the communes' zone: <c>expired</c> before today, <c>expiring</c>
