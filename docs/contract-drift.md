@@ -1151,6 +1151,7 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 | ST-8 | Capability mới **`ReadStatistics`** = `superior`, `manager`, `system_admin`. Không `field_engineer`: `work_order` lọc theo người được giao nên số của họ sẽ khác số thật |
 | ST-9 | `group_by`: `commune`, `segment` (fixture-status); `commune` (repair-timeliness). Khoá dòng **luôn có mặt**, `null` khi không nhóm theo chiều đó. Chỉ trả nhóm có dữ liệu. BE-30 thêm giá trị `group_by` mà không đổi hình dạng |
 | ST-10 | Xuất CSV để **BE-31**, chung cho mọi báo cáo |
+| ST-11 | **STAT-SEGMENT — Mỹ đồng ý 06/11/2026. Cộng thêm / SELF-SIGNED**, nền tạm tới FW kế tiếp, chưa lên Contract: `GET /api/v1/statistics/repair-timeliness` nhận `segment_id` tùy chọn, trim; rỗng / khoảng trắng = không lọc. Lọc theo **`work_order.segment_id`**, như danh sách phiếu: **một phiếu một tuyến** (repair nhiều sự cố lấy tuyến của sự cố ưu tiên cao nhất), NULL không khớp. Áp chung cho `completed / on_time / late / no_due_date` **và `open_overdue`**; query filter xã vẫn áp dụng. Tuyến không tồn tại / không có phiếu → 200, `rows: []`. Không đổi response; `group_by=segment` vẫn 400 (ST-9) |
 
 ## CABINET — trụ / tủ điện tổng thành tài sản riêng (07/10/2026)
 

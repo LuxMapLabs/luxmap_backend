@@ -271,6 +271,61 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Empty(body.GetProperty("rows").EnumerateArray());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Repair_segment_filters_finished_and_overdue_orders_without_counting_unassigned(bool byCommune)
+    {
+        var due = new DateOnly(2026, 9, 10);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, due, Local(2026, 9, 10, 22));
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Verified, due, Local(2026, 9, 11, 22));
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, null, Local(2026, 9, 12, 22));
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Open, Tonight().AddDays(-1), null);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, due, Local(2026, 9, 10, 22), otherRoad);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Assigned, Tonight().AddDays(-1), null, otherRoad);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, due, Local(2026, 9, 11, 22), unassigned: true);
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.InProgress, Tonight().AddDays(-1), null, unassigned: true);
+
+        var path = $"repair-timeliness?from=2026-09-01&to=2026-09-30&group_by={(byCommune ? "commune" : "")}";
+        var filtered = await Get("superior", path + $"&segment_id=%20{road}%20");
+        var row = Assert.Single(filtered.GetProperty("rows").EnumerateArray());
+        AssertTimeliness(row, completed: 3, onTime: 1, late: 1, noDueDate: 1, overdue: 1, rate: 0.5);
+        Assert.Equal(byCommune ? home : null, row.GetProperty("commune_id").GetString());
+
+        var other = await Get("superior", path + $"&segment_id={otherRoad}");
+        AssertTimeliness(Assert.Single(other.GetProperty("rows").EnumerateArray()), 1, 1, 0, 0, 1, 1);
+        foreach (var suffix in new[] { "", "&segment_id=", "&segment_id=%20%20%20" })
+        {
+            var all = await Get("superior", path + suffix);
+            AssertTimeliness(Assert.Single(all.GetProperty("rows").EnumerateArray()), 5, 2, 2, 1, 3, 0.5);
+        }
+    }
+
+    [Fact]
+    public async Task Repair_segment_without_orders_or_outside_scope_returns_no_rows()
+    {
+        await PlantOrder(home, TaskKind.Repair, WorkOrderStatus.Done, new DateOnly(2026, 9, 10), Local(2026, 9, 10, 22));
+        await PlantOrder(foreign, TaskKind.Repair, WorkOrderStatus.Done, new DateOnly(2026, 9, 10), Local(2026, 9, 10, 22));
+        await PlantOrder(foreign, TaskKind.Repair, WorkOrderStatus.Open, Tonight().AddDays(-1), null);
+        var path = "repair-timeliness?from=2026-09-01&to=2026-09-30";
+        // Prove the foreign orders exist and are visible to their own commune.
+        var visible = await Get("foreign_superior", path + $"&segment_id={foreignRoad}");
+        AssertTimeliness(Assert.Single(visible.GetProperty("rows").EnumerateArray()), 1, 1, 0, 0, 1, 1);
+        foreach (var segment in new[] { otherRoad, "SEG-nonexistent", foreignRoad })
+        {
+            var body = await Get("superior", path + $"&segment_id={segment}");
+            Assert.Empty(body.GetProperty("rows").EnumerateArray());
+        }
+    }
+
+    private static void AssertTimeliness(JsonElement row, int completed, int onTime, int late, int noDueDate, int overdue, double rate)
+    {
+        Assert.Equal((completed, onTime, late, noDueDate, overdue),
+            (row.GetProperty("completed").GetInt32(), row.GetProperty("on_time").GetInt32(),
+                row.GetProperty("late").GetInt32(), row.GetProperty("no_due_date").GetInt32(), row.GetProperty("open_overdue").GetInt32()));
+        Assert.Equal(rate, row.GetProperty("on_time_rate").GetDouble());
+    }
+
     // ---- helpers ------------------------------------------------------------------------------------------
 
     /// <summary>Tonight by the agenda's rule, worked out independently: local date, minus one before 12:00.</summary>
@@ -325,7 +380,8 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
             return 0;
         });
 
-    private Task PlantOrder(string commune, TaskKind kind, WorkOrderStatus status, DateOnly? due, DateTime? completed)
+    private Task PlantOrder(string commune, TaskKind kind, WorkOrderStatus status, DateOnly? due, DateTime? completed,
+        string? segment = null, bool unassigned = false)
         => Db(async db =>
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
@@ -334,7 +390,7 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
             db.Add(new WorkOrder
             {
                 CommuneId = commune, TaskKind = kind, Title = "Stats order", WoStatus = status, DueDate = due,
-                SegmentId = kind == TaskKind.Survey ? null : (commune == home ? road : foreignRoad),
+                SegmentId = unassigned || kind == TaskKind.Survey ? null : segment ?? (commune == home ? road : foreignRoad),
                 CreatedBy = users["manager"].UserId, CreatedAt = now, UpdatedAt = now,
                 AssignedTo = assigned ? users["engineer"].UserId : null, AssignedAt = assigned ? now : null,
                 StartedAt = status is WorkOrderStatus.InProgress or WorkOrderStatus.Done or WorkOrderStatus.Verified ? now : null,

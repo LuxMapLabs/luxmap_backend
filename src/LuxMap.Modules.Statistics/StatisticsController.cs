@@ -52,7 +52,9 @@ public sealed class StatisticsController(StatisticsService service, ICommuneScop
     /// <summary>Repair work orders finished in the nights <c>from</c>..<c>to</c>, on time or late, plus those overdue now.</summary>
     /// <remarks>
     /// Nights, not calendar days: a repair finished at 01:00 belongs to the night before, like the agenda. Both
-    /// bounds are optional — the last 30 nights by default. <c>group_by=commune</c> splits by commune.
+    /// bounds are optional — the last 30 nights by default. <c>group_by=commune</c> splits by commune;
+    /// <c>group_by=segment</c> is not supported. Optional <c>segment_id</c> filters by the work order's single
+    /// assigned segment, including <c>open_overdue</c>. Blank values mean no filter; only groups with data return.
     /// </remarks>
     [HttpGet("repair-timeliness")]
     [Authorize(Policy = LuxMapPolicies.ReadStatistics)]
@@ -64,6 +66,7 @@ public sealed class StatisticsController(StatisticsService service, ICommuneScop
     public async Task<ActionResult<RepairTimelinessStatistics>> RepairTimelinessAsync(
         [FromQuery(Name = "group_by")] string? groupBy,
         [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "segment_id")] string? segmentId,
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
         [FromQuery] string? format,
@@ -74,6 +77,7 @@ public sealed class StatisticsController(StatisticsService service, ICommuneScop
             new RepairTimelinessQuery(
                 WireEnum.ParseCsv<StatisticsDimension>(groupBy, "group_by") ?? [],
                 CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
+                string.IsNullOrWhiteSpace(segmentId) ? null : segmentId.Trim(),
                 from,
                 to),
             ct);
