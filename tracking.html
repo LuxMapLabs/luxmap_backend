@@ -41,6 +41,14 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="test-wo-parallel">
+    <strong>TEST-WO-PARALLEL — test flaky, 06/11/2026</strong>
+    <span class="tag t-next">Ticket mở · chưa làm</span>
+    <p><code>WorkOrderTests.Parallel_attempts_of_one_operation_end_on_one_row</code> đỏ ngẫu nhiên (1 lần / 4 lượt full-suite local; CI #210–#212 xanh):
+    <code>PoleClient</code> ghi <code>Dictionary</code> thường từ ba request song song. Lỗi của test, không phải của sản phẩm.
+    Chi tiết và cách sửa: <code>.ai/tasks/TEST-WO-PARALLEL.md</code>.</p>
+  </div>
+
   <div class="card" id="stat-wo">
     <strong>STAT-WO — cơ cấu phiếu công việc, 06/11/2026</strong>
     <span class="tag t-done">Đã merge · PR #211</span>
