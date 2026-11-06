@@ -4,6 +4,7 @@ using LuxMap.Modules.Assets;
 using LuxMap.Modules.Citizen;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Identity;
+using LuxMap.Modules.IOT;
 using LuxMap.Modules.Map;
 using LuxMap.Modules.Notifications;
 using LuxMap.Modules.Survey;
@@ -48,6 +49,7 @@ ILuxMapModule[] modules =
     new FaultsModule(),
     new WorkOrdersModule(),
     new TelemetryModule(),
+    new IotModule(),
     new AdminModule(),
     new NotificationsModule(),
     new SyncModule(),
