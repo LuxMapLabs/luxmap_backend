@@ -99,8 +99,17 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         foreach (var client in clients.Values) client.Dispose();
         foreach (var client in photoClients.Values) client.Dispose();
         if (photoHost is not null) await photoHost.DisposeAsync();
-        foreach (var client in polePhotoClients.Values) client.Dispose();
-        if (polePhotoHost is not null) await polePhotoHost.DisposeAsync();
+        await polePhotoClientGate.WaitAsync();
+        try
+        {
+            foreach (var client in polePhotoClients.Values) client.Dispose();
+            if (polePhotoHost is not null) await polePhotoHost.DisposeAsync();
+        }
+        finally
+        {
+            polePhotoClientGate.Release();
+            polePhotoClientGate.Dispose();
+        }
     }
 
     private async Task<JsonElement> Send(string who, string method, string path, object? body, int expected, string? error = null, int auditExpected = 1, string? correlation = null)

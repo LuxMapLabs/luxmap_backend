@@ -52,11 +52,16 @@
     Bàn giao: <code>.ai/results/ACCT-USERNAME.md</code>.</p>
   </div>
   <div class="card" id="test-wo-parallel">
-    <strong>TEST-WO-PARALLEL — test flaky, 06/11/2026</strong>
-    <span class="tag t-next">Ticket mở · chưa làm</span>
-    <p><code>WorkOrderTests.Parallel_attempts_of_one_operation_end_on_one_row</code> đỏ ngẫu nhiên (1 lần / 4 lượt full-suite local; CI #210–#212 xanh):
-    <code>PoleClient</code> ghi <code>Dictionary</code> thường từ ba request song song. Lỗi của test, không phải của sản phẩm.
-    Chi tiết và cách sửa: <code>.ai/tasks/TEST-WO-PARALLEL.md</code>.</p>
+    <strong>TEST-WO-PARALLEL — phase 2, 08/11/2026</strong>
+    <span class="tag t-next">Đã sửa · đã kiểm chứng</span>
+    <p><code>PoleClient</code> dùng <code>SemaphoreSlim</code> bảo vệ khởi tạo host, đăng nhập và cache client;
+    ba upload cùng operation vẫn gửi song song. Teardown giữ kiểm tra host null và dùng cùng khóa khi đọc cache;
+    thao tác xóa client để đăng nhập lại cũng dùng khóa này.</p>
+    <p>Files: <code>WorkOrderPolePhotoTests.cs</code>, <code>WorkOrderPolePhotoReviewTests.cs</code>, <code>WorkOrderTests.cs</code>,
+    <code>WorkOrderPoleClientTests.cs</code> (mới), <code>tracking.html</code>, <code>.ai/results/TEST-WO-PARALLEL.md</code>.
+    Chạy lại test gốc 10 lần (cả khi tăng tạm lên 16 request song song) đều xanh trước khi sửa, nên lỗi không tái hiện được bằng chính test đó.
+    Test mới <code>Overlapping_first_calls_of_PoleClient_share_one_client_per_user</code> (32 lời gọi đầu chồng nhau phải trả cùng một client)
+    đỏ 3/3 trên code gốc <code>origin/dev</code>, xanh sau khi sửa. Toàn bộ suite xanh (1418 API, 7 skipped).</p>
   </div>
 
   <div class="card" id="stat-wo">
