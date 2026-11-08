@@ -228,7 +228,12 @@ public partial class WorkOrderTests
             return 0;
         });
         // Commune claims belong to the access-token snapshot: sign in again after revocation.
-        polePhotoClients.Remove("a", out var old); old!.Dispose();
+        await polePhotoClientGate.WaitAsync();
+        try
+        {
+            if (polePhotoClients.Remove("a", out var old)) old.Dispose();
+        }
+        finally { polePhotoClientGate.Release(); }
         Assert.Equal("POLE_PHOTO_NOT_FOUND", Code(await PoleReview(id, photo, expected: 404)));
         var outside = await Plant(WorkOrderStatus.InProgress, commune: foreign);
         Assert.Equal("WORK_ORDER_NOT_FOUND", Code(await PoleReview(outside, photo, expected: 404)));
