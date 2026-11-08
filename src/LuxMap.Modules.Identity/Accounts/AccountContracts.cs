@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Identity.Accounts;
@@ -8,10 +9,8 @@ namespace LuxMap.Modules.Identity.Accounts;
 /// </summary>
 public sealed class CreateUserRequest
 {
-    [Required]
-    [MinLength(3)]
-    [MaxLength(256)]
-    public string? Username { get; init; }
+    /// <summary>Server-owned: omit this field, including null. Presence is rejected (ACCT-2).</summary>
+    public JsonElement Username { get; init; }
 
     [Required]
     [EmailAddress]

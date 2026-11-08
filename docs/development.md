@@ -423,8 +423,10 @@ GET  /api/v1/auth/me         → { user_id, username, email, full_name, role, co
 
 POST /api/v1/auth/password/set     { "token": "...", "new_password": "..." }   → 204
 POST /api/v1/auth/password/forgot  { "email": "..." }                          → luôn 202
-POST /api/v1/admin/users           { username, email, full_name, role, commune_ids }   # system_admin
+POST /api/v1/admin/users           { email, full_name, role, commune_ids }   # system_admin
 ```
+
+ACCT-2 (SELF-SIGNED 08/11/2026): bỏ field `username` khi tạo, kể cả `null`. Server sinh từ tên + chữ đầu họ/đệm + hậu tố số (Nguyễn Hữu Mỹ → `mynh1`); chỉ nhận chữ Việt/Latin, khoảng trắng và gạch ngang sau chuẩn hoá. Lấy tên đăng nhập từ `user.username` trả về hoặc mail mời. Xem `docs/contract-drift.md` mục ACCT-2.
 
 **Email trong dev:** mọi thư đi vào **Mailpit** (`docker compose up -d mailpit`), mở hộp thư ở
 <http://localhost:8025> để bấm link mời / đặt lại. Biến `SMTP_*` và `WEB_APP_BASE_URL` trong `.env` là
