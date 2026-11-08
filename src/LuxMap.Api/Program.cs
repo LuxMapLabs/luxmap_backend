@@ -96,6 +96,11 @@ builder.Services.AddLuxMapModules(builder.Configuration, modules);
 
 var app = builder.Build();
 
+if (app.Services.GetRequiredService<LuxMap.Modules.Identity.Auth.GoogleLoginOptions>().ClientIds.Length == 0)
+{
+    app.Logger.LogInformation("Google login is disabled: no Google client IDs configured.");
+}
+
 // BE-06 — `dotnet run -- --seed`: seed, then exit without building the HTTP pipeline.
 if (SeedCommand.IsRequested(args))
 {

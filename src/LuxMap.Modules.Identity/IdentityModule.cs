@@ -43,6 +43,8 @@ public sealed class IdentityModule : ILuxMapModule
 
         services.AddSingleton(options);
         services.AddSingleton(webOptions);
+        services.AddSingleton(GoogleLoginOptions.FromConfiguration(configuration));
+        services.AddSingleton<IGoogleIdTokenVerifier, GoogleIdTokenVerifier>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AccessTokenIssuer>();
         services.AddScoped<AuthService>();

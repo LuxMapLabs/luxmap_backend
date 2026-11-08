@@ -226,6 +226,8 @@ SUMMARY = {
     ("get", "/api/v1/lux-readings"): "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
     ("get", "/api/v1/lux-readings/poles/{poleId}"): "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
     ("post", "/api/v1/auth/web/login"): "Đăng nhập web; refresh token vào cookie",
+    ("post", "/api/v1/auth/google"): "[ACCT-4] Đăng nhập mobile bằng Google ID token; chỉ vào tài khoản đã có, khớp theo email đã xác minh",
+    ("post", "/api/v1/auth/web/google"): "[ACCT-4] Đăng nhập web bằng Google ID token; refresh token vào cookie; không tự tạo tài khoản",
     ("post", "/api/v1/auth/web/refresh"): "Xoay vòng refresh token từ cookie; không body",
     ("post", "/api/v1/auth/web/logout"): "Thu hồi token trong cookie, luôn xoá cookie, luôn 204",
 }

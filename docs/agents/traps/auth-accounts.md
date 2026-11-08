@@ -92,3 +92,12 @@ Field JSON vẫn là `username`; hai endpoint dùng chung `AuthService`. Usernam
 của người khác: luôn ưu tiên username, không thử email sau khi sai mật khẩu. Không cần xử lý "email khớp nhiều
 hàng": `ix_app_user_email_lower` (và `ix_app_user_username_lower`) là UNIQUE trên `lower(...)`, đừng viết lại nhánh đó
 dựa trên giả định index phân biệt hoa thường. Log đăng nhập không ghi chuỗi người dùng gõ (có thể là email). Nền API: ACCT-3 SELF-SIGNED.
+
+## ACCT-4 — Google không phải đăng ký hay kích hoạt lời mời (08/11/2026)
+
+Google chỉ chứng minh email: giữ kiểm `EmailVerified`, chỉ tra email vào tài khoản có sẵn, không tạo tài khoản,
+không đổi tên/email và không cho `PasswordHash == null` đi qua. ClientIds rỗng phải trả 401 **trước** khi gọi verifier.
+Không log ID token, email, Google `sub` hoặc exception của thư viện (có thể chứa credential).
+Test thay `IGoogleIdTokenVerifier` qua DI, không gọi Google. Google và mật khẩu dùng chung hàm mở refresh chain;
+chỉ thành công mới thu hồi cookie cũ. Web Google có body chỉ `id_token`, dùng `web_session` (không `remember_me`).
+Nền API ACCT-4 SELF-SIGNED; ba giới hạn (liên kết sub, nonce, bật/tắt từng tài khoản) nằm ở drift.

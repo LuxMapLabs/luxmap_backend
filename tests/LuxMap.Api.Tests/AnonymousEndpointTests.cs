@@ -39,11 +39,13 @@ public class AnonymousEndpointTests(ScopeTestFixture factory, ITestOutputHelper 
     /// </remarks>
     private static readonly string[] TokenIssuingEndpoints =
     [
+        "POST /api/v1/auth/google",
         "POST /api/v1/auth/login",
         "POST /api/v1/auth/logout",
         "POST /api/v1/auth/password/forgot",
         "POST /api/v1/auth/password/set",
         "POST /api/v1/auth/refresh",
+        "POST /api/v1/auth/web/google",
         "POST /api/v1/auth/web/login",
         "POST /api/v1/auth/web/logout",
         "POST /api/v1/auth/web/refresh",

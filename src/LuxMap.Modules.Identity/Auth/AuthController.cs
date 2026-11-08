@@ -29,7 +29,7 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     /// <summary>Đăng nhập bằng username hoặc email và mật khẩu.</summary>
     /// <remarks>
     /// Field <c>username</c> nhận username hoặc email, bỏ khoảng trắng đầu cuối và không phân biệt
-    /// hoa thường. Tra username trước, rồi email; email khớp nhiều tài khoản bị từ chối.
+    /// hoa thường. Tra username trước, rồi email.
     /// </remarks>
     [HttpPost("login")]
     [EnableRateLimiting(LuxMapRateLimits.Login)]
@@ -46,6 +46,24 @@ public sealed class AuthController(AuthService authService) : ControllerBase
     {
         var result = await authService.LoginAsync(
             request.Username!, request.Password!, RefreshTokenSessionKind.Mobile,
+            supersededWebRefreshToken: null, cancellationToken);
+        return Respond(result);
+    }
+
+    /// <summary>Đăng nhập bằng Google vào tài khoản đã được Quản trị tạo (ACCT-4).</summary>
+    [HttpPost("google")]
+    [AllowAnonymous]
+    [EnableRateLimiting(LuxMapRateLimits.Login)]
+    [ClientSurface(ClientSurface.Mobile)]
+    [ProducesResponseType<AuthTokenResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<AuthTokenResponse>> GoogleAsync(
+        [FromBody] GoogleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.GoogleSignInAsync(request.IdToken!, RefreshTokenSessionKind.Mobile,
             supersededWebRefreshToken: null, cancellationToken);
         return Respond(result);
     }

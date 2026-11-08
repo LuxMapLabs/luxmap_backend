@@ -13,6 +13,8 @@ public sealed class AuthService(
     AccessTokenIssuer accessTokenIssuer,
     JwtOptions options,
     WebAuthOptions webOptions,
+    GoogleLoginOptions googleOptions,
+    IGoogleIdTokenVerifier googleVerifier,
     TimeProvider timeProvider,
     ILogger<AuthService> logger)
 {
@@ -61,6 +63,48 @@ public sealed class AuthService(
             return AuthResult.Fail(AuthFailure.AccountLocked);
         }
 
+        return await OpenSignInChainAsync(user, kind, supersededWebRefreshToken, ct);
+    }
+
+    public async Task<AuthResult> GoogleSignInAsync(
+        string idToken,
+        RefreshTokenSessionKind kind,
+        string? supersededWebRefreshToken,
+        CancellationToken ct = default)
+    {
+        if (googleOptions.ClientIds.Length == 0)
+        {
+            return AuthResult.Fail(AuthFailure.InvalidCredentials);
+        }
+
+        var identity = await googleVerifier.VerifyAsync(idToken, ct);
+        if (identity is null || !identity.EmailVerified || string.IsNullOrWhiteSpace(identity.Email))
+        {
+            logger.LogWarning("Google sign-in failed: invalid identity.");
+            return AuthResult.Fail(AuthFailure.InvalidCredentials);
+        }
+
+        var user = await FindByEmailForSignInAsync(identity.Email.Trim().ToLowerInvariant(), ct);
+        if (user is null || user.PasswordHash is null)
+        {
+            logger.LogWarning("Google sign-in failed: no eligible account.");
+            return AuthResult.Fail(AuthFailure.InvalidCredentials);
+        }
+
+        if (user.IsLocked)
+        {
+            logger.LogWarning("Google sign-in failed: account locked.");
+            return AuthResult.Fail(AuthFailure.AccountLocked);
+        }
+
+        var result = await OpenSignInChainAsync(user, kind, supersededWebRefreshToken, ct);
+        logger.LogInformation("Sign-in succeeded for {UserId}, method={Method}.", user.UserId, "google");
+        return result;
+    }
+
+    private async Task<AuthResult> OpenSignInChainAsync(
+        AppUser user, RefreshTokenSessionKind kind, string? supersededWebRefreshToken, CancellationToken ct)
+    {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         // One transaction: the superseded web session dies only if the new chain is actually opened.

@@ -117,6 +117,8 @@ services:
     environment:
       <<: *internal-addresses
       ASPNETCORE_ENVIRONMENT: Production
+      # Optional CSV, mapped by the API to Google__ClientIds__N; empty disables Google sign-in.
+      GOOGLE_CLIENT_IDS: "${GOOGLE_CLIENT_IDS:-}"
       # Exactly Caddy's fixed address below. Without it the API ignores X-Forwarded-For and every client shares Caddy's
       # rate-limit bucket (CITIZEN-QR P2b; measured in the rehearsal, docs/deploy/vps.md). Change both together.
       ForwardedHeaders__KnownProxies__0: 172.30.0.10
