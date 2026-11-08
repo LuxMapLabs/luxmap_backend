@@ -9,6 +9,7 @@ Web SPA (WP5), app Android (WP6) và engine CV (WP4) qua REST API `/api/v1`.
 - Sơ đồ trạng thái (sự cố, phiếu, khảo sát, QR, lệnh đèn…), viết bằng tiếng Anh: [`docs/state-machines.md`](docs/state-machines.md)
 - Quy ước lõi và bảng tra cứu theo vùng: [`CLAUDE.md`](CLAUDE.md); bẫy chi tiết ở [`docs/agents/traps/`](docs/agents/traps/)
 - Lệnh và cấu hình chi tiết: [`docs/development.md`](docs/development.md)
+- Google sign-in (tuỳ chọn, ACCT-4 SELF-SIGNED): [`docs/deploy/google-login.md`](docs/deploy/google-login.md)
 - Triển khai lên máy chủ: [`docs/deploy/vps.md`](docs/deploy/vps.md)
 
 ## Chạy lần đầu sau khi clone

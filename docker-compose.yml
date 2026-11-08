@@ -1,6 +1,8 @@
 # BE-02 — local development infrastructure. No pgvector (the project dropped RAG), no pgAdmin.
 # BE-11 added the object store: minio, plus the one-shot minio-mc sidecar that creates its buckets.
 
+# The local API runs on the host and reads GOOGLE_CLIENT_IDS from the root .env.
+# Leave it empty to disable Google login; CSV maps to Google__ClientIds__N (docs/deploy/google-login.md).
 name: luxmap
 
 services:

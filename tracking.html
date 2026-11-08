@@ -41,6 +41,16 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="acct-google">
+    <strong>ACCT-GOOGLE — đăng nhập bằng Google, 09/11/2026</strong>
+    <span class="tag t-done">Đã kiểm chứng · chờ merge</span>
+    <p>Hai route <code>POST /auth/google</code> và <code>/auth/web/google</code>: verifier qua port (<code>Google.Apis.Auth</code> 1.78.0),
+    chỉ khớp email đã xác minh của tài khoản đã đặt mật khẩu, không bao giờ tạo tài khoản. Chung refresh chain với đăng nhập mật khẩu;
+    web thay cookie cũ, phiên không ghi nhớ. <code>GOOGLE_CLIENT_IDS</code> trống = tắt (luôn 401, không gọi Google). ACCT-4 SELF-SIGNED.</p>
+    <p>18 test (mobile + web, các nhánh lỗi, cấu hình tắt/CSV, cookie cũ, metadata). Bốn phá thử đều làm test đỏ. Toàn suite xanh, OpenAPI sinh lại (147 thao tác).
+    Chưa thử với Google thật: cần Client ID (xem <code>docs/deploy/google-login.md</code>).
+    Bàn giao: <code>.ai/results/ACCT-GOOGLE.md</code>.</p>
+  </div>
   <div class="card" id="acct-username">
     <strong>ACCT-USERNAME — server sinh tên đăng nhập, 08/11/2026</strong>
     <span class="tag t-done">Đã merge · #215</span>

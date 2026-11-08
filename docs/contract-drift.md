@@ -23,6 +23,23 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### ACCT-4 — đăng nhập Google vào tài khoản có sẵn (08/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | `POST /api/v1/auth/google` (mobile) và `/api/v1/auth/web/google` (web) nhận `{ "id_token": "<Google JWT>" }`, bắt buộc, tối đa 8192 ký tự. Google chứng minh danh tính, không đăng ký tài khoản. |
+| **Decision maker** | **Mỹ (Dylan), chốt 08/11/2026 · SELF-SIGNED** — nền tạm tới FW kế tiếp, chưa hợp nhất Contract/spec. |
+| **Date** | 08/11/2026 |
+| **Scope** | Identity, WP5/WP6 đăng nhập bằng Google; không migration/schema, vai trò/capability hay CORS mới. Google.Apis.Auth 1.78.0 xác minh chữ ký, issuer, audience, expiry. Không client secret, redirect hoặc authorization code. |
+
+- Chỉ `email_verified = true`; email khớp tài khoản do Quản trị tạo, không phân biệt hoa thường qua cùng lookup ACCT-3. Không tạo tài khoản, đổi email hoặc tên theo Google. Không dùng username để khớp Google.
+- Token sai, email chưa xác minh/không khớp, tài khoản đang mời (`password_hash IS NULL`) → `401 INVALID_CREDENTIALS`, thông điệp **Incorrect username or password.** như login mật khẩu. Tài khoản đã đặt mật khẩu nhưng khoá → `403 ACCOUNT_LOCKED` vì danh tính đã được chứng minh.
+- Mobile trả `AuthTokenResponse` gồm refresh token. Web trả `WebAuthTokenResponse`, refresh chỉ trong cookie Secure/HttpOnly/SameSite=Lax. Body chỉ có `id_token`: phiên `web_session` như login không gửi `remember_me`. Dùng chung mở refresh chain; thành công mới thu hồi cookie web cũ trong cùng transaction. Login mật khẩu/refresh/logout giữ hành vi cũ.
+- Từng action anonymous; cùng policy rate limit Login; giữ ClientSurface mobile/web và RequireAllowedOrigin ở web. Mã phản hồi 200/400/401/403/429.
+- `Google:ClientIds` nhận nhiều audience (web/Android). `GOOGLE_CLIENT_IDS` CSV ánh xạ thành các phần tử `Google__ClientIds__N`; trim và bỏ rỗng. CSV có mặt được ưu tiên, kể cả rỗng. Danh sách rỗng tắt tính năng: 401, không gọi verifier; khởi động log Information một dòng. Không bắt buộc Client ID ở dev/CI.
+- Log thành công chỉ UserId và `method=google`; thất bại chỉ lý do chung. Không log token, email hoặc Google subject.
+- **Giới hạn v1:** (1) khớp email, chưa liên kết Google `sub` với tài khoản (cần bảng liên kết/migration ở ticket sau); (2) không kiểm nonce, ID token lộ có thể dùng lại tới `exp` (~1 giờ), cần FE và ticket sau; (3) chưa tắt quyền Google theo từng tài khoản.
+
 ### ACCT-3 — đăng nhập bằng username hoặc email (08/11/2026)
 
 | Trường | Nội dung |

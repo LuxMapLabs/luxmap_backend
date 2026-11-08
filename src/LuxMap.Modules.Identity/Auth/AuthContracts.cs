@@ -19,6 +19,14 @@ public sealed class LoginRequest
     public string? Password { get; init; }
 }
 
+/// <summary>Google ID token sign-in (ACCT-4, SELF-SIGNED).</summary>
+public sealed class GoogleLoginRequest
+{
+    [Required]
+    [MaxLength(8192)]
+    public string? IdToken { get; init; }
+}
+
 public sealed class RefreshRequest
 {
     [Required]

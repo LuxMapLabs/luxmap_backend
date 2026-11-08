@@ -28,7 +28,6 @@ namespace LuxMap.Modules.Identity.Auth.Web;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/auth/web")]
-[AllowAnonymous]
 [RequireAllowedOrigin]
 [ClientSurface(ClientSurface.Web)]
 public sealed class WebAuthController(AuthService authService) : ControllerBase
@@ -36,8 +35,9 @@ public sealed class WebAuthController(AuthService authService) : ControllerBase
     /// <summary>Đăng nhập bằng username hoặc email và mật khẩu.</summary>
     /// <remarks>
     /// Field <c>username</c> nhận username hoặc email, bỏ khoảng trắng đầu cuối và không phân biệt
-    /// hoa thường. Tra username trước, rồi email; email khớp nhiều tài khoản bị từ chối.
+    /// hoa thường. Tra username trước, rồi email.
     /// </remarks>
+    [AllowAnonymous]
     [HttpPost("login")]
     [EnableRateLimiting(LuxMapRateLimits.Login)]
     [SetsRefreshTokenCookie]
@@ -59,7 +59,26 @@ public sealed class WebAuthController(AuthService authService) : ControllerBase
         return Respond(result);
     }
 
+    /// <summary>Đăng nhập Google; cookie phiên web, không tự tạo tài khoản (ACCT-4).</summary>
+    [HttpPost("google")]
+    [AllowAnonymous]
+    [EnableRateLimiting(LuxMapRateLimits.Login)]
+    [SetsRefreshTokenCookie]
+    [ProducesResponseType<WebAuthTokenResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<WebAuthTokenResponse>> GoogleAsync(
+        [FromBody] GoogleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var result = await authService.GoogleSignInAsync(request.IdToken!, RefreshTokenSessionKind.WebSession,
+            RefreshTokenCookie.Read(Request), cancellationToken);
+        return Respond(result);
+    }
+
     /// <summary>No body. The refresh token is read from the cookie and from nowhere else.</summary>
+    [AllowAnonymous]
     [HttpPost("refresh")]
     [ReadsRefreshTokenCookie]
     [SetsRefreshTokenCookie]
@@ -74,6 +93,7 @@ public sealed class WebAuthController(AuthService authService) : ControllerBase
     }
 
     /// <summary>No body. Always 204, and always clears the cookie.</summary>
+    [AllowAnonymous]
     [HttpPost("logout")]
     [ReadsRefreshTokenCookie]
     [SetsRefreshTokenCookie]
