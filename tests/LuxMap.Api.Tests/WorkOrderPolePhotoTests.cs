@@ -29,6 +29,7 @@ public partial class WorkOrderTests
 {
     private WebApplicationFactory<Program>? polePhotoHost;
     private readonly Dictionary<string, HttpClient> polePhotoClients = [];
+    private readonly SemaphoreSlim polePhotoClientGate = new(1, 1);
     private readonly HintStub poleHints = new();
     private readonly PhotoSaveProbe poleSave = new();
     private readonly PhotoStore poleStore = new();
@@ -48,20 +49,34 @@ public partial class WorkOrderTests
     }
     private async Task<HttpClient> PoleClient(string who = "a")
     {
-        polePhotoHost ??= factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
+        // Only initialization is serialized; callers send their requests after the gate is released.
+        await polePhotoClientGate.WaitAsync();
+        try
         {
-            s.Replace(ServiceDescriptor.Singleton<IObjectStore>(poleStore));
-            s.Replace(ServiceDescriptor.Singleton<ISingleLampPhotoHinter>(poleHints));
-            s.AddDbContext<LuxMapDbContext>((_, o) => o.AddInterceptors(poleSave, photoCommands));
-        }));
-        if (polePhotoClients.TryGetValue(who, out var prior)) return prior;
-        var client = polePhotoHost.CreateClient();
-        if (who != "anonymous")
-        {
-            var token = await (await client.PostLoginAsync(users[who].Username, factory.AccountPassword)).ReadTokensAsync();
-            client.DefaultRequestHeaders.Authorization = new("Bearer", token.AccessToken);
+            polePhotoHost ??= factory.WithWebHostBuilder(b => b.ConfigureServices(s =>
+            {
+                s.Replace(ServiceDescriptor.Singleton<IObjectStore>(poleStore));
+                s.Replace(ServiceDescriptor.Singleton<ISingleLampPhotoHinter>(poleHints));
+                s.AddDbContext<LuxMapDbContext>((_, o) => o.AddInterceptors(poleSave, photoCommands));
+            }));
+            if (polePhotoClients.TryGetValue(who, out var prior)) return prior;
+            var client = polePhotoHost.CreateClient();
+            try
+            {
+                if (who != "anonymous")
+                {
+                    var token = await (await client.PostLoginAsync(users[who].Username, factory.AccountPassword)).ReadTokensAsync();
+                    client.DefaultRequestHeaders.Authorization = new("Bearer", token.AccessToken);
+                }
+                return polePhotoClients[who] = client;
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
         }
-        return polePhotoClients[who] = client;
+        finally { polePhotoClientGate.Release(); }
     }
     private static string PhotosPath(string id) => $"{Route}/{id}/pole-photos";
     private async Task<(int Status, JsonElement Body)> PoleUpload(string id, string pole, string who = "a", string? op = null,
