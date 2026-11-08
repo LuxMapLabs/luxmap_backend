@@ -17245,16 +17245,11 @@
         "required": [
           "email",
           "full_name",
-          "role",
-          "username"
+          "role"
         ],
         "type": "object",
         "properties": {
-          "username": {
-            "maxLength": 256,
-            "minLength": 3,
-            "type": "string"
-          },
+          "username": {},
           "email": {
             "maxLength": 256,
             "minLength": 1,

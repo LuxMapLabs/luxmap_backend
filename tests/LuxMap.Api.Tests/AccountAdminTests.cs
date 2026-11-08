@@ -14,7 +14,7 @@ namespace LuxMap.Api.Tests;
 
 /// <summary>
 /// BE-33a: a system admin creates accounts, the person sets a password from the emailed link, and the
-/// admin can change, lock and re-invite. Every account here is a throwaway under
+/// admin can change, lock and re-invite. Every account here uses a throwaway email under
 /// <see cref="AccountTestFactory.UsernamePrefix"/>; the seeded accounts are only used to sign in.
 /// </summary>
 public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper output)
@@ -30,15 +30,15 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
     public async Task The_admin_invites_by_mail_and_the_link_sets_the_first_password()
     {
         var commune = await factory.SeededCommuneIdAsync();
-        var username = AccountTestFactory.NewUsername();
-        var email = $"{username}@example.invalid";
+        var email = $"{AccountTestFactory.NewUsername()}@example.invalid";
 
-        var created = await CreateAsync(new { username, email, full_name = "Kỹ sư mới", role = "field_engineer", commune_ids = new[] { commune } });
+        var created = await CreateAsync(new { email, full_name = "Kỹ sư mới", role = "field_engineer", commune_ids = new[] { commune } });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var body = await Json(created);
         output.WriteLine(body.ToString());
 
         var user = body.GetProperty("user");
+        var username = user.GetProperty("username").GetString()!;
         Assert.True(body.GetProperty("invitation_sent").GetBoolean());
         Assert.Equal("invited", user.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, user.GetProperty("password_set_at").ValueKind);
@@ -103,7 +103,7 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
     public async Task A_scoped_role_needs_communes_that_exist(string role, string[]? communes, string message)
     {
         var username = AccountTestFactory.NewUsername();
-        var response = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Thiếu xã", role, commune_ids = communes });
+        var response = await CreateAsync(new { email = $"{username}@example.invalid", full_name = "Thiếu xã", role, commune_ids = communes });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = (await Json(response)).GetProperty("error");
@@ -124,7 +124,7 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
         foreach (var communes in new[] { Array.Empty<string>(), new[] { home, home } })
         {
             var username = AccountTestFactory.NewUsername();
-            var created = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Invalid scope", role, commune_ids = communes });
+            var created = await CreateAsync(new { email = $"{username}@example.invalid", full_name = "Invalid scope", role, commune_ids = communes });
             var patched = await admin.PatchAsJsonAsync($"/api/v1/admin/users/{account.UserId}", new { role, commune_ids = communes });
             foreach (var response in new[] { created, patched })
             {
@@ -133,7 +133,7 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
                 Assert.Equal(ErrorCodes.ValidationFailed, error.GetProperty("code").GetString());
                 Assert.Equal("commune_ids", error.GetProperty("details").GetProperty("field").GetString());
             }
-            Assert.False(await factory.QueryAsync(db => db.Set<AppUser>().AnyAsync(u => u.Username == username)));
+            Assert.False(await factory.QueryAsync(db => db.Set<AppUser>().AnyAsync(u => u.Email == $"{username}@example.invalid")));
             Assert.Equal([home], await factory.QueryAsync(db => db.Set<AppUserCommune>()
                 .Where(x => x.UserId == account.UserId).Select(x => x.CommuneId).ToArrayAsync()));
         }
@@ -172,7 +172,7 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
     public async Task An_admin_rejects_even_an_empty_assignment_array_on_create_and_patch()
     {
         var username = AccountTestFactory.NewUsername();
-        var response = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Admin scope", role = "system_admin", commune_ids = Array.Empty<string>() });
+        var response = await CreateAsync(new { email = $"{username}@example.invalid", full_name = "Admin scope", role = "system_admin", commune_ids = Array.Empty<string>() });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var account = await CreateFieldEngineerAsync();
         var admin = await AdminAsync();
@@ -189,25 +189,21 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
         var commune = await factory.SeededCommuneIdAsync();
         var username = AccountTestFactory.NewUsername();
 
-        var refused = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Quản trị", role = "system_admin", commune_ids = new[] { commune } });
+        var refused = await CreateAsync(new { email = $"{username}@example.invalid", full_name = "Quản trị", role = "system_admin", commune_ids = new[] { commune } });
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
 
-        var created = await Json(await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Quản trị", role = "system_admin" }));
+        var created = await Json(await CreateAsync(new { email = $"{username}@example.invalid", full_name = "Quản trị", role = "system_admin" }));
         Assert.Equal(["*"], created.GetProperty("user").GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
-        Assert.True(await factory.QueryAsync(db => db.Set<AppUser>().Where(u => u.Username == username).Select(u => u.HasSystemWideScope).SingleAsync()));
+        Assert.True(await factory.QueryAsync(db => db.Set<AppUser>().Where(u => u.UserId == created.GetProperty("user").GetProperty("user_id").GetString()).Select(u => u.HasSystemWideScope).SingleAsync()));
     }
 
     [Fact]
-    public async Task A_username_or_email_already_used_in_any_case_is_409()
+    public async Task An_email_already_used_in_any_case_is_409()
     {
         var first = await CreateFieldEngineerAsync();
+        var sameMail = await CreateAsync(new { email = first.Email.ToUpperInvariant(), full_name = "Trùng", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
 
-        var sameName = await CreateAsync(new { username = first.Username.ToUpperInvariant(), email = $"other-{first.Email}", full_name = "Trùng", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
-        var sameMail = await CreateAsync(new { username = AccountTestFactory.NewUsername(), email = first.Email.ToUpperInvariant(), full_name = "Trùng", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
-
-        Assert.Equal(HttpStatusCode.Conflict, sameName.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, sameMail.StatusCode);
-        Assert.True((await Json(sameName)).GetProperty("error").GetProperty("details").TryGetProperty("username", out _));
         Assert.True((await Json(sameMail)).GetProperty("error").GetProperty("details").TryGetProperty("email", out _));
     }
 
@@ -219,11 +215,11 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
         try
         {
             var username = AccountTestFactory.NewUsername();
-            var response = await CreateAsync(new { username, email = $"{username}@example.invalid", full_name = "Thư lỗi", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
+            var response = await CreateAsync(new { email = $"{username}@example.invalid", full_name = "Thư lỗi", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
             var body = await Json(response);
             Assert.False(body.GetProperty("invitation_sent").GetBoolean());
-            account = new CreatedAccount(body.GetProperty("user").GetProperty("user_id").GetString()!, username, $"{username}@example.invalid");
+            account = new CreatedAccount(body.GetProperty("user").GetProperty("user_id").GetString()!, body.GetProperty("user").GetProperty("username").GetString()!, $"{username}@example.invalid");
         }
         finally
         {
@@ -329,6 +325,7 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
             Assert.Equal("manager", manager.GetProperty("role").GetString());
             Assert.Equal([second], manager.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
             Assert.Equal("Đổi tên", manager.GetProperty("full_name").GetString());
+            Assert.Equal(account.Username, manager.GetProperty("username").GetString());
 
             var promoted = await Json(await Patch(new { role = "system_admin" }));
             Assert.Equal(["*"], promoted.GetProperty("commune_ids").EnumerateArray().Select(c => c.GetString()));
@@ -488,9 +485,10 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
     {
         var username = AccountTestFactory.NewUsername();
         var email = $"{username}@example.invalid";
-        var response = await CreateAsync(new { username, email, full_name = "Kỹ sư thử", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
+        var response = await CreateAsync(new { email, full_name = "Kỹ sư thử", role = "field_engineer", commune_ids = new[] { await factory.SeededCommuneIdAsync() } });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return new CreatedAccount((await Json(response)).GetProperty("user").GetProperty("user_id").GetString()!, username, email);
+        var user = (await Json(response)).GetProperty("user");
+        return new CreatedAccount(user.GetProperty("user_id").GetString()!, user.GetProperty("username").GetString()!, email);
     }
 
     private async Task<CreatedAccount> CreateActiveFieldEngineerAsync()

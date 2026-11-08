@@ -185,7 +185,7 @@ giữ lại làm hàng phòng thủ thứ hai. Log ở mức **Error** vì đó 
 **Chỉ Quản trị hệ thống tạo tài khoản** (D-R11), qua `POST /api/v1/admin/users` (capability `ManageUsers`,
 BE-33a, Contract v1.8 §4.9). Không có tự đăng ký — `POST /auth/register` đã gỡ.
 
-1. Quản trị gửi `{ username, email, full_name, role, commune_ids }`. Tài khoản tạo ra **chưa có mật khẩu**
+1. Quản trị gửi `{ email, full_name, role, commune_ids }` (ACCT-2, SELF-SIGNED 08/11/2026). Server sinh username từ tên + chữ đầu họ/đệm + hậu tố số, ví dụ `Nguyễn Hữu Mỹ` → `mynh1`; bỏ field `username` (kể cả `null` bị từ chối). FE hiển thị username từ response; email mời cũng chứa tên đăng nhập này. Tài khoản tạo ra **chưa có mật khẩu**
    (`status: invited`) và hệ thống gửi **email mời** chứa link `{WEB_APP_BASE_URL}/set-password?token=…`
    (72 giờ, dùng một lần).
 2. Người dùng mở link, đặt mật khẩu (`POST /auth/password/set`), rồi đăng nhập bình thường.

@@ -41,6 +41,15 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="acct-username">
+    <strong>ACCT-USERNAME — server sinh tên đăng nhập, 08/11/2026</strong>
+    <span class="tag t-done">Đã merge · #215</span>
+    <p>Tạo tài khoản lấy gốc tên Việt + max hậu tố số; advisory lock theo gốc trong transaction.
+    Từ chối username có mặt kể cả null; mail mời giữ link và username. ACCT-2 SELF-SIGNED, WP5 bỏ ô nhập.</p>
+    <p>24 test mới (12 chuẩn hoá tên, 12 API: hậu tố, từ chối, 5 request song song, mail, PATCH). Bốn phá thử đều làm test đỏ.
+    Toàn suite xanh, OpenAPI sinh lại và lint hợp lệ.
+    Bàn giao: <code>.ai/results/ACCT-USERNAME.md</code>.</p>
+  </div>
   <div class="card" id="acct-login-email">
     <strong>ACCT-LOGIN-EMAIL — đăng nhập bằng username hoặc email, 08/11/2026</strong>
     <span class="tag t-next">Phase 2 · chờ Claude kiểm thử / Swagger</span>

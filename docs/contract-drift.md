@@ -39,6 +39,19 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 
 
+### ACCT-2 — server sinh username khi tạo tài khoản (08/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | `POST /api/v1/admin/users` sinh username từ `full_name`: NFD, bỏ dấu kết hợp, đ/Đ → d, chữ thường; tách khoảng trắng/gạch ngang; từ cuối + chữ đầu các từ trước theo thứ tự + hậu tố số. Ví dụ Nguyễn Hữu Mỹ → `mynh1`, Đỗ Văn Đức → `ducdv1`, Trần Thị Bích Ngọc → `ngocttb1`, Lê Văn-Tám → `tamlv1`. Hậu tố = max đang có khớp chính xác `^<gốc>[1-9][0-9]*$` không phân biệt hoa thường + 1, chưa có → 1 (không đếm hàng). |
+| **Decision maker** | Mỹ, chốt 08/11/2026 — **SELF-SIGNED**, nền tạm tới FW kế tiếp. |
+| **Date** | 08/11/2026 |
+| **Scope** | Identity, WP5 form tạo tài khoản; chưa hợp nhất Contract/spec. Không migration, không đổi username cũ/seed hoặc PATCH (D-11). |
+
+Chỉ áp quy tắc tên Việt: sau chuẩn hoá chỉ nhận a–z, khoảng trắng, gạch ngang; ký tự khác hoặc gốc rỗng → 400 `VALIDATION_FAILED`, `details.field = full_name`. Tên Latin nước ngoài đi cùng quy tắc, không nhận diện riêng.
+Field `username` có mặt, kể cả `null`/rỗng → 400 `SERVER_OWNED_FIELD`. FE **bỏ ô nhập username**, hiển thị `user.username` từ response. Đây là thay đổi request có breaking; WP5 cần cập nhật, **chưa báo**.
+Mail giữ link một lần (72 giờ), username sinh được ghi trong mail; không sinh/gửi mật khẩu. Lỗi gửi mail vẫn trả tài khoản đã tạo + `invitation_sent: false`.
+
 ### ACCT-1 — mỗi tài khoản thuộc đúng một xã (29/10/2026)
 
 | Trường | Nội dung |

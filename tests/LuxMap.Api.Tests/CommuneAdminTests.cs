@@ -14,7 +14,7 @@ namespace LuxMap.Api.Tests;
 /// the frames of their communes and the box around them, so the map opens there and stays there.
 /// </summary>
 /// <remarks>
-/// Every commune here is named under <see cref="NamePrefix"/> and every account under <see cref="UsernamePrefix"/> — NOT
+/// Every commune here is named under <see cref="NamePrefix"/> and every account email under <see cref="EmailPrefix"/> — NOT
 /// <see cref="AccountTestFactory.UsernamePrefix"/>: <c>AccountAdminTests</c> runs in parallel and deletes every account under
 /// that one after each of its tests. Both go after each test, accounts first (their commune assignments hold the communes).
 /// Nothing here counts communes: other classes create them at the same time. The seeded communes and accounts are only read.
@@ -22,7 +22,7 @@ namespace LuxMap.Api.Tests;
 public class CommuneAdminTests(AccountTestFactory factory) : IClassFixture<AccountTestFactory>, IAsyncLifetime
 {
     private const string NamePrefix = "bbox-test-";
-    private const string UsernamePrefix = "cbx-";
+    private const string EmailPrefix = "cbx-";
     private const string Route = "/api/v1/admin/communes";
     private const string Password = "a-long-enough-new-password";
 
@@ -36,7 +36,7 @@ public class CommuneAdminTests(AccountTestFactory factory) : IClassFixture<Accou
         await factory.QueryAsync(async db =>
         {
             #pragma warning disable RS0030 // Test TEARDOWN: bulk delete of this class's own accounts, then the communes they held.
-            await db.Set<AppUser>().Where(user => user.Username.StartsWith(UsernamePrefix)).ExecuteDeleteAsync();
+            await db.Set<AppUser>().Where(user => user.Email.StartsWith(EmailPrefix)).ExecuteDeleteAsync();
             return await db.Set<AdministrativeUnit>().Where(unit => unit.Name.StartsWith(NamePrefix)).ExecuteDeleteAsync();
             #pragma warning restore RS0030
         });
@@ -252,12 +252,12 @@ public class CommuneAdminTests(AccountTestFactory factory) : IClassFixture<Accou
     /// <summary>A throwaway manager of <paramref name="communes"/>, invited and signed in — never a seeded account.</summary>
     private async Task<HttpClient> ManagerAsync(HttpClient admin, params string[] communes)
     {
-        var username = $"{UsernamePrefix}{Guid.NewGuid():N}"[..24];
-        var email = $"{username}@example.invalid";
+        var email = $"{EmailPrefix}{Guid.NewGuid():N}@example.invalid";
         var created = await admin.PostAsJsonAsync("/api/v1/admin/users",
-            new { username, email, full_name = "Quản lý thử", role = "manager", commune_ids = communes });
+            new { email, full_name = "Quản lý thử", role = "manager", commune_ids = communes });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
+        var username = (await Json(created)).GetProperty("user").GetProperty("username").GetString()!;
         var token = factory.Mail.LatestTokenFor(email);
         var set = await factory.CreateClient().PostAsJsonAsync("/api/v1/auth/password/set", new { token, new_password = Password });
         Assert.Equal(HttpStatusCode.NoContent, set.StatusCode);
