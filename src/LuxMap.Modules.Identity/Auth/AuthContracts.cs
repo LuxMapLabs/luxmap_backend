@@ -9,6 +9,7 @@ namespace LuxMap.Modules.Identity.Auth;
 /// </summary>
 public sealed class LoginRequest
 {
+    /// <summary>Username hoặc email; trimmed and matched without case sensitivity.</summary>
     [Required]
     [MaxLength(256)]
     public string? Username { get; init; }

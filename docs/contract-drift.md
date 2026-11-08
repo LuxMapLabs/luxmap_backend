@@ -23,6 +23,20 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### ACCT-3 — đăng nhập bằng username hoặc email (08/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | `POST /auth/login` và `POST /auth/web/login` giữ body field `username`, nhận username **hoặc** email. `Trim()`, so không phân biệt hoa thường; tra username trước, chỉ khi không thấy mới tra email. Username cũ có thể chứa `@` và trùng email người khác; mật khẩu sai của username không được thử tiếp email. |
+| **Decision maker** | **Mỹ (Dylan), chốt 08/11/2026 · SELF-SIGNED** — nền tạm tới FW kế tiếp, chưa hợp nhất Contract. |
+| **Date** | 08/11/2026 |
+| **Scope** | Hai endpoint login, `AuthService`, mô tả và test; không đổi schema/index, DTO JSON, mã/thông điệp lỗi, rate limit hoặc vòng đời token. WP5/WP6 đổi nhãn ô nhập thành **Username hoặc email**, tiếp tục gửi field `username`. |
+
+- Không thể có hai tài khoản trùng email chỉ khác hoa thường: `ix_app_user_email_lower` là UNIQUE trên `lower(email)` (migration `AddCaseInsensitiveIdentityIndexes`), nên tra email luôn ra tối đa một hàng và không cần nhánh xử lý mơ hồ. Không migration, không thêm index.
+- PATCH đổi email có hiệu lực ngay cho lần đăng nhập kế tiếp: email cũ ngừng dùng, email mới dùng được (quy tắc ưu tiên username vẫn áp dụng). Không sửa PATCH và không thu hồi phiên vì thay đổi này.
+- Tài khoản đang mời chưa có mật khẩu vẫn `401 INVALID_CREDENTIALS`; tài khoản khoá chỉ trả `403 ACCOUNT_LOCKED` sau khi mật khẩu đúng. Một refresh chain mới mỗi lần login như hiện tại.
+
+
 
 ### ACCT-2 — server sinh username khi tạo tài khoản (08/11/2026)
 

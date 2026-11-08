@@ -43,13 +43,21 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="acct-username">
     <strong>ACCT-USERNAME — server sinh tên đăng nhập, 08/11/2026</strong>
-    <span class="tag t-next">Phase 2 · chờ Claude kiểm thử</span>
+    <span class="tag t-done">Đã merge · #215</span>
     <p>Tạo tài khoản lấy gốc tên Việt + max hậu tố số; advisory lock theo gốc trong transaction.
     Từ chối username có mặt kể cả null; mail mời giữ link và username. ACCT-2 SELF-SIGNED, WP5 bỏ ô nhập.</p>
-    <p>Đã viết test chuẩn hoá, validation, suffix/case/gap, 5 request song song, mail và PATCH.
-    Build toàn solution thành công (0 warning, 0 error). Chưa chạy test/phá thử/Swagger theo giới hạn sandbox; không stage/commit/push.
-    File: Identity/Accounts, Account*Tests/Factory, CommuneAdminTests, docs hướng dẫn/traps/drift, tracking.
+    <p>24 test mới (12 chuẩn hoá tên, 12 API: hậu tố, từ chối, 5 request song song, mail, PATCH). Bốn phá thử đều làm test đỏ.
+    Toàn suite xanh, OpenAPI sinh lại và lint hợp lệ.
     Bàn giao: <code>.ai/results/ACCT-USERNAME.md</code>.</p>
+  </div>
+  <div class="card" id="acct-login-email">
+    <strong>ACCT-LOGIN-EMAIL — đăng nhập bằng username hoặc email, 08/11/2026</strong>
+    <span class="tag t-done">Đã kiểm chứng · chờ merge</span>
+    <p>Giữ field <code>username</code> cho mobile/web; trim, so không phân biệt hoa thường, ưu tiên username.
+    Email tra qua <code>ix_app_user_email_lower</code> (UNIQUE trên <code>lower(email)</code>) nên luôn tối đa một tài khoản. ACCT-3 SELF-SIGNED, nền tạm tới FW.</p>
+    <p>10 ca (5 theory × mobile/web): email/username đúng, in hoa, email lưu chữ hoa, thất bại giữ nguyên mã/thông điệp, username thắng email, PATCH đổi email.
+    Ba phá thử đều làm test đỏ. Toàn suite xanh trừ test flaky đã biết (PR #216). OpenAPI không đổi.
+    Bàn giao: <code>.ai/results/ACCT-LOGIN-EMAIL.md</code>.</p>
   </div>
   <div class="card" id="test-wo-parallel">
     <strong>TEST-WO-PARALLEL — phase 2, 08/11/2026</strong>

@@ -85,3 +85,10 @@ trong transaction READ COMMITTED bao cả đọc max và SaveAsync/commit. Khoá
 không thay bằng khoá trên hàng chưa tồn tại. Hash collision chỉ tuần tự hoá thêm, không gây trùng username.
 Commit trước SMTP. Unique index vẫn là chốt cuối; không bỏ SaveAsync xử lý unique/email race.
 Test API lấy username từ response, teardown dùng email có prefix riêng (username do server sinh).
+
+## ACCT-3 — tra đăng nhập theo username rồi email (08/11/2026)
+
+Field JSON vẫn là `username`; hai endpoint dùng chung `AuthService`. Username cũ có thể chứa `@` và trùng email
+của người khác: luôn ưu tiên username, không thử email sau khi sai mật khẩu. Không cần xử lý "email khớp nhiều
+hàng": `ix_app_user_email_lower` (và `ix_app_user_username_lower`) là UNIQUE trên `lower(...)`, đừng viết lại nhánh đó
+dựa trên giả định index phân biệt hoa thường. Log đăng nhập không ghi chuỗi người dùng gõ (có thể là email). Nền API: ACCT-3 SELF-SIGNED.

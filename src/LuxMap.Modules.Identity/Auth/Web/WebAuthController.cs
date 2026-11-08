@@ -33,6 +33,11 @@ namespace LuxMap.Modules.Identity.Auth.Web;
 [ClientSurface(ClientSurface.Web)]
 public sealed class WebAuthController(AuthService authService) : ControllerBase
 {
+    /// <summary>Đăng nhập bằng username hoặc email và mật khẩu.</summary>
+    /// <remarks>
+    /// Field <c>username</c> nhận username hoặc email, bỏ khoảng trắng đầu cuối và không phân biệt
+    /// hoa thường. Tra username trước, rồi email; email khớp nhiều tài khoản bị từ chối.
+    /// </remarks>
     [HttpPost("login")]
     [EnableRateLimiting(LuxMapRateLimits.Login)]
     [SetsRefreshTokenCookie]
