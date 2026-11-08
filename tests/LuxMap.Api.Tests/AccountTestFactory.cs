@@ -17,7 +17,7 @@ namespace LuxMap.Api.Tests;
 /// </summary>
 public class AccountTestFactory : LuxMapTestHost
 {
-    /// <summary>Every username a test creates starts with this, so teardown finds exactly its own rows.</summary>
+    /// <summary>Every email in AccountAdminTests starts with this, so teardown finds exactly its own rows.</summary>
     public const string UsernamePrefix = "acct-";
 
     public FakeTimeProvider Clock { get; } = new(DateTimeOffset.UtcNow);
@@ -53,7 +53,7 @@ public class AccountTestFactory : LuxMapTestHost
             .Select(unit => unit.CommuneId)
             .SingleAsync());
 
-    /// <summary>A unique username under <see cref="UsernamePrefix"/>.</summary>
+    /// <summary>A unique identifier for direct inserts and API test email addresses.</summary>
     public static string NewUsername() => $"{UsernamePrefix}{Guid.NewGuid():N}"[..24];
 
     /// <summary>
@@ -64,7 +64,7 @@ public class AccountTestFactory : LuxMapTestHost
         => QueryAsync(async db =>
         {
             #pragma warning disable RS0030 // Test TEARDOWN: bulk delete is the only way to clean up under an empty scope. BE-36 removes the need entirely — a fresh database per run.
-            return await db.Set<AppUser>().Where(user => user.Username.StartsWith(UsernamePrefix)).ExecuteDeleteAsync();
+            return await db.Set<AppUser>().Where(user => (user.Email.StartsWith(UsernamePrefix) || user.Username.StartsWith(UsernamePrefix))).ExecuteDeleteAsync();
             #pragma warning restore RS0030
         });
 }

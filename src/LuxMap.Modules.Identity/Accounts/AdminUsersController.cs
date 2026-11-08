@@ -23,6 +23,12 @@ public sealed class AdminUsersController(UserAdminService service) : ControllerB
     /// Creates the account with no password and mails an invitation link (72 hours, single use).
     /// <c>invitation_sent: false</c> means the account exists but the mail failed — resend it.
     /// </summary>
+    /// <remarks>
+    /// Omit username (even null is rejected with SERVER_OWNED_FIELD). For Vietnamese names, the server
+    /// removes accents, maps đ to d and splits whitespace/hyphens: last word + initials of earlier
+    /// words + next numeric suffix (Nguyễn Hữu Mỹ → mynh1). Other scripts, digits and symbols are
+    /// rejected as full_name validation errors. Latin foreign names follow the same rule.
+    /// </remarks>
     [HttpPost]
     [Authorize(Policy = LuxMapPolicies.ManageUsers)]
     [ProducesResponseType<CreateUserResponse>(StatusCodes.Status201Created)]

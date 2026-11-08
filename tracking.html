@@ -41,6 +41,16 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="acct-username">
+    <strong>ACCT-USERNAME — server sinh tên đăng nhập, 08/11/2026</strong>
+    <span class="tag t-next">Phase 2 · chờ Claude kiểm thử</span>
+    <p>Tạo tài khoản lấy gốc tên Việt + max hậu tố số; advisory lock theo gốc trong transaction.
+    Từ chối username có mặt kể cả null; mail mời giữ link và username. ACCT-2 SELF-SIGNED, WP5 bỏ ô nhập.</p>
+    <p>Đã viết test chuẩn hoá, validation, suffix/case/gap, 5 request song song, mail và PATCH.
+    Build toàn solution thành công (0 warning, 0 error). Chưa chạy test/phá thử/Swagger theo giới hạn sandbox; không stage/commit/push.
+    File: Identity/Accounts, Account*Tests/Factory, CommuneAdminTests, docs hướng dẫn/traps/drift, tracking.
+    Bàn giao: <code>.ai/results/ACCT-USERNAME.md</code>.</p>
+  </div>
   <div class="card" id="test-wo-parallel">
     <strong>TEST-WO-PARALLEL — test flaky, 06/11/2026</strong>
     <span class="tag t-next">Ticket mở · chưa làm</span>

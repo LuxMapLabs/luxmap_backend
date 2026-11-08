@@ -74,3 +74,14 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 
 **Test luật "Quản trị cuối cùng" chạy trong transaction rồi rollback** (khoá các admin khác chỉ trong transaction đó).
 Đổi trạng thái admin thật trên DB dùng chung sẽ đua với các class test khác đang tạo admin (`WorkOrderTests`).
+
+## ACCT-USERNAME — khoá cấp hậu tố theo gốc (08/11/2026)
+
+Tạo qua API không nhận username, kể cả null: giữ field `JsonElement` để `OptionalJson.Present` thấy key có mặt.
+`UsernameGenerator.BaseName` là định nghĩa duy nhất của gốc. Lấy hậu tố max theo regex chính xác (không đếm hàng,
+không lấy max chuỗi), so không phân biệt hoa thường; `mynh7` → `mynh8`, `MYNH3` cũng được tính.
+`UserAdminService.CreateAsync` giữ `pg_advisory_xact_lock(hashtextextended("account-username:" + gốc, 0))`
+trong transaction READ COMMITTED bao cả đọc max và SaveAsync/commit. Khoá theo gốc hoạt động cả khi chưa có hàng;
+không thay bằng khoá trên hàng chưa tồn tại. Hash collision chỉ tuần tự hoá thêm, không gây trùng username.
+Commit trước SMTP. Unique index vẫn là chốt cuối; không bỏ SaveAsync xử lý unique/email race.
+Test API lấy username từ response, teardown dùng email có prefix riêng (username do server sinh).
