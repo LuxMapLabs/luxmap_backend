@@ -32,8 +32,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | **Date** | 08/11/2026 |
 | **Scope** | Hai endpoint login, `AuthService`, mô tả và test; không đổi schema/index, DTO JSON, mã/thông điệp lỗi, rate limit hoặc vòng đời token. WP5/WP6 đổi nhãn ô nhập thành **Username hoặc email**, tiếp tục gửi field `username`. |
 
-- Email khớp nhiều hàng (unique index hiện phân biệt hoa thường): **fail closed**, `401 INVALID_CREDENTIALS`, cùng thông điệp như sai mật khẩu/không có tài khoản. Warning chỉ ghi các `user_id`, không ghi email hoặc chuỗi nhập.
-- `RequireFreeAsync` đã chặn email trùng không phân biệt hoa thường khi tạo/sửa qua API; nhánh phòng vệ vẫn cần cho dữ liệu cũ/chèn trực tiếp. Không migration, không thêm index.
+- Không thể có hai tài khoản trùng email chỉ khác hoa thường: `ix_app_user_email_lower` là UNIQUE trên `lower(email)` (migration `AddCaseInsensitiveIdentityIndexes`), nên tra email luôn ra tối đa một hàng và không cần nhánh xử lý mơ hồ. Không migration, không thêm index.
 - PATCH đổi email có hiệu lực ngay cho lần đăng nhập kế tiếp: email cũ ngừng dùng, email mới dùng được (quy tắc ưu tiên username vẫn áp dụng). Không sửa PATCH và không thu hồi phiên vì thay đổi này.
 - Tài khoản đang mời chưa có mật khẩu vẫn `401 INVALID_CREDENTIALS`; tài khoản khoá chỉ trả `403 ACCOUNT_LOCKED` sau khi mật khẩu đúng. Một refresh chain mới mỗi lần login như hiện tại.
 

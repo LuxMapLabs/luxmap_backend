@@ -52,15 +52,12 @@
   </div>
   <div class="card" id="acct-login-email">
     <strong>ACCT-LOGIN-EMAIL — đăng nhập bằng username hoặc email, 08/11/2026</strong>
-    <span class="tag t-next">Phase 2 · chờ Claude kiểm thử / Swagger</span>
-    <p>Giữ field <code>username</code> cho mobile/web; trim, so không phân biệt hoa thường, ưu tiên username;
-    email mơ hồ bị từ chối và warning chỉ ghi user_id. ACCT-3 SELF-SIGNED, nền tạm tới FW.</p>
-    <p>Đã viết 10 ca theory cho cả mobile/web (a–h), gồm PATCH đổi email và dữ liệu cũ chèn trực tiếp.
-    Test, phá thử, Swagger chưa chạy theo giới hạn sandbox; chưa stage/commit/push.</p>
-    <p class="muted">Files: AuthService.cs, AuthContracts.cs, AuthController.cs, WebAuthController.cs,
-    WebAuthContracts.cs, EmailLoginTests.cs, contract-drift.md, auth-accounts.md, tracking.html,
-    README.md, .ai/results/ACCT-LOGIN-EMAIL.md. Build bị chặn khi restore: NU1301, không phân giải được api.nuget.org;
-    lượt đơn tiến trình hết hạn 55 giây (exit 124), chưa xác minh compile/warning.</p>
+    <span class="tag t-done">Đã kiểm chứng · chờ merge</span>
+    <p>Giữ field <code>username</code> cho mobile/web; trim, so không phân biệt hoa thường, ưu tiên username.
+    Email tra qua <code>ix_app_user_email_lower</code> (UNIQUE trên <code>lower(email)</code>) nên luôn tối đa một tài khoản. ACCT-3 SELF-SIGNED, nền tạm tới FW.</p>
+    <p>10 ca (5 theory × mobile/web): email/username đúng, in hoa, email lưu chữ hoa, thất bại giữ nguyên mã/thông điệp, username thắng email, PATCH đổi email.
+    Ba phá thử đều làm test đỏ. Toàn suite xanh trừ test flaky đã biết (PR #216). OpenAPI không đổi.
+    Bàn giao: <code>.ai/results/ACCT-LOGIN-EMAIL.md</code>.</p>
   </div>
   <div class="card" id="test-wo-parallel">
     <strong>TEST-WO-PARALLEL — test flaky, 06/11/2026</strong>

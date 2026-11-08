@@ -95,22 +95,9 @@ public sealed class AuthService(
         return user ?? await FindByEmailForSignInAsync(normalized, ct);
     }
 
-    private async Task<AppUser?> FindByEmailForSignInAsync(string normalizedEmail, CancellationToken ct)
-    {
-        // The DB unique index is case-sensitive. Refuse ambiguous legacy data rather than choosing
-        // an arbitrary account; keep the input (which may be an email address) out of every log.
-        var matches = await dbContext.Set<AppUser>()
-            .Where(candidate => candidate.Email.ToLower() == normalizedEmail)
-            .ToListAsync(ct);
-        if (matches.Count > 1)
-        {
-            logger.LogWarning("Sign-in refused: ambiguous email matches accounts {UserIds}.",
-                string.Join(", ", matches.Select(candidate => candidate.UserId)));
-            return null;
-        }
-
-        return matches.SingleOrDefault();
-    }
+    private Task<AppUser?> FindByEmailForSignInAsync(string normalizedEmail, CancellationToken ct)
+        // ix_app_user_email_lower is UNIQUE on lower(email), so at most one account can match.
+        => dbContext.Set<AppUser>().FirstOrDefaultAsync(candidate => candidate.Email.ToLower() == normalizedEmail, ct);
 
     /// <summary>
     /// The signed-in user as the database has them RIGHT NOW, or <c>null</c> when the id names nobody.

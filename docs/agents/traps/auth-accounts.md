@@ -89,6 +89,6 @@ Test API lấy username từ response, teardown dùng email có prefix riêng (u
 ## ACCT-3 — tra đăng nhập theo username rồi email (08/11/2026)
 
 Field JSON vẫn là `username`; hai endpoint dùng chung `AuthService`. Username cũ có thể chứa `@` và trùng email
-của người khác: luôn ưu tiên username, không thử email sau khi sai mật khẩu. Email khớp nhiều hàng chỉ khác hoa
-thường phải fail closed (unique index DB phân biệt hoa thường); warning chỉ ghi `user_id`, không ghi chuỗi nhập.
-`RequireFreeAsync` chặn trùng ở API không thay thế phòng vệ cho dữ liệu cũ/chèn trực tiếp. Nền API: ACCT-3 SELF-SIGNED.
+của người khác: luôn ưu tiên username, không thử email sau khi sai mật khẩu. Không cần xử lý "email khớp nhiều
+hàng": `ix_app_user_email_lower` (và `ix_app_user_username_lower`) là UNIQUE trên `lower(...)`, đừng viết lại nhánh đó
+dựa trên giả định index phân biệt hoa thường. Log đăng nhập không ghi chuỗi người dùng gõ (có thể là email). Nền API: ACCT-3 SELF-SIGNED.

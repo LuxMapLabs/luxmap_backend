@@ -80,18 +80,18 @@ public sealed class EmailLoginTests(AuthTestFactory factory) : IAsyncLifetime
         await AssertInvalidAsync(await LoginAsync(web, identifier, OtherPassword));
     }
 
-    // (g): bypass RequireFreeAsync to exercise case-sensitive DB uniqueness with legacy data.
+    // The stored email keeps the casing the admin typed; the lookup must match it from any casing.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Ambiguous_email_fails_closed_for_either_accounts_correct_password(bool web)
+    public async Task A_mixed_case_stored_email_is_found_from_any_casing(bool web)
     {
-        var email = $"{Prefix}{Guid.NewGuid():N}@ambiguous.test";
-        await CreateAsync(email: email);
-        await CreateAsync(email: email.ToUpperInvariant(), password: OtherPassword);
+        var email = $"Mixed.Case.{Guid.NewGuid():N}@Email-Login.test";
+        var user = await CreateAsync(email: email);
 
-        await AssertInvalidAsync(await LoginAsync(web, email));
-        await AssertInvalidAsync(await LoginAsync(web, email.ToUpperInvariant(), OtherPassword));
+        await AssertSubjectAsync(await LoginAsync(web, email), user.UserId);
+        await AssertSubjectAsync(await LoginAsync(web, email.ToLowerInvariant()), user.UserId);
+        await AssertSubjectAsync(await LoginAsync(web, email.ToUpperInvariant()), user.UserId);
     }
 
     // (h): use the public PATCH path, then fresh login requests (no stale tracked entities).

@@ -20,7 +20,7 @@ bằng **email hoặc username**. Hai endpoint đăng nhập (mobile `POST /auth
 
 - **Không đổi tên field**: body vẫn là `{ "username": "...", "password": "..." }` để FE web / mobile đang chạy không gãy. Field `username` nhận username **hoặc** email. Chỉ đổi XML-doc / mô tả.
 - Thứ tự tra: **username trước**, không tìm thấy mới tra **email**; cả hai so **không phân biệt hoa thường**, sau `Trim()`. Lý do thứ tự: username tài khoản cũ do client nhập tự do (không cấm `@`), về lý thuyết có thể trùng email người khác; username sinh mới chỉ gồm `a-z0-9` nên không bao giờ có `@`.
-- **Fail closed khi mơ hồ:** nếu tra theo email ra **nhiều hơn một** hàng (unique index của `email` phân biệt hoa thường — `A@x.com` và `a@x.com` cùng tồn tại được; đọc `RequireFreeAsync` xem lúc tạo / sửa có chặn không) → coi như không tìm thấy (`InvalidCredentials`), ghi log cảnh báo kèm các `user_id` (KHÔNG ghi email / chuỗi người dùng gõ), và nêu trong results.
+- **Đính chính (Claude, 08/11/2026):** ticket ban đầu giả định unique index của `email` phân biệt hoa thường nên cần "fail closed khi nhiều hàng". Sai: `ix_app_user_email_lower` là UNIQUE trên `lower(email)` (migration `AddCaseInsensitiveIdentityIndexes`), nên không có ca mơ hồ; nhánh đó và test (g) đã bỏ.
 - Mọi thứ sau bước tra GIỮ NGUYÊN: tài khoản đang mời (chưa có mật khẩu) thất bại giống sai mật khẩu; khoá kiểm SAU khi xác minh mật khẩu; một lỗi chung `InvalidCredentials`; rate limit `LuxMapRateLimits.Login` hiện có; một chuỗi refresh mới mỗi lần đăng nhập. Không thêm mã lỗi mới, không để lộ tài khoản có tồn tại hay không (kể cả log mức Warning hiện tại — không in chuỗi người dùng gõ).
 - Không migration, không thêm index (bảng nhỏ; truy vấn `ToLower()` giống hiện tại).
 - Đổi email (`PATCH /admin/users/{id}`) có hiệu lực ngay cho đăng nhập: email cũ ngừng dùng được, email mới dùng được. Chỉ cần test, không đổi code PATCH.
@@ -43,10 +43,9 @@ bằng **email hoặc username**. Hai endpoint đăng nhập (mobile `POST /auth
    - (d) tài khoản đang mời (chưa đặt mật khẩu) đăng nhập bằng email → 401 giống sai mật khẩu; tài khoản khoá + mật khẩu đúng bằng email → 403 `ACCOUNT_LOCKED` (mã hiện có — đọc `AuthFailureErrors.cs`), mật khẩu sai → 401 (không lộ);
    - (e) username vẫn đăng nhập được như cũ (hồi quy);
    - (f) ưu tiên username: tài khoản A có username `b@x.test` (chèn trực tiếp qua DbContext, vì API không còn cho đặt), tài khoản B có email `b@x.test`; mật khẩu của A → đăng nhập ra A; mật khẩu của B với `b@x.test` → 401;
-   - (g) mơ hồ: hai tài khoản email chỉ khác hoa thường (chèn trực tiếp) → đăng nhập bằng email đó → 401, kể cả mật khẩu đúng của một trong hai;
    - (h) Quản trị đổi email qua PATCH → email cũ 401, email mới 200.
    Tiền tố tài khoản riêng mỗi class test; teardown theo thứ tự FK (CLAUDE.md mục Test).
-4. **Phá thử** (viết vào results là "chưa chạy, Claude sẽ chạy", kèm đúng dòng): (a) bỏ nhánh tra email → test (a) đỏ; (b) đổi thứ tự (email trước username) → test (f) đỏ; (c) bỏ kiểm "nhiều hơn một" → test (g) đỏ; (d) đổi `ToLower` thành so sánh phân biệt hoa thường → test (b) đỏ.
+4. **Phá thử** (viết vào results là "chưa chạy, Claude sẽ chạy", kèm đúng dòng): (a) bỏ nhánh tra email → test (a) đỏ; (b) đổi thứ tự (email trước username) → test (f) đỏ; (c) đổi `ToLower` thành so sánh phân biệt hoa thường → test (b) đỏ.
 5. Tài liệu: `docs/contract-drift.md` dòng ACCT-3 (SELF-SIGNED 08/11/2026): field `username` nhận username hoặc email, thứ tự tra, fail-closed, hệ quả đổi email, việc FE phải đổi (nhãn ô nhập). `docs/agents/traps/auth-accounts.md` thêm bẫy ngắn nếu có. `tracking.html` thêm thẻ. **KHÔNG** sửa `docs/api-contract-v1.1.md`, **KHÔNG** sửa `docs/openapi/*` (Claude sinh lại).
 6. Ghi `.ai/results/ACCT-LOGIN-EMAIL.md` ngắn: đã làm gì, lệnh Claude cần chạy, điều chưa chắc.
 
