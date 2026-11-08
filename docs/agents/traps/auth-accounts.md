@@ -74,3 +74,10 @@ thì kiểm thời hạn đã cấp rồi dời `expires_at` của chính bản 
 
 **Test luật "Quản trị cuối cùng" chạy trong transaction rồi rollback** (khoá các admin khác chỉ trong transaction đó).
 Đổi trạng thái admin thật trên DB dùng chung sẽ đua với các class test khác đang tạo admin (`WorkOrderTests`).
+
+## ACCT-3 — tra đăng nhập theo username rồi email (08/11/2026)
+
+Field JSON vẫn là `username`; hai endpoint dùng chung `AuthService`. Username cũ có thể chứa `@` và trùng email
+của người khác: luôn ưu tiên username, không thử email sau khi sai mật khẩu. Email khớp nhiều hàng chỉ khác hoa
+thường phải fail closed (unique index DB phân biệt hoa thường); warning chỉ ghi `user_id`, không ghi chuỗi nhập.
+`RequireFreeAsync` chặn trùng ở API không thay thế phòng vệ cho dữ liệu cũ/chèn trực tiếp. Nền API: ACCT-3 SELF-SIGNED.

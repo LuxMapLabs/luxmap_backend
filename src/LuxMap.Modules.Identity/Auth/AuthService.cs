@@ -25,17 +25,13 @@ public sealed class AuthService(
     /// chain; a missing, unknown, expired, revoked or mobile token is ignored. Only a SUCCESSFUL
     /// sign-in revokes anything.</param>
     public async Task<AuthResult> LoginAsync(
-        string username,
+        string identifier,
         string password,
         RefreshTokenSessionKind kind,
         string? supersededWebRefreshToken,
         CancellationToken ct = default)
     {
-        var normalized = (username ?? string.Empty).Trim();
-
-        // BE-06 stores usernames verbatim with no case normalisation, so the lookup lowercases itself.
-        var user = await dbContext.Set<AppUser>()
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == normalized.ToLower(), ct);
+        var user = await FindForSignInAsync(identifier, ct);
 
         if (user is null)
         {
@@ -86,6 +82,34 @@ public sealed class AuthService(
         logger.LogInformation(
             "Sign-in succeeded for {UserId}, opened {SessionKind} chain {ChainId}.", user.UserId, kind, chainId);
         return AuthResult.Success(await BuildTokensAsync(user, refresh.Entity, refresh.RawToken, ct));
+    }
+
+    private async Task<AppUser?> FindForSignInAsync(string identifier, CancellationToken ct)
+    {
+        var normalized = (identifier ?? string.Empty).Trim().ToLowerInvariant();
+
+        // Legacy usernames may contain @ and collide with another account's email. Username wins,
+        // even when its password is wrong: never retry another account after password verification.
+        var user = await dbContext.Set<AppUser>()
+            .FirstOrDefaultAsync(candidate => candidate.Username.ToLower() == normalized, ct);
+        return user ?? await FindByEmailForSignInAsync(normalized, ct);
+    }
+
+    private async Task<AppUser?> FindByEmailForSignInAsync(string normalizedEmail, CancellationToken ct)
+    {
+        // The DB unique index is case-sensitive. Refuse ambiguous legacy data rather than choosing
+        // an arbitrary account; keep the input (which may be an email address) out of every log.
+        var matches = await dbContext.Set<AppUser>()
+            .Where(candidate => candidate.Email.ToLower() == normalizedEmail)
+            .ToListAsync(ct);
+        if (matches.Count > 1)
+        {
+            logger.LogWarning("Sign-in refused: ambiguous email matches accounts {UserIds}.",
+                string.Join(", ", matches.Select(candidate => candidate.UserId)));
+            return null;
+        }
+
+        return matches.SingleOrDefault();
     }
 
     /// <summary>

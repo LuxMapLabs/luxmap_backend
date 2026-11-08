@@ -86,7 +86,8 @@ dotnet run --project src/LuxMap.Api
 ```
 
 Mở **http://localhost:5141/swagger**. Gọi `POST /api/v1/auth/login` với một tài khoản ở trên, copy `access_token`, bấm
-**Authorize** và dán token (không kèm chữ `Bearer`).
+**Authorize** và dán token (không kèm chữ `Bearer`). Field `username` nhận username hoặc email ở cả login mobile
+và `/api/v1/auth/web/login` (ACCT-3 SELF-SIGNED, xem [contract-drift.md](docs/contract-drift.md#acct-3--đăng-nhập-bằng-username-hoặc-email-08112026)).
 
 ### 7. Chạy test
 
