@@ -10,7 +10,7 @@ Data API: backend tự lo đăng nhập và phân quyền theo xã (Contract §2
 > ⚠️ **Ảnh và video KHÔNG nằm trong database.** MinIO giữ byte, các bảng chỉ giữ khoá (`object_key`, `thumbnail_key`) —
 > ảnh khảo sát (`luxmap-survey`), ảnh phiếu (`luxmap-evidence`), clip và file thô (`luxmap-video`). Script dưới đây chỉ chép
 > **hàng**. Chừng nào API vẫn chạy trên máy có MinIO cũ thì không cần đổi gì. Nếu API chạy ở **máy khác** (hay cả nhóm cùng
-> trỏ vào Supabase), máy đó phải đọc được **cùng** kho file: một MinIO dùng chung, chép ba bucket bằng `mc mirror` **giữ
+> trỏ vào Supabase), máy đó phải đọc được **cùng** kho file: một MinIO dùng chung, chép năm bucket (`luxmap-survey`, `luxmap-evidence`, `luxmap-video`, `luxmap-citizen`, `luxmap-avatar`) bằng `mc mirror` **giữ
 > nguyên khoá**. Thiếu file thì API trả `503 STORAGE_OBJECT_MISSING` cho ảnh, không hỏng dữ liệu. Máy chạy API cũng cần
 > `ffmpeg` (worker cắt frame chạy trong tiến trình API).
 

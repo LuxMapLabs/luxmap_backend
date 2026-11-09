@@ -91,7 +91,8 @@ public sealed record UserAccountItem(
     IReadOnlyList<string> CommuneIds,
     string Status,
     DateTime CreatedAt,
-    DateTime? PasswordSetAt);
+    DateTime? PasswordSetAt,
+    string? AvatarUrl);
 
 /// <summary>
 /// What creating an account returns: the account, and whether the invitation mail went out (D-3).

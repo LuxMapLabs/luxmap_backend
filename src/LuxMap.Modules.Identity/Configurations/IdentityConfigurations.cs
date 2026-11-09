@@ -28,10 +28,20 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         builder.Property(user => user.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(user => user.UpdatedAt).HasDefaultValueSql("now()");
 
+        builder.Property(user => user.AvatarObjectKey).HasColumnType("text");
+        builder.Property(user => user.AvatarByteCount).HasColumnType("bigint");
+        builder.Property(user => user.AvatarThumbnailKey).HasColumnType("text");
+        builder.Property(user => user.AvatarThumbnailBytes).HasColumnType("bigint");
+        builder.Property(user => user.AvatarUpdatedAt).HasColumnType("timestamp with time zone");
+
         builder.HasContractEnum(user => user.Role);
 
         builder.ToTable(table =>
         {
+            table.HasCheckConstraint("ck_app_user_avatar_all_or_none",
+                "(avatar_object_key IS NULL AND avatar_byte_count IS NULL AND avatar_thumbnail_key IS NULL AND avatar_thumbnail_bytes IS NULL AND avatar_updated_at IS NULL) OR " +
+                "(avatar_object_key IS NOT NULL AND avatar_byte_count IS NOT NULL AND avatar_byte_count >= 0 AND avatar_thumbnail_key IS NOT NULL AND avatar_thumbnail_bytes IS NOT NULL AND avatar_thumbnail_bytes >= 0 AND avatar_updated_at IS NOT NULL)");
+
             // The "*" claim belongs to system_admin and only to it (Contract section 7). Before BE-33a only
             // CommuneScopeConsistency caught a mismatch, at request time; now no row can carry one.
             table.HasCheckConstraint(

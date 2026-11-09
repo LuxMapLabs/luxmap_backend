@@ -21,16 +21,17 @@ Khớp luôn Contract mục 2.7 (`GET /api/v1/frames/{frame_id}/thumbnail` → J
 `mock-pole-detail.json` (`"thumbnail_url": "/api/v1/frames/FRM-088213/thumbnail"` — đường dẫn tương
 đối, không host, không chữ ký). FE đã dựng theo hình dạng đó.
 
-**2. Bốn bucket, key phân tầng, KHÔNG nhúng `commune_id`.**
+**2. Năm bucket, key phân tầng, KHÔNG nhúng `commune_id`.**
 
 ```
 luxmap-survey     original/{frame_id}.jpg      thumb/{frame_id}.jpg
 luxmap-evidence   original/{evidence_id}.jpg   thumb/{evidence_id}.jpg
 luxmap-citizen    ảnh đã sanitize + thumbnail
+luxmap-avatar     original/{user_id}.jpg       thumb/{user_id}.jpg (sanitize, ghi đè)
 luxmap-video      clip và JSON/JSONL đầu vào khảo sát (key theo ingest)
 ```
 
-Tên bucket/key lấy từ `StorageKeys` và ingest; Citizen sanitize trước lưu, video/raw input đi qua `StoreStreamAsync`.
+Tên bucket/key lấy từ `StorageKeys` và ingest; Citizen và Avatar sanitize trước lưu, video/raw input đi qua `StoreStreamAsync`.
 
 `commune_id` nằm ngoài key **có chủ đích**: phân quyền có đúng một nguồn sự thật là cột `commune_id`
 với khoá ngoại thật tới `administrative_unit`. Một bản sao trong key là **câu trả lời thứ hai không
@@ -62,7 +63,7 @@ Mỗi lượt ghi trả **byte thật**, không tin `Content-Length` — tổng 
 
 **4. Ảnh gốc khảo sát / evidence / ảnh cột giữ NGUYÊN BYTE; thumbnail là object RIÊNG.**
 
-Không re-encode, strip EXIF hay xoay original. **Ảnh công dân là ngoại lệ**: sanitize trước lưu
+Không re-encode, strip EXIF hay xoay original. **Ảnh công dân và avatar là ngoại lệ**: sanitize trước lưu
 (`docs/agents/traps/citizen.md`, mục P2b). Capture config và chất lượng GPS track kiểm ở cấp phiên, không đòi metadata
 ISO/shutter/aperture/GPS/heading trên từng JPEG (D-R24; `SurveyRawParser`). Thumbnail bỏ metadata tường minh — xem cuối file.
 
@@ -139,3 +140,10 @@ Tiến độ test S3 thật theo `tracking.html` (BE-36 D-7); một lần kiểm
 - **Lỗi cần header riêng (`Content-Range: bytes */size`) tự ghi, không ném**: `ExceptionHandlingMiddleware.WriteAsync` gọi `Response.Clear()` (cùng lý do `Retry-After`).
 - Ghi lượt xem (`video_viewed_by/at`) khoá **chỉ dòng ảnh** (khoá cuối trong thứ tự phiếu → cột → ảnh nên không đảo thứ tự); nhiều request Range đồng thời của một player thấy dòng đã
   đánh dấu và không ghi thêm. Mở object **trước** khi ghi lượt xem để clip thiếu không được tính là đã xem.
+
+## ACCT-AVATAR — nền tạm ACCT-5 (09/11/2026)
+
+Avatar dùng `IImageSanitizer` như ảnh công dân: JPEG-only, xoay orientation, bỏ EXIF/GPS/XMP/IPTC/ICC, cạnh dài ≤512,
+đọc tối đa 1 MiB và 16 triệu pixel. Khác survey/evidence: original avatar cũng đã sanitize. Bucket thứ năm `luxmap-avatar`,
+hai key cố định theo user, upload lại ghi đè. DELETE chỉ gỡ năm cột liên kết; byte vẫn còn tới upload kế tiếp, chưa có xoá thật.
+Phục vụ thumbnail qua API có Bearer, không URL S3. `StoredObjectColumn` khai tên cột avatar tường minh trong IdentityModule.

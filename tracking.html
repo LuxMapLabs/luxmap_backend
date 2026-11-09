@@ -41,6 +41,17 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="acct-avatar">
+    <strong>ACCT-AVATAR — phase 2, 09/11/2026</strong>
+    <span class="tag t-done">Xong · chờ PR</span>
+    <p>Bốn route avatar, capability ManageOwnProfile, JPEG-only sanitize ≤512 px / 1 MiB, bucket luxmap-avatar,
+    avatar_url cho me/admin, cache private + ETag/304. DELETE chỉ gỡ liên kết. ACCT-5 SELF-SIGNED.</p>
+    <p>Files: Identity/Profiles, AppUser, IdentityConfigurations, Auth/Accounts DTO và service, IdentityModule,
+    LuxMapPolicies, ErrorCodes, ObjectStorage, compose/backup, migration AddAccountAvatars, AvatarTests,
+    OldSchemaUser (test migration lùi), docs drift/traps/development/deploy.</p>
+    <p>Claude đã chạy: build 0 cảnh báo, toàn bộ suite xanh (1499 test API, 7 skip), phá thử bảy chốt đều làm test đỏ,
+    OpenAPI sinh lại (151 operation, lint hợp lệ). Bàn giao <code>.ai/results/ACCT-AVATAR.md</code>.</p>
+  </div>
   <div class="card" id="asset-segment-poles">
     <strong>ASSET-SEGMENT-POLES — phase 2, 09/11/2026</strong>
     <span class="tag t-done">Xong · chờ PR</span>

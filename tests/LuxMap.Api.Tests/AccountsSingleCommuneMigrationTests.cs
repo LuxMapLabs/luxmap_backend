@@ -32,7 +32,8 @@ public sealed class AccountsSingleCommuneMigrationTests(AssetImportFixture fixtu
         await migrator.MigrateAsync(previous);
         var communes = new[] { new AdministrativeUnit { Name = "First" }, new AdministrativeUnit { Name = "Second" }, new AdministrativeUnit { Name = "Third" } };
         var users = new[] { User("earliest"), User("tied") };
-        db.AddRange(communes); db.AddRange(users); await db.SaveChangesAsync();
+        db.AddRange(communes); await db.SaveChangesAsync();
+        foreach (var account in users) await OldSchemaUser.InsertAsync(db, account);
         var ordered = communes.Select(c => c.CommuneId).Order(StringComparer.Ordinal).ToArray();
         // Reverse insertion order; timestamps, then ordinal IDs, must decide the retained rows.
         foreach (var user in users)

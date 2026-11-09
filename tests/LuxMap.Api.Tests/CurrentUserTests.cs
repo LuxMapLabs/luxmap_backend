@@ -38,7 +38,7 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
         output.WriteLine($"  GET /auth/me → {me.GetRawText()}");
 
         Assert.Equal(
-            ["user_id", "username", "email", "full_name", "role", "commune_ids", "communes", "map_bounds"],
+            ["user_id", "username", "email", "full_name", "role", "commune_ids", "communes", "map_bounds", "avatar_url"],
             me.EnumerateObject().Select(property => property.Name));
 
         Assert.Equal("engineer", me.GetProperty("username").GetString());

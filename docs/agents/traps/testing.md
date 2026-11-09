@@ -85,3 +85,7 @@ assert đúng tập key và Artifact.Version. Day/unknown không có key YOLO; n
 Test model thật dùng hai JPEG nhỏ, nhãn cố định day/night, mặc định threshold0.7; không rẽ nhánh theo
 output thật và không hạ ngưỡng để xanh. Nguồn ảnh ghi trong `.ai/results/AI-DAYNIGHT.md`.
 Test OpenAPI kiểm oneOf, enum rời nhau, khoảng confidence, consumer web; artifact thay ngưỡng phải đổi version.
+
+## Test migration lùi: tạo tài khoản bằng SQL, không bằng `db.Add(new AppUser …)`
+
+Test dừng DB ở một migration cũ rồi mới ghi dữ liệu (`WorkOrderCancellationMigrationTests`, `AccountsSingleCommuneMigrationTests`) **không được** ghi `AppUser` qua EF: EF ghi mọi cột của model hiện tại, kể cả cột migration sau (như `avatar_*`) mà schema cũ chưa có ⇒ `42703 column … does not exist`. Dùng `OldSchemaUser.InsertAsync` (SQL chỉ nêu cột có ở mọi schema xuất phát). Thêm cột vào `app_user` ở migration mới thì test cũ kiểu này đỏ nếu còn đi đường EF.

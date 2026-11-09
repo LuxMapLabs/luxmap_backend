@@ -257,6 +257,7 @@ public class ObjectStorageTests
     [Fact]
     public void The_four_key_shapes_are_exactly_as_agreed()
     {
+        Assert.Equal("luxmap-avatar", StorageKeys.NameOf(StorageBucket.Avatar));
         Assert.Equal("luxmap-survey", StorageKeys.NameOf(StorageBucket.Survey));
         Assert.Equal("luxmap-evidence", StorageKeys.NameOf(StorageBucket.Evidence));
 

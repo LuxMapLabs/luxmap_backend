@@ -24,7 +24,7 @@ find "$BACKUP_DIR/db" -name 'luxmap-*.dump' -mtime +"$KEEP_DAYS" -delete
 docker compose run --rm --no-deps -T -v "$BACKUP_DIR/objects:/backup" --entrypoint /bin/sh minio-mc -c '
   set -e
   mc alias set luxmap http://minio:9000 "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" >/dev/null
-  for bucket in luxmap-survey luxmap-evidence luxmap-video luxmap-citizen; do
+  for bucket in luxmap-survey luxmap-evidence luxmap-video luxmap-citizen luxmap-avatar; do
     mc mirror --quiet --overwrite "luxmap/$bucket" "/backup/$bucket"
   done'
 

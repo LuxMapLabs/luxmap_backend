@@ -4452,6 +4452,528 @@
         "x-luxmap-client": "mobile"
       }
     },
+    "/api/v1/auth/me/avatar": {
+      "post": {
+        "tags": [
+          "Avatar"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_own_profile",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "get": {
+        "tags": [
+          "Avatar"
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          }
+        },
+        "x-luxmap-capability": "cap:manage_own_profile",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "delete": {
+        "tags": [
+          "Avatar"
+        ],
+        "responses": {
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "x-luxmap-capability": "cap:manage_own_profile",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/admin/users/{id}/avatar": {
+      "get": {
+        "tags": [
+          "Avatar"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          }
+        },
+        "x-luxmap-capability": "cap:manage_users",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/citizen-reports": {
       "get": {
         "tags": [
@@ -13332,6 +13854,16 @@
         },
         "additionalProperties": false
       },
+      "AvatarResponse": {
+        "type": "object",
+        "properties": {
+          "avatar_url": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "BoundingBox": {
         "type": "object",
         "properties": {
@@ -14927,6 +15459,10 @@
           },
           "map_bounds": {
             "$ref": "#/components/schemas/MapBounds"
+          },
+          "avatar_url": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -18677,7 +19213,8 @@
           "survey",
           "evidence",
           "video",
-          "citizen"
+          "citizen",
+          "avatar"
         ],
         "type": "string"
       },
@@ -19923,6 +20460,10 @@
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time",
             "nullable": true
+          },
+          "avatar_url": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -20756,7 +21297,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:edit_pole_location = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_users = system_admin; cap:manage_communes = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager; cap:monitor_system = system_admin; cap:manage_settings = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:edit_pole_location = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_own_profile = superior, manager, field_engineer, system_admin; cap:manage_users = system_admin; cap:manage_communes = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager; cap:monitor_system = system_admin; cap:manage_settings = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -20806,6 +21347,9 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "Avatar"
     },
     {
       "name": "CitizenReports"

@@ -54,6 +54,16 @@ public class AppUser
     /// </summary>
     public bool HasSystemWideScope { get; set; }
 
+    public string? AvatarObjectKey { get; set; }
+
+    public long? AvatarByteCount { get; set; }
+
+    public string? AvatarThumbnailKey { get; set; }
+
+    public long? AvatarThumbnailBytes { get; set; }
+
+    public DateTime? AvatarUpdatedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
