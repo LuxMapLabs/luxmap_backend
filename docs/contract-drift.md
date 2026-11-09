@@ -23,6 +23,26 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### WO-BATCH-1 — tạo hàng loạt phiếu công việc (09/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | Thêm `POST /api/v1/work-orders/batch`, dùng capability hiện có `ManageWorkOrders`; body `{ "items": [ <body POST /work-orders>, … ] }`. |
+| **Decision maker** | **Mỹ (Dylan), chốt 09/11/2026 · SELF-SIGNED** — nền tạm tới FW kế tiếp, chưa hợp nhất Contract/spec. |
+| **Date** | 09/11/2026 |
+| **Scope** | WP2 / WP5; không schema, migration, capability mới hay thay đổi field hiện hành. |
+
+- `items` bắt buộc, từ **1–50** phần tử; thiếu/null/rỗng/quá 50 → **400 `VALIDATION_FAILED`**, `details.field = "items"`.
+  Phần tử null → cùng mã 400 kèm `details.index` (0-based).
+- Mỗi phần tử dùng đúng logic tạo phiếu đơn (kể cả lịch, server-owned field, assignee, audit và thông báo), không đổi thứ tự gửi lên.
+  Thành công → **201** `{ "count": N, "created_items": [ WorkOrderDetail, … ] }` theo thứ tự `items`, **không header Location**.
+- **Một transaction toàn lô**, mỗi phiếu một SaveChanges / một audit `created`; bất kỳ phần tử lỗi thì rollback mọi phiếu,
+  liên kết, audit và thông báo trong lô. Trả nguyên code/status/message/details của lỗi tạo đơn, cộng **`details.index`**.
+  Fault trùng giữa các phần tử hoặc đã thuộc phiếu mở → **409 `FAULT_ALREADY_IN_WORK_ORDER`** cùng index.
+- **Không idempotency / `client_op_id`**: FE khóa nút trong lúc gửi, khi lỗi mạng phải tải lại danh sách và đối chiếu trước khi thử lại;
+  không gửi lại mù vì request trước có thể đã commit. **Không kiểm quota / cân bằng tải**: Quản lý được đổi người và ngày.
+- Phạm vi quyền dùng nguyên ma trận `ManageWorkOrders` hiện tại (chỉ `manager`). Ticket yêu cầu test `system_admin` nhận 201
+  mâu thuẫn ma trận hiện hành và yêu cầu không đổi quyền; cần Mỹ chốt trước khi mở quyền, chưa thay đổi ma trận trong WO-BATCH.
 ### WO-AUTODISPATCH-1 — preview phân lịch kiểm tra tự động (09/11/2026)
 
 **Mỹ chốt 09/11/2026 · SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract/spec.

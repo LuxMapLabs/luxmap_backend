@@ -132,14 +132,53 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         };
     }
 
+    public async Task<BatchCreateWorkOrdersResponse> CreateBatch(BatchCreateWorkOrdersRequest request, CancellationToken ct)
+    {
+        var items = request.Items;
+        if (items is null || items.Length is < 1 or > 50) throw OptionalJson.Invalid("items");
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // Items over the per-order cap are rejected by CreateCore with their index; never lock their ids.
+        var faultIds = items.Where(x => x?.FaultIds is not null and { Length: <= 200 }).SelectMany(x => x.FaultIds!)
+            .Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal).ToArray();
+        await FaultLocks.LockAsync(db, faultIds, ct);
+        var created = new List<WorkOrderDetail>(items.Length);
+        for (var index = 0; index < items.Length; index++)
+        {
+            try
+            {
+                var item = items[index] ?? throw OptionalJson.Invalid("items");
+                created.Add(await CreateCore(item, ct));
+            }
+            catch (LuxMapException error)
+            {
+                // Save may already have rolled back before resolving a database conflict.
+                if (db.Database.CurrentTransaction == transaction) await transaction.RollbackAsync(ct);
+                var details = error.Details.ToDictionary(x => x.Key, x => x.Value);
+                details["index"] = index;
+                throw new LuxMapException(error.Code, error.StatusCode, error.Message, details);
+            }
+        }
+        await transaction.CommitAsync(ct);
+        return new(created.Count, created.ToArray());
+    }
+
     public async Task<WorkOrderDetail> Create(CreateWorkOrderRequest request, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var result = await CreateCore(request, ct);
+        await transaction.CommitAsync(ct);
+        return result;
+    }
+
+    private async Task<WorkOrderDetail> CreateCore(CreateWorkOrderRequest request, CancellationToken ct)
     {
         if (new[] { request.WorkOrderId, request.WoStatus, request.ClusterId, request.PriorityScore }.Any(OptionalJson.Present))
             throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
         var title = ValidTitle(request.Title);
         Schedule(request.ScheduledDate, request.DueDate);
         var kind = request.TaskKind ?? throw OptionalJson.Invalid("task_kind");
-        if (kind == TaskKind.Survey) return await CreateSurvey(request, title, ct);
+        if (kind == TaskKind.Survey) return await CreateSurveyCore(request, title, ct);
         if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
         if (request.SegmentIds is not null) throw OptionalJson.Invalid("segment_ids");
         var ids = request.FaultIds ?? [];
@@ -154,12 +193,12 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var road = faults.Count > 0 ? (RoadSegment?)null
             : await db.Set<RoadSegment>().FirstOrDefaultAsync(x => x.SegmentId == request.SegmentId, ct)
                 ?? throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
-        return await Insert(new(kind, title, faults, road, request.AssignedTo, request.DueDate, request.ScheduledDate,
+        return await InsertCore(new(kind, title, faults, road, request.AssignedTo, request.DueDate, request.ScheduledDate,
             request.Note, Materials(request.MaterialsNote), null), ct);
     }
 
     // SELF-SIGNED BE-15 P2a: uses the existing commune_id as the explicit anchor.
-    private async Task<WorkOrderDetail> CreateSurvey(CreateWorkOrderRequest request, string title, CancellationToken ct)
+    private async Task<WorkOrderDetail> CreateSurveyCore(CreateWorkOrderRequest request, string title, CancellationToken ct)
     {
         var ids = request.SegmentIds ?? [];
         var commune = OptionalJson.Text(request.CommuneId, "commune_id", false);
@@ -175,7 +214,6 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             await RequireAssignee(request.AssignedTo, commune, ct);
             await RequireSurveyAssignee(request.AssignedTo, ids, ct);
         }
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         // SQL expression comes only from the immutable server-side ID specification.
         var idSql = $"SELECT {PrefixedIds.WorkOrder.DefaultValueSql} AS \"Value\"";
         var id = await db.Database.SqlQueryRaw<string>(idSql).SingleAsync(ct);
@@ -192,7 +230,6 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         Record(wo, AuditAction.Created, null, new { work_order = Snapshot(wo, []), segment_ids = ids }, now);
         Notify(WorkOrderNotices.Assigned(wo), [wo.AssignedTo], now);
         await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
         return await Detail(id, ct);
     }
 
@@ -262,10 +299,17 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     private async Task<WorkOrderDetail> Insert(NewWorkOrder order, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var result = await InsertCore(order, ct);
+        await transaction.CommitAsync(ct);
+        return result;
+    }
+
+    private async Task<WorkOrderDetail> InsertCore(NewWorkOrder order, CancellationToken ct)
+    {
         var ids = order.Faults.Select(x => x.FaultId).ToArray();
         // Lock, then RE-READ: the statuses checked below must be the ones a concurrent fault review
         // (BE-19) cannot change before this work order commits (FaultLocks).
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await FaultLocks.LockAsync(db, ids, ct);
         var faults = await db.Set<Fault>().AsNoTracking().Where(x => ids.Contains(x.FaultId))
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.FaultId.Length).ThenBy(x => x.FaultId).ToListAsync(ct);
@@ -323,7 +367,6 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         Record(wo, AuditAction.Created, null, Snapshot(wo, ids), now, order.Note);
         Notify(WorkOrderNotices.Assigned(wo), [wo.AssignedTo], now);
         await Save(id, ids, ct);
-        await transaction.CommitAsync(ct);
         return await Detail(id, ct);
     }
 

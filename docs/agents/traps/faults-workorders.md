@@ -312,6 +312,15 @@ rollback ứng dụng có thể giữ schema cộng thêm, không sửa/xóa aud
 - **Để CV-15:** hiện không có writer gom cụm trong `src/`; seed mock không phải pipeline. Khi viết writer `fault_cluster`,
   phải từ chối cột chưa tuyến theo D-8, giữ schema cụm bắt buộc tuyến; không suy tuyến gần nhất, không viết lại cụm/snapshot cũ khi gán tuyến cột.
 
+## WO-BATCH — transaction và thứ tự khóa (09/11/2026)
+
+Batch khóa hợp mọi fault ID (khử trùng, thứ tự cố định qua `FaultLocks`) trước phần tử đầu tiên;
+chỉ khóa lần lượt theo phần tử sẽ cho hai lô đảo thứ tự tự deadlock. `CreateCore` / `InsertCore` /
+`CreateSurveyCore` dùng chung luật tạo đơn, không tự mở hay commit transaction. Mỗi phần tử save riêng
+để phần tử sau thấy liên kết vừa tạo, audit / thông báo đi cùng save. Khi lỗi, rollback trước khi ném lại
+cùng details cộng index; `Save` có thể đã rollback để tra conflict, nên kiểm CurrentTransaction tránh rollback hai lần.
+`BatchCreateWorkOrdersRequest.Items` dùng `ValidateNever` để validation nghiệp vụ đi vào service và có index;
+lỗi JSON binding (sai kiểu/enum/date) vẫn do MVC trả trước service.
 ## WO-AUTODISPATCH — preview chỉ đọc (09/11/2026)
 
 Eligibility dùng `WorkOrderAssignees.EligibleUsers` cho cả Create/assignees/preview; vị trí dọc tuyến dùng
