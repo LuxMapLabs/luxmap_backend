@@ -146,6 +146,7 @@ SUMMARY = {
     ("post", "/api/v1/notifications/read-all"): "[BE-27] Đánh dấu mọi thông báo chưa đọc của người gọi là đã đọc",
     ("post", "/api/v1/work-orders/{id}/request-cancellation"): "[SELF-SIGNED — CR-1…CR-6] Kỹ sư được giao xin hủy lịch assigned, lý do trim 1…500; chỉ online",
     ("post", "/api/v1/work-orders/{id}/reject-cancellation"): "[SELF-SIGNED — CR-1…CR-6] Quản lý bác yêu cầu pending, lý do trim 1…500; quyết định trên yêu cầu hiện tại",
+    ("post", "/api/v1/work-orders/batch"): "[SELF-SIGNED — WO-BATCH-1] Tạo 1–50 phiếu trong MỘT transaction; lỗi ở phần tử nào thì rollback cả lô, lỗi kèm details.index. 201 {count, created_items}; không kiểm quota",
     # POLE-PHOTO-AI, PP-1…PP-10 — Mỹ SELF-SIGNED 15/10/2026, nền tạm; WP5/WP6 chưa báo.
     ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
     ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",

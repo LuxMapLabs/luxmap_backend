@@ -48,6 +48,17 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
         [FromQuery(Name = "near")] string? near, [FromQuery(Name = "assigned_to")] string? assigned, CancellationToken ct)
         => agenda.AgendaAsync(nightOf, near, assigned, ct);
 
+    [HttpPost("batch")]
+    [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
+    [ProducesResponseType(typeof(BatchCreateWorkOrdersResponse), 201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(409)]
+    public async Task<ActionResult<BatchCreateWorkOrdersResponse>> CreateBatch(BatchCreateWorkOrdersRequest request, CancellationToken ct)
+        => StatusCode(201, await service.CreateBatch(request, ct));
+
     [HttpGet("{id}")]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
     public Task<WorkOrderDetail> Detail(string id, CancellationToken ct) => service.Detail(id, ct);
