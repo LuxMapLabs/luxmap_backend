@@ -6,6 +6,10 @@ namespace LuxMap.Shared.Contracts.Errors;
 /// </summary>
 public static class ErrorCodes
 {
+    // SURVEY-SCHED-1, SELF-SIGNED 09/11/2026.
+    public const string SurveyScheduleNotFound = "SURVEY_SCHEDULE_NOT_FOUND";
+    public const string SurveyScheduleExists = "SURVEY_SCHEDULE_EXISTS";
+
     /// <summary>413 — the bbox covers more than 2000 poles (section 2.1).</summary>
     public const string BboxTooLarge = "BBOX_TOO_LARGE";
 

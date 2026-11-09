@@ -100,3 +100,10 @@ Không trích số đo cũ làm chi phí guard hoặc lý do nới guard: phép 
 Muốn đo lại phải loại nhiễu có chu kỳ của phép ghi trước, không chỉ tăng số lượt. Benchmark tham chiếu:
 `CommuneWriteGuardCostTests`, `The_parts_of_the_guard_measured_separately`.
 Tối ưu vòng nạp bằng `AutoDetectChangesEnabled` rồi `DetectChanges()` một lần trước `SaveChanges`; **giữ nguyên kiểm phạm vi**.
+
+## Cascade occurrence của lịch khảo sát (SURVEY-RECURRING, 09/11/2026)
+
+`survey_recurring_occurrence` → `survey_recurring_schedule` được `Cascade` vì FK ghép
+`(schedule_id, commune_id)` tới alternate key của lịch buộc cùng xã ngay ở DB. Xoá lịch chỉ xoá receipts
+của chính xã đó; FK occurrence → work_order là `Restrict`, không cascade phiếu đã sinh.
+Cả hai entity implement `ICommuneScoped`, có query filter và `HasCommuneReference`; occurrence là gốc tra cứu trong job.

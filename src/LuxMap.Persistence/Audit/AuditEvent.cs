@@ -35,7 +35,7 @@ public enum AuditActorKind
     /// </summary>
     Public,
 }
-public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport, Pole }
+public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport, Pole, SurveyRecurringSchedule }
 public enum AuditAction
 {
     CancellationRequested, CancellationRejected,
@@ -62,6 +62,9 @@ public enum AuditAction
 
     /// <summary>POLE-VIDEO D-13: a Manager opened a pole video clip before deciding on it.</summary>
     Viewed,
+
+    /// <summary>A recurring schedule was deleted; generated work orders remain.</summary>
+    Deleted,
 }
 
 /// <summary>Marks business entities whose writes require one audit event per SaveChanges.</summary>

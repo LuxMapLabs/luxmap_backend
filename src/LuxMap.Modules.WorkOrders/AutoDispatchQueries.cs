@@ -4,6 +4,8 @@ using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Http;
+using System.Net;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -16,6 +18,44 @@ internal static class WorkOrderAssignees
     internal static IQueryable<AppUser> EligibleUsers(LuxMapDbContext db, string commune) => db.Set<AppUser>().Where(user =>
         user.Role == UserRole.FieldEngineer && !user.IsLocked
         && db.Set<AppUserCommune>().Any(link => link.UserId == user.UserId && link.CommuneId == commune));
+    internal static async Task RequireAssignee(LuxMapDbContext db, string assigned, string commune, CancellationToken ct)
+    {
+        if (!await EligibleUsers(db, commune).AnyAsync(u => u.UserId == assigned, ct))
+            throw new LuxMapException("ASSIGNEE_NOT_ELIGIBLE", HttpStatusCode.Conflict, "ASSIGNEE NOT ELIGIBLE",
+                new Dictionary<string, object?> { ["assigned_to"] = assigned });
+    }
+
+    internal static async Task RequireSurveyAssignee(LuxMapDbContext db, string assigned, string[] ids, CancellationToken ct)
+    {
+        foreach (var commune in await SurveyCommunes(db, ids, ct))
+            await RequireAssignee(db, assigned, commune, ct);
+    }
+
+    internal static async Task<string[]> SurveyCommunes(LuxMapDbContext db, string[] ids, CancellationToken ct, bool includeReferencedRoad = false)
+    {
+        var roadQuery = db.Set<RoadSegment>().AsNoTracking();
+        var poleQuery = db.Set<Pole>().AsNoTracking();
+        // Jobs may read the referenced inter-commune road, but Q7 still limits poles to the assigning commune.
+        if (includeReferencedRoad) roadQuery = roadQuery.IgnoreQueryFilters();
+        var roads = await roadQuery.Where(x => ids.Contains(x.SegmentId)).Select(x => x.CommuneId).ToArrayAsync(ct);
+        if (roads.Length != ids.Length)
+            throw new LuxMapException("ASSET_NOT_FOUND", HttpStatusCode.NotFound, "Asset not found.");
+        return roads.Concat(await poleQuery.Where(x => ids.Contains(x.SegmentId))
+            .Select(x => x.CommuneId).Distinct().ToArrayAsync(ct)).Distinct().ToArray();
+    }
+}
+
+internal static class WorkOrderLoads
+{
+    internal static Task<List<EngineerLoad>> Read(LuxMapDbContext db, string[] engineerIds,
+        DateOnly from, DateOnly to, CancellationToken ct, bool acrossCommunes = false)
+    {
+        var query = db.Set<WorkOrder>().AsNoTracking();
+        if (acrossCommunes) query = query.IgnoreQueryFilters();
+        return query.Where(w => w.AssignedTo != null && engineerIds.Contains(w.AssignedTo)
+                && w.WoStatus != WorkOrderStatus.Cancelled && w.ScheduledDate >= from && w.ScheduledDate <= to)
+            .Select(w => new EngineerLoad(w.AssignedTo!, w.ScheduledDate!.Value)).ToListAsync(ct);
+    }
 }
 
 internal static class WorkOrderPoleOrdering
@@ -64,9 +104,7 @@ public sealed class AutoDispatchQueries(LuxMapDbContext db, TimeProvider clock, 
         var engineerIds = engineers.Select(e => e.UserId).Distinct().ToArray();
         var from = EngineerLoadBoard.WeekStart(start);
         var to = EngineerLoadBoard.WeekStart(start.AddDays(EngineerLoadBoard.SearchDays - 1)).AddDays(6);
-        var loads = await db.Set<WorkOrder>().AsNoTracking().Where(w => w.AssignedTo != null && engineerIds.Contains(w.AssignedTo)
-                && w.WoStatus != WorkOrderStatus.Cancelled && w.ScheduledDate >= from && w.ScheduledDate <= to)
-            .Select(w => new EngineerLoad(w.AssignedTo!, w.ScheduledDate!.Value)).ToListAsync(ct);
+        var loads = await WorkOrderLoads.Read(db, engineerIds, from, to, ct);
         var candidates = selected.Select(f => new DispatchFault(f.FaultId, f.CommuneId, f.SegmentId,
             f.SegmentId is null ? "" : names.GetValueOrDefault(f.SegmentId, f.SegmentId), f.PoleId,
             positions.GetValueOrDefault(f.PoleId ?? ""), f.Severity, f.PriorityScore, f.DetectedAt)).ToArray();

@@ -41,6 +41,18 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="survey-recurring">
+    <strong>SURVEY-RECURRING — phase 2, 09/11/2026</strong>
+    <span class="tag t-next">Build xanh · chờ migration và test</span>
+    <p>CRUD lịch khảo sát hàng tuần, lịch địa phương T2–CN, cutoff T5 17:00; job 15 phút,
+    receipt chống sinh lại và kiểm survey cùng tuần; gán người chung EngineerLoadBoard, ghi phiếu chung CreateSurvey.</p>
+    <p>Files: WorkOrders/SurveyRecurring*, SurveyScheduleCalendar, Entities/Configurations/Jobs, shared audit/prefix/errors,
+    WorkOrderService/AutoDispatchQueries/Planner/Module, test lịch/API/job, copy_dev_to_supabase.py, drift và traps.
+    Build toàn solution 0 warning / 0 error. Chờ Claude sinh migration (hai bảng + audit CHECK), chạy test và phá thử.
+    Chưa xác minh hành vi HTTP/DB. Không git/test/EF/Swagger theo yêu cầu.
+    Commit dự kiến: <code>feat(survey): generate weekly recurring survey orders</code>.
+    Bàn giao: <code>.ai/results/SURVEY-RECURRING.md</code>.</p>
+  </div>
   <div class="card" id="wo-batch">
     <strong>WO-BATCH — phase 2, 09/11/2026</strong>
     <span class="tag t-block">Đã implement · chờ xác minh và chốt quyền admin</span>

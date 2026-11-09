@@ -42,6 +42,16 @@ public sealed class EngineerLoadBoard(IEnumerable<EngineerLoad> existing, int qu
         return Enumerable.Range(0, 7).Sum(i => Day(id, monday.AddDays(i)));
     }
 
+    /// <summary>Fixed recurring night: ignore quota and reserve only that date.</summary>
+    public DispatchEngineer? SelectOn(IEnumerable<DispatchEngineer> eligible, DateOnly date)
+    {
+        var engineer = eligible.DistinctBy(e => e.UserId).OrderBy(e => Week(e.UserId, date))
+            .ThenBy(e => Day(e.UserId, date)).ThenBy(e => e.UserId.Length)
+            .ThenBy(e => e.UserId, StringComparer.Ordinal).FirstOrDefault();
+        if (engineer is not null) daily[(engineer.UserId, date)] = Day(engineer.UserId, date) + 1;
+        return engineer;
+    }
+
     public (DispatchEngineer? Engineer, DateOnly Date, string? Reason) Select(
         IEnumerable<DispatchEngineer> eligible, DateOnly start)
     {

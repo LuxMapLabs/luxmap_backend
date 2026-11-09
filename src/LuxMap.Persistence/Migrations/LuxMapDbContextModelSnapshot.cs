@@ -64,6 +64,8 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.HasSequence("segment_id_seq");
 
+            modelBuilder.HasSequence("survey_recurring_schedule_id_seq");
+
             modelBuilder.HasSequence("sweep_id_seq");
 
             modelBuilder.HasSequence("user_id_seq");
@@ -3589,6 +3591,132 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.SurveyRecurringOccurrence", b =>
+                {
+                    b.Property<string>("ScheduleId")
+                        .HasColumnType("text")
+                        .HasColumnName("schedule_id");
+
+                    b.Property<DateOnly>("ScheduledDate")
+                        .HasColumnType("date")
+                        .HasColumnName("scheduled_date");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("ScheduleId", "ScheduledDate")
+                        .HasName("pk_survey_recurring_occurrence");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_survey_recurring_occurrence_commune_id");
+
+                    b.HasIndex("ScheduleId", "CommuneId")
+                        .HasDatabaseName("ix_survey_recurring_occurrence_schedule_id_commune_id");
+
+                    b.HasIndex("WorkOrderId", "CommuneId")
+                        .HasDatabaseName("ix_survey_recurring_occurrence_work_order_id_commune_id");
+
+                    b.ToTable("survey_recurring_occurrence", (string)null);
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.SurveyRecurringSchedule", b =>
+                {
+                    b.Property<string>("ScheduleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("schedule_id")
+                        .HasDefaultValueSql("luxmap_format_id('SSCH', nextval('survey_recurring_schedule_id_seq'), 4)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "survey_recurring_schedule_id_seq");
+
+                    b.Property<string>("AssignedTo")
+                        .HasColumnType("text")
+                        .HasColumnName("assigned_to");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<short>("DayOfWeek")
+                        .HasColumnType("smallint")
+                        .HasColumnName("day_of_week");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("SegmentId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("segment_id");
+
+                    b.Property<DateOnly>("StartsOnWeek")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on_week");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("ScheduleId")
+                        .HasName("pk_survey_recurring_schedule");
+
+                    b.HasAlternateKey("ScheduleId", "CommuneId")
+                        .HasName("ak_survey_recurring_schedule_schedule_id_commune_id");
+
+                    b.HasIndex("AssignedTo")
+                        .HasDatabaseName("ix_survey_recurring_schedule_assigned_to");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_survey_recurring_schedule_commune_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_survey_recurring_schedule_created_by");
+
+                    b.HasIndex("SegmentId", "DayOfWeek")
+                        .IsUnique()
+                        .HasDatabaseName("ux_survey_recurring_schedule_segment_day");
+
+                    b.ToTable("survey_recurring_schedule", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_survey_recurring_schedule_day", "day_of_week BETWEEN 1 AND 7");
+
+                            t.HasCheckConstraint("ck_survey_recurring_schedule_note", "note IS NULL OR char_length(note) <= 1000");
+
+                            t.HasCheckConstraint("ck_survey_recurring_schedule_week", "EXTRACT(ISODOW FROM starts_on_week) = 1");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrder", b =>
                 {
                     b.Property<string>("WorkOrderId")
@@ -4354,7 +4482,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("audit_event", null, t =>
                         {
-                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('cancellation_requested', 'cancellation_rejected', 'created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated', 'viewed')");
+                            t.HasCheckConstraint("ck_audit_event_action", "\"action\" IN ('cancellation_requested', 'cancellation_rejected', 'created', 'assigned', 'reassigned', 'unassigned', 'started', 'completed', 'verified', 'returned', 'cancelled', 'details_changed', 'confirmed', 'rejected', 'submitted', 'requested', 'delivered', 'applied', 'failed', 'expired', 'superseded', 'reported', 'revoked', 'accepted', 'merged', 'analyzed', 'relocated', 'viewed', 'deleted')");
 
                             t.HasCheckConstraint("ck_audit_event_actor", "(actor_kind = 'user') = (actor_user_id IS NOT NULL) AND (actor_user_id IS NULL) = (actor_role IS NULL)");
 
@@ -4366,7 +4494,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_audit_event_before_state_object", "before_state IS NULL OR jsonb_typeof(before_state) = 'object'");
 
-                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report', 'pole')");
+                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report', 'pole', 'survey_recurring_schedule')");
 
                             t.HasCheckConstraint("ck_audit_event_has_state", "before_state IS NOT NULL OR after_state IS NOT NULL");
                         });
@@ -5532,6 +5660,62 @@ namespace LuxMap.Persistence.Migrations
                         .HasPrincipalKey("WorkOrderId", "CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_repair_evidence_work_order_work_order_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.SurveyRecurringOccurrence", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_survey_recurring_occurrence_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.SurveyRecurringSchedule", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduleId", "CommuneId")
+                        .HasPrincipalKey("ScheduleId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_survey_recurring_occurrence_schedule");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId", "CommuneId")
+                        .HasPrincipalKey("WorkOrderId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_survey_recurring_occurrence_work_order");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.SurveyRecurringSchedule", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("AssignedTo")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_survey_recurring_schedule_app_user_assigned_to");
+
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_survey_recurring_schedule_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_survey_recurring_schedule_app_user_created_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.RoadSegment", null)
+                        .WithMany()
+                        .HasForeignKey("SegmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_survey_recurring_schedule_road_segment_segment_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrder", b =>

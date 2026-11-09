@@ -23,6 +23,59 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### SURVEY-SCHED-1 — lịch khảo sát định kỳ theo tuần (09/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | Cấu hình tuyến khảo sát hàng tuần, CRUD và job sinh phiếu trước tuần khảo sát. |
+| **Decision maker** | **Mỹ (Dylan), chốt 09/11/2026 · SELF-SIGNED**, nền tạm tới FW kế tiếp. |
+| **Date** | 09/11/2026 |
+| **Scope** | WP2 / WP5; chưa hợp nhất Contract/OpenAPI, dùng capability hiện có. |
+
+- Bảng `survey_recurring_schedule`: `schedule_id` SSCH tối thiểu 4 số (sequence `survey_recurring_schedule_id_seq`),
+  `commune_id`, `segment_id`, `day_of_week` smallint 1–7 (T2–CN), `assigned_to?`, `is_active` mặc định true,
+  `starts_on_week` date bắt buộc T2, `note?` tối đa 1000 ký tự, `created_by`, `created_at`, `updated_at` UTC.
+  Unique `(segment_id, day_of_week)` →409 `SURVEY_SCHEDULE_EXISTS`; FK tài sản/người/xã Restrict.
+  Bảng `survey_recurring_occurrence`: PK `(schedule_id, scheduled_date)`, xã, work_order_id, created_at;
+  FK ghép cùng xã tới lịch Cascade, tới phiếu Restrict. Hai bảng đều scoped; lịch audited.
+- `/api/v1/survey-schedules/recurring`: **GET** (`ReadWorkOrders`) có `commune_id?`, page/page_size chuẩn,
+  sắp created_at / length(schedule_id) / schedule_id; trả `schedule_id, commune_id, segment_id, segment_name,
+  day_of_week, assigned_to, assigned_to_name, is_active, note, starts_on_week, first_occurrence_date,
+  created_at, created_by, updated_at`. Không lọc xã = mọi xã trong phạm vi; ngoài phạm vi →403 `COMMUNE_FORBIDDEN`.
+  **POST** (`ManageWorkOrders`, chỉ manager, admin/superior/field_engineer →403 `ROLE_FORBIDDEN`):
+  `{commune_id,segment_id,day_of_week,assigned_to?,note?}` →201 item.
+  Weekday phải số nguyên 1–7 →400 `VALIDATION_FAILED` với details.field; segment không thấy →404 `ASSET_NOT_FOUND`;
+  khác xã mà không inter_commune →409 `CROSS_COMMUNE_REFERENCE`; assignee sai →409 `ASSIGNEE_NOT_ELIGIBLE`.
+  `schedule_id/starts_on_week/is_active/created_by/first_occurrence_date` có trong POST →400 `SERVER_OWNED_FIELD`.
+- **PATCH /{id}** chỉ cho `is_active`, `assigned_to` (nullable), `note` (nullable), ít nhất một field;
+  không sửa commune/segment/weekday hay trường server-owned. Tắt rồi bật lại tính lại starts_on_week từ lúc bật.
+  **DELETE /{id}** →204 xoá lịch và occurrences, **giữ nguyên phiếu đã sinh**.
+  Không thấy/ngoài scope →404 `SURVEY_SCHEDULE_NOT_FOUND`. Tạo/sửa/xoá mỗi SaveChanges đúng một audit của người thực hiện.
+- Lịch dùng `Asia/Ho_Chi_Minh` theo `WorkOrderAgendaOptions.TimeZone`, tuần luôn T2–CN, cả 7 ngày.
+  Với T là giờ thiết lập, M là T2 tuần chứa T, cutoff = M + 3 ngày 17:00:
+  **T < cutoff** → starts_on_week=M+7; **T ≥ cutoff** → M+14.
+  first_occurrence_date = starts_on_week+(day_of_week−1), **luôn là lần đầu**, không nhảy theo tuần đang chạy.
+  Ví dụ 2025: T3 04/11 10:00 chọn T4 →12/11; T6 07/11 chọn T4 →19/11;
+  T2 10/11 chọn T6 →**21/11**. FE spec ghi 14/11 ở ví dụ cuối là sai (cùng tuần), làm theo luật chốt.
+  T5 16:59:59 ở phía trước cutoff, 17:00:00 đã ở phía sau.
+- Job `survey_recurring_generate` mỗi 15 phút, lease hạ tầng scheduled_job; trước cutoff chỉ tới CN tuần này,
+  từ cutoff tới CN tuần kế tiếp. Sinh từ **hôm nay địa phương** tới horizon_end, đúng weekday, tuần ≥ starts_on_week,
+  lịch active. Bù lần chạy lỡ, không bù ngày đã qua. Đọc ứng viên unscoped chỉ đọc, ghi bằng Open(commune).
+  Chống trùng **hai lớp**: receipt PK, order+receipt một SaveChanges; và bất kỳ survey chưa cancelled chứa tuyến đó
+  trong work_order_segment trong cùng tuần ⇒ không sinh, không ghi receipt. Huỷ phiếu thủ công ⇒ kiểm lại và sinh;
+  **huỷ phiếu đã sinh vẫn giữ receipt nên không sinh lại**, kể cả khi đổi ngày phiếu.
+- Phiếu: survey, xã của lịch, một segment position=0, title `Khảo sát toàn tuyến - {SegmentName}`,
+  scheduled_date=due_date=ngày khảo sát, note lịch hoặc `Tự động sinh từ lịch khảo sát định kỳ {schedule_id}`,
+  created_by của lịch. Dùng phần ghi chung CreateSurvey (ID/audit Created/thông báo Assigned), một transaction nhỏ mỗi occurrence.
+  Assignee chỉ định còn đủ điều kiện thì giữ; không thì `EngineerLoadBoard.SelectOn`: tải tuần ít nhất, rồi ngày,
+  rồi user ID length/ordinal; **bỏ quota ngày, không dời ngày**, tính cả phiếu vừa sinh. Không kỹ sư → open, Warning, không thông báo mới.
+- **Không hỗ trợ tạm dừng/dời từng tuần cụ thể.** Quản lý huỷ hoặc đổi ngày chính phiếu đã sinh;
+  muốn dừng một tuần chưa sinh thì tắt lịch rồi bật lại (starts_on_week tính lại).
+  FE vẽ thẻ ảo [Định kỳ] tháng hiện tại/kế tiếp từ starts_on_week + weekday, dùng first_occurrence_date cho lời xác nhận,
+  phân biệt thẻ ảo với phiếu thật, tải lại sau CRUD, xử lý 400/403/404/409, không giả định phiếu đã sinh từ thẻ ảo.
+  Không có endpoint ngoại lệ tuần, không capability/notification type mới.
+
+
 ### WO-BATCH-1 — tạo hàng loạt phiếu công việc (09/11/2026)
 
 | Trường | Nội dung |

@@ -22,6 +22,7 @@ public sealed class WorkOrdersModule : ILuxMapModule
         services.AddSingleton(dispatch);
         services.AddScoped<AutoDispatchQueries>();
         services.AddScoped<WorkOrderService>();
+        services.AddScoped<SurveyRecurringService>();
         services.AddScoped<WorkOrderPoleService>();
         var agenda = configuration.GetSection(WorkOrderAgendaOptions.SectionName).Get<WorkOrderAgendaOptions>() ?? new WorkOrderAgendaOptions();
         // An unknown time zone STOPS startup rather than putting every engineer on the wrong night.
@@ -34,6 +35,7 @@ public sealed class WorkOrdersModule : ILuxMapModule
 
         // BE-26 — runs under the scheduled job runner (LuxMap.Persistence.Jobs).
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.WorkOrderOverdueJob>();
+        services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.SurveyRecurringGenerateJob>();
 
         // BE-35 — what these tables hold in the store, for the storage totals and the orphan check.
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "repair_evidence"));
