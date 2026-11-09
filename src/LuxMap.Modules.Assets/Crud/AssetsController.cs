@@ -168,11 +168,15 @@ public sealed class AssetsController(
     public async Task<ActionResult<PoleDetail>> PoleAsync(string poleId, CancellationToken ct)
         => Ok(await service.PoleAsync(poleId, ct));
 
+    /// <summary>Create a segment with an optional unordered set of pole_ids, atomically.</summary>
+    /// <remarks>Absent or [] creates no membership; null is 400. Missing/hidden poles are 404;
+    /// occupied poles or disallowed cross-commune assignments are 409 (ASSET-SEG-1, SELF-SIGNED).</remarks>
     [HttpPost("segments")]
     [Authorize(Policy = LuxMapPolicies.ManageAssets)]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreateSegmentAsync(
         [FromBody] CreateSegmentRequest request, CancellationToken ct)
@@ -215,7 +219,9 @@ public sealed class AssetsController(
     /// </summary>
     /// <remarks>
     /// A FULL replacement: every writable field is sent every time, and <c>commune_id</c> is not one
-    /// of them. See <see cref="UpdateSegmentRequest"/> for why, and for what a missing field means.
+    /// of them. The unordered pole_ids set is kept when absent, [] detaches visible poles, null is 400.
+    /// Missing/hidden poles are 404; occupied poles or disallowed cross-commune assignments are 409.
+    /// Membership and segment changes are atomic (ASSET-SEG-1, SELF-SIGNED).
     /// <para>
     /// 204 with no body, like every other write in this controller. Echoing the updated segment would
     /// publish a read shape, and that decision belongs to <b>BE-12b</b>.

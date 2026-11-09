@@ -41,6 +41,20 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="asset-segment-poles">
+    <strong>ASSET-SEGMENT-POLES — phase 2, 09/11/2026</strong>
+    <span class="tag t-done">Xong · chờ PR</span>
+    <p>POST/PUT tuyến nhận <code>pole_ids</code> là tập không thứ tự: vắng giữ trên PUT, [] bỏ cột thấy được,
+    null lỗi 400. Một transaction và một SaveChanges cho tuyến + cột; khóa hàng chống gán đồng thời,
+    404 cột thiếu/ẩn, 409 cột đã thuộc tuyến khác / sai luật khác xã. ASSET-SEG-1 SELF-SIGNED.</p>
+    <p>Thêm <code>SegmentPoleMembershipTests.cs</code> (19 ca): tạo, thay thế và timestamp, validation, atomic,
+    phạm vi xã, luật liên xã, hai request đồng thời (POST/PUT, mỗi loại ba vòng, không sleep).
+    Claude đã chạy: build 0 cảnh báo, toàn bộ suite xanh (1477 test API, 7 skip), phá thử sáu chốt đều làm test đỏ,
+    OpenAPI sinh lại (147 operation, lint hợp lệ).</p>
+    <p>Files: AssetContracts.cs, AssetCrudService.cs, AssetsController.cs, JsonElementFieldSchemaFilter.cs,
+    SegmentPoleMembershipTests.cs, contract-drift.md, traps/assets.md, tracking.html.
+    Bàn giao: <code>.ai/results/ASSET-SEGMENT-POLES.md</code>.</p>
+  </div>
   <div class="card" id="acct-google">
     <strong>ACCT-GOOGLE — đăng nhập bằng Google, 09/11/2026</strong>
     <span class="tag t-done">Đã kiểm chứng · chờ merge</span>

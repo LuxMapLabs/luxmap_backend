@@ -82,6 +82,17 @@ public sealed class JsonElementFieldSchemaFilter : ISchemaFilter
                 + "a blank string is a 400; an id that does not exist (or is out of scope) is a 404.";
         }
 
+        if ((context.Type == typeof(CreateSegmentRequest) || context.Type == typeof(UpdateSegmentRequest))
+            && concrete.Properties.TryGetValue("pole_ids", out var membership) && membership is OpenApiSchema poleIds)
+        {
+            poleIds.Type = JsonSchemaType.Array;
+            poleIds.MaxItems = 2000;
+            poleIds.UniqueItems = true;
+            poleIds.Items = new OpenApiSchema { Type = JsonSchemaType.String, Pattern = "^POLE-[0-9]{4,}$" };
+            poleIds.Description = "Optional unordered set; order is never stored. Absent keeps membership on PUT "
+                + "(empty on POST); [] detaches visible poles on PUT; null is 400. ASSET-SEG-1 SELF-SIGNED.";
+        }
+
         foreach (var ((type, name), description) in Fields)
         {
             if (type == context.Type && concrete.Properties.TryGetValue(name, out var property) && property is OpenApiSchema field)

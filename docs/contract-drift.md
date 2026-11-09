@@ -23,6 +23,39 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### ASSET-SEG-1 — tạo / sửa tuyến kèm tập cột (09/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | Mở rộng `POST /api/v1/assets/segments` và `PUT /api/v1/assets/segments/{id}` bằng `pole_ids?: string[]`. Giữ mọi field hiện hành, response 201 + Location / 204. Tuyến và mọi cột đổi trong một transaction, một `SaveChangesAsync`. |
+| **Decision maker** | **Mỹ (Dylan), chốt 09/11/2026 · SELF-SIGNED** — nền tạm tới FW kế tiếp; chưa hợp nhất Contract/spec. |
+| **Date** | 09/11/2026 |
+| **Scope** | WP2 / WP5; không schema, migration hay thứ tự lưu. Chỉ Quản lý (`ManageAssets`), query filter và write guard giữ nguyên. |
+
+- `pole_ids` là **TẬP KHÔNG THỨ TỰ**, tối đa 2000 ID duy nhất (so ordinal), dạng `^POLE-[0-9]{4,}$`.
+  Thứ tự gửi lên **không lưu và không được dùng**; FE lấy `position` từ `GET /work-orders/{id}/poles` hoặc tính theo hình học.
+- PUT: **vắng = giữ nguyên**; `[]` = bỏ mọi cột đang thuộc tuyến mà người gọi **thấy được**;
+  mảng có phần tử = thay thế tập cột thấy được. Cột ngoài scope đang thuộc tuyến **vẫn giữ nguyên**.
+  POST: vắng / `[]` = tạo tuyến không cột. Cả hai: `null` = **400 `VALIDATION_FAILED`**, `details.field = "pole_ids"`.
+  Không phải mảng, phần tử không phải chuỗi / rỗng / sai định dạng, trùng hoặc hơn 2000 phần tử cũng cùng lỗi 400;
+  kiểm trước mọi tra cứu (400 thắng 404/409).
+- Cột thiếu / ngoài phạm vi → **404 `ASSET_NOT_FOUND`**, message và `details.pole_id` nêu ID đầu tiên thiếu trong mảng.
+  **Chỗ lệch trong ticket:** chữ `NOT_FOUND` được đọc theo Contract §0 / bảng lỗi và `RequireAsync` hiện hành:
+  tài sản dùng `ASSET_NOT_FOUND`; `NOT_FOUND` dành cho route không tồn tại. Không đổi mã đã publish.
+- Cột đã thuộc tuyến khác → **409 `ASSET_IN_USE`**, `details = {pole_id, segment_id}` (tuyến hiện tại);
+  không tự chuyển cột từ tuyến khác. Chưa tuyến / đã thuộc chính tuyến này thì được.
+- Chỉ với cột **gán mới**: khác xã và tuyến không phải `inter_commune` → **409 `CROSS_COMMUNE_REFERENCE`**,
+  `details = {pole_commune_id, segment_commune_id}`. Phải thấy được cả hai xã trước khi xét luật này;
+  ngoài scope luôn 404. Cột đã thuộc tuyến và còn trong tập giữ nguyên, kể cả PUT đổi `road_class`.
+- Lỗi bất kỳ → không tạo / đổi tuyến, không đổi cột nào. Cột giữ nguyên không được đóng dấu `updated_at` / `updated_by` mới.
+  Đua gán một cột tự do vào hai tuyến: một thành công, một 409 `ASSET_IN_USE` (khóa hàng trước khi ghi).
+- **FE cần làm:** gửi đầy đủ tập mong muốn khi sửa membership, bỏ field khi chỉ sửa thông tin tuyến;
+  gửi `[]` có chủ ý để bỏ hết, không gửi `null`, không dùng thứ tự mảng làm thứ tự dọc tuyến;
+  xử lý 400 / 404 / 409 trên đây. Chưa gửi thông báo WP5 trong phiên implement này.
+- **Hai đường ghi `segment_id`:** đường segment mới áp luật trên; `POST/PUT /assets/poles` vẫn giữ hành vi cũ
+  (cho gán tuyến nhìn thấy được, chưa kiểm `road_class` khác xã và chưa dùng khóa tập cột này). Không mở rộng phạm vi ticket.
+
+
 ### ACCT-4 — đăng nhập Google vào tài khoản có sẵn (08/11/2026)
 
 | Trường | Nội dung |

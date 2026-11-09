@@ -425,3 +425,15 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   — đừng đổi chỗ đó để "tha" cho mã sai. `required: false` của `Resolve` chỉ nói ô được phép trống, không nói mã sai được phép qua.
 - **Bộ lọc `unassigned_segment`** áp trước `CountAsync` và phân trang (`ListAsync` nhận `Expression<Func<TEntity,bool>>? filter`); `false` là không lọc, không phải "chỉ cột đã có tuyến". Khác `feeders/poles?unassigned=true` (chưa gán MẠCH).
 
+
+## ASSET-SEGMENT-POLES — tập cột trên tuyến (09/11/2026, drift ASSET-SEG-1)
+
+- `pole_ids` **không có thứ tự**; vắng ≠ `[]` ≠ `null`: PUT vắng giữ, `[]` bỏ cột thấy được, null lỗi 400.
+  Đọc qua `ReadPoleIds()` trước DB; không bỏ query filter để bỏ cột của xã người gọi không thấy.
+- `ReplaceSegmentPolesAsync` là nơi chung cho POST/PUT: đọc ID qua filter → khóa pole theo ID cố định → đọc lại
+  (lượt trước chỉ projection ID, tránh entity track cũ) → kiểm toàn bộ → đổi navigation / FK → `Touch` chỉ cột đổi.
+  Transaction tường minh bao cả khóa và **một** SaveChanges. PUT có tập cột khóa tuyến trước để serialize hai lần thay thế cùng tuyến.
+  POST dùng navigation `Pole.Segment` hiện có để EF truyền ID tuyến sinh ở DB, không save tuyến riêng để lấy ID.
+- Có **hai đường ghi `pole.segment_id`**: segment API mới chặn cột thuộc tuyến khác và kiểm khác xã chỉ lúc gán mới;
+  pole CRUD cũ giữ hành vi cũ, chưa áp hai luật này. Không âm thầm sửa đường cũ trong ticket khác.
+  `Pole` chưa implement `IAudited`; giữ nguyên không `Touch`, không sinh audit thừa.

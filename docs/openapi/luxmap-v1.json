@@ -1442,6 +1442,26 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflict",
             "content": {
@@ -14716,6 +14736,16 @@
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
+          },
+          "pole_ids": {
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "pattern": "^POLE-[0-9]{4,}$",
+              "type": "string"
+            },
+            "description": "Optional unordered set; order is never stored. Absent keeps membership on PUT (empty on POST); [] detaches visible poles on PUT; null is 400. ASSET-SEG-1 SELF-SIGNED."
           }
         },
         "additionalProperties": false
@@ -19799,6 +19829,16 @@
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"
+          },
+          "pole_ids": {
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "pattern": "^POLE-[0-9]{4,}$",
+              "type": "string"
+            },
+            "description": "Optional unordered set; order is never stored. Absent keeps membership on PUT (empty on POST); [] detaches visible poles on PUT; null is 400. ASSET-SEG-1 SELF-SIGNED."
           }
         },
         "additionalProperties": false
