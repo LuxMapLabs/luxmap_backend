@@ -321,3 +321,12 @@ chỉ khóa lần lượt theo phần tử sẽ cho hai lô đảo thứ tự t�
 cùng details cộng index; `Save` có thể đã rollback để tra conflict, nên kiểm CurrentTransaction tránh rollback hai lần.
 `BatchCreateWorkOrdersRequest.Items` dùng `ValidateNever` để validation nghiệp vụ đi vào service và có index;
 lỗi JSON binding (sai kiểu/enum/date) vẫn do MVC trả trước service.
+## WO-AUTODISPATCH — preview chỉ đọc (09/11/2026)
+
+Eligibility dùng `WorkOrderAssignees.EligibleUsers` cho cả Create/assignees/preview; vị trí dọc tuyến dùng
+`WorkOrderPoleOrdering.Along` chung WO-12. Không chép phép chiếu hoặc điều kiện chọn kỹ sư.
+`EngineerLoadBoard` là bảng tải trong một lượt đề xuất (có reserve), không đăng ký singleton.
+Tuần Thứ Hai–Chủ Nhật; đếm mọi loại phiếu trừ cancelled, cả đề xuất trong lượt; không bỏ cuối tuần.
+Nhóm cột phân biệt trước khi chunk để hai fault của một cột không bị tách. Quota không phải ràng buộc Create/batch.
+Preview không SaveChanges/audit/notification/khoá; không bỏ filter xã để lấy tên tuyến ngoài quyền.
+Quyền vẫn theo ManageWorkOrders hiện hành; mâu thuẫn system_admin của ticket ghi ở drift WO-AUTODISPATCH-1.

@@ -12250,6 +12250,119 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/work-orders/auto-dispatch/preview": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoDispatchRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoDispatchRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoDispatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDispatchPreview"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDispatchPreview"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDispatchPreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/work-orders": {
       "get": {
         "tags": [
@@ -14003,6 +14116,47 @@
           "expires_in": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AutoDispatchPreview": {
+        "type": "object",
+        "properties": {
+          "start_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "fault_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "order_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchProposal"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispatchSkipped"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "AutoDispatchRequest": {
+        "type": "object",
+        "properties": {
+          "commune_id": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -15782,6 +15936,83 @@
           },
           "low": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "DispatchProposal": {
+        "type": "object",
+        "properties": {
+          "task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "title": {
+            "type": "string"
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string"
+          },
+          "segment_name": {
+            "type": "string"
+          },
+          "assigned_to_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "pole_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max_severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "unassigned_reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "DispatchSkipped": {
+        "type": "object",
+        "properties": {
+          "fault_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
           }
         },
         "additionalProperties": false

@@ -16,8 +16,19 @@ namespace LuxMap.Modules.WorkOrders;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/work-orders")]
 public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles, WorkOrderEvidenceService evidence,
-    WorkOrderAgendaService agenda) : ControllerBase
+    WorkOrderAgendaService agenda, AutoDispatchQueries dispatch) : ControllerBase
 {
+    /// <summary>Read-only inspection schedule suggestions (WO-AUTODISPATCH-1, SELF-SIGNED).</summary>
+    [HttpPost("auto-dispatch/preview")]
+    [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
+    [ProducesResponseType(typeof(AutoDispatchPreview), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    public Task<AutoDispatchPreview> AutoDispatchPreview(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AutoDispatchRequest? request, CancellationToken ct)
+        => dispatch.Preview(request, ct);
+
     [HttpGet]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
     public Task<PagedResult<WorkOrderItem>> List(

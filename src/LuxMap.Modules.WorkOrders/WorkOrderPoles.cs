@@ -132,7 +132,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
             {
                 Row = r,
                 SegmentOrder = r.SegmentId is { } segment && segmentIds.IndexOf(segment) is var at and >= 0 ? at : int.MaxValue,
-                Along = r.SegmentId is { } road && lines.TryGetValue(road, out var line) ? line.Project(r.Geom.Coordinate) : 0d,
+                Along = WorkOrderPoleOrdering.Along(r.SegmentId, r.Geom, lines),
             })
             .OrderBy(x => x.Row.SegmentId is null)
             .ThenBy(x => x.SegmentOrder).ThenBy(x => x.Row.SegmentId?.Length).ThenBy(x => x.Row.SegmentId, StringComparer.Ordinal)

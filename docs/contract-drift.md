@@ -43,6 +43,41 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
   không gửi lại mù vì request trước có thể đã commit. **Không kiểm quota / cân bằng tải**: Quản lý được đổi người và ngày.
 - Phạm vi quyền dùng nguyên ma trận `ManageWorkOrders` hiện tại (chỉ `manager`). Ticket yêu cầu test `system_admin` nhận 201
   mâu thuẫn ma trận hiện hành và yêu cầu không đổi quyền; cần Mỹ chốt trước khi mở quyền, chưa thay đổi ma trận trong WO-BATCH.
+### WO-AUTODISPATCH-1 — preview phân lịch kiểm tra tự động (09/11/2026)
+
+**Mỹ chốt 09/11/2026 · SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract/spec.
+
+- `POST /api/v1/work-orders/auto-dispatch/preview`, capability có sẵn `ManageWorkOrders`.
+  **POST chỉ vì có body** tuỳ chọn `{commune_id?: string|null}`; vắng/body rỗng/null/chuỗi rỗng = toàn phạm vi.
+  Không ghi phiếu, audit, thông báo hay lấy khoá. Ngoài xã →403 `COMMUNE_FORBIDDEN`; kiểu sai →400 `VALIDATION_FAILED`.
+- Ứng viên chỉ `detected`, không có liên kết `work_order_fault` với `released_at IS NULL`, qua query filter.
+  Lấy tối đa 2000 theo severity hạng tường minh rồi `detected_at`, hoà theo length/id.
+  Dư vào `skipped[{fault_id,reason:LIMIT_EXCEEDED}]`; không tuyến vào `NO_SEGMENT`.
+- Gom `(commune_id,segment_id)`, đếm cột **phân biệt**, mọi fault cùng cột chung ca; fault không cột mỗi cái một đơn vị.
+  Tách tối đa 8 đơn vị theo cùng phép chiếu vị trí của WO-12, fault không cột ở cuối theo length/id.
+  Tiêu đề `Kiểm tra {n} cột sự cố - {SegmentName}`, tuyến tách ca thêm ` (ca {i}/{k})`; note `Phân lịch tự động`.
+  Đường liên xã ngoài scope chỉ dùng hình học để sắp, tên hiển thị dùng segment ID nếu không đọc được tên.
+- Khởi điểm = `WorkOrderAgendaOptions.NightOf(TimeProvider.GetUtcNow()) + LeadDays` (mặc định 2),
+  **chạy cả 7 ngày, không bỏ T7/CN**, không ngày lễ; due = scheduled.
+  `WorkOrders:AutoDispatch` trong appsettings: `LeadDays=2, QuotaPerDay=2, MaxPolesPerOrder=8`, tất cả >0 khi khởi động.
+- Kỹ sư dùng chung eligibility với Create/assignees (field_engineer, không khoá, thuộc xã).
+  Tải = **mọi loại phiếu trừ cancelled**, có người và ngày; cộng đề xuất đã xếp.
+  Xét ngày tăng dần, tải ngày <quota; chọn ít tải tuần **Thứ Hai–Chủ Nhật**, rồi tải ngày, rồi user ID length/ordinal.
+  Tối đa 366 ngày; chạm giới hạn trả ca chưa gán với `SEARCH_LIMIT_EXCEEDED` để người quản lý xếp tay.
+  Không kỹ sư: vẫn trả ca ngày khởi điểm, assigned_to null, `NO_ELIGIBLE_ENGINEER`.
+- Xếp ca: max severity critical/high/medium/low, max priority_score (null thấp nhất), detected_at sớm nhất,
+  segment length/id, số ca; response theo ngày rồi thứ tự xếp. Quota **chỉ gợi ý**, Create/batch không kiểm lại.
+- Response: `{start_date,fault_count,order_count,proposals[],skipped[]}`; fault_count là số fault trong proposals.
+  Mỗi proposal có `task_kind=inspection,title,scheduled_date,due_date,assigned_to,fault_ids,note` khớp trường tạo của
+  batch `items[]`, cộng `commune_id,segment_id,segment_name,assigned_to_name,pole_ids,pole_count,max_severity,unassigned_reason`.
+  `pole_count` đếm đơn vị (kể cả fault cấp đoạn không cột); fault_ids theo dọc tuyến.
+  Ticket gọi nhóm này “sáu trường” nhưng danh sách thực tế có **bảy** khoá kể cả note; giữ đầy đủ cả bảy.
+- **FE cần làm:** hiện popup preview, cho sửa người/ngày, gửi các trường tạo vào `POST /work-orders/batch` (WO-BATCH).
+  Chưa gửi thông báo WP5 trong phiên này.
+- **Mâu thuẫn chờ Mỹ chốt:** ticket yêu cầu system_admin được và caller `*` nhiều xã, nhưng WO-1,
+  `docs/authorization-guide.md` và `LuxMapPolicies.Matrix` hiện chỉ cho manager vào ManageWorkOrders.
+  Giữ policy hiện hành (system_admin →403), không mở rộng quyền các endpoint Create/Patch/Assign khác.
+  Planner vẫn tách xã đúng; chưa có đường HTTP caller `*` được phép theo ma trận hiện hành.
 
 ### ASSET-SEG-1 — tạo / sửa tuyến kèm tập cột (09/11/2026)
 
