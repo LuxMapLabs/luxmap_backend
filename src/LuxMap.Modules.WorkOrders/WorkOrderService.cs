@@ -31,9 +31,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         => await db.Set<WorkOrder>().FirstOrDefaultAsync(x => x.WorkOrderId == id, ct)
             ?? throw Error("WORK_ORDER_NOT_FOUND", HttpStatusCode.NotFound);
 
-    private IQueryable<AppUser> EligibleUsers(string commune) => db.Set<AppUser>().Where(user =>
-        user.Role == UserRole.FieldEngineer && !user.IsLocked
-        && db.Set<AppUserCommune>().Any(link => link.UserId == user.UserId && link.CommuneId == commune));
+    private IQueryable<AppUser> EligibleUsers(string commune) => WorkOrderAssignees.EligibleUsers(db, commune);
 
     private async Task RequireAssignee(string id, string commune, CancellationToken ct)
     {

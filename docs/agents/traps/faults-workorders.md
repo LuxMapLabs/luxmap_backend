@@ -311,3 +311,13 @@ rollback ứng dụng có thể giữ schema cộng thêm, không sửa/xóa aud
   `Without_segments_the_bundle_also_packs_the_unassigned_poles_my_open_orders_hold_faults_on`). Sự cố mở trên cột được đóng gói vào gói như với cột trên tuyến, kể cả sự cố do phiếu người khác giữ.
 - **Để CV-15:** hiện không có writer gom cụm trong `src/`; seed mock không phải pipeline. Khi viết writer `fault_cluster`,
   phải từ chối cột chưa tuyến theo D-8, giữ schema cụm bắt buộc tuyến; không suy tuyến gần nhất, không viết lại cụm/snapshot cũ khi gán tuyến cột.
+
+## WO-AUTODISPATCH — preview chỉ đọc (09/11/2026)
+
+Eligibility dùng `WorkOrderAssignees.EligibleUsers` cho cả Create/assignees/preview; vị trí dọc tuyến dùng
+`WorkOrderPoleOrdering.Along` chung WO-12. Không chép phép chiếu hoặc điều kiện chọn kỹ sư.
+`EngineerLoadBoard` là bảng tải trong một lượt đề xuất (có reserve), không đăng ký singleton.
+Tuần Thứ Hai–Chủ Nhật; đếm mọi loại phiếu trừ cancelled, cả đề xuất trong lượt; không bỏ cuối tuần.
+Nhóm cột phân biệt trước khi chunk để hai fault của một cột không bị tách. Quota không phải ràng buộc Create/batch.
+Preview không SaveChanges/audit/notification/khoá; không bỏ filter xã để lấy tên tuyến ngoài quyền.
+Quyền vẫn theo ManageWorkOrders hiện hành; mâu thuẫn system_admin của ticket ghi ở drift WO-AUTODISPATCH-1.

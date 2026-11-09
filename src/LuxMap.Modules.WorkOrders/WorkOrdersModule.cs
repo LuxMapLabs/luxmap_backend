@@ -17,6 +17,10 @@ public sealed class WorkOrdersModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        var dispatch = configuration.GetSection(AutoDispatchOptions.SectionName).Get<AutoDispatchOptions>() ?? new AutoDispatchOptions();
+        dispatch.Validate();
+        services.AddSingleton(dispatch);
+        services.AddScoped<AutoDispatchQueries>();
         services.AddScoped<WorkOrderService>();
         services.AddScoped<WorkOrderPoleService>();
         var agenda = configuration.GetSection(WorkOrderAgendaOptions.SectionName).Get<WorkOrderAgendaOptions>() ?? new WorkOrderAgendaOptions();

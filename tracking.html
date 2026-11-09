@@ -41,6 +41,17 @@
 <div class="wrap">
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="wo-autodispatch">
+    <strong>WO-AUTODISPATCH — phase 2, 09/11/2026</strong>
+    <span class="tag t-next">Build xanh · chờ test và chốt quyền admin</span>
+    <p>POST preview chỉ đọc; planner thuần, EngineerLoadBoard công khai; dùng chung eligibility/vị trí dọc tuyến.
+    Gom cột phân biệt, tách 8, quota 2, tuần T2–CN, cả 7 ngày; drift WO-AUTODISPATCH-1 SELF-SIGNED.</p>
+    <p>Files: WorkOrders/AutoDispatch*.cs, service/controller/poles/module, Api/appsettings.json,
+    AutoDispatchPlannerTests, WorkOrderAutoDispatchTests, drift/traps/tracking/results.
+    Chưa chạy test/phá thử theo chỉ dẫn; build toàn solution thành công, 0 warning / 0 error. Không migration, git hay Swagger.
+    Còn: Mỹ chốt system_admin (ManageWorkOrders hiện chỉ manager), Claude chạy build/test/phá thử;
+    WO-BATCH chưa có trong cây nên chưa kiểm liên thông. Chi tiết <code>.ai/results/WO-AUTODISPATCH.md</code>.</p>
+  </div>
   <div class="card" id="acct-avatar">
     <strong>ACCT-AVATAR — phase 2, 09/11/2026</strong>
     <span class="tag t-done">Xong · chờ PR</span>
