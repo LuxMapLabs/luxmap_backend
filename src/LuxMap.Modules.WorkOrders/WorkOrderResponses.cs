@@ -3,6 +3,8 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.WorkOrders;
 
+public sealed record BatchCreateWorkOrdersResponse(int Count, WorkOrderDetail[] CreatedItems);
+
 /// <summary>A record so a richer view (the agenda, BE-25) can extend it through the copy constructor instead of re-listing fields.</summary>
 public record WorkOrderItem
 {

@@ -4,6 +4,13 @@ using LuxMap.Modules.WorkOrders.Entities;
 
 namespace LuxMap.Modules.WorkOrders;
 
+public sealed class BatchCreateWorkOrdersRequest
+{
+    // Element validation belongs to CreateCore so business errors retain their batch index.
+    [Microsoft.AspNetCore.Mvc.ModelBinding.Validation.ValidateNever]
+    public CreateWorkOrderRequest[]? Items { get; init; }
+}
+
 public sealed class CreateWorkOrderRequest
 {
     [Required] public TaskKind? TaskKind { get; init; }
