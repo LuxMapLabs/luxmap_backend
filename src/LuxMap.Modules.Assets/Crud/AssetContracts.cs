@@ -20,7 +20,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// one, the database sequence does.
 /// </para>
 /// </remarks>
-public sealed record CreateSegmentRequest
+public sealed class CreateSegmentRequest
 {
     /// <summary>The authority's own inventory code. Optional — assets traced from imagery have none.</summary>
     [MaxLength(64)]
@@ -48,6 +48,15 @@ public sealed record CreateSegmentRequest
 
     [Required]
     public DataSource? DataSource { get; init; }
+
+    /// <summary>
+    /// Unordered set of at most 2000 pole ids. Absent keeps membership on PUT (empty on POST);
+    /// [] detaches visible poles on PUT; explicit null is invalid. Array order is never stored.
+    /// </summary>
+    public JsonElement PoleIds { get; init; }
+
+    /// <summary>Validate before database lookups, retaining whether the key was present.</summary>
+    public (bool Present, IReadOnlyList<string> Ids) ReadPoleIds() => SegmentPoleIds.Read(PoleIds);
 }
 
 public sealed record CreateFeederRequest
@@ -219,7 +228,7 @@ public sealed record CreateFixtureRequest
 /// No response body — <c>204</c>. What a read returns is still <b>BE-12b</b>.
 /// </para>
 /// </remarks>
-public sealed record UpdateSegmentRequest
+public sealed class UpdateSegmentRequest
 {
     /// <summary>The authority's own inventory code, or null. Unique per commune when present.</summary>
     [MaxLength(64)]
@@ -250,6 +259,15 @@ public sealed record UpdateSegmentRequest
     /// </summary>
     [Required]
     public DataSource? DataSource { get; init; }
+
+    /// <summary>
+    /// Unordered set of at most 2000 pole ids. Absent keeps membership on PUT (empty on POST);
+    /// [] detaches visible poles on PUT; explicit null is invalid. Array order is never stored.
+    /// </summary>
+    public JsonElement PoleIds { get; init; }
+
+    /// <summary>Validate before database lookups, retaining whether the key was present.</summary>
+    public (bool Present, IReadOnlyList<string> Ids) ReadPoleIds() => SegmentPoleIds.Read(PoleIds);
 }
 
 /// <summary>Full replacement of a feeder. See <see cref="UpdateSegmentRequest"/> for the shared rules.</summary>
@@ -847,4 +865,26 @@ public sealed record CabinetDetail
     public required string GeomWkt { get; init; }
 
     public required DateTime CreatedAt { get; init; }
+}
+
+/// <summary>Shared validation, before either segment write performs any database lookup.</summary>
+internal static class SegmentPoleIds
+{
+    public static (bool Present, IReadOnlyList<string> Ids) Read(JsonElement value)
+    {
+        if (!OptionalJson.Present(value)) return (false, Array.Empty<string>());
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() > 2000)
+            throw OptionalJson.Invalid("pole_ids");
+
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String || item.GetString() is not { } id
+                || !System.Text.RegularExpressions.Regex.IsMatch(id, @"\APOLE-[0-9]{4,}\z") || !seen.Add(id))
+                throw OptionalJson.Invalid("pole_ids");
+            ids.Add(id);
+        }
+        return (true, ids);
+    }
 }

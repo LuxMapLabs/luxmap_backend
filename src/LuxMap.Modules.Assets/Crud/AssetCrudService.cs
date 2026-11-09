@@ -241,6 +241,8 @@ public sealed class AssetCrudService(
 
     public async Task<string> CreateSegmentAsync(CreateSegmentRequest request, CancellationToken ct)
     {
+        var (present, poleIds) = request.ReadPoleIds();
+        await using var transaction = present ? await dbContext.Database.BeginTransactionAsync(ct) : null;
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
         await RejectDuplicateRefAsync<RoadSegment>(communeId, request.ExternalRef, ct);
 
@@ -256,8 +258,10 @@ public sealed class AssetCrudService(
         };
 
         dbContext.Set<RoadSegment>().Add(segment);
+        if (present) await ReplaceSegmentPolesAsync(segment, poleIds, ct);
         Touch(segment);
         await dbContext.SaveChangesAsync(ct);
+        if (transaction is not null) await transaction.CommitAsync(ct);
         return segment.SegmentId;
     }
 
@@ -397,6 +401,16 @@ public sealed class AssetCrudService(
     /// </remarks>
     public async Task UpdateSegmentAsync(string segmentId, UpdateSegmentRequest request, CancellationToken ct)
     {
+        var (present, poleIds) = request.ReadPoleIds();
+        await using var transaction = present ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        if (present)
+        {
+            if (!await dbContext.Set<RoadSegment>().AnyAsync(candidate => candidate.SegmentId == segmentId, ct))
+                throw NotFound("road segment");
+            // Serialize replacements of the same segment before taking the fixed-order pole locks.
+            await dbContext.Database.ExecuteSqlRawAsync(
+                "SELECT 1 FROM road_segment WHERE segment_id = {0} FOR UPDATE", [segmentId], ct);
+        }
         var segment = await RequireAsync<RoadSegment>(candidate => candidate.SegmentId == segmentId, "road segment", ct);
 
         await RejectDuplicateRefAsync<RoadSegment>(segment.CommuneId, request.ExternalRef, ct, segment.ExternalRef);
@@ -407,9 +421,11 @@ public sealed class AssetCrudService(
         segment.LengthM = request.LengthM!.Value;
         segment.Geom = Read<LineString>(request.GeomWkt);
         segment.DataSource = request.DataSource!.Value;
+        if (present) await ReplaceSegmentPolesAsync(segment, poleIds, ct);
         Touch(segment);
 
         await dbContext.SaveChangesAsync(ct);
+        if (transaction is not null) await transaction.CommitAsync(ct);
     }
 
     /// <summary>Full replacement of a feeder (BE-12). <c>commune_id</c> is not writable.</summary>
@@ -778,6 +794,72 @@ public sealed class AssetCrudService(
     private static bool Finite(double value, double limit) => double.IsFinite(value) && Math.Abs(value) <= limit;
 
     private void Touch(IUpdateStamped asset) => AssetStamp.Touch(dbContext, asset, actor);
+
+    /// <summary>Replace only visible membership; all validation and locks precede changes to poles.</summary>
+    private async Task ReplaceSegmentPolesAsync(RoadSegment segment, IReadOnlyList<string> ids, CancellationToken ct)
+    {
+        var creating = dbContext.Entry(segment).State == EntityState.Added;
+        var requested = ids.ToArray();
+        var visible = await dbContext.Set<Pole>().Where(pole => requested.Contains(pole.PoleId))
+            .Select(pole => pole.PoleId).ToListAsync(ct);
+        RequireAll(visible);
+
+        var current = creating ? [] : await dbContext.Set<Pole>()
+            .Where(pole => pole.SegmentId == segment.SegmentId).Select(pole => pole.PoleId).ToListAsync(ct);
+        var locked = visible.Concat(current).Distinct(StringComparer.Ordinal).ToArray();
+        if (locked.Length == 0) return;
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM pole WHERE pole_id = ANY({0}) ORDER BY pole_id FOR UPDATE", [locked], ct);
+        // The first read projected ids only: EF cannot return a stale tracked pole after waiting for a lock.
+        var poles = await dbContext.Set<Pole>().Where(pole => locked.Contains(pole.PoleId)).ToListAsync(ct);
+        RequireAll(poles.Select(pole => pole.PoleId));
+        var wanted = requested.ToHashSet(StringComparer.Ordinal);
+        foreach (var pole in poles.Where(pole => wanted.Contains(pole.PoleId)))
+        {
+            if (!creating && pole.SegmentId == segment.SegmentId) continue;
+            if (pole.SegmentId is not null)
+                throw new LuxMapException(ErrorCodes.AssetInUse, HttpStatusCode.Conflict,
+                    "That pole already belongs to another road segment.",
+                    new Dictionary<string, object?> { ["pole_id"] = pole.PoleId, ["segment_id"] = pole.SegmentId });
+            if (pole.CommuneId != segment.CommuneId && segment.RoadClass != RoadClass.InterCommune)
+                throw new LuxMapException(ErrorCodes.CrossCommuneReference, HttpStatusCode.Conflict,
+                    "That pole belongs to a different commune than the road segment.",
+                    new Dictionary<string, object?>
+                    {
+                        ["pole_commune_id"] = pole.CommuneId, ["segment_commune_id"] = segment.CommuneId,
+                    });
+        }
+
+        var changed = new List<Pole>();
+        foreach (var pole in poles)
+        {
+            if (wanted.Contains(pole.PoleId))
+            {
+                if (!creating && pole.SegmentId == segment.SegmentId) continue;
+                // Navigation propagates the DB-generated segment id during the single SaveChanges on POST.
+                pole.Segment = segment;
+                changed.Add(pole);
+            }
+            else if (!creating && pole.SegmentId == segment.SegmentId)
+            {
+                pole.Segment = null;
+                pole.SegmentId = null;
+                changed.Add(pole);
+            }
+        }
+        dbContext.ChangeTracker.DetectChanges();
+        foreach (var pole in changed) Touch(pole);
+
+        void RequireAll(IEnumerable<string> found)
+        {
+            var foundSet = found.ToHashSet(StringComparer.Ordinal);
+            var missing = ids.FirstOrDefault(id => !foundSet.Contains(id));
+            if (missing is not null) throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound,
+                $"That pole {missing} does not exist, or it is outside your permitted commune scope.",
+                new Dictionary<string, object?> { ["pole_id"] = missing });
+        }
+    }
 
     private const string FeederSourceField = "feeder_source";
 
