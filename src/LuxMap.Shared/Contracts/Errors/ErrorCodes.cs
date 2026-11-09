@@ -266,6 +266,9 @@ public static class ErrorCodes
     /// <summary>404 — CITIZEN-QR P2c: no such citizen report in the caller's communes.</summary>
     public const string CitizenReportNotFound = "CITIZEN_REPORT_NOT_FOUND";
 
+    /// <summary>404 — no avatar, including an unknown account on the admin route (ACCT-5).</summary>
+    public const string AvatarNotFound = "AVATAR_NOT_FOUND";
+
     /// <summary>404 — CITIZEN-QR P2c: no such photo on that report.</summary>
     public const string CitizenPhotoNotFound = "CITIZEN_PHOTO_NOT_FOUND";
 

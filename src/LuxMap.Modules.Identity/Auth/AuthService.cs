@@ -1,3 +1,4 @@
+using LuxMap.Modules.Identity.Profiles;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Persistence;
@@ -177,7 +178,8 @@ public sealed class AuthService(
             ContractEnum.ToDbValue(user.Role),
             communeIds,
             communes,
-            MapBounds.Of(CommuneBbox.Union(communes.Where(commune => commune.Bbox is not null).Select(commune => commune.Bbox!))));
+            MapBounds.Of(CommuneBbox.Union(communes.Where(commune => commune.Bbox is not null).Select(commune => commune.Bbox!))),
+            AvatarUrls.For(user));
     }
 
     /// <summary>

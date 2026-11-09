@@ -73,6 +73,32 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 - Log thành công chỉ UserId và `method=google`; thất bại chỉ lý do chung. Không log token, email hoặc Google subject.
 - **Giới hạn v1:** (1) khớp email, chưa liên kết Google `sub` với tài khoản (cần bảng liên kết/migration ở ticket sau); (2) không kiểm nonce, ID token lộ có thể dùng lại tới `exp` (~1 giờ), cần FE và ticket sau; (3) chưa tắt quyền Google theo từng tài khoản.
 
+### ACCT-5 — avatar tài khoản (09/11/2026)
+
+**Mỹ chốt 09/11/2026 · SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract.
+
+- `POST /api/v1/auth/me/avatar`: multipart field **`file`**, 200 `{avatar_url}`; thiếu file → 400 `VALIDATION_FAILED`, `details.field=file`.
+  **JPEG-only theo magic bytes**; PNG/WebP/file không giải mã được → 415 `UNSUPPORTED_IMAGE_FORMAT`. FE tự chuyển PNG/WebP sang JPEG
+  bằng canvas trước gửi. Giới hạn **1 MiB (1 048 576 byte)** đọc vào, **16 000 000 pixel**, sanitize xoay orientation, bỏ EXIF/GPS/XMP/IPTC/ICC,
+  cạnh dài **≤512 px**. Quá byte → 413 `VALIDATION_FAILED`, quá pixel → 400 `VALIDATION_FAILED` (mã sanitizer hiện có).
+- `GET /api/v1/auth/me/avatar`: thumbnail JPEG, 404 **`AVATAR_NOT_FOUND`** nếu chưa có; `Cache-Control: private, max-age=86400`,
+  `X-Content-Type-Options: nosniff`, ETag theo `avatar_updated_at`, `If-None-Match` khớp →304.
+- `DELETE /api/v1/auth/me/avatar`: 204 idempotent, chỉ gỡ năm cột avatar. **Chưa xoá byte**: object còn tới lần upload kế tiếp;
+  xoá thật cần ticket riêng có chữ ký (`DeleteAsync` + audit).
+- Ba route self-service dùng capability **`ManageOwnProfile`**, cả bốn vai trò. `GET /api/v1/admin/users/{id}/avatar` có cùng hành vi đọc
+  nhưng **`ManageUsers`**, chỉ system_admin; id không tồn tại và chưa có avatar đều 404 `AVATAR_NOT_FOUND`. **Không có endpoint cho manager**
+  xem avatar kỹ sư; nếu cần phải có ticket riêng.
+- Thêm cuối `/auth/me` và `UserAccountItem` field **`avatar_url: string | null`**. Dạng `/api/v1/auth/me/avatar?v=<Unix mili-giây UTC>` hoặc
+  `/api/v1/admin/users/{id}/avatar?v=<Unix mili-giây UTC>`. URL **tương đối, đòi Bearer**: FE phải **fetch → blob URL** (và revoke blob khi bỏ),
+  `<img src>` trần sẽ 401. `?v=` để đổi cache key, server bỏ qua giá trị. ETag dùng độ chính xác µs, không lấy `v` làm quyền đọc.
+  `v` tính bằng mili-giây nên hai upload cách nhau dưới 1 mili-giây mới có thể trùng (thực tế không xảy ra với một người).
+- Bucket riêng **`luxmap-avatar`**, hai key `original/{user_id}.jpg`, `thumb/{user_id}.jpg` ghi đè; original đã sanitize, phục vụ thumbnail.
+  Ghi object trước row; lỗi SaveChanges có thể để object mồ côi, lần sau ghi đè. Không khoá/transaction qua sanitize/S3; hai upload cùng người hợp lệ,
+  mỗi SaveChanges ghi trọn bộ năm cột, row cuối thắng. Năm cột nullable trên `app_user` và CHECK all-or-none/byte ≥0;
+  migration `AddAccountAvatars` (chỉ thêm cột nullable nên không mất dữ liệu cũ) đồng thời mở `ck_storage_reconciliation_bucket` thêm `'avatar'`; `Down()` xoá các dòng báo cáo đối chiếu của bucket đó trước khi trả CHECK cũ.
+- WP5/WP6: thêm upload field `file`, chuyển JPEG, fetch ảnh có token, thay URL theo response, hiển thị trạng thái null sau DELETE;
+  giải thích gỡ avatar hiện chưa xoá byte khỏi kho.
+
 ### ACCT-3 — đăng nhập bằng username hoặc email (08/11/2026)
 
 | Trường | Nội dung |

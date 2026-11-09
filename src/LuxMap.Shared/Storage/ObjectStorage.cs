@@ -21,6 +21,9 @@ public enum StorageBucket
 
     /// <summary>Photos citizens send through a pole's QR code (CITIZEN-QR P2b) — metadata stripped before storing.</summary>
     Citizen,
+
+    /// <summary>Sanitized account avatars, overwritten at fixed user keys.</summary>
+    Avatar,
 }
 
 /// <summary>Which of the two objects a stored image produces.</summary>
@@ -59,6 +62,8 @@ public static class StorageKeys
     /// <summary>Photos citizens send through a pole's QR code (CITIZEN-QR P2b, D-2) — kept apart so their retention can differ.</summary>
     public const string CitizenBucketName = "luxmap-citizen";
 
+    public const string AvatarBucketName = "luxmap-avatar";
+
     public const string OriginalPrefix = "original";
 
     public const string ThumbnailPrefix = "thumb";
@@ -74,6 +79,7 @@ public static class StorageKeys
         StorageBucket.Evidence => EvidenceBucketName,
         StorageBucket.Video => VideoBucketName,
         StorageBucket.Citizen => CitizenBucketName,
+        StorageBucket.Avatar => AvatarBucketName,
         _ => throw new ArgumentOutOfRangeException(nameof(bucket), bucket, "Unknown storage bucket."),
     };
 

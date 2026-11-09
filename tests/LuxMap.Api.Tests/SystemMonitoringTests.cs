@@ -100,7 +100,7 @@ public sealed class SystemMonitoringTests(AssetImportFixture factory) : IAsyncLi
         Assert.All(jobs, job => Assert.Contains(job.GetProperty("state").GetString(), new[] { "ok", "failing", "stalled", "running" }));
 
         var storage = root.GetProperty("storage");
-        Assert.Equal(["survey", "evidence", "video", "citizen"],
+        Assert.Equal(["survey", "evidence", "video", "citizen", "avatar"],
             storage.GetProperty("buckets").EnumerateArray().Select(b => b.GetProperty("bucket").GetString()!).ToArray());
         var disk = storage.GetProperty("disk");
         Assert.True(disk.GetProperty("total_bytes").GetInt64() > 0);
@@ -156,7 +156,8 @@ public sealed class SystemMonitoringTests(AssetImportFixture factory) : IAsyncLi
 
         Assert.Equal((5L, 360L), totals[StorageBucket.Citizen]); // 2 originals (300) + 3 thumbnails (60); the keyless 999 is not stored
         Assert.Equal((0L, 0L), totals[StorageBucket.Survey]);
-        Assert.Equal(4, totals.Count);
+        Assert.Equal(5, totals.Count);
+        Assert.Equal((0L, 0L), totals[StorageBucket.Avatar]);
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public sealed class SystemMonitoringTests(AssetImportFixture factory) : IAsyncLi
         Assert.Equal(["old-orphan"], row.OrphanSample);
         Assert.Equal(["missing"], row.MissingSample);
         Assert.Equal(3, store.Listed); // listed, never touched
-        Assert.Equal(4, await Db(db => db.Set<StorageReconciliation>().CountAsync())); // every bucket checked
+        Assert.Equal(5, await Db(db => db.Set<StorageReconciliation>().CountAsync())); // every bucket checked
     }
 
     [Fact]

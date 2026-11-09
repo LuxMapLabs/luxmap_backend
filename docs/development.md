@@ -759,9 +759,19 @@ Cấu hình (mặc định trong code, đổi qua appsettings / biến môi trư
 | `Citizen:DaylightMeanLuma` | 0.45 | P2c: thumbnail sáng trung bình hơn mức này ⇒ coi như ảnh ban ngày, gợi ý AI `inconclusive`. Đổi giá trị = đổi `artifact_version` của gợi ý |
 | `Citizen:HintsPerRequest` | 6 | P2c: số ảnh model xem mỗi lượt Quản lý mở một báo cáo; phần còn lại có gợi ý ở lượt mở sau |
 
-Ảnh lưu ở bucket `luxmap-citizen` (sidecar `minio-mc` tạo) **đã bỏ EXIF/XMP/IPTC/ICC** — ngoại lệ của BE-11 quy tắc 4, chỉ cho ảnh công dân.
+Ảnh lưu ở bucket `luxmap-citizen` (sidecar `minio-mc` tạo) **đã bỏ EXIF/XMP/IPTC/ICC** — ngoại lệ của BE-11 quy tắc 4, cùng với avatar.
 
 **P2c (Quản lý duyệt):** `GET /api/v1/citizen-reports`, `GET /api/v1/citizen-reports/{report_id}`, ảnh qua
 `…/photos/{photo_id}/thumbnail|original`, và `accept` / `merge` / `reject` (mỗi quyết định gửi kèm `submission_count` đã xem). Chấp nhận
 tạo sự cố `field_report` `confirmed`. Gợi ý AI dùng model YOLO của AI-1 (`Ai:ModelPath`); không có model thì báo cáo vẫn mở được, chỉ không
 có gợi ý. Drift PC-1…PC-10.
+
+### Avatar tài khoản (ACCT-5, SELF-SIGNED 09/11/2026)
+
+Sidecar tạo thêm bucket `luxmap-avatar` (cùng bốn bucket survey/evidence/video/citizen). POST `/api/v1/auth/me/avatar`
+nhận multipart field `file`, chỉ JPEG ≤1 MiB; client chuyển PNG/WebP sang JPEG trước gửi. Server sanitize (bỏ metadata,
+xoay orientation, cạnh dài ≤512, tối đa 16 triệu pixel), lưu original sạch và thumbnail ở hai key cố định theo user.
+GET cùng đường dẫn phục vụ thumbnail; DELETE trả 204, chỉ gỡ liên kết, chưa xoá byte. Admin xem qua
+GET `/api/v1/admin/users/{id}/avatar`. `avatar_url` của `/auth/me` và dòng tài khoản admin là relative URL + `?v=<Unix giây UTC>`,
+null khi chưa có avatar. Mọi GET đòi Bearer: FE fetch → blob URL; cache private 86400 giây, có ETag/304.
+Claude cần sinh migration năm cột avatar và CHECK trước khi chạy API/test trên DB; xem `.ai/results/ACCT-AVATAR.md`.

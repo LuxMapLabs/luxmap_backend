@@ -158,7 +158,7 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("storage_reconciliation", null, t =>
                         {
-                            t.HasCheckConstraint("ck_storage_reconciliation_bucket", "\"bucket\" IN ('survey', 'evidence', 'video', 'citizen')");
+                            t.HasCheckConstraint("ck_storage_reconciliation_bucket", "\"bucket\" IN ('survey', 'evidence', 'video', 'citizen', 'avatar')");
 
                             t.HasCheckConstraint("ck_storage_reconciliation_counts", "store_object_count >= 0 AND store_bytes >= 0 AND orphan_count >= 0 AND orphan_bytes >= 0 AND missing_count >= 0 AND orphan_count <= store_object_count AND orphan_bytes <= store_bytes");
 
@@ -1403,6 +1403,26 @@ namespace LuxMap.Persistence.Migrations
                         .HasDefaultValueSql("luxmap_format_id('USR', nextval('user_id_seq'), 3)")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "user_id_seq");
 
+                    b.Property<long?>("AvatarByteCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("avatar_byte_count");
+
+                    b.Property<string>("AvatarObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("avatar_object_key");
+
+                    b.Property<long?>("AvatarThumbnailBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("avatar_thumbnail_bytes");
+
+                    b.Property<string>("AvatarThumbnailKey")
+                        .HasColumnType("text")
+                        .HasColumnName("avatar_thumbnail_key");
+
+                    b.Property<DateTime?>("AvatarUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("avatar_updated_at");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1473,6 +1493,8 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("app_user", null, t =>
                         {
+                            t.HasCheckConstraint("ck_app_user_avatar_all_or_none", "(avatar_object_key IS NULL AND avatar_byte_count IS NULL AND avatar_thumbnail_key IS NULL AND avatar_thumbnail_bytes IS NULL AND avatar_updated_at IS NULL) OR (avatar_object_key IS NOT NULL AND avatar_byte_count IS NOT NULL AND avatar_byte_count >= 0 AND avatar_thumbnail_key IS NOT NULL AND avatar_thumbnail_bytes IS NOT NULL AND avatar_thumbnail_bytes >= 0 AND avatar_updated_at IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_app_user_password_set_together", "(password_hash IS NULL) = (password_set_at IS NULL)");
 
                             t.HasCheckConstraint("ck_app_user_role", "\"role\" IN ('superior', 'manager', 'field_engineer', 'system_admin')");

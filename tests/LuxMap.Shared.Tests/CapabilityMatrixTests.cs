@@ -27,6 +27,7 @@ public class CapabilityMatrixTests
         ["cap:edit_pole_location"] = ["field_engineer", "manager"],
         ["cap:record_lux_reading"] = ["field_engineer"],
         ["cap:control_lighting"] = ["manager"],
+        ["cap:manage_own_profile"] = ["field_engineer", "manager", "superior", "system_admin"],
         ["cap:manage_users"] = ["system_admin"],
         ["cap:manage_communes"] = ["system_admin"],
         ["cap:read_faults"] = ["field_engineer", "manager", "superior", "system_admin"],

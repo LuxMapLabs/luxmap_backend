@@ -101,3 +101,10 @@ Không log ID token, email, Google `sub` hoặc exception của thư viện (có
 Test thay `IGoogleIdTokenVerifier` qua DI, không gọi Google. Google và mật khẩu dùng chung hàm mở refresh chain;
 chỉ thành công mới thu hồi cookie cũ. Web Google có body chỉ `id_token`, dùng `web_session` (không `remember_me`).
 Nền API ACCT-4 SELF-SIGNED; ba giới hạn (liên kết sub, nonce, bật/tắt từng tài khoản) nằm ở drift.
+
+## ACCT-AVATAR — nền tạm ACCT-5 (09/11/2026)
+
+`ManageOwnProfile` liệt kê cả bốn vai trò cho POST/GET/DELETE `/auth/me/avatar`; GET `/admin/users/{id}/avatar` chỉ
+`ManageUsers` (system_admin). Không có đường cho manager xem avatar người khác. `avatar_url` nullable, đường dẫn tương đối
+có Bearer: FE phải fetch rồi dùng blob URL. `?v=` là Unix mili-giây UTC, server bỏ qua query này; ETag lấy timestamp chính xác tới µs.
+DELETE chỉ gỡ liên kết, không xoá byte. Không thêm `[AllowAnonymous]` ở controller avatar.

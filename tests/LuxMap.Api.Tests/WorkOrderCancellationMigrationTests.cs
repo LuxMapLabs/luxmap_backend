@@ -38,7 +38,7 @@ public sealed class WorkOrderCancellationMigrationTests(AssetImportFixture fixtu
         var commune = new AdministrativeUnit { Name = "Cancellation rollback" };
         var user = new AppUser { Username = "wocr" + Guid.NewGuid().ToString("N"), FullName = "Rollback actor", Email = "wocr@example.invalid",
             Role = UserRole.FieldEngineer, PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow };
-        db.AddRange(commune, user); await db.SaveChangesAsync();
+        db.Add(commune); await db.SaveChangesAsync(); await OldSchemaUser.InsertAsync(db, user);
         // Insert with SQL while the model has columns which the previous schema does not have yet.
         var id = await db.Database.SqlQuery<string>($"INSERT INTO work_order (commune_id,title,created_by,task_kind,wo_status,assigned_to,assigned_at) VALUES ({commune.CommuneId},'Old row',{user.UserId},'inspection','assigned',{user.UserId},now()) RETURNING work_order_id AS \"Value\"").ToListAsync();
         var woId = Assert.Single(id);

@@ -120,7 +120,7 @@ docker run --rm -e SRC_KEY -e SRC_SECRET -e DST_KEY -e DST_SECRET --entrypoint /
   quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z -c '
   mc alias set src http://host.docker.internal:9000 "$SRC_KEY" "$SRC_SECRET"
   mc alias set dst http://host.docker.internal:19000 "$DST_KEY" "$DST_SECRET"
-  for b in luxmap-survey luxmap-evidence luxmap-video luxmap-citizen; do mc mirror "src/$b" "dst/$b"; done'
+  for b in luxmap-survey luxmap-evidence luxmap-video luxmap-citizen luxmap-avatar; do mc mirror "src/$b" "dst/$b"; done'
 ```
 
 Rồi làm **mục 7 bước 1 khi API còn tắt**, sau đó mới bật lại:

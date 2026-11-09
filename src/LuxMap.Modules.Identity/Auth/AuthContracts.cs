@@ -86,4 +86,5 @@ public sealed record CurrentUserResponse(
     string Role,
     IReadOnlyList<string> CommuneIds,
     IReadOnlyList<CommuneSummary> Communes,
-    MapBounds? MapBounds);
+    MapBounds? MapBounds,
+    string? AvatarUrl);

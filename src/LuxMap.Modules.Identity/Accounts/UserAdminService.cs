@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Net;
 using LuxMap.Modules.Identity.Auth;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Identity.Profiles;
 using LuxMap.Modules.Identity.Seeding;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
@@ -244,7 +245,8 @@ public sealed class UserAdminService(
             AuthClaims.CommuneIdsFor(user.HasSystemWideScope, CurrentCommunes(user)),
             user.IsLocked ? AccountStatus.Locked : user.PasswordSetAt is null ? AccountStatus.Invited : AccountStatus.Active,
             user.CreatedAt,
-            user.PasswordSetAt);
+            user.PasswordSetAt,
+            AvatarUrls.For(user, admin: true));
 
     private static Expression<Func<AppUser, bool>> StatusIs(string status) => status switch
     {

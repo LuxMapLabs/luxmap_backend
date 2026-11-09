@@ -46,6 +46,9 @@ public static class LuxMapPolicies
     /// </summary>
     public const string ControlLighting = "cap:control_lighting";
 
+    /// <summary>Manage the caller's own avatar (ACCT-5); all four named roles.</summary>
+    public const string ManageOwnProfile = "cap:manage_own_profile";
+
     /// <summary>Create accounts and assign roles and communes (BE-33a, <c>/admin/users</c>).</summary>
     public const string ManageUsers = "cap:manage_users";
 
@@ -141,6 +144,7 @@ public static class LuxMapPolicies
             [EditPoleLocation] = [UserRole.Manager, UserRole.FieldEngineer],
             [RecordLuxReading] = [UserRole.FieldEngineer],
             [ControlLighting] = [UserRole.Manager],
+            [ManageOwnProfile] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ManageUsers] = [UserRole.SystemAdmin],
             [ManageCommunes] = [UserRole.SystemAdmin],
             [ReadFaults] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],

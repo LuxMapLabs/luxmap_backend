@@ -226,6 +226,10 @@ SUMMARY = {
     ("get", "/api/v1/lux-readings"): "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
     ("get", "/api/v1/lux-readings/poles/{poleId}"): "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
     ("post", "/api/v1/auth/web/login"): "Đăng nhập web; refresh token vào cookie",
+    ("post", "/api/v1/auth/me/avatar"): "[ACCT-5] Tải ảnh đại diện của chính mình (multipart, field file; chỉ JPEG, tối đa 1 MiB, làm sạch EXIF, cạnh dài 512 px)",
+    ("get", "/api/v1/auth/me/avatar"): "[ACCT-5] Ảnh đại diện của chính mình (thumbnail JPEG, cần Bearer; 404 AVATAR_NOT_FOUND khi chưa có)",
+    ("delete", "/api/v1/auth/me/avatar"): "[ACCT-5] Gỡ ảnh đại diện (chỉ gỡ liên kết, chưa xoá byte trong kho)",
+    ("get", "/api/v1/admin/users/{id}/avatar"): "[ACCT-5] Quản trị xem ảnh đại diện của một tài khoản",
     ("post", "/api/v1/auth/google"): "[ACCT-4] Đăng nhập mobile bằng Google ID token; chỉ vào tài khoản đã có, khớp theo email đã xác minh",
     ("post", "/api/v1/auth/web/google"): "[ACCT-4] Đăng nhập web bằng Google ID token; refresh token vào cookie; không tự tạo tài khoản",
     ("post", "/api/v1/auth/web/refresh"): "Xoay vòng refresh token từ cookie; không body",
@@ -343,7 +347,7 @@ for path, item in d["paths"].items():
             op["summary"] = "[Mobile] " + op["summary"]
         elif client == "web":
             op["summary"] = "[Web] " + op["summary"]
-        elif method == "get" and path == "/api/v1/auth/me":
+        elif path == "/api/v1/auth/me" or path.startswith("/api/v1/auth/me/"):
             op["summary"] = "[Dùng chung] " + op["summary"]
         op["operationId"] = opid(method, path)
         op["x-luxmap-status"] = "implemented"
@@ -351,9 +355,9 @@ for path, item in d["paths"].items():
             if path.startswith(prefix):
                 op["x-luxmap-contract"] = sec
                 break
-        # The auth group is anonymous EXCEPT /auth/me, which requires the bearer token (§4.7).
+        # The auth group is anonymous EXCEPT /auth/me and /auth/me/avatar (ACCT-5), which require the bearer token (§4.7).
         # CITIZEN-QR P2b: the citizen's two endpoints are the only anonymous data endpoints (D-R1).
-        is_anonymous = (path.startswith("/api/v1/auth") and path != "/api/v1/auth/me") or path.startswith("/api/v1/public/")
+        is_anonymous = (path.startswith("/api/v1/auth") and path != "/api/v1/auth/me" and not path.startswith("/api/v1/auth/me/")) or path.startswith("/api/v1/public/")
         if is_anonymous and "security" not in op:
             op["security"] = []          # AllowAnonymous
         if not is_anonymous:

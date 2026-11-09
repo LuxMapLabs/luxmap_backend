@@ -1,7 +1,9 @@
 using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Identity.Auth;
+using LuxMap.Modules.Identity.Profiles;
 using LuxMap.Modules.Identity.Seeding;
 using LuxMap.Shared.Modularity;
+using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -48,6 +50,9 @@ public sealed class IdentityModule : ILuxMapModule
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AccessTokenIssuer>();
         services.AddScoped<AuthService>();
+        services.AddScoped<AvatarService>();
+        services.AddSingleton(new StoredObjectColumn(StorageBucket.Avatar, "app_user", "avatar_object_key", "avatar_byte_count"));
+        services.AddSingleton(new StoredObjectColumn(StorageBucket.Avatar, "app_user", "avatar_thumbnail_key", "avatar_thumbnail_bytes"));
 
         // BE-33a — accounts created by the system admin, invited and reset by email. A missing SMTP
         // setting STOPS startup (D-5); development points at Mailpit.

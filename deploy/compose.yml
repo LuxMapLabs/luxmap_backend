@@ -87,7 +87,8 @@ services:
         mc mb --ignore-existing luxmap/luxmap-evidence
         mc mb --ignore-existing luxmap/luxmap-video
         mc mb --ignore-existing luxmap/luxmap-citizen
-        echo "luxmap-survey, luxmap-evidence, luxmap-video and luxmap-citizen are ready"
+        mc mb --ignore-existing luxmap/luxmap-avatar
+        echo "luxmap-survey, luxmap-evidence, luxmap-video, luxmap-citizen and luxmap-avatar are ready"
     networks: [backend]
 
   # The EF migration bundle of the SAME build as the API. Profile `tools`: `up` never runs it — deploy.sh runs it

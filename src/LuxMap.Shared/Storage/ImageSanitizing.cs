@@ -12,8 +12,8 @@ public sealed record ImageLimits(long MaxBytes, long MaxPixels, int MaxLongEdge)
 /// </summary>
 /// <remarks>
 /// <para>
-/// The exception to BE-11 rule 4 (originals byte-for-byte), for citizen photos ONLY: a survey frame's EXIF is measurement data,
-/// a citizen photo's EXIF is the sender's phone and position. The output is what gets stored — original and thumbnail alike.
+/// The exception to BE-11 rule 4 (originals byte-for-byte), for citizen photos and account avatars: a survey frame's EXIF is measurement data,
+/// a citizen photo or avatar's EXIF is the sender's phone and position. The output is what gets stored — original and thumbnail alike.
 /// </para>
 /// <para>
 /// Order, each step before the next can cost anything: a slot in the concurrency gate (a bounded queue — beyond it 503
