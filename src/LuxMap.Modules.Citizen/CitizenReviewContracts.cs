@@ -70,7 +70,8 @@ public sealed record CitizenReportPole
 {
     public required string PoleId { get; init; }
     public required string? SegmentId { get; init; }
-    public required ReportPoint Location { get; init; }
+    /// <summary>Never null in practice: a pole without a position takes no citizen report (POLE-GEOM-NULL G-4).</summary>
+    public required ReportPoint? Location { get; init; }
 
     /// <summary>From the last published survey; <c>unknown</c> when none covered the pole.</summary>
     public required FixtureStatus FixtureStatus { get; init; }

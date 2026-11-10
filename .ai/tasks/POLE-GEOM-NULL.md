@@ -1,9 +1,9 @@
 ---
 ticket: POLE-GEOM-NULL
 title: Cột (pole) được phép chưa có GPS — `pole.geom` nullable, gắn GPS lần đầu ở thực địa
-status: ready
-phase: 1
-owner: claude (P1) · chưa giao (P2)
+status: in_progress
+phase: 2
+owner: claude (P1, PR 2a) · chưa giao (PR 2b)
 branch: feat/ASSET-pole-without-gps
 contract_refs:
   - "docs/api-contract-v1.1.md — POST / PUT /assets/poles (geom_wkt), PoleListItem.location, import poles, PUT /assets/poles/{id}/location, GET /map/poles/{id}, GET /work-orders/{id}/poles, GET /sync/bundle, POST /faults, /public/…"

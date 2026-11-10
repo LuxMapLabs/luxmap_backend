@@ -11,6 +11,7 @@ using LuxMap.Shared.AI;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Media;
@@ -46,6 +47,9 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             ?? throw Error("POLE_NOT_FOUND", HttpStatusCode.NotFound);
         if (!await poles.Targets(id).AnyAsync(p => p.PoleId == poleId, ct))
             throw Error("POLE_NOT_IN_WORK_ORDER", HttpStatusCode.Conflict);
+        // A confirmed "off" photo becomes a pole-bound fault, which needs the pole's position (POLE-GEOM-NULL GN-3). Photo and clip
+        // uploads both pass here.
+        if (pole.Geom is null) throw PoleLocationRequired.For(pole.PoleId, PoleLocationRequired.PolePhoto);
         return pole;
     }
 

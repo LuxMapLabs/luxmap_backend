@@ -85,8 +85,8 @@ public class SpatialDistanceTests(AssetSchemaFixture fixture)
         {
             var query = db.Set<Pole>()
                 .IgnoreQueryFilters()
-                .Where(pole => SpatialFunctions.DistanceMeters(pole.Geom, origin) < 2000)
-                .OrderBy(pole => SpatialFunctions.DistanceMeters(pole.Geom, origin))
+                .Where(pole => SpatialFunctions.DistanceMeters(pole.Geom!, origin) < 2000)
+                .OrderBy(pole => SpatialFunctions.DistanceMeters(pole.Geom!, origin))
                 .Select(pole => pole.PoleId);
 
             // Asserted on the SQL, not on the result: a client-side fallback would still return rows

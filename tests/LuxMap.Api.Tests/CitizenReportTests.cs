@@ -124,7 +124,9 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
 
         var body = await Read(await host.CreateClient().PostAsJsonAsync(Lookup, new { code }));
 
-        Assert.Equal(["commune_name", "segment_name"], body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+        // can_report / reason: POLE-GEOM-NULL GN-7. Still no id of any kind.
+        Assert.Equal(["can_report", "commune_name", "reason", "segment_name"], body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+        Assert.True(body.GetProperty("can_report").GetBoolean());
         Assert.Equal("Citizen road", body.GetProperty("segment_name").GetString());
         Assert.DoesNotContain(pole, body.GetRawText(), StringComparison.Ordinal);
     }

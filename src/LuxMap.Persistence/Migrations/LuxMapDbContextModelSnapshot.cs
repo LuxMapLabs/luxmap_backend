@@ -471,7 +471,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnName("feeder_source");
 
                     b.Property<Point>("Geom")
-                        .IsRequired()
                         .HasColumnType("geometry(Point,4326)")
                         .HasColumnName("geom");
 

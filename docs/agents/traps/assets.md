@@ -426,6 +426,19 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - **Bộ lọc `unassigned_segment`** áp trước `CountAsync` và phân trang (`ListAsync` nhận `Expression<Func<TEntity,bool>>? filter`); `false` là không lọc, không phải "chỉ cột đã có tuyến". Khác `feeders/poles?unassigned=true` (chưa gán MẠCH).
 
 
+## POLE-GEOM-NULL — cột chưa có GPS (PR 2a, 10/11/2026)
+
+- **`Pole.Geom` là `Point?`.** `geom IS NULL` = cột mới có trong sổ sách. Không bao giờ điền toạ độ giả để "cho chạy".
+  Cột đã có GPS **không** quay về null (GN-2) — nhiều chốt chặn dựa vào điều này nên không cần khoá (xem `citizen.md`).
+- **Hai cách hỏng khác nhau.** Ở C#, `pole.Geom.X` của null là 500. Ở SQL / LINQ dịch sang SQL, `ST_Y(NULL)`, `ST_Intersects(NULL, …)`,
+  `ST_Distance(NULL, …)` trả NULL: predicate thành "không khớp" (hàng **lặng lẽ rơi**), còn projection vào `double` thì ném lúc
+  materialize. Projection phải ghi rõ `pole.Geom == null ? null : …`; `SpatialFunctions.DistanceMeters(pole.Geom!, …)` chỉ sau khi đã lọc `Geom != null`.
+- **Chỗ cố ý để rơi** (G-7, GN-11): `GET /map/poles` theo bbox, `SurveyChainageQuery.Poles`, `RequirePolesInCorridorAsync` (cột chưa GPS
+  không thể "lệch tuyến"). Mỗi chỗ có test trồng cột null — đừng "sửa" bằng `COALESCE`.
+- **`PUT …/location` lần đầu** (G-2, GN-9): `moved_m: null`, audit `relocated` với `before: null`. Hành lang của tuyến **vẫn đo** nếu cột có tuyến
+  — nó đo tới tuyến, không tới vị trí cũ, nên "chưa có vị trí cũ" không phải lý do bỏ qua.
+- **PR 2a chưa bật writer:** `POST` / `PUT /assets/poles` và import vẫn bắt buộc `geom_wkt` (PR 2b). Test trồng cột null thẳng vào DB.
+
 ## ASSET-SEGMENT-POLES — tập cột trên tuyến (09/11/2026, drift ASSET-SEG-1)
 
 - `pole_ids` **không có thứ tự**; vắng ≠ `[]` ≠ `null`: PUT vắng giữ, `[]` bỏ cột thấy được, null lỗi 400.

@@ -74,7 +74,7 @@ public class Pole : ICommuneScoped, IExternallyReferenced, IUpdateStamped
     /// <c>geometry(Point, 4326)</c>, always WGS84. EPSG:3405 is internal to distance calculations
     /// (BE-10) and never reaches the API. Backed by the GIST index the <c>bbox</c> queries need.
     /// </summary>
-    public required Point Geom { get; set; }
+    public Point? Geom { get; set; }
 
     /// <summary>
     /// Near a school, market, bridge or junction — raises repair priority, and the front end draws a

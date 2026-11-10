@@ -343,3 +343,12 @@ Job đọc liên xã tường minh (road được lịch tham chiếu, tải và
 mọi ghi vẫn `Open(commune)`.
 Lịch có audit nội bộ `SurveyRecurringSchedule`, action `Created` / `DetailsChanged` / `Deleted`; phiếu tự sinh có actor System,
 `created_by` vẫn là người tạo lịch, correlation do runner truyền `job:survey_recurring_generate:…`.
+
+## POLE-GEOM-NULL PR 2a — sự cố và phiếu trên cột chưa có GPS
+
+- **Một mã, một hình dạng:** `PoleLocationRequired.For(poleId, operation)` (`LuxMap.Shared`) → 409 `POLE_LOCATION_REQUIRED`, `details {pole_id, operation}`.
+  Ba chỗ gọi: `FaultReportService.ReportAsync` (cả `/sync/push` đi qua đây), `PublicReportService.SubmitAsync` + `StageReviewedReportAsync`,
+  `WorkOrderPolePhotoService.Target` (ảnh **và** clip). Nơi mới sinh sự cố theo cột phải gọi cùng hàm này.
+- `location` của sự cố vẫn `fault.lat/lng ?? pole.geom`; nhánh `pole.Geom == null` trong ba truy vấn đó là **lưới đỡ**, không phải đường đi hợp lệ.
+- `GET /work-orders/{id}/poles`: cột chưa GPS có `location: null`, `position: null`, đứng cuối tuyến của nó theo `created_at, length(pole_id), pole_id`;
+  cột đã có GPS vẫn đánh số 1..n liền nhau (GN-6).

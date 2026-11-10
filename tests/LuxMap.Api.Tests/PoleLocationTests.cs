@@ -173,9 +173,65 @@ public sealed class PoleLocationTests(AssetImportFixture fixture)
         Assert.Equal(body.GetProperty("moved_m").GetDouble(), after.GetProperty("moved_m").GetDouble());
     }
 
+    /// <summary>POLE-GEOM-NULL G-2, GN-9: the first position of a pole known only from the books.</summary>
+    [Fact]
+    public async Task First_position_of_a_pole_on_a_road_must_be_in_its_corridor_and_has_nothing_to_have_moved_from()
+    {
+        var poleId = await NewPoleAsync(fixture.CommuneId, fixture.CommuneId);
+        await ForgetPositionAsync(poleId);
+        var engineer = await fixture.FieldEngineerClientAsync();
+
+        // 60 m north of the road: scanned at the wrong pole, or a bad fix. Refused, and the pole stays without a position.
+        var off = await engineer.PutAsJsonAsync(LocationUrl(poleId), new { lat = Lat + 60 * DegreesPerMetre, lng = PoleLng });
+        Assert.Equal(HttpStatusCode.Conflict, off.StatusCode);
+        Assert.Equal(ErrorCodes.PoleOffSegment, (await Json(off)).GetProperty("error").GetProperty("code").GetString());
+        Assert.False(await HasPositionAsync(poleId));
+        Assert.Empty(await AuditsAsync(poleId));
+
+        var target = (Lat: Lat + 5 * DegreesPerMetre, Lng: Lng + 0.002);
+        var response = await engineer.PutAsJsonAsync(LocationUrl(poleId), new { lat = target.Lat, lng = target.Lng });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await Json(response);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("moved_m").ValueKind);
+        Assert.Equal((target.Lat, target.Lng), (body.GetProperty("lat").GetDouble(), body.GetProperty("lng").GetDouble()));
+        var stored = await StoredAsync(poleId);
+        Assert.Equal((target.Lat, target.Lng), (stored.Lat, stored.Lng));
+
+        var audit = Assert.Single(await AuditsAsync(poleId));
+        Assert.Equal(AuditAction.Relocated, audit.Action);
+        Assert.Null(audit.BeforeState);
+        var after = JsonDocument.Parse(audit.AfterState!).RootElement;
+        Assert.Equal(JsonValueKind.Null, after.GetProperty("moved_m").ValueKind);
+        Assert.InRange(after.GetProperty("segment_distance_m").GetDouble(), 3, 7);
+
+        // From here on it is an ordinary move, measured from the position just set.
+        var again = await Json(await engineer.PutAsJsonAsync(LocationUrl(poleId), new { lat = target.Lat, lng = target.Lng + 0.001 }));
+        Assert.InRange(again.GetProperty("moved_m").GetDouble(), 100, 115);
+    }
+
+    [Fact]
+    public async Task First_position_of_a_pole_on_no_road_is_accepted_anywhere()
+    {
+        var poleId = await NewPoleAsync(fixture.CommuneId, fixture.CommuneId);
+        await fixture.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE pole SET geom = NULL, segment_id = NULL WHERE pole_id = {poleId}"));
+
+        var response = await (await fixture.FieldEngineerClientAsync()).PutAsJsonAsync(LocationUrl(poleId),
+            new { lat = Lat + 400 * DegreesPerMetre, lng = PoleLng });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await Json(response)).GetProperty("moved_m").ValueKind);
+        Assert.True(await HasPositionAsync(poleId));
+    }
+
+    private Task<int> ForgetPositionAsync(string poleId)
+        => fixture.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE pole SET geom = NULL WHERE pole_id = {poleId}"));
+
+    private Task<bool> HasPositionAsync(string poleId)
+        => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AnyAsync(p => p.PoleId == poleId && p.Geom != null));
+
     private Task<Stored> StoredAsync(string poleId)
         => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().Where(p => p.PoleId == poleId)
-            .Select(p => new Stored(p.Geom.Y, p.Geom.X, p.UpdatedBy, p.UpdatedAt)).SingleAsync());
+            .Select(p => new Stored(p.Geom!.Y, p.Geom.X, p.UpdatedBy, p.UpdatedAt)).SingleAsync());
 
     private Task<List<AuditEvent>> AuditsAsync(string poleId)
         => fixture.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters()

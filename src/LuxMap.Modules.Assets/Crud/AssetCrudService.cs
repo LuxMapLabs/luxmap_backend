@@ -125,7 +125,9 @@ public sealed class AssetCrudService(
 
             // No segment, or an inter-commune road hidden by scope: keep the name null.
             SegmentName = extra.SegmentName,
-            GeomWkt = Wkt(extra.Geom),
+
+            // No position yet (POLE-GEOM-NULL G-3): null, never a made-up point.
+            GeomWkt = extra.Geom is null ? null : Wkt(extra.Geom),
             CreatedAt = extra.CreatedAt,
         };
     }
@@ -447,11 +449,11 @@ public sealed class AssetCrudService(
         var line = segment.Geom;
         var limit = corridor.RouteCorridorM;
         var total = await dbContext.Set<Pole>().IgnoreQueryFilters().CountAsync(pole =>
-            pole.SegmentId == segment.SegmentId && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit, ct);
+            pole.SegmentId == segment.SegmentId && pole.Geom != null && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit, ct);
         if (total == 0) return;
 
         var visible = await dbContext.Set<Pole>()
-            .Where(pole => pole.SegmentId == segment.SegmentId && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit)
+            .Where(pole => pole.SegmentId == segment.SegmentId && pole.Geom != null && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit)
             .OrderBy(pole => pole.CreatedAt).ThenBy(pole => pole.PoleId.Length).ThenBy(pole => pole.PoleId)
             .Select(pole => pole.PoleId).Take(100).ToListAsync(ct);
         throw new LuxMapException(ErrorCodes.PoleOffSegment, HttpStatusCode.Conflict,
@@ -786,15 +788,16 @@ public sealed class AssetCrudService(
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
         var target = new Point(lng, lat) { SRID = 4326 };
 
-        var moved = await dbContext.Set<Pole>().Where(candidate => candidate.PoleId == poleId)
-            .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom, target)).SingleAsync(ct);
+        // First position of a pole known only from the books (POLE-GEOM-NULL G-2, GN-9): nothing to measure a move from.
+        double? moved = pole.Geom is null ? null : await dbContext.Set<Pole>().Where(candidate => candidate.PoleId == poleId)
+            .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom!, target)).SingleAsync(ct);
         // Unfiltered on purpose: an inter_commune segment may belong to another commune than its pole (BE-REVIEW-02
         // constraint 1). Only a distance leaves the query, never the segment.
         double? offSegment = pole.SegmentId is null ? null : await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
             .Where(segment => segment.SegmentId == pole.SegmentId)
             .Select(segment => SpatialFunctions.DistanceMeters(segment.Geom, target)).SingleAsync(ct);
 
-        var before = new { lat = pole.Geom.Y, lng = pole.Geom.X };
+        var before = pole.Geom is null ? null : new { lat = pole.Geom.Y, lng = pole.Geom.X };
         pole.Geom = target;
         if (AssetStamp.Touch(dbContext, pole, actor))
         {
@@ -812,7 +815,7 @@ public sealed class AssetCrudService(
 
             audit.Record(new AuditChange(pole.UpdatedAt, AuditActorKind.User, actor.UserId, actor.Role, pole.CommuneId,
                 AuditEntityType.Pole, pole.PoleId, AuditAction.Relocated, before,
-                new { lat, lng, moved_m = Math.Round(moved, 2), pole.SegmentId, segment_distance_m = offSegment is { } measured ? (double?)Math.Round(measured, 2) : null }));
+                new { lat, lng, moved_m = moved is { } metres ? (double?)Math.Round(metres, 2) : null, pole.SegmentId, segment_distance_m = offSegment is { } measured ? (double?)Math.Round(measured, 2) : null }));
         }
         else
         {
@@ -823,7 +826,7 @@ public sealed class AssetCrudService(
         await transaction.CommitAsync(ct);
 
         var name = await dbContext.Set<AppUser>().Where(user => user.UserId == pole.UpdatedBy).Select(user => user.FullName).FirstOrDefaultAsync(ct);
-        return new PoleLocationResponse(pole.PoleId, pole.Geom.Y, pole.Geom.X, Math.Round(moved, 2), pole.UpdatedAt, pole.UpdatedBy, name);
+        return new PoleLocationResponse(pole.PoleId, lat, lng, moved is { } by ? Math.Round(by, 2) : null, pole.UpdatedAt, pole.UpdatedBy, name);
     }
 
     private static bool Finite(double value, double limit) => double.IsFinite(value) && Math.Abs(value) <= limit;
@@ -1012,8 +1015,9 @@ public sealed class AssetCrudService(
                 FeederId = pole.FeederId,
                 FeederSource = pole.FeederSource,
                 // EPSG:4326 straight off the column. 3405 never leaves the SQL tree (BE-10, rule 3).
-                Lat = pole.Geom.Y,
-                Lng = pole.Geom.X,
+                // null for a pole without a position yet (POLE-GEOM-NULL G-3).
+                Lat = pole.Geom == null ? (double?)null : pole.Geom.Y,
+                Lng = pole.Geom == null ? (double?)null : pole.Geom.X,
             })
             .ToListAsync(ct);
 
@@ -1120,7 +1124,7 @@ public sealed class AssetCrudService(
             CommuneName = dbContext.Set<AdministrativeUnit>().Where(unit => unit.CommuneId == pole.CommuneId).Select(unit => unit.Name).FirstOrDefault()!,
             DataSource = pole.DataSource,
             NearSensitivePoi = pole.NearSensitivePoi,
-            Location = new AssetLocation { Lat = pole.Geom.Y, Lng = pole.Geom.X },
+            Location = pole.Geom == null ? null : new AssetLocation { Lat = pole.Geom.Y, Lng = pole.Geom.X },
             ActiveFixture = pole.Fixtures
                 .Where(lamp => lamp.RemovedDate == null)
                 .Select(lamp => new ActiveFixture

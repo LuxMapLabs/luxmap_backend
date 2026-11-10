@@ -8263,17 +8263,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeatureCollection"
+                  "$ref": "#/components/schemas/CabinetTopology"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeatureCollection"
+                  "$ref": "#/components/schemas/CabinetTopology"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeatureCollection"
+                  "$ref": "#/components/schemas/CabinetTopology"
                 }
               }
             }
@@ -14704,6 +14704,34 @@
         },
         "additionalProperties": false
       },
+      "CabinetTopology": {
+        "required": [
+          "features",
+          "unlocated_pole_count"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "readOnly": true
+          },
+          "crs_note": {
+            "type": "string",
+            "readOnly": true
+          },
+          "unlocated_pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "features": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeature"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "CabinetTopologyEdgeProperties": {
         "required": [
           "branch",
@@ -14758,29 +14786,6 @@
           },
           "properties": {
             "$ref": "#/components/schemas/CabinetTopologyEdgeProperties"
-          }
-        },
-        "additionalProperties": false
-      },
-      "CabinetTopologyEdgePropertiesFeatureCollection": {
-        "required": [
-          "features"
-        ],
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "readOnly": true
-          },
-          "crs_note": {
-            "type": "string",
-            "readOnly": true
-          },
-          "features": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CabinetTopologyEdgePropertiesFeature"
-            }
           }
         },
         "additionalProperties": false
@@ -17971,7 +17976,8 @@
             "nullable": true
           },
           "geom_wkt": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "created_at": {
             "type": "string",
@@ -18101,7 +18107,8 @@
           },
           "moved_m": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "updated_at": {
             "type": "string",
@@ -18931,7 +18938,9 @@
       },
       "PublicQrInfo": {
         "required": [
+          "can_report",
           "commune_name",
+          "reason",
           "segment_name"
         ],
         "type": "object",
@@ -18942,6 +18951,13 @@
           },
           "commune_name": {
             "type": "string"
+          },
+          "can_report": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -20902,11 +20918,13 @@
           },
           "lat": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "lng": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           }
         },
         "additionalProperties": false

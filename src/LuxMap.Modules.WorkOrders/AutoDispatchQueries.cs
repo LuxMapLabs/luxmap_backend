@@ -60,8 +60,9 @@ internal static class WorkOrderLoads
 
 internal static class WorkOrderPoleOrdering
 {
-    internal static double Along(string? segment, Point point, IReadOnlyDictionary<string, LengthIndexedLine> lines)
-        => segment is not null && lines.TryGetValue(segment, out var line) ? line.Project(point.Coordinate) : 0d;
+    /// <remarks>A pole with no position yet (POLE-GEOM-NULL) projects nowhere: 0, and the caller orders it apart.</remarks>
+    internal static double Along(string? segment, Point? point, IReadOnlyDictionary<string, LengthIndexedLine> lines)
+        => segment is not null && point is not null && lines.TryGetValue(segment, out var line) ? line.Project(point.Coordinate) : 0d;
 }
 
 public sealed class AutoDispatchRequest

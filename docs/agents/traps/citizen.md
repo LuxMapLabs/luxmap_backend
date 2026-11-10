@@ -83,3 +83,11 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
 
 QR vẫn neo cột/xã khi cột chưa tuyến: lookup hợp lệ trả `segment_name: null`, không coi là QR invalid.
 Chi tiết báo cáo có `pole.segment_id: null`; giữ nguyên quyền xã và luồng duyệt.
+
+## POLE-GEOM-NULL PR 2a — QR trên cột chưa có GPS
+
+- QR **vẫn cấp** (kỹ sư quét để gắn GPS). `PublicQrInfo` thêm `can_report` + `reason` (`pole_location_required`) để trang công dân báo trước khi điền form.
+- `POST /public/reports` trên cột chưa GPS → 409 `POLE_LOCATION_REQUIRED` (`operation: citizen_report`), kiểm **sau** replay và **trước** khi decode ảnh,
+  không cần khoá vì vị trí không bao giờ bị gỡ. `StageReviewedReportAsync` (Quản lý duyệt) kiểm lại — chốt thứ hai.
+- ⚠️ Phát hiện ngoài phạm vi: `lat` / `lng` của form là `[FromForm] double?`, binder đọc theo culture của host. Trên máy locale dấu phẩy thập phân
+  (`en_VN`) `13.5` bị đọc sai và trả 400. VPS (container, invariant) không dính. Chưa sửa; test của ticket này dùng số nguyên.

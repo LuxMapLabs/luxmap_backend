@@ -45,8 +45,12 @@ public sealed record Feature<TProperties>
     [JsonPropertyOrder(-3)]
     public string Type => "Feature";
 
+    /// <summary>
+    /// <c>null</c> only for a pole that has no position yet (POLE-GEOM-NULL GN-4), and only where poles are listed by
+    /// segment rather than by <c>bbox</c> — the offline bundle. RFC 7946 calls that an unlocated feature.
+    /// </summary>
     [JsonPropertyOrder(-2)]
-    public required Geometry Geometry { get; init; }
+    public required Geometry? Geometry { get; init; }
 
     [JsonPropertyOrder(-1)]
     public required TProperties Properties { get; init; }

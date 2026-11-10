@@ -17,7 +17,8 @@ public sealed record PoleMapDetail
     public required string? SegmentId { get; init; }
     public required string? SegmentName { get; init; }
     public required string CommuneId { get; init; }
-    public required PoleMapLocation Location { get; init; }
+    /// <summary><c>null</c> for a pole known from the books that has no position yet (POLE-GEOM-NULL G-3).</summary>
+    public required PoleMapLocation? Location { get; init; }
 
     /// <summary>The lamp in use; <c>null</c> when the pole has no active fixture.</summary>
     public PoleMapFixture? Fixture { get; init; }

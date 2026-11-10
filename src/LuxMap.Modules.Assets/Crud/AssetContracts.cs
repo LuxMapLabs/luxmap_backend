@@ -444,9 +444,10 @@ public sealed record TopologyPole
     /// <summary>Provenance of <see cref="FeederId"/> (TOPO-INFER): <c>verified</c> | <c>inferred</c>; <c>null</c> with no feeder.</summary>
     public TopologySource? FeederSource { get; init; }
 
-    public required double Lat { get; init; }
+    /// <summary>Null, together with <see cref="Lng"/>, for a pole that has no position yet (POLE-GEOM-NULL G-3).</summary>
+    public required double? Lat { get; init; }
 
-    public required double Lng { get; init; }
+    public required double? Lng { get; init; }
 }
 
 // ── BE-12b — the READ shape for asset inventory ───────────────────────────────────────────────
@@ -575,7 +576,8 @@ public sealed record PoleListItem
 
     public required bool NearSensitivePoi { get; init; }
 
-    public required AssetLocation Location { get; init; }
+    /// <summary>Null for a pole known from the books that has no position yet (POLE-GEOM-NULL G-3).</summary>
+    public required AssetLocation? Location { get; init; }
 
     /// <summary>
     /// Carried in the LIST, not only the detail, because the inventory table shows lamp type and
@@ -665,7 +667,7 @@ public sealed record SetPoleLocationRequest(double? Lat, double? Lng);
 /// there), and who last changed the pole.
 /// </summary>
 public sealed record PoleLocationResponse(
-    string PoleId, double Lat, double Lng, double MovedM, DateTime UpdatedAt, string? UpdatedBy, string? UpdatedByName);
+    string PoleId, double Lat, double Lng, double? MovedM, DateTime UpdatedAt, string? UpdatedBy, string? UpdatedByName);
 
 /// <summary>One pole read on its own — the list row plus what only a detail view needs.</summary>
 public sealed record PoleDetail
@@ -675,8 +677,8 @@ public sealed record PoleDetail
     /// <summary>Resolved for display. The list omits it: one join per row for a label.</summary>
     public required string? SegmentName { get; init; }
 
-    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first — what a <c>PUT</c> body wants back.</summary>
-    public required string GeomWkt { get; init; }
+    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first — what a <c>PUT</c> body wants back. Null with no position yet.</summary>
+    public required string? GeomWkt { get; init; }
 
     public required DateTime CreatedAt { get; init; }
 }
