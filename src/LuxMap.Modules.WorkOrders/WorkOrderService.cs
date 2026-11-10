@@ -33,11 +33,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     private IQueryable<AppUser> EligibleUsers(string commune) => WorkOrderAssignees.EligibleUsers(db, commune);
 
-    private async Task RequireAssignee(string id, string commune, CancellationToken ct)
-    {
-        if (!await EligibleUsers(commune).AnyAsync(user => user.UserId == id, ct))
-            throw Error("ASSIGNEE_NOT_ELIGIBLE", HttpStatusCode.Conflict, ("assigned_to", id));
-    }
+    private Task RequireAssignee(string id, string commune, CancellationToken ct)
+        => WorkOrderAssignees.RequireAssignee(db, id, commune, ct);
 
     public async Task<PagedResult<WorkOrderAssignee>> Assignees(string commune, PageRequest page, CancellationToken ct)
     {
@@ -214,33 +211,38 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             await RequireAssignee(request.AssignedTo, commune, ct);
             await RequireSurveyAssignee(request.AssignedTo, ids, ct);
         }
-        // SQL expression comes only from the immutable server-side ID specification.
+        var wo = await StageSurvey(db, audit, commune, ids, title, request.AssignedTo, request.DueDate,
+            request.ScheduledDate, request.Note, Materials(request.MaterialsNote), ActorId, actor.Role,
+            UtcMicrosecondClock.UtcNow(), ct);
+        await db.SaveChangesAsync(ct);
+        return await Detail(wo.WorkOrderId, ct);
+    }
+
+    // Both the request and recurring job stage the SAME write; the caller saves with its occurrence, if any.
+    internal static async Task<WorkOrder> StageSurvey(LuxMapDbContext db, IAuditTrail audit, string commune,
+        string[] ids, string title, string? assigned, DateOnly? due, DateOnly? scheduled, string? note,
+        string? materials, string creator, UserRole? actorRole, DateTime now, CancellationToken ct)
+    {
         var idSql = $"SELECT {PrefixedIds.WorkOrder.DefaultValueSql} AS \"Value\"";
         var id = await db.Database.SqlQueryRaw<string>(idSql).SingleAsync(ct);
-        var now = UtcMicrosecondClock.UtcNow();
         var wo = new WorkOrder { WorkOrderId = id, CommuneId = commune, TaskKind = TaskKind.Survey,
-            Title = title, CreatedBy = ActorId, AssignedTo = request.AssignedTo,
-            AssignedAt = request.AssignedTo is null ? null : now,
-            WoStatus = request.AssignedTo is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
-            DueDate = request.DueDate, ScheduledDate = request.ScheduledDate, Note = request.Note,
-            MaterialsNote = Materials(request.MaterialsNote), CreatedAt = now, UpdatedAt = now };
+            Title = title, CreatedBy = creator, AssignedTo = assigned,
+            AssignedAt = assigned is null ? null : now,
+            WoStatus = assigned is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
+            DueDate = due, ScheduledDate = scheduled, Note = note,
+            MaterialsNote = materials, CreatedAt = now, UpdatedAt = now };
         db.Add(wo);
         for (var position = 0; position < ids.Length; position++)
             db.Add(new WorkOrderSegment { WorkOrderId = id, CommuneId = commune, Position = position, SegmentId = ids[position] });
-        Record(wo, AuditAction.Created, null, new { work_order = Snapshot(wo, []), segment_ids = ids }, now);
-        Notify(WorkOrderNotices.Assigned(wo), [wo.AssignedTo], now);
-        await db.SaveChangesAsync(ct);
-        return await Detail(id, ct);
+        audit.Record(new(now, actorRole is null ? AuditActorKind.System : AuditActorKind.User,
+            actorRole is null ? null : creator, actorRole, commune, AuditEntityType.WorkOrder, id,
+            AuditAction.Created, null, new { work_order = Snapshot(wo, []), segment_ids = ids }));
+        Notifier.Stage(db, WorkOrderNotices.Assigned(wo), [assigned], actorRole is null ? null : creator, now);
+        return wo;
     }
 
-    private async Task RequireSurveyAssignee(string assigned, string[] ids, CancellationToken ct)
-    {
-        var roads = await db.Set<RoadSegment>().Where(x => ids.Contains(x.SegmentId)).Select(x => x.CommuneId).ToArrayAsync(ct);
-        if (roads.Length != ids.Length) throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound);
-        // Q7: the eligible pole set is restricted to the assigning manager's scope.
-        var communes = roads.Concat(await db.Set<Pole>().Where(x => ids.Contains(x.SegmentId)).Select(x => x.CommuneId).Distinct().ToArrayAsync(ct)).Distinct();
-        foreach (var commune in communes) await RequireAssignee(assigned, commune, ct);
-    }
+    private Task RequireSurveyAssignee(string assigned, string[] ids, CancellationToken ct)
+        => WorkOrderAssignees.RequireSurveyAssignee(db, assigned, ids, ct);
 
     /// <summary>
     /// Creates the next step of a chain from a verified work order (drift FR-2). The server carries the

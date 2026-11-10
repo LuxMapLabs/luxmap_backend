@@ -148,6 +148,10 @@ SUMMARY = {
     ("post", "/api/v1/work-orders/{id}/reject-cancellation"): "[SELF-SIGNED — CR-1…CR-6] Quản lý bác yêu cầu pending, lý do trim 1…500; quyết định trên yêu cầu hiện tại",
     ("post", "/api/v1/work-orders/batch"): "[SELF-SIGNED — WO-BATCH-1] Tạo 1–50 phiếu trong MỘT transaction; lỗi ở phần tử nào thì rollback cả lô, lỗi kèm details.index. 201 {count, created_items}; không kiểm quota",
     ("post", "/api/v1/work-orders/auto-dispatch/preview"): "[SELF-SIGNED — WO-AUTODISPATCH-1] Đề xuất ca kiểm tra cho sự cố detected chưa có phiếu: gom theo tuyến ≤8 cột, ngày +2 cả 7 ngày, quota 2 ca/ngày/kỹ sư. Chỉ đọc, không ghi; POST vì có body",
+    ("get", "/api/v1/survey-schedules/recurring"): "[SELF-SIGNED — SURVEY-SCHED-1] Danh sách lịch khảo sát định kỳ theo tuần (lọc commune_id, phân trang); mỗi dòng có starts_on_week và first_occurrence_date",
+    ("post", "/api/v1/survey-schedules/recurring"): "[SELF-SIGNED — SURVEY-SCHED-1] Tạo lịch lặp theo tuần cho một tuyến + thứ (1=T2…7=CN); mốc chốt 17:00 Thứ Năm quyết định starts_on_week; 201 kèm first_occurrence_date",
+    ("patch", "/api/v1/survey-schedules/recurring/{id}"): "[SELF-SIGNED — SURVEY-SCHED-1] Bật/tắt is_active, đổi assigned_to hoặc note (không đổi tuyến/thứ); bật lại tính lại starts_on_week",
+    ("delete", "/api/v1/survey-schedules/recurring/{id}"): "[SELF-SIGNED — SURVEY-SCHED-1] Xoá lịch và biên nhận đã sinh; phiếu đã sinh giữ nguyên. 204",
     # POLE-PHOTO-AI, PP-1…PP-10 — Mỹ SELF-SIGNED 15/10/2026, nền tạm; WP5/WP6 chưa báo.
     ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
     ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",

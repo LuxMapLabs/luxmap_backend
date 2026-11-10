@@ -111,6 +111,8 @@ PLAN = [
     ("lux_reading", IN_COMMUNES, "lux_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.
     ("work_order", IN_COMMUNES, "root_work_order_id IS NOT NULL, created_at, work_order_id"),
+    ("survey_recurring_schedule", IN_COMMUNES, "created_at, length(schedule_id), schedule_id"),
+    ("survey_recurring_occurrence", IN_COMMUNES, "schedule_id, scheduled_date"),
     ("work_order_segment", IN_COMMUNES, "work_order_id, position"),
     # BE-26: "already reported overdue for this due date" — copied so the target does not tell everyone again.
     ("work_order_overdue_notice", IN_COMMUNES, "work_order_id, due_date"),

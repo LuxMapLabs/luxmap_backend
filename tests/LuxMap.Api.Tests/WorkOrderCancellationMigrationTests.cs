@@ -93,8 +93,8 @@ public sealed class WorkOrderCancellationMigrationTests(AssetImportFixture fixtu
         var pendingError = await Assert.ThrowsAsync<PostgresException>(() => migrator.MigrateAsync(previous));
         Assert.Contains("Cannot roll back AddWorkOrderCancellationRequests", pendingError.MessageText);
         await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE work_order SET cancellation_request_status='none', cancellation_request_note=NULL, cancellation_requested_at=NULL WHERE work_order_id={woId}");
-        // Viewed (POLE-VIDEO) is newer than this migration: the schema this test rolls back to does not allow it yet.
-        foreach (var action in Enum.GetValues<AuditAction>().Where(x => x is not AuditAction.CancellationRequested and not AuditAction.CancellationRejected and not AuditAction.Viewed))
+        // Viewed (POLE-VIDEO) and Deleted (SURVEY-SCHED) are newer than this migration: the schema this test rolls back to does not allow them yet.
+        foreach (var action in Enum.GetValues<AuditAction>().Where(x => x is not AuditAction.CancellationRequested and not AuditAction.CancellationRejected and not AuditAction.Viewed and not AuditAction.Deleted))
         {
             db.Add(new AuditEvent { Action = action, ActorKind = AuditActorKind.User, ActorUserId = user.UserId, ActorRole = UserRole.FieldEngineer, AfterState = "{}",
                 EntityType = AuditEntityType.WorkOrder, EntityId = woId, CommuneId = commune.CommuneId, CorrelationId = "rollback-old" });

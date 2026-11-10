@@ -330,3 +330,16 @@ Tuần Thứ Hai–Chủ Nhật; đếm mọi loại phiếu trừ cancelled, c�
 Nhóm cột phân biệt trước khi chunk để hai fault của một cột không bị tách. Quota không phải ràng buộc Create/batch.
 Preview không SaveChanges/audit/notification/khoá; không bỏ filter xã để lấy tên tuyến ngoài quyền.
 Quyền vẫn theo ManageWorkOrders hiện hành; mâu thuẫn system_admin của ticket ghi ở drift WO-AUTODISPATCH-1.
+
+## SURVEY-RECURRING — lịch địa phương và biên ghi chung (09/11/2026)
+
+Mốc Thứ Năm 17:00, tuần T2–CN và cửa sổ sinh phiếu chỉ qua `SurveyScheduleCalendar`, với giờ địa phương
+của `WorkOrderAgendaOptions.TimeZone`; không dùng `NightOf` (ca đêm) để tính ngày lịch của job.
+`StageSurvey` chỉ stage: API tự save; job thêm occurrence rồi save **cùng phiếu / segment / audit / notification**.
+PK occurrence chống đua, bắt đúng tên constraint và rollback transaction trước mọi truy vấn tiếp.
+Không xoá occurrence khi huỷ phiếu; nếu xoá thì job sinh lại. Kiểm survey cùng tuyến/cùng tuần không thay cho receipt.
+`WorkOrderAssignees` và `WorkOrderLoads.Read` dùng chung; `SelectOn` giữ ngày, bỏ quota, khác `Select` tìm ngày.
+Job đọc liên xã tường minh (road được lịch tham chiếu, tải và survey đã có); poles vẫn theo scope xã của lịch (Q7),
+mọi ghi vẫn `Open(commune)`.
+Lịch có audit nội bộ `SurveyRecurringSchedule`, action `Created` / `DetailsChanged` / `Deleted`; phiếu tự sinh có actor System,
+`created_by` vẫn là người tạo lịch, correlation do runner truyền `job:survey_recurring_generate:…`.
