@@ -262,6 +262,16 @@
   </div>
 
   <div class="card">
+    <strong>POLE-GEOM-NULL — cột chưa có GPS: xong Pha 1, chờ chốt GN-1…GN-11, 10/11/2026</strong>
+    <p><span class="tag t-next">Chưa bắt đầu Pha 2 · nhánh <code>feat/ASSET-pole-without-gps</code> (chưa push) · chưa báo WP5 / WP6</span>
+    Cột của xã lúc đầu chỉ có trong sổ sách; cần nhập trước, kỹ sư gắn GPS ở thực địa sau. Đã chốt (Mỹ, 10/11): <code>pole.geom</code> nullable;
+    gắn GPS lần đầu qua <code>PUT /assets/poles/{id}/location</code>, cột có tuyến vẫn kiểm hành lang 25 m; <code>location: null</code> trên response;
+    cột chưa GPS không nhận sự cố theo cột (409), QR vẫn cấp; bản đồ, sơ đồ mạch, khảo sát đêm bỏ qua cột chưa GPS.
+    Khảo sát tìm ra 17 chỗ đọc vị trí cột, 10 chỗ sẽ trả 500 nếu không sửa. Còn chờ: tên mã lỗi, ảnh cột trong phiếu, bundle offline, gắn GPS khi không có mạng.
+    <a href=".ai/tasks/POLE-GEOM-NULL.md">Đề bài + quyết định</a> · <a href=".ai/results/POLE-GEOM-NULL-p1.md">Kết quả Pha 1</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-VIDEO — đã chốt D-1…D-4, D-9, D-13, D-14; sẵn sàng Pha 2, 04/11/2026</strong>
     <p><span class="tag t-next">Chưa bắt đầu Pha 2 · PR #204 (tài liệu) · chưa báo WP4 / WP5 / WP6</span>
     Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột: chỉ ON/OFF, bỏ qua cấu hình quay, <code>data_source</code> lấy từ cột.

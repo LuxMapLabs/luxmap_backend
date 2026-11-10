@@ -2013,3 +2013,24 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 | Mã | Quyết định / bề mặt client (nền tạm) |
 |---|---|
 | **PV-10** | `POST /work-orders/{id}/pole-photos/{photo_id}/decision` với `decision = "confirm"` trên ảnh **có clip**: người quyết định phải là người **mở clip gần nhất** (`video.viewed_by` của chính họ); chưa thì **409 `POLE_VIDEO_NOT_VIEWED`** (`details.photo_id`, `details.video_url`), không quyết định, không công bố, không sự cố, không audit `confirmed`. Áp cho **cả `on` lẫn `off`** (OFF tạo `lamp_out` ngay, ON có thể gỡ trạng thái `out`). `reject` **không** cần xem; ảnh không có clip **không đổi**. Thứ tự kiểm: đã quyết (409 `POLE_PHOTO_ALREADY_DECIDED`) → không có nhãn (409 `POLE_PHOTO_INCONCLUSIVE`) → chưa xem. Kỹ sư sửa nhãn (`/review`) **không** thay lượt xem của Quản lý. Client nên tắt nút xác nhận tới khi `video.viewed_by` là chính người dùng hiện tại. Giới hạn đã biết (PV-3): cột chỉ giữ người mở **gần nhất**, hai Quản lý luân phiên mở thì người trước phải mở lại. Đây là rào cản, không chứng minh người đó đã xem |
+
+## POLE-GEOM-NULL — cột chưa có GPS (10/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Cho phép `pole.geom` null = cột mới có trong sổ sách, chưa có GPS; kỹ sư gắn GPS ở thực địa sau. Không dùng toạ độ giả. Triển khai tuần tự: bảo vệ mọi chỗ đọc trước (PR 2a), bật writer sau (PR 2b) |
+| **Decision maker** | **Mỹ**, 10/11/2026 — chốt G-1…G-7; GN-1…GN-11 của Phase 1 **còn chờ** |
+| **Chạm API** | **Có** |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract |
+
+**Chưa có hiệu lực** — mới xong Phase 1 (`.ai/results/POLE-GEOM-NULL-p1.md`), chưa có dòng code nào. WP5 / WP6 **chưa báo**.
+
+| Mã | Quyết định |
+|---|---|
+| G-1 | `pole.geom` nullable = chưa có GPS |
+| G-2 | Gắn GPS lần đầu qua `PUT /assets/poles/{poleId}/location` (`EditPoleLocation`). Cột có tuyến: **giữ** giới hạn hành lang của PL-3 (409 `POLE_OFF_SEGMENT`); cột chưa tuyến: không đo (D-5 của POLE-SEGMENT-NULL) |
+| G-3 | `location` của cột là `null` trên các response hiện có khi cột chưa GPS (inventory, chi tiết cột, cột của phiếu, bundle offline). Không ẩn cột |
+| G-4 | Cột chưa GPS không nhận sự cố theo cột: `POST /faults` có `pole_id` và báo cáo QR của công dân → **409** với mã lỗi riêng (tên mã: GN-1). `location` của sự cố giữ nguyên cam kết luôn có |
+| G-5 | QR vẫn cấp cho cột chưa GPS; FE công dân hiện "cột chưa được cập nhật vị trí, vui lòng báo cho đơn vị quản lý" |
+| G-6 | Cột chưa GPS vẫn gán được tuyến |
+| G-7 | Bản đồ (`GET /map/poles`), thứ tự cột trên mạch, khảo sát đêm bỏ qua cột chưa GPS |
