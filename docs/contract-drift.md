@@ -165,6 +165,30 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
   (cho gán tuyến nhìn thấy được, chưa kiểm `road_class` khác xã và chưa dùng khóa tập cột này). Không mở rộng phạm vi ticket.
 
 
+### ASSET-SEG-2 — đổi hình học tuyến không được bỏ rơi cột (10/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | `PUT /api/v1/assets/segments/{id}` gửi `geom_wkt` **khác** hình học đang lưu mà để một cột của tuyến cách đường mới quá hành lang khảo sát (`SurveyProcessing:RouteCorridorM`, 25 m) → **409 `POLE_OFF_SEGMENT`**, không ghi gì. |
+| **Decision maker** | **Mỹ (Dylan), chốt 10/11/2026 · SELF-SIGNED** — nền tạm tới FW kế tiếp; chưa hợp nhất Contract. |
+| **Date** | 10/11/2026 |
+| **Scope** | WP2 / WP5; không schema, không migration, không mã lỗi mới (dùng lại mã của PL-3 với `details` khác). |
+
+- **Vì sao:** form sửa tuyến của WP5 dựng lại LINESTRING từ các cột **nó thấy**. Tuyến `inter_commune` giữ cả cột của xã
+  người gọi không thấy (ASSET-SEG-1); đường mới bỏ qua chúng thì khảo sát sau **âm thầm** không còn thấy các cột đó.
+- Đo trên tập cột **sau** thao tác: cột chính PUT này tháo ra không tính, cột nó gán vào có tính. Tính **cả cột ngoài phạm vi** người gọi.
+- `details = {segment_id, pole_ids[], pole_count, corridor_m}`. `pole_ids` chỉ gồm cột người gọi **thấy được**, tối đa 100,
+  theo `created_at, length(pole_id), pole_id`; `pole_count` là tổng kể cả cột ẩn. `pole_count > pole_ids.length` nghĩa là
+  còn cột của xã khác — ID của chúng không bao giờ lộ.
+- **Hình học không đổi thì KHÔNG đo** (so toạ độ chính xác): đổi tên / cấp đường / tập cột với đúng `geom_wkt` cũ không bị dữ liệu
+  lệch sẵn có chặn. Hệ quả có chủ ý: gán một cột ở xa vào tuyến mà giữ nguyên đường vẫn qua — như `POST /assets/segments` và
+  `POST/PUT /assets/poles` (chưa đo hành lang ở ba đường đó; không mở rộng phạm vi ở đây).
+- **FE cần làm:** chỉ sửa thông tin tuyến thì gửi lại **nguyên** `geom_wkt` đọc từ `GET /assets/segments/{id}`; gặp 409 này thì
+  hiện các cột trong `pole_ids`, và khi `pole_count` lớn hơn thì báo có cột của xã khác trên tuyến (cần người thấy cả hai xã sửa).
+  **Chưa báo WP5.**
+- **Giới hạn đã biết:** dời cột (`PUT /assets/poles/{id}/location`) và đổi đường của chính tuyến đó chạy đồng thời thì mỗi bên đo
+  theo trạng thái cũ của bên kia; chưa có khoá chung cho cặp này.
+
 ### ACCT-4 — đăng nhập Google vào tài khoản có sẵn (08/11/2026)
 
 | Trường | Nội dung |

@@ -437,3 +437,8 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - Có **hai đường ghi `pole.segment_id`**: segment API mới chặn cột thuộc tuyến khác và kiểm khác xã chỉ lúc gán mới;
   pole CRUD cũ giữ hành vi cũ, chưa áp hai luật này. Không âm thầm sửa đường cũ trong ticket khác.
   `Pole` chưa implement `IAudited`; giữ nguyên không `Touch`, không sinh audit thừa.
+- **Đổi `geom` của tuyến đo hành lang SAU `SaveChanges`, trong transaction (drift ASSET-SEG-2).** `RequirePolesInCorridorAsync`
+  đếm cột lệch **bỏ query filter** (cột xã khác trên tuyến `inter_commune` chính là ca cần bắt), nhưng liệt kê ID **qua filter**
+  — đừng gộp hai truy vấn thành một: hoặc mất cột ẩn (xanh giả), hoặc lộ ID xã khác. Vì đo sau khi ghi nên `UpdateSegmentAsync`
+  **luôn** mở transaction, kể cả khi vắng `pole_ids`; bỏ transaction là 409 trả về nhưng tuyến đã lưu.
+  Chỉ đo khi hình học **thật sự đổi** (`EqualsExact`): đo mọi PUT sẽ khoá việc đổi tên những tuyến có cột lệch sẵn.

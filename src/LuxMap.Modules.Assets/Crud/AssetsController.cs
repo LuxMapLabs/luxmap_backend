@@ -222,6 +222,8 @@ public sealed class AssetsController(
     /// of them. The unordered pole_ids set is kept when absent, [] detaches visible poles, null is 400.
     /// Missing/hidden poles are 404; occupied poles or disallowed cross-commune assignments are 409.
     /// Membership and segment changes are atomic (ASSET-SEG-1, SELF-SIGNED).
+    /// A changed geom_wkt that leaves a pole of the segment outside the survey corridor is 409 POLE_OFF_SEGMENT, counting
+    /// poles the caller cannot see (ASSET-SEG-2, SELF-SIGNED).
     /// <para>
     /// 204 with no body, like every other write in this controller. Echoing the updated segment would
     /// publish a read shape, and that decision belongs to <b>BE-12b</b>.
