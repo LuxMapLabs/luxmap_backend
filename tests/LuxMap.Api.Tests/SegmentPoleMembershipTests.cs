@@ -221,6 +221,82 @@ public sealed class SegmentPoleMembershipTests(AssetImportFixture fixture)
         }
     }
 
+    // The fixture pole sits on the first vertex of Body()'s line; Far is about 11 km east of it.
+    private const string Far = "LINESTRING(106.60 10.97,106.61 10.98)";
+
+    [Fact]
+    public async Task Put_rerouting_a_segment_away_from_its_poles_is_409_and_writes_nothing()
+    {
+        using var client = await fixture.ManagerClientAsync();
+        var kept = await NewPole(client);
+        var dropped = await NewPole(client);
+        var segment = await NewSegment(client, new[] { kept, dropped });
+        var before = await SegmentRow(client, segment);
+
+        var body = WithoutCommune(Body(new[] { kept }));
+        body["geom_wkt"] = Far;
+        body["segment_name"] = tag + "-must-not-save";
+        var error = await Error(await client.PutAsJsonAsync($"{Segments}/{segment}", body),
+            HttpStatusCode.Conflict, "POLE_OFF_SEGMENT");
+        var details = error.GetProperty("details");
+        Assert.Equal(segment, details.GetProperty("segment_id").GetString());
+        // Only poles that stay on the segment are measured: the pole this very PUT detaches is not named.
+        Assert.Equal([kept], details.GetProperty("pole_ids").EnumerateArray().Select(id => id.GetString()));
+        Assert.Equal(1, details.GetProperty("pole_count").GetInt32());
+        Assert.Equal(25, details.GetProperty("corridor_m").GetDouble());
+        Assert.Equal(before, await SegmentRow(client, segment));
+        Assert.Equal(segment, await SegmentOf(client, dropped));
+
+        // A new line that still passes the poles is accepted, and so is any line once no pole is left on it.
+        body["geom_wkt"] = "LINESTRING(106.49 10.97,106.52 10.99)";
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Segments}/{segment}", body)).StatusCode);
+        body["geom_wkt"] = Far;
+        body["pole_ids"] = Array.Empty<string>();
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Segments}/{segment}", body)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Put_rerouting_counts_a_hidden_pole_without_naming_it()
+    {
+        using var local = await fixture.ManagerClientAsync();
+        using var foreign = await fixture.ForeignCommuneClientAsync();
+        using var both = await fixture.LegacyTwoCommuneClientAsync();
+        var hidden = await NewPole(foreign, fixture.ForeignCommuneId);
+        var visible = await NewPole(local);
+        var segment = await NewSegment(both, new[] { hidden, visible }, "inter_commune");
+        var before = await SegmentRow(local, segment);
+
+        // What a form that rebuilds the line from the poles it can see would send.
+        var body = WithoutCommune(Body(Array.Empty<string>(), "inter_commune"));
+        body["geom_wkt"] = Far;
+        var response = await local.PutAsJsonAsync($"{Segments}/{segment}", body);
+        var text = await response.Content.ReadAsStringAsync();
+        var error = await Error(response, HttpStatusCode.Conflict, "POLE_OFF_SEGMENT");
+        Assert.Empty(error.GetProperty("details").GetProperty("pole_ids").EnumerateArray());
+        Assert.Equal(1, error.GetProperty("details").GetProperty("pole_count").GetInt32());
+        Assert.DoesNotContain(hidden, text);
+        Assert.Equal(before, await SegmentRow(local, segment));
+        Assert.Equal(segment, await SegmentOf(local, visible));
+        Assert.Equal(segment, await SegmentOf(foreign, hidden));
+    }
+
+    [Fact]
+    public async Task Put_keeping_the_geometry_never_measures_the_corridor()
+    {
+        using var client = await fixture.ManagerClientAsync();
+        var pole = await NewPole(client);
+        var created = await client.PostAsJsonAsync(Segments, new Dictionary<string, object?>(Body(new[] { pole })) { ["geom_wkt"] = Far });
+        Assert.True(created.StatusCode == HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        var segment = Id(created);
+
+        // The pole is already 11 km off: a rename with the same line must not be held hostage by old data.
+        var body = WithoutCommune(Body());
+        body["geom_wkt"] = Far;
+        body["segment_name"] = tag + "-renamed";
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Segments}/{segment}", body)).StatusCode);
+        Assert.Contains(tag + "-renamed", await SegmentRow(client, segment));
+    }
+
     private Dictionary<string, object?> Body(object? ids = null, string roadClass = "inter_village")
     {
         var body = new Dictionary<string, object?>

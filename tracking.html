@@ -99,6 +99,19 @@
     SegmentPoleMembershipTests.cs, contract-drift.md, traps/assets.md, tracking.html.
     Bàn giao: <code>.ai/results/ASSET-SEGMENT-POLES.md</code>.</p>
   </div>
+  <div class="card" id="asset-segment-corridor">
+    <strong>ASSET-SEGMENT-CORRIDOR — 10/11/2026</strong>
+    <span class="tag t-done">Xong · chờ PR</span>
+    <p>PUT tuyến đổi <code>geom_wkt</code> mà để cột của tuyến ngoài hành lang khảo sát 25 m →
+    <strong>409 <code>POLE_OFF_SEGMENT</code></strong>, không ghi gì. Đếm cả cột xã khác trên tuyến liên xã
+    (<code>pole_count</code>) nhưng chỉ nêu ID cột người gọi thấy (<code>pole_ids</code>). Hình học không đổi thì không đo.
+    Drift ASSET-SEG-2, SELF-SIGNED; <strong>chưa báo WP5</strong>.</p>
+    <p>Tồn đọng: POST tuyến và <code>POST/PUT /assets/poles</code> chưa đo hành lang khi gán cột; dời cột và đổi đường
+    đồng thời chưa có khoá chung. Chú thích XML của <code>ErrorCodes.PoleOffSegment</code> đang nằm nhầm trên
+    <code>PoleSegmentRequired</code> (có từ trước, chưa sửa).</p>
+    <p>Files: AssetCrudService.cs, AssetsController.cs, SegmentPoleMembershipTests.cs, contract-drift.md,
+    traps/assets.md, tracking.html (OpenAPI sinh lại: không đổi). Toàn bộ suite xanh (1585 test API, 7 skip), phá thử ba chốt đều đỏ. Commit: <code>feat(assets): refuse a segment reroute that strands its poles</code>.</p>
+  </div>
   <div class="card" id="acct-google">
     <strong>ACCT-GOOGLE — đăng nhập bằng Google, 09/11/2026</strong>
     <span class="tag t-done">Đã kiểm chứng · chờ merge</span>

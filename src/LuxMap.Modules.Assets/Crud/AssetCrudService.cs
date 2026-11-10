@@ -402,7 +402,8 @@ public sealed class AssetCrudService(
     public async Task UpdateSegmentAsync(string segmentId, UpdateSegmentRequest request, CancellationToken ct)
     {
         var (present, poleIds) = request.ReadPoleIds();
-        await using var transaction = present ? await dbContext.Database.BeginTransactionAsync(ct) : null;
+        // Always explicit: the corridor is measured AFTER SaveChanges and has to be able to undo it.
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
         if (present)
         {
             if (!await dbContext.Set<RoadSegment>().AnyAsync(candidate => candidate.SegmentId == segmentId, ct))
@@ -419,13 +420,47 @@ public sealed class AssetCrudService(
         segment.SegmentName = request.SegmentName!;
         segment.RoadClass = request.RoadClass!.Value;
         segment.LengthM = request.LengthM!.Value;
-        segment.Geom = Read<LineString>(request.GeomWkt);
+        var geometry = Read<LineString>(request.GeomWkt);
+        var rerouted = !segment.Geom.EqualsExact(geometry);
+        segment.Geom = geometry;
         segment.DataSource = request.DataSource!.Value;
         if (present) await ReplaceSegmentPolesAsync(segment, poleIds, ct);
         Touch(segment);
 
         await dbContext.SaveChangesAsync(ct);
-        if (transaction is not null) await transaction.CommitAsync(ct);
+        if (rerouted) await RequirePolesInCorridorAsync(segment, ct);
+        await transaction.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// 409 <c>POLE_OFF_SEGMENT</c> when the line just saved leaves a pole of the segment outside the survey corridor
+    /// (<see cref="ISurveyCorridor"/>); the caller's transaction then rolls the whole PUT back.
+    /// </summary>
+    /// <remarks>
+    /// Runs after <c>SaveChanges</c> so it measures the membership the PUT produces: poles it detaches are gone, poles it
+    /// assigns are in. The count is UNFILTERED on purpose — an <c>inter_commune</c> segment keeps poles of communes the
+    /// caller cannot see, and a form that rebuilds the line from the poles it can see is exactly what strands them. Only
+    /// a count leaves that query; ids are listed through the query filter.
+    /// </remarks>
+    private async Task RequirePolesInCorridorAsync(RoadSegment segment, CancellationToken ct)
+    {
+        var line = segment.Geom;
+        var limit = corridor.RouteCorridorM;
+        var total = await dbContext.Set<Pole>().IgnoreQueryFilters().CountAsync(pole =>
+            pole.SegmentId == segment.SegmentId && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit, ct);
+        if (total == 0) return;
+
+        var visible = await dbContext.Set<Pole>()
+            .Where(pole => pole.SegmentId == segment.SegmentId && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit)
+            .OrderBy(pole => pole.CreatedAt).ThenBy(pole => pole.PoleId.Length).ThenBy(pole => pole.PoleId)
+            .Select(pole => pole.PoleId).Take(100).ToListAsync(ct);
+        throw new LuxMapException(ErrorCodes.PoleOffSegment, HttpStatusCode.Conflict,
+            $"That line leaves {total} pole(s) of the segment more than {limit:0.#} m away; a survey only sees poles "
+            + "within that distance. Move or detach those poles first, or draw the line past them.",
+            new Dictionary<string, object?>
+            {
+                ["segment_id"] = segment.SegmentId, ["pole_ids"] = visible, ["pole_count"] = total, ["corridor_m"] = limit,
+            });
     }
 
     /// <summary>Full replacement of a feeder (BE-12). <c>commune_id</c> is not writable.</summary>
