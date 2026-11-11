@@ -177,6 +177,16 @@ Khu vực mới có thể nhập **cột và tủ điện trước**, tuyến b�
 - Lọc cột chưa tuyến: `GET /api/v1/assets/poles?unassigned_segment=true` (khác với `feeders/poles?unassigned=true`, vốn là "chưa gán mạch").
 - Gõ nhầm mã tuyến **vẫn là lỗi dòng**, không biến thành chưa tuyến.
 
+### Cột chưa có GPS (POLE-GEOM-NULL)
+
+Cột của xã lúc đầu thường chỉ có trong sổ sách. Nhập cột trước, kỹ sư ra thực địa gắn GPS sau:
+
+- `geom_wkt` để trống hoặc bỏ hẳn cột ⇒ cột mới được tạo **chưa có GPS** (`location: null` ở API). Cột đó không lên bản đồ, không vào khảo sát đêm, và **không nhận sự cố theo cột** (409 `POLE_LOCATION_REQUIRED`) cho tới khi có vị trí. Mã QR vẫn cấp được.
+- Nạp lại file với ô trống **không** xoá vị trí của cột đã có — một cột đã có GPS không quay về "chưa có". Muốn đổi vị trí: điền WKT mới, hoặc `PUT /assets/poles/{id}/location`.
+- Gắn GPS lần đầu: `PUT /assets/poles/{id}/location` (Quản lý hoặc Kỹ sư hiện trường). Cột **có tuyến** phải nằm trong hành lang khảo sát (25 m quanh tuyến, nếu không 409 `POLE_OFF_SEGMENT`); cột chưa tuyến thì không đo.
+- Việc cần làm của kỹ sư: `GET /api/v1/assets/poles?missing_location=true` (có thể kết hợp `unassigned_segment=true`, hai điều kiện là AND).
+- Giá trị **sai** (`POINT(abc)`, kiểu không phải Point, GeoJSON `geometry` là chuỗi / mảng) **vẫn là lỗi dòng**, không biến thành "chưa có GPS".
+
 ### `external_ref` — mã kiểm kê của đơn vị, CÓ lưu trong database
 
 Ba file `segments.csv`, `feeders.csv`, `poles.csv` đều có cột `external_ref` **bắt buộc**;
@@ -286,7 +296,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `feeder_source` | Không | `verified` / `inferred` | Nguồn gốc của quan hệ cột → mạch (TOPO-INFER). Xem mục "Nhãn nguồn gốc" bên dưới |
 | `feeder_external_ref` | Không | text | Khớp `external_ref` trong `feeders.csv`. Để trống = cột chưa gán mạch. ⚠️ Trước Contract v1.6 ô này để trống với cột solar; đèn solar nay đã hết nên **mọi cột đều nên có tủ điện** |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
-| `geom_wkt` | **Có** | Point | `geometry(Point,4326)`, NOT NULL |
+| `geom_wkt` | Không | Point | `geometry(Point,4326)`, **nullable** (POLE-GEOM-NULL). Để trống / không có cột = cột có trong sổ sách nhưng **chưa có GPS**; nạp lại với ô trống **giữ** vị trí đã có. Sai định dạng vẫn là lỗi dòng |
 | `near_sensitive_poi` | Không | bool | `true` / `false`. Mặc định `false`. Gần trường học, chợ, cầu, ngã ba |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_pole_data_source` |
 

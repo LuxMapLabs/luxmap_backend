@@ -443,7 +443,13 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   không thể "lệch tuyến"). Mỗi chỗ có test trồng cột null — đừng "sửa" bằng `COALESCE`.
 - **`PUT …/location` lần đầu** (G-2, GN-9): `moved_m: null`, audit `relocated` với `before: null`. Hành lang của tuyến **vẫn đo** nếu cột có tuyến
   — nó đo tới tuyến, không tới vị trí cũ, nên "chưa có vị trí cũ" không phải lý do bỏ qua.
-- **PR 2a chưa bật writer:** `POST` / `PUT /assets/poles` và import vẫn bắt buộc `geom_wkt` (PR 2b). Test trồng cột null thẳng vào DB.
+- **PR 2b đã bật writer.** `CreatePoleRequest.GeomWkt` là `string?` tuỳ chọn (vắng / `null` ⇒ chưa GPS; `""`, `"  "`, WKT sai ⇒ 400 — đừng "chuẩn hoá" chuỗi trắng thành null).
+  `UpdatePoleRequest.GeomWkt` **không** `[Required]` nữa vì quy tắc phụ thuộc cột đang lưu (GN-2): kiểm trong `UpdatePoleAsync`, không ở DataAnnotations.
+- **Import: "rỗng" ≠ "sai".** `IImportRow.GeometryIsEmpty` chỉ true cho ô CSV trắng / thiếu cột hoặc GeoJSON `geometry` vắng / `null`. `geometry` là chuỗi, mảng, số vẫn không rỗng ⇒ lỗi dòng.
+  `ImportGeoJsonAsync` KHÔNG được ép mọi giá trị không-object về null nữa (đó chính là lỗi "object / array bị đọc thành rỗng" từng gặp ở `segment_external_ref`).
+  Cột đã có + ô trống ⇒ giữ vị trí; chỉ cột MỚI nhận null.
+- `AssetGeometry.TryReadWkt` phải bắt `NetTopologySuite.IO.ParseException` (WKT `POINT(abc)`); thiếu nó là 500, và chốt "sai không phải rỗng" ở trên thành vô nghĩa.
+- Bộ lọc `missing_location` đi cùng `unassigned_segment` trong **một** `Expression` (AND) áp trước `CountAsync` — đừng gọi `ListAsync` hai lần.
 
 ## ASSET-SEGMENT-POLES — tập cột trên tuyến (09/11/2026, drift ASSET-SEG-1)
 

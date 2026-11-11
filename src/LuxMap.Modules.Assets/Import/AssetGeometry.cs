@@ -42,10 +42,12 @@ internal static class AssetGeometry
             geometry = parsed;
             return true;
         }
-        catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidOperationException)
+        catch (Exception exception) when (exception is ArgumentException or FormatException or InvalidOperationException
+                                          or NetTopologySuite.IO.ParseException)
         {
             // WKTReader signals malformed input with several exception types depending on where it
-            // gives up. Catching the shape of the failure keeps a typo in one cell from becoming a 500.
+            // gives up — ParseException for "POINT(abc)", which was a 500 until POLE-GEOM-NULL PR 2b relied on this path.
+            // Catching the shape of the failure keeps a typo in one cell from becoming a 500.
             error = $"Not valid WKT: {exception.Message}";
             return false;
         }

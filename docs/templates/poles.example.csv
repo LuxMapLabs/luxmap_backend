@@ -1,3 +1,4 @@
 external_ref,segment_external_ref,feeder_external_ref,commune_id,geom_wkt,near_sensitive_poi,data_source,note,feeder_source
 CTA-001,TUYEN-A,FDR-A,COM-070,POINT(106.4900 10.9700),true,public_imagery,"Cạnh cổng trường TH Long Phước, tan học 17h",
 CTA-002,,FDR-A,COM-070,POINT(106.4930 10.9704),false,public_imagery,"Ví dụ cột chưa phân tuyến: ô segment_external_ref để trống",,
+CTA-003,TUYEN-A,FDR-A,COM-070,,false,public_imagery,"Ví dụ cột chưa có GPS: ô geom_wkt để trống, kỹ sư gắn vị trí ngoài thực địa sau",

@@ -2702,6 +2702,13 @@
             }
           },
           {
+            "name": "missing_location",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -15826,8 +15833,7 @@
       "CreatePoleRequest": {
         "required": [
           "commune_id",
-          "data_source",
-          "geom_wkt"
+          "data_source"
         ],
         "type": "object",
         "properties": {
@@ -15853,8 +15859,8 @@
             "type": "string"
           },
           "geom_wkt": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "near_sensitive_poi": {
             "type": "boolean"
@@ -21206,7 +21212,6 @@
       "UpdatePoleRequest": {
         "required": [
           "data_source",
-          "geom_wkt",
           "segment_id"
         ],
         "type": "object",
@@ -21228,8 +21233,8 @@
             "nullable": true
           },
           "geom_wkt": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "near_sensitive_poi": {
             "type": "boolean"
