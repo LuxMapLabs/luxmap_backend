@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.WorkOrders.Entities;
@@ -10,7 +11,7 @@ namespace LuxMap.Api.Tests;
 /// <summary>
 /// ROAD-SEGMENT-GEOM-NULL PR 2a — a road known only from the books has no line (<c>road_segment.geom IS NULL</c>). Rows 11, 12, 13
 /// of the survey and the weekly-schedule path: none may answer 500, and creating / assigning / scheduling its orders must keep working.
-/// No API writes such a road yet (PR 2b), so each test plants one straight into the database.
+/// PR 2a planted such roads straight into the database; PR 2b's writer makes them through the API.
 /// </summary>
 public partial class WorkOrderTests
 {
@@ -120,4 +121,49 @@ public partial class WorkOrderTests
             Assert.Equal(undrawn, group.GetProperty("segment_id").GetString());
         });
     }
+
+    [Fact]
+    public async Task A_road_created_through_the_api_without_a_line_takes_poles_a_weekly_schedule_and_a_survey_order_and_is_drawn_later()
+    {
+        await WithRecurringHost(async (client, clock, services) =>
+        {
+            var poleA = await PlantFreePole(located: false);
+            var poleB = await PlantFreePole(located: false);
+
+            // The form of a commune that only has its books: name, class, declared length, the poles — no line yet (RG-2, RG-13).
+            var created = await client.PostAsJsonAsync("/api/v1/assets/segments", new Dictionary<string, object?>
+            {
+                ["segment_name"] = "Books-only road", ["road_class"] = "inter_village", ["length_m"] = 900, ["commune_id"] = home,
+                ["data_source"] = "simulated", ["pole_ids"] = new[] { poleA, poleB },
+            });
+            Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+            var road = created.Headers.Location!.ToString().Split('/')[^1];
+
+            // A weekly schedule and a survey order for it both work, and the order lists the poles with no position or place along the road.
+            var schedule = await NewRecurring(client, road: road, assigned: users["a"].UserId);
+            Assert.Equal("Books-only road", schedule.GetProperty("segment_name").GetString());
+            var order = await SurveyOrderOn(road);
+            var listed = (await PolesOf(order, query: "?page_size=200")).GetProperty("items").EnumerateArray().ToArray();
+            Assert.Equal(new[] { poleA, poleB }.Order(), listed.Select(x => x.GetProperty("pole_id").GetString()!).Order());
+            Assert.All(listed, x => Assert.Equal(JsonValueKind.Null, x.GetProperty("position").ValueKind));
+
+            // Sweeping it stays refused until somebody draws it (RG-7, pinned in SurveyIngestTests); drawing it later is an ordinary PUT:
+            // no pole has a position yet, so there is no corridor to break.
+            var drawn = await client.PutAsJsonAsync($"/api/v1/assets/segments/{road}", new Dictionary<string, object?>
+            {
+                ["segment_name"] = "Books-only road", ["road_class"] = "inter_village", ["length_m"] = 900,
+                ["data_source"] = "simulated", ["geom_wkt"] = "LINESTRING(108.1 16.1, 108.11 16.1)",
+            });
+            Assert.Equal(System.Net.HttpStatusCode.NoContent, drawn.StatusCode);
+            Assert.True(await Db(db => db.Set<RoadSegment>().IgnoreQueryFilters().AnyAsync(x => x.SegmentId == road && x.Geom != null)));
+        });
+    }
+
+    private Task<string> PlantFreePole(bool located) => Db(async db =>
+    {
+        using var system = db.EnterUnscopedSystemWriteBackdoor();
+        var pole = new Pole { CommuneId = home, DataSource = DataSource.Simulated,
+            Geom = located ? new Point(108.1, 16.1) { SRID = 4326 } : null };
+        db.Add(pole); await db.SaveChangesAsync(); return pole.PoleId;
+    });
 }

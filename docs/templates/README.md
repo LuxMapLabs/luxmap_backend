@@ -252,9 +252,20 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | `segment_name` | **Có** | text | |
 | `road_class` | **Có** | enum | `inter_commune` · `inter_village` — `ck_road_segment_road_class` |
 | `length_m` | **Có** | integer | Mét. **Giá trị KHAI BÁO**, không tính lại từ `geom_wkt` |
-| `geom_wkt` | **Có** | LineString | `geometry(LineString,4326)`, NOT NULL |
+| `geom_wkt` | Không | LineString | `geometry(LineString,4326)`, **nullable** (ROAD-SEGMENT-GEOM-NULL): để trống hoặc bỏ hẳn cột ⇒ tuyến chưa có hình — xem mục *Tuyến chưa có hình* bên dưới |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_road_segment_data_source` |
+
+### Tuyến chưa có hình (ROAD-SEGMENT-GEOM-NULL)
+
+Xã có tuyến mới chỉ có trong sổ sách: nhập tuyến + cột trước, tạo lịch công tác theo tuyến, ra thực địa lấy GPS sau.
+
+- `geom_wkt` để trống hoặc bỏ hẳn cột ⇒ tuyến mới được tạo **chưa có hình** (`has_geometry: false`, `geom_wkt: null` ở API). Tuyến đó **không lên bản đồ** (`/map/segments`), nhưng vẫn gán được `pole_ids`, vẫn có lịch tuần và phiếu khảo sát. `length_m` vẫn **bắt buộc** (giá trị khai báo).
+- Nạp lại file với ô trống **không** xoá hình của tuyến đã có — một tuyến đã có hình không quay về "chưa có". Muốn đổi hình: điền WKT mới, hoặc `PUT /assets/segments/{id}`.
+- Vẽ hình lần đầu: điền WKT rồi nạp lại file (trùng `external_ref` ⇒ cập nhật), hoặc `PUT` kèm `geom_wkt`. ⚠️ Import **không** đo hành lang cột (khác `PUT`, vốn trả 409 `POLE_OFF_SEGMENT` khi hình mới bỏ sót cột đã có GPS).
+- **Khảo sát đêm không bắt đầu được trên tuyến chưa có hình**: `POST /sweeps` trả 409 `SEGMENT_GEOMETRY_REQUIRED` cho tới khi tuyến được vẽ.
+- Việc cần làm của người vẽ tuyến: `GET /api/v1/assets/segments?missing_geometry=true`.
+- Giá trị **sai** (`LINESTRING(abc)`, kiểu không phải LineString, GeoJSON `geometry` là chuỗi / mảng) **vẫn là lỗi dòng**, không biến thành "chưa có hình".
 
 > `length_m` là giá trị **khai báo**, không phải dẫn xuất. Đừng "sửa cho đúng" bằng
 > `ST_Length` — số đo trên mặt phẳng chiếu ngắn hơn trên ellipsoid khoảng 73 ppm, ghi đè

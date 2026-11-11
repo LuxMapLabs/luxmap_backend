@@ -1317,6 +1317,13 @@
             }
           },
           {
+            "name": "missing_geometry",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -15889,7 +15896,6 @@
         "required": [
           "commune_id",
           "data_source",
-          "geom_wkt",
           "length_m",
           "road_class",
           "segment_name"
@@ -15916,8 +15922,8 @@
             "format": "int32"
           },
           "geom_wkt": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "maxLength": 32,
@@ -21279,7 +21285,6 @@
       "UpdateSegmentRequest": {
         "required": [
           "data_source",
-          "geom_wkt",
           "length_m",
           "road_class",
           "segment_name"
@@ -21306,8 +21311,8 @@
             "format": "int32"
           },
           "geom_wkt": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"

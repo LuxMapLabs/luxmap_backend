@@ -38,8 +38,10 @@ public sealed class CreateSegmentRequest
     [Range(1, int.MaxValue)]
     public int? LengthM { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326, longitude first.</summary>
-    [Required]
+    /// <summary>
+    /// WKT <c>LINESTRING</c> in EPSG:4326, longitude first. Optional (ROAD-SEGMENT-GEOM-NULL RG-2): absent or <c>null</c> creates a segment
+    /// that has no drawn route yet — the books know it, nobody has walked it. A blank or malformed value is still a 400.
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     [Required]
@@ -249,8 +251,11 @@ public sealed class UpdateSegmentRequest
     [Range(1, int.MaxValue)]
     public int? LengthM { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326, longitude first.</summary>
-    [Required]
+    /// <summary>
+    /// WKT <c>LINESTRING</c> in EPSG:4326, longitude first. Required for a segment that already has a route (400 if absent or <c>null</c>:
+    /// a route never goes back to "undrawn"); for a segment that has none, absent or <c>null</c> leaves it undrawn and a WKT draws it for the
+    /// first time (ROAD-SEGMENT-GEOM-NULL RG-2). Decided in the service because it depends on the stored segment.
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     /// <summary>

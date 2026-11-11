@@ -37,9 +37,16 @@ public sealed class AssetCrudService(
     // placeholder was waiting on — emit external_ref? data_source? feeder_id? — were answered YES
     // on 22/09/2026; docs/review/BE-12b-read-shape.md carries the reasoning.
 
+    /// <param name="missingGeometry">
+    /// <c>true</c> keeps only segments with no drawn route yet (ROAD-SEGMENT-GEOM-NULL RG-5), the work list for whoever draws them; <c>false</c> is
+    /// no restriction. Applied BEFORE the total and the page, like <c>missing_location</c> on poles.
+    /// </param>
     public Task<PagedResult<SegmentListItem>> ListSegmentsAsync(
-        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, null, ct);
+        IReadOnlyList<string>? communes, PageRequest page, bool missingGeometry, CancellationToken ct)
+    {
+        System.Linq.Expressions.Expression<Func<RoadSegment, bool>>? filter = missingGeometry ? segment => segment.Geom == null : null;
+        return ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, filter, ct);
+    }
 
     public async Task<PagedResult<FeederListItem>> ListFeedersAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
@@ -264,7 +271,8 @@ public sealed class AssetCrudService(
             SegmentName = request.SegmentName!,
             RoadClass = request.RoadClass!.Value,
             LengthM = request.LengthM!.Value,
-            Geom = Read<LineString>(request.GeomWkt),
+            // Absent / null = a segment from the books with no route yet (ROAD-SEGMENT-GEOM-NULL RG-2); blank or malformed is still a 400.
+            Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt),
             CommuneId = communeId,
             DataSource = request.DataSource!.Value,
         };
@@ -435,10 +443,19 @@ public sealed class AssetCrudService(
         segment.SegmentName = request.SegmentName!;
         segment.RoadClass = request.RoadClass!.Value;
         segment.LengthM = request.LengthM!.Value;
-        var geometry = Read<LineString>(request.GeomWkt);
-        // ROAD-SEGMENT-GEOM-NULL: drawing a segment for the first time (null → line) IS a change of route, so the corridor
-        // is measured then (RG-11's safety net); only an identical line skips it. The request still requires geom_wkt (2a).
-        var rerouted = segment.Geom is null || !segment.Geom.EqualsExact(geometry);
+        // RG-2: a segment that has a route keeps one — absent / null is a 400; a segment without one stays undrawn unless a WKT arrives.
+        // Read BEFORE any assignment: the 400 must leave the tracked row untouched.
+        var geometry = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt);
+        if (geometry is null && segment.Geom is not null)
+        {
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "geom_wkt is required for a segment that already has a route.",
+                new Dictionary<string, object?> { ["field"] = "geom_wkt" });
+        }
+
+        // Drawing a segment for the first time (null → line) IS a change of route, so the corridor is measured then (ASSET-SEG-2);
+        // only an identical line, or no line at all, skips it. An undrawn segment taking poles (RG-13) has nothing to measure against.
+        var rerouted = geometry is not null && (segment.Geom is null || !segment.Geom.EqualsExact(geometry));
         segment.Geom = geometry;
         segment.DataSource = request.DataSource!.Value;
         if (present) await ReplaceSegmentPolesAsync(segment, poleIds, ct);
