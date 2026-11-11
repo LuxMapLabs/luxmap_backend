@@ -89,7 +89,7 @@ public sealed class RoadSegmentConfiguration : IEntityTypeConfiguration<RoadSegm
         builder.Property(segment => segment.SegmentName).HasColumnType("text").IsRequired();
         builder.HasExternalRef("road_segment");
         builder.Property(segment => segment.LengthM).IsRequired();
-        builder.Property(segment => segment.Geom).HasColumnType(GeometryColumns.LineString).IsRequired();
+        builder.Property(segment => segment.Geom).HasColumnType(GeometryColumns.LineString);
         builder.Property(segment => segment.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(segment => segment.UpdatedAt).HasDefaultValueSql("now()");
         builder.HasUpdatedBy();

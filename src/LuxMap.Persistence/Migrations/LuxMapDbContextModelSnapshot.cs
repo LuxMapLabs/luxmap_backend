@@ -639,7 +639,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnName("external_ref");
 
                     b.Property<LineString>("Geom")
-                        .IsRequired()
                         .HasColumnType("geometry(LineString,4326)")
                         .HasColumnName("geom");
 

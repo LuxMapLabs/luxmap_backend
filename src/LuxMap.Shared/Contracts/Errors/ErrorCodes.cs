@@ -223,6 +223,13 @@ public static class ErrorCodes
     public const string PoleLocationRequired = "POLE_LOCATION_REQUIRED";
 
     /// <summary>
+    /// 409 — <c>POST /sweeps</c> on a work order with a road that has no geometry yet (ROAD-SEGMENT-GEOM-NULL RG-7): a night
+    /// survey drives a drawn route. <c>details</c> carries <c>work_order_id</c> and <c>segment_ids</c> (the undrawn roads, in
+    /// order position). Creating, assigning and scheduling the order are unaffected.
+    /// </summary>
+    public const string SegmentGeometryRequired = "SEGMENT_GEOMETRY_REQUIRED";
+
+    /// <summary>
     /// <c>POST /sync/push</c> — an operation skipped because an earlier operation of the same batch, on the same
     /// work order or pole, was a conflict or was rejected (BE-43 D-7). <c>details.blocked_by</c> names it.
     /// </summary>

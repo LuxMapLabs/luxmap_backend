@@ -68,7 +68,15 @@ public sealed record CabinetTopology
     [JsonPropertyOrder(-2)]
     public required int UnlocatedPoleCount { get; init; }
 
+    /// <summary>
+    /// Poles WITH a position that stand on a segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-10), so they cannot be
+    /// ordered along a road and are NOT in the diagram. Never overlaps <see cref="UnlocatedPoleCount"/>: a pole with no
+    /// position is counted there only. 0 for both means the diagram is complete.
+    /// </summary>
     [JsonPropertyOrder(-1)]
+    public required int UnroutedPoleCount { get; init; }
+
+    [JsonPropertyOrder(0)]
     public required IReadOnlyList<Feature<CabinetTopologyEdgeProperties>> Features { get; init; }
 }
 
@@ -149,6 +157,11 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
                 .ToListAsync(ct))
             .ToDictionary(segment => segment.SegmentId, StringComparer.Ordinal);
 
+        // A pole on a segment that has no geometry yet cannot be ordered along it (RG-10): left out and counted, apart from
+        // the unlocated ones above. Same reasoning as GN-5 for not answering 409 — an undrawn road is a long-lived state.
+        // A road missing from `roads` was deleted meanwhile (below), which is not "undrawn".
+        var unrouted = assigned.Count(pole => roads.TryGetValue(pole.SegmentId, out var road) && road.Geom is null);
+
         var features = new List<Feature<CabinetTopologyEdgeProperties>>();
         var branch = 0;
 
@@ -157,7 +170,7 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
             // A road missing here was deleted after its poles were read (a pole cannot outlive its segment — RESTRICT), so
             // its poles are gone too: skip them rather than answer 500 on a concurrent delete (Codex review P2).
             var bySegment = assigned
-                .Where(pole => pole.FeederId == feeder.FeederId && roads.ContainsKey(pole.SegmentId))
+                .Where(pole => pole.FeederId == feeder.FeederId && roads.TryGetValue(pole.SegmentId, out var road) && road.Geom is not null)
                 .GroupBy(pole => pole.SegmentId, StringComparer.Ordinal)
                 .OrderBy(group => roads[group.Key].CreatedAt)
                 .ThenBy(group => group.Key.Length)
@@ -165,7 +178,7 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
 
             foreach (var group in bySegment)
             {
-                var line = new LengthIndexedLine(roads[group.Key].Geom);
+                var line = new LengthIndexedLine(roads[group.Key].Geom!);
                 var cabinetAt = line.Project(cabinet.Geom.Coordinate);
                 var placed = group
                     .Select(pole => new { Pole = pole, At = line.Project(pole.Geom.Coordinate) })
@@ -214,7 +227,7 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
             }
         }
 
-        return new CabinetTopology { UnlocatedPoleCount = unlocated, Features = features };
+        return new CabinetTopology { UnlocatedPoleCount = unlocated, UnroutedPoleCount = unrouted, Features = features };
     }
 
     /// <summary><c>inferred</c> when either side is — a chain is only as confirmed as its weakest link.</summary>
