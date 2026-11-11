@@ -232,6 +232,7 @@ SUMMARY = {
     ("get", "/api/v1/lux-readings"): "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
     ("get", "/api/v1/lux-readings/poles/{poleId}"): "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
     ("post", "/api/v1/auth/web/login"): "Đăng nhập web; refresh token vào cookie",
+    ("patch", "/api/v1/auth/me"): "[ACCT-6] Sửa hồ sơ của chính mình (chỉ full_name; trả cùng thân với GET /auth/me)",
     ("post", "/api/v1/auth/me/avatar"): "[ACCT-5] Tải ảnh đại diện của chính mình (multipart, field file; chỉ JPEG, tối đa 1 MiB, làm sạch EXIF, cạnh dài 512 px)",
     ("get", "/api/v1/auth/me/avatar"): "[ACCT-5] Ảnh đại diện của chính mình (thumbnail JPEG, cần Bearer; 404 AVATAR_NOT_FOUND khi chưa có)",
     ("delete", "/api/v1/auth/me/avatar"): "[ACCT-5] Gỡ ảnh đại diện (chỉ gỡ liên kết, chưa xoá byte trong kho)",
