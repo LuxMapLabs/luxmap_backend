@@ -108,3 +108,7 @@ Nền API ACCT-4 SELF-SIGNED; ba giới hạn (liên kết sub, nonce, bật/t�
 `ManageUsers` (system_admin). Không có đường cho manager xem avatar người khác. `avatar_url` nullable, đường dẫn tương đối
 có Bearer: FE phải fetch rồi dùng blob URL. `?v=` là Unix mili-giây UTC, server bỏ qua query này; ETag lấy timestamp chính xác tới µs.
 DELETE chỉ gỡ liên kết, không xoá byte. Không thêm `[AllowAnonymous]` ở controller avatar.
+
+**`PATCH /auth/me` (ACCT-6) chỉ nhận `full_name`.** Đừng thêm `email` vào `UpdateProfileRequest` khi chưa có luồng xác minh qua mail:
+email nhận link đặt lại mật khẩu và khớp đăng nhập Google. Request cố ý **không** có `[Required]` — nó sẽ từ chối tên toàn khoảng trắng
+trước khi service kịp gắn `details.field`. `GET` và `PATCH` cùng đường `/auth/me`, nên test tìm route theo hậu tố phải lọc thêm theo method.

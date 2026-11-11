@@ -466,9 +466,10 @@ public sealed record TopologyPole
 /// </summary>
 /// <remarks>
 /// <para>
-/// Exactly ONE, never a list: <c>ux_fixture_pole_id_active</c> makes the lamp with no
-/// <c>removed_date</c> unique per pole (BE-REVIEW-02, constraint 3), so there is nothing to
-/// aggregate and no rule to invent.
+/// A pole carries up to TWO of these (MULTI-FIXTURE, drift MF-1): <c>ux_fixture_pole_slot_active</c>
+/// allows one lamp with no <c>removed_date</c> per slot. <see cref="PoleListItem.ActiveFixtures"/> lists them in slot
+/// order; <see cref="PoleListItem.ActiveFixture"/> is the first of them, kept so a reader written for one lamp
+/// keeps working.
 /// </para>
 /// <para>
 /// <b>Nested here, flat in Contract section 5.1 — and that is deliberate, not drift.</b> The map
@@ -590,6 +591,9 @@ public sealed record PoleListItem
     /// wattage per row — a boolean would force one request per pole to fill a visible column.
     /// </summary>
     public ActiveFixture? ActiveFixture { get; init; }
+
+    /// <summary>Every lamp in service, in slot order — at most two (MULTI-FIXTURE). Empty when none; <see cref="ActiveFixture"/> is its first item.</summary>
+    public IReadOnlyList<ActiveFixture> ActiveFixtures { get; init; } = [];
 
     /// <summary>The free-text note on this spot (POLE-NOTE); <c>null</c> when there is none.</summary>
     public string? Note { get; init; }

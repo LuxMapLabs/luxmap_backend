@@ -44,6 +44,9 @@ public sealed record WorkOrderPole
     public int? LampWatt { get; init; }
     public int? LampCount { get; init; }
 
+    /// <summary>Lamps in service, 0 to 2 (MULTI-FIXTURE); the lamp fields above describe the first (slot order).</summary>
+    public int FixtureCount { get; init; }
+
     /// <summary>Faults of THIS work order standing on the pole — the poles to repair or inspect.</summary>
     public required string[] WorkOrderFaultIds { get; init; }
 
@@ -111,7 +114,9 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 Status = db.Set<PoleCurrentStatus>().Where(s => s.PoleId == p.PoleId)
                     .Select(s => new { s.FixtureStatus, s.StatusConfidence, s.LastSeenAt }).FirstOrDefault(),
                 Lamp = db.Set<Fixture>().Where(f => f.PoleId == p.PoleId && f.RemovedDate == null)
+                    .OrderBy(f => f.Slot)
                     .Select(f => new { f.FixtureType, f.LampWatt, f.LampCount }).FirstOrDefault(),
+                FixtureCount = db.Set<Fixture>().Count(f => f.PoleId == p.PoleId && f.RemovedDate == null),
                 // FaultStatusSets.Open is the one definition of an open fault (BE-18); never a copied list.
                 OpenFaults = db.Set<Fault>().Count(f => f.PoleId == p.PoleId && OpenStatuses.Contains(f.FaultStatus)),
             })
@@ -164,6 +169,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 FixtureType = r.Lamp?.FixtureType,
                 LampWatt = r.Lamp?.LampWatt,
                 LampCount = r.Lamp?.LampCount,
+                FixtureCount = r.FixtureCount,
                 WorkOrderFaultIds = faultsByPole.GetValueOrDefault(r.PoleId, []),
                 Note = r.Note,
             };

@@ -122,9 +122,11 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                     })
                     .FirstOrDefault(),
 
-                // The lamp IN SERVICE — unique per pole since BE-REVIEW-02 constraint 3.
+                // The flat lamp fields describe the FIRST lamp in service (slot order). A pole may carry two
+                // (MULTI-FIXTURE, drift MF-1); fixture_count says so, and GET /map/poles/{id} lists both.
                 Lamp = pole.Fixtures
                     .Where(lamp => lamp.RemovedDate == null)
+                    .OrderBy(lamp => lamp.Slot)
                     .Select(lamp => new
                     {
                         lamp.PowerSource,
@@ -135,6 +137,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                         lamp.WarrantyExpiry,
                     })
                     .FirstOrDefault(),
+
+                FixtureCount = pole.Fixtures.Count(lamp => lamp.RemovedDate == null),
 
                 // FaultStatusSets.Open is the ONE definition of an open fault (BE-18). Never a
                 // hand-written status list here: a second copy would be right the day it was
@@ -169,6 +173,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                     FixtureType = row.Lamp?.FixtureType,
                     LampWatt = row.Lamp?.LampWatt,
                     LampCount = row.Lamp?.LampCount,
+                    FixtureCount = row.FixtureCount,
                     InstallDate = row.Lamp?.InstallDate,
                     WarrantyExpiry = row.Lamp?.WarrantyExpiry,
                     WarrantyStatus = window.Classify(row.Lamp?.WarrantyExpiry),

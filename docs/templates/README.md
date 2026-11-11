@@ -304,20 +304,20 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
-| `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã có bóng → lỗi theo dòng** (insert-only) |
+| `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã đủ 2 bóng đang dùng → lỗi theo dòng** (insert-only) |
 | `fixture_type` | **Có** | enum | `led_road_lamp` — **giá trị duy nhất** từ Contract v1.6 (`ck_fixture_fixture_type`) |
 | `power_source` | **Có** | enum | `grid` — **giá trị duy nhất** từ Contract v1.6 — `ck_fixture_power_source` |
 | `lamp_watt` | **Có** | integer | Công suất **một** bóng |
-| `lamp_count` | Không | integer `1..4` | Số bóng **giống nhau** lắp cùng lúc trên cột (cột cần đôi = `2`). Để trống / không có cột = `1` (LAMP-COUNT) |
+| `lamp_count` | Không | integer `1..4` | Số bóng **giống nhau** trong MỘT bộ đèn (chao đôi = `2`). Để trống / không có cột = `1` (LAMP-COUNT). Hai bóng tách riêng (mã, bảo hành riêng) là **hai dòng**, không phải `lamp_count = 2` |
 | `install_date` | **Có** | date | `YYYY-MM-DD` |
 | `removed_date` | Không | date | Để trống nghĩa là bóng **đang lắp**. Thay bóng thì điền vào dòng cũ và thêm một dòng mới |
 | `warranty_expiry` | Không | date | Không phải bóng nào cũng có bảo hành |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_fixture_data_source` |
 
-> **Một cột mang được nhiều bóng** — đó là cách ghi lịch sử thay bóng. Nhưng **import không làm
-> việc đó**: nhiều dòng cùng `pole_external_ref` trong một file, hoặc nạp lại file cho cột đã có
-> bóng, đều bị từ chối theo dòng. Chính vì "một cột nhiều bóng" nên không có khoá tự nhiên nào để
-> upsert, và đoán sai sẽ nhân đôi lịch sử thiết bị mà không ai phát hiện. Thay bóng dùng CRUD.
+> **Một cột mang được tối đa HAI bóng đang dùng** (MULTI-FIXTURE) — và nhiều bóng đã ngừng dùng làm lịch sử thay bóng. Import
+> cho hai dòng đang dùng (`removed_date` trống) cùng `pole_external_ref`; dòng thứ ba cho cùng cột, hoặc nạp lại file cho cột đã đủ
+> hai bóng, bị từ chối theo dòng. Không có khoá tự nhiên nào để upsert, và đoán sai sẽ nhân đôi lịch sử thiết bị mà không ai phát
+> hiện. Thay bóng dùng CRUD.
 >
 > ⚠️ **`fixture` không có cột trạng thái nào.** Tình trạng sáng/mờ/tắt thuộc **vị trí cột**
 > (`pole_current_status`), do luồng xử lý ảnh khảo sát ghi (BE-15/BE-17). Import kiểm kê

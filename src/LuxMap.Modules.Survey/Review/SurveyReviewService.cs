@@ -321,7 +321,8 @@ public sealed class SurveyReviewService(LuxMapDbContext db, ICurrentActorAccesso
     private async Task BuildBaselines(SurveySweep sweep, SurveyProcessingRun run, PoleObservation[] current, DateTime now, CancellationToken ct)
     {
         var poleId = current[0].PoleId;
-        var fixture = await db.Set<Fixture>().AsNoTracking().SingleOrDefaultAsync(f => f.PoleId == poleId && f.RemovedDate == null, ct);
+        var fixture = await db.Set<Fixture>().AsNoTracking().Where(f => f.PoleId == poleId && f.RemovedDate == null)
+            .NewestFirst().FirstOrDefaultAsync(ct);
         var candidates = await db.Set<PoleObservation>().Include(o => o.Pass).Include(o => o.Run)
             .Where(o => o.PoleId == poleId && o.DataSource == sweep.DataSource
                 && db.Set<SurveySweep>().Any(s => s.SweepId == o.Run.SweepId && s.Status == SweepStatus.Accepted && s.AcceptedRunId == o.RunId)

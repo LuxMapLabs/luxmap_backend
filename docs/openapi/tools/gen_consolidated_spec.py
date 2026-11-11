@@ -232,6 +232,7 @@ SUMMARY = {
     ("get", "/api/v1/lux-readings"): "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
     ("get", "/api/v1/lux-readings/poles/{poleId}"): "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
     ("post", "/api/v1/auth/web/login"): "Đăng nhập web; refresh token vào cookie",
+    ("patch", "/api/v1/auth/me"): "[ACCT-6] Sửa hồ sơ của chính mình (chỉ full_name; trả cùng thân với GET /auth/me)",
     ("post", "/api/v1/auth/me/avatar"): "[ACCT-5] Tải ảnh đại diện của chính mình (multipart, field file; chỉ JPEG, tối đa 1 MiB, làm sạch EXIF, cạnh dài 512 px)",
     ("get", "/api/v1/auth/me/avatar"): "[ACCT-5] Ảnh đại diện của chính mình (thumbnail JPEG, cần Bearer; 404 AVATAR_NOT_FOUND khi chưa có)",
     ("delete", "/api/v1/auth/me/avatar"): "[ACCT-5] Gỡ ảnh đại diện (chỉ gỡ liên kết, chưa xoá byte trong kho)",
@@ -395,9 +396,9 @@ S["LatLng"] = {"type": "object", "required": ["lat", "lng"], "additionalProperti
 
 S["PoleProperties"] = {
     "type": "object", "additionalProperties": False,
-    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1) + lamp_count (LAMP-COUNT LMC-3). Không có data_source / external_ref / feeder_id (không emit).",
+    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1) + lamp_count (LAMP-COUNT LMC-3) + fixture_count (MULTI-FIXTURE MF-3). Không có data_source / external_ref / feeder_id (không emit).",
     "required": ["pole_id", "segment_id", "fixture_status", "power_source", "fixture_type", "lamp_watt", "lamp_count",
-                 "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
+                 "fixture_count", "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
     "properties": OrderedDict([
         ("pole_id", {"$ref": "#/components/schemas/PoleId"}),
         ("segment_id", {"type": "string", "nullable": True, "allOf": [{"$ref": "#/components/schemas/SegmentId"}]}),
@@ -409,6 +410,8 @@ S["PoleProperties"] = {
         ("lamp_watt", {"type": "integer", "format": "int32"}),
         ("lamp_count", {"type": "integer", "format": "int32", "minimum": 1, "maximum": 4, "nullable": True,
                         "description": "LAMP-COUNT LMC-1: số bóng giống nhau của bộ đèn đang dùng (cột cần đôi = 2); lamp_watt là công suất MỘT bóng; null khi cột không có bóng đang dùng"}),
+        ("fixture_count", {"type": "integer", "format": "int32", "minimum": 0, "maximum": 2,
+                           "description": "MULTI-FIXTURE MF-3: số bóng đang dùng trên cột (0–2); lamp_watt / lamp_count / install_date / warranty_* mô tả bóng ĐẦU TIÊN (theo slot), bóng thứ hai đọc ở GET /map/poles/{id} (fixtures[])"}),
         ("install_date", {"type": "string", "format": "date"}),
         ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),
         ("warranty_status", {"$ref": "#/components/schemas/WarrantyStatus",

@@ -74,6 +74,14 @@
     Còn: Mỹ chốt system_admin (ManageWorkOrders hiện chỉ manager), Claude chạy build/test/phá thử;
     WO-BATCH chưa có trong cây nên chưa kiểm liên thông. Chi tiết <code>.ai/results/WO-AUTODISPATCH.md</code>.</p>
   </div>
+  <div class="card" id="acct-profile">
+    <strong>ACCT-PROFILE — người dùng tự sửa hồ sơ, 11/11/2026</strong>
+    <span class="tag t-done">Xong · chờ PR</span>
+    <p><code>PATCH /auth/me</code> nhận <code>full_name</code>, capability ManageOwnProfile (cả bốn vai trò), trả cùng thân với GET /auth/me.
+    Email, vai trò, xã vẫn chỉ Quản trị sửa (email gắn link reset mật khẩu và đăng nhập Google). Upload avatar đã có từ ACCT-5. ACCT-6 SELF-SIGNED, không migration.</p>
+    <p>Files: Identity/Profiles/ProfileController.cs, ProfileService.cs, IdentityModule, LuxMapPolicies (chú thích), ProfileTests.cs (14 ca),
+    CurrentUserTests (lọc GET), contract-drift.md, traps/auth-accounts.md. Phá thử bỏ Trim làm 6 test đỏ.</p>
+  </div>
   <div class="card" id="acct-avatar">
     <strong>ACCT-AVATAR — phase 2, 09/11/2026</strong>
     <span class="tag t-done">Xong · chờ PR</span>
@@ -268,6 +276,18 @@
     <code>GET /assets/poles?missing_location=true</code> là danh sách chờ gắn GPS; template có dòng ví dụ. Sửa kèm lỗi có sẵn: WKT sai số (<code>POINT(abc)</code>) từng ra 500.
     Hết lệch yêu cầu FE (FE tạo được cột không GPS khi PR lên môi trường dev).
     <a href=".ai/results/POLE-GEOM-NULL-p2b.md">Kết quả 2b</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>MULTI-FIXTURE — một cột mang tối đa hai bóng, mỗi bóng một bản ghi, 11/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/MULTI-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>AddFixtureSlot</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    Mỹ chọn hướng B (đảo D-11 và hướng A của LAMP-COUNT): hai bản ghi <code>fixture</code> riêng mỗi cột. Giới hạn nằm ở DB: <code>fixture.slot</code> (1..2) + UNIQUE
+    partial <code>(pole_id, slot) WHERE removed_date IS NULL</code>; server chọn slot trống, không lộ ra API. Bóng thứ ba → 409 <code>POLE_HAS_ACTIVE_FIXTURE</code>; import báo theo dòng.
+    Đọc chỉ THÊM: <code>fixtures[]</code> (chi tiết cột), <code>active_fixtures[]</code> (kiểm kê), <code>fixture_count</code> (bản đồ, cột của phiếu); field một bóng giữ, mô tả bóng đầu.
+    Trạng thái, baseline vẫn theo cột; baseline neo vào bóng mới nhất đang dùng; bảo hành thống kê một hàng mỗi bóng. 6 test mới + 4 test cũ sửa theo luật hai bóng, phá thử <code>FirstFree</code> → 7/8 đỏ; spec sinh lại, lint vẫn 10 cảnh báo như trước.
+    Drift MF-1…MF-8, SELF-SIGNED. <strong>Còn mở:</strong> MF-5 — ngừng dùng bóng cũ hơn mà không thay thì baseline vẫn hiệu lực, cột có thể đọc <code>dim</code> oan; cần luật vận hành. Mock chưa có cột đôi.
+    <a href=".ai/tasks/MULTI-FIXTURE.md">Đề bài</a> · <a href=".ai/results/MULTI-FIXTURE-p2.md">Kết quả</a>.</p>
+    <p class="muted">Commit: <code>feat(assets): allow two lamps in service per pole, one fixture record each</code>.</p>
   </div>
 
   <div class="card">

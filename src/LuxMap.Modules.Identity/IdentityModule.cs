@@ -51,6 +51,7 @@ public sealed class IdentityModule : ILuxMapModule
         services.AddSingleton<AccessTokenIssuer>();
         services.AddScoped<AuthService>();
         services.AddScoped<AvatarService>();
+        services.AddScoped<ProfileService>();
         services.AddSingleton(new StoredObjectColumn(StorageBucket.Avatar, "app_user", "avatar_object_key", "avatar_byte_count"));
         services.AddSingleton(new StoredObjectColumn(StorageBucket.Avatar, "app_user", "avatar_thumbnail_key", "avatar_thumbnail_bytes"));
 

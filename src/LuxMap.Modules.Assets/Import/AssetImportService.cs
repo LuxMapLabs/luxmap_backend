@@ -513,15 +513,15 @@ public sealed class AssetImportService(
     /// <remarks>
     /// There is no natural key to upsert on. A pole carries several lamps over its life and the
     /// history is the point, so nothing in the file identifies a particular installation. Re-running
-    /// a fixtures file therefore reports one error per ACTIVE row rather than silently doubling the
-    /// equipment history (D-11: one lamp in service per pole). Replacing a lamp goes through CRUD,
-    /// which can say which row it means.
+    /// a fixtures file therefore reports one error per ACTIVE row beyond a pole's two slots rather than silently
+    /// doubling the equipment history (MULTI-FIXTURE: at most two lamps in service per pole). Replacing a lamp
+    /// goes through CRUD, which can say which row it means.
     /// </remarks>
     private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var poles = await ReferenceIndexAsync<Pole>(readers, "pole_external_ref", cancellationToken);
 
-        var occupied = await OccupiedPolesAsync(
+        var slotsInUse = await SlotsInUseAsync(
             poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray(), cancellationToken);
         var inserted = 0;
 
@@ -538,21 +538,35 @@ public sealed class AssetImportService(
             var warranty = reader.Date("warranty_expiry", required: false);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
 
-            // One lamp in service per pole (BE-REVIEW-02, D-11). A row with removed_date is history
-            // and neither occupies the pole nor is refused by an active lamp already there; only an
-            // ACTIVE row can collide, whether the other one is in the database or earlier in this file.
+            // At most two lamps in service per pole, one per slot (MULTI-FIXTURE). A row with removed_date is
+            // history and neither takes a slot nor is refused by a lamp already there; only an ACTIVE row can
+            // run out of slots, whether the other lamps are in the database or earlier in this file.
             if (installDate is not null && removedDate is not null && removedDate < installDate)
             {
                 reader.Fail("removed_date", $"'{removedDate:yyyy-MM-dd}' is before install_date '{installDate:yyyy-MM-dd}'.");
             }
 
-            if (poleId is not null && removedDate is null && !occupied.Add(poleId))
+            short slot = FixtureSlots.First;
+            if (poleId is not null && removedDate is null)
             {
-                reader.Fail(
-                    "pole_external_ref",
-                    "That pole already carries a lamp in service. Import creates equipment records, it "
-                    + "never replaces them — retire the current lamp (PUT /assets/fixtures/{id}/removal) "
-                    + "before recording its replacement.");
+                if (!slotsInUse.TryGetValue(poleId, out var taken))
+                {
+                    slotsInUse[poleId] = taken = [];
+                }
+
+                if (FixtureSlots.FirstFree(taken) is { } free)
+                {
+                    slot = free;
+                    taken.Add(free);
+                }
+                else
+                {
+                    reader.Fail(
+                        "pole_external_ref",
+                        $"That pole already carries {FixtureSlots.MaxInService} lamps in service. Import creates "
+                        + "equipment records, it never replaces them — retire one lamp "
+                        + "(PUT /assets/fixtures/{id}/removal) before recording another.");
+                }
             }
 
             if (!reader.IsValid)
@@ -572,6 +586,7 @@ public sealed class AssetImportService(
                 PowerSource = powerSource,
                 LampWatt = watt,
                 LampCount = lampCount,
+                Slot = slot,
                 InstallDate = installDate!.Value,
                 RemovedDate = removedDate,
                 WarrantyExpiry = warranty,
@@ -730,21 +745,21 @@ public sealed class AssetImportService(
         return matches[0];
     }
 
-    private async Task<HashSet<string>> OccupiedPolesAsync(string[] poleIds, CancellationToken cancellationToken)
+    private async Task<Dictionary<string, HashSet<short>>> SlotsInUseAsync(string[] poleIds, CancellationToken cancellationToken)
     {
         if (poleIds.Length == 0)
         {
-            return new HashSet<string>(StringComparer.Ordinal);
+            return new Dictionary<string, HashSet<short>>(StringComparer.Ordinal);
         }
 
-        // Only lamps still in service occupy a pole; a retired one leaves room for its replacement.
-        var occupied = await dbContext.Set<Fixture>().AsNoTracking()
+        // Only lamps still in service hold a slot; a retired one leaves room for its replacement.
+        var rows = await dbContext.Set<Fixture>().AsNoTracking()
             .Where(fixture => poleIds.Contains(fixture.PoleId) && fixture.RemovedDate == null)
-            .Select(fixture => fixture.PoleId)
-            .Distinct()
+            .Select(fixture => new { fixture.PoleId, fixture.Slot })
             .ToListAsync(cancellationToken);
 
-        return new HashSet<string>(occupied, StringComparer.Ordinal);
+        return rows.GroupBy(row => row.PoleId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.Select(row => row.Slot).ToHashSet(), StringComparer.Ordinal);
     }
 
     /// <summary>Ordinal comparison for the composite key, so casing is never quietly folded.</summary>

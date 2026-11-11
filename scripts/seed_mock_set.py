@@ -161,16 +161,16 @@ END $$;""".strip())
             f"{geometry(feature['geometry'])}, {str(p['near_sensitive_poi']).lower()}, "
             f"{DATA_SOURCE}, {quote(p['pole_id'])});")
 
-    # Contract section 5.1 flattens the ACTIVE lamp into the pole's properties, so the mock keeps a
-    # fixture's fields there and carries no fixture id of its own. FIX-nnnn is aligned with the pole's
+    # Contract section 5.1 flattens the FIRST active lamp into the pole's properties, so the mock keeps a
+    # fixture's fields there and carries no fixture id of its own (one lamp per pole, in slot 1). FIX-nnnn is aligned with the pole's
     # number, which makes FIX-0047 the lamp on POLE-0047 and is the only readable choice.
     for index, feature in enumerate(poles, start=1):
         p = feature["properties"]
         sql.append(
             "INSERT INTO fixture (fixture_id, pole_id, commune_id, fixture_type, power_source, "
-            "lamp_watt, lamp_count, install_date, removed_date, warranty_expiry, data_source) VALUES ("
+            "lamp_watt, lamp_count, slot, install_date, removed_date, warranty_expiry, data_source) VALUES ("
             f"'FIX-{index:04d}', {quote(p['pole_id'])}, {COMMUNE}, {quote(p['fixture_type'])}, "
-            f"{quote(p['power_source'])}, {p['lamp_watt']}, {p.get('lamp_count', 1)}, {quote(p['install_date'])}, NULL, "
+            f"{quote(p['power_source'])}, {p['lamp_watt']}, {p.get('lamp_count', 1)}, 1, {quote(p['install_date'])}, NULL, "
             f"{quote(p.get('warranty_expiry'))}, {DATA_SOURCE});")
 
     # One cluster: the segment-wide outage the mock plants on SEG-003, which is what makes

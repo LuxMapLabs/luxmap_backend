@@ -47,7 +47,7 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
         string[] expected =
         [
             "pole_id", "external_ref", "segment_id", "feeder_id", "commune_id", "commune_name", "data_source",
-            "near_sensitive_poi", "location", "active_fixture", "note", "updated_at", "updated_by", "updated_by_name",
+            "near_sensitive_poi", "location", "active_fixture", "active_fixtures", "note", "updated_at", "updated_by", "updated_by_name",
             "feeder_source", "cabinet_id", "cabinet_name", "cabinet_source",
         ];
 

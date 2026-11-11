@@ -295,20 +295,23 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
 
         builder.HasCommuneReference(fixture => fixture.CommuneId);
 
-        // "The lamp currently in service on this pole" is the lookup BE-14 makes for every pole in a
+        // "The lamps currently in service on this pole" is the lookup BE-14 makes for every pole in a
         // bbox, so it gets its own partial index rather than filtering the full history each time.
         //
-        // UNIQUE since BE-REVIEW-02 (D-11): a pole carries AT MOST ONE lamp in service at a time.
-        // That is now a business rule, decided by Dylan on 18/09/2026, and this index is what
-        // enforces it. Three places used to disagree — import refused any pole that had EVER had a
-        // lamp, CRUD allowed any number of active lamps, and BE-14 was going to flatten "the active
-        // fixture" (singular). The history is untouched: replacing a lamp still keeps the old row
-        // with a removed_date, and the index only sees rows where removed_date IS NULL. CV cannot
-        // tell two lamps on one pole apart anyway (see Fixture), and every pole in the FO-26 mock set
-        // carries exactly one.
-        builder.HasIndex(fixture => fixture.PoleId)
+        // UNIQUE on (pole_id, slot) since MULTI-FIXTURE (drift MF-1), which replaced BE-REVIEW-02's D-11
+        // "one lamp per pole" on 11/11/2026 (Mỹ): a pole carries AT MOST TWO lamps in service, one per slot.
+        // Modelling the limit as a slot rather than counting rows is what lets the database refuse a third
+        // lamp even when two requests race past the service's own check. The history is untouched:
+        // replacing a lamp still keeps the old row with a removed_date, and the index only sees rows where
+        // removed_date IS NULL. Status, baseline and fixture_status stay per POLE — CV cannot tell two lamps
+        // on one pole apart (see Fixture).
+        builder.Property(fixture => fixture.Slot).HasColumnType("smallint").IsRequired();
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_fixture_slot", $"slot BETWEEN {FixtureSlots.First} AND {FixtureSlots.MaxInService}"));
+
+        builder.HasIndex(fixture => new { fixture.PoleId, fixture.Slot })
             .IsUnique()
-            .HasDatabaseName("ux_fixture_pole_id_active")
+            .HasDatabaseName("ux_fixture_pole_slot_active")
             .HasFilter("removed_date IS NULL");
 
         // A lamp cannot be taken down before it was put up (BE-REVIEW-02, Q-4). The API checks it

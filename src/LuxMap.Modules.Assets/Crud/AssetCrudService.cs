@@ -351,13 +351,14 @@ public sealed class AssetCrudService(
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == request.PoleId, "pole", ct);
 
-        // At most ONE lamp in service per pole (BE-REVIEW-02, D-11). A row that arrives already
-        // retired is history and may coexist with the active one. The friendly check is here; the
-        // partial unique index ux_fixture_pole_id_active is the guard that cannot be raced past —
-        // see the catch around SaveChanges below.
+        // At most TWO lamps in service per pole, one per slot (MULTI-FIXTURE, drift MF-1). A row that
+        // arrives already retired is history, holds no slot and may coexist with any number of others. The
+        // friendly check is here; the partial unique index ux_fixture_pole_slot_active is the guard that
+        // cannot be raced past — see the catch around SaveChanges below.
+        short slot = FixtureSlots.First;
         if (request.RemovedDate is null)
         {
-            await RejectActiveFixtureAsync(pole.PoleId, ct);
+            slot = await FreeSlotOrRejectAsync(pole.PoleId, ct);
         }
         else
         {
@@ -377,6 +378,7 @@ public sealed class AssetCrudService(
             PowerSource = request.PowerSource!.Value,
             LampWatt = request.LampWatt!.Value,
             LampCount = request.LampCount ?? 1,
+            Slot = slot,
             InstallDate = request.InstallDate!.Value,
             RemovedDate = request.RemovedDate,
             WarrantyExpiry = request.WarrantyExpiry,
@@ -1116,9 +1118,12 @@ public sealed class AssetCrudService(
     /// definition — rather than as a second copy of the rule inside the SQL projection. Every pole read goes through it.
     /// </summary>
     private static PoleListItem WithWarranty(PoleListItem item, WarrantyWindow window)
-        => item.ActiveFixture is { } lamp
-            ? item with { ActiveFixture = lamp with { WarrantyStatus = window.Classify(lamp.WarrantyExpiry) } }
-            : item;
+    {
+        var lamps = item.ActiveFixtures
+            .Select(lamp => lamp with { WarrantyStatus = window.Classify(lamp.WarrantyExpiry) })
+            .ToArray();
+        return item with { ActiveFixtures = lamps, ActiveFixture = lamps.FirstOrDefault() };
+    }
 
     private System.Linq.Expressions.Expression<Func<Pole, PoleListItem>> PoleRow =>
         pole => new PoleListItem
@@ -1144,8 +1149,9 @@ public sealed class AssetCrudService(
             DataSource = pole.DataSource,
             NearSensitivePoi = pole.NearSensitivePoi,
             Location = pole.Geom == null ? null : new AssetLocation { Lat = pole.Geom.Y, Lng = pole.Geom.X },
-            ActiveFixture = pole.Fixtures
+            ActiveFixtures = pole.Fixtures
                 .Where(lamp => lamp.RemovedDate == null)
+                .OrderBy(lamp => lamp.Slot)
                 .Select(lamp => new ActiveFixture
                 {
                     FixtureId = lamp.FixtureId,
@@ -1157,7 +1163,7 @@ public sealed class AssetCrudService(
                     WarrantyExpiry = lamp.WarrantyExpiry,
                     DataSource = lamp.DataSource,
                 })
-                .FirstOrDefault(),
+                .ToList(),
             Note = pole.Note,
             UpdatedAt = pole.UpdatedAt,
             UpdatedBy = pole.UpdatedBy,
@@ -1434,30 +1440,30 @@ public sealed class AssetCrudService(
         }
     }
 
-    private async Task RejectActiveFixtureAsync(string poleId, CancellationToken ct)
+    /// <summary>The lowest free slot on the pole, or 409 when both lamp positions are taken.</summary>
+    private async Task<short> FreeSlotOrRejectAsync(string poleId, CancellationToken ct)
     {
-        var occupied = await dbContext.Set<Fixture>().AsNoTracking()
-            .AnyAsync(fixture => fixture.PoleId == poleId && fixture.RemovedDate == null, ct);
+        var inUse = await dbContext.Set<Fixture>().AsNoTracking()
+            .Where(fixture => fixture.PoleId == poleId && fixture.RemovedDate == null)
+            .Select(fixture => fixture.Slot)
+            .ToListAsync(ct);
 
-        if (occupied)
-        {
-            throw ActiveFixtureConflict(poleId);
-        }
+        return FixtureSlots.FirstFree(inUse) ?? throw ActiveFixtureConflict(poleId);
     }
 
     private static LuxMapException ActiveFixtureConflict(string poleId)
         => new(
             ErrorCodes.PoleHasActiveFixture,
             HttpStatusCode.Conflict,
-            "That pole already carries a lamp in service. Retire it (PUT /assets/fixtures/{id}/removal) before recording its replacement.",
+            $"That pole already carries {FixtureSlots.MaxInService} lamps in service. Retire one (PUT /assets/fixtures/{{id}}/removal) before recording another.",
             new Dictionary<string, object?> { ["pole_id"] = poleId });
 
-    /// <summary>PostgreSQL <c>23505</c> on the one-active-lamp index.</summary>
+    /// <summary>PostgreSQL <c>23505</c> on the lamps-in-service index.</summary>
     private static bool IsActiveFixtureCollision(DbUpdateException failure)
         => failure.InnerException is PostgresException
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "ux_fixture_pole_id_active",
+            ConstraintName: "ux_fixture_pole_slot_active",
         };
 
     /// <summary>What refused the delete, taken from the database's own answer.</summary>

@@ -186,7 +186,8 @@ Lược đồ đích theo Phiếu v1.4: **`docs/database/erd.md`** (quyết đ�
 thì ghi lại.
 
 - **`Pole` và `Fixture` tách riêng.** Cột là kết cấu, bóng là thiết bị thay được; lịch sử trạng thái thuộc **vị trí cột**, nên `Fixture`
-  không có cột trạng thái nào. Mỗi cột tối đa **một bóng đang dùng**.
+  không có cột trạng thái nào. Mỗi cột tối đa **hai bóng đang dùng** (MULTI-FIXTURE, drift MF-1 — đảo D-11): giới hạn là
+  `fixture.slot` + UNIQUE `(pole_id, slot) WHERE removed_date IS NULL`, không phải đếm dòng. Trạng thái, baseline vẫn **theo cột**.
 - **`SurveyFrame` và `RepairEvidence` là hai luồng ảnh riêng.** Ảnh khảo sát là dữ liệu chính, không phải file đính kèm.
 - **Ảnh không nằm trong DB**: object store giữ bytes, row giữ key.
 - **`external_ref`** (khoá tự nhiên của import) là **mã vĩnh viễn** do nhóm quản lý; mã kiểm kê của xã đi cột riêng (`docs/agents/traps/assets.md`).

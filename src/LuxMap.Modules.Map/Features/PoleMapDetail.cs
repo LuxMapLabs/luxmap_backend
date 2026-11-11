@@ -23,6 +23,9 @@ public sealed record PoleMapDetail
     /// <summary>The lamp in use; <c>null</c> when the pole has no active fixture.</summary>
     public PoleMapFixture? Fixture { get; init; }
 
+    /// <summary>Every lamp in service, in slot order — at most two (MULTI-FIXTURE, drift MF-1); <see cref="Fixture"/> is its first item. Empty when none.</summary>
+    public IReadOnlyList<PoleMapFixture> Fixtures { get; init; } = [];
+
     public required PoleMapStatus CurrentStatus { get; init; }
 
     /// <summary>
@@ -64,6 +67,7 @@ public sealed record PoleMapLocation(double Lat, double Lng);
 
 public sealed record PoleMapFixture
 {
+    public required string FixtureId { get; init; }
     public FixtureType FixtureType { get; init; }
     public PowerSource PowerSource { get; init; }
     public int LampWatt { get; init; }

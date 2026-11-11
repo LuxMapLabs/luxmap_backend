@@ -4404,6 +4404,120 @@
           }
         },
         "x-luxmap-client": "shared"
+      },
+      "patch": {
+        "tags": [
+          "Profile"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentUserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_own_profile",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
       }
     },
     "/api/v1/auth/logout": {
@@ -18053,6 +18167,12 @@
           "active_fixture": {
             "$ref": "#/components/schemas/ActiveFixture"
           },
+          "active_fixtures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActiveFixture"
+            }
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -18202,6 +18322,12 @@
           "fixture": {
             "$ref": "#/components/schemas/PoleMapFixture"
           },
+          "fixtures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapFixture"
+            }
+          },
           "current_status": {
             "$ref": "#/components/schemas/PoleMapStatus"
           },
@@ -18249,8 +18375,14 @@
         "additionalProperties": false
       },
       "PoleMapFixture": {
+        "required": [
+          "fixture_id"
+        ],
         "type": "object",
         "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
           "fixture_type": {
             "$ref": "#/components/schemas/FixtureType"
           },
@@ -18824,6 +18956,10 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "fixture_count": {
+            "type": "integer",
+            "format": "int32"
           },
           "install_date": {
             "type": "string",
@@ -20721,6 +20857,10 @@
             "format": "int32",
             "nullable": true
           },
+          "fixture_count": {
+            "type": "integer",
+            "format": "int32"
+          },
           "install_date": {
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
@@ -21110,6 +21250,17 @@
           "feeder_source": {
             "type": "string",
             "description": "Provenance of the pole → feeder relation (TOPO-INFER): verified | inferred. OPTIONAL: absent = inferred for a new or moved feeder, KEPT when the feeder stays. null while a feeder is set, or a label with no feeder, is 400.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "full_name": {
+            "maxLength": 256,
+            "type": "string",
             "nullable": true
           }
         },
@@ -21949,6 +22100,10 @@
             "format": "int32",
             "nullable": true
           },
+          "fixture_count": {
+            "type": "integer",
+            "format": "int32"
+          },
           "work_order_fault_ids": {
             "type": "array",
             "items": {
@@ -22131,6 +22286,9 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "Profile"
     },
     {
       "name": "Avatar"

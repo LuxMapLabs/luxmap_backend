@@ -150,8 +150,10 @@ public class CurrentUserTests(ScopeTestFixture factory, ITestOutputHelper output
         var endpoints = factory.Services
             .GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints;
 
+        // GET only: PATCH /auth/me (ACCT-6) shares the path and is covered by ProfileTests.
         var me = endpoints.OfType<Microsoft.AspNetCore.Routing.RouteEndpoint>().Single(endpoint =>
-            endpoint.RoutePattern.RawText!.EndsWith("/auth/me", StringComparison.Ordinal));
+            endpoint.RoutePattern.RawText!.EndsWith("/auth/me", StringComparison.Ordinal)
+            && endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()!.HttpMethods.Contains("GET"));
 
         Assert.Null(me.Metadata.GetMetadata<IAllowAnonymous>());
 

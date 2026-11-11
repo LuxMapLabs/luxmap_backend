@@ -389,6 +389,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("removed_date");
 
+                    b.Property<short>("Slot")
+                        .HasColumnType("smallint")
+                        .HasColumnName("slot");
+
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -409,13 +413,13 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_fixture_commune_id");
 
-                    b.HasIndex("PoleId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_fixture_pole_id_active")
-                        .HasFilter("removed_date IS NULL");
-
                     b.HasIndex("UpdatedBy")
                         .HasDatabaseName("ix_fixture_updated_by");
+
+                    b.HasIndex("PoleId", "Slot")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fixture_pole_slot_active")
+                        .HasFilter("removed_date IS NULL");
 
                     b.ToTable("fixture", null, t =>
                         {
@@ -428,6 +432,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_fixture_power_source", "\"power_source\" IN ('grid')");
 
                             t.HasCheckConstraint("ck_fixture_removed_after_install", "removed_date IS NULL OR removed_date >= install_date");
+
+                            t.HasCheckConstraint("ck_fixture_slot", "slot BETWEEN 1 AND 2");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);

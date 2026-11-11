@@ -8,7 +8,8 @@ namespace LuxMap.Modules.Assets.Entities;
 /// <para>
 /// This entity records an INSTALLATION: which device, on which pole, from when to when. Replacing a
 /// lamp sets <see cref="RemovedDate"/> on the old row and inserts a new one, so the pole keeps its
-/// full equipment history.
+/// full equipment history. A pole may carry TWO lamps in service at once (MULTI-FIXTURE, drift MF-1) —
+/// each its own row with its own ID, wattage and warranty.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -57,6 +58,14 @@ public class Fixture : ICommuneScoped, IUpdateStamped
     public int LampCount { get; set; } = 1;
 
     /// <summary>
+    /// Which of the pole's (at most <see cref="FixtureSlots.MaxInService"/>) lamp positions this fitting holds
+    /// while in service (MULTI-FIXTURE). The unique index on <c>(pole_id, slot) WHERE removed_date IS NULL</c> is
+    /// what limits a pole to two lamps in service; the API picks the lowest free slot and never exposes it.
+    /// A retired fitting keeps its slot as history and frees it.
+    /// </summary>
+    public short Slot { get; set; } = FixtureSlots.First;
+
+    /// <summary>
     /// <c>date</c>, not <c>timestamptz</c> — Contract section 0 separates the two, and a fitting is
     /// installed on a day, not at an instant.
     /// </summary>
@@ -64,7 +73,7 @@ public class Fixture : ICommuneScoped, IUpdateStamped
 
     /// <summary>
     /// When this fixture was taken off the pole. <c>NULL</c> means it is the one currently in service;
-    /// that is what the partial index keys on and what BE-14 flattens into the pole's properties.
+    /// that is what the partial index keys on.
     /// </summary>
     public DateOnly? RemovedDate { get; set; }
 
