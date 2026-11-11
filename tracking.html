@@ -40,10 +40,20 @@
 <body>
 <div class="wrap">
 
+  <div class="card">
+    <strong>Đồng bộ trạng thái — 11/11/2026</strong>
+    <p><span class="tag t-next">Đối chiếu với <code>origin/dev</code> (970e300) · chỉ sửa nhãn trạng thái, không đụng nội dung card</span>
+    Các card từ 24/10 đến 11/11 còn ghi "chờ PR / chờ merge / chưa push" trong khi PR đã merge: nay ghi theo số PR và ngày merge.
+    <strong>Lên VPS:</strong> d128e97 (10/11) gồm tới #223. <strong>Chưa lên VPS:</strong> #224 (ASSET-SEGMENT-CORRIDOR), #225 + #227 (POLE-GEOM-NULL),
+    #226 (MULTI-FIXTURE, migration <code>AddFixtureSlot</code>), #228 (ACCT-PROFILE). <strong>PR mở:</strong> #143 SPEC-NULLABLE (HOLD, chờ WP5 sửa
+    script sinh types), #213 IoT device diagnostics (DatBongDem). <strong>Task CSV chưa xong:</strong> BE-34 (90%, còn D-6 / D-7), BE-39 (30%, chưa có kịch bản demo),
+    BE-16 / BE-29 / BE-30 (tạm dừng), BE-32, BE-37, BE-38 (chưa bắt đầu). Các dòng "chưa báo WP4 / WP5 / WP6" giữ nguyên như đã ghi — chưa xác minh lại.</p>
+  </div>
+
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="survey-recurring">
     <strong>SURVEY-RECURRING — phase 2, 09/11/2026</strong>
-    <span class="tag t-next">Build xanh · chờ migration và test</span>
+    <span class="tag t-done">Đã merge · #223 (10/11) · full suite xanh, 7 phá thử đỏ · VPS d128e97 (10/11), migration <code>SurveyRecurringSchedules</code></span>
     <p>CRUD lịch khảo sát hàng tuần, lịch địa phương T2–CN, cutoff T5 17:00; job 15 phút,
     receipt chống sinh lại và kiểm survey cùng tuần; gán người chung EngineerLoadBoard, ghi phiếu chung CreateSurvey.</p>
     <p>Files: WorkOrders/SurveyRecurring*, SurveyScheduleCalendar, Entities/Configurations/Jobs, shared audit/prefix/errors,
@@ -55,7 +65,7 @@
   </div>
   <div class="card" id="wo-batch">
     <strong>WO-BATCH — phase 2, 09/11/2026</strong>
-    <span class="tag t-block">Đã implement · chờ xác minh và chốt quyền admin</span>
+    <span class="tag t-done">Đã merge · #221 (09/11) · 1522 pass, 5 phá thử đỏ · <code>ManageWorkOrders</code> chỉ <code>manager</code> (admin nhận 403) · VPS d128e97 (10/11)</span>
     <p>POST /work-orders/batch: 1–50 phần tử, giữ thứ tự, dùng chung logic Create, khóa tập fault trước,
     một transaction toàn lô, lỗi kèm details.index; rollback cả audit và thông báo. WO-BATCH-1 SELF-SIGNED.</p>
     <p>Files: WorkOrderService/Requests/Responses, WorkOrdersController, WorkOrderBatchTests.cs,
@@ -65,7 +75,7 @@
     giữ ma trận hiện hành, test admin kỳ vọng 201 hiện chưa thể xanh. Commit dự kiến: <code>feat(work-orders): create atomic batches</code>.</p>
   <div class="card" id="wo-autodispatch">
     <strong>WO-AUTODISPATCH — phase 2, 09/11/2026</strong>
-    <span class="tag t-next">Build xanh · chờ test và chốt quyền admin</span>
+    <span class="tag t-done">Đã merge · #222 (09/11) · 1556 pass, 7 phá thử đỏ · VPS d128e97 (10/11) · chưa báo WP5</span>
     <p>POST preview chỉ đọc; planner thuần, EngineerLoadBoard công khai; dùng chung eligibility/vị trí dọc tuyến.
     Gom cột phân biệt, tách 8, quota 2, tuần T2–CN, cả 7 ngày; drift WO-AUTODISPATCH-1 SELF-SIGNED.</p>
     <p>Files: WorkOrders/AutoDispatch*.cs, service/controller/poles/module, Api/appsettings.json,
@@ -76,7 +86,7 @@
   </div>
   <div class="card" id="acct-profile">
     <strong>ACCT-PROFILE — người dùng tự sửa hồ sơ, 11/11/2026</strong>
-    <span class="tag t-done">Xong · chờ PR</span>
+    <span class="tag t-done">Đã merge · #228 (11/11) · chưa lên VPS</span>
     <p><code>PATCH /auth/me</code> nhận <code>full_name</code>, capability ManageOwnProfile (cả bốn vai trò), trả cùng thân với GET /auth/me.
     Email, vai trò, xã vẫn chỉ Quản trị sửa (email gắn link reset mật khẩu và đăng nhập Google). Upload avatar đã có từ ACCT-5. ACCT-6 SELF-SIGNED, không migration.</p>
     <p>Files: Identity/Profiles/ProfileController.cs, ProfileService.cs, IdentityModule, LuxMapPolicies (chú thích), ProfileTests.cs (14 ca),
@@ -84,7 +94,7 @@
   </div>
   <div class="card" id="acct-avatar">
     <strong>ACCT-AVATAR — phase 2, 09/11/2026</strong>
-    <span class="tag t-done">Xong · chờ PR</span>
+    <span class="tag t-done">Đã merge · #220 (09/11) · VPS d128e97 (10/11)</span>
     <p>Bốn route avatar, capability ManageOwnProfile, JPEG-only sanitize ≤512 px / 1 MiB, bucket luxmap-avatar,
     avatar_url cho me/admin, cache private + ETag/304. DELETE chỉ gỡ liên kết. ACCT-5 SELF-SIGNED.</p>
     <p>Files: Identity/Profiles, AppUser, IdentityConfigurations, Auth/Accounts DTO và service, IdentityModule,
@@ -95,7 +105,7 @@
   </div>
   <div class="card" id="asset-segment-poles">
     <strong>ASSET-SEGMENT-POLES — phase 2, 09/11/2026</strong>
-    <span class="tag t-done">Xong · chờ PR</span>
+    <span class="tag t-done">Đã merge · #219 (09/11) · VPS d128e97 (10/11)</span>
     <p>POST/PUT tuyến nhận <code>pole_ids</code> là tập không thứ tự: vắng giữ trên PUT, [] bỏ cột thấy được,
     null lỗi 400. Một transaction và một SaveChanges cho tuyến + cột; khóa hàng chống gán đồng thời,
     404 cột thiếu/ẩn, 409 cột đã thuộc tuyến khác / sai luật khác xã. ASSET-SEG-1 SELF-SIGNED.</p>
@@ -109,7 +119,7 @@
   </div>
   <div class="card" id="asset-segment-corridor">
     <strong>ASSET-SEGMENT-CORRIDOR — 10/11/2026</strong>
-    <span class="tag t-done">Xong · chờ PR</span>
+    <span class="tag t-done">Đã merge · #224 (10/11) · chưa lên VPS · drift ASSET-SEG-2 SELF-SIGNED · chưa báo WP5</span>
     <p>PUT tuyến đổi <code>geom_wkt</code> mà để cột của tuyến ngoài hành lang khảo sát 25 m →
     <strong>409 <code>POLE_OFF_SEGMENT</code></strong>, không ghi gì. Đếm cả cột xã khác trên tuyến liên xã
     (<code>pole_count</code>) nhưng chỉ nêu ID cột người gọi thấy (<code>pole_ids</code>). Hình học không đổi thì không đo.
@@ -122,7 +132,7 @@
   </div>
   <div class="card" id="acct-google">
     <strong>ACCT-GOOGLE — đăng nhập bằng Google, 09/11/2026</strong>
-    <span class="tag t-done">Đã kiểm chứng · chờ merge</span>
+    <span class="tag t-done">Đã merge · #218 (08/11) · VPS d128e97 (10/11)</span>
     <p>Hai route <code>POST /auth/google</code> và <code>/auth/web/google</code>: verifier qua port (<code>Google.Apis.Auth</code> 1.78.0),
     chỉ khớp email đã xác minh của tài khoản đã đặt mật khẩu, không bao giờ tạo tài khoản. Chung refresh chain với đăng nhập mật khẩu;
     web thay cookie cũ, phiên không ghi nhớ. <code>GOOGLE_CLIENT_IDS</code> trống = tắt (luôn 401, không gọi Google). ACCT-4 SELF-SIGNED.</p>
@@ -141,7 +151,7 @@
   </div>
   <div class="card" id="acct-login-email">
     <strong>ACCT-LOGIN-EMAIL — đăng nhập bằng username hoặc email, 08/11/2026</strong>
-    <span class="tag t-done">Đã kiểm chứng · chờ merge</span>
+    <span class="tag t-done">Đã merge · #217 (08/11) · VPS d128e97 (10/11)</span>
     <p>Giữ field <code>username</code> cho mobile/web; trim, so không phân biệt hoa thường, ưu tiên username.
     Email tra qua <code>ix_app_user_email_lower</code> (UNIQUE trên <code>lower(email)</code>) nên luôn tối đa một tài khoản. ACCT-3 SELF-SIGNED, nền tạm tới FW.</p>
     <p>10 ca (5 theory × mobile/web): email/username đúng, in hoa, email lưu chữ hoa, thất bại giữ nguyên mã/thông điệp, username thắng email, PATCH đổi email.
@@ -150,7 +160,7 @@
   </div>
   <div class="card" id="test-wo-parallel">
     <strong>TEST-WO-PARALLEL — phase 2, 08/11/2026</strong>
-    <span class="tag t-next">Đã sửa · đã kiểm chứng</span>
+    <span class="tag t-done">Đã merge · #216 (08/11) · toàn suite exit 0</span>
     <p><code>PoleClient</code> dùng <code>SemaphoreSlim</code> bảo vệ khởi tạo host, đăng nhập và cache client;
     ba upload cùng operation vẫn gửi song song. Teardown giữ kiểm tra host null và dùng cùng khóa khi đọc cache;
     thao tác xóa client để đăng nhập lại cũng dùng khóa này.</p>
@@ -189,7 +199,7 @@
 
   <div class="card" id="stat-citizen">
     <strong>STAT-CITIZEN — thống kê phản ánh QR, 06/11/2026</strong>
-    <p><span class="tag t-next">PR #212 · chờ CI</span>
+    <p><span class="tag t-done">Đã merge · PR #212 (06/11) · toàn suite exit 0</span>
     <code>GET /statistics/citizen-feedback</code> đếm CitizenReport theo bốn trạng thái; nhóm nguồn/xã/tuyến,
     giữ cột chưa tuyến, lọc <code>night_of</code>, tỉ lệ gồm rejected, CSV theo W-5. Drift ST-13 SELF-SIGNED;
     không migration. File: <code>src/LuxMap.Modules.Statistics/{StatisticsContracts,StatisticsController,StatisticsService}.cs</code>,
@@ -223,7 +233,7 @@
 
   <div class="card">
     <strong>POLE-VIDEO — PV-c3 (xác nhận clip phải sau khi đã mở), 05/11/2026</strong>
-    <p><span class="tag t-next">PR #209 · đổi hành vi API (thêm 409) · không migration · chưa báo WP5</span>
+    <p><span class="tag t-done">Đã merge · PR #209 (05/11) · đổi hành vi API (thêm 409) · không migration · VPS d128e97 (10/11) · chưa báo WP5</span>
     <code>POST …/pole-photos/{photo_id}/decision</code> với <code>confirm</code> trên ảnh có clip: người quyết định phải là người mở clip gần nhất, không thì <b>409 <code>POLE_VIDEO_NOT_VIEWED</code></b> (kèm <code>photo_id</code>, <code>video_url</code>) và không có gì được ghi.
     Áp cho cả <code>on</code> lẫn <code>off</code>; <code>reject</code> và ảnh thường không đổi; thứ tự: đã quyết → không có nhãn → chưa xem; kỹ sư sửa nhãn không thay lượt xem. Drift <b>PV-10</b>.
     <a href=".ai/tasks/POLE-VIDEO.md">Đề bài + chia PR</a>.</p>
@@ -232,7 +242,7 @@
 
   <div class="card">
     <strong>POLE-VIDEO — PV-c2 (upload clip một đèn + luật nhãn), 05/11/2026</strong>
-    <p><span class="tag t-next">PR #208 · đổi API (thêm PUT + khối <code>video</code>) · không migration · chưa báo WP5 / WP6</span>
+    <p><span class="tag t-done">Đã merge · PR #208 (05/11) · đổi API (thêm PUT + khối <code>video</code>) · không migration · VPS d128e97 (10/11) · chưa báo WP5 / WP6</span>
     <code>PUT /work-orders/{id}/pole-videos/{client_op_id}</code>: MP4 thô stream sang kho (≤ 100 MiB, Caddy chặn riêng route), sampler (PV-b) cắt ≤ 12 frame, AI chấm từng frame, <code>PoleVideoVerdict</code> gộp nhãn (≥ 60 % frame có nhãn, đồng thuận ≥ 70 %, đầu = cuối, trung vị confidence);
     kết quả là <b>một ảnh cột</b> (frame đại diện) mang khối <code>video</code> — review, quyết định, công bố, sự cố dùng nguyên. Replay không đọc / chấm / ghi lại; kiểm lại phiếu sau khi nhận clip; <code>captured_at</code> có biên (7 ngày / +5 phút).
     Model vắng ⇒ vẫn 201, <code>ai_status = unavailable</code>. Audit quyết định mang <code>media = video</code>, <code>capture_config = not_verified</code>, <code>hdr</code>. Drift <b>PV-4…PV-9</b>; OpenAPI xuất lại.
@@ -261,7 +271,7 @@
 
   <div class="card">
     <strong>POLE-VIDEO — PV-a (lược đồ clip một đèn), 04/11/2026</strong>
-    <p><span class="tag t-next">PR #205 · migration <code>AddPoleVideoColumns</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa có endpoint · chưa báo WP4 / WP5 / WP6</span>
+    <p><span class="tag t-done">Đã merge · PR #205 (04/11) · migration <code>AddPoleVideoColumns</code> · VPS d128e97 (10/11) · chưa báo WP4 / WP5 / WP6</span>
     D-1 (C): 17 cột <code>video_*</code> nullable, tất cả-hoặc-không, ngay trong <code>work_order_pole_photo</code> (clip gốc, đếm frame, trải confidence, độ sáng, cờ <code>hdr</code>, phiên bản extractor, mã lý do, lượt mở clip của người quyết định)
     cùng audit <code>viewed</code> (D-13). <code>byte_count</code>/<code>width</code>/<code>height</code> của dòng vẫn mô tả <b>frame</b>; clip ở <code>video_bytes</code>. Khai <code>StoredObjectColumn</code> (bucket video) và <code>VersionedResultColumn</code>; script sao chép DB thêm bộ lọc <code>video_viewed_by</code>.
     Test viết chính CHECK lộ một lỗi thật: nhánh CHECK có toán hạng NULL cho NULL nên hàng sai lọt — đã sửa, ghi bẫy vào <code>traps/migrations.md</code>. Toàn bộ test xanh; <code>Down()</code> từ chối khi đã có clip hoặc audit <code>viewed</code>.
@@ -271,7 +281,7 @@
 
   <div class="card">
     <strong>POLE-GEOM-NULL — PR 2b (bật tạo / sửa / nhập cột chưa GPS), 11/11/2026</strong>
-    <p><span class="tag t-next">Nhánh <code>feat/ASSET-pole-geom-writers</code> · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS · chưa báo WP5 / WP6 · VPS dev chưa deploy / migrate</span>
+    <p><span class="tag t-done">Đã merge · #227 (11/11) · chưa lên VPS / chưa migrate · chưa báo WP5 / WP6</span>
     <code>POST</code>/<code>PUT /assets/poles</code> và import <code>poles.csv</code>/<code>.geojson</code> nhận cột không có <code>geom_wkt</code> (cột đã có GPS không bao giờ mất vị trí);
     <code>GET /assets/poles?missing_location=true</code> là danh sách chờ gắn GPS; template có dòng ví dụ. Sửa kèm lỗi có sẵn: WKT sai số (<code>POINT(abc)</code>) từng ra 500.
     Hết lệch yêu cầu FE (FE tạo được cột không GPS khi PR lên môi trường dev).
@@ -280,7 +290,7 @@
 
   <div class="card">
     <strong>MULTI-FIXTURE — một cột mang tối đa hai bóng, mỗi bóng một bản ghi, 11/11/2026</strong>
-    <p><span class="tag t-next">Nhánh <code>feat/MULTI-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>AddFixtureSlot</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    <p><span class="tag t-done">Đã merge · #226 (11/11) · migration <code>AddFixtureSlot</code> chưa lên VPS · chưa báo WP5 / WP6</span>
     Mỹ chọn hướng B (đảo D-11 và hướng A của LAMP-COUNT): hai bản ghi <code>fixture</code> riêng mỗi cột. Giới hạn nằm ở DB: <code>fixture.slot</code> (1..2) + UNIQUE
     partial <code>(pole_id, slot) WHERE removed_date IS NULL</code>; server chọn slot trống, không lộ ra API. Bóng thứ ba → 409 <code>POLE_HAS_ACTIVE_FIXTURE</code>; import báo theo dòng.
     Đọc chỉ THÊM: <code>fixtures[]</code> (chi tiết cột), <code>active_fixtures[]</code> (kiểm kê), <code>fixture_count</code> (bản đồ, cột của phiếu); field một bóng giữ, mô tả bóng đầu.
@@ -292,7 +302,7 @@
 
   <div class="card">
     <strong>POLE-GEOM-NULL — PR 2a (schema + mọi chỗ đọc), 10/11/2026 · đã merge (#225)</strong>
-    <p><span class="tag t-next">Nhánh <code>feat/ASSET-pole-without-gps</code> (chưa push, chưa mở PR) · còn PR 2b (bật tạo / sửa / nhập cột chưa GPS) · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS · chưa báo WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    <p><span class="tag t-done">Đã merge · #225 (10/11) · chưa lên VPS · chưa báo WP5 / WP6</span>
     PR 2a: <code>pole.geom</code> nullable (rollback từ chối khi còn cột chưa GPS); inventory, chi tiết cột, cột của phiếu trả <code>location: null</code>; gói offline trả <code>geometry: null</code>;
     sơ đồ nhánh tủ bỏ qua và đếm <code>unlocated_pole_count</code>; sự cố, báo cáo QR, ảnh cột trên cột chưa GPS trả 409 <code>POLE_LOCATION_REQUIRED</code>; <code>PUT …/location</code> gắn được GPS lần đầu, vẫn kiểm hành lang 25 m.
     GN-1…GN-11 đã chốt. Tồn đọng ngoài phạm vi: form công dân đọc sai <code>lat</code>/<code>lng</code> thập phân trên host locale dấu phẩy; <code>AvatarTests.Both_concurrent_uploads…</code> chập chờn, kể cả trên <code>dev</code>.
@@ -306,7 +316,7 @@
 
   <div class="card">
     <strong>POLE-VIDEO — đã chốt D-1…D-4, D-9, D-13, D-14; sẵn sàng Pha 2, 04/11/2026</strong>
-    <p><span class="tag t-next">Chưa bắt đầu Pha 2 · PR #204 (tài liệu) · chưa báo WP4 / WP5 / WP6</span>
+    <p><span class="tag t-done">Pha 2 xong · PV-a…PV-c3 = #205–#209 (04–05/11) · PR #204 (tài liệu) đã merge · chưa báo WP4 / WP5 / WP6</span>
     Clip ngắn chứa <b>một</b> đèn, gắn vào phiếu như ảnh cột: chỉ ON/OFF, bỏ qua cấu hình quay, <code>data_source</code> lấy từ cột.
     Đã chốt: cột clip nằm thẳng trong <code>work_order_pole_photo</code>; suy luận đồng bộ; luật nhãn với số tạm; phát clip có Range;
     Quản lý phải mở clip trước mọi <code>confirm</code> (409 nếu chưa); clip HDR HLG được nhận và gắn cờ <code>hdr</code>.
@@ -316,7 +326,7 @@
 
   <div class="card">
     <strong>POLE-SEGMENT-NULL — PR 2e (nút bật: ghi cột chưa tuyến), 03/11/2026</strong>
-    <p><span class="tag t-next">PR #202 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS (NTNgoc204 / thinh2509) hoặc merge admin · chưa báo WP4 / WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
+    <p><span class="tag t-done">Đã merge · #202 (03/11) · <code>luxmap_dev</code> và VPS đã migrate / deploy <code>c0f4a03</code> (03/11) · chưa báo WP4 / WP5 / WP6</span>
     PR cuối của ticket. <code>POST /assets/poles</code>: <code>segment_id</code> vắng hoặc <code>null</code> ⇒ cột chưa tuyến (chuỗi trắng 400, mã lạ 404). <code>PUT</code>: khoá <code>segment_id</code> vẫn bắt buộc
     (thiếu = 400, để form cũ không lặng lẽ tháo tuyến) nhưng nhận <code>null</code> — cách duy nhất để tháo. Import CSV / GeoJSON: <code>segment_external_ref</code> không còn bắt buộc; ô trống tạo cột mới chưa tuyến, cột đã có
     giữ tuyến; mã gõ sai hoặc ô GeoJSON dạng object/array vẫn là lỗi dòng. <code>GET /assets/poles?unassigned_segment=true</code> lọc trước tổng và phân trang. Review <code>river</code> bắt được một regression thật ở import GeoJSON
@@ -375,7 +385,7 @@
 
   <div class="card">
     <strong>ASSET-PHOTOS Phase 2-B — trạng thái mạch điện, 28/10/2026</strong>
-    <p><span class="tag t-next">PR mở từ <code>feat/ASSET-FEEDER-STATE</code> · không migration · chưa báo WP5</span>
+    <p><span class="tag t-done">Đã merge · #194 (28/10) · không migration · chưa báo WP5</span>
     <code>control</code> + <code>power_state</code> trên <code>/assets/feeders</code>, <code>feeders[]</code> trên <code>/map/cabinets</code> (giữ <code>feeder_ids[]</code>); một truy vấn control theo lô qua port
     <code>IFeederControlLookup</code>; <code>power_state</code> luôn <code>unknown</code> tới khi có telemetry đo điện. Contract <strong>v1.21</strong> (sửa luôn heading / <code>info.version</code> đang sót ở v1.19), drift FPS-1,
     spec vẫn 141 op, lint 9 warning. Bắt được lỗi enum mặc định <code>On</code> khi rà code. 5 phá thử đều đỏ đúng test; toàn bộ test xanh. Việc mở: bốn câu hỏi firmware, phần A (ảnh) là PR sau.</p>
@@ -389,14 +399,14 @@
   </div>
   <div class="card">
     <strong>OPS-OFFSITE-BACKUP — sao lưu ra S3, 26/10/2026</strong>
-    <p><span class="tag t-next">PR mở từ <code>feat/OPS-OFFSITE-S3-BACKUP</code> · chỉ deploy/docs · chưa chạy thử với S3 thật</span>
+    <p><span class="tag t-done">Đã merge · #191 (27/10) · chỉ deploy/docs · chưa chạy thử với S3 thật</span>
     <code>deploy/backup-offsite.sh</code> chép <code>/var/backups/luxmap</code> lên bucket S3 bằng <code>mc mirror</code> (một chiều, không <code>--remove</code>); bốn biến
     <code>OFFSITE_S3_*</code> qua <code>.env</code> và compose, để trống thì script từ chối chạy. <code>vps.md</code> mục "Sao lưu ra ngoài (S3)": versioning, SSE,
     IAM không có <code>DeleteObject</code>, lifecycle chỉ chuyển lớp, cron 03:45, cách khôi phục ảnh. Cần Mỹ tạo bucket + IAM key trước khi bật cron.</p>
   </div>
   <div class="card">
     <strong>WO-REASSIGN-DATE — giao lại kèm ngày khác, 26/10/2026</strong>
-    <p><span class="tag t-next">PR mở từ <code>feat/WO-REASSIGN-DATE</code> · không migration · chưa báo WP5</span>
+    <p><span class="tag t-done">Đã merge · #190 (26/10) · không migration · chưa báo WP5</span>
     Nhánh 1a của luồng duyệt xin hủy: <code>PUT /work-orders/{id}/assignee</code> nhận thêm <code>scheduled_date</code> / <code>due_date</code> <strong>tuỳ chọn</strong>
     (vắng = giữ, <code>null</code> = xoá, cùng luật <code>PATCH</code>). Đổi người + ngày là một thao tác: một audit <code>reassigned</code>, mỗi người một thông báo,
     ngày sai hoặc kèm bỏ giao → <code>400</code> và không đổi gì; cùng người + ngày thật đổi = dời lịch. Chỉ thêm, client cũ không đổi.
@@ -417,7 +427,7 @@
   </div>
   <div class="card">
     <strong>WO-CANCEL-REQUEST + BE-29 + BE-30 — Phase 1 và quyết định, 26/10/2026</strong>
-    <p><span class="tag t-next">Chưa báo WP5 / WP6 · PR docs chưa mở · Phase 2 của WO-CANCEL chờ PR này merge</span>
+    <p><span class="tag t-done">Phase 1 đã merge (#188) · Phase 2 đã merge (#189), 26/10 · chưa báo WP5 / WP6</span>
     Codex (<code>gpt-6.1-sol</code> medium, ba lượt chỉ-đọc ngoài file kết quả) khảo sát; Mỹ ủy quyền Claude chốt D-item, đã kiểm với code.
     <strong>WO-CANCEL-REQUEST</strong> (kỹ sư xin hủy lịch, Quản lý duyệt / bác): D-1…D-14 chốt — năm cột trên <code>work_order</code>, chỉ xin khi <code>assigned</code>,
     online-only, lý do 1…500 ký tự, hai <code>NotificationType</code> + hai <code>AuditAction</code> mới trong một migration; dời lịch thật sự cũng reset cờ (WP5 / WP6 xác nhận).
@@ -438,7 +448,7 @@
   </div>
   <div class="card">
     <strong>BE-34 — registry phiên bản, firmware, Phase 2, 24/10/2026</strong>
-    <p><span class="tag t-next">PR mở từ <code>feat/BE-34-versions</code> · <code>luxmap_dev</code> / VPS chưa migrate · chưa báo WP5 / WP6 / Đạt / WP4</span>
+    <p><span class="tag t-done">Đã merge · #186 (23/10) · còn mở: D-6 (header firmware, chờ Đạt), D-7 (chờ WP6) · chưa báo WP5 / WP6 / Đạt / WP4</span>
     Registry <code>artifact_version</code> xuống Persistence, thêm firmware; heartbeat MQTT nay <strong>lưu</strong> firmware (con trỏ trên
     <code>iot_node</code> + lịch sử bất biến <code>iot_node_firmware</code>, chỉ ghi khi đổi); 5 trường nguồn gốc của file khảo sát được lưu;
     <code>/admin/artifact-versions</code> (liệt kê, đăng ký firmware, <strong>đếm kết quả theo phiên bản</strong> qua 14 khai báo
