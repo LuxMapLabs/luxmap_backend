@@ -51,6 +51,19 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="road-segment-geom-null">
+    <strong>ROAD-SEGMENT-GEOM-NULL — Pha 1 (khảo sát), 11/11/2026</strong>
+    <span class="tag t-block">Chờ Mỹ duyệt RG-1…RG-15 · chưa có code, migration hay OpenAPI · chưa báo WP5 / WP6</span>
+    <p>FE xin tạo tuyến khi chưa có hình (tuyến mới chỉ có trong sổ sách, kỹ sư lấy GPS sau). Hôm nay <code>road_segment.geom</code> là <code>NOT NULL</code>,
+    <code>geom_wkt</code> bắt buộc ở tạo / sửa / import. Khảo sát <b>22 chỗ đọc hình tuyến</b>: 8 chỗ sẽ 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý.
+    Nguy hiểm nhất: khảo sát đêm trên tuyến chưa hình cho coverage trông đủ trong khi cả tuyến không được khảo sát ⇒ đề xuất 409 <code>SEGMENT_GEOMETRY_REQUIRED</code> ở <code>POST /sweeps</code>.
+    Tạo / giao / lên lịch tuần theo <code>segment_ids</code> không đọc hình nên chạy được với tuyến chưa hình.</p>
+    <p>Đề xuất chính: <code>geom</code> nullable (migration một <code>AlterColumn</code>, <code>Down()</code> từ chối khi còn tuyến chưa hình); tuyến đã có hình không quay về chưa hình; <code>length_m</code> vẫn bắt buộc;
+    tuyến chưa hình không vào <code>/map/segments</code>, vào bundle offline với <code>geometry: null</code>; thêm <code>has_geometry</code>, <code>?missing_geometry=</code>, <code>unrouted_pole_count</code>;
+    gắn GPS cột không đo hành lang khi tuyến chưa hình (lúc vẽ tuyến vẫn đo, ASSET-SEG-2). Hai PR: 2a (schema + mọi chỗ đọc) rồi 2b (bật writer).
+    <a href=".ai/tasks/ROAD-SEGMENT-GEOM-NULL.md">Đề bài</a> · <a href=".ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md">Kết quả Pha 1</a> · drift <code>ROAD-SEGMENT-GEOM-NULL</code> (SELF-SIGNED khi duyệt).</p>
+    <p class="muted">Nhánh <code>docs/ROAD-SEGMENT-GEOM-NULL-p1</code> (chưa push). Commit: <code>docs(ROAD-SEGMENT-GEOM-NULL): phase 1 survey of segment readers</code>.</p>
+  </div>
   <div class="card" id="survey-recurring">
     <strong>SURVEY-RECURRING — phase 2, 09/11/2026</strong>
     <span class="tag t-done">Đã merge · #223 (10/11) · full suite xanh, 7 phá thử đỏ · VPS d128e97 (10/11), migration <code>SurveyRecurringSchedules</code></span>
