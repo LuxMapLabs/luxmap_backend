@@ -74,6 +74,14 @@
     Còn: Mỹ chốt system_admin (ManageWorkOrders hiện chỉ manager), Claude chạy build/test/phá thử;
     WO-BATCH chưa có trong cây nên chưa kiểm liên thông. Chi tiết <code>.ai/results/WO-AUTODISPATCH.md</code>.</p>
   </div>
+  <div class="card" id="acct-profile">
+    <strong>ACCT-PROFILE — người dùng tự sửa hồ sơ, 11/11/2026</strong>
+    <span class="tag t-done">Xong · chờ PR</span>
+    <p><code>PATCH /auth/me</code> nhận <code>full_name</code>, capability ManageOwnProfile (cả bốn vai trò), trả cùng thân với GET /auth/me.
+    Email, vai trò, xã vẫn chỉ Quản trị sửa (email gắn link reset mật khẩu và đăng nhập Google). Upload avatar đã có từ ACCT-5. ACCT-6 SELF-SIGNED, không migration.</p>
+    <p>Files: Identity/Profiles/ProfileController.cs, ProfileService.cs, IdentityModule, LuxMapPolicies (chú thích), ProfileTests.cs (14 ca),
+    CurrentUserTests (lọc GET), contract-drift.md, traps/auth-accounts.md. Phá thử bỏ Trim làm 6 test đỏ.</p>
+  </div>
   <div class="card" id="acct-avatar">
     <strong>ACCT-AVATAR — phase 2, 09/11/2026</strong>
     <span class="tag t-done">Xong · chờ PR</span>

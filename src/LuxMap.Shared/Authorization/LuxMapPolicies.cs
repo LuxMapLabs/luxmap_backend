@@ -46,7 +46,7 @@ public static class LuxMapPolicies
     /// </summary>
     public const string ControlLighting = "cap:control_lighting";
 
-    /// <summary>Manage the caller's own avatar (ACCT-5); all four named roles.</summary>
+    /// <summary>Manage the caller's own avatar (ACCT-5) and edit their own full name (ACCT-6); all four named roles.</summary>
     public const string ManageOwnProfile = "cap:manage_own_profile";
 
     /// <summary>Create accounts and assign roles and communes (BE-33a, <c>/admin/users</c>).</summary>

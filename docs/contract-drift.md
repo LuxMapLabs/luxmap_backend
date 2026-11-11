@@ -232,6 +232,20 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 - WP5/WP6: thêm upload field `file`, chuyển JPEG, fetch ảnh có token, thay URL theo response, hiển thị trạng thái null sau DELETE;
   giải thích gỡ avatar hiện chưa xoá byte khỏi kho.
 
+### ACCT-6 — người dùng tự sửa hồ sơ (11/11/2026)
+
+**SELF-SIGNED** (Mỹ yêu cầu 11/11/2026: API sửa hồ sơ và upload avatar bởi chính người đăng nhập; upload avatar đã có từ ACCT-5), nền tạm tới FW kế tiếp; chưa hợp nhất Contract.
+
+- `PATCH /api/v1/auth/me`, body `{ "full_name": string }`, capability **`ManageOwnProfile`** (cả bốn vai trò). 200 trả **cùng thân với `GET /auth/me`**
+  (FE thay nguyên object). 400 `VALIDATION_FAILED` với `details.field = "full_name"` khi thiếu / null / rỗng / chỉ khoảng trắng / dưới 2 ký tự sau khi trim
+  hoặc quá 256 ký tự; 401 khi token không còn trỏ tới tài khoản; 403 `ROLE_FORBIDDEN`.
+- **Chỉ `full_name` sửa được.** `email`, `username`, `role`, `commune_ids` gửi lên bị **bỏ qua**, không báo lỗi (request không có các trường đó). Email ở lại với Quản trị:
+  nó là nơi gửi link đặt lại mật khẩu và là khoá khớp đăng nhập Google, nên một token bị lộ cộng với tự đổi email là chiếm được tài khoản;
+  tự đổi email cần xác minh qua mail, là ticket riêng. Quy tắc tên Việt của `POST /admin/users` (để sinh username) **không** áp ở đây: username không bao giờ đổi (D-11).
+- `full_name` không nằm trong access token nên đổi tên có hiệu lực ngay ở `/auth/me`, không phải chờ cấp lại token. Không thu hồi phiên.
+- Avatar giữ nguyên ACCT-5 (`POST/GET/DELETE /auth/me/avatar`); đổi tên không đụng năm cột avatar. Không migration.
+- WP5/WP6: màn sửa hồ sơ gọi `PATCH /auth/me` cho tên và `POST /auth/me/avatar` cho ảnh; email hiện chỉ đọc.
+
 ### ACCT-3 — đăng nhập bằng username hoặc email (08/11/2026)
 
 | Trường | Nội dung |
