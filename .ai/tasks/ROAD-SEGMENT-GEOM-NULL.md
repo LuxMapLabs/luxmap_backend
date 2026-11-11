@@ -1,9 +1,9 @@
 ---
 ticket: ROAD-SEGMENT-GEOM-NULL
 title: Tuyến đường (road_segment) được phép chưa có hình — `road_segment.geom` nullable, vẽ hình sau khi có GPS
-status: phase1_review
-phase: 1
-owner: claude (P1)
+status: phase2_ready
+phase: 2
+owner: claude (P1; PR 2a, 2b chưa bắt đầu)
 branch: docs/ROAD-SEGMENT-GEOM-NULL-p1
 contract_refs:
   - "docs/api-contract-v1.1.md — POST / PUT /assets/segments (geom_wkt), SegmentDetail.geom_wkt, import segments, GET /map/segments, GET /map/cabinets/{id}/topology, GET /work-orders/{id}/poles, GET /work-orders/agenda, GET /sync/bundle, POST /sweeps"
@@ -36,11 +36,12 @@ chưa hình sẽ cho coverage trông đủ trong khi cả tuyến không đượ
 Consumer bị ảnh hưởng: WP5 (model nullable, `has_geometry`, bộ lọc, mã lỗi, form sửa tuyến), WP6 (`GET /sync/bundle` có segment `geometry: null`,
 không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi.
 
-## Quyết định — CHƯA CÓ
+## Quyết định đã chốt (Mỹ, 11/11/2026) — KHÔNG mở lại
 
-Phase 1 chỉ đề xuất. Toàn bộ **RG-1…RG-15** ở `.ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md` mục 6 chờ Mỹ chốt (tóm tắt ở
-`docs/contract-drift.md` mục *ROAD-SEGMENT-GEOM-NULL*). Khi Mỹ chốt, ghi bảng "đã chốt" vào đây theo khuôn `POLE-GEOM-NULL.md` và đổi `status` /
-`phase`.
+Mỹ duyệt **toàn bộ RG-1…RG-15 đúng như đề xuất** ở `.ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md` mục 6 (nguyên văn từng mục ở đó; tóm tắt ở
+`docs/contract-drift.md` mục *ROAD-SEGMENT-GEOM-NULL*). Điểm cần nhớ khi hiện thực: RG-2 (một chiều; PUT tuyến đã có hình gửi vắng / `null` ⇒ 400), RG-3 (`length_m`
+vẫn bắt buộc), RG-4 (không vào `/map/segments`), RG-6 (bundle `geometry: null`), RG-7 (409 `SEGMENT_GEOMETRY_REQUIRED` ở `POST /sweeps`), RG-10
+(`unrouted_pole_count` tách khỏi `unlocated_pole_count`), RG-11 (gắn GPS cột không đo khi tuyến chưa hình), RG-15 (2a rồi 2b, không stack).
 
 ## Phải đọc trước
 
@@ -50,7 +51,7 @@ Phase 1 chỉ đề xuất. Toàn bộ **RG-1…RG-15** ở `.ai/results/ROAD-SE
 - `docs/agents/traps/assets.md` (POLE-GEOM-NULL, ASSET-SEGMENT-POLES), `spatial-map.md` (bẫy 4: `length_m` khai báo), `migrations.md`,
   `survey.md`, `faults-workorders.md`.
 
-## Yêu cầu (Phase 2 — sau khi Mỹ chốt)
+## Yêu cầu (Phase 2)
 
 Tuần tự như POLE-GEOM-NULL: **bảo vệ consumer trước, bật writer sau.** Không stack PR — PR sau chờ PR trước merge.
 
@@ -81,7 +82,6 @@ Tiêu chí xong — mỗi dòng kiểm chứng được bằng một lệnh:
 - Không sửa việc `pole_ids` thêm cột vào tuyến **đã có hình** mà không đo hành lang (ghi nhận ở P1 mục 3.3; ngoài phạm vi).
 - Không viết tên index / constraint / cột từ trí nhớ; chép từ migration / snapshot.
 
-## Phase 1 dừng ở đâu
+## Trạng thái
 
-Khảo sát xong thì **dừng hẳn**, commit ticket + kết quả + mục drift + thẻ `tracking.html` (stage theo đường dẫn), chờ Mỹ chốt RG-1…RG-15.
-Không viết code Phase 2. Không push.
+Phase 1 xong (66466e4), Mỹ duyệt 11/11/2026. Phase 2 chưa bắt đầu: PR 2a từ `origin/dev` mới nhất, nhánh `feat/ASSET-segment-geom-readers`; PR 2b chờ 2a merge. Không push khi chưa hỏi.

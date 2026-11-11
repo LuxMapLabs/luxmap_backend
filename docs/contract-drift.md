@@ -2088,15 +2088,15 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 
 | | |
 |---|---|
-| **Decision** | **ĐỀ XUẤT — CHƯA DUYỆT (Phase 1).** Cho phép `road_segment.geom` null = tuyến mới có trong sổ sách, chưa có hình; vẽ hình sau khi cột có GPS. Không hình giả. Triển khai tuần tự: bảo vệ mọi chỗ đọc trước (PR 2a), bật writer sau (PR 2b), theo khuôn POLE-GEOM-NULL |
-| **Decision maker** | **Chờ Mỹ** chốt RG-1…RG-15 (`.ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md` mục 6). Nguồn yêu cầu: FE (WP5), 11/11/2026 |
-| **Chạm API** | **Có** (khi duyệt) — nới `geom_wkt` thành tuỳ chọn ở tạo / sửa / import tuyến; `SegmentDetail.geom_wkt` nullable; THÊM `SegmentListItem.has_geometry`, `GET /assets/segments?missing_geometry=`, `CabinetTopology.unrouted_pole_count`, mã 409 `SEGMENT_GEOMETRY_REQUIRED`; Feature segment trong `GET /sync/bundle` có thể `geometry: null`. Không đổi / bỏ field hay enum đã publish |
-| **Nền** | **SELF-SIGNED khi Mỹ duyệt**, nền tạm tới FW; chưa hợp nhất Contract. Chưa có gì trong code, OpenAPI hay migration |
+| **Decision** | **ĐÃ DUYỆT (11/11/2026).** Cho phép `road_segment.geom` null = tuyến mới có trong sổ sách, chưa có hình; vẽ hình sau khi cột có GPS. Không hình giả. Triển khai tuần tự: bảo vệ mọi chỗ đọc trước (PR 2a), bật writer sau (PR 2b), theo khuôn POLE-GEOM-NULL |
+| **Decision maker** | **Mỹ (Dylan), 11/11/2026** — duyệt RG-1…RG-15 đúng như đề xuất (`.ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md` mục 6). Nguồn yêu cầu: FE (WP5), 11/11/2026 |
+| **Chạm API** | **Có** — nới `geom_wkt` thành tuỳ chọn ở tạo / sửa / import tuyến; `SegmentDetail.geom_wkt` nullable; THÊM `SegmentListItem.has_geometry`, `GET /assets/segments?missing_geometry=`, `CabinetTopology.unrouted_pole_count`, mã 409 `SEGMENT_GEOMETRY_REQUIRED`; Feature segment trong `GET /sync/bundle` có thể `geometry: null`. Không đổi / bỏ field hay enum đã publish |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract. **Chưa có gì trong code, OpenAPI hay migration** — Phase 2 chưa bắt đầu |
 | **Scope** | Assets, Map, WorkOrders, Survey, Sync; một migration (`AlterColumn road_segment.geom` nullable). Consumer: WP5, WP6 — **chưa báo** |
 
 **Phase 1 (11/11/2026): khảo sát 22 chỗ đọc hình tuyến** — 8 chỗ sẽ trả 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý; nguy hiểm nhất là khảo sát đêm trên tuyến chưa hình cho coverage trông đủ trong khi cả tuyến không được khảo sát (kết quả mục 2). Tạo / giao / lên lịch phiếu khảo sát và lịch hàng tuần theo `segment_ids` **không đọc hình** nên chạy được với tuyến chưa hình ngay khi cột `geom` nullable.
 
-| Mã | Đề xuất (chờ Mỹ) |
+| Mã | Quyết định (đã duyệt) |
 |---|---|
 | RG-1 | `road_segment.geom` nullable = chưa có hình. Không hình giả |
 | RG-2 | Tuyến đã có hình **không** quay về chưa hình. `PUT`: tuyến chưa hình gửi `geom_wkt` vắng / `null` ⇒ giữ chưa hình, gửi WKT ⇒ gắn hình lần đầu; tuyến đã có hình gửi vắng / `null` ⇒ 400 như hôm nay. `POST`: vắng / `null` ⇒ chưa hình. Import: ô trống ở tuyến MỚI ⇒ chưa hình, ở tuyến ĐÃ CÓ ⇒ giữ hình |
@@ -2114,4 +2114,4 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 | RG-14 | `Down()` từ chối khi còn tuyến chưa hình; binary cũ cũng không chạy được với hàng `geom IS NULL` — vẽ hoặc xoá hết trước khi triển khai lại binary cũ |
 | RG-15 | PR 2a (schema + mọi chỗ đọc, writer vẫn bắt buộc `geom_wkt`) rồi PR 2b (bật writer). Không stack |
 
-**Cần báo / cần quyết:** Mỹ duyệt RG-1…RG-15 trước Phase 2. Khi code xong: WP5 (model nullable, `has_geometry`, `missing_geometry`, form sửa tuyến đã vẽ **phải gửi lại** `geom_wkt`, `unrouted_pole_count`, mã 409 mới, 409 `POLE_OFF_SEGMENT` lúc vẽ tuyến), WP6 (bundle `geometry: null` cho segment; không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi. **Chưa báo ai.**
+**Cần báo:** khi code xong: WP5 (model nullable, `has_geometry`, `missing_geometry`, form sửa tuyến đã vẽ **phải gửi lại** `geom_wkt`, `unrouted_pole_count`, mã 409 mới, 409 `POLE_OFF_SEGMENT` lúc vẽ tuyến), WP6 (bundle `geometry: null` cho segment; không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi. **Chưa báo ai.**

@@ -86,7 +86,7 @@ migration sinh ra **không** có `DropIndex` / `CreateIndex` nào trên `ix_road
 
 ## 6. D-item cần Mỹ chốt trước Phase 2
 
-Đề xuất của Claude là cột "Đề xuất"; **chưa có mục nào được duyệt**. (Ba yêu cầu của FE — nới `geom_wkt` ở tạo / sửa / import, vẫn gán `pole_ids`,
+Cột "Đề xuất" là đề xuất của Claude; **Mỹ duyệt toàn bộ RG-1…RG-15 đúng như đề xuất ngày 11/11/2026**. (Ba yêu cầu của FE — nới `geom_wkt` ở tạo / sửa / import, vẫn gán `pole_ids`,
 bỏ qua tuyến chưa hình ở bản đồ / thứ tự / khảo sát — là đầu vào, RG-1…RG-13 là cách hiện thực.)
 
 | Mã | Câu hỏi | Đề xuất |
