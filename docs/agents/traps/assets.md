@@ -451,10 +451,10 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - `AssetGeometry.TryReadWkt` phải bắt `NetTopologySuite.IO.ParseException` (WKT `POINT(abc)`); thiếu nó là 500, và chốt "sai không phải rỗng" ở trên thành vô nghĩa.
 - Bộ lọc `missing_location` đi cùng `unassigned_segment` trong **một** `Expression` (AND) áp trước `CountAsync` — đừng gọi `ListAsync` hai lần.
 
-## ROAD-SEGMENT-GEOM-NULL — tuyến chưa có hình (PR 2a, 11/11/2026)
+## ROAD-SEGMENT-GEOM-NULL — tuyến chưa có hình (PR 2a + 2b, 11/11/2026)
 
 - **`RoadSegment.Geom` là `LineString?`.** `geom IS NULL` = tuyến mới có trong sổ sách (RG-1). Không bao giờ nối cột đầu–cuối, tâm xã hay hình suy ra cho "chạy được".
-  Tuyến đã có hình **không** quay về null (RG-2) — nhiều chốt chặn dựa vào đây. Ở 2a **POST / PUT / import vẫn đòi `geom_wkt`**: hàng null chỉ có khi ghi thẳng DB (test làm vậy).
+  Tuyến đã có hình **không** quay về null (RG-2) — nhiều chốt chặn dựa vào đây. Từ 2b POST / PUT / import nhận tuyến chưa hình (bên dưới); ở 2a hàng null chỉ có khi ghi thẳng DB.
 - **Hai cách hỏng, y như cột chưa GPS (mục POLE-GEOM-NULL) — nhưng ở đây còn một cách thứ ba.** C# đọc `.Coordinates` / `.StartPoint` / `new LengthIndexedLine(null)` / `EqualsExact` của null ⇒ **500**.
   `ST_Intersects(NULL, …)` ⇒ hàng **rơi**. `ST_Distance(NULL, …)` ⇒ NULL: **đưa vào `double` thì ném lúc materialize** (500), đưa vào `ORDER BY` / `lead()` thì **lọt qua** và NULL xếp cuối. Chỗ đo khoảng cách phải
   lọc `segment.Geom != null` **trước** (`SpatialFunctions.DistanceMeters(segment.Geom!, …)`), không tin SQL tự rơi.
@@ -467,6 +467,14 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - **`length_m` không bị tính lại khi vẽ lần đầu** (RG-3, bẫy 4 của `spatial-map.md`); `SpatialFunctions` ghi rõ `segment.geom` nay nullable.
 - **Migration** `RoadSegmentGeomNullable`: `Up()` một `AlterColumn`, **không** Drop/CreateIndex trên `ix_road_segment_geom` (GIST nhận NULL). `Down()` từ chối khi còn `geom IS NULL` (RG-14): đó cũng là lý do **binary cũ không chạy được**
   với hàng null (`required LineString`) — vẽ hoặc xoá hết tuyến chưa hình trước khi triển khai lại bản cũ.
+- **Writer (2b) — ba chỗ dễ sai, cả ba im lặng.**
+  1. **`UpdateSegmentRequest.GeomWkt` không còn `[Required]`** — luật "tuyến đã có hình thì bắt buộc" nằm trong `UpdateSegmentAsync` vì nó phụ thuộc hình đang lưu (như `UpdatePoleRequest`). Thêm lại `[Required]` sẽ chặn luôn việc giữ tuyến chưa hình;
+     bỏ nhánh 400 ở service thì một form cũ gửi thiếu `geom_wkt` **xoá hình** của tuyến đã vẽ. `Read<LineString>` chạy TRƯỚC mọi phép gán (400 không được để lại entity đang track bị sửa dở).
+  2. **Import: ô trống KHÔNG được ghi đè hình** của tuyến đã có (`if (geometry is not null) segment.Geom = geometry`). Bản "gán thẳng" trông đúng, và test import một-lượt vẫn xanh — chỉ lượt nạp lại mới xoá hình.
+     Dùng `OptionalGeometry` (rỗng ⇒ null, sai ⇒ lỗi dòng) chứ không phải `Geometry` (rỗng ⇒ lỗi dòng). Import **không đo hành lang** khi vẽ lần đầu — không import nào đo khi đổi hình; chỉ `PUT` có ASSET-SEG-2.
+  3. **`rerouted = geometry is not null && (segment.Geom is null || !EqualsExact)`.** Vế `geometry is not null` không có test nào bắt được: tuyến chưa hình nhận `pole_ids` mà không có hình, nếu `rerouted` = true thì `RequirePolesInCorridorAsync` chạy với đường `null` và SQL trả NULL
+     (≠ ném) nên đếm 0 — **xanh giả**. Giữ vế đó vì lý do "đừng dựa vào NULL của SQL", không phải vì test. Phá thử: bỏ nó ⇒ 8/8 test vẫn xanh (đã đo).
+- **`missing_geometry` lọc bằng MỘT `Expression` trước `CountAsync`** (`ListAsync` nhận `filter`), cùng khuôn `missing_location`; lọc sau phân trang thì `total` sai.
 
 ## ASSET-SEGMENT-POLES — tập cột trên tuyến (09/11/2026, drift ASSET-SEG-1)
 

@@ -1,9 +1,9 @@
 ---
 ticket: ROAD-SEGMENT-GEOM-NULL
 title: Tuyến đường (road_segment) được phép chưa có hình — `road_segment.geom` nullable, vẽ hình sau khi có GPS
-status: phase2a_done
+status: phase2b_done
 phase: 2
-owner: claude (P1, PR 2a; PR 2b chưa bắt đầu)
+owner: claude (P1, PR 2a, PR 2b)
 branch: docs/ROAD-SEGMENT-GEOM-NULL-p1
 contract_refs:
   - "docs/api-contract-v1.1.md — POST / PUT /assets/segments (geom_wkt), SegmentDetail.geom_wkt, import segments, GET /map/segments, GET /map/cabinets/{id}/topology, GET /work-orders/{id}/poles, GET /work-orders/agenda, GET /sync/bundle, POST /sweeps"
@@ -84,4 +84,4 @@ Tiêu chí xong — mỗi dòng kiểm chứng được bằng một lệnh:
 
 ## Trạng thái
 
-Phase 1 xong (66466e4), Mỹ duyệt 11/11/2026. **PR 2a code xong** (nhánh `feat/ROAD-SEGMENT-GEOM-NULL-2a`, chưa push; kết quả `.ai/results/ROAD-SEGMENT-GEOM-NULL-p2a.md`). PR 2b (bật writer) chờ 2a merge. Không push khi chưa hỏi.
+Phase 1 xong (66466e4), Mỹ duyệt 11/11/2026. **PR 2a đã merge** (#230, `8471bb8`). **PR 2b code xong** (nhánh `feat/ROAD-SEGMENT-GEOM-NULL-2b`, chưa push; kết quả `.ai/results/ROAD-SEGMENT-GEOM-NULL-p2b.md`). Không push khi chưa hỏi.

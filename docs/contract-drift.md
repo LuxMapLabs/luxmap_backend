@@ -2091,7 +2091,7 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 | **Decision** | **ĐÃ DUYỆT (11/11/2026).** Cho phép `road_segment.geom` null = tuyến mới có trong sổ sách, chưa có hình; vẽ hình sau khi cột có GPS. Không hình giả. Triển khai tuần tự: bảo vệ mọi chỗ đọc trước (PR 2a), bật writer sau (PR 2b), theo khuôn POLE-GEOM-NULL |
 | **Decision maker** | **Mỹ (Dylan), 11/11/2026** — duyệt RG-1…RG-15 đúng như đề xuất (`.ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md` mục 6). Nguồn yêu cầu: FE (WP5), 11/11/2026 |
 | **Chạm API** | **Có** — nới `geom_wkt` thành tuỳ chọn ở tạo / sửa / import tuyến; `SegmentDetail.geom_wkt` nullable; THÊM `SegmentListItem.has_geometry`, `GET /assets/segments?missing_geometry=`, `CabinetTopology.unrouted_pole_count`, mã 409 `SEGMENT_GEOMETRY_REQUIRED`; Feature segment trong `GET /sync/bundle` có thể `geometry: null`. Không đổi / bỏ field hay enum đã publish |
-| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract. **PR 2a đã code (11/11/2026, chưa push / merge)**: migration `RoadSegmentGeomNullable` + mọi chỗ đọc + chốt chặn `POST /sweeps`; **POST / PUT / import tuyến VẪN bắt buộc `geom_wkt`** — writer, `missing_geometry`, template import ở PR 2b |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract. **PR 2a đã merge (#230, `8471bb8`)**: migration `RoadSegmentGeomNullable` + mọi chỗ đọc + chốt chặn `POST /sweeps`. **PR 2b đã code (11/11/2026, chưa push / merge)**: bật writer — `POST` / `PUT` / import tuyến nhận tuyến chưa hình, `?missing_geometry=`, template import. Migration chưa áp lên `luxmap_dev` / VPS |
 | **Scope** | Assets, Map, WorkOrders, Survey, Sync; một migration (`AlterColumn road_segment.geom` nullable). Consumer: WP5, WP6 — **chưa báo** |
 
 **Phase 1 (11/11/2026): khảo sát 22 chỗ đọc hình tuyến** — 8 chỗ sẽ trả 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý; nguy hiểm nhất là khảo sát đêm trên tuyến chưa hình cho coverage trông đủ trong khi cả tuyến không được khảo sát (kết quả mục 2). Tạo / giao / lên lịch phiếu khảo sát và lịch hàng tuần theo `segment_ids` **không đọc hình** nên chạy được với tuyến chưa hình ngay khi cột `geom` nullable.
@@ -2131,6 +2131,17 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 
 Không đổi: tạo / giao / lên lịch phiếu khảo sát, lịch tuần (`survey-schedules/recurring`) và sinh phiếu cho tuyến chưa hình — chạy được (có test).
 
+**PR 2b (11/11/2026) — writer bật; response / request nào đổi.** Chỉ NỚI và THÊM; không đổi / bỏ field hay enum đã publish:
+
+| Endpoint | Đổi |
+|---|---|
+| `POST /assets/segments` | `geom_wkt` **bỏ `required`**: vắng / `null` ⇒ tuyến chưa hình (RG-2). Chuỗi trắng, WKT sai, hình không phải LineString, `LINESTRING EMPTY` ⇒ vẫn 400 `VALIDATION_FAILED`. `pole_ids` gán được, không đo hành lang (RG-13). `length_m` vẫn bắt buộc (RG-3) |
+| `PUT /assets/segments/{id}` | `geom_wkt` bỏ `required` ở schema, luật chuyển vào service vì phụ thuộc hình đang lưu (khuôn `UpdatePoleRequest`): tuyến **đã có hình** gửi vắng / `null` / trắng ⇒ 400 (như hôm nay); tuyến **chưa hình** gửi vắng / `null` ⇒ giữ chưa hình, 204 (`pole_ids` vẫn nhận, không đo hành lang); gửi WKT ⇒ vẽ lần đầu, đo hành lang mọi cột có GPS ⇒ 409 `POLE_OFF_SEGMENT` (RG-11) |
+| `GET /assets/segments` | THÊM query `missing_geometry` (bool; `true` = chỉ tuyến chưa hình, `false` / vắng = không lọc; lọc TRƯỚC total và phân trang, AND với `commune_id`; giá trị không phải bool ⇒ 400) |
+| `POST /assets/import/segments` (CSV / GeoJSON) | `geom_wkt` **bỏ khỏi cột bắt buộc** (bỏ hẳn cột cũng được). Ô trống / `geometry` vắng hoặc `null`: tuyến **mới** ⇒ chưa hình; tuyến **đã có** (trùng `external_ref`) ⇒ **giữ hình**. Giá trị sai (WKT hỏng, `Point`, GeoJSON `geometry` là chuỗi / mảng) ⇒ vẫn lỗi dòng. ⚠️ Import **không đo hành lang** khi vẽ lần đầu (không import nào đo khi đổi hình — chỉ `PUT`) |
+
+Template `docs/templates/segments.example.csv` thêm một dòng tuyến chưa hình; `README.md` có mục *Tuyến chưa có hình*. OpenAPI: `POST` / `PUT` body `geom_wkt` nullable và rời `required`, thêm query `missing_geometry` — cần CODEOWNERS.
+
 **Phát hiện lúc code 2a (đo, không giả định):** (1) `SurveyChainageQuery.Gps` trên tuyến chưa hình **không** làm GPS thành "không gán tuyến" như P1 dự đoán: khi tuyến null đứng **một mình**, mọi mẫu GPS bị gán `segment_id` = tuyến đó với `route_distance_m` null và chainage 0 (khoảng cách NULL lọt qua bộ lọc ứng viên); đứng cạnh tuyến có hình thì NULL xếp cuối nên tuyến có hình thắng. Còn `SurveyChainageQuery.Poles` đúng như dự đoán (cột của tuyến null không vào `poles_expected`). Không có chốt chặn nào ở phía SQL — chỉ `POST /sweeps` (#14) đứng trước cả hai. (2) `SpatialFunctions.DistanceMeters(NULL, …)` vào `double` vẫn ném lúc materialize, nên #7 và #13 phải lọc `Geom != null` TRƯỚC khi gọi hàm.
 
-**Cần báo:** khi code xong: WP5 (model nullable, `has_geometry`, `missing_geometry`, form sửa tuyến đã vẽ **phải gửi lại** `geom_wkt`, `unrouted_pole_count`, mã 409 mới, 409 `POLE_OFF_SEGMENT` lúc vẽ tuyến), WP6 (bundle `geometry: null` cho segment; không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi. **Chưa báo ai.**
+**Cần báo:** khi 2b xong (Mỹ quyết thời điểm): WP5 (model nullable, `has_geometry`, `missing_geometry`, form sửa tuyến đã vẽ **phải gửi lại** `geom_wkt`, `unrouted_pole_count`, mã 409 mới, 409 `POLE_OFF_SEGMENT` lúc vẽ tuyến), WP6 (bundle `geometry: null` cho segment; không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi. **Chưa báo ai.**

@@ -43,13 +43,19 @@ public sealed class AssetsController(
     // Every inventory read names ReadNetwork, which admits all four roles (Contract v1.7 section 2).
 
     /// <summary>Road segments in the caller's communes, paged.</summary>
+    /// <remarks>
+    /// <c>missing_geometry=true</c> keeps only segments with no drawn route yet (ROAD-SEGMENT-GEOM-NULL RG-5, SELF-SIGNED); <c>false</c> or absent is no
+    /// restriction. Applied before the total and the page.
+    /// </remarks>
     [HttpGet("segments")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<PagedResult<SegmentListItem>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<PagedResult<SegmentListItem>>> ListSegmentsAsync(
-        [FromQuery(Name = "commune_id")] string[]? communeId, PageQuery page, CancellationToken ct)
-        => Ok(await service.ListSegmentsAsync(Narrow(communeId), page.ToPageRequest(), ct));
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "missing_geometry")] bool missingGeometry,
+        PageQuery page, CancellationToken ct)
+        => Ok(await service.ListSegmentsAsync(Narrow(communeId), page.ToPageRequest(), missingGeometry, ct));
 
     /// <summary>One road segment, with its geometry as WKT.</summary>
     [HttpGet("segments/{segmentId}")]
@@ -170,7 +176,10 @@ public sealed class AssetsController(
         => Ok(await service.PoleAsync(poleId, ct));
 
     /// <summary>Create a segment with an optional unordered set of pole_ids, atomically.</summary>
-    /// <remarks>Absent or [] creates no membership; null is 400. Missing/hidden poles are 404;
+    /// <remarks>
+    /// <c>geom_wkt</c> is optional: absent or null creates a segment with no drawn route yet (ROAD-SEGMENT-GEOM-NULL RG-2); a blank or malformed WKT is 400.
+    /// Poles can be assigned to such a segment; no corridor is measured until a route is drawn (RG-13).
+    /// Absent or [] creates no membership; null is 400. Missing/hidden poles are 404;
     /// occupied poles or disallowed cross-commune assignments are 409 (ASSET-SEG-1, SELF-SIGNED).</remarks>
     [HttpPost("segments")]
     [Authorize(Policy = LuxMapPolicies.ManageAssets)]
@@ -225,6 +234,9 @@ public sealed class AssetsController(
     /// Membership and segment changes are atomic (ASSET-SEG-1, SELF-SIGNED).
     /// A changed geom_wkt that leaves a pole of the segment outside the survey corridor is 409 POLE_OFF_SEGMENT, counting
     /// poles the caller cannot see (ASSET-SEG-2, SELF-SIGNED).
+    /// geom_wkt is required for a segment that already has a route (absent or null is 400 — a route never goes back to undrawn); for a segment
+    /// without one, absent or null keeps it undrawn and a WKT draws it for the first time, which measures the corridor of every pole that has a
+    /// position (ROAD-SEGMENT-GEOM-NULL RG-2, SELF-SIGNED).
     /// <para>
     /// 204 with no body, like every other write in this controller. Echoing the updated segment would
     /// publish a read shape, and that decision belongs to <b>BE-12b</b>.
