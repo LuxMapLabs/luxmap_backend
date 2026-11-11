@@ -204,3 +204,14 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
 - **Hỏi model một lần khi nó vắng:** hint null ở frame nào thì không hỏi frame sau, và **cả clip** không có nhãn (một nhãn dựa trên nửa số frame là nhãn không ai kiểm được).
 - **Test host trong bộ nhớ không đo được `Content-Length` vắng** (TestServer tự đo thân): ca "chunked ⇒ 400" kiểm ở mức service. Test sinh clip bằng `ffmpeg -f lavfi` lúc chạy; `HintStub.PerCall` cho từng frame một câu trả lời.
 - **Caddy chặn 100 MiB riêng route PUT clip** (`@pole_video_too_large`), đứng **trước** guard 300 MiB chung; `PolePhotoProxyTests` kiểm cả hai chiều (413 ở route này, không ở clip khảo sát).
+
+## ROAD-SEGMENT-GEOM-NULL — khảo sát trên tuyến chưa có hình (PR 2a, 11/11/2026)
+
+- 🔴 **`POST /sweeps` là chốt chặn DUY NHẤT** (RG-7): `SurveyIngestService.RequireDrawnSegmentsAsync` ⇒ 409 `SEGMENT_GEOMETRY_REQUIRED` khi phiếu có (dù chỉ một) tuyến chưa hình, dưới khoá phiếu, **sau** nhánh replay
+  idempotent và kiểm trạng thái. Tạo / giao / lên lịch phiếu khảo sát và lịch tuần cho tuyến chưa hình **không** bị chặn — kỹ sư cần chúng trước khi có GPS.
+- **Chỗ xanh giả (#16).** Nếu chốt trên bị bỏ, sweep được nhận và không có gì báo lỗi: `SurveyChainageQuery.Poles` không bao giờ nối cột của tuyến null (`ST_Intersects(NULL)`) ⇒ cột không vào `poles_expected`
+  ⇒ **coverage trông đủ** trong khi cả tuyến không được khảo sát. Không có test hay `COALESCE` nào ở tầng SQL cứu được — đừng "sửa" ở đó; canh bằng test của chốt `POST /sweeps`.
+- **#15 `SurveyChainageQuery.Gps` không rơi như tưởng — đã đo.** Tuyến null **đứng một mình** vẫn được chọn làm ứng viên gần nhất: khoảng cách NULL lọt qua bộ lọc, mọi mẫu GPS bị gán `segment_id` = tuyến đó với
+  `route_distance_m` null, chainage 0, length 0. Đứng cạnh tuyến có hình thì NULL xếp cuối (`ORDER BY distance_m`) nên tuyến có hình thắng. `SurveyReviewService.GapGeometriesAsync` (`ST_LineSubstring(NULL)` ⇒ `JsonDocument.Parse("")`)
+  cũng chỉ tới được khi chốt hổng. Test `A_road_with_no_geometry_measures_nothing_in_both_survey_queries` ghim cả hai.
+- Hai cách hỏng của một tuyến null ở tầng khảo sát khác nhau về mặt người thấy: **500** (C# / `double`) thì ồn ào và được sửa; **rơi hoặc lọt** (SQL) thì im lặng và làm sai số liệu nghiên cứu. Chốt chặn đặt ở biên để cả hai đều không tới được.

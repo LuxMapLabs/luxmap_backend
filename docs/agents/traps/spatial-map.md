@@ -133,3 +133,10 @@ client nhận URL mà mở ra 404 — hoặc tệ hơn, thấy frame của xã k
   (lọc theo tuyến, không bbox) nên **phải** chịu được `Geom` null: Feature `geometry: null` (GN-4). `Feature<T>.Geometry` vì thế là nullable ở C#.
 - Sơ đồ nhánh tủ điện **bỏ qua** cột chưa GPS và đếm vào `unlocated_pole_count` (GN-5) — khác cột chưa tuyến (409). Response là kiểu riêng
   `CabinetTopology`, không phải `FeatureCollection<T>`, để số đếm không xuất hiện ở mọi lớp bản đồ. Thứ tự kiểm: chưa tuyến (409) trước, chưa GPS sau.
+
+## ROAD-SEGMENT-GEOM-NULL PR 2a — đọc tuyến chưa có hình
+
+- `GET /map/segments` (bbox) **không** trả tuyến chưa hình (RG-4): `segment.Geom!.Intersects(envelope)` trên cột null rơi — cố ý, `MapQueryPlanTests` vẫn qua `ix_road_segment_geom`. `ProjectSegmentsAsync` dùng chung cho gói offline
+  (`SegmentsByIdAsync`, không bbox) nên **phải** chịu được `Geom` null: Feature `geometry: null`, `properties` (kể cả `length_m` khai báo) giữ nguyên (RG-6).
+- Sơ đồ nhánh tủ điện: cột **có GPS** trên tuyến chưa hình bị bỏ và đếm vào `unrouted_pole_count` (RG-10), tách khỏi `unlocated_pole_count` — một cột vừa chưa GPS vừa trên tuyến chưa hình chỉ đếm là `unlocated`, để
+  `cạnh + unlocated + unrouted` luôn bằng tổng cột. Tuyến đã bị xoá giữa hai truy vấn (không còn trong `roads`) **không** phải "chưa hình" và không đếm. Thứ tự kiểm: chưa tuyến (409) → chưa GPS → chưa hình.

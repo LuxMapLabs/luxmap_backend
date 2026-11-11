@@ -451,6 +451,23 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - `AssetGeometry.TryReadWkt` phải bắt `NetTopologySuite.IO.ParseException` (WKT `POINT(abc)`); thiếu nó là 500, và chốt "sai không phải rỗng" ở trên thành vô nghĩa.
 - Bộ lọc `missing_location` đi cùng `unassigned_segment` trong **một** `Expression` (AND) áp trước `CountAsync` — đừng gọi `ListAsync` hai lần.
 
+## ROAD-SEGMENT-GEOM-NULL — tuyến chưa có hình (PR 2a, 11/11/2026)
+
+- **`RoadSegment.Geom` là `LineString?`.** `geom IS NULL` = tuyến mới có trong sổ sách (RG-1). Không bao giờ nối cột đầu–cuối, tâm xã hay hình suy ra cho "chạy được".
+  Tuyến đã có hình **không** quay về null (RG-2) — nhiều chốt chặn dựa vào đây. Ở 2a **POST / PUT / import vẫn đòi `geom_wkt`**: hàng null chỉ có khi ghi thẳng DB (test làm vậy).
+- **Hai cách hỏng, y như cột chưa GPS (mục POLE-GEOM-NULL) — nhưng ở đây còn một cách thứ ba.** C# đọc `.Coordinates` / `.StartPoint` / `new LengthIndexedLine(null)` / `EqualsExact` của null ⇒ **500**.
+  `ST_Intersects(NULL, …)` ⇒ hàng **rơi**. `ST_Distance(NULL, …)` ⇒ NULL: **đưa vào `double` thì ném lúc materialize** (500), đưa vào `ORDER BY` / `lead()` thì **lọt qua** và NULL xếp cuối. Chỗ đo khoảng cách phải
+  lọc `segment.Geom != null` **trước** (`SpatialFunctions.DistanceMeters(segment.Geom!, …)`), không tin SQL tự rơi.
+- **Chỗ CỐ Ý để rơi, đừng `COALESCE`** (RG-4): `GET /map/segments` (bbox không chọn được thứ không có vị trí; tuyến chưa hình đi qua `GET /assets/segments?missing_geometry=` ở 2b, và qua bundle); `SurveyChainageQuery.Gps` / `.Poles`
+  — xem `survey.md`, đó là chỗ **xanh giả** nếu chốt `POST /sweeps` bị bỏ. Mỗi chỗ có test trồng tuyến null.
+- **`has_geometry` tính lúc đọc** (`segment.Geom != null` trong `SegmentRow`), như `FeederListItem.HasGeometry`. Không thêm cột lưu: hai nơi giữ một sự thật thì lệch nhau.
+- **Gắn hình lần đầu là "đổi hình"** (`rerouted = old is null || !old.EqualsExact(new)`): hành lang 25 m (ASSET-SEG-2) đo mọi cột **có GPS** của tuyến. Đây là lưới an toàn của RG-11 — `PUT …/location` trên tuyến chưa hình
+  **không đo** (`SetPoleLocationAsync` lọc `segment.Geom != null` rồi `SingleOrDefaultAsync`, `offSegment` null, audit `segment_distance_m: null`). Ép `rerouted = false` khi hình cũ null là lỗi im lặng: cột lệch lọt qua mãi mãi.
+  FE cần biết: 409 `POLE_OFF_SEGMENT` có thể tới ở bước **vẽ tuyến**, kèm `pole_ids`.
+- **`length_m` không bị tính lại khi vẽ lần đầu** (RG-3, bẫy 4 của `spatial-map.md`); `SpatialFunctions` ghi rõ `segment.geom` nay nullable.
+- **Migration** `RoadSegmentGeomNullable`: `Up()` một `AlterColumn`, **không** Drop/CreateIndex trên `ix_road_segment_geom` (GIST nhận NULL). `Down()` từ chối khi còn `geom IS NULL` (RG-14): đó cũng là lý do **binary cũ không chạy được**
+  với hàng null (`required LineString`) — vẽ hoặc xoá hết tuyến chưa hình trước khi triển khai lại bản cũ.
+
 ## ASSET-SEGMENT-POLES — tập cột trên tuyến (09/11/2026, drift ASSET-SEG-1)
 
 - `pole_ids` **không có thứ tự**; vắng ≠ `[]` ≠ `null`: PUT vắng giữ, `[]` bỏ cột thấy được, null lỗi 400.

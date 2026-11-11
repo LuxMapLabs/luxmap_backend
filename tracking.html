@@ -52,17 +52,19 @@
 
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="road-segment-geom-null">
-    <strong>ROAD-SEGMENT-GEOM-NULL — Pha 1 (khảo sát), 11/11/2026</strong>
-    <span class="tag t-next">Mỹ đã duyệt RG-1…RG-15 (11/11) · Phase 2 chưa bắt đầu · chưa có code, migration hay OpenAPI · chưa báo WP5 / WP6</span>
-    <p>FE xin tạo tuyến khi chưa có hình (tuyến mới chỉ có trong sổ sách, kỹ sư lấy GPS sau). Hôm nay <code>road_segment.geom</code> là <code>NOT NULL</code>,
-    <code>geom_wkt</code> bắt buộc ở tạo / sửa / import. Khảo sát <b>22 chỗ đọc hình tuyến</b>: 8 chỗ sẽ 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý.
-    Nguy hiểm nhất: khảo sát đêm trên tuyến chưa hình cho coverage trông đủ trong khi cả tuyến không được khảo sát ⇒ 409 <code>SEGMENT_GEOMETRY_REQUIRED</code> ở <code>POST /sweeps</code>.
-    Tạo / giao / lên lịch tuần theo <code>segment_ids</code> không đọc hình nên chạy được với tuyến chưa hình.</p>
-    <p>Đã duyệt: <code>geom</code> nullable (migration một <code>AlterColumn</code>, <code>Down()</code> từ chối khi còn tuyến chưa hình); tuyến đã có hình không quay về chưa hình; <code>length_m</code> vẫn bắt buộc;
-    tuyến chưa hình không vào <code>/map/segments</code>, vào bundle offline với <code>geometry: null</code>; thêm <code>has_geometry</code>, <code>?missing_geometry=</code>, <code>unrouted_pole_count</code>;
-    gắn GPS cột không đo hành lang khi tuyến chưa hình (lúc vẽ tuyến vẫn đo, ASSET-SEG-2). Hai PR: 2a (schema + mọi chỗ đọc) rồi 2b (bật writer).
-    <a href=".ai/tasks/ROAD-SEGMENT-GEOM-NULL.md">Đề bài</a> · <a href=".ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md">Kết quả Pha 1</a> · drift <code>ROAD-SEGMENT-GEOM-NULL</code> (SELF-SIGNED).</p>
-    <p class="muted">Nhánh <code>docs/ROAD-SEGMENT-GEOM-NULL-p1</code> (chưa push). Commit: <code>docs(ROAD-SEGMENT-GEOM-NULL): phase 1 survey of segment readers</code>.</p>
+    <strong>ROAD-SEGMENT-GEOM-NULL — PR 2a (schema + mọi chỗ đọc), 11/11/2026</strong>
+    <span class="tag t-next">Mỹ đã duyệt RG-1…RG-15 (11/11) · PR 2a code xong, chưa push / chưa mở PR · POST / PUT / import tuyến VẪN bắt buộc <code>geom_wkt</code> (writer ở 2b) · chưa báo WP5 / WP6</span>
+    <p>FE xin tạo tuyến khi chưa có hình (tuyến mới chỉ có trong sổ sách, kỹ sư lấy GPS sau). Pha 1 khảo sát <b>22 chỗ đọc hình tuyến</b>: 8 chỗ sẽ 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý.
+    <b>PR 2a làm:</b> migration <code>RoadSegmentGeomNullable</code> (một <code>AlterColumn</code>, <code>Down()</code> từ chối khi còn tuyến chưa hình, GIST giữ nguyên);
+    gói offline trả segment <code>geometry: null</code>; chi tiết tuyến <code>geom_wkt</code> nullable; THÊM <code>has_geometry</code> ở danh sách / chi tiết;
+    sơ đồ nhánh tủ bỏ qua cột trên tuyến chưa hình và đếm <code>unrouted_pole_count</code>; cột của phiếu <code>position: null</code>; agenda giữ tên nhóm, <code>location</code> / <code>distance_m</code> null, xếp sau;
+    tự giao việc không 500; gắn GPS cột không đo hành lang khi tuyến chưa hình (vẽ tuyến lần đầu thì đo, có thể 409 <code>POLE_OFF_SEGMENT</code>);
+    <code>POST /sweeps</code> trên phiếu có tuyến chưa hình ⇒ 409 <code>SEGMENT_GEOMETRY_REQUIRED</code>. Tạo / giao / lên lịch tuần cho tuyến chưa hình vẫn chạy (có test).
+    Chỗ cố ý để rơi, không <code>COALESCE</code>: <code>/map/segments</code>, hai truy vấn khảo sát (có test). Phá thử 10 chốt ⇒ 9 đỏ ngay, ca còn lại (<code>offSegment</code>) đỏ khi trả về dạng gốc.
+    <b>Phát hiện:</b> P1 đoán sai #15 — GPS trên tuyến chưa hình đứng một mình bị gán chính tuyến đó với khoảng cách null (không phải "không gán"); chốt chặn vẫn là <code>POST /sweeps</code>. Ghi ở <code>traps/survey.md</code>.
+    <b>Còn:</b> PR 2b (bật POST / PUT / import, <code>?missing_geometry=</code>, template) sau khi 2a merge. Spec <code>luxmap-v1.json</code> / <code>v1.5</code> sinh lại, lint 10 cảnh báo như trước — cần CODEOWNERS.
+    <a href=".ai/tasks/ROAD-SEGMENT-GEOM-NULL.md">Đề bài</a> · <a href=".ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md">Kết quả Pha 1</a> · <a href=".ai/results/ROAD-SEGMENT-GEOM-NULL-p2a.md">Kết quả 2a</a> · drift <code>ROAD-SEGMENT-GEOM-NULL</code> (SELF-SIGNED).</p>
+    <p class="muted">Nhánh <code>feat/ROAD-SEGMENT-GEOM-NULL-2a</code> (chưa push). Commit: <code>feat(assets): let road segments exist without geometry and guard every reader</code>. Hai commit tài liệu Pha 1 ở đáy nhánh vào <code>dev</code> bằng PR docs riêng.</p>
   </div>
   <div class="card" id="survey-recurring">
     <strong>SURVEY-RECURRING — phase 2, 09/11/2026</strong>
