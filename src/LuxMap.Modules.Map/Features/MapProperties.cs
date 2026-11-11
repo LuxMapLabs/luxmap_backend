@@ -43,9 +43,9 @@ public record PoleProperties
     /// <summary><c>null</c> if and ONLY if <see cref="FixtureStatus"/> is <c>unknown</c> (section 5.1).</summary>
     public double? StatusConfidence { get; init; }
 
-    // The installation fields come from the lamp IN SERVICE — unique per pole since BE-REVIEW-02
-    // constraint 3, so there is one to read and no aggregation rule to invent. Null on a pole that
-    // carries no lamp at all.
+    // The installation fields come from the FIRST lamp in service (slot order). A pole may carry two
+    // (MULTI-FIXTURE, drift MF-1) — see FixtureCount; the second one is read from GET /map/poles/{id}.
+    // Null on a pole that carries no lamp at all.
     public PowerSource? PowerSource { get; init; }
 
     public FixtureType? FixtureType { get; init; }
@@ -54,6 +54,9 @@ public record PoleProperties
 
     /// <summary>Lamps in the active fitting (LAMP-COUNT); <c>null</c> with no active fixture, like <c>lamp_watt</c>.</summary>
     public int? LampCount { get; init; }
+
+    /// <summary>Lamps in service on the pole, 0 to 2 (MULTI-FIXTURE). The lamp fields above describe the first.</summary>
+    public int FixtureCount { get; init; }
 
     public DateOnly? InstallDate { get; init; }
 

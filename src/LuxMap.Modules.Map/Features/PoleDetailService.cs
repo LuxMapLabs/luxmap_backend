@@ -58,19 +58,28 @@ public sealed class PoleDetailService(
             ?? throw new LuxMapException(ErrorCodes.PoleNotFound, HttpStatusCode.NotFound,
                 "That pole does not exist, or it is outside your permitted commune scope.");
 
-        var fixture = await db.Set<Fixture>().AsNoTracking()
+        var lamps = await db.Set<Fixture>().AsNoTracking()
             .Where(f => f.PoleId == poleId && f.RemovedDate == null)
-            .Select(f => new { f.FixtureId, Detail = new PoleMapFixture
+            .OrderBy(f => f.Slot)
+            .Select(f => new PoleMapFixture
             {
-                FixtureType = f.FixtureType, PowerSource = f.PowerSource, LampWatt = f.LampWatt, LampCount = f.LampCount,
+                FixtureId = f.FixtureId, FixtureType = f.FixtureType, PowerSource = f.PowerSource,
+                LampWatt = f.LampWatt, LampCount = f.LampCount,
                 InstallDate = f.InstallDate, WarrantyExpiry = f.WarrantyExpiry,
-            } })
-            .SingleOrDefaultAsync(ct);
+            })
+            .ToListAsync(ct);
+        var window = warranty.Window();
+        PoleMapFixture[] fixtures = [.. lamps.Select(lamp => lamp with { WarrantyStatus = window.Classify(lamp.WarrantyExpiry) })];
+
+        // The baseline belongs to the pole; it is keyed to the newest lamp in service so replacing either lamp retires it.
+        var anchorId = await db.Set<Fixture>().AsNoTracking()
+            .Where(f => f.PoleId == poleId && f.RemovedDate == null)
+            .NewestFirst().Select(f => f.FixtureId).FirstOrDefaultAsync(ct);
 
         var status = await db.Set<PoleCurrentStatus>().AsNoTracking()
             .Where(s => s.PoleId == poleId).SingleOrDefaultAsync(ct);
 
-        var baselines = await CurrentBaselinesAsync(poleId, fixture?.FixtureId, ct);
+        var baselines = await CurrentBaselinesAsync(poleId, anchorId, ct);
 
         return new PoleMapDetail
         {
@@ -79,9 +88,8 @@ public sealed class PoleDetailService(
             SegmentName = pole.SegmentName,
             CommuneId = pole.CommuneId,
             Location = pole.Geom is null ? null : new PoleMapLocation(pole.Geom.Y, pole.Geom.X),
-            Fixture = fixture?.Detail is { } lamp
-                ? lamp with { WarrantyStatus = warranty.Window().Classify(lamp.WarrantyExpiry) }
-                : null,
+            Fixture = fixtures.FirstOrDefault(),
+            Fixtures = fixtures,
             CurrentStatus = new PoleMapStatus
             {
                 // No row = no published sweep ever covered the pole = `unknown` (Contract 3.1).
@@ -102,9 +110,9 @@ public sealed class PoleDetailService(
     }
 
     /// <summary>
-    /// The newest baseline per travel direction for the lamp in use — the same "current lamp" rule the
-    /// classifier applies (<see cref="SurveyBaselineLookup.ForFixture"/>): a baseline built on a lamp
-    /// that has since been replaced is not shown as the pole's baseline.
+    /// The newest baseline per travel direction for the pole's current lamps — the same rule the classifier
+    /// applies (<see cref="SurveyBaselineLookup.ForFixture"/>, anchored on <see cref="FixtureSlots.NewestFirst"/>):
+    /// a baseline built on a lamp that has since been replaced is not shown as the pole's baseline.
     /// </summary>
     private async Task<IReadOnlyList<PoleMapBaseline>> CurrentBaselinesAsync(
         string poleId, string? fixtureId, CancellationToken ct)

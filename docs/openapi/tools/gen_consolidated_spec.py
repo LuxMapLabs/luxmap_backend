@@ -395,9 +395,9 @@ S["LatLng"] = {"type": "object", "required": ["lat", "lng"], "additionalProperti
 
 S["PoleProperties"] = {
     "type": "object", "additionalProperties": False,
-    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1) + lamp_count (LAMP-COUNT LMC-3). Không có data_source / external_ref / feeder_id (không emit).",
+    "description": "Contract §5.1 — 15 thuộc tính phẳng + warranty_status (BE-31 drift W-1) + lamp_count (LAMP-COUNT LMC-3) + fixture_count (MULTI-FIXTURE MF-3). Không có data_source / external_ref / feeder_id (không emit).",
     "required": ["pole_id", "segment_id", "fixture_status", "power_source", "fixture_type", "lamp_watt", "lamp_count",
-                 "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
+                 "fixture_count", "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
     "properties": OrderedDict([
         ("pole_id", {"$ref": "#/components/schemas/PoleId"}),
         ("segment_id", {"type": "string", "nullable": True, "allOf": [{"$ref": "#/components/schemas/SegmentId"}]}),
@@ -409,6 +409,8 @@ S["PoleProperties"] = {
         ("lamp_watt", {"type": "integer", "format": "int32"}),
         ("lamp_count", {"type": "integer", "format": "int32", "minimum": 1, "maximum": 4, "nullable": True,
                         "description": "LAMP-COUNT LMC-1: số bóng giống nhau của bộ đèn đang dùng (cột cần đôi = 2); lamp_watt là công suất MỘT bóng; null khi cột không có bóng đang dùng"}),
+        ("fixture_count", {"type": "integer", "format": "int32", "minimum": 0, "maximum": 2,
+                           "description": "MULTI-FIXTURE MF-3: số bóng đang dùng trên cột (0–2); lamp_watt / lamp_count / install_date / warranty_* mô tả bóng ĐẦU TIÊN (theo slot), bóng thứ hai đọc ở GET /map/poles/{id} (fixtures[])"}),
         ("install_date", {"type": "string", "format": "date"}),
         ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),
         ("warranty_status", {"$ref": "#/components/schemas/WarrantyStatus",

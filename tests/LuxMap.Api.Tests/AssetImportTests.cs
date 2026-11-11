@@ -75,7 +75,7 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task A_second_fixtures_file_is_refused_per_row_rather_than_doubling_the_equipment_history()
+    public async Task A_third_fixtures_file_is_refused_per_row_rather_than_piling_up_the_equipment_history()
     {
         var client = await fixture.ManagerClientAsync();
         var tag = Tag();
@@ -83,22 +83,23 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
 
         var file = FixtureHeader + $"\n{tag}-P1,led_road_lamp,grid,100,2022-03-24,,2024-03-24,public_imagery";
 
-        var first = await ImportAsync(client, "fixtures", "fixtures.csv", file);
-        Assert.Equal(1, first.GetProperty("inserted").GetInt32());
+        // A pole takes two lamps in service (MULTI-FIXTURE): re-running the file fills the second slot, then runs out.
+        Assert.Equal(1, (await ImportAsync(client, "fixtures", "fixtures.csv", file)).GetProperty("inserted").GetInt32());
+        Assert.Equal(1, (await ImportAsync(client, "fixtures", "fixtures.csv", file)).GetProperty("inserted").GetInt32());
 
-        var second = await ImportAsync(client, "fixtures", "fixtures.csv", file);
-        Assert.Equal(0, second.GetProperty("inserted").GetInt32());
-        Assert.Equal(1, second.GetProperty("failed").GetInt32());
-        Assert.Contains("already carries a lamp in service", second.GetProperty("rows")[0].GetProperty("message").GetString()!);
+        var third = await ImportAsync(client, "fixtures", "fixtures.csv", file);
+        Assert.Equal(0, third.GetProperty("inserted").GetInt32());
+        Assert.Equal(1, third.GetProperty("failed").GetInt32());
+        Assert.Contains("already carries 2 lamps in service", third.GetProperty("rows")[0].GetProperty("message").GetString()!);
 
         var count = await fixture.QueryAsync(db => db.Set<Fixture>().IgnoreQueryFilters()
             .CountAsync(item => item.Pole.ExternalRef == $"{tag}-P1"));
 
-        Assert.Equal(1, count);
+        Assert.Equal(2, count);
     }
 
     [Fact]
-    public async Task Two_rows_in_ONE_file_claiming_the_same_pole_are_caught_before_the_write()
+    public async Task Three_rows_in_ONE_file_claiming_the_same_pole_are_caught_before_the_write()
     {
         var client = await fixture.ManagerClientAsync();
         var tag = Tag();
@@ -107,11 +108,12 @@ public sealed class AssetImportTests(AssetImportFixture fixture)
         var result = await ImportAsync(client, "fixtures", "fixtures.csv",
             FixtureHeader
             + $"\n{tag}-P1,led_road_lamp,grid,100,2022-03-24,,,public_imagery"
-            + $"\n{tag}-P1,led_road_lamp,grid,150,2023-01-01,,,public_imagery");
+            + $"\n{tag}-P1,led_road_lamp,grid,150,2023-01-01,,,public_imagery"
+            + $"\n{tag}-P1,led_road_lamp,grid,200,2023-06-01,,,public_imagery");
 
-        // The in-batch check matters as much as the database one: both rows are new, so nothing in
-        // the schema would have stopped the second.
-        Assert.Equal(1, result.GetProperty("inserted").GetInt32());
+        // The in-batch check matters as much as the database one: all three rows are new, so nothing in
+        // the schema would have stopped the third before the write.
+        Assert.Equal(2, result.GetProperty("inserted").GetInt32());
         Assert.Equal(1, result.GetProperty("failed").GetInt32());
     }
 

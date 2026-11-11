@@ -2045,3 +2045,25 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 | GN-9 | `PUT …/location` lần đầu: `moved_m: null`; audit `relocated` với `before: null`, `after.moved_m: null` |
 | GN-10 | `GET /assets/poles?missing_location=true` (PR 2b) |
 | GN-11 | Gán tuyến cho cột chưa GPS không đo hành lang; hành lang đo lúc gắn GPS (G-2) |
+
+## MULTI-FIXTURE — một cột mang tối đa HAI bóng đang dùng, mỗi bóng một bản ghi `fixture` (11/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 11/11/2026**: tách thành hai `fixture` riêng (hướng B của LAMP-COUNT), **đảo D-11** (BE-REVIEW-02) và hướng A của 21/10. Ba lựa chọn chốt cùng lúc: trạng thái theo cột, thêm mảng `fixtures[]` giữ field cũ, giữ `lamp_count` |
+| **Chạm API** | **Có** — chỉ THÊM, không đổi trường nào đã có. **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract |
+| **Scope** | Assets (entity, import, inventory), Map (bản đồ, chi tiết cột), Survey (khoá baseline), WorkOrders (cột của phiếu), Statistics (bảo hành); migration `AddFixtureSlot`; `seed_mock_set.py`; spec sinh lại |
+| **Consumer** | WP5 (kiểm kê, chi tiết cột, nhập bóng), WP6 (chi tiết cột, gói offline). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| MF-1 | Một cột có tối đa **2 bản ghi `fixture` đang dùng** (`removed_date IS NULL`), mỗi bản ghi ID / công suất / bảo hành / `data_source` riêng. Cột mới **`fixture.slot smallint NOT NULL`**, CHECK `ck_fixture_slot` = `1..2`, UNIQUE partial **`ux_fixture_pole_slot_active`** `(pole_id, slot) WHERE removed_date IS NULL` thay `ux_fixture_pole_id_active`. Giới hạn nằm ở DB nên hai request đua nhau vẫn không vượt được hai bóng. Server chọn **slot trống thấp nhất** và **không** trả `slot` ra API (không có field mới ở đó). Bóng đã ngừng dùng giữ slot cũ làm lịch sử, không chiếm chỗ. Migration backfill `1` rồi bỏ default |
+| MF-2 | `POST /assets/fixtures`: bóng thứ hai nhận như bóng đầu; bóng thứ ba → **409 `POLE_HAS_ACTIVE_FIXTURE`** (mã giữ nguyên, thông điệp nay nói "hai bóng"). Dòng đã có `removed_date` là lịch sử, không tốn slot. Import bóng: mỗi dòng đang dùng nhận slot trống kế tiếp, dòng thứ ba cho một cột lỗi **theo dòng** (đếm cả bóng đã có trong DB lẫn dòng trước trong file). Vẫn insert-only, vẫn không có PUT |
+| MF-3 | Đọc: `GET /map/poles/{id}` thêm **`fixtures[]`** (theo slot; mỗi item thêm `fixture_id`) và giữ `fixture` = bóng đầu. `GET /assets/poles` thêm **`active_fixtures[]`** và giữ `active_fixture` = bóng đầu. `properties` của `GET /map/poles` (kéo theo `/sync/bundle`) và `GET /work-orders/{id}/poles` thêm **`fixture_count`** (0..2); `lamp_watt` / `lamp_count` / `install_date` / `warranty_*` phẳng mô tả **bóng đầu**. Tổng công suất cột hai bóng **không** cộng sẵn |
+| MF-4 | **Trạng thái đèn vẫn theo cột** (giữ LMC-4): `pole_current_status`, `fixture_status`, `status_confidence` và mọi thống kê không tách theo bóng — CV và đỉnh lux không phân biệt được hai bóng cùng một cột. Cột hai bóng tắt một → CV thấy ON, lux tụt so với baseline → `dim` |
+| MF-5 | **Baseline neo vào bóng MỚI NHẤT đang dùng** của cột (`FixtureSlots.NewestFirst`: `created_at, length(id), id`). Thay **một trong hai** bóng chèn bản ghi mới hơn ⇒ neo đổi ⇒ baseline cũ ngừng khớp (đúng luật "baseline dựng trên bóng đã thay không còn là baseline của cột" của mô hình một bóng). **Lỗ hổng đã biết:** ngừng dùng bóng CŨ hơn mà KHÔNG thay thì neo vẫn là bóng mới, baseline vẫn hiệu lực dù cột nay sáng kém hơn ⇒ có thể đọc `dim` tới khi baseline mới đủ đêm. Không có chốt chặn nào cho trường hợp này — cần người biết vận hành quyết (đòi chụp lại baseline khi ngừng bóng? cảnh báo ở FE?) |
+| MF-6 | `GET /statistics/warranty`: **một hàng mỗi bóng đang dùng**, nên cột hai bóng xuất hiện hai lần và `total` đếm bóng, không đếm cột (cột không bóng vẫn một hàng `unknown`). Thứ tự hoà thêm `fixture_id` theo luật ID |
+| MF-7 | `lamp_count` (LMC-1) **giữ nguyên**, mặc định 1: một chao đôi vẫn là một bản ghi `lamp_count = 2`; hai bóng tách riêng là hai bản ghi. Hai cách cùng tồn tại — nhập liệu chọn theo việc bóng có thay / bảo hành riêng được không |
+| MF-8 | `Down()` của migration **không đảo được** khi đã có cột hai bóng (tạo lại index cũ báo trùng `pole_id`) — cố ý: ngừng dùng bóng thứ hai của mọi cột đó trước, không bao giờ xoá dòng |
+
+**Cần báo / cần quyết:** WP5, WP6 (shape mới, chỉ thêm); MF-5 cần Mỹ hoặc người vận hành chốt luật khi ngừng bóng; bộ mock `mocks/*.json` **chưa** thêm `fixtures[]` / `fixture_count` (mock vẫn một bóng mỗi cột — thêm nếu FE cần dựng thử cột đôi).

@@ -175,10 +175,16 @@ máy chủ (đo được 7 giờ trên máy Asia/Saigon). Chuẩn hoá bằng `U
    rồi giao lại binder cũ nên nghĩa không đổi. Tham số ngày mới **không cần làm gì** — chỉ đừng nhận ngày dưới dạng `string`
    rồi tự `DateTime.Parse`, như vậy là đi vòng qua chốt chặn. Canh bằng `A_bound_that_is_not_iso_8601_is_a_400_never_a_guess`.
 
-**3. Một cột có tối đa MỘT bóng đang dùng.** `ux_fixture_pole_id_active` là UNIQUE partial
-(`pole_id WHERE removed_date IS NULL`). Thay bóng = ngừng dùng bóng cũ rồi ghi bóng mới; bóng có
-`removed_date` là lịch sử, không chặn và không bị chặn. CRUD trả 409 `POLE_HAS_ACTIVE_FIXTURE`, import
-báo theo dòng. BE-14 flatten từ **bóng đang dùng** — nay là duy nhất, không cần quy tắc tổng hợp.
+**3. Một cột có tối đa HAI bóng đang dùng (MULTI-FIXTURE, drift MF-1 — đảo D-11 ngày 11/11/2026).** Giới hạn là
+**`fixture.slot` (1..2, `ck_fixture_slot`) + UNIQUE partial `ux_fixture_pole_slot_active`** `(pole_id, slot WHERE removed_date IS NULL)`,
+không phải đếm dòng: đếm dòng thì hai request đua nhau vẫn qua được, còn index thì không. Service chỉ **chọn slot trống thấp nhất**
+(`FixtureSlots.FirstFree`) để trả 409 có thông điệp trước khi index phải từ chối; slot **không ra API**. Thay bóng = ngừng dùng bóng cũ
+(giải phóng slot) rồi ghi bóng mới; bóng có `removed_date` là lịch sử, không chiếm slot. CRUD trả 409 `POLE_HAS_ACTIVE_FIXTURE` ở bóng thứ
+ba, import báo theo dòng. 🔴 **Mọi đường ghi `fixture` bằng SQL thô phải kèm `slot`** (cột `NOT NULL`, không default — `seed_mock_set.py`
+đã làm; script mới quên là chết ngay ở lần nạp đầu). Đọc: cột phẳng (`lamp_watt`, …) lấy **bóng đầu theo slot** và đi kèm `fixture_count`;
+đừng `SingleOrDefault` / `FirstOrDefault` không có `OrderBy(Slot)` trên bóng đang dùng — cột hai bóng làm cái trước ném lỗi, cái sau cho
+kết quả không xác định. **Baseline neo vào bóng MỚI NHẤT đang dùng** (`FixtureSlots.NewestFirst`), không phải bóng đầu: thay bóng nào cũng
+làm baseline cũ ngừng khớp. Lỗ hổng đã biết (MF-5): ngừng dùng bóng cũ hơn mà không thay thì baseline vẫn hiệu lực.
 
 **4. `removed_date >= install_date` và ngừng dùng đúng một lần.** CHECK
 `ck_fixture_removed_after_install` ở DB; API trả 400 `VALIDATION_FAILED` nêu cả hai ngày; PUT lần hai
