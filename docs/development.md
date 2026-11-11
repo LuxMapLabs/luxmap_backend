@@ -644,8 +644,8 @@ Các giá trị trên chưa được hiệu chỉnh bằng chuyến quay thử. 
 
 ## Frame và CV mô phỏng — BE-15 P2b-2
 
-Cần migration `AddSurveyFrames` và `ffmpeg`/`ffprobe` trong PATH của worker; CI Ubuntu cài package
-`ffmpeg` trước test (`--no-install-recommends`, bước giới hạn 12 phút — mirror chậm từng làm job hết giờ trước khi test chạy). Không có NuGet mới. Test media tự sinh video, thiếu executable là lỗi, không skip.
+Cần migration `AddSurveyFrames` và `ffmpeg`/`ffprobe` trong PATH của worker; CI tải bản static ffmpeg/ffprobe
+đã ghim (GitHub Releases, kiểm SHA-256, bước giới hạn 8 phút) thay vì `apt-get` — mirror Ubuntu của runner từng chậm rồi lỗi DNS làm job hết giờ trước khi test chạy. Đổi phiên bản = đổi URL và SHA-256 cùng lúc trong `.github/workflows/ci.yml`. Không có NuGet mới. Test media tự sinh video, thiếu executable là lỗi, không skip.
 Máy đã thử: ffmpeg/ffprobe 8.1.2 trên macOS; đường dẫn, version/build và hash binary cùng
 assembly bộ cắt được lưu vào `artifact_version` mỗi run. Chưa ghim bản triển khai production (chờ pilot).
 

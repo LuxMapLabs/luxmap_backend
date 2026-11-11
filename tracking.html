@@ -53,7 +53,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="road-segment-geom-null">
     <strong>ROAD-SEGMENT-GEOM-NULL — PR 2a (schema + mọi chỗ đọc), 11/11/2026</strong>
-    <span class="tag t-next">Mỹ đã duyệt RG-1…RG-15 (11/11) · PR 2a code xong, chưa push / chưa mở PR · POST / PUT / import tuyến VẪN bắt buộc <code>geom_wkt</code> (writer ở 2b) · chưa báo WP5 / WP6</span>
+    <span class="tag t-next">Mỹ đã duyệt RG-1…RG-15 (11/11) · PR 2a code xong, PR #230 · POST / PUT / import tuyến VẪN bắt buộc <code>geom_wkt</code> (writer ở 2b) · chưa báo WP5 / WP6</span>
     <p>FE xin tạo tuyến khi chưa có hình (tuyến mới chỉ có trong sổ sách, kỹ sư lấy GPS sau). Pha 1 khảo sát <b>22 chỗ đọc hình tuyến</b>: 8 chỗ sẽ 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý.
     <b>PR 2a làm:</b> migration <code>RoadSegmentGeomNullable</code> (một <code>AlterColumn</code>, <code>Down()</code> từ chối khi còn tuyến chưa hình, GIST giữ nguyên);
     gói offline trả segment <code>geometry: null</code>; chi tiết tuyến <code>geom_wkt</code> nullable; THÊM <code>has_geometry</code> ở danh sách / chi tiết;
@@ -64,7 +64,14 @@
     <b>Phát hiện:</b> P1 đoán sai #15 — GPS trên tuyến chưa hình đứng một mình bị gán chính tuyến đó với khoảng cách null (không phải "không gán"); chốt chặn vẫn là <code>POST /sweeps</code>. Ghi ở <code>traps/survey.md</code>.
     <b>Còn:</b> PR 2b (bật POST / PUT / import, <code>?missing_geometry=</code>, template) sau khi 2a merge. Spec <code>luxmap-v1.json</code> / <code>v1.5</code> sinh lại, lint 10 cảnh báo như trước — cần CODEOWNERS.
     <a href=".ai/tasks/ROAD-SEGMENT-GEOM-NULL.md">Đề bài</a> · <a href=".ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md">Kết quả Pha 1</a> · <a href=".ai/results/ROAD-SEGMENT-GEOM-NULL-p2a.md">Kết quả 2a</a> · drift <code>ROAD-SEGMENT-GEOM-NULL</code> (SELF-SIGNED).</p>
-    <p class="muted">Nhánh <code>feat/ROAD-SEGMENT-GEOM-NULL-2a</code> (chưa push). Commit: <code>feat(assets): let road segments exist without geometry and guard every reader</code>. Hai commit tài liệu Pha 1 ở đáy nhánh vào <code>dev</code> bằng PR docs riêng.</p>
+    <p class="muted">Nhánh <code>feat/ROAD-SEGMENT-GEOM-NULL-2a</code> (PR #230). Commit: <code>feat(assets): let road segments exist without geometry and guard every reader</code>. Hai commit tài liệu Pha 1 ở đáy nhánh vào <code>dev</code> bằng PR docs riêng.</p>
+  </div>
+  <div class="card" id="ci-ffmpeg-pinned">
+    <strong>CI — cài ffmpeg bằng bản static đã ghim thay cho apt-get, 11/11/2026</strong>
+    <span class="tag t-next">Nhánh <code>ci/ffmpeg-pinned-fallback</code> · đã merge (#231)</span>
+    <p>CI của PR #230 đỏ ba lần ở bước cài ffmpeg: mirror apt của runner lỗi DNS (<code>azure.archive.ubuntu.com</code>), quá 12 phút, trước khi build / test chạy.
+    Bước nay tải bản static ghim sẵn từ GitHub Releases, kiểm SHA-256 (đã tự kiểm lại), chạy <code>ffmpeg</code> / <code>ffprobe -version</code>; mọi lần chạy dùng cùng một phiên bản. Giới hạn bước 8 phút.
+    Chỉ sửa <code>.github/workflows/ci.yml</code> và mô tả ở <code>docs/development.md</code>. Cùng ý với hunk CI của PR #213, nhưng không dùng ffmpeg có sẵn của runner (không ghim được); #213 sẽ xung đột văn bản ở hunk này nếu merge sau.</p>
   </div>
   <div class="card" id="survey-recurring">
     <strong>SURVEY-RECURRING — phase 2, 09/11/2026</strong>
