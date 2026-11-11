@@ -60,11 +60,21 @@ public sealed class AssetCrudService(
     /// <c>true</c> keeps only poles that are on no segment (POLE-SEGMENT-NULL D-2); <c>false</c> is no restriction. Applied BEFORE the
     /// total and the page, so <c>total</c> counts the filtered set. Unrelated to <c>feeders/poles?unassigned=true</c>, which is about circuits.
     /// </param>
+    /// <param name="missingLocation">
+    /// <c>true</c> keeps only poles with no position yet (POLE-GEOM-NULL GN-10), the work list for the field engineer; <c>false</c> is no restriction.
+    /// Combines with <paramref name="unassignedSegment"/> as AND, and is applied before the total and the page.
+    /// </param>
     public async Task<PagedResult<PoleListItem>> ListPolesAsync(
-        IReadOnlyList<string>? communes, PageRequest page, bool unassignedSegment, CancellationToken ct)
+        IReadOnlyList<string>? communes, PageRequest page, bool unassignedSegment, bool missingLocation, CancellationToken ct)
     {
-        System.Linq.Expressions.Expression<Func<Pole, bool>>? onlyUnassigned = unassignedSegment ? pole => pole.SegmentId == null : null;
-        var result = await ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, onlyUnassigned, ct);
+        System.Linq.Expressions.Expression<Func<Pole, bool>>? filter = (unassignedSegment, missingLocation) switch
+        {
+            (true, true) => pole => pole.SegmentId == null && pole.Geom == null,
+            (true, false) => pole => pole.SegmentId == null,
+            (false, true) => pole => pole.Geom == null,
+            _ => null,
+        };
+        var result = await ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, filter, ct);
         var window = warranty.Window();
         return result with { Items = [.. result.Items.Select(item => WithWarranty(item, window))] };
     }
@@ -320,7 +330,8 @@ public sealed class AssetCrudService(
             FeederId = request.FeederId,
             FeederSource = feederSource,
             CommuneId = communeId,
-            Geom = Read<Point>(request.GeomWkt),
+            // Absent / null = a pole from the books with no position yet (POLE-GEOM-NULL); blank or malformed is still a 400.
+            Geom = request.GeomWkt is null ? null : Read<Point>(request.GeomWkt),
             NearSensitivePoi = request.NearSensitivePoi,
             DataSource = request.DataSource!.Value,
             Note = PoleNoteInput.Normalize(request.Note),
@@ -553,7 +564,15 @@ public sealed class AssetCrudService(
         pole.ExternalRef = request.ExternalRef;
         pole.SegmentId = segmentId;
         TopologyLink.ApplyPoleFeeder(dbContext, pole, request.FeederId, feederSource);
-        pole.Geom = Read<Point>(request.GeomWkt);
+        // GN-2: a pole that has a position keeps one — absent / null is a 400; a pole without one stays without unless a WKT arrives.
+        if (request.GeomWkt is not null) pole.Geom = Read<Point>(request.GeomWkt);
+        else if (pole.Geom is not null)
+        {
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "geom_wkt is required for a pole that already has a position.",
+                new Dictionary<string, object?> { ["field"] = "geom_wkt" });
+        }
+
         pole.NearSensitivePoi = request.NearSensitivePoi;
         pole.DataSource = request.DataSource!.Value;
 

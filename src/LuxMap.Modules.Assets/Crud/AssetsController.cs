@@ -153,8 +153,9 @@ public sealed class AssetsController(
     public async Task<ActionResult<PagedResult<PoleListItem>>> ListPolesAsync(
         [FromQuery(Name = "commune_id")] string[]? communeId,
         [FromQuery(Name = "unassigned_segment")] bool unassignedSegment,
+        [FromQuery(Name = "missing_location")] bool missingLocation,
         PageQuery page, CancellationToken ct)
-        => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), unassignedSegment, ct));
+        => Ok(await service.ListPolesAsync(Narrow(communeId), page.ToPageRequest(), unassignedSegment, missingLocation, ct));
 
     /// <summary>One pole, with its geometry as WKT and its segment's name resolved.</summary>
     /// <remarks>

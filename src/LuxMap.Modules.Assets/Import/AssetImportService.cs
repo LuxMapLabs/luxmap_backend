@@ -81,9 +81,8 @@ public sealed class AssetImportService(
         {
             index++;
             var properties = feature.TryGetProperty("properties", out var p) ? p : default;
-            JsonElement? geometry = feature.TryGetProperty("geometry", out var g) && g.ValueKind == JsonValueKind.Object
-                ? g
-                : null;
+            // Undefined when the key is absent; the row decides what a non-object value means.
+            var geometry = feature.TryGetProperty("geometry", out var g) ? g : default;
 
             rows.Add(new GeoJsonImportRow(index, properties, geometry));
         }
@@ -96,7 +95,8 @@ public sealed class AssetImportService(
         ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "geom_wkt", "commune_id", "data_source"],
         ImportKind.Cabinets => ["external_ref", "cabinet_name", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Feeders => ["external_ref", "feeder_name", "commune_id"],
-        ImportKind.Poles => ["external_ref", "commune_id", "geom_wkt", "data_source"],
+        // geom_wkt is optional for poles since POLE-GEOM-NULL: a pole known only from the books has no position yet.
+        ImportKind.Poles => ["external_ref", "commune_id", "data_source"],
         ImportKind.Fixtures => ["pole_external_ref", "fixture_type", "power_source", "lamp_watt", "install_date", "data_source"],
         _ => [],
     };
@@ -372,7 +372,10 @@ public sealed class AssetImportService(
             var communeId = await CommuneAsync(reader, cancellationToken);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
             var nearPoi = reader.Flag("near_sensitive_poi", fallback: false);
-            var geometry = reader.Geometry<Point>(CsvImportRow.GeometryColumn);
+
+            // POLE-GEOM-NULL GN-2: a blank or missing cell leaves a NEW pole without a position and KEEPS an existing pole's one (a
+            // pole never goes back to "no position"); a malformed value is still a row error — never read as "empty".
+            var geometry = reader.OptionalGeometry<Point>(CsvImportRow.GeometryColumn);
 
             // Optional, and never required in the header. Already trimmed, blank = no note.
             var note = reader.Optional("note");
@@ -431,7 +434,11 @@ public sealed class AssetImportService(
                 }
 
                 TopologyLink.ApplyPoleFeeder(dbContext, pole, feeder?.Id, feederSource);
-                pole.Geom = geometry!;
+                if (geometry is not null)
+                {
+                    pole.Geom = geometry;
+                }
+
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
                 ImportNote(reader, pole, note, warnings);
@@ -446,7 +453,7 @@ public sealed class AssetImportService(
                 FeederId = feeder?.Id,
                 FeederSource = feederSource,
                 CommuneId = communeId!,
-                Geom = geometry!,
+                Geom = geometry,
                 NearSensitivePoi = nearPoi,
                 DataSource = dataSource,
                 Note = note,

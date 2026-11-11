@@ -29,6 +29,13 @@ internal interface IImportRow
     bool IsNonScalar(string column);
 
     bool TryGeometry(out Geometry? geometry, out string? error);
+
+    /// <summary>
+    /// The geometry is deliberately not there: a blank or missing <c>geom_wkt</c> cell, or a GeoJSON feature whose <c>geometry</c> is absent or
+    /// <c>null</c>. Anything else — including a value of the wrong JSON type — is NOT empty, so a malformed geometry can never be taken for
+    /// "no position yet" (the same trap as TOPO-INFER's non-scalar cells).
+    /// </summary>
+    bool GeometryIsEmpty { get; }
 }
 
 internal sealed class CsvImportRow(CsvRow row) : IImportRow
@@ -43,9 +50,11 @@ internal sealed class CsvImportRow(CsvRow row) : IImportRow
 
     public bool TryGeometry(out Geometry? geometry, out string? error)
         => AssetGeometry.TryReadWkt(row[GeometryColumn], out geometry, out error);
+
+    public bool GeometryIsEmpty => string.IsNullOrWhiteSpace(row[GeometryColumn]);
 }
 
-internal sealed class GeoJsonImportRow(int index, JsonElement properties, JsonElement? geometry) : IImportRow
+internal sealed class GeoJsonImportRow(int index, JsonElement properties, JsonElement geometry) : IImportRow
 {
     public int Row => index;
 
@@ -79,15 +88,17 @@ internal sealed class GeoJsonImportRow(int index, JsonElement properties, JsonEl
 
     public bool TryGeometry(out Geometry? result, out string? error)
     {
-        if (geometry is null)
+        if (geometry.ValueKind != JsonValueKind.Object)
         {
             result = null;
-            error = "Feature has no geometry.";
+            error = GeometryIsEmpty ? "Feature has no geometry." : "Feature geometry must be a GeoJSON geometry object.";
             return false;
         }
 
-        return AssetGeometry.TryReadGeoJson(geometry.Value, out result, out error);
+        return AssetGeometry.TryReadGeoJson(geometry, out result, out error);
     }
+
+    public bool GeometryIsEmpty => geometry.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
 }
 
 /// <summary>
@@ -250,6 +261,14 @@ internal sealed class ImportRowReader(IImportRow row, List<ImportRowError> error
         Fail(column, $"'{text}' is not one of: {Crud.TopologyLink.Allowed}.");
         return Crud.TopologyLink.Label.Absent;
     }
+
+    /// <summary>
+    /// Like <see cref="Geometry{TGeometry}"/> but an EMPTY geometry is a legitimate answer (<c>null</c>), not a row error — a pole known only from
+    /// the books has none yet (POLE-GEOM-NULL). A present but malformed one still fails the row.
+    /// </summary>
+    public TGeometry? OptionalGeometry<TGeometry>(string column)
+        where TGeometry : Geometry
+        => row.GeometryIsEmpty ? null : Geometry<TGeometry>(column);
 
     public TGeometry? Geometry<TGeometry>(string column)
         where TGeometry : Geometry

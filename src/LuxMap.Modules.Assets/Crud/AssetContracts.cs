@@ -147,8 +147,11 @@ public sealed record CreatePoleRequest
     [MaxLength(32)]
     public string? CommuneId { get; init; }
 
-    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first.</summary>
-    [Required]
+    /// <summary>
+    /// WKT <c>POINT</c> in EPSG:4326, longitude first. OPTIONAL since POLE-GEOM-NULL: absent or <c>null</c> creates a pole known only
+    /// from the commune's books, with no position yet; its first position comes later from <c>PUT /assets/poles/{id}/location</c>.
+    /// A blank or malformed string is still a 400.
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     public bool NearSensitivePoi { get; init; }
@@ -371,8 +374,11 @@ public sealed record UpdatePoleRequest
     [MaxLength(32)]
     public string? FeederId { get; init; }
 
-    /// <summary>WKT <c>POINT</c> in EPSG:4326, longitude first.</summary>
-    [Required]
+    /// <summary>
+    /// WKT <c>POINT</c>. Required for a pole that already has a position (400 if absent or <c>null</c>: a pole never goes back to
+    /// "no position"); for a pole that has none, absent or <c>null</c> leaves it without one and a WKT gives it its first one
+    /// (POLE-GEOM-NULL GN-2). Decided in the service because it depends on the stored pole.
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     public bool NearSensitivePoi { get; init; }
