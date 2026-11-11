@@ -352,3 +352,11 @@ Lịch có audit nội bộ `SurveyRecurringSchedule`, action `Created` / `Detai
 - `location` của sự cố vẫn `fault.lat/lng ?? pole.geom`; nhánh `pole.Geom == null` trong ba truy vấn đó là **lưới đỡ**, không phải đường đi hợp lệ.
 - `GET /work-orders/{id}/poles`: cột chưa GPS có `location: null`, `position: null`, đứng cuối tuyến của nó theo `created_at, length(pole_id), pole_id`;
   cột đã có GPS vẫn đánh số 1..n liền nhau (GN-6).
+
+## ROAD-SEGMENT-GEOM-NULL PR 2a — phiếu trên tuyến chưa có hình
+
+- **Không có hình ≠ không làm được việc.** Tạo / giao / lên lịch phiếu khảo sát, lịch tuần và sinh phiếu cho tuyến chưa hình đều chạy (chỉ đọc `commune_id` / tên / sự tồn tại). Chỉ `POST /sweeps` bị chặn (`survey.md`).
+- `GET /work-orders/{id}/poles` (RG-8): `lines` (từ điển `LengthIndexedLine`) **bỏ** tuyến chưa hình; "không chỗ dọc đường" = `Unplaced` = cột chưa GPS **hoặc** tuyến chưa hình ⇒ `position: null`, xếp sau các cột đã định vị của tuyến
+  theo `created_at, length(pole_id), pole_id`. `WorkOrderPoleOrdering.Along` đã trả 0 khi không có `line`; `AutoDispatchQueries` dùng cùng cách (không bao giờ dựng `LengthIndexedLine(null)`).
+- `GET /work-orders/agenda` (RG-9): nhóm giữ `segment_name`; `location` và `distance_m` null; xếp sau nhóm đo được (`OrderBy(DistanceM is null)` sẵn có). `roadDistance` lọc `Geom != null` **trước** `DistanceMeters`
+  (NULL vào `double` ném), và `roadDistance[segmentId]` đổi thành `TryGetValue` — tuyến không hình vắng trong từ điển. `Location` của **từng phiếu** vẫn ưu tiên toạ độ sự cố nếu có.

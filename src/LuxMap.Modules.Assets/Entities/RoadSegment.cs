@@ -60,10 +60,11 @@ public class RoadSegment : ICommuneScoped, IExternallyReferenced, IUpdateStamped
     public int LengthM { get; set; }
 
     /// <summary>
-    /// <c>geometry(LineString, 4326)</c>. Required: a segment with no route cannot be drawn, and the
-    /// GIST index exists to serve exactly this column.
+    /// <c>geometry(LineString, 4326)</c>. Null (ROAD-SEGMENT-GEOM-NULL, RG-1) means "on the books, not yet
+    /// drawn" — never a made-up line. The GIST index exists to serve exactly this column; a null never
+    /// matches a bbox, so an undrawn segment is not on the map (RG-4). Once drawn it never goes back (RG-2).
     /// </summary>
-    public required LineString Geom { get; set; }
+    public LineString? Geom { get; set; }
 
     /// <summary>
     /// The commune administering this segment.

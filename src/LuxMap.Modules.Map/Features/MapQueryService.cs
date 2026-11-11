@@ -197,8 +197,10 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
     {
         var envelope = Envelope(query.Bbox);
 
+        // A segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-4) is NULL here and drops out — it has no place on
+        // a map. Deliberate: the undrawn list is GET /assets/segments?missing_geometry (2b), never a bbox.
         var segments = dbContext.Set<RoadSegment>().AsNoTracking()
-            .Where(segment => segment.Geom.Intersects(envelope));
+            .Where(segment => segment.Geom!.Intersects(envelope));
 
         segments = WithDataSource(segments, query.DataSource, segment => segment.DataSource);
 
@@ -250,7 +252,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
         {
             Features = [.. rows.Select(row => new Feature<SegmentProperties>
             {
-                Geometry = GeoJsonGeometry.LineString(
+                // Only the offline bundle reaches an undrawn segment (RG-6): the bbox query above never selects one.
+                Geometry = row.Geom is null ? null : GeoJsonGeometry.LineString(
                     row.Geom.Coordinates.Select(point => (point.X, point.Y))),
                 Properties = new SegmentProperties
                 {

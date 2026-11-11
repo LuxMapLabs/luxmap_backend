@@ -9,6 +9,7 @@ using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
@@ -82,6 +83,7 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
             return (false, await Response(existing, ct));
         }
         if (wo.WoStatus != WorkOrderStatus.InProgress) throw Error("INVALID_STATE_TRANSITION", HttpStatusCode.Conflict);
+        await RequireDrawnSegmentsAsync(wo.WorkOrderId, ct);
         var now = UtcMicrosecondClock.UtcNow();
         // SQL expression comes only from the immutable server-side ID specification.
         var idSql = $"SELECT {PrefixedIds.SurveySweep.DefaultValueSql} AS \"Value\"";
@@ -103,6 +105,30 @@ public sealed class SurveyIngestService(LuxMapDbContext db, ICurrentActorAccesso
             return (false, await Response(existing, ct));
         }
         return (true, await Response(sweep, ct));
+    }
+
+    /// <summary>
+    /// 409 <c>SEGMENT_GEOMETRY_REQUIRED</c> when any road of the order has no geometry yet (ROAD-SEGMENT-GEOM-NULL RG-7).
+    /// </summary>
+    /// <remarks>
+    /// 🔴 The ONLY thing between an undrawn road and a sweep that looks complete. Both survey SQL queries drop a NULL
+    /// <c>road_segment.geom</c> silently (<c>SurveyChainageQuery.Gps</c> never picks it, <c>.Poles</c> never joins its poles),
+    /// so without this guard the sweep is accepted, its poles are never "expected", and coverage reads full while a whole road
+    /// went unsurveyed. A mixed order (one drawn road, one not) is refused too. Ordering, assigning and scheduling the order
+    /// are NOT blocked: engineers need them before the GPS exists. Runs under the order lock taken above, so a road cannot
+    /// lose its geometry meanwhile (it never goes back to undrawn anyway, RG-2). Not run for a replay of an existing sweep.
+    /// </remarks>
+    private async Task RequireDrawnSegmentsAsync(string workOrderId, CancellationToken ct)
+    {
+        // LockOrder already proved every road of the order is visible to the caller, so the filtered set is complete.
+        var undrawn = await db.Set<WorkOrderSegment>().Where(link => link.WorkOrderId == workOrderId)
+            .Join(db.Set<RoadSegment>().Where(road => road.Geom == null), link => link.SegmentId, road => road.SegmentId,
+                (link, road) => new { link.Position, road.SegmentId })
+            .OrderBy(x => x.Position).Select(x => x.SegmentId).ToListAsync(ct);
+        if (undrawn.Count == 0) return;
+        throw new LuxMapException(ErrorCodes.SegmentGeometryRequired, HttpStatusCode.Conflict,
+            "Every road of the work order needs a drawn route before a sweep can start. Draw the listed roads, or split them off the order.",
+            new Dictionary<string, object?> { ["work_order_id"] = workOrderId, ["segment_ids"] = undrawn });
     }
 
     public async Task<SurveyClipResponse> Clip(string id, int clipNo, Stream body, long? length, string sha, CancellationToken ct)

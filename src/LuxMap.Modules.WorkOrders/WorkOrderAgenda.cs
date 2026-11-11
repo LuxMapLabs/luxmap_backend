@@ -187,8 +187,10 @@ public sealed class WorkOrderAgendaService(LuxMapDbContext db, ICurrentActorAcce
         var roads = await db.Set<RoadSegment>().AsNoTracking().Where(s => firstRoads.Contains(s.SegmentId))
             .Select(s => new { s.SegmentId, s.SegmentName, s.CommuneId, s.CreatedAt, s.Geom }).ToDictionaryAsync(s => s.SegmentId, ct);
         Dictionary<string, double> roadDistance = origin is null ? [] : await db.Set<RoadSegment>().AsNoTracking()
-            .Where(s => firstRoads.Contains(s.SegmentId))
-            .Select(s => new { s.SegmentId, Metres = SpatialFunctions.DistanceMeters(s.Geom, origin) })
+            // A segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-9) has no distance: filtered BEFORE the call, because
+            // ST_Distance(NULL, …) materialised into a double throws — it is not a harmless NULL.
+            .Where(s => firstRoads.Contains(s.SegmentId) && s.Geom != null)
+            .Select(s => new { s.SegmentId, Metres = SpatialFunctions.DistanceMeters(s.Geom!, origin) })
             .ToDictionaryAsync(s => s.SegmentId, s => s.Metres, ct);
 
         WorkOrderLocation? LocationOf(WorkOrder wo)
@@ -196,7 +198,7 @@ public sealed class WorkOrderAgendaService(LuxMapDbContext db, ICurrentActorAcce
             if (faults[wo.WorkOrderId].FirstOrDefault(x => x.Lat is not null && x.Lng is not null) is { } first)
                 return new(first.Lat!.Value, first.Lng!.Value);
             return roadsOf[wo.WorkOrderId] is [var road, ..] && roads.TryGetValue(road, out var line)
-                ? new(line.Geom.StartPoint.Y, line.Geom.StartPoint.X) : null;
+                && line.Geom is { } geom ? new(geom.StartPoint.Y, geom.StartPoint.X) : null;
         }
 
         var items = (await WorkOrderService.ItemsAsync(db, tonight, ct)).ToDictionary(x => x.WorkOrderId);
@@ -220,8 +222,10 @@ public sealed class WorkOrderAgendaService(LuxMapDbContext db, ICurrentActorAcce
                 groups.Add((new WorkOrderAgendaGroup
                 {
                     SegmentId = segmentId, SegmentName = road.SegmentName, CommuneId = road.CommuneId,
-                    Location = origin is null ? new(road.Geom.StartPoint.Y, road.Geom.StartPoint.X) : Nearest(road.Geom, origin),
-                    DistanceM = origin is null ? null : roadDistance[segmentId], WorkOrders = orders,
+                    // Not drawn yet (RG-9): the group keeps its name, has no place and no distance, and sorts after the measured ones.
+                    Location = road.Geom is null ? null
+                        : origin is null ? new(road.Geom.StartPoint.Y, road.Geom.StartPoint.X) : Nearest(road.Geom, origin),
+                    DistanceM = origin is null ? null : roadDistance.TryGetValue(segmentId, out var metres) ? metres : null, WorkOrders = orders,
                 }, [0, road.CreatedAt, segmentId.Length, segmentId]));
                 continue;
             }

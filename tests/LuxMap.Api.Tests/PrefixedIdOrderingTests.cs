@@ -31,13 +31,16 @@ namespace LuxMap.Api.Tests;
 /// <para>
 /// Segments rather than poles on purpose: the pole width boundary 9999/10000 is claimed by
 /// <c>PrefixedIdOverflowTests</c> and, unlike a decade, it cannot be moved to a free range. The
-/// segment boundary 999/1000 is the same rule on a sequence nothing else contends for.
+/// rule under test is the same on any digit boundary, so this one sits at 99999/100000 — out of
+/// reach of <c>segment_id_seq</c>. It used to sit at the real width boundary 999/1000 and went red
+/// (ROAD-SEGMENT-GEOM-NULL PR 2a) the moment one full run created ~1000 segments: the suite's own
+/// generated ids reached SEG-999.
 /// </para>
 /// </remarks>
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class PrefixedIdOrderingTests(AssetSchemaFixture fixture)
 {
-    private static readonly string[] Straddling = ["SEG-999", "SEG-1000", "SEG-1001", "SEG-1002"];
+    private static readonly string[] Straddling = ["SEG-99999", "SEG-100000", "SEG-100001", "SEG-100002"];
 
     [Fact]
     public async Task A_listing_orders_ids_past_the_padding_width_numerically_not_as_text()
@@ -61,7 +64,7 @@ public sealed class PrefixedIdOrderingTests(AssetSchemaFixture fixture)
                 .ThenBy(segment => segment.SegmentId.Length)
                 .ThenBy(segment => segment.SegmentId));
 
-            Assert.Equal(["SEG-999", "SEG-1000", "SEG-1001", "SEG-1002"], ordered);
+            Assert.Equal(["SEG-99999", "SEG-100000", "SEG-100001", "SEG-100002"], ordered);
 
             // The sabotage, asserted directly so the test above cannot be mistaken for a restatement
             // of the insert order: text order really does put the four-digit ids first.
@@ -69,12 +72,12 @@ public sealed class PrefixedIdOrderingTests(AssetSchemaFixture fixture)
                 .OrderBy(segment => segment.CreatedAt)
                 .ThenBy(segment => segment.SegmentId));
 
-            Assert.Equal(["SEG-1000", "SEG-1001", "SEG-1002", "SEG-999"], asText);
+            Assert.Equal(["SEG-100000", "SEG-100001", "SEG-100002", "SEG-99999"], asText);
         }
         finally
         {
             await ExecuteAsync(
-                "DELETE FROM road_segment WHERE segment_id IN ('SEG-999','SEG-1000','SEG-1001','SEG-1002');");
+                "DELETE FROM road_segment WHERE segment_id IN ('SEG-99999','SEG-100000','SEG-100001','SEG-100002');");
         }
     }
 
@@ -109,13 +112,13 @@ public sealed class PrefixedIdOrderingTests(AssetSchemaFixture fixture)
             INSERT INTO road_segment
                 (segment_id, segment_name, road_class, length_m, geom, commune_id, data_source)
             VALUES
-                ('SEG-999',  'ordering probe 999',  'inter_village', 100,
+                ('SEG-99999',  'ordering probe 99999',  'inter_village', 100,
                  ST_GeomFromText('LINESTRING(106.49 10.97, 106.50 10.98)', 4326), '{fixture.CommuneId}', 'public_imagery'),
-                ('SEG-1000', 'ordering probe 1000', 'inter_village', 100,
+                ('SEG-100000', 'ordering probe 100000', 'inter_village', 100,
                  ST_GeomFromText('LINESTRING(106.49 10.97, 106.50 10.98)', 4326), '{fixture.CommuneId}', 'public_imagery'),
-                ('SEG-1001', 'ordering probe 1001', 'inter_village', 100,
+                ('SEG-100001', 'ordering probe 100001', 'inter_village', 100,
                  ST_GeomFromText('LINESTRING(106.49 10.97, 106.50 10.98)', 4326), '{fixture.CommuneId}', 'public_imagery'),
-                ('SEG-1002', 'ordering probe 1002', 'inter_village', 100,
+                ('SEG-100002', 'ordering probe 100002', 'inter_village', 100,
                  ST_GeomFromText('LINESTRING(106.49 10.97, 106.50 10.98)', 4326), '{fixture.CommuneId}', 'public_imagery');
             """);
 

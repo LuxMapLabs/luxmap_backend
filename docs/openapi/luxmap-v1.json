@@ -1317,6 +1317,13 @@
             }
           },
           {
+            "name": "missing_geometry",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -14828,7 +14835,8 @@
       "CabinetTopology": {
         "required": [
           "features",
-          "unlocated_pole_count"
+          "unlocated_pole_count",
+          "unrouted_pole_count"
         ],
         "type": "object",
         "properties": {
@@ -14841,6 +14849,10 @@
             "readOnly": true
           },
           "unlocated_pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unrouted_pole_count": {
             "type": "integer",
             "format": "int32"
           },
@@ -15884,7 +15896,6 @@
         "required": [
           "commune_id",
           "data_source",
-          "geom_wkt",
           "length_m",
           "road_class",
           "segment_name"
@@ -15911,8 +15922,8 @@
             "format": "int32"
           },
           "geom_wkt": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "maxLength": 32,
@@ -19711,7 +19722,8 @@
             "$ref": "#/components/schemas/SegmentListItem"
           },
           "geom_wkt": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "created_at": {
             "type": "string",
@@ -19726,6 +19738,7 @@
           "commune_id",
           "commune_name",
           "data_source",
+          "has_geometry",
           "length_m",
           "pole_count",
           "road_class",
@@ -19764,6 +19777,9 @@
           "pole_count": {
             "type": "integer",
             "format": "int32"
+          },
+          "has_geometry": {
+            "type": "boolean"
           },
           "updated_at": {
             "type": "string",
@@ -21269,7 +21285,6 @@
       "UpdateSegmentRequest": {
         "required": [
           "data_source",
-          "geom_wkt",
           "length_m",
           "road_class",
           "segment_name"
@@ -21296,8 +21311,8 @@
             "format": "int32"
           },
           "geom_wkt": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "data_source": {
             "$ref": "#/components/schemas/DataSource"

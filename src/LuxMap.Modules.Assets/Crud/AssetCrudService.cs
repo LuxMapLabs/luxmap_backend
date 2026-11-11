@@ -37,9 +37,16 @@ public sealed class AssetCrudService(
     // placeholder was waiting on — emit external_ref? data_source? feeder_id? — were answered YES
     // on 22/09/2026; docs/review/BE-12b-read-shape.md carries the reasoning.
 
+    /// <param name="missingGeometry">
+    /// <c>true</c> keeps only segments with no drawn route yet (ROAD-SEGMENT-GEOM-NULL RG-5), the work list for whoever draws them; <c>false</c> is
+    /// no restriction. Applied BEFORE the total and the page, like <c>missing_location</c> on poles.
+    /// </param>
     public Task<PagedResult<SegmentListItem>> ListSegmentsAsync(
-        IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
-        => ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, null, ct);
+        IReadOnlyList<string>? communes, PageRequest page, bool missingGeometry, CancellationToken ct)
+    {
+        System.Linq.Expressions.Expression<Func<RoadSegment, bool>>? filter = missingGeometry ? segment => segment.Geom == null : null;
+        return ListAsync(communes, page, (RoadSegment segment) => segment.SegmentId, SegmentRow, filter, ct);
+    }
 
     public async Task<PagedResult<FeederListItem>> ListFeedersAsync(
         IReadOnlyList<string>? communes, PageRequest page, CancellationToken ct)
@@ -155,7 +162,7 @@ public sealed class AssetCrudService(
             .Select(segment => new { segment.Geom, segment.CreatedAt })
             .FirstAsync(ct);
 
-        return new SegmentDetail { Segment = item, GeomWkt = Wkt(extra.Geom), CreatedAt = extra.CreatedAt };
+        return new SegmentDetail { Segment = item, GeomWkt = extra.Geom is null ? null : Wkt(extra.Geom), CreatedAt = extra.CreatedAt };
     }
 
     /// <summary>One feeder, read for the inventory screen.</summary>
@@ -264,7 +271,8 @@ public sealed class AssetCrudService(
             SegmentName = request.SegmentName!,
             RoadClass = request.RoadClass!.Value,
             LengthM = request.LengthM!.Value,
-            Geom = Read<LineString>(request.GeomWkt),
+            // Absent / null = a segment from the books with no route yet (ROAD-SEGMENT-GEOM-NULL RG-2); blank or malformed is still a 400.
+            Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt),
             CommuneId = communeId,
             DataSource = request.DataSource!.Value,
         };
@@ -435,8 +443,19 @@ public sealed class AssetCrudService(
         segment.SegmentName = request.SegmentName!;
         segment.RoadClass = request.RoadClass!.Value;
         segment.LengthM = request.LengthM!.Value;
-        var geometry = Read<LineString>(request.GeomWkt);
-        var rerouted = !segment.Geom.EqualsExact(geometry);
+        // RG-2: a segment that has a route keeps one — absent / null is a 400; a segment without one stays undrawn unless a WKT arrives.
+        // Read BEFORE any assignment: the 400 must leave the tracked row untouched.
+        var geometry = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt);
+        if (geometry is null && segment.Geom is not null)
+        {
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "geom_wkt is required for a segment that already has a route.",
+                new Dictionary<string, object?> { ["field"] = "geom_wkt" });
+        }
+
+        // Drawing a segment for the first time (null → line) IS a change of route, so the corridor is measured then (ASSET-SEG-2);
+        // only an identical line, or no line at all, skips it. An undrawn segment taking poles (RG-13) has nothing to measure against.
+        var rerouted = geometry is not null && (segment.Geom is null || !segment.Geom.EqualsExact(geometry));
         segment.Geom = geometry;
         segment.DataSource = request.DataSource!.Value;
         if (present) await ReplaceSegmentPolesAsync(segment, poleIds, ct);
@@ -459,7 +478,8 @@ public sealed class AssetCrudService(
     /// </remarks>
     private async Task RequirePolesInCorridorAsync(RoadSegment segment, CancellationToken ct)
     {
-        var line = segment.Geom;
+        // Only reached after the route was just saved, so it is drawn; the ! restates that for the compiler.
+        var line = segment.Geom!;
         var limit = corridor.RouteCorridorM;
         var total = await dbContext.Set<Pole>().IgnoreQueryFilters().CountAsync(pole =>
             pole.SegmentId == segment.SegmentId && pole.Geom != null && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit, ct);
@@ -814,9 +834,12 @@ public sealed class AssetCrudService(
             .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom!, target)).SingleAsync(ct);
         // Unfiltered on purpose: an inter_commune segment may belong to another commune than its pole (BE-REVIEW-02
         // constraint 1). Only a distance leaves the query, never the segment.
+        // A segment not drawn yet has no route to measure against (ROAD-SEGMENT-GEOM-NULL RG-11): filtered out BEFORE the call
+        // (a NULL distance materialised into a double throws), so no row comes back and offSegment stays null — the move is
+        // accepted. The safety net is the corridor check when the segment is first drawn (UpdateSegmentAsync).
         double? offSegment = pole.SegmentId is null ? null : await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
-            .Where(segment => segment.SegmentId == pole.SegmentId)
-            .Select(segment => SpatialFunctions.DistanceMeters(segment.Geom, target)).SingleAsync(ct);
+            .Where(segment => segment.SegmentId == pole.SegmentId && segment.Geom != null)
+            .Select(segment => (double?)SpatialFunctions.DistanceMeters(segment.Geom!, target)).SingleOrDefaultAsync(ct);
 
         var before = pole.Geom is null ? null : new { lat = pole.Geom.Y, lng = pole.Geom.X };
         pole.Geom = target;
@@ -1186,6 +1209,7 @@ public sealed class AssetCrudService(
             // On an inter_commune road that is not the whole road, and it must not be: reporting a
             // count the caller cannot then list would be a way to probe another commune's data.
             PoleCount = dbContext.Set<Pole>().Count(pole => pole.SegmentId == segment.SegmentId),
+            HasGeometry = segment.Geom != null,
             UpdatedAt = segment.UpdatedAt,
             UpdatedBy = segment.UpdatedBy,
             UpdatedByName = dbContext.Set<AppUser>().Where(user => user.UserId == segment.UpdatedBy).Select(user => user.FullName).FirstOrDefault(),

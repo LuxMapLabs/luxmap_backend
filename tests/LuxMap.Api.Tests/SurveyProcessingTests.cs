@@ -33,7 +33,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
     private ModuleAssemblyCatalog catalog = null!;
     private string a = null!, b = null!, road = null!, sweep = null!;
     private string[] poles = [];
-    private string? parallelRoad;
+    private string? parallelRoad, undrawnRoad;
     private string userId = null!, orderId = null!;
     /// <summary>BE-27: one manager of the job commune and one of a different commune.</summary>
     private string homeManager = null!, foreignManager = null!;
@@ -119,6 +119,11 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         {
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {parallelRoad}");
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {parallelRoad}");
+        }
+        if (undrawnRoad is not null)
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {undrawnRoad}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {undrawnRoad}");
         }
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE segment_id = {road}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM road_segment WHERE segment_id = {road}");
@@ -369,7 +374,7 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
             var original = await db.Set<RoadSegment>().SingleAsync(x => x.SegmentId == road);
             var other = new RoadSegment { CommuneId = a, SegmentName = "Parallel", RoadClass = RoadClass.InterVillage,
                 DataSource = DataSource.Simulated, LengthM = 999,
-                Geom = new LineString(original.Geom.Coordinates.Select(c => new Coordinate(c.X, c.Y + .000135)).ToArray()) { SRID = 4326 } };
+                Geom = new LineString(original.Geom!.Coordinates.Select(c => new Coordinate(c.X, c.Y + .000135)).ToArray()) { SRID = 4326 } };
             db.Add(other); await db.SaveChangesAsync(); parallelRoad = other.SegmentId;
             db.Add(new Pole { CommuneId = a, SegmentId = parallelRoad, DataSource = DataSource.Simulated,
                 Geom = new Point(108.00025,16.000145) { SRID = 4326 } });
@@ -388,6 +393,44 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         Assert.DoesNotContain(passes, x => x.SegmentId == parallelRoad);
         if (ambiguous) { Assert.Empty(passes); Assert.Equal(0, run.CoveragePct); }
         else { Assert.Single(passes); Assert.InRange(run.CoveragePct!.Value, 66, 67); }
+    }
+
+    /// <summary>
+    /// ROAD-SEGMENT-GEOM-NULL rows 15 and 16: neither survey query measures anything on a road with no line — its poles are never
+    /// "expected" and no GPS sample is ever placed along it. That is a silent outcome on purpose, NOT a check: a sweep on such a road
+    /// would read as fully covered, and only the 409 of <c>POST /sweeps</c> (<c>SEGMENT_GEOMETRY_REQUIRED</c>) stands in front.
+    /// </summary>
+    [Fact]
+    public async Task A_road_with_no_geometry_measures_nothing_in_both_survey_queries()
+    {
+        await PlacePolesOnRouteForChainageTests();
+        await using var db = Db();
+        using (db.EnterUnscopedSystemWriteBackdoor())
+        {
+            var undrawn = new RoadSegment { CommuneId = a, SegmentName = "Undrawn", RoadClass = RoadClass.InterVillage,
+                DataSource = DataSource.Simulated, LengthM = 100, Geom = null };
+            db.Add(undrawn); await db.SaveChangesAsync(); undrawnRoad = undrawn.SegmentId;
+            // Standing right beside the drawn route: only its road, not its position, keeps it out.
+            db.Add(new Pole { CommuneId = a, SegmentId = undrawnRoad, DataSource = DataSource.Simulated,
+                Geom = new Point(108.0005, 16.00004) { SRID = 4326 } });
+            await db.SaveChangesAsync();
+        }
+
+        var expected = await SurveyChainageQuery.Poles(db, [road, undrawnRoad!], [a,b], "simulated", new(), default);
+        Assert.Equal(poles.Order(), expected.Select(x => x.PoleId).Order());
+        Assert.All(expected, x => Assert.Equal(road, x.SegmentId));
+
+        var matched = await SurveyChainageQuery.Gps(db, sweep, [road, undrawnRoad!], [a,b], new(), default);
+        Assert.Equal(21, matched.Length);
+        Assert.All(matched, x => Assert.Equal(road, x.SegmentId));
+        var alone = await SurveyChainageQuery.Gps(db, sweep, [undrawnRoad!], [a,b], new(), default);
+        // Alone, the undrawn road is NOT dropped from the GPS match: its NULL distance survives the candidate filter, so every
+        // sample is labelled with it — but with no distance, no route and chainage 0. Measured, not assumed (P1 predicted "unassigned").
+        // A NULL sorts last, so beside a drawn road the drawn one always wins (above). Either way nothing is measured on it.
+        Assert.Equal(21, alone.Length);
+        Assert.All(alone, x => Assert.Null(x.RouteDistanceM));
+        Assert.All(alone, x => Assert.Equal(0, x.ChainageM));
+        Assert.Empty(await SurveyChainageQuery.Poles(db, [undrawnRoad!], [a,b], "simulated", new(), default));
     }
 
     [Theory]

@@ -92,7 +92,8 @@ public sealed class AssetImportService(
 
     private static IReadOnlyList<string> RequiredColumns(ImportKind kind) => kind switch
     {
-        ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "geom_wkt", "commune_id", "data_source"],
+        // geom_wkt is optional for segments since ROAD-SEGMENT-GEOM-NULL: a route known only from the books has no line yet.
+        ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "commune_id", "data_source"],
         ImportKind.Cabinets => ["external_ref", "cabinet_name", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Feeders => ["external_ref", "feeder_name", "commune_id"],
         // geom_wkt is optional for poles since POLE-GEOM-NULL: a pole known only from the books has no position yet.
@@ -166,7 +167,8 @@ public sealed class AssetImportService(
             var roadClass = reader.RequiredEnum<RoadClass>("road_class");
             var length = reader.RequiredInt("length_m");
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
-            var geometry = reader.Geometry<LineString>(CsvImportRow.GeometryColumn);
+            // Empty = no route yet (RG-2); a present but malformed one still fails the row.
+            var geometry = reader.OptionalGeometry<LineString>(CsvImportRow.GeometryColumn);
 
             if (!reader.IsValid)
             {
@@ -178,7 +180,8 @@ public sealed class AssetImportService(
                 segment.SegmentName = name!;
                 segment.RoadClass = roadClass;
                 segment.LengthM = length;
-                segment.Geom = geometry!;
+                // An empty cell KEEPS the route a segment already has: a re-import of a sheet without lines must not wipe what was drawn.
+                if (geometry is not null) segment.Geom = geometry;
                 segment.DataSource = dataSource;
                 Count(segment, ref updated, ref unchanged);
                 continue;
@@ -190,7 +193,7 @@ public sealed class AssetImportService(
                 SegmentName = name!,
                 RoadClass = roadClass,
                 LengthM = length,
-                Geom = geometry!,
+                Geom = geometry,
                 CommuneId = communeId!,
                 DataSource = dataSource,
             };

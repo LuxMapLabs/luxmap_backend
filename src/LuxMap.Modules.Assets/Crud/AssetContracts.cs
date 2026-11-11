@@ -38,8 +38,10 @@ public sealed class CreateSegmentRequest
     [Range(1, int.MaxValue)]
     public int? LengthM { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326, longitude first.</summary>
-    [Required]
+    /// <summary>
+    /// WKT <c>LINESTRING</c> in EPSG:4326, longitude first. Optional (ROAD-SEGMENT-GEOM-NULL RG-2): absent or <c>null</c> creates a segment
+    /// that has no drawn route yet — the books know it, nobody has walked it. A blank or malformed value is still a 400.
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     [Required]
@@ -249,8 +251,11 @@ public sealed class UpdateSegmentRequest
     [Range(1, int.MaxValue)]
     public int? LengthM { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326, longitude first.</summary>
-    [Required]
+    /// <summary>
+    /// WKT <c>LINESTRING</c> in EPSG:4326, longitude first. Required for a segment that already has a route (400 if absent or <c>null</c>:
+    /// a route never goes back to "undrawn"); for a segment that has none, absent or <c>null</c> leaves it undrawn and a WKT draws it for the
+    /// first time (ROAD-SEGMENT-GEOM-NULL RG-2). Decided in the service because it depends on the stored segment.
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     /// <summary>
@@ -720,6 +725,12 @@ public sealed record SegmentListItem
     /// <summary>⚠️ Counted within the CALLER'S commune scope, like every other read.</summary>
     public required int PoleCount { get; init; }
 
+    /// <summary>
+    /// Whether the segment has been drawn (ROAD-SEGMENT-GEOM-NULL RG-5) — computed on read from <c>geom IS NOT NULL</c>, never stored,
+    /// so there is no second truth to drift from the column. <c>false</c> = on the books only: not on the map, not surveyable.
+    /// </summary>
+    public required bool HasGeometry { get; init; }
+
     public required DateTime UpdatedAt { get; init; }
 
     /// <summary>Who last changed the row by form, note or import (e.g. <c>USR-004</c>); <c>null</c> for system-loaded rows.</summary>
@@ -734,8 +745,8 @@ public sealed record SegmentDetail
 {
     public required SegmentListItem Segment { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326.</summary>
-    public required string GeomWkt { get; init; }
+    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326. <c>null</c> for a segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-5).</summary>
+    public required string? GeomWkt { get; init; }
 
     public required DateTime CreatedAt { get; init; }
 }

@@ -31,10 +31,10 @@ public static class SpatialFunctions
     /// nothing at all here, so it is made loud.
     /// <para>
     /// Both parameters are non-nullable by design (BE-10): the result is a plain <c>double</c>, and a SQL NULL
-    /// materialised into it is an exception, not a missing value. <c>segment.geom</c> is <c>NOT NULL</c>, but
-    /// <c>pole.geom</c> is nullable since POLE-GEOM-NULL — a caller passing it must exclude poles without a
-    /// position FIRST (<c>pole.Geom != null</c> in the same predicate, or an earlier check) and then pass
-    /// <c>pole.Geom!</c>. <c>feeder.geom</c> is nullable and deliberately out of scope.
+    /// materialised into it is an exception, not a missing value. <c>pole.geom</c> is nullable since POLE-GEOM-NULL and
+    /// <c>road_segment.geom</c> since ROAD-SEGMENT-GEOM-NULL — a caller passing either must exclude the rows without a
+    /// geometry FIRST (<c>pole.Geom != null</c> / <c>segment.Geom != null</c> in the same predicate, or an earlier check)
+    /// and then pass <c>pole.Geom!</c> / <c>segment.Geom!</c>. <c>feeder.geom</c> is nullable and deliberately out of scope.
     /// </para>
     /// <para>
     /// The result is a distance on the PROJECTION PLANE — see <see cref="SpatialConstants.SridVn2000"/>
