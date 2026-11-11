@@ -16,7 +16,7 @@ public sealed class SurveyBaselineLookup(LuxMapDbContext db) : ISurveyBaselineLo
     public async Task<BaselineReference?> FindAsync(BaselineQuery query, CancellationToken ct)
     {
         var fixtureId = await db.Set<Fixture>().Where(f => f.PoleId == query.PoleId && f.RemovedDate == null)
-            .Select(f => f.FixtureId).SingleOrDefaultAsync(ct);
+            .NewestFirst().Select(f => f.FixtureId).FirstOrDefaultAsync(ct);
         // Inspect every member, not just a cached count or creation date. Late acceptance may create
         // a baseline today from old captures; that is legal, but self/future members are never legal.
         return await ForFixture(db.Set<LuminanceBaseline>().AsNoTracking(), fixtureId)

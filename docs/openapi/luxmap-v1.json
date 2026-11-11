@@ -18047,6 +18047,12 @@
           "active_fixture": {
             "$ref": "#/components/schemas/ActiveFixture"
           },
+          "active_fixtures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActiveFixture"
+            }
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -18196,6 +18202,12 @@
           "fixture": {
             "$ref": "#/components/schemas/PoleMapFixture"
           },
+          "fixtures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapFixture"
+            }
+          },
           "current_status": {
             "$ref": "#/components/schemas/PoleMapStatus"
           },
@@ -18243,8 +18255,14 @@
         "additionalProperties": false
       },
       "PoleMapFixture": {
+        "required": [
+          "fixture_id"
+        ],
         "type": "object",
         "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
           "fixture_type": {
             "$ref": "#/components/schemas/FixtureType"
           },
@@ -18818,6 +18836,10 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "fixture_count": {
+            "type": "integer",
+            "format": "int32"
           },
           "install_date": {
             "type": "string",
@@ -20715,6 +20737,10 @@
             "format": "int32",
             "nullable": true
           },
+          "fixture_count": {
+            "type": "integer",
+            "format": "int32"
+          },
           "install_date": {
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
@@ -21943,6 +21969,10 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "fixture_count": {
+            "type": "integer",
+            "format": "int32"
           },
           "work_order_fault_ids": {
             "type": "array",

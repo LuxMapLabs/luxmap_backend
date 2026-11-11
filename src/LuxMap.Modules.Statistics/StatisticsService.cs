@@ -298,8 +298,9 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
     }
 
     /// <summary>
-    /// BE-31 — poles and the warranty of their lamp in service. A pole with no lamp in service is listed too, as
-    /// <c>unknown</c>: "nothing on record" must show up, not drop out of the list.
+    /// BE-31 — poles and the warranty of their lamps in service: one row per lamp, so a pole with two lamps appears
+    /// twice (MULTI-FIXTURE, drift MF-1) and <c>total</c> counts lamps, not poles. A pole with no lamp in service is
+    /// listed too, as <c>unknown</c>: "nothing on record" must show up, not drop out of the list.
     /// </summary>
     /// <param name="page"><c>null</c> = every matching row, for the CSV export (capped by <see cref="CsvExport.MaxRows"/>).</param>
     public async Task<WarrantyList> WarrantyAsync(WarrantyQuery query, PageRequest? page, CancellationToken ct)
@@ -339,7 +340,8 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
 
         // Soonest expiry first, unknown last; ties by the ID rule of section 0 (created_at, length(id), id).
         var ordered = rows.OrderBy(r => r.Expiry == null).ThenBy(r => r.Expiry)
-            .ThenBy(r => r.CreatedAt).ThenBy(r => r.PoleId.Length).ThenBy(r => r.PoleId);
+            .ThenBy(r => r.CreatedAt).ThenBy(r => r.PoleId.Length).ThenBy(r => r.PoleId)
+            .ThenBy(r => r.FixtureId == null ? 0 : r.FixtureId.Length).ThenBy(r => r.FixtureId);
         var found = await (page is null ? ordered : ordered.Skip(page.Skip).Take(page.PageSize)).ToListAsync(ct);
 
         return new WarrantyList

@@ -262,6 +262,18 @@
   </div>
 
   <div class="card">
+    <strong>MULTI-FIXTURE — một cột mang tối đa hai bóng, mỗi bóng một bản ghi, 11/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/MULTI-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>AddFixtureSlot</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    Mỹ chọn hướng B (đảo D-11 và hướng A của LAMP-COUNT): hai bản ghi <code>fixture</code> riêng mỗi cột. Giới hạn nằm ở DB: <code>fixture.slot</code> (1..2) + UNIQUE
+    partial <code>(pole_id, slot) WHERE removed_date IS NULL</code>; server chọn slot trống, không lộ ra API. Bóng thứ ba → 409 <code>POLE_HAS_ACTIVE_FIXTURE</code>; import báo theo dòng.
+    Đọc chỉ THÊM: <code>fixtures[]</code> (chi tiết cột), <code>active_fixtures[]</code> (kiểm kê), <code>fixture_count</code> (bản đồ, cột của phiếu); field một bóng giữ, mô tả bóng đầu.
+    Trạng thái, baseline vẫn theo cột; baseline neo vào bóng mới nhất đang dùng; bảo hành thống kê một hàng mỗi bóng. 6 test mới + 4 test cũ sửa theo luật hai bóng, phá thử <code>FirstFree</code> → 7/8 đỏ; spec sinh lại, lint vẫn 10 cảnh báo như trước.
+    Drift MF-1…MF-8, SELF-SIGNED. <strong>Còn mở:</strong> MF-5 — ngừng dùng bóng cũ hơn mà không thay thì baseline vẫn hiệu lực, cột có thể đọc <code>dim</code> oan; cần luật vận hành. Mock chưa có cột đôi.
+    <a href=".ai/tasks/MULTI-FIXTURE.md">Đề bài</a> · <a href=".ai/results/MULTI-FIXTURE-p2.md">Kết quả</a>.</p>
+    <p class="muted">Commit: <code>feat(assets): allow two lamps in service per pole, one fixture record each</code>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-GEOM-NULL — PR 2a (schema + mọi chỗ đọc), 10/11/2026</strong>
     <p><span class="tag t-next">Nhánh <code>feat/ASSET-pole-without-gps</code> (chưa push, chưa mở PR) · còn PR 2b (bật tạo / sửa / nhập cột chưa GPS) · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS · chưa báo WP5 / WP6 · <code>luxmap_dev</code> / VPS chưa migrate</span>
     PR 2a: <code>pole.geom</code> nullable (rollback từ chối khi còn cột chưa GPS); inventory, chi tiết cột, cột của phiếu trả <code>location: null</code>; gói offline trả <code>geometry: null</code>;

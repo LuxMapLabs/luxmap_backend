@@ -60,7 +60,7 @@ public sealed class PoleDetailEndpointTests(AssetImportFixture fixture)
         var keys = body.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         Assert.Equal(new[]
         {
-            "pole_id", "segment_id", "segment_name", "commune_id", "location", "fixture", "current_status",
+            "pole_id", "segment_id", "segment_name", "commune_id", "location", "fixture", "fixtures", "current_status",
             "iot_node", "luminance_baseline", "luminance_baselines", "luminance_history", "runtime_history",
             "open_faults", "recent_frames", "note",
         }.ToHashSet(StringComparer.Ordinal), keys);
