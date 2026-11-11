@@ -171,8 +171,8 @@ public sealed class WorkOrderAgendaService(LuxMapDbContext db, ICurrentActorAcce
                              orderby fault.CreatedAt, fault.FaultId.Length, fault.FaultId
                              // The pole's road is where the lamp physically stands (WO-12 orders by it too).
                              select new { link.WorkOrderId, SegmentId = pole != null ? pole.SegmentId : fault.SegmentId,
-                                 Lat = fault.Lat ?? (pole == null ? (double?)null : pole.Geom.Y),
-                                 Lng = fault.Lng ?? (pole == null ? (double?)null : pole.Geom.X) }).ToListAsync(ct))
+                                 Lat = fault.Lat ?? (pole == null || pole.Geom == null ? (double?)null : pole.Geom.Y),
+                                 Lng = fault.Lng ?? (pole == null || pole.Geom == null ? (double?)null : pole.Geom.X) }).ToListAsync(ct))
             .ToLookup(x => x.WorkOrderId);
 
         string[] RoadsOf(WorkOrder wo) => surveyRoads.Contains(wo.WorkOrderId)

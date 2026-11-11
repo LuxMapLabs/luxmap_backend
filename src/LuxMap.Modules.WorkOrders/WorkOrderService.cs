@@ -105,8 +105,9 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                              where link.WorkOrderId == id
                              orderby fault.CreatedAt, fault.FaultId.Length, fault.FaultId
                              select new { Fault = fault, link.InspectionOutcome,
-                                 Lat = fault.Lat ?? (pole == null ? 0 : pole.Geom.Y),
-                                 Lng = fault.Lng ?? (pole == null ? 0 : pole.Geom.X) }).ToListAsync(ct);
+                                 // Geom test: backstop only — a pole without a position cannot carry a fault (POLE-GEOM-NULL G-4).
+                                 Lat = fault.Lat ?? (pole == null || pole.Geom == null ? 0 : pole.Geom.Y),
+                                 Lng = fault.Lng ?? (pole == null || pole.Geom == null ? 0 : pole.Geom.X) }).ToListAsync(ct);
         return new WorkOrderDetail
         {
             WorkOrderId = id, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,

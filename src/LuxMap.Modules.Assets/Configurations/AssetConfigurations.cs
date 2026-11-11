@@ -198,7 +198,8 @@ public sealed class PoleConfiguration : IEntityTypeConfiguration<Pole>
         builder.Property(pole => pole.SegmentId).HasColumnType("text");
         builder.HasExternalRef("pole");
         builder.Property(pole => pole.FeederId).HasColumnType("text");
-        builder.Property(pole => pole.Geom).HasColumnType(GeometryColumns.Point).IsRequired();
+        // NULL = a pole known from the commune's books that nobody has stood next to yet (POLE-GEOM-NULL G-1).
+        builder.Property(pole => pole.Geom).HasColumnType(GeometryColumns.Point);
         builder.Property(pole => pole.NearSensitivePoi).HasDefaultValue(false);
         builder.Property(pole => pole.Note).HasColumnType("text");
         builder.Property(pole => pole.CreatedAt).HasDefaultValueSql("now()");

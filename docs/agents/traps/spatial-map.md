@@ -126,3 +126,10 @@ client nhận URL mà mở ra 404 — hoặc tệ hơn, thấy frame của xã k
   road để lấy nhãn: sẽ làm cột chưa tuyến biến mất. Tổng cột toàn xã có thể lớn hơn tổng pole_count của các tuyến.
 - Cabinet topology kiểm cột chưa tuyến trước khi dựng cạnh/dictionary: `ContainsKey(null)` ném lỗi, không phải nhánh rỗng.
   Từ chối 409 `POLE_SEGMENT_REQUIRED` kèm operation, tối đa 100 pole_ids có thứ tự và tổng pole_count.
+
+## POLE-GEOM-NULL PR 2a — đọc cột chưa có GPS
+
+- `GET /map/poles` (bbox) không trả cột chưa GPS; `GET /map/poles/{id}` trả `location: null`. `ProjectPolesAsync` dùng chung cho gói offline
+  (lọc theo tuyến, không bbox) nên **phải** chịu được `Geom` null: Feature `geometry: null` (GN-4). `Feature<T>.Geometry` vì thế là nullable ở C#.
+- Sơ đồ nhánh tủ điện **bỏ qua** cột chưa GPS và đếm vào `unlocated_pole_count` (GN-5) — khác cột chưa tuyến (409). Response là kiểu riêng
+  `CabinetTopology`, không phải `FeatureCollection<T>`, để số đếm không xuất hiện ở mọi lớp bản đồ. Thứ tự kiểm: chưa tuyến (409) trước, chưa GPS sau.

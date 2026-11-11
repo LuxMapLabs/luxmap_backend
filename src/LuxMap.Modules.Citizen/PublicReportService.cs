@@ -32,6 +32,15 @@ public sealed record PublicQrInfo
 {
     public required string? SegmentName { get; init; }
     public required string CommuneName { get; init; }
+
+    /// <summary>
+    /// <c>false</c> when a send would be refused, so the page can say so before the citizen fills the form (POLE-GEOM-NULL
+    /// GN-7). The code itself is still valid.
+    /// </summary>
+    public required bool CanReport { get; init; }
+
+    /// <summary>Why not: <c>pole_location_required</c>. <c>null</c> when <see cref="CanReport"/> is true.</summary>
+    public required string? Reason { get; init; }
 }
 
 /// <summary>The answer to a send. No internal id, no queue state — only what the citizen's page needs.</summary>
@@ -60,6 +69,8 @@ public sealed partial class PublicReportService(
     [GeneratedRegex("^[0-9A-Za-z]{16}$")]
     private static partial Regex CodeShape();
 
+    private const string LocationRequiredReason = "pole_location_required";
+
     public async Task<PublicQrInfo> LookupAsync(string? code, CancellationToken ct)
     {
         var target = await ResolveAsync(code, ct);
@@ -72,6 +83,8 @@ public sealed partial class PublicReportService(
                     .Where(s => s.SegmentId == p.SegmentId).Select(s => s.SegmentName).FirstOrDefault(),
                 CommuneName = db.Set<AdministrativeUnit>()
                     .Where(u => u.CommuneId == p.CommuneId).Select(u => u.Name).First(),
+                CanReport = p.Geom != null,
+                Reason = p.Geom != null ? null : LocationRequiredReason,
             })
             .SingleOrDefaultAsync(ct) ?? throw NotFound();
     }
@@ -96,6 +109,10 @@ public sealed partial class PublicReportService(
         var (from, to) = (nights.NightStartUtc(night), nights.NightStartUtc(night.AddDays(1)));
 
         await using var db = scopes.Open(target.CommuneId);
+        // Before any photo is decoded: a report on a pole with no position cannot become a fault (POLE-GEOM-NULL G-4). A position is
+        // never taken away again (GN-2), so this needs no lock.
+        if (!await db.Set<Pole>().AnyAsync(p => p.PoleId == target.PoleId && p.Geom != null, ct))
+            throw PoleLocationRequired.For(target.PoleId, PoleLocationRequired.CitizenReport);
         var farFromPole = send.Position is { } here && await DistanceAsync(db, target.PoleId, here, ct) > options.FarFromPoleMeters;
 
         // Early allowance (no lock): spares the decode when the night is already used up. Declared lengths stand in for bytes here.
@@ -307,7 +324,7 @@ public sealed partial class PublicReportService(
     {
         var point = new Point(here.Lng, here.Lat) { SRID = 4326 };
         return await db.Set<Pole>().Where(p => p.PoleId == poleId)
-            .Select(p => SpatialFunctions.DistanceMeters(p.Geom, point)).SingleAsync(ct);
+            .Select(p => SpatialFunctions.DistanceMeters(p.Geom!, point)).SingleAsync(ct);
     }
 
     private static async Task<string> NextIdAsync(LuxMapDbContext db, PrefixedIdSpec spec, CancellationToken ct)

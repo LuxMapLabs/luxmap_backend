@@ -2013,3 +2013,35 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 | Mã | Quyết định / bề mặt client (nền tạm) |
 |---|---|
 | **PV-10** | `POST /work-orders/{id}/pole-photos/{photo_id}/decision` với `decision = "confirm"` trên ảnh **có clip**: người quyết định phải là người **mở clip gần nhất** (`video.viewed_by` của chính họ); chưa thì **409 `POLE_VIDEO_NOT_VIEWED`** (`details.photo_id`, `details.video_url`), không quyết định, không công bố, không sự cố, không audit `confirmed`. Áp cho **cả `on` lẫn `off`** (OFF tạo `lamp_out` ngay, ON có thể gỡ trạng thái `out`). `reject` **không** cần xem; ảnh không có clip **không đổi**. Thứ tự kiểm: đã quyết (409 `POLE_PHOTO_ALREADY_DECIDED`) → không có nhãn (409 `POLE_PHOTO_INCONCLUSIVE`) → chưa xem. Kỹ sư sửa nhãn (`/review`) **không** thay lượt xem của Quản lý. Client nên tắt nút xác nhận tới khi `video.viewed_by` là chính người dùng hiện tại. Giới hạn đã biết (PV-3): cột chỉ giữ người mở **gần nhất**, hai Quản lý luân phiên mở thì người trước phải mở lại. Đây là rào cản, không chứng minh người đó đã xem |
+
+## POLE-GEOM-NULL — cột chưa có GPS (10/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Cho phép `pole.geom` null = cột mới có trong sổ sách, chưa có GPS; kỹ sư gắn GPS ở thực địa sau. Không dùng toạ độ giả. Triển khai tuần tự: bảo vệ mọi chỗ đọc trước (PR 2a), bật writer sau (PR 2b) |
+| **Decision maker** | **Mỹ**, 10/11/2026 — chốt G-1…G-7 và GN-1…GN-11 của Phase 1 (theo đề xuất) |
+| **Chạm API** | **Có** |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract |
+
+**PR 2a đã làm (10/11/2026): schema + mọi chỗ đọc** — G-3, G-4, G-5, G-7, GN-1, GN-3…GN-7, GN-9, GN-11 và phần gắn GPS lần đầu của G-2 (`.ai/results/POLE-GEOM-NULL-p2a.md`). **API GHI cột chưa GPS (tạo / sửa / nhập, GN-2, GN-10) chưa có hiệu lực — PR 2b**, nên hôm nay chưa API nào tạo ra cột chưa GPS. Thay đổi response đã có trong `luxmap-v1.json`: `PoleListItem.location`, `PoleDetail.geom_wkt`, `TopologyPole.lat/lng`, `PoleMapDetail.location`, `WorkOrderPole.location`, `PoleLocationResponse.moved_m` thành nullable; `PublicQrInfo` thêm `can_report`, `reason`; `GET /map/cabinets/{id}/topology` đổi schema sang `CabinetTopology` (thêm `unlocated_pole_count`, trên dây vẫn là FeatureCollection); Feature cột trong `GET /sync/bundle` có thể `geometry: null` (spec vẫn `$ref` trần — hạn chế nullable object). WP5 / WP6 **chưa báo**.
+
+| Mã | Quyết định |
+|---|---|
+| G-1 | `pole.geom` nullable = chưa có GPS |
+| G-2 | Gắn GPS lần đầu qua `PUT /assets/poles/{poleId}/location` (`EditPoleLocation`). Cột có tuyến: **giữ** giới hạn hành lang của PL-3 (409 `POLE_OFF_SEGMENT`); cột chưa tuyến: không đo (D-5 của POLE-SEGMENT-NULL) |
+| G-3 | `location` của cột là `null` trên các response hiện có khi cột chưa GPS (inventory, chi tiết cột, cột của phiếu, bundle offline). Không ẩn cột |
+| G-4 | Cột chưa GPS không nhận sự cố theo cột: `POST /faults` có `pole_id` và báo cáo QR của công dân → **409** với mã lỗi riêng (tên mã: GN-1). `location` của sự cố giữ nguyên cam kết luôn có |
+| G-5 | QR vẫn cấp cho cột chưa GPS; FE công dân hiện "cột chưa được cập nhật vị trí, vui lòng báo cho đơn vị quản lý" |
+| G-6 | Cột chưa GPS vẫn gán được tuyến |
+| G-7 | Bản đồ (`GET /map/poles`), thứ tự cột trên mạch, khảo sát đêm bỏ qua cột chưa GPS |
+| GN-1 | Mã 409 mới **`POLE_LOCATION_REQUIRED`**, `details {pole_id, operation}`, `operation` ∈ `fault_report` / `citizen_report` / `pole_photo` |
+| GN-2 | Cột đã có GPS **không** quay về chưa GPS. `PUT /assets/poles/{id}`: cột chưa GPS gửi `geom_wkt` vắng / `null` ⇒ giữ chưa GPS; cột đã có GPS gửi vắng / `null` ⇒ 400 như cũ. Import: ô trống ở cột MỚI ⇒ chưa GPS, ở cột ĐÃ CÓ ⇒ giữ vị trí |
+| GN-3 | Ảnh cột trong phiếu: upload cho cột chưa GPS → 409 `POLE_LOCATION_REQUIRED` (`operation: pole_photo`) |
+| GN-4 | `GET /sync/bundle`: cột chưa GPS trên tuyến của phiếu **có** trong gói, Feature `geometry: null` |
+| GN-5 | `GET /map/cabinets/{id}/topology`: bỏ qua cột chưa GPS, trả thêm `unlocated_pole_count`. Khác D-3 (cột chưa tuyến → 409) có chủ ý |
+| GN-6 | `GET /work-orders/{id}/poles`: cột chưa GPS vẫn hiện, `location: null`, `position: null`, xếp nhóm cuối của tuyến theo `created_at, length(pole_id), pole_id` |
+| GN-7 | `PublicQrInfo` thêm `can_report` (bool) và `reason` (`pole_location_required` hoặc null) |
+| GN-8 | Gắn GPS lần đầu **offline**: ngoài phạm vi (PL-5). Kỹ sư cần mạng lúc gắn GPS — đã chấp nhận |
+| GN-9 | `PUT …/location` lần đầu: `moved_m: null`; audit `relocated` với `before: null`, `after.moved_m: null` |
+| GN-10 | `GET /assets/poles?missing_location=true` (PR 2b) |
+| GN-11 | Gán tuyến cho cột chưa GPS không đo hành lang; hành lang đo lúc gắn GPS (G-2) |

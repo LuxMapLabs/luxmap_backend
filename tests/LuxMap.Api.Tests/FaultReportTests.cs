@@ -128,6 +128,27 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
     private static object OnPole(string poleId, string? key = null, string type = "lamp_out", string note = "Lamp is dark all night")
         => new { client_op_id = key ?? Guid.NewGuid().ToString(), pole_id = poleId, fault_type = type, note };
 
+    /// <summary>POLE-GEOM-NULL G-4: a fault promises a location, and a pole-bound one takes it from the pole.</summary>
+    [Fact]
+    public async Task A_report_on_a_pole_without_a_position_is_refused_and_writes_nothing()
+    {
+        var unlocated = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var planted = new Pole { CommuneId = home, SegmentId = road, DataSource = DataSource.Simulated };
+            db.Add(planted); await db.SaveChangesAsync(); return planted.PoleId;
+        });
+
+        var (status, body) = await Report("crew", OnPole(unlocated));
+
+        Assert.Equal(409, status);
+        Assert.Equal("POLE_LOCATION_REQUIRED", Code(body));
+        var details = body.GetProperty("error").GetProperty("details");
+        Assert.Equal(unlocated, details.GetProperty("pole_id").GetString());
+        Assert.Equal("fault_report", details.GetProperty("operation").GetString());
+        Assert.Equal(0, await Db(db => db.Set<Fault>().IgnoreQueryFilters().CountAsync(f => f.PoleId == unlocated)));
+    }
+
     [Fact]
     public async Task A_report_on_a_pole_starts_detected_as_a_field_report_and_takes_everything_else_from_the_pole()
     {

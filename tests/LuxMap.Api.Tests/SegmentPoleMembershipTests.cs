@@ -280,6 +280,21 @@ public sealed class SegmentPoleMembershipTests(AssetImportFixture fixture)
         Assert.Equal(segment, await SegmentOf(foreign, hidden));
     }
 
+    /// <summary>POLE-GEOM-NULL GN-11: a pole with no position cannot be off the line, so it does not block a reroute.</summary>
+    [Fact]
+    public async Task Put_rerouting_a_segment_ignores_a_pole_that_has_no_position()
+    {
+        using var client = await fixture.ManagerClientAsync();
+        var pole = await NewPole(client);
+        var segment = await NewSegment(client, new[] { pole });
+        await fixture.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE pole SET geom = NULL WHERE pole_id = {pole}"));
+
+        var body = WithoutCommune(Body());
+        body["geom_wkt"] = Far;
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{Segments}/{segment}", body)).StatusCode);
+        Assert.Equal(segment, await SegmentOf(client, pole));
+    }
+
     [Fact]
     public async Task Put_keeping_the_geometry_never_measures_the_corridor()
     {

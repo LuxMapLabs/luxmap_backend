@@ -473,6 +473,11 @@ public sealed class SurveyProcessingTests(AssetImportFixture factory) : IAsyncLi
         await PlacePolesOnRouteForChainageTests();
         var capture = new CaptureProjection();
         await using var db = Db(interceptor: capture);
+        // POLE-GEOM-NULL G-7: a pole on this road with no position is not something a sweep can be expected to see.
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO pole (segment_id, commune_id, geom, data_source, near_sensitive_poi)
+            VALUES ({road}, {a}, NULL, 'simulated', false)
+            """);
         var projected = await SurveyChainageQuery.Poles(db, [road], [a,b], "simulated", new(), default);
         Assert.Equal(2, projected.Length);
         Assert.InRange(projected[0].LengthM, 105, 110); // Declared length is deliberately 999.

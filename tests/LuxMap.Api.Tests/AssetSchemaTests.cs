@@ -62,6 +62,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
             .Select(pole => pole.Geom)
             .SingleAsync());
 
+        Assert.NotNull(read);
         Assert.Equal(Srid, read.SRID);
         Assert.Equal(written.X, read.X, precision: 9);
         Assert.Equal(written.Y, read.Y, precision: 9);

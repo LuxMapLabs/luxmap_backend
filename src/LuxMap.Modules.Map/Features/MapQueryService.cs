@@ -150,7 +150,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
         {
             Features = [.. rows.Select(row => new Feature<PoleProperties>
             {
-                Geometry = GeoJsonGeometry.Point(row.Geom.X, row.Geom.Y),
+                // A bbox query never returns a pole without a position; a by-segment one (the offline bundle) does.
+                Geometry = row.Geom is null ? null : GeoJsonGeometry.Point(row.Geom.X, row.Geom.Y),
                 Properties = new PoleProperties
                 {
                     PoleId = row.PoleId,
@@ -461,7 +462,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
 
         // ⚠️ Intersects(envelope), not X/Y comparisons: this is the form that reaches ix_pole_geom.
         var poles = dbContext.Set<Pole>().AsNoTracking()
-            .Where(pole => pole.Geom.Intersects(envelope));
+            // A pole with no position yet (POLE-GEOM-NULL G-7) is NULL here and drops out — it has no place on a map.
+            .Where(pole => pole.Geom!.Intersects(envelope));
 
         poles = WithDataSource(poles, query.DataSource, pole => pole.DataSource);
 

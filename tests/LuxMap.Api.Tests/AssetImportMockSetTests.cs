@@ -71,7 +71,7 @@ public sealed class AssetImportMockSetTests(AssetImportFixture fixture, ITestOut
         // transposed pair somewhere in the Indian Ocean.
         Assert.All(stored, pole =>
         {
-            Assert.Equal(4326, pole.Geom.SRID);
+            Assert.Equal(4326, pole.Geom!.SRID);
             Assert.InRange(pole.Geom.X, 106.0, 107.0);
             Assert.InRange(pole.Geom.Y, 10.0, 11.0);
         });

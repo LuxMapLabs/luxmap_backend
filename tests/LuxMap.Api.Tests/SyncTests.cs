@@ -115,6 +115,28 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
 
     // ── Bundle ──────────────────────────────────────────────────────────────────────────────────────────
 
+    /// <summary>POLE-GEOM-NULL GN-4: the engineer must see the pole that still waits for a position.</summary>
+    [Fact]
+    public async Task The_bundle_carries_a_pole_without_a_position_as_a_feature_with_null_geometry()
+    {
+        var unlocated = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var planted = new Pole { CommuneId = home, SegmentId = road1, DataSource = DataSource.Simulated };
+            db.Add(planted); await db.SaveChangesAsync(); return planted.PoleId;
+        });
+        await CreateOrderAsync("inspection", users["a"], road: road1);
+
+        var bundle = await GetAsync("a", Bundle);
+
+        var features = bundle.GetProperty("poles").GetProperty("features").EnumerateArray().ToArray();
+        var feature = features.Single(f => f.GetProperty("properties").GetProperty("pole_id").GetString() == unlocated);
+        Assert.Equal(JsonValueKind.Null, feature.GetProperty("geometry").ValueKind);
+        Assert.Equal(road1, feature.GetProperty("properties").GetProperty("segment_id").GetString());
+        var placed = features.Single(f => f.GetProperty("properties").GetProperty("pole_id").GetString() == pole1);
+        Assert.Equal("Point", placed.GetProperty("geometry").GetProperty("type").GetString());
+    }
+
     [Fact]
     public async Task Without_segments_the_bundle_packs_the_roads_of_my_open_orders_and_only_my_orders()
     {

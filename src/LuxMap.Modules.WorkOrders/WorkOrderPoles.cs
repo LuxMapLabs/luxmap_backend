@@ -25,7 +25,8 @@ public sealed record WorkOrderPole
     /// <summary>1-based place along its segment; null when the pole has no segment.</summary>
     public int? Position { get; init; }
 
-    public required WorkOrderLocation Location { get; init; }
+    /// <summary><c>null</c>, with <see cref="Position"/>, for a pole that has no position yet (POLE-GEOM-NULL GN-6).</summary>
+    public required WorkOrderLocation? Location { get; init; }
 
     /// <summary><c>unknown</c> when no published sweep ever covered the pole — that is what unknown MEANS (Contract 3.1).</summary>
     public FixtureStatus FixtureStatus { get; init; }
@@ -136,14 +137,16 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
             })
             .OrderBy(x => x.Row.SegmentId is null)
             .ThenBy(x => x.SegmentOrder).ThenBy(x => x.Row.SegmentId?.Length).ThenBy(x => x.Row.SegmentId, StringComparer.Ordinal)
-            .ThenBy(x => x.Along).ThenBy(x => x.Row.SegmentId is null ? x.Row.CreatedAt : default)
+            // POLE-GEOM-NULL GN-6: a pole with no position has no place along the road — after the placed ones of its segment.
+            .ThenBy(x => x.Row.Geom is null)
+            .ThenBy(x => x.Along).ThenBy(x => x.Row.SegmentId is null || x.Row.Geom is null ? x.Row.CreatedAt : default)
             .ThenBy(x => x.Row.PoleId.Length).ThenBy(x => x.Row.PoleId, StringComparer.Ordinal)
             .ToList();
 
         var positions = new Dictionary<string, int>();
         var all = ordered.Select(x =>
         {
-            int? position = x.Row.SegmentId is { } segment
+            int? position = x.Row.SegmentId is { } segment && x.Row.Geom is not null
                 ? positions[segment] = positions.GetValueOrDefault(segment) + 1
                 : null;
             var r = x.Row;
@@ -152,7 +155,7 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 PoleId = r.PoleId,
                 SegmentId = r.SegmentId,
                 Position = position,
-                Location = new WorkOrderLocation(r.Geom.Y, r.Geom.X),
+                Location = r.Geom is null ? null : new WorkOrderLocation(r.Geom.Y, r.Geom.X),
                 FixtureStatus = r.Status?.FixtureStatus ?? FixtureStatus.Unknown,
                 StatusConfidence = r.Status?.StatusConfidence,
                 LastSeenAt = r.Status?.LastSeenAt,

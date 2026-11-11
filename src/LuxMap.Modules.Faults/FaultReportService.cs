@@ -140,6 +140,9 @@ public sealed class FaultReportService(
             var pole = await db.Set<Pole>().AsNoTracking().SingleOrDefaultAsync(p => p.PoleId == poleId, ct)
                 ?? throw new LuxMapException(ErrorCodes.PoleNotFound, HttpStatusCode.NotFound,
                     "That pole does not exist, or it is outside your permitted commune scope.");
+            // A fault promises a location, and a pole-bound one takes it from the pole (POLE-GEOM-NULL G-4). Here, not in the
+            // controller: /sync/push reaches this method too.
+            if (pole.Geom is null) throw PoleLocationRequired.For(pole.PoleId, PoleLocationRequired.FaultReport);
             communeId = pole.CommuneId; segmentId = pole.SegmentId; source = pole.DataSource;
             if (request.FixtureId is { } fixtureId && !await db.Set<Fixture>().AnyAsync(
                     f => f.FixtureId == fixtureId && f.PoleId == poleId && f.RemovedDate == null, ct))
@@ -202,6 +205,8 @@ public sealed class FaultReportService(
         var pole = await db.Set<Pole>().AsNoTracking().SingleOrDefaultAsync(p => p.PoleId == report.PoleId, ct)
             ?? throw new LuxMapException(ErrorCodes.PoleNotFound, HttpStatusCode.NotFound,
                 "That pole does not exist, or it is outside your permitted commune scope.");
+        // Second stop behind the public form's own refusal (POLE-GEOM-NULL G-4).
+        if (pole.Geom is null) throw PoleLocationRequired.For(pole.PoleId, PoleLocationRequired.CitizenReport);
         var fault = new Fault
         {
             FaultId = await NextFaultId(ct), PoleId = pole.PoleId, SegmentId = pole.SegmentId, CommuneId = pole.CommuneId,

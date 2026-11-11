@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json.Serialization;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
@@ -46,6 +47,32 @@ public sealed record CabinetTopologyEdgeProperties
 }
 
 /// <summary>
+/// The answer of <c>GET /map/cabinets/{cabinetId}/topology</c>: a GeoJSON <c>FeatureCollection</c> of edges plus one count.
+/// </summary>
+/// <remarks>
+/// Its own type rather than <see cref="FeatureCollection{TProperties}"/> so the count does not appear on every map layer.
+/// On the wire it is that collection with one extra member, which GeoJSON allows.
+/// </remarks>
+public sealed record CabinetTopology
+{
+    [JsonPropertyOrder(-4)]
+    public string Type => "FeatureCollection";
+
+    [JsonPropertyOrder(-3)]
+    public string CrsNote => "EPSG:4326 (lng, lat)";
+
+    /// <summary>
+    /// Poles on this cabinet's feeders that have no position yet and are therefore NOT in the diagram (POLE-GEOM-NULL
+    /// GN-5). An edge needs two points; a pole from the books has none. 0 means the diagram is complete.
+    /// </summary>
+    [JsonPropertyOrder(-2)]
+    public required int UnlocatedPoleCount { get; init; }
+
+    [JsonPropertyOrder(-1)]
+    public required IReadOnlyList<Feature<CabinetTopologyEdgeProperties>> Features { get; init; }
+}
+
+/// <summary>
 /// <c>GET /map/cabinets/{cabinetId}/topology</c> — the branches a cabinet feeds, built from stored relations only.
 /// </summary>
 /// <remarks>
@@ -67,7 +94,7 @@ public sealed record CabinetTopologyEdgeProperties
 /// </remarks>
 public sealed class CabinetTopologyService(LuxMapDbContext db)
 {
-    public async Task<FeatureCollection<CabinetTopologyEdgeProperties>> TopologyAsync(string cabinetId, CancellationToken ct)
+    public async Task<CabinetTopology> TopologyAsync(string cabinetId, CancellationToken ct)
     {
         var cabinet = await db.Set<ElectricalCabinet>().AsNoTracking()
             .Where(candidate => candidate.CabinetId == cabinetId)
@@ -106,11 +133,15 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
         }
 
         // The guard above establishes this invariant before any dictionary lookup or branch is built.
-        var assigned = poles.Select(pole => new
+        // A pole without a position is LEFT OUT and counted (POLE-GEOM-NULL GN-5) — unlike a pole without a segment above,
+        // which refuses: book-only poles are an ordinary, long-lived state, and a 409 would lock the whole cabinet's diagram
+        // until the last one is visited.
+        var assigned = poles.Where(pole => pole.Geom is not null).Select(pole => new
         {
-            pole.PoleId, pole.FeederId, pole.Geom, pole.FeederSource,
+            pole.PoleId, pole.FeederId, Geom = pole.Geom!, pole.FeederSource,
             SegmentId = pole.SegmentId ?? throw new InvalidOperationException("Unassigned pole passed the topology guard."),
         }).ToArray();
+        var unlocated = poles.Count - assigned.Length;
         var segmentIds = assigned.Select(pole => pole.SegmentId).Distinct().ToArray();
         var roads = (await db.Set<RoadSegment>().AsNoTracking().IgnoreQueryFilters()
                 .Where(segment => segmentIds.Contains(segment.SegmentId))
@@ -183,7 +214,7 @@ public sealed class CabinetTopologyService(LuxMapDbContext db)
             }
         }
 
-        return new FeatureCollection<CabinetTopologyEdgeProperties> { Features = features };
+        return new CabinetTopology { UnlocatedPoleCount = unlocated, Features = features };
     }
 
     /// <summary><c>inferred</c> when either side is — a chain is only as confirmed as its weakest link.</summary>

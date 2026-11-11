@@ -126,8 +126,9 @@ public sealed class FaultQueryService(LuxMapDbContext db, IActiveWorkOrderLookup
             select new LocatedFault
             {
                 Fault = fault,
-                Lat = fault.Lat ?? (pole == null ? 0 : pole.Geom.Y),
-                Lng = fault.Lng ?? (pole == null ? 0 : pole.Geom.X),
+                // Geom test: backstop only — a pole without a position cannot carry a fault (POLE-GEOM-NULL G-4).
+                Lat = fault.Lat ?? (pole == null || pole.Geom == null ? 0 : pole.Geom.Y),
+                Lng = fault.Lng ?? (pole == null || pole.Geom == null ? 0 : pole.Geom.X),
             };
 
     private async Task<FaultItem[]> ToItemsAsync(IReadOnlyList<LocatedFault> rows, CancellationToken ct)

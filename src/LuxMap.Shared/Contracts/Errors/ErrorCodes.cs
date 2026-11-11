@@ -216,6 +216,13 @@ public static class ErrorCodes
     public const string PoleOffSegment = "POLE_OFF_SEGMENT";
 
     /// <summary>
+    /// 409 — the pole has no position yet (POLE-GEOM-NULL G-4, GN-1), and the operation needs one: a fault, a citizen
+    /// report or a pole photo on it. <c>details</c> carries <c>pole_id</c> and <c>operation</c>. Set the position
+    /// with <c>PUT /assets/poles/{poleId}/location</c> first.
+    /// </summary>
+    public const string PoleLocationRequired = "POLE_LOCATION_REQUIRED";
+
+    /// <summary>
     /// <c>POST /sync/push</c> — an operation skipped because an earlier operation of the same batch, on the same
     /// work order or pole, was a conflict or was rejected (BE-43 D-7). <c>details.blocked_by</c> names it.
     /// </summary>
