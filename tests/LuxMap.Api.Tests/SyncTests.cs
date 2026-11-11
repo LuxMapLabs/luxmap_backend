@@ -137,6 +137,35 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal("Point", placed.GetProperty("geometry").GetProperty("type").GetString());
     }
 
+    /// <summary>ROAD-SEGMENT-GEOM-NULL RG-6 (row 2): the engineer must see the road that still waits for a line — a 500 here would leave them with no bundle at all.</summary>
+    [Fact]
+    public async Task The_bundle_carries_a_road_without_a_line_as_a_feature_with_null_geometry()
+    {
+        var undrawn = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var road = new RoadSegment { CommuneId = home, SegmentName = "Sync undrawn road", RoadClass = RoadClass.InterVillage,
+                DataSource = DataSource.Simulated, LengthM = 250 };
+            db.Add(road); await db.SaveChangesAsync();
+            db.Add(new Pole { CommuneId = home, SegmentId = road.SegmentId, DataSource = DataSource.Simulated, Geom = new Point(108.5, 16) { SRID = 4326 } });
+            await db.SaveChangesAsync();
+            return road.SegmentId;
+        });
+        await CreateOrderAsync("inspection", users["a"], road: undrawn);
+        await CreateOrderAsync("inspection", users["a"], road: road1);
+
+        var bundle = await GetAsync("a", Bundle);
+
+        Assert.Equal(IdOrder(road1, undrawn), Strings(bundle.GetProperty("segment_ids")));
+        var features = bundle.GetProperty("segments").GetProperty("features").EnumerateArray().ToArray();
+        var feature = features.Single(f => f.GetProperty("properties").GetProperty("segment_id").GetString() == undrawn);
+        Assert.Equal(JsonValueKind.Null, feature.GetProperty("geometry").ValueKind);
+        Assert.Equal(250, feature.GetProperty("properties").GetProperty("length_m").GetInt32());
+        Assert.Equal(1, feature.GetProperty("properties").GetProperty("pole_count").GetInt32());
+        var drawn = features.Single(f => f.GetProperty("properties").GetProperty("segment_id").GetString() == road1);
+        Assert.Equal("LineString", drawn.GetProperty("geometry").GetProperty("type").GetString());
+    }
+
     [Fact]
     public async Task Without_segments_the_bundle_packs_the_roads_of_my_open_orders_and_only_my_orders()
     {

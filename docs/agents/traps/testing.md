@@ -14,6 +14,8 @@ ra `23505 pk_pole`. Không tách collection để tăng tốc.
 Dùng `FreeFourDigitDecadeAsync`, assert tiền đề bằng `RequireFreeAsync`; chọn dải trống rồi **trả sequence về giá trị cũ
 trong `try/finally`**. Dải đang ghi trống không chứng minh cả đoạn sequence sẽ đi qua đều trống.
 Ngưỡng **9999 → 10000** là ngoại lệ cố định bởi độ rộng đệm; loại thập niên `1000` khỏi ứng viên.
+**Một lượt đầy đủ tự tiêu ID:** `segment_id_seq` đi qua `SEG-999` / `SEG-1000` khi cả bộ test tạo ~1000 tuyến, nên test ghim ngưỡng 999/1000 (`PrefixedIdOrderingTests`)
+đỏ ngay khi một PR thêm vài chục tuyến (gặp ở ROAD-SEGMENT-GEOM-NULL 2a) — nay nó ghim 99999/100000, ngoài tầm sequence. Test mới cần ngưỡng độ rộng của một tiền tố thì chọn ngưỡng sequence không bao giờ tới.
 Không `setval` trong fixture để nâng sàn theo ID lớn nhất: nó có thể đẩy khối dữ liệu vào đúng dải ngưỡng mà test giữ.
 
 ## Hai bẫy test chốt ở REG-v1.2 — culture và tài khoản seed

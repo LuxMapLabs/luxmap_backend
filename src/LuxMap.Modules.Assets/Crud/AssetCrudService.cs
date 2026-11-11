@@ -155,7 +155,7 @@ public sealed class AssetCrudService(
             .Select(segment => new { segment.Geom, segment.CreatedAt })
             .FirstAsync(ct);
 
-        return new SegmentDetail { Segment = item, GeomWkt = Wkt(extra.Geom), CreatedAt = extra.CreatedAt };
+        return new SegmentDetail { Segment = item, GeomWkt = extra.Geom is null ? null : Wkt(extra.Geom), CreatedAt = extra.CreatedAt };
     }
 
     /// <summary>One feeder, read for the inventory screen.</summary>
@@ -436,7 +436,9 @@ public sealed class AssetCrudService(
         segment.RoadClass = request.RoadClass!.Value;
         segment.LengthM = request.LengthM!.Value;
         var geometry = Read<LineString>(request.GeomWkt);
-        var rerouted = !segment.Geom.EqualsExact(geometry);
+        // ROAD-SEGMENT-GEOM-NULL: drawing a segment for the first time (null → line) IS a change of route, so the corridor
+        // is measured then (RG-11's safety net); only an identical line skips it. The request still requires geom_wkt (2a).
+        var rerouted = segment.Geom is null || !segment.Geom.EqualsExact(geometry);
         segment.Geom = geometry;
         segment.DataSource = request.DataSource!.Value;
         if (present) await ReplaceSegmentPolesAsync(segment, poleIds, ct);
@@ -459,7 +461,8 @@ public sealed class AssetCrudService(
     /// </remarks>
     private async Task RequirePolesInCorridorAsync(RoadSegment segment, CancellationToken ct)
     {
-        var line = segment.Geom;
+        // Only reached after the route was just saved, so it is drawn; the ! restates that for the compiler.
+        var line = segment.Geom!;
         var limit = corridor.RouteCorridorM;
         var total = await dbContext.Set<Pole>().IgnoreQueryFilters().CountAsync(pole =>
             pole.SegmentId == segment.SegmentId && pole.Geom != null && SpatialFunctions.DistanceMeters(pole.Geom, line) > limit, ct);
@@ -814,9 +817,12 @@ public sealed class AssetCrudService(
             .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom!, target)).SingleAsync(ct);
         // Unfiltered on purpose: an inter_commune segment may belong to another commune than its pole (BE-REVIEW-02
         // constraint 1). Only a distance leaves the query, never the segment.
+        // A segment not drawn yet has no route to measure against (ROAD-SEGMENT-GEOM-NULL RG-11): filtered out BEFORE the call
+        // (a NULL distance materialised into a double throws), so no row comes back and offSegment stays null — the move is
+        // accepted. The safety net is the corridor check when the segment is first drawn (UpdateSegmentAsync).
         double? offSegment = pole.SegmentId is null ? null : await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
-            .Where(segment => segment.SegmentId == pole.SegmentId)
-            .Select(segment => SpatialFunctions.DistanceMeters(segment.Geom, target)).SingleAsync(ct);
+            .Where(segment => segment.SegmentId == pole.SegmentId && segment.Geom != null)
+            .Select(segment => (double?)SpatialFunctions.DistanceMeters(segment.Geom!, target)).SingleOrDefaultAsync(ct);
 
         var before = pole.Geom is null ? null : new { lat = pole.Geom.Y, lng = pole.Geom.X };
         pole.Geom = target;
@@ -1186,6 +1192,7 @@ public sealed class AssetCrudService(
             // On an inter_commune road that is not the whole road, and it must not be: reporting a
             // count the caller cannot then list would be a way to probe another commune's data.
             PoleCount = dbContext.Set<Pole>().Count(pole => pole.SegmentId == segment.SegmentId),
+            HasGeometry = segment.Geom != null,
             UpdatedAt = segment.UpdatedAt,
             UpdatedBy = segment.UpdatedBy,
             UpdatedByName = dbContext.Set<AppUser>().Where(user => user.UserId == segment.UpdatedBy).Select(user => user.FullName).FirstOrDefault(),

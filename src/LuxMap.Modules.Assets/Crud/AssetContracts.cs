@@ -720,6 +720,12 @@ public sealed record SegmentListItem
     /// <summary>⚠️ Counted within the CALLER'S commune scope, like every other read.</summary>
     public required int PoleCount { get; init; }
 
+    /// <summary>
+    /// Whether the segment has been drawn (ROAD-SEGMENT-GEOM-NULL RG-5) — computed on read from <c>geom IS NOT NULL</c>, never stored,
+    /// so there is no second truth to drift from the column. <c>false</c> = on the books only: not on the map, not surveyable.
+    /// </summary>
+    public required bool HasGeometry { get; init; }
+
     public required DateTime UpdatedAt { get; init; }
 
     /// <summary>Who last changed the row by form, note or import (e.g. <c>USR-004</c>); <c>null</c> for system-loaded rows.</summary>
@@ -734,8 +740,8 @@ public sealed record SegmentDetail
 {
     public required SegmentListItem Segment { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326.</summary>
-    public required string GeomWkt { get; init; }
+    /// <summary>WKT <c>LINESTRING</c> in EPSG:4326. <c>null</c> for a segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-5).</summary>
+    public required string? GeomWkt { get; init; }
 
     public required DateTime CreatedAt { get; init; }
 }

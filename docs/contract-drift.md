@@ -2083,3 +2083,54 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 | MF-8 | `Down()` của migration **không đảo được** khi đã có cột hai bóng (tạo lại index cũ báo trùng `pole_id`) — cố ý: ngừng dùng bóng thứ hai của mọi cột đó trước, không bao giờ xoá dòng |
 
 **Cần báo / cần quyết:** WP5, WP6 (shape mới, chỉ thêm); MF-5 cần Mỹ hoặc người vận hành chốt luật khi ngừng bóng; bộ mock `mocks/*.json` **chưa** thêm `fixtures[]` / `fixture_count` (mock vẫn một bóng mỗi cột — thêm nếu FE cần dựng thử cột đôi).
+
+## ROAD-SEGMENT-GEOM-NULL — tuyến chưa có hình (11/11/2026)
+
+| | |
+|---|---|
+| **Decision** | **ĐÃ DUYỆT (11/11/2026).** Cho phép `road_segment.geom` null = tuyến mới có trong sổ sách, chưa có hình; vẽ hình sau khi cột có GPS. Không hình giả. Triển khai tuần tự: bảo vệ mọi chỗ đọc trước (PR 2a), bật writer sau (PR 2b), theo khuôn POLE-GEOM-NULL |
+| **Decision maker** | **Mỹ (Dylan), 11/11/2026** — duyệt RG-1…RG-15 đúng như đề xuất (`.ai/results/ROAD-SEGMENT-GEOM-NULL-p1.md` mục 6). Nguồn yêu cầu: FE (WP5), 11/11/2026 |
+| **Chạm API** | **Có** — nới `geom_wkt` thành tuỳ chọn ở tạo / sửa / import tuyến; `SegmentDetail.geom_wkt` nullable; THÊM `SegmentListItem.has_geometry`, `GET /assets/segments?missing_geometry=`, `CabinetTopology.unrouted_pole_count`, mã 409 `SEGMENT_GEOMETRY_REQUIRED`; Feature segment trong `GET /sync/bundle` có thể `geometry: null`. Không đổi / bỏ field hay enum đã publish |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract. **PR 2a đã code (11/11/2026, chưa push / merge)**: migration `RoadSegmentGeomNullable` + mọi chỗ đọc + chốt chặn `POST /sweeps`; **POST / PUT / import tuyến VẪN bắt buộc `geom_wkt`** — writer, `missing_geometry`, template import ở PR 2b |
+| **Scope** | Assets, Map, WorkOrders, Survey, Sync; một migration (`AlterColumn road_segment.geom` nullable). Consumer: WP5, WP6 — **chưa báo** |
+
+**Phase 1 (11/11/2026): khảo sát 22 chỗ đọc hình tuyến** — 8 chỗ sẽ trả 500 nếu không sửa, 3 chỗ rơi lặng lẽ có chủ ý; nguy hiểm nhất là khảo sát đêm trên tuyến chưa hình cho coverage trông đủ trong khi cả tuyến không được khảo sát (kết quả mục 2). Tạo / giao / lên lịch phiếu khảo sát và lịch hàng tuần theo `segment_ids` **không đọc hình** nên chạy được với tuyến chưa hình ngay khi cột `geom` nullable.
+
+| Mã | Quyết định (đã duyệt) |
+|---|---|
+| RG-1 | `road_segment.geom` nullable = chưa có hình. Không hình giả |
+| RG-2 | Tuyến đã có hình **không** quay về chưa hình. `PUT`: tuyến chưa hình gửi `geom_wkt` vắng / `null` ⇒ giữ chưa hình, gửi WKT ⇒ gắn hình lần đầu; tuyến đã có hình gửi vắng / `null` ⇒ 400 như hôm nay. `POST`: vắng / `null` ⇒ chưa hình. Import: ô trống ở tuyến MỚI ⇒ chưa hình, ở tuyến ĐÃ CÓ ⇒ giữ hình |
+| RG-3 | `length_m` vẫn bắt buộc và khai báo (không tính từ hình) |
+| RG-4 | Tuyến chưa hình **không** vào `GET /map/segments` (bbox) |
+| RG-5 | `SegmentListItem.has_geometry`, `SegmentDetail.geom_wkt` nullable, `GET /assets/segments?missing_geometry=true` |
+| RG-6 | `GET /sync/bundle`: tuyến chưa hình của phiếu **có** trong gói, Feature `geometry: null` |
+| RG-7 | Tạo / giao / lên lịch phiếu khảo sát cho tuyến chưa hình **được**; `POST /sweeps` trên phiếu có tuyến chưa hình ⇒ 409 `SEGMENT_GEOMETRY_REQUIRED`, `details {work_order_id, segment_ids}` |
+| RG-8 | `GET /work-orders/{id}/poles`: cột của tuyến chưa hình vẫn hiện, `position: null`, xếp nhóm cuối của tuyến |
+| RG-9 | `GET /work-orders/agenda`: nhóm tuyến chưa hình giữ tên, `location: null`, `distance_m: null`, xếp sau |
+| RG-10 | `GET /map/cabinets/{id}/topology`: bỏ qua cột trên tuyến chưa hình, đếm vào `unrouted_pole_count` (tách khỏi `unlocated_pole_count`) |
+| RG-11 | `PUT /assets/poles/{id}/location` với tuyến của cột chưa hình: không đo hành lang. Lưới an toàn: gắn hình tuyến lần đầu đo mọi cột có GPS (ASSET-SEG-2) ⇒ 409 `POLE_OFF_SEGMENT` có thể xuất hiện ở bước **vẽ tuyến** |
+| RG-12 | Không đổi luồng nào khác của mobile ngoài bundle |
+| RG-13 | `pole_ids` gán được vào tuyến chưa hình, không đo hành lang |
+| RG-14 | `Down()` từ chối khi còn tuyến chưa hình; binary cũ cũng không chạy được với hàng `geom IS NULL` — vẽ hoặc xoá hết trước khi triển khai lại binary cũ |
+| RG-15 | PR 2a (schema + mọi chỗ đọc, writer vẫn bắt buộc `geom_wkt`) rồi PR 2b (bật writer). Không stack |
+
+**PR 2a (11/11/2026) — response nào đổi.** Chỉ THÊM và nới nullable; chưa có API nào tạo được tuyến chưa hình (hàng chỉ tồn tại nếu ghi thẳng DB), nên consumer chưa thấy giá trị mới trong sản xuất cho tới 2b:
+
+| Response | Đổi |
+|---|---|
+| `GET /assets/segments` (item) | THÊM `has_geometry` (bool, tính lúc đọc từ `geom IS NOT NULL`, không lưu) — cũng nằm trong `SegmentDetail.segment` |
+| `GET /assets/segments/{id}` | `geom_wkt` thành `string` **nullable** (RG-5) |
+| `GET /sync/bundle` | Feature trong `segments` có thể `geometry: null` (RG-6; `properties` giữ nguyên, kể cả `length_m` khai báo) |
+| `GET /map/segments` | Không đổi hình dạng; tuyến chưa hình **vắng** khỏi kết quả (RG-4, cố ý) |
+| `GET /map/cabinets/{id}/topology` | THÊM `unrouted_pole_count` (RG-10): cột **có GPS** trên tuyến chưa hình, bị bỏ khỏi sơ đồ. Cột chưa GPS vẫn chỉ vào `unlocated_pole_count` — hai số không giao nhau |
+| `GET /work-orders/{id}/poles` | Cột của tuyến chưa hình: `position: null`, `location` theo cột, xếp sau các cột đã định vị của tuyến theo `created_at, length(pole_id), pole_id` (RG-8) |
+| `GET /work-orders/agenda` | Nhóm tuyến chưa hình: `segment_name` giữ, `location: null`, `distance_m: null`, xếp sau nhóm đo được (RG-9) |
+| `POST /sweeps` | THÊM 409 `SEGMENT_GEOMETRY_REQUIRED`, `details {work_order_id, segment_ids}` khi phiếu có (dù chỉ một) tuyến chưa hình (RG-7); replay idempotent của sweep đã có không bị chặn |
+| `PUT /assets/poles/{id}/location` | Tuyến của cột chưa hình ⇒ không đo hành lang, 200; audit `segment_distance_m: null` (RG-11) |
+| `PUT /assets/segments/{id}` | Tuyến chưa hình nhận hình lần đầu (chỉ qua `geom_wkt`, vẫn `[Required]` ở 2a) được tính là "đổi hình" ⇒ đo hành lang mọi cột có GPS ⇒ có thể 409 `POLE_OFF_SEGMENT` (RG-11, lưới an toàn) |
+
+Không đổi: tạo / giao / lên lịch phiếu khảo sát, lịch tuần (`survey-schedules/recurring`) và sinh phiếu cho tuyến chưa hình — chạy được (có test).
+
+**Phát hiện lúc code 2a (đo, không giả định):** (1) `SurveyChainageQuery.Gps` trên tuyến chưa hình **không** làm GPS thành "không gán tuyến" như P1 dự đoán: khi tuyến null đứng **một mình**, mọi mẫu GPS bị gán `segment_id` = tuyến đó với `route_distance_m` null và chainage 0 (khoảng cách NULL lọt qua bộ lọc ứng viên); đứng cạnh tuyến có hình thì NULL xếp cuối nên tuyến có hình thắng. Còn `SurveyChainageQuery.Poles` đúng như dự đoán (cột của tuyến null không vào `poles_expected`). Không có chốt chặn nào ở phía SQL — chỉ `POST /sweeps` (#14) đứng trước cả hai. (2) `SpatialFunctions.DistanceMeters(NULL, …)` vào `double` vẫn ném lúc materialize, nên #7 và #13 phải lọc `Geom != null` TRƯỚC khi gọi hàm.
+
+**Cần báo:** khi code xong: WP5 (model nullable, `has_geometry`, `missing_geometry`, form sửa tuyến đã vẽ **phải gửi lại** `geom_wkt`, `unrouted_pole_count`, mã 409 mới, 409 `POLE_OFF_SEGMENT` lúc vẽ tuyến), WP6 (bundle `geometry: null` cho segment; không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi. **Chưa báo ai.**

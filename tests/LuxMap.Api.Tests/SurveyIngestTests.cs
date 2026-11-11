@@ -104,7 +104,7 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
         await host.DisposeAsync(); storage.Dispose();
     }
 
-    private object Body(Guid op, double uncertainty = 2) => new { work_order_id = wo, client_op_id = op, boot_session_id = boot,
+    private object Body(Guid op, double uncertainty = 2, string? order = null) => new { work_order_id = order ?? wo, client_op_id = op, boot_session_id = boot,
         elapsed_anchor_ns = "9007199254740000", started_elapsed_ns = "9007199254740000", utc_anchor = Anchor, utc_uncertainty_ms = uncertainty, data_source = "simulated" };
     private async Task<string> Create() => (await Json(await clients["owner"].PostAsJsonAsync("/api/v1/sweeps", Body(Guid.NewGuid())), 201)).GetProperty("sweep_id").GetString()!;
     private static async Task<JsonElement> Json(HttpResponseMessage response, int status)
@@ -145,6 +145,38 @@ public sealed class SurveyIngestTests(AssetImportFixture factory) : IAsyncLifeti
             white_balance_mode = "manual", white_balance_value = 4000, resolution = new { width = 1920, height = 1080 },
             ae_enabled = false, eis_enabled = false, hdr_enabled = false, night_mode_enabled = false },
         mount = new { camera_side = "right", mount_height_m = 1.5, angle_deg = 10, sensor_position = "roof" } });
+
+    /// <summary>
+    /// ROAD-SEGMENT-GEOM-NULL RG-7 (row 14): a road with no line cannot be surveyed, and both survey queries would silently drop it
+    /// (<c>SurveyProcessingTests</c>), so the sweep is refused up front — whole order, mixed or not. Creating, assigning and
+    /// starting the order must still work: the engineer needs it before there is GPS.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_sweep_is_refused_on_an_order_with_an_undrawn_road_though_the_order_itself_runs(bool mixed)
+    {
+        var undrawn = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var road = new RoadSegment { CommuneId = commune, SegmentName = "Survey undrawn", RoadClass = RoadClass.InterVillage,
+                DataSource = DataSource.Simulated, LengthM = 100, Geom = null };
+            db.Add(road); await db.SaveChangesAsync(); return road.SegmentId;
+        });
+        string[] targets = mixed ? [roads[0], undrawn] : [undrawn];
+        var created = await Json(await clients["manager"].PostAsJsonAsync("/api/v1/work-orders", new { task_kind = "survey", title = "Undrawn survey",
+            commune_id = commune, segment_ids = targets, assigned_to = users["owner"].UserId }), 201);
+        var order = created.GetProperty("work_order_id").GetString()!;
+        await Json(await clients["owner"].PostAsync($"/api/v1/work-orders/{order}/start", null), 200);
+
+        var refused = await Json(await clients["owner"].PostAsJsonAsync("/api/v1/sweeps", Body(Guid.NewGuid(), order: order)), 409);
+
+        var error = refused.GetProperty("error");
+        Assert.Equal("SEGMENT_GEOMETRY_REQUIRED", error.GetProperty("code").GetString());
+        Assert.Equal(order, error.GetProperty("details").GetProperty("work_order_id").GetString());
+        Assert.Equal([undrawn], error.GetProperty("details").GetProperty("segment_ids").EnumerateArray().Select(x => x.GetString()));
+        Assert.Equal(0, await Db(db => db.Set<SurveySweep>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == order)));
+    }
 
     [Fact]
     public async Task Concurrent_create_returns_one_id_and_one_audit_and_conflicting_body_is_409()

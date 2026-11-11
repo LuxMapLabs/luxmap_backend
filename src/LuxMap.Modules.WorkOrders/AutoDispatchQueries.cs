@@ -90,7 +90,9 @@ public sealed class AutoDispatchQueries(LuxMapDbContext db, TimeProvider clock, 
         var roadIds = selected.Select(f => f.SegmentId).OfType<string>().Distinct().ToArray();
         // As in WorkOrderPoleService: unfiltered geometry ONLY, for scoped poles on inter-commune roads.
         var lines = (await db.Set<RoadSegment>().AsNoTracking().IgnoreQueryFilters().Where(s => roadIds.Contains(s.SegmentId))
-            .Select(s => new { s.SegmentId, s.Geom }).ToListAsync(ct)).ToDictionary(s => s.SegmentId, s => new LengthIndexedLine(s.Geom));
+            .Select(s => new { s.SegmentId, s.Geom }).ToListAsync(ct))
+            // A segment not drawn yet (ROAD-SEGMENT-GEOM-NULL) has no line: left out, its poles project to 0 like any unplaced pole.
+            .Where(s => s.Geom is not null).ToDictionary(s => s.SegmentId, s => new LengthIndexedLine(s.Geom!));
         // Names remain scoped; another commune's road name must never leak.
         var names = await db.Set<RoadSegment>().AsNoTracking().Where(s => roadIds.Contains(s.SegmentId))
             .ToDictionaryAsync(s => s.SegmentId, s => s.SegmentName, ct);

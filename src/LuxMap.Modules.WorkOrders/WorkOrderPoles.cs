@@ -22,7 +22,10 @@ public sealed record WorkOrderPole
     public required string PoleId { get; init; }
     public required string? SegmentId { get; init; }
 
-    /// <summary>1-based place along its segment; null when the pole has no segment.</summary>
+    /// <summary>
+    /// 1-based place along its segment; null when the pole has no segment, no position yet (POLE-GEOM-NULL GN-6), or stands on a
+    /// segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-8) — there is no road to be "along".
+    /// </summary>
     public int? Position { get; init; }
 
     /// <summary><c>null</c>, with <see cref="Position"/>, for a pole that has no position yet (POLE-GEOM-NULL GN-6).</summary>
@@ -131,7 +134,8 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
         // filter, and nothing of the road except the order along it leaves this method.
         var lines = (await db.Set<RoadSegment>().AsNoTracking().IgnoreQueryFilters().Where(s => roadIds.Contains(s.SegmentId))
             .Select(s => new { s.SegmentId, s.Geom }).ToListAsync(ct))
-            .ToDictionary(s => s.SegmentId, s => new LengthIndexedLine(s.Geom));
+            // A segment not drawn yet (ROAD-SEGMENT-GEOM-NULL RG-8) has no line: left out, so its poles read as unplaced below.
+            .Where(s => s.Geom is not null).ToDictionary(s => s.SegmentId, s => new LengthIndexedLine(s.Geom!));
 
         var ordered = rows
             .Select(r => new
@@ -139,19 +143,22 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
                 Row = r,
                 SegmentOrder = r.SegmentId is { } segment && segmentIds.IndexOf(segment) is var at and >= 0 ? at : int.MaxValue,
                 Along = WorkOrderPoleOrdering.Along(r.SegmentId, r.Geom, lines),
+                // No place along a road: the pole has no position (GN-6) or its road is not drawn (RG-8).
+                Unplaced = r.Geom is null || (r.SegmentId is { } road && !lines.ContainsKey(road)),
             })
             .OrderBy(x => x.Row.SegmentId is null)
             .ThenBy(x => x.SegmentOrder).ThenBy(x => x.Row.SegmentId?.Length).ThenBy(x => x.Row.SegmentId, StringComparer.Ordinal)
-            // POLE-GEOM-NULL GN-6: a pole with no position has no place along the road — after the placed ones of its segment.
-            .ThenBy(x => x.Row.Geom is null)
-            .ThenBy(x => x.Along).ThenBy(x => x.Row.SegmentId is null || x.Row.Geom is null ? x.Row.CreatedAt : default)
+            // POLE-GEOM-NULL GN-6 / ROAD-SEGMENT-GEOM-NULL RG-8: a pole with no place along the road — no position, or a road
+            // not drawn — comes after the placed ones of its segment, in creation order.
+            .ThenBy(x => x.Unplaced)
+            .ThenBy(x => x.Along).ThenBy(x => x.Row.SegmentId is null || x.Unplaced ? x.Row.CreatedAt : default)
             .ThenBy(x => x.Row.PoleId.Length).ThenBy(x => x.Row.PoleId, StringComparer.Ordinal)
             .ToList();
 
         var positions = new Dictionary<string, int>();
         var all = ordered.Select(x =>
         {
-            int? position = x.Row.SegmentId is { } segment && x.Row.Geom is not null
+            int? position = x.Row.SegmentId is { } segment && !x.Unplaced
                 ? positions[segment] = positions.GetValueOrDefault(segment) + 1
                 : null;
             var r = x.Row;

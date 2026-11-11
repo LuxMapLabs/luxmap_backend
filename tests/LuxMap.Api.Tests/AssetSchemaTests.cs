@@ -107,6 +107,7 @@ public class AssetSchemaTests(AssetSchemaFixture fixture)
             .Select(segment => segment.Geom)
             .SingleAsync());
 
+        Assert.NotNull(read);
         Assert.Equal(Srid, read.SRID);
         Assert.Equal(3, read.NumPoints);
         Assert.Equal(written.Coordinates.Length, read.Coordinates.Length);
