@@ -1347,6 +1347,97 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.IOT.IotRegistrationAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details");
+
+                    b.Property<string>("NodeId")
+                        .HasColumnType("text")
+                        .HasColumnName("node_id");
+
+                    b.Property<string>("ServerId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("server_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_iot_registration_audit");
+
+                    b.ToTable("iot_registration_audit", (string)null);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.IotServerRegistration", b =>
+                {
+                    b.Property<string>("ServerId")
+                        .HasColumnType("text")
+                        .HasColumnName("server_id");
+
+                    b.Property<string>("BaseUrl")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("base_url");
+
+                    b.HasKey("ServerId")
+                        .HasName("pk_iot_server_registration");
+
+                    b.ToTable("iot_server_registration", (string)null);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.IotSourceRegistration", b =>
+                {
+                    b.Property<string>("NodeId")
+                        .HasColumnType("text")
+                        .HasColumnName("node_id");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("device_id");
+
+                    b.Property<string>("Profile")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("profile");
+
+                    b.Property<string>("ServerId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("server_id");
+
+                    b.HasKey("NodeId")
+                        .HasName("pk_iot_source_registration");
+
+                    b.HasIndex("ServerId", "DeviceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_iot_source_registration_server_id_device_id");
+
+                    b.ToTable("iot_source_registration", (string)null);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AccountToken", b =>
                 {
                     b.Property<long>("Id")
@@ -3897,7 +3988,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
 
-                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
+                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\r\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\r\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\r\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\r\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\r\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
 
                             t.HasCheckConstraint("ck_work_order_cancellation_request_status", "\"cancellation_request_status\" IN ('none', 'pending', 'rejected')");
 
@@ -5053,6 +5144,16 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_fault_cluster_road_segment_segment_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.IotSourceRegistration", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
+                        .WithOne()
+                        .HasForeignKey("LuxMap.Modules.IOT.IotSourceRegistration", "NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_source_registration_iot_node_node_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AccountToken", b =>

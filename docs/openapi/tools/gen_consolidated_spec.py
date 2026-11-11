@@ -321,6 +321,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics/citizen-feedback": "drift ST-13 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics": "drift BE-28 ST-1…ST-10 + BE-31 W-1…W-8 (SELF-SIGNED, nền tạm tới FW)",
@@ -343,6 +344,15 @@ SECTION = {
     "/api/v1/frames": "§2.7 + BE-15 P2c",
     "/api/v1/evidence": "§5.5 + BE-24",
 }
+
+SUMMARY.update({
+    ("post", "/api/v1/iot/servers"): "Đăng ký địa chỉ server IoT",
+    ("get", "/api/v1/iot/servers"): "Xem trạng thái các server IoT trong phạm vi truy cập",
+    ("post", "/api/v1/iot/nodes/{nodeId}/source"): "Gán nguồn đo IoT cho node đã đăng ký",
+    ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
+    ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
+    ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
+})
 
 for path, item in d["paths"].items():
     for method, op in item.items():
