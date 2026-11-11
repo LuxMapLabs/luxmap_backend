@@ -67,9 +67,17 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             Assert.Equal("IOT_SOURCE_UNAVAILABLE", json.GetProperty("error").GetProperty("code").GetString());
         }
 
-        var nodes = await manager.GetFromJsonAsync<JsonElement>($"{root}/nodes");
-        var node = Assert.Single(nodes.GetProperty("items").EnumerateArray(),
-            item => item.GetProperty("node_id").GetString() == rig.Node);
+        // Other tests can leave earlier nodes in the shared fixture database.
+        var matchingNodes = new List<JsonElement>();
+        for (var page = 1; ; page++)
+        {
+            var nodes = await manager.GetFromJsonAsync<JsonElement>($"{root}/nodes?page={page}");
+            matchingNodes.AddRange(nodes.GetProperty("items").EnumerateArray()
+                .Where(item => item.GetProperty("node_id").GetString() == rig.Node));
+            if (page * nodes.GetProperty("page_size").GetInt32() >= nodes.GetProperty("total").GetInt32())
+                break;
+        }
+        var node = Assert.Single(matchingNodes);
         Assert.Equal("source_unavailable", node.GetProperty("status").GetString());
         var servers = await manager.GetFromJsonAsync<JsonElement>($"{root}/servers");
         var visible = Assert.Single(servers.EnumerateArray(), item => item.GetProperty("server_id").GetString() == id);
