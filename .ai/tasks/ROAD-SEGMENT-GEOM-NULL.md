@@ -74,7 +74,7 @@ Tiêu chí xong — mỗi dòng kiểm chứng được bằng một lệnh:
 
 - Không hình giả: không nối đường thẳng giữa các cột, không tâm xã, không suy hình từ cột lân cận.
 - Không cho tuyến **đã có hình** quay về chưa hình (RG-2, nếu chốt theo đề xuất).
-- Không tính lại `length_m` từ hình, không đổi `length_m` thành nullable (RG-3).
+- Không tính lại `length_m` từ hình, không đổi `length_m` thành nullable (RG-3). *(12/11/2026: phần "không đổi thành nullable" bị thay thế bởi drift `ASSET-SEGMENT-LENGTH-NULL`; "không tính lại từ hình" vẫn giữ.)*
 - Không thêm / đổi giá trị enum đã publish; không đổi / bỏ field đã publish (chỉ THÊM `has_geometry`, `unrouted_pole_count`, mã lỗi, và nới nullable).
 - Không `ExecuteUpdate` / `ExecuteDelete`; mọi FK `Restrict`; không `COALESCE` thay cho chỗ cố ý để rơi (RG-4, #15, #16).
 - Không `git push`; không `git add -A` / `git add .`; không sửa `docs/api-contract-v1.1.md` (hợp nhất Contract là việc sau khi FW xác nhận).

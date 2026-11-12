@@ -464,7 +464,11 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 - **Gắn hình lần đầu là "đổi hình"** (`rerouted = old is null || !old.EqualsExact(new)`): hành lang 25 m (ASSET-SEG-2) đo mọi cột **có GPS** của tuyến. Đây là lưới an toàn của RG-11 — `PUT …/location` trên tuyến chưa hình
   **không đo** (`SetPoleLocationAsync` lọc `segment.Geom != null` rồi `SingleOrDefaultAsync`, `offSegment` null, audit `segment_distance_m: null`). Ép `rerouted = false` khi hình cũ null là lỗi im lặng: cột lệch lọt qua mãi mãi.
   FE cần biết: 409 `POLE_OFF_SEGMENT` có thể tới ở bước **vẽ tuyến**, kèm `pole_ids`.
-- **`length_m` không bị tính lại khi vẽ lần đầu** (RG-3, bẫy 4 của `spatial-map.md`); `SpatialFunctions` ghi rõ `segment.geom` nay nullable.
+- **`length_m` không bị tính lại khi vẽ lần đầu** (bẫy 4 của `spatial-map.md`); `SpatialFunctions` ghi rõ `segment.geom` nay nullable.
+- **`length_m` nullable, và chỉ được null khi chưa có hình** (ASSET-SEGMENT-LENGTH-NULL, đảo RG-3). Luật "có hình ⇒ có `length_m` ≥ 1" nằm ở **service**, không ở CHECK DB: `RequireLengthWhenDrawn` (POST / PUT, kiểm trên hình SẼ LƯU) và kiểm dòng
+  trong `PlanSegmentsAsync` (import; ô `length_m` trống **giữ** số đang lưu, như ô `geom_wkt` trống giữ hình). Đường ghi mới vào `road_segment` phải gọi cùng luật. Đọc `RoadSegment.LengthM` là `int?`: dịch `?? 0` thành "dài 0 m" là
+  số bịa — `SweepCoverage` đã coi null là "độ dài chưa biết, giữ mọi khoảng trống"; `SurveyChainageQuery` tính từ hình nên không đụng. Migration `RoadSegmentLengthNullable`: `Down()` từ chối khi còn `length_m IS NULL` (EF sinh
+  `defaultValue: 0` — phải thay, không để nó bịa số).
 - **Migration** `RoadSegmentGeomNullable`: `Up()` một `AlterColumn`, **không** Drop/CreateIndex trên `ix_road_segment_geom` (GIST nhận NULL). `Down()` từ chối khi còn `geom IS NULL` (RG-14): đó cũng là lý do **binary cũ không chạy được**
   với hàng null (`required LineString`) — vẽ hoặc xoá hết tuyến chưa hình trước khi triển khai lại bản cũ.
 - **Writer (2b) — ba chỗ dễ sai, cả ba im lặng.**

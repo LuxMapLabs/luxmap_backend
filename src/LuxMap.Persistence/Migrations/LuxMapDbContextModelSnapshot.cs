@@ -642,7 +642,7 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("geometry(LineString,4326)")
                         .HasColumnName("geom");
 
-                    b.Property<int>("LengthM")
+                    b.Property<int?>("LengthM")
                         .HasColumnType("integer")
                         .HasColumnName("length_m");
 

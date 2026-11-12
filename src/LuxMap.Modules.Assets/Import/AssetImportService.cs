@@ -93,7 +93,8 @@ public sealed class AssetImportService(
     private static IReadOnlyList<string> RequiredColumns(ImportKind kind) => kind switch
     {
         // geom_wkt is optional for segments since ROAD-SEGMENT-GEOM-NULL: a route known only from the books has no line yet.
-        ImportKind.Segments => ["external_ref", "segment_name", "road_class", "length_m", "commune_id", "data_source"],
+        // length_m too (ASSET-SEGMENT-LENGTH-NULL): it is only required of a row that has a route, which the row check below decides.
+        ImportKind.Segments => ["external_ref", "segment_name", "road_class", "commune_id", "data_source"],
         ImportKind.Cabinets => ["external_ref", "cabinet_name", "commune_id", "geom_wkt", "data_source"],
         ImportKind.Feeders => ["external_ref", "feeder_name", "commune_id"],
         // geom_wkt is optional for poles since POLE-GEOM-NULL: a pole known only from the books has no position yet.
@@ -165,21 +166,33 @@ public sealed class AssetImportService(
             var communeId = await CommuneAsync(reader, cancellationToken);
             var name = reader.Required("segment_name");
             var roadClass = reader.RequiredEnum<RoadClass>("road_class");
-            var length = reader.RequiredInt("length_m");
+            // Empty = unknown (ASSET-SEGMENT-LENGTH-NULL); a present one must still be a whole number ≥ 1.
+            var length = reader.OptionalInt("length_m", 1);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
             // Empty = no route yet (RG-2); a present but malformed one still fails the row.
             var geometry = reader.OptionalGeometry<LineString>(CsvImportRow.GeometryColumn);
+
+            existing.TryGetValue((communeId!, externalRef!), out var segment);
+
+            // A length is measured off a route, so a row that leaves the segment WITH one must carry a length — its own, or the one the
+            // segment already has (an empty cell keeps what is stored, exactly as an empty geom_wkt cell keeps the route).
+            var drawn = geometry is not null || segment?.Geom is not null;
+            if (reader.IsValid && drawn && length is null && segment?.LengthM is null)
+            {
+                reader.Fail("length_m", "Required when the segment has a route (geom_wkt), but the cell is empty.");
+            }
 
             if (!reader.IsValid)
             {
                 continue;
             }
 
-            if (existing.TryGetValue((communeId!, externalRef!), out var segment))
+            if (segment is not null)
             {
                 segment.SegmentName = name!;
                 segment.RoadClass = roadClass;
-                segment.LengthM = length;
+                // An empty cell KEEPS the length a segment already has, like the route below.
+                if (length is not null) segment.LengthM = length;
                 // An empty cell KEEPS the route a segment already has: a re-import of a sheet without lines must not wipe what was drawn.
                 if (geometry is not null) segment.Geom = geometry;
                 segment.DataSource = dataSource;

@@ -51,6 +51,17 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="asset-segment-length-null">
+    <strong>ASSET-SEGMENT-LENGTH-NULL — <code>length_m</code> của tuyến null khi chưa có hình, 12/11/2026</strong>
+    <span class="tag t-next">Mỹ chốt theo FE (12/11) · đảo RG-3 · code xong, chưa push · migration chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6</span>
+    <p>FE tạo tuyến ở bước "chưa có GPS" nên không có gì để đo; bắt gửi số ≥ 1 thì thành số giả trong DB, hiện ở danh sách tuyến và thống kê.
+    Migration <code>RoadSegmentLengthNullable</code> (một <code>AlterColumn</code>; <code>Down()</code> từ chối khi còn <code>length_m IS NULL</code>, không bịa 0).
+    <code>POST</code> / <code>PUT /assets/segments</code>: <code>length_m</code> vắng / null khi không có <code>geom_wkt</code>; có hình mà thiếu ⇒ 400 <code>length_m</code>; số gửi lên vẫn ≥ 1.
+    Import: <code>length_m</code> hết là cột bắt buộc, chỉ bắt ở dòng có <code>geom_wkt</code>; ô trống giữ số đang lưu. List / detail / bundle trả <code>length_m: null</code> (nới schema, FE phải chịu null).
+    Không đổi: hành lang 25 m, tuyến đã vẽ không quay về chưa vẽ, <code>length_m</code> không tính từ hình. Test: 3 ca ghi + 1 ca rollback migration + bundle; phá thử 2 chốt ⇒ 3 test đỏ.
+    Drift <code>ASSET-SEGMENT-LENGTH-NULL</code> (SELF-SIGNED), trap ở <code>traps/assets.md</code>.</p>
+    <p class="muted">Nhánh <code>feat/ASSET-segment-length-nullable</code> (từ <code>origin/dev</code>). <b>Còn:</b> push + PR vào <code>dev</code> khi Mỹ cho; báo WP5 / WP6; OpenAPI cần CODEOWNERS.</p>
+  </div>
   <div class="card" id="road-segment-geom-null">
     <strong>ROAD-SEGMENT-GEOM-NULL — PR 2a (đã merge #230) + PR 2b (writer), 11/11/2026</strong>
     <span class="tag t-next">Mỹ đã duyệt RG-1…RG-15 (11/11) · 2a merge <code>8471bb8</code> · PR 2b code xong, chờ Mỹ cho push · migration chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6</span>

@@ -56,8 +56,13 @@ public class RoadSegment : ICommuneScoped, IExternallyReferenced, IUpdateStamped
     /// Length in metres, STORED rather than derived. It is a published property of section 2.3, and
     /// recomputing <c>ST_Length</c> on every bbox request would be wasted work; the mock values agree
     /// with the geometry to within a metre. BE-10 owns the distance convention that keeps it honest.
+    /// <para>
+    /// Null (ASSET-SEGMENT-LENGTH-NULL, reverses RG-3) only while <see cref="Geom"/> is null: a length is measured off a drawn line, so a
+    /// segment with none has nothing to measure and must not carry a made-up number. A drawn segment always has one (≥ 1) — enforced in
+    /// the writers, not by a CHECK.
+    /// </para>
     /// </summary>
-    public int LengthM { get; set; }
+    public int? LengthM { get; set; }
 
     /// <summary>
     /// <c>geometry(LineString, 4326)</c>. Null (ROAD-SEGMENT-GEOM-NULL, RG-1) means "on the books, not yet

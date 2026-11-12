@@ -251,7 +251,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | `external_ref` | **Có** | text | Mã tuyến của đơn vị quản lý. `poles.csv` trỏ về bằng `segment_external_ref`. Trùng trong cùng xã → **UPDATE** |
 | `segment_name` | **Có** | text | |
 | `road_class` | **Có** | enum | `inter_commune` · `inter_village` — `ck_road_segment_road_class` |
-| `length_m` | **Có** | integer | Mét. **Giá trị KHAI BÁO**, không tính lại từ `geom_wkt` |
+| `length_m` | Có **nếu có `geom_wkt`** | integer ≥ 1 | Mét. **Giá trị KHAI BÁO**, không tính lại từ `geom_wkt`. Để trống / bỏ cột khi tuyến chưa có hình |
 | `geom_wkt` | Không | LineString | `geometry(LineString,4326)`, **nullable** (ROAD-SEGMENT-GEOM-NULL): để trống hoặc bỏ hẳn cột ⇒ tuyến chưa có hình — xem mục *Tuyến chưa có hình* bên dưới |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_road_segment_data_source` |
@@ -260,7 +260,8 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 
 Xã có tuyến mới chỉ có trong sổ sách: nhập tuyến + cột trước, tạo lịch công tác theo tuyến, ra thực địa lấy GPS sau.
 
-- `geom_wkt` để trống hoặc bỏ hẳn cột ⇒ tuyến mới được tạo **chưa có hình** (`has_geometry: false`, `geom_wkt: null` ở API). Tuyến đó **không lên bản đồ** (`/map/segments`), nhưng vẫn gán được `pole_ids`, vẫn có lịch tuần và phiếu khảo sát. `length_m` vẫn **bắt buộc** (giá trị khai báo).
+- `geom_wkt` để trống hoặc bỏ hẳn cột ⇒ tuyến mới được tạo **chưa có hình** (`has_geometry: false`, `geom_wkt: null` ở API). Tuyến đó **không lên bản đồ** (`/map/segments`), nhưng vẫn gán được `pole_ids`, vẫn có lịch tuần và phiếu khảo sát. `length_m` để trống được **khi không có `geom_wkt`** (ASSET-SEGMENT-LENGTH-NULL: chưa có hình thì chưa có gì để đo); dòng có `geom_wkt` thì `length_m` **bắt buộc**, số nguyên ≥ 1.
+- Nạp lại file với ô `length_m` trống **giữ** số đang lưu của tuyến đã có.
 - Nạp lại file với ô trống **không** xoá hình của tuyến đã có — một tuyến đã có hình không quay về "chưa có". Muốn đổi hình: điền WKT mới, hoặc `PUT /assets/segments/{id}`.
 - Vẽ hình lần đầu: điền WKT rồi nạp lại file (trùng `external_ref` ⇒ cập nhật), hoặc `PUT` kèm `geom_wkt`. ⚠️ Import **không** đo hành lang cột (khác `PUT`, vốn trả 409 `POLE_OFF_SEGMENT` khi hình mới bỏ sót cột đã có GPS).
 - **Khảo sát đêm không bắt đầu được trên tuyến chưa có hình**: `POST /sweeps` trả 409 `SEGMENT_GEOMETRY_REQUIRED` cho tới khi tuyến được vẽ.

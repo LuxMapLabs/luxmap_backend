@@ -222,26 +222,149 @@ public sealed class SegmentWithoutGeometryWriteTests(AssetImportFixture fixture)
         Assert.DoesNotContain($"{tag}-B2", stored.Keys);
     }
 
+    /// <summary>ASSET-SEGMENT-LENGTH-NULL (reverses RG-3): a length is measured off a line, so it is optional exactly while there is none.</summary>
+    [Fact]
+    public async Task Create_takes_no_length_for_an_undrawn_segment_but_requires_one_with_a_route()
+    {
+        var client = await fixture.ManagerClientAsync();
+
+        var absent = IdOf(await Post(client, Create(wkt: null, length: Omit)));
+        var explicitNull = IdOf(await Post(client, Create(wkt: null, length: Null)));
+        foreach (var id in new[] { absent, explicitNull })
+        {
+            Assert.Null(await StoredLength(id));
+            Assert.Equal(JsonValueKind.Null, (await Get(client, $"{Segments}/{id}")).GetProperty("segment").GetProperty("length_m").ValueKind);
+        }
+        var listed = (await Get(client, $"{Segments}?missing_geometry=true&page_size=200")).GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("segment_id").GetString() == absent);
+        Assert.Equal(JsonValueKind.Null, listed.GetProperty("length_m").ValueKind);
+
+        // A line with no length to go with it is a 400 on length_m, and nothing is stored.
+        foreach (var length in new object?[] { Omit, Null })
+        {
+            var refused = await Post(client, Create(wkt: Line(), length: length));
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            Assert.Equal("VALIDATION_FAILED", await ErrorCode(refused));
+            Assert.Equal("length_m", JsonDocument.Parse(await refused.Content.ReadAsStringAsync()).RootElement
+                .GetProperty("error").GetProperty("details").GetProperty("field").GetString());
+        }
+
+        // A number that does arrive is still a whole metre or more, drawn or not.
+        foreach (var bad in new object?[] { 0, -5 })
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await Post(client, Create(wkt: null, length: bad))).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await Post(client, Create(wkt: Line(), length: bad))).StatusCode);
+        }
+
+        var drawn = IdOf(await Post(client, Create(wkt: Line(), length: 1234)));
+        Assert.Equal(1234, await StoredLength(drawn));
+    }
+
+    [Fact]
+    public async Task Update_requires_a_length_once_the_segment_has_a_route_and_a_later_PUT_keeps_membership_when_pole_ids_is_absent()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var pole = await FreePole(offsetM: null);
+        var undrawn = IdOf(await Post(client, Create(wkt: null, length: Omit, poleIds: [pole])));
+
+        // Still undrawn: no length asked for, none stored.
+        Assert.Equal(HttpStatusCode.NoContent, (await Put(client, undrawn, Update(wkt: null, length: Omit))).StatusCode);
+        Assert.Null(await StoredLength(undrawn));
+
+        // Drawing it for the first time needs the length; without it the whole PUT is refused and the segment stays undrawn.
+        foreach (var length in new object?[] { Omit, Null })
+        {
+            var refused = await Put(client, undrawn, Update(wkt: Line(), length: length));
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            Assert.Equal("VALIDATION_FAILED", await ErrorCode(refused));
+        }
+        Assert.False(await HasRoute(undrawn));
+        Assert.Null(await StoredLength(undrawn));
+
+        // The first line, measured by the client, with pole_ids absent: membership is untouched.
+        Assert.Equal(HttpStatusCode.NoContent, (await Put(client, undrawn, Update(wkt: Line(), length: 1111))).StatusCode);
+        Assert.Equal(1111, await StoredLength(undrawn));
+        Assert.Equal(undrawn, await StoredSegment(pole));
+
+        // Once drawn the length stays required: a PUT that leaves it out is a 400 and changes nothing.
+        var drawn = await Put(client, undrawn, Update(wkt: Line(), length: Omit));
+        Assert.Equal(HttpStatusCode.BadRequest, drawn.StatusCode);
+        Assert.Equal(1111, await StoredLength(undrawn));
+        Assert.Equal(HttpStatusCode.BadRequest, (await Put(client, undrawn, Update(wkt: Line(), length: 0))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Import_needs_length_m_only_on_a_row_that_leaves_the_segment_with_a_route_and_an_empty_cell_keeps_what_is_stored()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var tag = Tag();
+        var commune = fixture.CommuneId;
+        const string header = "external_ref,segment_name,road_class,length_m,geom_wkt,commune_id,data_source";
+
+        var first = await AssetImportTests.ImportAsync(client, "segments", "segments.csv", header
+            + $"\n{tag}-S1,Books only,inter_village,,,{commune},public_imagery"
+            + $"\n{tag}-S2,Drawn with length,inter_village,900,\"{Line()}\",{commune},public_imagery"
+            + $"\n{tag}-S3,Drawn no length,inter_village,,\"{Line()}\",{commune},public_imagery"
+            + $"\n{tag}-S4,Zero,inter_village,0,,{commune},public_imagery"
+            + $"\n{tag}-S5,Text,inter_village,abc,,{commune},public_imagery");
+        Assert.Equal(2, first.GetProperty("inserted").GetInt32());
+        Assert.Equal(3, first.GetProperty("failed").GetInt32());
+        Assert.All(first.GetProperty("rows").EnumerateArray(), row => Assert.Equal("length_m", row.GetProperty("column").GetString()));
+        var stored = await StoredLengths(tag);
+        Assert.Equal(new int?[] { null, 900 }, new[] { stored[$"{tag}-S1"], stored[$"{tag}-S2"] });
+        Assert.DoesNotContain($"{tag}-S3", stored.Keys);
+
+        // Re-import with empty cells: S2 keeps its length (and its line); S1 draws a line and so now needs one — its row fails without.
+        var second = await AssetImportTests.ImportAsync(client, "segments", "segments.csv", header
+            + $"\n{tag}-S2,Renamed,inter_village,,,{commune},public_imagery"
+            + $"\n{tag}-S1,Books only,inter_village,,\"{Line()}\",{commune},public_imagery");
+        Assert.Equal(1, second.GetProperty("updated").GetInt32());
+        Assert.Equal(1, second.GetProperty("failed").GetInt32());
+        stored = await StoredLengths(tag);
+        Assert.Equal(new int?[] { null, 900 }, new[] { stored[$"{tag}-S1"], stored[$"{tag}-S2"] });
+
+        var third = await AssetImportTests.ImportAsync(client, "segments", "segments.csv", header
+            + $"\n{tag}-S1,Books only,inter_village,640,\"{Line()}\",{commune},public_imagery");
+        Assert.Equal(0, third.GetProperty("failed").GetInt32());
+        Assert.Equal(640, (await StoredLengths(tag))[$"{tag}-S1"]);
+
+        // A file with neither length_m nor geom_wkt is a valid books-only segments file.
+        var bare = await AssetImportTests.ImportAsync(client, "segments", "segments.csv",
+            $"external_ref,segment_name,road_class,commune_id,data_source\n{tag}-S6,Bare,inter_village,{commune},public_imagery");
+        Assert.Equal(1, bare.GetProperty("inserted").GetInt32());
+        Assert.Null((await StoredLengths(tag))[$"{tag}-S6"]);
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────────────
 
-    private Dictionary<string, object?> Create(string? wkt = null, bool includeWkt = true, string[]? poleIds = null)
+    /// <summary>Marks a body field to be left out of the JSON altogether, as opposed to sent as <c>null</c>.</summary>
+    private const string Omit = "<omit>";
+
+    /// <summary>An explicit JSON <c>null</c>; a plain C# <c>null</c> argument means "the usual 1000".</summary>
+    private const string Null = "<null>";
+
+    private static object? LengthFrom(object? length) => length switch { null => 1000, Null => null, _ => length };
+
+    private Dictionary<string, object?> Create(string? wkt = null, bool includeWkt = true, string[]? poleIds = null, object? length = null)
     {
         var body = new Dictionary<string, object?>
         {
-            ["segment_name"] = "write probe road", ["road_class"] = "inter_village", ["length_m"] = 1000,
+            ["segment_name"] = "write probe road", ["road_class"] = "inter_village",
             ["commune_id"] = fixture.CommuneId, ["data_source"] = "simulated",
         };
+        if (length is not Omit) body["length_m"] = LengthFrom(length);
         if (includeWkt) body["geom_wkt"] = wkt;
         if (poleIds is not null) body["pole_ids"] = poleIds;
         return body;
     }
 
-    private static Dictionary<string, object?> Update(string? wkt = null, bool includeWkt = true, string[]? poleIds = null)
+    private static Dictionary<string, object?> Update(string? wkt = null, bool includeWkt = true, string[]? poleIds = null, object? length = null)
     {
         var body = new Dictionary<string, object?>
         {
-            ["segment_name"] = "write probe road", ["road_class"] = "inter_village", ["length_m"] = 1000, ["data_source"] = "simulated",
+            ["segment_name"] = "write probe road", ["road_class"] = "inter_village", ["data_source"] = "simulated",
         };
+        if (length is not Omit) body["length_m"] = LengthFrom(length);
         if (includeWkt) body["geom_wkt"] = wkt;
         if (poleIds is not null) body["pole_ids"] = poleIds;
         return body;
@@ -299,6 +422,13 @@ public sealed class SegmentWithoutGeometryWriteTests(AssetImportFixture fixture)
 
     private Task<bool> HasRoute(string segment)
         => fixture.QueryAsync(db => db.Set<RoadSegment>().IgnoreQueryFilters().AnyAsync(s => s.SegmentId == segment && s.Geom != null));
+
+    private Task<int?> StoredLength(string segment)
+        => fixture.QueryAsync(db => db.Set<RoadSegment>().IgnoreQueryFilters().Where(s => s.SegmentId == segment).Select(s => s.LengthM).SingleAsync());
+
+    private Task<Dictionary<string, int?>> StoredLengths(string tag)
+        => fixture.QueryAsync(async db => await db.Set<RoadSegment>().IgnoreQueryFilters().Where(s => s.ExternalRef!.StartsWith(tag))
+            .ToDictionaryAsync(s => s.ExternalRef!, s => s.LengthM));
 
     private Task<string?> StoredSegment(string pole)
         => fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().Where(p => p.PoleId == pole).Select(p => p.SegmentId).SingleAsync());

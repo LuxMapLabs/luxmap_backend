@@ -18777,7 +18777,6 @@
         "required": [
           "commune_id",
           "data_source",
-          "length_m",
           "road_class",
           "segment_name"
         ],
@@ -18800,7 +18799,8 @@
             "maximum": 2147483647,
             "minimum": 1,
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "geom_wkt": {
             "type": "string",
@@ -22673,7 +22673,8 @@
           },
           "length_m": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "commune_id": {
             "type": "string"
@@ -22757,7 +22758,8 @@
           "length_m": {
             "type": "integer",
             "format": "int32",
-            "description": "Giá trị KHAI BÁO, không dẫn xuất từ ST_Length"
+            "nullable": true,
+            "description": "Giá trị KHAI BÁO, không dẫn xuất từ ST_Length. null khi tuyến chưa có hình (ASSET-SEGMENT-LENGTH-NULL) — chỉ bundle offline gặp"
           },
           "pole_count": {
             "type": "integer",
@@ -24201,7 +24203,6 @@
       "UpdateSegmentRequest": {
         "required": [
           "data_source",
-          "length_m",
           "road_class",
           "segment_name"
         ],
@@ -24224,7 +24225,8 @@
             "maximum": 2147483647,
             "minimum": 1,
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "geom_wkt": {
             "type": "string",

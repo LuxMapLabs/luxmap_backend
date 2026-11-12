@@ -145,7 +145,7 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
             var road = new RoadSegment { CommuneId = home, SegmentName = "Sync undrawn road", RoadClass = RoadClass.InterVillage,
-                DataSource = DataSource.Simulated, LengthM = 250 };
+                DataSource = DataSource.Simulated, LengthM = null };
             db.Add(road); await db.SaveChangesAsync();
             db.Add(new Pole { CommuneId = home, SegmentId = road.SegmentId, DataSource = DataSource.Simulated, Geom = new Point(108.5, 16) { SRID = 4326 } });
             await db.SaveChangesAsync();
@@ -160,7 +160,8 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
         var features = bundle.GetProperty("segments").GetProperty("features").EnumerateArray().ToArray();
         var feature = features.Single(f => f.GetProperty("properties").GetProperty("segment_id").GetString() == undrawn);
         Assert.Equal(JsonValueKind.Null, feature.GetProperty("geometry").ValueKind);
-        Assert.Equal(250, feature.GetProperty("properties").GetProperty("length_m").GetInt32());
+        // ASSET-SEGMENT-LENGTH-NULL: nothing to measure on a road with no line, so the bundle says null rather than a number nobody measured.
+        Assert.Equal(JsonValueKind.Null, feature.GetProperty("properties").GetProperty("length_m").ValueKind);
         Assert.Equal(1, feature.GetProperty("properties").GetProperty("pole_count").GetInt32());
         var drawn = features.Single(f => f.GetProperty("properties").GetProperty("segment_id").GetString() == road1);
         Assert.Equal("LineString", drawn.GetProperty("geometry").GetProperty("type").GetString());

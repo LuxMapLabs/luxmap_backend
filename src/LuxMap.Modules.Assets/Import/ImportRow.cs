@@ -153,6 +153,24 @@ internal sealed class ImportRowReader(IImportRow row, List<ImportRowError> error
         return value;
     }
 
+    /// <summary>An empty cell (or a file without the column) is null; anything else must be a whole number of at least <paramref name="min"/>.</summary>
+    public int? OptionalInt(string column, int min)
+    {
+        var text = row[column];
+        if (text is null)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) || value < min)
+        {
+            Fail(column, $"'{text}' is not a whole number of at least {min}.");
+            return null;
+        }
+
+        return value;
+    }
+
     /// <summary>An empty cell (or a file without the column) is <paramref name="fallback"/>; anything else must be a whole number in range.</summary>
     public int OptionalInt(string column, int fallback, int min, int max)
     {

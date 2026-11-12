@@ -106,7 +106,8 @@ public sealed record SegmentProperties
     /// BE-10 rule 4. Deriving it would shift the number the front end shows by roughly 73 ppm — the
     /// UTM grid scale factor — for a reason nobody could explain from the screen.
     /// </remarks>
-    public required double LengthM { get; init; }
+    /// <summary>Null for an undrawn segment — only the offline bundle reaches one.</summary>
+    public required double? LengthM { get; init; }
 
     public required int PoleCount { get; init; }
 

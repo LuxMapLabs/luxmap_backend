@@ -265,14 +265,17 @@ public sealed class AssetCrudService(
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
         await RejectDuplicateRefAsync<RoadSegment>(communeId, request.ExternalRef, ct);
 
+        // Absent / null = a segment from the books with no route yet (ROAD-SEGMENT-GEOM-NULL RG-2); blank or malformed is still a 400.
+        var geometry = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt);
+        RequireLengthWhenDrawn(geometry, request.LengthM);
+
         var segment = new RoadSegment
         {
             ExternalRef = request.ExternalRef,
             SegmentName = request.SegmentName!,
             RoadClass = request.RoadClass!.Value,
-            LengthM = request.LengthM!.Value,
-            // Absent / null = a segment from the books with no route yet (ROAD-SEGMENT-GEOM-NULL RG-2); blank or malformed is still a 400.
-            Geom = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt),
+            LengthM = request.LengthM,
+            Geom = geometry,
             CommuneId = communeId,
             DataSource = request.DataSource!.Value,
         };
@@ -442,7 +445,7 @@ public sealed class AssetCrudService(
         segment.ExternalRef = request.ExternalRef;
         segment.SegmentName = request.SegmentName!;
         segment.RoadClass = request.RoadClass!.Value;
-        segment.LengthM = request.LengthM!.Value;
+        segment.LengthM = request.LengthM;
         // RG-2: a segment that has a route keeps one — absent / null is a 400; a segment without one stays undrawn unless a WKT arrives.
         // Read BEFORE any assignment: the 400 must leave the tracked row untouched.
         var geometry = request.GeomWkt is null ? null : Read<LineString>(request.GeomWkt);
@@ -452,6 +455,9 @@ public sealed class AssetCrudService(
                 "geom_wkt is required for a segment that already has a route.",
                 new Dictionary<string, object?> { ["field"] = "geom_wkt" });
         }
+
+        // Only a drawn segment has something to measure; a length-less PUT of an undrawn one stays undrawn and length-less.
+        RequireLengthWhenDrawn(geometry, request.LengthM);
 
         // Drawing a segment for the first time (null → line) IS a change of route, so the corridor is measured then (ASSET-SEG-2);
         // only an identical line, or no line at all, skips it. An undrawn segment taking poles (RG-13) has nothing to measure against.
@@ -464,6 +470,20 @@ public sealed class AssetCrudService(
         await dbContext.SaveChangesAsync(ct);
         if (rerouted) await RequirePolesInCorridorAsync(segment, ct);
         await transaction.CommitAsync(ct);
+    }
+
+    /// <summary>
+    /// ASSET-SEGMENT-LENGTH-NULL: a declared length is measured off a drawn line, so it is optional exactly when there is no line.
+    /// 400 <c>VALIDATION_FAILED</c> on <c>length_m</c> when a segment is being saved WITH a route and no length.
+    /// </summary>
+    private static void RequireLengthWhenDrawn(LineString? geometry, int? lengthM)
+    {
+        if (geometry is not null && lengthM is null)
+        {
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "length_m is required for a segment that has a route.",
+                new Dictionary<string, object?> { ["field"] = "length_m" });
+        }
     }
 
     /// <summary>
