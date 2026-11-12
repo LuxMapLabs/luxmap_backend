@@ -23,6 +23,34 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### IOT-DIAGNOSTICS — đăng ký và chẩn đoán nguồn đo IoT (11/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | Ghi nhận sáu route IoT của PR #213 để review trước khi hợp nhất Contract. |
+| **Decision maker** | Chờ maintainer duyệt PR #213. |
+| **Date** | 11/11/2026 |
+| **Scope** | Backend và web testbed; chưa nằm trong Contract hoặc tasks-backend. |
+
+| Endpoint | Capability | Hành vi |
+|---|---|---|
+| `GET /api/v1/iot/servers` | `ReadNetwork` | Chỉ hiện server có node thuộc xã được xem. `online` khi broker nhận heartbeat của gateway trong 30 giây gần nhất, `offline` khi chưa nhận hoặc đã quá hạn. `unconfigured` khi chưa xác định được gateway duy nhất từ ánh xạ thiết bị, `broker_down` khi broker dừng và `unreachable` khi nguồn trạng thái không truy cập được hoặc trả dữ liệu không hợp lệ. |
+| `POST /api/v1/iot/nodes/{nodeId}/command` | `ControlLighting` | Gửi ON, OFF hoặc AUTO qua nguồn IoT đã đăng ký của node trong phạm vi xã. Trả 202 khi nguồn chấp nhận lệnh. |
+| `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại và ACK của node trong phạm vi xã. |
+| `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
+| `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
+| `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageSettings` | Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW; trạng thái `online`, `offline`, `no_data`. |
+| `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | `normal`, `anomaly`, `stale`, `no_data`; chẩn đoán mất áp riêng và tùy chọn hiệu chuẩn 10 bóng. |
+
+- Hai GET chi tiết trả 404 nếu node không tồn tại hoặc ngoài xã, và 503 `IOT_SOURCE_UNAVAILABLE` nếu cấu hình không dùng được hoặc upstream không trả JSON hợp lệ.
+- `unconfigured` là chưa có ánh xạ hợp lệ; `no_data` là đã cấu hình nhưng nguồn chưa có mẫu; `source_unavailable` là nguồn lỗi hoặc hết ngân sách truy vấn của trang. Danh sách node giới hạn tổng thời gian chờ upstream 5 giây.
+- Origin phải khớp chính xác scheme/host/port trong `IotDiagnostics:AllowedOrigins` do bên triển khai cấp. Mặc định danh sách rỗng. Chỉ allowlist origin do bên triển khai kiểm soát, bao gồm DNS nếu dùng hostname; client tắt redirect và proxy.
+- Đăng ký mới được ghi vào PostgreSQL cùng người tạo, thời điểm UTC và correlation ID. Ánh xạ khai sẵn trong cấu hình vẫn đọc được nếu origin đã được allowlist. Triển khai dùng cấu hình từ bản thử cũ cần chuyển ánh xạ vào DB hoặc cấp qua cấu hình tĩnh.
+- Registry thiết bị và relay vẫn do Telemetry sở hữu. Module chẩn đoán đọc qua nguồn HTTP của testbed. `relay_no` mặc định 1 và có thể chọn 1–32. `use_ten_lamp_calibration` mặc định tắt; khi bật, dùng 25 mẫu / 15 phiếu cho cụm 10 bóng đã hiệu chuẩn, và `voltage_loss` không tính là thiếu bóng.
+
+
+
 ### SURVEY-SCHED-1 — lịch khảo sát định kỳ theo tuần (09/11/2026)
 
 | Trường | Nội dung |
