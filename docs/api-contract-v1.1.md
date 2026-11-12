@@ -20,7 +20,7 @@
 **v1.18:** 23/10/2026 (BE-34 — `/admin/artifact-versions`, registry phiên bản + "kết quả nào do phiên bản nào"; firmware thiết bị qua heartbeat) ·
 **v1.19:** 26/10/2026 (WO-CANCEL-REQUEST — xin hủy / từ chối lịch, SELF-SIGNED) ·
 **v1.20:** 26/10/2026 (WO-REASSIGN-DATE — giao lại kèm ngày khác, SELF-SIGNED) ·
-**v1.21:** 28/10/2026 (ASSET-PHOTOS phần B — trạng thái mạch, SELF-SIGNED; phần A, ảnh tài sản, chưa hiện thực) ·
+**v1.21:** 28/10/2026 (ASSET-PHOTOS — trạng thái mạch và ảnh tài sản, SELF-SIGNED; phần A hiện thực 12/11/2026) ·
 **v1.22:** 29/10/2026 (ACCOUNT-ONE-COMMUNE — mỗi tài khoản đúng một xã, trừ Quản trị hệ thống; ACCT-1).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
@@ -30,8 +30,8 @@ tài liệu này: đổi tên làm chết mọi liên kết và mọi lệnh đ�
 `luxmap-v1.5.json` đã làm hỏng lệnh lint trong `README.md` và để `CLAUDE.md` trỏ vào file không còn
 tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải phiên bản Contract hiện hành.
 
-**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (141 operation, cả 141
-`implemented` — đếm lại ở v1.19 từ output của script sinh; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
+**Bản máy đọc:** `docs/openapi/luxmap-v1.5.json` — khớp 1-1 với tài liệu này (176 operation, cả 176
+`implemented` — đếm lại 12/11/2026 sau ASSET-PHOTOS phần A; mỗi operation nghiệp vụ mang `x-luxmap-capability` và
 `x-luxmap-roles` sinh từ code), sinh bằng `docs/openapi/tools/gen_consolidated_spec.py` từ
 `docs/openapi/luxmap-v1.json` (spec xuất từ code, **không sửa tay**) cộng các endpoint chưa có code.
 
@@ -92,6 +92,8 @@ tồn tại. Số trong tên là **phiên bản nó ra đời**, không phải p
 | `ExternalUnit` | `EXT` | `EXT-001` | `^EXT-[0-9]{3,}$` |
 | `AppUser` | `USR` | `USR-001` | `^USR-[0-9]{3,}$` |
 | Cụm sự cố (`cluster_id`) | `CLS` | `CLS-001` | `^CLS-[0-9]{3,}$` |
+| `PoleAssetPhoto` (v1.21) | `PAP` | `PAP-000001` | `^PAP-[0-9]{6,}$` |
+| `CabinetAssetPhoto` (v1.21) | `CAP` | `CAP-000001` | `^CAP-[0-9]{6,}$` |
 | `Notification` (v1.10) | `NTF` | `NTF-000001` | `^NTF-[0-9]{6,}$` |
 
 - **Số chữ số là TỐI THIỂU, không cố định.** `POLE-9999` kế tiếp là `POLE-10000`. Client **không** parse,
@@ -144,6 +146,7 @@ client **không** parse.
 | `ORIGIN_NOT_ALLOWED` | 403 | `Origin` thiếu / lạ / `null` — chỉ nhóm `/auth/web/*` |
 | `POLE_NOT_FOUND` | 404 | `pole_id` không tồn tại **hoặc ngoài phạm vi** — cùng một câu trả lời |
 | `ASSET_NOT_FOUND` | 404 | Tài sản (`/assets/…`) không tồn tại **hoặc ngoài phạm vi** |
+| `ASSET_PHOTO_NOT_FOUND` | 404 | Ảnh tài sản sai cha, ngoài xã hoặc đã ẩn (v1.21, APH-1) |
 | `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
 | `METHOD_NOT_ALLOWED` | 405 | Sai method trên route có thật |
 | `INVALID_ACCOUNT_TOKEN` | 400 | Link mời / đặt lại mật khẩu không tồn tại, hết hạn hoặc đã dùng — một mã (v1.8, mục 4.8) |
@@ -157,6 +160,7 @@ client **không** parse.
 | `ACCOUNT_ALREADY_ACTIVE` | 409 | Gửi lại lời mời cho tài khoản đã đặt mật khẩu (v1.8) |
 | `RATE_LIMITED` | 429 | Quá số lần cho phép từ một địa chỉ (`POST /auth/password/forgot`); header `Retry-After` (v1.8) |
 | `EXTERNAL_REF_TAKEN` | 409 | `(commune_id, external_ref)` đã có |
+| `ASSET_PHOTO_LIMIT_REACHED` | 409 | Tài sản đã có 10 ảnh chưa ẩn (v1.21, APH-1) |
 | `ASSET_IN_USE` | 409 | `DELETE` bị khoá ngoại từ chối; `details.constraint`, `details.table` |
 | `CROSS_COMMUNE_REFERENCE` | 409 | Gắn cột vào mạch điện **khác xã** với cột (v1.4, D-5) |
 | `POLE_HAS_ACTIVE_FIXTURE` | 409 | Cột đã có bóng đang dùng; ngừng dùng trước (v1.4, D-11) |
@@ -201,6 +205,9 @@ nào (`calibration_rig` hay giá trị mới) còn mở: `[OPEN → O-9]`.
 
 ---
 
+Ảnh tài sản lưu snapshot `commune_id` / `data_source` từ cột hoặc tủ **lúc upload**. Đổi nguồn cha sau đó
+không viết lại nguồn ảnh đã nhận; nguồn ảnh không nhận từ client và không emit vào properties bản đồ.
+
 ## 2. Phân quyền — theo địa bàn và theo vai trò
 
 Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3.2.c (v1.7, D-R6). JWT mang claim
@@ -244,7 +251,8 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
 |---|---|---|
 | `ReadNetwork` | superior, manager, field_engineer, system_admin | mọi `GET /assets/*`, `GET /poles`, `GET /segments` |
 | `ReadLuxReadings` | superior, manager, field_engineer, system_admin | `GET /lux-readings`, `GET /lux-readings/poles/{id}` |
-| `ManageAssets` | **manager** | mọi `POST`/`PUT`/`DELETE` `/assets/*` và `POST /assets/import/{kind}`, **trừ** ghi chú cột |
+| `ManageAssets` | **manager** | mọi `POST`/`PUT`/`DELETE` `/assets/*` và `POST /assets/import/{kind}`, **trừ** ghi chú cột và upload ảnh tài sản |
+| `UploadAssetPhotos` | **manager, field_engineer** | `POST /assets/poles/{pole_id}/photos`, `POST /assets/cabinets/{cabinet_id}/photos` (v1.21, APH-1) |
 | `EditPoleNotes` | **manager, field_engineer** | `PUT /assets/poles/{poleId}/note` — ghi chú của kỹ sư trên cột (v1.9, mục 5.3) |
 | `RecordLuxReading` | **field_engineer** | `POST /lux-readings` |
 | `ControlLighting` | **manager** | chưa có endpoint — điều khiển ON/OFF/AUTO thiết bị được hỗ trợ (testbed demo), mục 5.6 |
@@ -265,6 +273,11 @@ Bốn vai trò đăng nhập theo **Phiếu đăng ký FA26SE222 v1.2**, mục 3
   từ DB).
 
 ---
+
+**Ngoại lệ ảnh dưới `/assets` (v1.21, SELF-SIGNED):** `UploadAssetPhotos` (`cap:upload_asset_photos`)
+chỉ `[manager, field_engineer]`; kỹ sư được POST ảnh cột/tủ mà không được quyền `ManageAssets`.
+Đọc list/original/thumbnail dùng `ReadNetwork` (bốn vai trò); ẩn ảnh dùng `ManageAssets` (chỉ manager).
+Mọi lookup vẫn scope theo xã; system_admin chỉ đọc.
 
 ## 3. Mô hình miền, enum, máy trạng thái
 
@@ -314,9 +327,18 @@ cố; `resolved` = đã sửa; `verified` = đã nghiệm thu.
 
 ### 3.3 Thực thể và quy tắc dữ liệu
 
+**Ảnh tài sản (v1.21, APH-1, SELF-SIGNED).** `pole_asset_photo` / `cabinet_asset_photo` là gallery nhận dạng
+cột/tủ; khác `work_order_pole_photo` (ảnh nghiệp vụ), survey frame, ảnh fault và repair evidence.
+`DELETE` ảnh chỉ **ẩn**: giữ row, key và bytes; chưa có purge/restore. Ảnh ẩn không được list/mở qua API,
+không tính quota/bìa, nhưng vẫn tính storage monitoring. Cột/tủ đã từng có ảnh **không xoá được nữa**, kể cả
+mọi ảnh đã ẩn: `409 ASSET_IN_USE` (FK Restrict). WP5 phải giải thích trước upload đầu tiên.
+Dời cột, đổi external_ref, import upsert hay thay bóng không chuyển/xoá ảnh. Ảnh không tạo fault,
+không gọi AI và không thay trạng thái đèn. Upload/ẩn mỗi thao tác ghi một audit cùng transaction.
+
 `Pole` · `Fixture` · `RoadSegment` · `Feeder` · `IotNode` · `TelemetryReading` · `SurveySweep` ·
 `SurveyFrame` · `Detection` · `LuminanceBaseline` · `LuxReading` · `Fault` · `FaultCluster` ·
-`WorkOrder` · `ExternalUnit` · `RepairEvidence` · `AdministrativeUnit` · `AppUser` · `RefreshToken`.
+`WorkOrder` · `ExternalUnit` · `RepairEvidence` · `AdministrativeUnit` · `AppUser` · `RefreshToken` ·
+`PoleAssetPhoto` · `CabinetAssetPhoto`.
 
 - `Pole` và `Fixture` tách riêng; trạng thái thuộc **vị trí cột** (`pole_current_status`), bóng không có
   trạng thái. **Một cột có tối đa MỘT bóng đang dùng** (`removed_date IS NULL`); thay bóng = ngừng dùng
@@ -572,7 +594,7 @@ không chia theo xã. Một request cho cả màn Quản trị hệ thống:
 | `survey_processing.recent_failures` | ≤ 20 lần chạy lỗi mới nhất, mới trước; `error_code` là mã của worker (`VIDEO_TIMEOUT`, `RETRY_EXHAUSTED`…) |
 | `storage.disk` | Đĩa chứa dữ liệu (cấu hình `Monitoring:DiskPath`); **null** khi không đo được. `low` = `free_ratio` dưới `Monitoring:LowDiskRatio` (mặc định 0,15) |
 | `storage.database_bytes` | `pg_database_size` |
-| `storage.buckets[]` | Đủ 4 bucket `survey` / `evidence` / `video` / `citizen`. `object_count` / `bytes` **theo dòng trong DB** (ảnh gốc + thumbnail) |
+| `storage.buckets[]` | Đủ 5 bucket `survey` / `evidence` / `video` / `citizen` / `avatar` (ACCT-5; sửa chữ cho khớp runtime). Ảnh PAP/CAP dùng lại Evidence, không thêm bucket. `object_count` / `bytes` **theo dòng trong DB** (ảnh gốc + thumbnail) |
 | `storage.buckets[].reconciliation` | Lần đối chiếu gần nhất với object store (job ngày một lần); **null** trước lần đầu. Mồ côi = object không dòng nào trỏ tới, **cũ hơn 24 giờ**; thiếu = dòng trỏ tới object không còn. Mẫu ≤ 20 key. **Chỉ báo cáo — không gì bị xoá** |
 
 Đĩa trống dưới ngưỡng thì server **gửi email** (không phải thông báo trong app — thông báo luôn thuộc một xã) cho mọi
@@ -711,6 +733,10 @@ xử lý không ghi) — đổi ngưỡng không phân loại lại điểm cũ,
 `out_threshold_ratio` luôn `null` (D-R22: `out` do CV quyết). `thumbnail_url`
 là đường dẫn **tương đối qua API**, không presigned. Ngoài phạm vi → `404`.
 
+**Ảnh tài sản trên chi tiết cột (v1.21, APH-1):** `GET /api/v1/map/poles/{pole_id}` thêm
+`asset_photos[]` (0..10, cùng item gallery ở §5.3.2), giữ nguyên `recent_frames[]` là ảnh khảo sát;
+không trộn hai luồng. `/map/poles` bbox và `/map/segments` không nhận trường ảnh nào.
+
 ### 5.2 Đoạn đường — `[NOT IMPLEMENTED]` (BE-14)
 
 **`GET /api/v1/segments`** — Query `bbox` bắt buộc, `commune_id`, `data_source` (mặc định loại
@@ -750,6 +776,14 @@ là **lỗi theo dòng**. Mỗi request nạp đúng một loại; thứ tự t�
 `docs/templates/`.
 
 #### 5.3.1 Hình dạng khi ĐỌC (v1.7, BE-12b)
+
+**Ảnh tài sản (v1.21, APH-1).** Dòng cột/tủ ở `GET /assets/poles`, `/assets/cabinets` và properties
+`GET /map/cabinets` thêm `photo_count` (chỉ ảnh chưa ẩn) và `cover_photo {photo_id,thumbnail_url}|null`.
+Bìa là ảnh chưa ẩn đầu tiên theo `created_at, length(photo_id), photo_id`; chưa có API đặt bìa.
+Chi tiết `/assets/poles/{id}` / `/assets/cabinets/{id}` giữ summary trong wrapper `pole` / `cabinet`
+và thêm `asset_photos[]` ngoài wrapper (rỗng = `[]`). Map cabinets chỉ có summary, gallery đọc collection.
+`cover_photo` nullable có thể xuất thành `$ref` trần (SPEC-NULLABLE); client phải nhận null.
+MapLibre có thể đưa object/array property thành JSON string: popup cần parse như `feeders[]`.
 
 **v1.21 — trạng thái mạch (SELF-SIGNED, drift FPS-1).** `GET /assets/feeders` và
 `GET /assets/feeders/{id}` (trong `feeder`) thêm `control` và `power_state` chỉ khi đọc.
@@ -835,6 +869,34 @@ một trường là hai nguồn sự thật cho một câu hỏi, và không gì
 - **`pole_count` đếm trong PHẠM VI của người gọi**, không phải tổng thật của tuyến. Đường
   `inter_commune` mang cột của xã khác và query filter giấu chúng; trả tổng thật sẽ thành kênh đo
   dữ liệu xã khác mà không liệt kê được — đúng thứ mục 7 sinh ra để chặn.
+
+#### 5.3.2 Ảnh tài sản — v1.21 `SELF-SIGNED`, APH-1
+
+Mỗi loại có đúng 5 operation; đường dẫn tương đối dưới `/api/v1`:
+
+| Method | Cột | Tủ | Kết quả |
+|---|---|---|---|
+| POST | `/assets/poles/{pole_id}/photos` | `/assets/cabinets/{cabinet_id}/photos` | multipart một `photo` + UUID khác zero `client_op_id`; 201, replay 200; Location tới collection |
+| GET | `/assets/poles/{pole_id}/photos` | `/assets/cabinets/{cabinet_id}/photos` | `{page,page_size,total,items[]}`, thứ tự cũ trước |
+| GET | `/assets/poles/{pole_id}/photos/{photo_id}/original` | `/assets/cabinets/{cabinet_id}/photos/{photo_id}/original` | `image/jpeg`, `Cache-Control: no-store` |
+| GET | `/assets/poles/{pole_id}/photos/{photo_id}/thumbnail` | `/assets/cabinets/{cabinet_id}/photos/{photo_id}/thumbnail` | `image/jpeg`, `Cache-Control: no-store` |
+| DELETE | `/assets/poles/{pole_id}/photos/{photo_id}` | `/assets/cabinets/{cabinet_id}/photos/{photo_id}` | 204, ẩn; gọi lại trên ảnh đã ẩn đúng cha vẫn 204, không audit thứ hai |
+
+Item có `photo_id`, `pole_id` **hoặc** `cabinet_id`, `created_at` (UTC server nhận, không giả làm giờ chụp),
+`uploaded_by`, `client_op_id`, `width`, `height`, `byte_count`, `thumbnail_bytes`, `original_url`,
+`thumbnail_url`. URL tương đối qua API; không object key/bucket/hash/EXIF.
+
+Giới hạn trong service: 10 ảnh chưa ẩn/tài sản, một file, original ≤16 MiB, toàn request ≤17 MiB,
+≤40 triệu pixel. Chỉ JPEG theo magic `FF D8 FF`, không tin MIME/đuôi; original nguyên byte,
+thumbnail cạnh dài 320/q80 bỏ EXIF/XMP/IPTC. Dùng Evidence. Client gửi `commune_id`/`data_source` →
+400 `SERVER_OWNED_FIELD`; UUID/form sai →400 `VALIDATION_FAILED`, quá bytes →413 `UPLOAD_TOO_LARGE`,
+không JPEG →415 `UNSUPPORTED_IMAGE_FORMAT`; object thiếu →503 `STORAGE_OBJECT_MISSING`.
+
+Replay riêng từng loại ảnh, khoá `(uploaded_by,client_op_id)`, hash gồm cha + SHA256 bytes. Khác cha/nội dung
+→409 `IDEMPOTENCY_CONFLICT`. Replay ảnh đã ẩn →404, không hồi sinh. Replay được xét trước quota, kể cả khi đủ 10.
+Khoá cha chỉ sau decode/storage; đọc lại scope/nguồn, replay/count và save row+audit trong transaction.
+Không xoá object để bù khi DB thất bại; reconciliation áp grace 24h. Online-only; thumbnail 320/q80 và UI
+còn chờ WP5/WP6 xác nhận; không đặt thêm yêu cầu capture config của khảo sát cho ảnh nhận dạng tài sản.
 
 ### 5.4 Sự cố
 
@@ -1022,6 +1084,11 @@ qua API. Nợ có chủ: BE-15/BE-17.
 
 ### 5.8 Đồng bộ offline — `/api/v1/sync` — `implemented` (v1.13, BE-43)
 
+Ảnh tài sản APH-1 là **online-only**: chưa có gallery/bytes trong bundle và không có sync op ảnh.
+Upload lỗi hoặc chưa gửi không chặn `work_order_complete`; retry HTTP bằng `client_op_id` không cam kết
+queue/capture offline của mobile. WP6 cần offline gallery phải đặc tả ticket riêng.
+
+
 Cho **Kỹ sư hiện trường** làm việc ở chỗ không có sóng: tải **gói dữ liệu** trước khi đi, xếp các thao tác
 vào **hàng chờ** trên máy, đẩy lên khi có mạng. Capability **`SyncOffline`** = chỉ `field_engineer` (mục 2).
 Ảnh và clip **không** đi qua đây — dùng endpoint riêng (đã khử trùng lặp theo `client_op_id`); **tải ảnh lên
@@ -1193,7 +1260,7 @@ highlight `SEG-003`.
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
 | v1.22 | 29/10/2026 | **Mỹ (Dylan), quyết định 29/10** | **ACCOUNT-ONE-COMMUNE (ACCT-1)**: mỗi tài khoản superior/manager/field_engineer đúng một xã; system_admin không gán xã. Giữ commune_ids[] trên request/response/JWT; siết số phần tử. UNIQUE user_id, migration giữ xã gán sớm nhất (hòa → ordinal commune_id), Down không khôi phục dòng bị xóa. Thay D-R3 nhiều xã; không đổi capability/endpoint |
-| v1.21 | 28/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **ASSET-PHOTOS chỉ phần B** (FPS-1): `control` + `power_state` trên feeder inventory, `feeders[]` trên map cabinets giữ `feeder_ids[]`; power luôn unknown đến khi có telemetry đo điện. Additive, không migration/capability/sync. **Phần A ảnh tài sản chưa hiện thực**. 141 operation giữ nguyên. Đồng bộ heading/info.version đang sót v1.19 dù đã có changelog v1.20 (#190). Nền tạm tới FW; WP5/WP6/BE2 chưa xác nhận |
+| v1.21 | 28/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **ASSET-PHOTOS A + B** (APH-1, FPS-1): `control` + `power_state` trên feeder inventory, `feeders[]` trên map cabinets giữ `feeder_ids[]`; power luôn unknown đến khi có telemetry đo điện. Phần A hiện thực 12/11/2026: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa/gallery, ẩn giữ bytes, UploadAssetPhotos; một migration. Additive, không đổi sync. Baseline hiện tại 166 →176 operation; giữ v1.22 (D-14). Evidence không thêm bucket; §4.10 sửa thành năm bucket theo ACCT-5 (D-13). Đồng bộ heading/info.version đang sót v1.19 dù đã có changelog v1.20 (#190). Nền tạm tới FW; WP5/WP6/BE2 chưa xác nhận |
 | v1.20 | 26/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **WO-REASSIGN-DATE — giao lại kèm ngày khác** (mục 5.5, drift CR-7). **Thêm** hai trường tuỳ chọn `scheduled_date`, `due_date` vào body `PUT /work-orders/{id}/assignee`; đổi người + ngày là một thao tác, một audit. Chỉ thêm, client cũ không đổi, không migration, spec vẫn 141 op. Nền tạm tới FW |
 | v1.19 | 26/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **WO-CANCEL-REQUEST** — hai POST xin/bác, năm trường trạng thái phụ, filter pending, hai allowed_actions, hai notification type (mục 5.5, 5.9; drift CR-1…CR-6). Chỉ assigned, online-only; dời lịch thật đổi làm hết hiệu lực; chấp nhận quyết định từ màn hình cũ tác động lên yêu cầu hiện tại. Không đổi wo_status/capability/sync op. 141 operation; nền tạm tới FW, WP5/WP6 chưa xác nhận |
 | v1.18 | 23/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **BE-34 — registry phiên bản, firmware** (mục 4.12, drift VR-1…VR-9; D-1…D-9 chốt 23/10 sau review Codex). **Thêm** `GET` / `POST /admin/artifact-versions`, `GET /admin/artifact-versions/{id}/usage` (capability `ManageSettings`), mã lỗi `ARTIFACT_VERSION_NOT_FOUND`, `ARTIFACT_VERSION_EXISTS`. Heartbeat MQTT nay **lưu** `firmware_version` (trước đây bị bỏ). File phiên khảo sát: 5 trường nguồn gốc được lưu; ba trường chữ giới hạn 200 ký tự (mới — trước không giới hạn). Chỉ thêm. Nền tạm tới FW |

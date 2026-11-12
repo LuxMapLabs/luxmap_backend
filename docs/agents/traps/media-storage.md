@@ -147,3 +147,10 @@ Avatar dùng `IImageSanitizer` như ảnh công dân: JPEG-only, xoay orientatio
 đọc tối đa 1 MiB và 16 triệu pixel. Khác survey/evidence: original avatar cũng đã sanitize. Bucket thứ năm `luxmap-avatar`,
 hai key cố định theo user, upload lại ghi đè. DELETE chỉ gỡ năm cột liên kết; byte vẫn còn tới upload kế tiếp, chưa có xoá thật.
 Phục vụ thumbnail qua API có Bearer, không URL S3. `StoredObjectColumn` khai tên cột avatar tường minh trong IdentityModule.
+
+## ASSET-PHOTOS — Evidence nay có ba nguồn ảnh
+
+Evidence chứa repair/fault evidence, ảnh cột trong phiếu (`PPH`) và gallery tài sản (`PAP` / `CAP`).
+PAP/CAP có hai bảng riêng, không AI/publication. Ẩn ảnh **giữ bytes** và vẫn nằm trong StoredObjectColumn/PLAN;
+chỉ truy vấn phục vụ người dùng lọc `deleted_at`, không thêm global soft-delete filter làm monitoring mất key.
+Giữ FK Restrict kể cả ảnh ẩn. Dùng ID registry phân biệt key, không thêm xã hay hash vào key.

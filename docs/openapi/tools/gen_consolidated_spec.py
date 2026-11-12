@@ -53,7 +53,7 @@ d["info"]["description"] = (
     "v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. "
     "v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. "
     "v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. "
-    "v1.21 (ASSET-PHOTOS phần B, SELF-SIGNED — FPS-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A ảnh tài sản chưa hiện thực. "
+    "v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. "
     "v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
@@ -83,6 +83,8 @@ TAGS = OrderedDict([
     ("Auth", "MOBILE (Android) — refresh token trong body. Riêng GET /auth/me dùng chung cho web và mobile."),
     ("WebAuth", "WEB (trình duyệt) — refresh token chỉ trong cookie HttpOnly, kiểm Origin."),
     ("Assets", "Quản lý kiểm kê tài sản — Contract §5.3. Không phải endpoint bản đồ §5.1. Ghi = Quản lý (cap:manage_assets); đọc = cap:read_network."),
+    ("PoleAssetPhotos", "Gallery cột online-only — APH-1; upload manager/field_engineer, đọc ReadNetwork, ẩn ManageAssets."),
+    ("CabinetAssetPhotos", "Gallery tủ online-only — APH-1; Evidence, giữ bytes khi ẩn."),
     ("AssetImport", "Nhập tài sản CSV/GeoJSON theo từng loại file — Contract §5.3."),
     ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
     ("Poles", "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."),
@@ -356,6 +358,14 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
 })
 
+for kind, parent in [("poles", "pole_id"), ("cabinets", "cabinet_id")]:
+    collection = f"/api/v1/assets/{kind}/{{{parent}}}/photos"
+    SUMMARY[("post", collection)] = "Ảnh tài sản online-only: một JPEG, 201/replay 200; quota 10, 16 MiB, 40 triệu pixel (APH-1)"
+    SUMMARY[("get", collection)] = "Gallery tài sản phân trang; bỏ ảnh ẩn; created_at, length(photo_id), photo_id (APH-1)"
+    SUMMARY[("get", collection + "/{photo_id}/original")] = "Ảnh gốc nguyên byte qua API, no-store; ảnh ẩn = 404 (APH-1)"
+    SUMMARY[("get", collection + "/{photo_id}/thumbnail")] = "Thumbnail 320/q80 bỏ metadata qua API, no-store (APH-1)"
+    SUMMARY[("delete", collection + "/{photo_id}")] = "Ẩn ảnh, giữ row/key/bytes; lặp lại 204, không audit thứ hai (APH-1)"
+
 for path, item in d["paths"].items():
     for method, op in item.items():
         if method not in HTTP_METHODS:
@@ -392,6 +402,9 @@ def pid(prefix, digits):
     return {"type": "string", "pattern": f"^{prefix}-[0-9]{{{digits},}}$",
             "description": f"Contract §1.2 — số chữ số là SÀN ({digits}), không phải trần. Chuỗi đục, không parse."}
 
+# Preserve the code-generated shapes; only annotate the two new photo-id patterns.
+for name, prefix in [("PoleAssetPhotoItem", "PAP"), ("CabinetAssetPhotoItem", "CAP")]:
+    S[name]["properties"]["photo_id"].update(pid(prefix, 6))
 S["PoleId"] = pid("POLE", 4)
 S["FaultId"] = pid("FAULT", 4)
 S["SegmentId"] = pid("SEG", 3)

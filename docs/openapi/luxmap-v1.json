@@ -5102,6 +5102,540 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/assets/cabinets/{cabinet_id}/photos": {
+      "post": {
+        "tags": [
+          "CabinetAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "cabinet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "client_op_id",
+                  "photo"
+                ],
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "client_op_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "photo": {
+                  "style": "form"
+                },
+                "client_op_id": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:upload_asset_photos",
+        "x-luxmap-roles": [
+          "manager",
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "get": {
+        "tags": [
+          "CabinetAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "cabinet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CabinetAssetPhotoItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/cabinets/{cabinet_id}/photos/{photo_id}/original": {
+      "get": {
+        "tags": [
+          "CabinetAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "cabinet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/cabinets/{cabinet_id}/photos/{photo_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "CabinetAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "cabinet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/cabinets/{cabinet_id}/photos/{photo_id}": {
+      "delete": {
+        "tags": [
+          "CabinetAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "cabinet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/citizen-reports": {
       "get": {
         "tags": [
@@ -9566,6 +10100,540 @@
             }
           }
         },
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/poles/{pole_id}/photos": {
+      "post": {
+        "tags": [
+          "PoleAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "client_op_id",
+                  "photo"
+                ],
+                "type": "object",
+                "properties": {
+                  "photo": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "client_op_id": {
+                    "type": "string"
+                  }
+                }
+              },
+              "encoding": {
+                "photo": {
+                  "style": "form"
+                },
+                "client_op_id": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItem"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:upload_asset_photos",
+        "x-luxmap-roles": [
+          "manager",
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared"
+      },
+      "get": {
+        "tags": [
+          "PoleAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageQuery"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoleAssetPhotoItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/poles/{pole_id}/photos/{photo_id}/original": {
+      "get": {
+        "tags": [
+          "PoleAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/poles/{pole_id}/photos/{photo_id}/thumbnail": {
+      "get": {
+        "tags": [
+          "PoleAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/poles/{pole_id}/photos/{photo_id}": {
+      "delete": {
+        "tags": [
+          "PoleAssetPhotos"
+        ],
+        "parameters": [
+          {
+            "name": "pole_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
         "x-luxmap-client": "shared"
       }
     },
@@ -15134,6 +16202,18 @@
         },
         "additionalProperties": false
       },
+      "AssetPhotoCover": {
+        "type": "object",
+        "properties": {
+          "photo_id": {
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "AssignWorkOrderRequest": {
         "required": [
           "assigned_to"
@@ -15343,6 +16423,76 @@
         },
         "additionalProperties": false
       },
+      "CabinetAssetPhotoItem": {
+        "type": "object",
+        "properties": {
+          "photo_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "uploaded_by": {
+            "type": "string"
+          },
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byte_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "thumbnail_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "original_url": {
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          },
+          "cabinet_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CabinetAssetPhotoItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "CabinetDetail": {
         "required": [
           "cabinet",
@@ -15351,6 +16501,12 @@
         ],
         "type": "object",
         "properties": {
+          "asset_photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CabinetAssetPhotoItem"
+            }
+          },
           "cabinet": {
             "$ref": "#/components/schemas/CabinetListItem"
           },
@@ -15407,6 +16563,13 @@
         ],
         "type": "object",
         "properties": {
+          "photo_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cover_photo": {
+            "$ref": "#/components/schemas/AssetPhotoCover"
+          },
           "cabinet_id": {
             "type": "string"
           },
@@ -15489,6 +16652,13 @@
         ],
         "type": "object",
         "properties": {
+          "photo_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cover_photo": {
+            "$ref": "#/components/schemas/AssetPhotoCover"
+          },
           "cabinet_id": {
             "type": "string"
           },
@@ -19124,6 +20294,76 @@
         ],
         "type": "string"
       },
+      "PoleAssetPhotoItem": {
+        "type": "object",
+        "properties": {
+          "photo_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "uploaded_by": {
+            "type": "string"
+          },
+          "client_op_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byte_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "thumbnail_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "original_url": {
+            "type": "string"
+          },
+          "thumbnail_url": {
+            "type": "string"
+          },
+          "pole_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleAssetPhotoItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleAssetPhotoItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "PoleDetail": {
         "required": [
           "created_at",
@@ -19133,6 +20373,12 @@
         ],
         "type": "object",
         "properties": {
+          "asset_photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleAssetPhotoItem"
+            }
+          },
           "pole": {
             "$ref": "#/components/schemas/PoleListItem"
           },
@@ -19165,6 +20411,13 @@
         ],
         "type": "object",
         "properties": {
+          "photo_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cover_photo": {
+            "$ref": "#/components/schemas/AssetPhotoCover"
+          },
           "pole_id": {
             "type": "string"
           },
@@ -19347,6 +20600,12 @@
         ],
         "type": "object",
         "properties": {
+          "asset_photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleAssetPhotoItem"
+            }
+          },
           "pole_id": {
             "type": "string"
           },
@@ -23323,7 +24582,7 @@
     "securitySchemes": {
       "Bearer": {
         "type": "http",
-        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:edit_pole_location = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_own_profile = superior, manager, field_engineer, system_admin; cap:manage_users = system_admin; cap:manage_communes = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager; cap:monitor_system = system_admin; cap:manage_settings = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
+        "description": "Paste the JWT here WITHOUT the 'Bearer ' prefix. Claims: role (one of superior, manager, field_engineer, system_admin — Contract v1.7 section 3.1) and commune_ids (always an array; [\"*\"] for system_admin only). Every business operation requires one capability, named in x-luxmap-capability, admitting exactly the roles in x-luxmap-roles — no ranking between roles. Matrix: cap:read_surveys = superior, manager, field_engineer, system_admin; cap:submit_surveys = field_engineer; cap:review_surveys = manager; cap:read_network = superior, manager, field_engineer, system_admin; cap:read_lux_readings = superior, manager, field_engineer, system_admin; cap:upload_asset_photos = manager, field_engineer; cap:manage_assets = manager; cap:edit_pole_notes = manager, field_engineer; cap:edit_pole_location = manager, field_engineer; cap:record_lux_reading = field_engineer; cap:control_lighting = manager; cap:manage_own_profile = superior, manager, field_engineer, system_admin; cap:manage_users = system_admin; cap:manage_communes = system_admin; cap:read_faults = superior, manager, field_engineer, system_admin; cap:read_notifications = superior, manager, field_engineer, system_admin; cap:review_faults = manager; cap:report_faults = field_engineer; cap:read_work_orders = superior, manager, field_engineer, system_admin; cap:manage_work_orders = manager; cap:execute_work_orders = field_engineer; cap:sync_offline = field_engineer; cap:read_statistics = superior, manager, system_admin; cap:manage_qr_codes = manager; cap:read_citizen_reports = superior, manager, system_admin; cap:review_citizen_reports = manager; cap:monitor_system = system_admin; cap:manage_settings = system_admin. 401 UNAUTHENTICATED: token missing, invalid or expired. 403 ROLE_FORBIDDEN: the role is not in the capability's list. 403 COMMUNE_FORBIDDEN: a commune_id outside the caller's scope, or [\"*\"] on a role other than system_admin.",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       },
@@ -23381,6 +24640,9 @@
       "name": "Avatar"
     },
     {
+      "name": "CabinetAssetPhotos"
+    },
+    {
       "name": "CitizenReports"
     },
     {
@@ -23415,6 +24677,9 @@
     },
     {
       "name": "Password"
+    },
+    {
+      "name": "PoleAssetPhotos"
     },
     {
       "name": "Public"
