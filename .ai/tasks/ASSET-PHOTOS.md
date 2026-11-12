@@ -175,3 +175,14 @@ Phần "KHÔNG ĐƯỢC làm" của Phase 1 về code / migration / Contract / `
 - Ghi `.ai/results/ASSET-PHOTOS-p2a.md`: đã làm gì theo thứ tự trên, **output thật** (migration `Up()` / `Down()`, `dotnet test` mã thoát + số pass / skip, mỗi lần phá thử, số op spec trước / sau, kết quả lint, SQL đếm khi tải list), D-item phát sinh. Chỗ mơ hồ hoặc thấy phải lệch D-01…D-06 thì **dừng ở đó và ghi D-item**, đừng tự chọn.
 - Commit theo Conventional Commits (`feat(ASSET-PHOTOS): …`), một thay đổi logic một commit (gợi ý: schema+migration / service+controller / hiển thị / docs+spec), stage theo đường dẫn tường minh (không `git add -A`), **không push**, không thêm trailer `Co-Authored-By`.
 - Dừng sau commit cuối + results. Không mở PR, không deploy, không động `luxmap_dev`.
+
+### Bổ sung 12/11/2026 sau lượt Codex đầu (D-13, D-14) — ghi đè các câu tương ứng ở trên
+
+Lượt đầu Codex dừng đúng quy tắc và ghi `.ai/results/ASSET-PHOTOS-p2a.md`. Hai điểm là **số liệu ticket viết trên nền cũ**, Claude đã tự kiểm lại bằng code / JSON parser (không phải quyết định kiến trúc mới).
+Hai điểm này Claude áp theo đề xuất của Codex; Mỹ xác nhận khi review PR — nếu Mỹ muốn khác thì chỉ đổi chữ trong docs, không đổi code.
+
+- **D-13 (bucket):** `StorageBucket` thật có **năm** giá trị (`Survey, Evidence, Video, Citizen, Avatar`, ACCT-5). PAP/CAP vẫn dùng `Evidence`, không tạo bucket mới. Ở mục 7 thay "§4.10 vẫn bốn bucket" bằng:
+  đồng bộ §4.10 và dòng `storage.buckets[]` (`docs/api-contract-v1.1.md` quanh dòng 575, hiện ghi "Đủ 4 bucket") với **năm bucket** theo ACCT-5, nêu rõ trong results và drift entry là sửa chữ cho khớp runtime, không phải đổi hành vi. Không đăng ký thêm deviation bucket trùng ACCT-5.
+- **D-14 (số operation / version):** baseline hiện là **v1.22, 166 operation** (`docs/openapi/luxmap-v1.json` và `luxmap-v1.5.json`), không phải 141. Tiêu chí mới: **166 → 176, tăng đúng 10**, mọi operation khác giữ nguyên. Không hạ version, không nâng thêm: giữ v1.22 và cập nhật entry v1.21 phần A như ticket đã nói. Mục "141 → 151" ở trên không còn hiệu lực.
+- **Git:** sandbox của Codex **không ghi được `.git`** (`index.lock: Operation not permitted`). Vì vậy **đừng `git add` / `git commit`**. Làm xong để thay đổi ở working tree (không stash, không reset), và trong results liệt kê **nhóm file cho từng commit gợi ý** (schema+migration / service+controller / hiển thị / docs+spec+scripts) để Claude commit theo đường dẫn tường minh. Mục "Commit theo Conventional Commits…" ở trên thay bằng điều này.
+- Lượt đầu chưa thử restore / build / Docker. Hãy **thử thật** (`dotnet restore LuxMap.slnx -warnaserror`, rồi build, rồi test) và dán output; chỉ ghi "sandbox chặn" khi có lỗi thật kèm thông báo.
