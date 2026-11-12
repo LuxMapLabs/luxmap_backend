@@ -148,6 +148,11 @@ Avatar dùng `IImageSanitizer` như ảnh công dân: JPEG-only, xoay orientatio
 hai key cố định theo user, upload lại ghi đè. DELETE chỉ gỡ năm cột liên kết; byte vẫn còn tới upload kế tiếp, chưa có xoá thật.
 Phục vụ thumbnail qua API có Bearer, không URL S3. `StoredObjectColumn` khai tên cột avatar tường minh trong IdentityModule.
 
+🔴 **Upload avatar khoá hàng `app_user` quanh lượt ghi object + commit row (12/11/2026).** Key cố định theo user nên ghi object là
+last-writer-wins, độc lập với row: hai upload chồng nhau có thể để row của lượt này trỏ vào byte của lượt kia (`AssertStored` đỏ
+"Expected 3719, Actual 3712"). Khoá chỉ bọc đoạn ghi byte đã buffer (sanitize nằm ngoài), vẫn ghi object trước, commit row sau.
+Hook `DuringWrite` của test không được chờ vô hạn người thứ hai: dịch vụ tuần tự hoá thì người thứ hai không bao giờ vào.
+
 ## ASSET-PHOTOS — Evidence nay có ba nguồn ảnh
 
 Evidence chứa repair/fault evidence, ảnh cột trong phiếu (`PPH`) và gallery tài sản (`PAP` / `CAP`).

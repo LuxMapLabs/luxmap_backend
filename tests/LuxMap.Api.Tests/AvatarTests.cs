@@ -235,7 +235,10 @@ public sealed class AvatarTests(AvatarTestFactory factory) : IClassFixture<Avata
         factory.Photos.DuringWrite = async () =>
         {
             if (Interlocked.Increment(ref count) == 2) entered.TrySetResult();
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            // Overlap the writes if the service lets them; a service that serializes uploads of one account never lets
+            // the second in while the first waits here, so the barrier gives up instead of deadlocking.
+            try { await entered.Task.WaitAsync(TimeSpan.FromSeconds(1)); }
+            catch (TimeoutException) { }
         };
         var responses = await Task.WhenAll(Upload(client, PhotoStore.Jpeg(10)), Upload(client, PhotoStore.Jpeg(200)));
         Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));

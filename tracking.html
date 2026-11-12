@@ -135,6 +135,9 @@
     OldSchemaUser (test migration lùi), docs drift/traps/development/deploy.</p>
     <p>Claude đã chạy: build 0 cảnh báo, toàn bộ suite xanh (1499 test API, 7 skip), phá thử bảy chốt đều làm test đỏ,
     OpenAPI sinh lại (151 operation, lint hợp lệ). Bàn giao <code>.ai/results/ACCT-AVATAR.md</code>.</p>
+    <p><strong>Sửa 12/11/2026 (fix/avatar-concurrent-upload-race):</strong> hai upload đồng thời của một tài khoản có thể để row trỏ vào byte
+    của lượt kia (key cố định, ghi object last-writer-wins). Upload nay khoá hàng <code>app_user</code> quanh ghi object + commit row;
+    <code>Both_concurrent_uploads_…</code> hết flaky (10/10 xanh, bỏ khoá thì đỏ), hook DuringWrite không còn chờ vô hạn.</p>
   </div>
   <div class="card" id="asset-segment-poles">
     <strong>ASSET-SEGMENT-POLES — phase 2, 09/11/2026</strong>
