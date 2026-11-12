@@ -109,6 +109,17 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
         => diagnostics.CommandAsync(nodeId, ct);
 
+    /// <summary>Đọc lịch sử điện đã lưu. Dùng next_cursor làm after để lấy mẫu tiếp theo.</summary>
+    [HttpGet("nodes/{nodeId}/electrical/history")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<IotTelemetryPage>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IotTelemetryPage> TelemetryHistoryAsync(string nodeId, CancellationToken ct,
+        [FromQuery] long after = 0, [FromQuery] int limit = 100)
+        => diagnostics.TelemetryHistoryAsync(nodeId, after, limit, ct);
+
     [HttpGet("nodes/{nodeId}/electrical")]
     [ProducesResponseType<IotElectricalResult>(StatusCodes.Status200OK)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
