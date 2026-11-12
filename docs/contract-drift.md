@@ -2100,7 +2100,7 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 |---|---|
 | RG-1 | `road_segment.geom` nullable = chưa có hình. Không hình giả |
 | RG-2 | Tuyến đã có hình **không** quay về chưa hình. `PUT`: tuyến chưa hình gửi `geom_wkt` vắng / `null` ⇒ giữ chưa hình, gửi WKT ⇒ gắn hình lần đầu; tuyến đã có hình gửi vắng / `null` ⇒ 400 như hôm nay. `POST`: vắng / `null` ⇒ chưa hình. Import: ô trống ở tuyến MỚI ⇒ chưa hình, ở tuyến ĐÃ CÓ ⇒ giữ hình |
-| RG-3 | `length_m` vẫn bắt buộc và khai báo (không tính từ hình) |
+| RG-3 | `length_m` vẫn bắt buộc và khai báo (không tính từ hình). ⚠️ **Phần "vẫn bắt buộc" bị đảo ngược 12/11/2026** — xem *ASSET-SEGMENT-LENGTH-NULL* bên dưới; phần "khai báo, không tính từ hình" giữ nguyên |
 | RG-4 | Tuyến chưa hình **không** vào `GET /map/segments` (bbox) |
 | RG-5 | `SegmentListItem.has_geometry`, `SegmentDetail.geom_wkt` nullable, `GET /assets/segments?missing_geometry=true` |
 | RG-6 | `GET /sync/bundle`: tuyến chưa hình của phiếu **có** trong gói, Feature `geometry: null` |
@@ -2145,3 +2145,27 @@ Template `docs/templates/segments.example.csv` thêm một dòng tuyến chưa h
 **Phát hiện lúc code 2a (đo, không giả định):** (1) `SurveyChainageQuery.Gps` trên tuyến chưa hình **không** làm GPS thành "không gán tuyến" như P1 dự đoán: khi tuyến null đứng **một mình**, mọi mẫu GPS bị gán `segment_id` = tuyến đó với `route_distance_m` null và chainage 0 (khoảng cách NULL lọt qua bộ lọc ứng viên); đứng cạnh tuyến có hình thì NULL xếp cuối nên tuyến có hình thắng. Còn `SurveyChainageQuery.Poles` đúng như dự đoán (cột của tuyến null không vào `poles_expected`). Không có chốt chặn nào ở phía SQL — chỉ `POST /sweeps` (#14) đứng trước cả hai. (2) `SpatialFunctions.DistanceMeters(NULL, …)` vào `double` vẫn ném lúc materialize, nên #7 và #13 phải lọc `Geom != null` TRƯỚC khi gọi hàm.
 
 **Cần báo:** khi 2b xong (Mỹ quyết thời điểm): WP5 (model nullable, `has_geometry`, `missing_geometry`, form sửa tuyến đã vẽ **phải gửi lại** `geom_wkt`, `unrouted_pole_count`, mã 409 mới, 409 `POLE_OFF_SEGMENT` lúc vẽ tuyến), WP6 (bundle `geometry: null` cho segment; không bắt đầu sweep được trên tuyến chưa hình). WP4 không đổi. **Chưa báo ai.**
+
+## ASSET-SEGMENT-LENGTH-NULL — `length_m` của tuyến null khi chưa có hình (12/11/2026)
+
+| | |
+|---|---|
+| **Decision** | `road_segment.length_m` nullable. Tuyến **chưa có hình**: `length_m` vắng / `null`. Tuyến **có hình**: `length_m` bắt buộc, ≥ 1. **Đảo ngược RG-3** (ROAD-SEGMENT-GEOM-NULL, "`length_m` vẫn bắt buộc"). Không tính lại từ hình — `length_m` vẫn là giá trị KHAI BÁO (client đo trên hình rồi gửi) |
+| **Decision maker** | **Mỹ (Dylan), 12/11/2026**, theo yêu cầu của FE (WP5): tạo tuyến ở bước "chưa có GPS" thì không có gì để đo; bắt nhập số tay hoặc gửi số giả thì số đó bị thay ở lần vẽ hình đầu tiên và trong lúc ấy là dữ liệu sai hiện ở danh sách tuyến và thống kê |
+| **Chạm API** | **Có** — chỉ NỚI, không đổi / bỏ field hay enum đã publish. `POST` / `PUT /assets/segments` bỏ `length_m` khỏi `required`; `SegmentListItem.length_m` và `properties.length_m` của Feature segment (`GET /sync/bundle`) **nullable** — **FE phải chịu `null`**; import tuyến không bắt `length_m` |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW; chưa hợp nhất Contract. Migration `RoadSegmentLengthNullable` (`AlterColumn road_segment.length_m` nullable; `Down()` từ chối khi còn `length_m IS NULL`, không bịa số 0). Chưa áp lên `luxmap_dev` / VPS |
+
+| Endpoint | Luật |
+|---|---|
+| `POST /assets/segments` | `length_m` vắng / `null` ⇒ được **khi không có `geom_wkt`**. Có `geom_wkt` mà không có `length_m` ⇒ 400 `VALIDATION_FAILED`, `details.field = "length_m"`. Số gửi lên vẫn phải ≥ 1 (0, âm ⇒ 400), có hình hay không |
+| `PUT /assets/segments/{id}` | Cùng luật, kiểm trên **hình sẽ lưu**: tuyến chưa hình + vắng `geom_wkt` + vắng `length_m` ⇒ 204, vẫn chưa hình và chưa có số; vẽ hình lần đầu (`geom_wkt` có) mà thiếu `length_m` ⇒ 400, không ghi gì. Tuyến đã có hình thiếu `geom_wkt` vẫn 400 như RG-2. `pole_ids` vắng ⇒ giữ membership (luật cũ) — nên "chỉ gửi `geom_wkt` + `length_m`" để đổi hình là đủ (cùng các trường bắt buộc khác của PUT) |
+| `GET /assets/segments`, `/{id}` | `length_m: null` khi tuyến chưa có số |
+| `GET /sync/bundle` | `properties.length_m: null` với tuyến chưa hình |
+| `GET /map/segments` | Không đổi — tuyến chưa hình không vào bbox (RG-4) nên không gặp `null`; kiểu schema vẫn nullable vì dùng chung `SegmentProperties` |
+| `POST /assets/import/segments` | Cột `length_m` **bỏ khỏi cột bắt buộc** (bỏ hẳn cột cũng được). Ô trống hợp lệ khi dòng không để tuyến có hình; dòng có `geom_wkt` mà tuyến chưa có số ⇒ lỗi dòng `length_m`. Tuyến **đã có** (trùng `external_ref`): ô `length_m` trống **giữ** số đang lưu (như ô `geom_wkt` trống giữ hình). Giá trị có mặt phải là số nguyên ≥ 1 |
+
+Không đổi: kiểm tra hành lang 25 m (`POLE_OFF_SEGMENT`); tuyến đã có hình không quay về chưa hình (RG-2); `length_m` không bị tính lại. Hai chỗ đọc `length_m` ở khảo sát (`SweepCoverage`, `SurveyReviewService`) vốn đã nhận `double?` ("độ dài chưa biết: giữ mọi khoảng trống"); `SurveyChainageQuery` tính độ dài từ hình, không đọc cột này.
+
+⚠️ **Không có CHECK ở DB** cho "có hình ⇒ có `length_m`": luật nằm ở service (POST / PUT / import là ba đường ghi duy nhất). Thêm đường ghi mới (sync push, v.v.) phải gọi cùng luật.
+
+**Cần báo:** WP5 (model `length_m` nullable ở list / detail / bundle; form tạo tuyến không gửi `length_m` khi chưa có hình; 400 `length_m` khi có hình mà thiếu) và WP6 (bundle: `length_m` có thể `null`). OpenAPI cần CODEOWNERS. **Chưa báo ai.**

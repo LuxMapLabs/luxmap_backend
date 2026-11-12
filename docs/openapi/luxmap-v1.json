@@ -15896,7 +15896,6 @@
         "required": [
           "commune_id",
           "data_source",
-          "length_m",
           "road_class",
           "segment_name"
         ],
@@ -15919,7 +15918,8 @@
             "maximum": 2147483647,
             "minimum": 1,
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "geom_wkt": {
             "type": "string",
@@ -19763,7 +19763,8 @@
           },
           "length_m": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "commune_id": {
             "type": "string"
@@ -19844,7 +19845,8 @@
           },
           "length_m": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "pole_count": {
             "type": "integer",
@@ -21285,7 +21287,6 @@
       "UpdateSegmentRequest": {
         "required": [
           "data_source",
-          "length_m",
           "road_class",
           "segment_name"
         ],
@@ -21308,7 +21309,8 @@
             "maximum": 2147483647,
             "minimum": 1,
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "geom_wkt": {
             "type": "string",

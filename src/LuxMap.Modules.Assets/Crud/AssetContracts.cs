@@ -33,8 +33,10 @@ public sealed class CreateSegmentRequest
     [Required]
     public RoadClass? RoadClass { get; init; }
 
-    /// <summary>Metres, DECLARED. Never recomputed from the geometry — see <c>RoadSegment.LengthM</c>.</summary>
-    [Required]
+    /// <summary>
+    /// Metres, DECLARED. Never recomputed from the geometry — see <c>RoadSegment.LengthM</c>. Optional only for a segment without a route
+    /// (ASSET-SEGMENT-LENGTH-NULL): required (≥ 1) whenever the segment has one. Decided in the service because it depends on the geometry.
+    /// </summary>
     [Range(1, int.MaxValue)]
     public int? LengthM { get; init; }
 
@@ -246,8 +248,10 @@ public sealed class UpdateSegmentRequest
     [Required]
     public RoadClass? RoadClass { get; init; }
 
-    /// <summary>Metres, DECLARED. Never recomputed from the geometry — see <c>RoadSegment.LengthM</c>.</summary>
-    [Required]
+    /// <summary>
+    /// Metres, DECLARED. Never recomputed from the geometry — see <c>RoadSegment.LengthM</c>. Optional only for a segment without a route
+    /// (ASSET-SEGMENT-LENGTH-NULL): required (≥ 1) whenever the segment has one. Decided in the service because it depends on the geometry.
+    /// </summary>
     [Range(1, int.MaxValue)]
     public int? LengthM { get; init; }
 
@@ -709,8 +713,8 @@ public sealed record SegmentListItem
 
     public required RoadClass RoadClass { get; init; }
 
-    /// <summary>The DECLARED length, never <c>ST_Length</c> of the geometry (BE-10, rule 4).</summary>
-    public required double LengthM { get; init; }
+    /// <summary>The DECLARED length, never <c>ST_Length</c> of the geometry (BE-10, rule 4). Null while the segment has no route.</summary>
+    public required double? LengthM { get; init; }
 
     public required string CommuneId { get; init; }
 

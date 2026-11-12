@@ -132,7 +132,7 @@ public sealed class PoleSegmentNullableTests(AssetImportFixture fixture)
 
             var road = new RoadSegment
             {
-                CommuneId = commune.CommuneId, SegmentName = "rollback", DataSource = DataSource.Simulated,
+                CommuneId = commune.CommuneId, SegmentName = "rollback", DataSource = DataSource.Simulated, LengthM = 100,
                 Geom = new LineString([new Coordinate(108, 16), new Coordinate(108.01, 16.01)]) { SRID = 4326 },
             };
             db.Add(road);

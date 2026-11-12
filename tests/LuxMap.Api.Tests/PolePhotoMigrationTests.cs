@@ -44,7 +44,7 @@ public sealed class PolePhotoMigrationTests(AssetImportFixture fixture)
         using (db.EnterUnscopedSystemWriteBackdoor())
         {
             var commune = new AdministrativeUnit { Name = "Photo review rollback test" }; db.Add(commune); await db.SaveChangesAsync();
-            var road = new RoadSegment { CommuneId = commune.CommuneId, SegmentName = "rollback", DataSource = DataSource.Simulated,
+            var road = new RoadSegment { CommuneId = commune.CommuneId, SegmentName = "rollback", DataSource = DataSource.Simulated, LengthM = 100,
                 Geom = new LineString([new Coordinate(108, 16), new Coordinate(108.01, 16.01)]) { SRID = 4326 } };
             db.Add(road); await db.SaveChangesAsync();
             var pole = new Pole { CommuneId = commune.CommuneId, SegmentId = road.SegmentId, DataSource = DataSource.Simulated,
