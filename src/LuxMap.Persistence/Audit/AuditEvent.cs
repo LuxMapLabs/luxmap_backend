@@ -35,7 +35,7 @@ public enum AuditActorKind
     /// </summary>
     Public,
 }
-public enum AuditEntityType { WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport, Pole, SurveyRecurringSchedule }
+public enum AuditEntityType { PoleAssetPhoto, CabinetAssetPhoto, WorkOrder, Fault, SurveySweep, LightingRequest, LightingCommand, QrCode, CitizenReport, Pole, SurveyRecurringSchedule }
 public enum AuditAction
 {
     CancellationRequested, CancellationRejected,
