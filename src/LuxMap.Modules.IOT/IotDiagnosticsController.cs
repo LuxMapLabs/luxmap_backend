@@ -89,6 +89,26 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotDiagnosticResult> GetAsync(string nodeId, CancellationToken ct)
         => diagnostics.GetAsync(nodeId, ct);
 
+    /// <summary>Gửi ON, OFF hoặc AUTO đến node. Đọc GET command để xem ACK.</summary>
+    [HttpPost("nodes/{nodeId}/command")]
+    [Authorize(Policy = LuxMapPolicies.ControlLighting)]
+    [ProducesResponseType<IotCommandStatus>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<IotCommandStatus>> SendCommandAsync(
+        string nodeId, IotCommandRequest request, CancellationToken ct)
+        => Accepted(await diagnostics.SendCommandAsync(nodeId, request, ct));
+
+    /// <summary>Đọc lệnh hiện tại và ACK từ node.</summary>
+    [HttpGet("nodes/{nodeId}/command")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<IotCommandStatus>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
+        => diagnostics.CommandAsync(nodeId, ct);
+
     [HttpGet("nodes/{nodeId}/electrical")]
     [ProducesResponseType<IotElectricalResult>(StatusCodes.Status200OK)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]

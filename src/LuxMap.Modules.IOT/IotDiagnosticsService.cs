@@ -70,6 +70,10 @@ public sealed record IotElectricalResult(
 
 public sealed record IotServerStatus(string ServerId, string Status);
 
+public sealed record IotCommandRequest(string? Mode, string? Command);
+public sealed record IotCommandStatus(
+    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged);
+
 public sealed class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry)
 {
@@ -112,6 +116,51 @@ public sealed class IotDiagnosticsService(
                 Anomalies = [.. diagnosis.Anomalies, new("lamp_count_shortfall", estimate.EstimatedMissing, null, null, null)],
             }
             : diagnosis with { LampCount = estimate };
+    }
+
+    public async Task<IotCommandStatus> SendCommandAsync(
+        string nodeId, IotCommandRequest request, CancellationToken ct)
+    {
+        var (uri, deviceId) = await CommandSourceAsync(nodeId, ct);
+        var mode = request.Mode?.Trim().ToUpperInvariant();
+        var command = request.Command?.Trim().ToUpperInvariant();
+        if (!(mode == "AUTO" && command is null || mode == "MANUAL" && command is ("ON" or "OFF")))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "Dùng MANUAL với ON hoặc OFF, hoặc AUTO với command null.");
+
+        var endpoint = new Uri(uri, $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/command");
+        try
+        {
+            using var response = await client.PostAsJsonAsync(endpoint, new IotCommandRequest(mode, command), ct);
+            response.EnsureSuccessStatusCode();
+            if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
+            var saved = await response.Content.ReadFromJsonAsync<PrototypeCommand>(cancellationToken: ct);
+            if (saved is null || string.IsNullOrWhiteSpace(saved.CommandId) || saved.Mode != mode || saved.Command != command)
+                throw Unavailable("Server IoT trả về lệnh không khớp yêu cầu.");
+            return new(nodeId, saved.CommandId, mode!, command, false);
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không xác nhận được việc gửi lệnh đến server IoT.");
+        }
+    }
+
+    public async Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
+    {
+        var (uri, deviceId) = await CommandSourceAsync(nodeId, ct);
+        var device = await ReadDeviceAsync(uri, deviceId, ct);
+        if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
+            throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
+        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged);
+    }
+
+    private async Task<(Uri Uri, string DeviceId)> CommandSourceAsync(string nodeId, CancellationToken ct)
+    {
+        await RequireNodeAsync(nodeId, ct);
+        var settings = await registry.ReadAsync([nodeId], ct);
+        if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out _, out var uri))
+            throw Unavailable("Chưa cấu hình nguồn điều khiển cho thiết bị IoT.");
+        return (uri, profile.DeviceId);
     }
 
     public async Task<IotElectricalResult> ElectricalAsync(string nodeId, CancellationToken ct)
@@ -161,10 +210,10 @@ public sealed class IotDiagnosticsService(
         var visibleIds = await db.Set<IotNode>().AsNoTracking()
             .Select(node => node.NodeId).ToListAsync(ct);
         var settings = await registry.ReadAsync(visibleIds, ct);
-        var servers = new SortedDictionary<string, Uri>(StringComparer.Ordinal);
-        foreach (var profile in settings.Nodes.Values)
+        var servers = new SortedDictionary<string, (Uri Uri, string DeviceId)>(StringComparer.Ordinal);
+        foreach (var profile in settings.Nodes.Values.OrderBy(profile => profile.DeviceId, StringComparer.Ordinal))
             if (TryServer(settings, profile, out var id, out var uri))
-                servers.TryAdd(id, uri);
+                servers.TryAdd(id, (uri, profile.DeviceId));
 
         var entries = servers.ToArray();
         var result = new IotServerStatus[entries.Length];
@@ -174,20 +223,20 @@ public sealed class IotDiagnosticsService(
             CancellationToken = ct,
         }, async (index, token) =>
         {
-            var (id, uri) = entries[index];
-            result[index] = new(id, await ServerStatusAsync(uri, token));
+            var (id, (uri, deviceId)) = entries[index];
+            result[index] = new(id, await ServerStatusAsync(uri, deviceId, token));
         });
         return result;
     }
 
-    private async Task<string> ServerStatusAsync(Uri uri, CancellationToken ct)
+    private async Task<string> ServerStatusAsync(Uri uri, string deviceId, CancellationToken ct)
     {
         try
         {
-            using var response = await client.GetAsync(new Uri(uri, "api/luxmap/mqtt"), ct);
+            using var response = await client.GetAsync(new Uri(uri, $"api/luxmap/gateways/by-device/{Uri.EscapeDataString(deviceId)}/status"), ct);
             if (!response.IsSuccessStatusCode || !IsJson(response)) return "unreachable";
-            var broker = await response.Content.ReadFromJsonAsync<BrokerHealth>(cancellationToken: ct);
-            return broker?.Running switch { true => "online", false => "broker_down", _ => "unreachable" };
+            var gateway = await response.Content.ReadFromJsonAsync<GatewayHealth>(cancellationToken: ct);
+            return gateway?.Status is "online" or "offline" or "broker_down" or "unconfigured" ? gateway.Status : "unreachable";
         }
         catch (Exception ex) when (IsSourceFailure(ex, ct))
         {
@@ -355,9 +404,11 @@ public sealed class IotDiagnosticsService(
            (type.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
             type.EndsWith("+json", StringComparison.OrdinalIgnoreCase));
 
-    private sealed record BrokerHealth(bool? Running);
+    private sealed record GatewayHealth(string? Status);
     private sealed record PrototypeDevice(
-        string? DeviceId, PrototypeReading? LatestTelemetry, PrototypeReading[]? History);
+        string? DeviceId, PrototypeReading? LatestTelemetry, PrototypeReading[]? History,
+        PrototypeCommand? DesiredCommand, bool CommandAcknowledged);
+    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId);
     private sealed record PrototypeReading(DateTimeOffset ReceivedAt, PrototypeSample? Data);
     private sealed record PrototypeSample(
         string? LampCommand, double? Voltage, double? Current, double? Power, string? SessionId, long? SequenceNumber);
