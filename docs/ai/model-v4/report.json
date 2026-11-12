@@ -1,0 +1,83 @@
+{
+  "yolo11n": {
+    "test_mAP50": 0.7996540118107589,
+    "test_mAP50_95": 0.5956170238169135,
+    "test_AP50_per_class": {
+      "normal": 0.6856639447600478,
+      "out": 0.9136440788614701
+    },
+    "at_backend_threshold": {
+      "normal": {
+        "tp": 26,
+        "fp": 3,
+        "fn": 21,
+        "precision": 0.896551724137931,
+        "recall": 0.5531914893617021
+      },
+      "out": {
+        "tp": 20,
+        "fp": 4,
+        "fn": 2,
+        "precision": 0.8333333333333334,
+        "recall": 0.9090909090909091
+      },
+      "out_detected_as_normal": 0
+    },
+    "onnx": {
+      "file": "/content/runs/yolo11n/weights/best.onnx",
+      "sha256": "9007bdbd8ddebe19c4db4e2189d3166e2f4c5bb4c4474dda2cb9883cf1969278",
+      "bytes": 10605387,
+      "output_shape": [
+        1,
+        6,
+        8400
+      ],
+      "colab_cpu_ms_median": 126.24245200004225
+    }
+  },
+  "yolo11s": {
+    "test_mAP50": 0.7726454761383357,
+    "test_mAP50_95": 0.5402997510920196,
+    "test_AP50_per_class": {
+      "normal": 0.651986901405263,
+      "out": 0.8933040508714084
+    },
+    "at_backend_threshold": {
+      "normal": {
+        "tp": 29,
+        "fp": 5,
+        "fn": 18,
+        "precision": 0.8529411764705882,
+        "recall": 0.6170212765957447
+      },
+      "out": {
+        "tp": 20,
+        "fp": 16,
+        "fn": 2,
+        "precision": 0.5555555555555556,
+        "recall": 0.9090909090909091
+      },
+      "out_detected_as_normal": 0
+    },
+    "onnx": {
+      "file": "/content/runs/yolo11s/weights/best.onnx",
+      "sha256": "bf414402cd694b4dc728c101e965b01883d044ba586fdfa96dcc10d8b909bde5",
+      "bytes": 37929853,
+      "output_shape": [
+        1,
+        6,
+        8400
+      ],
+      "colab_cpu_ms_median": 244.72800050011756
+    }
+  },
+  "training": {
+    "ultralytics": "8.4.173",
+    "roboflow_version": 4,
+    "imgsz": 640,
+    "epochs": 200,
+    "patience": 50,
+    "seed": 0,
+    "split": "grouped by source video; valid/test from field video only"
+  }
+}
