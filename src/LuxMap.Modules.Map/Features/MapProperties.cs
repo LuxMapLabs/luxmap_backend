@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets.Photos;
 using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.Map.Features;
@@ -180,6 +181,9 @@ public sealed record IotNodeProperties
 /// </remarks>
 public sealed record CabinetProperties
 {
+    public int PhotoCount { get; init; }
+    public AssetPhotoCover? CoverPhoto { get; init; }
+
     public required string CabinetId { get; init; }
 
     public required string CabinetName { get; init; }

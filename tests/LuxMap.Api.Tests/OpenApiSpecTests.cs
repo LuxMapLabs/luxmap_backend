@@ -32,6 +32,43 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Asset_photo_contract_has_exactly_ten_operations_and_separate_parent_shapes()
+    {
+        var paths = Spec.GetProperty("paths");
+        var operations = 0;
+        foreach (var (kind, parent, schema) in new[] { ("poles", "pole_id", "PoleAssetPhotoItem"), ("cabinets", "cabinet_id", "CabinetAssetPhotoItem") })
+        {
+            var root = $"/api/v1/assets/{kind}/{{{parent}}}/photos";
+            var upload = paths.GetProperty(root).GetProperty("post");
+            foreach (var code in new[] { "200", "400", "404" })
+                Assert.True(paths.GetProperty(root).GetProperty("get").GetProperty("responses").TryGetProperty(code, out _));
+            var form = upload.GetProperty("requestBody").GetProperty("content").GetProperty("multipart/form-data").GetProperty("schema");
+            Assert.Equal(new[] { "client_op_id", "photo" }, form.GetProperty("required").EnumerateArray().Select(x => x.GetString()!).Order());
+            Assert.Equal(new[] { "manager", "field_engineer" }, upload.GetProperty("x-luxmap-roles").EnumerateArray().Select(x => x.GetString()));
+            foreach (var code in new[] { "200", "201", "400", "404", "409", "413", "415", "503" })
+                Assert.True(upload.GetProperty("responses").TryGetProperty(code, out _));
+            var fields = Schema(schema).GetProperty("properties");
+            Assert.True(fields.TryGetProperty(parent, out _));
+            Assert.False(fields.TryGetProperty(kind == "poles" ? "cabinet_id" : "pole_id", out _));
+            foreach (var path in paths.EnumerateObject().Where(p => p.Name.StartsWith(root, StringComparison.Ordinal)))
+                operations += path.Value.EnumerateObject().Count(p => p.Name is "get" or "post" or "delete");
+        }
+        Assert.Equal(10, operations);
+        foreach (var schema in new[] { "PoleListItem", "CabinetListItem", "CabinetProperties" })
+        {
+            var properties = Schema(schema).GetProperty("properties");
+            Assert.True(properties.TryGetProperty("photo_count", out _)); Assert.True(properties.TryGetProperty("cover_photo", out _));
+        }
+        foreach (var schema in new[] { "PoleDetail", "CabinetDetail", "PoleMapDetail" })
+            Assert.True(Schema(schema).GetProperty("properties").TryGetProperty("asset_photos", out _));
+        foreach (var schema in new[] { "PoleProperties", "SegmentProperties" })
+        {
+            var properties = Schema(schema).GetProperty("properties");
+            Assert.False(properties.TryGetProperty("asset_photos", out _)); Assert.False(properties.TryGetProperty("photo_count", out _));
+        }
+    }
+
+    [Fact]
     public void Manual_ai_detection_has_a_disjoint_web_union()
     {
         var operation = Spec.GetProperty("paths").GetProperty("/api/v1/ai/detect").GetProperty("post");

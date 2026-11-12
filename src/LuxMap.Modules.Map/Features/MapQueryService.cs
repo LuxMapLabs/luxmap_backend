@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets.Photos;
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Warranty;
@@ -409,6 +410,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
             })
             .ToListAsync(ct);
 
+        var galleries = await new AssetPhotoReader(dbContext).CabinetsAsync([.. rows.Select(r => r.CabinetId)], ct);
         return new FeatureCollection<CabinetProperties>
         {
             Features = [.. rows.Select(row => new Feature<CabinetProperties>
@@ -416,6 +418,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                 Geometry = GeoJsonGeometry.Point(row.Geom.X, row.Geom.Y),
                 Properties = new CabinetProperties
                 {
+                    PhotoCount = galleries.GetValueOrDefault(row.CabinetId)?.Count ?? 0,
+                    CoverPhoto = AssetPhotoReader.Cover(galleries.GetValueOrDefault(row.CabinetId) ?? []),
                     CabinetId = row.CabinetId,
                     CabinetName = row.CabinetName,
                     CommuneId = row.CommuneId,
