@@ -19,6 +19,8 @@ FE ↔ HTTP API LuxMap ↔ HTTP nội bộ IoT Bridge ↔ MQTT ↔ ESP32 gateway
 
 Chuẩn bị tủ điện có GPS, feeder thuộc tủ đó và một trụ đèn thuộc feeder. Mỗi tủ hiện gắn tối đa một IoT node. Các ID và tọa độ dưới đây là ví dụ cho bộ thứ hai.
 
+Admin thực hiện bước 2.1–2.2. Manager thực hiện bước 2.3–2.4 trong xã được cấp quyền.
+
 ### 2.1 Đăng ký server và vị trí gateway
 
 `POST /api/v1/iot/servers` · quyền `ManageSettings` · thành công `201`
@@ -44,7 +46,7 @@ Chuẩn bị tủ điện có GPS, feeder thuộc tủ đó và một trụ đè
 
 `204` nghĩa là tuyến có hiệu lực ngay trên bridge đang chạy. Gửi lại đúng cặp vẫn trả `204`. Nếu gateway hoặc thiết bị đã thuộc cặp khác, API trả `409`. Firmware gateway hiện chuyển tiếp một node.
 
-Backend gửi khóa quản trị cho bridge ở phía server. FE chỉ gửi Bearer token. Người vận hành cấp secret bằng API nội bộ `POST /api/luxmap/gateways/{gatewayId}/credential` của bridge, rồi nhập địa chỉ broker, Gateway ID, Node ID, username và secret trên trang cấu hình ESP32. Secret chỉ hiển thị một lần lúc cấp. Node dùng LoRa và `DEVICE_ID` của firmware phải khớp `device_id` đã đăng ký.
+Backend gửi khóa quản trị cho bridge ở phía server. FE chỉ gửi Bearer token. Người vận hành cấp secret bằng API backend `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` với quyền `ManageSettings`, rồi nhập địa chỉ broker, Gateway ID, Node ID, username và secret trên trang cấu hình ESP32. API trả client_id, username, password và node_ids. Hiển thị password cho Admin ngay khi cấp và tránh lưu vào localStorage hoặc log. Cấp lại trả 409. Node dùng LoRa và `DEVICE_ID` của firmware phải khớp `device_id` đã đăng ký.
 
 ### 2.3 Tạo node và gán relay
 
@@ -66,7 +68,7 @@ Lấy `node_id` từ header `Location`, ví dụ `/api/v1/assets/iot-nodes/NODE-
 
 ### 2.4 Gán nguồn đo cho node
 
-`POST /api/v1/iot/nodes/{nodeId}/source` · quyền `ManageSettings` · thành công `201`
+`POST /api/v1/iot/nodes/{nodeId}/source` · quyền `ManageAssets` · thành công `201`
 
 ```json
 {
@@ -81,7 +83,7 @@ Lấy `node_id` từ header `Location`, ví dụ `/api/v1/assets/iot-nodes/NODE-
 }
 ```
 
-Nhập chỉ số danh định thực tế để API chẩn đoán so sánh. Backend kiểm tra trụ thuộc feeder đã gán vào relay của node.
+Manager chỉ gán nguồn cho node và server cùng xã, với thiết bị đã được Admin đăng ký tuyến và cấp secret MQTT. Nhập chỉ số danh định thực tế để API chẩn đoán so sánh. Backend kiểm tra trụ thuộc feeder đã gán vào relay của node.
 
 ## 3. Hiển thị trên bản đồ
 
@@ -91,7 +93,7 @@ Nhập chỉ số danh định thực tế để API chẩn đoán so sánh. Bac
 | `GET /api/v1/iot/nodes` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status` và `last_received_at`. |
 | `GET /api/v1/iot/poles/{poleId}/control` | Khi bấm trụ, lấy `feeder_id`, `node_id`, `relay_no` và `can_control_feeder`. |
 
-Gateway báo `online` theo heartbeat. Node báo `online` theo độ mới của mẫu điện. Một gateway có thể online khi node chưa có dữ liệu mới. FE hiện nút điều khiển khi `can_control_feeder: true` và người dùng có quyền `ControlLighting`. Nút tác động lên **cả feeder**, ví dụ **Tắt mạch FDR-001**. Điều khiển qua bridge hiện hỗ trợ relay 1.
+Gateway báo `online` theo heartbeat. Node báo `online` theo độ mới của mẫu điện. Một gateway có thể online khi node chưa có dữ liệu mới. FE hiện nút điều khiển khi `can_control_feeder: true` và người dùng có quyền `ControlLighting`. Khi control_channel là iot_bridge, gọi endpoint ở mục 4. Nút tác động lên **cả feeder**, ví dụ **Tắt mạch FDR-001**. Điều khiển qua bridge hiện hỗ trợ relay 1.
 
 ## 4. Gửi lệnh và đặt lịch AUTO
 
@@ -123,6 +125,8 @@ Từ 07:00 đến trước 19:00, AUTO điều khiển theo cảm biến ánh s�
 3. Hiển thị **Node đã xác nhận** khi `command_id` khớp và `command_acknowledged: true`. Nếu GET trả mã khác, lệnh mới đã thay lệnh đang theo dõi.
 4. Khi cần xác minh mạch thực sự ngắt tải, đọc mẫu điện mới sau OFF. ACK xác nhận firmware đã xử lý lệnh.
 
+Lệnh mới có `expires_at` theo UTC và hết hạn sau 5 phút. Nếu đến hạn mà chưa nhận ACK cho đúng mã lệnh, hiển thị **Hết hạn chờ xác nhận**. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
+
 ## 5. Dữ liệu điện và lỗi
 
 | API | Cách dùng |
@@ -132,5 +136,3 @@ Từ 07:00 đến trước 19:00, AUTO điều khiển theo cảm biến ánh s�
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
 
 `400` thường là dữ liệu đầu vào hoặc ánh xạ relay không hợp lệ. `401` là cần đăng nhập. `403` là thiếu quyền. `404` là tài sản không tồn tại hoặc ngoài phạm vi truy cập. `409` là cấu hình trùng. `503` là nguồn IoT chưa cấu hình hoặc backend chưa gọi được bridge. Hiển thị thông báo từ `error.message` khi có.
-
-Đăng ký tuyến và lưu lịch đã được thử ở local. Lượt thử lịch 07:00–19:00 trả `202` và đọc lại đúng lịch, nhưng gateway đang offline nên chưa xác nhận node đã áp dụng lịch đó.

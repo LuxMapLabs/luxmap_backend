@@ -150,6 +150,12 @@ public sealed class IotRegistrationStore(
         await SaveAsync(ct);
     }
 
+    internal Task AuditCommandAsync(string serverId, string nodeId, object details, CancellationToken ct)
+    {
+        RecordRegistration(serverId, nodeId, JsonSerializer.Serialize(details, LuxMapJsonOptions.Default));
+        return SaveAsync(ct);
+    }
+
     // No FK to the registered objects: deleting a node must not erase its registration history.
     private void RecordRegistration(string serverId, string? nodeId, string details) =>
         db.Add(new IotRegistrationAudit

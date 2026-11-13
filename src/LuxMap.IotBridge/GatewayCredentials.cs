@@ -26,6 +26,11 @@ sealed class GatewayCredentials(IHostEnvironment environment)
         }
     }
 
+    public bool IsIssued(string gatewayId)
+    {
+        lock (gate) return Read().ContainsKey(gatewayId);
+    }
+
     public bool Validate(string gatewayId, string? username, string? password)
     {
         if (username != gatewayId || password is not { Length: 64 }) return false;

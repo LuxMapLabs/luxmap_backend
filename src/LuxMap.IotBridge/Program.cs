@@ -19,12 +19,29 @@ builder.Services.AddSwaggerGen(options =>
     options.OperationFilter<CommandExamples>();
 });
 var app = builder.Build();
-// Available for the normal `dotnet run` command, including Production on the LAN.
+if (app.Environment.IsDevelopment())
+{
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "LuxMap API v1");
     options.DocumentTitle = "LuxMap - Điều khiển ESP32";
+});
+
+}
+
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    if ((path.StartsWithSegments("/api/luxmap/devices") ||
+         path.StartsWithSegments("/api/luxmap/gateways")) &&
+        !GatewayCredentials.MatchesAdminKey(app.Configuration["Mqtt:BridgeKey"],
+            context.Request.Headers["X-Iot-Bridge-Key"].ToString()))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return;
+    }
+    await next(context);
 });
 
 app.MapGet("/", () => Results.Ok(new { service = "LuxMap API", status = "running" }));
@@ -57,7 +74,10 @@ api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest reques
         return Results.BadRequest(new { error = "MANUAL requires command ON or OFF." });
     if (request.AutoSchedule is { } schedule && (mode != "AUTO" || !schedule.IsValid()))
         return Results.BadRequest(new { error = "AUTO schedule needs two distinct minutes between 0 and 1439." });
-    var desired = new LampCommand(mode, mode == "AUTO" ? null : command, AutoSchedule: request.AutoSchedule);
+    if (request.CommandId is not null && !Guid.TryParseExact(request.CommandId, "N", out _))
+        return Results.BadRequest(new { error = "Invalid command ID." });
+    var desired = new LampCommand(mode, mode == "AUTO" ? null : command,
+        CommandId: request.CommandId, AutoSchedule: request.AutoSchedule);
     try
     {
         var saved = await mqtt.SetCommandAsync(deviceId, desired, cancellationToken);
@@ -104,6 +124,15 @@ app.MapPut("/api/luxmap/gateways/{gatewayId}/route", (string gatewayId, GatewayR
         return Results.BadRequest();
     return mqtt.RegisterGateway(gatewayId, request.DeviceId) ? Results.NoContent() : Results.Conflict();
 }).WithTags("MQTT");
+app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/authorization", (string deviceId,
+    HttpContext context, MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    var authorized = mqtt.Gateways.Any(route => route.Value.Contains(deviceId) && credentials.IsIssued(route.Key));
+    return authorized ? Results.NoContent() : Results.NotFound();
+}).WithTags("MQTT");
+
 app.MapPost("/api/luxmap/gateways/{gatewayId}/credential", (string gatewayId, HttpContext context,
     MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
 {

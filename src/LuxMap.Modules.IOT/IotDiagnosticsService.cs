@@ -77,7 +77,7 @@ public sealed record IotLocation(
     [property: System.Text.Json.Serialization.JsonRequired] double Lat,
     [property: System.Text.Json.Serialization.JsonRequired] double Lng);
 public sealed record IotServerStatus(string ServerId, string Status, string? CommuneId = null, IotLocation? Location = null);
-public sealed record IotPoleControl(string PoleId, string? FeederId, string? NodeId, short? RelayNo, bool CanControlFeeder);
+public sealed record IotPoleControl(string PoleId, string? FeederId, string? NodeId, short? RelayNo, bool CanControlFeeder, string? ControlChannel = null);
 
 public sealed record IotTelemetryPage(IReadOnlyList<IotArchivedSample> Items, long NextCursor, bool HasMore);
 public sealed record IotArchivedSample(long Cursor, IotArchivedReading Reading);
@@ -88,8 +88,9 @@ public sealed record IotArchivedData(string? Timestamp, string? SessionId, long?
 public sealed record IotAutoSchedule(string? DayStart, string? NightStart);
 public sealed record IotCommandRequest(string? Mode, string? Command, IotAutoSchedule? AutoSchedule = null);
 public sealed record IotGatewayRouteRequest(string? DeviceId);
+public sealed record IotGatewayCredential(string ClientId, string Username, string Password, string[] NodeIds);
 public sealed record IotCommandStatus(
-    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null);
+    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null);
 
 public sealed class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry)
@@ -133,6 +134,76 @@ public sealed class IotDiagnosticsService(
                 Anomalies = [.. diagnosis.Anomalies, new("lamp_count_shortfall", estimate.EstimatedMissing, null, null, null)],
             }
             : diagnosis with { LampCount = estimate };
+    }
+
+    public async Task RequireMqttAuthorizationAsync(string serverId, string deviceId, string communeId,
+        string? key, CancellationToken ct)
+    {
+        var uri = await ProvisioningOriginAsync(serverId, communeId, key, ct);
+        using var request = ProvisioningRequest(HttpMethod.Get, uri,
+            $"gateways/by-device/{Uri.EscapeDataString(deviceId)}/authorization", key!);
+        try
+        {
+            using var response = await client.SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                    "Thiết bị MQTT chưa được Admin cấp tuyến và secret.");
+            if (response.StatusCode != HttpStatusCode.NoContent)
+                throw Unavailable("IoT Bridge không xác nhận quyền MQTT.");
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không kiểm tra được quyền MQTT trên IoT Bridge.");
+        }
+    }
+
+    public async Task<IotGatewayCredential> IssueGatewayCredentialAsync(string serverId, string gatewayId,
+        string? key, CancellationToken ct)
+    {
+        if (gatewayId.Length is < 1 or > 64 || !char.IsAsciiLetterOrDigit(gatewayId[0]) ||
+            gatewayId.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_')))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Gateway ID không hợp lệ.");
+
+        var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
+        using var request = ProvisioningRequest(HttpMethod.Post, uri,
+            $"gateways/{Uri.EscapeDataString(gatewayId)}/credential", key!);
+        try
+        {
+            using var response = await client.SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Gateway chưa có tuyến MQTT.");
+            if (response.StatusCode == HttpStatusCode.Conflict)
+                throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict, "Gateway đã được cấp secret.");
+            if (response.StatusCode != HttpStatusCode.OK || !IsJson(response))
+                throw Unavailable("IoT Bridge không cấp được secret.");
+            var credential = await response.Content.ReadFromJsonAsync<IotGatewayCredential>(cancellationToken: ct);
+            if (credential is null || credential.ClientId != gatewayId || credential.Username != gatewayId ||
+                credential.Password is not { Length: 64 } || credential.NodeIds is not { Length: > 0 })
+                throw Unavailable("IoT Bridge trả thông tin xác thực không hợp lệ.");
+            return credential;
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không cấp được secret từ IoT Bridge.");
+        }
+    }
+
+    private async Task<Uri> ProvisioningOriginAsync(string serverId, string? communeId, string? key, CancellationToken ct)
+    {
+        var settings = await registry.ReadAsync([], ct);
+        if (!settings.Servers.TryGetValue(serverId, out var server) ||
+            (communeId is not null && server.CommuneId != communeId))
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy IoT server trong phạm vi.");
+        if (key is not { Length: >= 32 } || !IotOrigin.TryAllowed(settings, server.BaseUrl, out var uri))
+            throw Unavailable("Chưa cấu hình địa chỉ hoặc khóa quản trị IoT Bridge.");
+        return uri;
+    }
+
+    private static HttpRequestMessage ProvisioningRequest(HttpMethod method, Uri uri, string path, string key)
+    {
+        var request = new HttpRequestMessage(method, new Uri(uri, $"api/luxmap/{path}"));
+        request.Headers.Add("X-Iot-Provisioning-Key", key);
+        return request;
     }
 
     public async Task RegisterGatewayRouteAsync(string serverId, string gatewayId, IotGatewayRouteRequest request,
@@ -188,7 +259,7 @@ public sealed class IotDiagnosticsService(
             settings.Nodes.TryGetValue(control.NodeId, out var profile) &&
             profile.FeederId == pole.FeederId && profile.RelayNo == control.RelayNo && control.RelayNo == 1 &&
             TryServer(settings, profile, out _, out _);
-        return new(poleId, pole.FeederId, control.NodeId, control.RelayNo, canControl);
+        return new(poleId, pole.FeederId, control.NodeId, control.RelayNo, canControl, canControl ? "iot_bridge" : null);
     }
 
     public async Task<IotCommandStatus> SendCommandAsync(
@@ -221,16 +292,32 @@ public sealed class IotDiagnosticsService(
             bridgeSchedule = new(day.Hour * 60 + day.Minute, night.Hour * 60 + night.Minute);
         }
 
+        if (await ServerStatusAsync(uri, deviceId, ct) != "online")
+            throw Unavailable("Gateway chưa online. Hãy thử lại khi gateway kết nối.");
+
+        var commandId = Guid.NewGuid().ToString("N");
+        var serverId = profile.ServerId ?? "default";
+        await registry.AuditCommandAsync(serverId, nodeId, new
+        {
+            event_type = "command_requested", command_id = commandId, mode, command,
+            device_id = deviceId, feeder_id = profile.FeederId, relay_no = profile.RelayNo,
+            auto_schedule = request.AutoSchedule,
+        }, ct);
+
         var endpoint = new Uri(uri, $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/command");
         try
         {
-            using var response = await client.PostAsJsonAsync(endpoint, new { mode, command, autoSchedule = bridgeSchedule }, ct);
+            using var response = await client.PostAsJsonAsync(endpoint, new { mode, command, commandId, autoSchedule = bridgeSchedule }, ct);
             response.EnsureSuccessStatusCode();
             if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
             var saved = await response.Content.ReadFromJsonAsync<PrototypeCommand>(cancellationToken: ct);
-            if (saved is null || string.IsNullOrWhiteSpace(saved.CommandId) || saved.Mode != mode || saved.Command != command)
+            if (saved is null || saved.CommandId != commandId || saved.Mode != mode || saved.Command != command)
                 throw Unavailable("Server IoT trả về lệnh không khớp yêu cầu.");
-            return new(nodeId, saved.CommandId, mode!, command, false, saved.AutoSchedule?.ToApi());
+            await registry.AuditCommandAsync(serverId, nodeId, new
+            {
+                event_type = "command_accepted", command_id = commandId, mode, command,
+            }, ct);
+            return new(nodeId, commandId, mode!, command, false, saved.AutoSchedule?.ToApi(), saved.ExpiresAt);
         }
         catch (Exception ex) when (IsSourceFailure(ex, ct))
         {
@@ -244,7 +331,7 @@ public sealed class IotDiagnosticsService(
         var device = await ReadDeviceAsync(uri, deviceId, ct);
         if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
-        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi());
+        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi(), command.ExpiresAt);
     }
 
     public async Task<IotTelemetryPage> TelemetryHistoryAsync(
@@ -564,7 +651,11 @@ public sealed class IotDiagnosticsService(
         private static string Format(int minute) => FormattableString.Invariant($"{minute / 60:00}:{minute % 60:00}");
     }
 
-    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId, BridgeAutoSchedule? AutoSchedule);
+    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId, BridgeAutoSchedule? AutoSchedule, long? ExpiresAtUnixSeconds)
+    {
+        public DateTimeOffset? ExpiresAt => ExpiresAtUnixSeconds is >= 0 and <= 253402300799
+            ? DateTimeOffset.FromUnixTimeSeconds(ExpiresAtUnixSeconds.Value) : null;
+    }
     private sealed record PrototypeReading(DateTimeOffset ReceivedAt, PrototypeSample? Data);
     private sealed record PrototypeSample(
         string? LampCommand, double? Voltage, double? Current, double? Power, string? SessionId, long? SequenceNumber);

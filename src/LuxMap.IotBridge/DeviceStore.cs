@@ -5,9 +5,9 @@ record AutoSchedule(int? DayStartMinute, int? NightStartMinute)
     public bool IsValid() => DayStartMinute is >= 0 and < 1440 &&
         NightStartMinute is >= 0 and < 1440 && DayStartMinute != NightStartMinute;
 }
-record CommandRequest(string? Mode, string? Command, AutoSchedule? AutoSchedule = null);
+record CommandRequest(string? Mode, string? Command, AutoSchedule? AutoSchedule = null, string? CommandId = null);
 record LampCommand(string Mode, string? Command, string? CommandId = null, long Version = 0,
-    AutoSchedule? AutoSchedule = null);
+    AutoSchedule? AutoSchedule = null, long? ExpiresAtUnixSeconds = null);
 record TelemetryRequest(string? DeviceId, string? Mode, string? LampCommand,
     double? Lux, double? Voltage, double? Current, double? Power, string? Timestamp,
     string? SessionId = null, long? SequenceNumber = null, string? AppliedCommandId = null);
@@ -65,7 +65,7 @@ sealed class DeviceStore
             var state = Get(id);
             command = command with
             {
-                CommandId = Guid.NewGuid().ToString("N"),
+                CommandId = command.CommandId ?? Guid.NewGuid().ToString("N"), ExpiresAtUnixSeconds = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
                 AutoSchedule = command.AutoSchedule ?? state.DesiredCommand.AutoSchedule,
                 Version = Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), checked(state.DesiredCommand.Version + 1))
             };
