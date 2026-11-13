@@ -351,6 +351,8 @@ SECTION = {
 }
 
 SUMMARY.update({
+    ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
+    ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("post", "/api/v1/iot/servers"): "Đăng ký địa chỉ server IoT",
     ("get", "/api/v1/iot/servers"): "Xem trạng thái các server IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/source"): "Gán nguồn đo IoT cho node đã đăng ký",
