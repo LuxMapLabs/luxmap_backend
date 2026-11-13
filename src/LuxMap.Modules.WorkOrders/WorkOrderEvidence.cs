@@ -62,6 +62,9 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
     /// <summary>A phone photo is a few MB; this leaves room without letting one request hold the server.</summary>
     public const long MaxUploadBytes = 16 * 1024 * 1024;
 
+    /// <summary>The whole multipart request: a file at <see cref="MaxUploadBytes"/> plus the fields and part headers around it.</summary>
+    public const long MaxRequestBytes = MaxUploadBytes + 1024 * 1024;
+
     private static LuxMapException Error(string code, HttpStatusCode status, params (string Key, object? Value)[] details)
         => new(code, status, code.Replace('_', ' '), details.ToDictionary(x => x.Key, x => x.Value));
 
@@ -140,6 +143,7 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
     {
         // Shape first, so a malformed request costs no database round trip and no storage write.
         if (file is null || file.Length == 0) throw OptionalJson.Invalid("file");
+        if (file.Length > MaxUploadBytes) throw Error("UPLOAD_TOO_LARGE", HttpStatusCode.RequestEntityTooLarge);
         var parsedKind = WireEnum.ParseCsv<EvidenceKind>(kind, "kind") is [var single] ? single : throw OptionalJson.Invalid("kind");
         // A COMPLETE ISO 8601 date-time: TryParse alone accepts "13:30" and quietly supplies today's date.
         // Z or an offset is converted to UTC; no designator is read as UTC (Contract §0, as for query strings).

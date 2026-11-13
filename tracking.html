@@ -51,6 +51,22 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="wo-upload-fixes">
+    <strong>Sửa hai lỗi upload của phiếu công việc, 13/11/2026</strong>
+    <span class="tag t-next">PR #249 vào <code>dev</code> (nhánh <code>fix/pole-video-replay-evidence-limit</code>, từ <code>origin/dev</code> e89cc5a) · chưa merge · chưa báo WP5 / WP6</span>
+    <p>Codex khảo sát upload ảnh theo phiếu (đọc, không sửa) và tìm ra hai lỗi; Claude kiểm lại trong code rồi sửa.
+    <b>1. Gửi lại clip cột</b> (<code>PUT /work-orders/{id}/pole-videos/{client_op_id}</code>): hạn <code>captured_at</code> ≤ 7 ngày được kiểm
+    <em>trước</em> bước replay, nên app gửi lại một clip server đã lưu, khi clip đã cũ hơn 7 ngày, nhận 400 thay vì 200 + bản đã lưu (trái PV-6).
+    Nay chỉ clip mới mới bị kiểm hạn; đồng hồ lấy từ <code>TimeProvider</code> để test tua được.
+    <b>2. Cỡ ảnh <code>/evidence</code> và <code>/faults/{id}/photos</code></b>: 16 MiB là giới hạn của <em>cả request multipart</em>, nên file đúng
+    16 MiB bị 413 dù drift ghi "file ≤ 16 MiB". Nay file ≤ 16 MiB kiểm trong service, cả request ≤ 17 MiB, thêm <code>UploadBodyLimit</code>
+    (như ảnh cột / ảnh tài sản, chặn cả body chunked).</p>
+    <p>Kiểm (Claude): test mới <code>A_retry_of_a_stored_clip_is_answered_after_its_capture_has_aged_past_the_week_but_a_new_clip_is_not</code>
+    và <code>A_photo_of_exactly_16_MiB_is_taken_with_its_form_around_it_and_one_byte_more_is_a_413</code>; phá thử 3 chốt ⇒ đều đỏ;
+    toàn bộ suite xanh (427 + 45 + 83 + 1688, 7 skip có sẵn), mã thoát 0.</p>
+    <p class="muted"><b>Còn:</b> merge #249, báo WP5 / WP6. Caddy chưa có matcher chặn sớm Content-Length &gt; 17 MiB cho hai route ảnh này
+    (như PP-8 làm cho <code>/pole-photos</code>) — body khai lớn hơn có thể ra 502 thay vì 413, lỗi có từ trước. Upload ảnh / video vẫn không đi qua <code>/sync/push</code>.</p>
+  </div>
   <div class="card" id="ci-shard">
     <strong>CI — chia regression test thành hai shard song song + bỏ qua PR chỉ đổi văn bản, 13/11/2026</strong>
     <span class="tag t-next">Nhánh <code>ci/shard-api-tests</code> (từ <code>origin/dev</code> 73707cb) · commit xong, chưa push · chưa chạy trên GitHub</span>

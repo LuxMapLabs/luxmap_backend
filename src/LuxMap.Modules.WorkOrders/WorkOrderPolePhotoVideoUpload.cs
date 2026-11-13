@@ -47,8 +47,6 @@ public sealed partial class WorkOrderPolePhotoService
         if (length > MaxClipBytes) throw Error("UPLOAD_TOO_LARGE", HttpStatusCode.RequestEntityTooLarge);
         if (string.IsNullOrWhiteSpace(poleId)) throw OptionalJson.Invalid("pole_id");
         var captured = ParseCapturedAt(capturedAt);
-        var now = UtcMicrosecondClock.UtcNow();
-        if (captured < now - MaxCaptureAge || captured > now + MaxClockSkew) throw OptionalJson.Invalid("captured_at");
         var latitude = ParseCoordinate(lat, "lat", 90); var longitude = ParseCoordinate(lng, "lng", 180);
         var actorId = ActorId;
         await Order(id, true, ct);
@@ -58,6 +56,9 @@ public sealed partial class WorkOrderPolePhotoService
         }, LuxMapJsonOptions.Default)));
         Task<PolePhotoItem?> Replay() => ReplayAsync(id, actorId, op, hash, ct);
         if (await Replay() is { } replay) return (replay, false);
+        // The capture window is for a NEW clip only: a retry of a stored one is answered however old its capture has become (PV-6).
+        var now = UtcMicrosecondClock.UtcNow(clock);
+        if (captured < now - MaxCaptureAge || captured > now + MaxClockSkew) throw OptionalJson.Invalid("captured_at");
         // Refuse before taking a 100 MB body from a phone on mobile data, not after.
         Writable(await Order(id, true, ct));
         var target = await Target(id, poleId, ct);
