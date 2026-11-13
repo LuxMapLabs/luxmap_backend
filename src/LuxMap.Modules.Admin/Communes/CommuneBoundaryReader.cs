@@ -93,13 +93,21 @@ internal static class CommuneBoundaryReader
             : Factory.CreateLinearRing(points);
     }
 
-    /// <summary><c>[lng, lat]</c> — GeoJSON's order.</summary>
+    /// <summary>
+    /// <c>[lng, lat]</c> — GeoJSON's order. RFC 7946 §3.1.1 allows an altitude as a third number; it is accepted and dropped
+    /// (the column is 2D). Anything else — a fourth value, a <c>null</c> — is refused rather than silently ignored.
+    /// </summary>
     private static Coordinate ReadPosition(JsonElement position)
     {
         var values = position.EnumerateArray().ToArray();
-        if (values.Length < 2)
+        if (values.Length is < 2 or > 3)
         {
-            throw new FormatException("a position needs a longitude and a latitude");
+            throw new FormatException("a position is [longitude, latitude] with an optional altitude");
+        }
+
+        if (values.Length == 3 && values[2].ValueKind != JsonValueKind.Number)
+        {
+            throw new FormatException("an altitude, when given, must be a number");
         }
 
         var (lng, lat) = (values[0].GetDouble(), values[1].GetDouble());

@@ -29,7 +29,7 @@ public sealed record UpdateCommuneRequest
 /// <c>PUT /admin/communes/{id}/boundary</c> (COMMUNE-BOUNDARY): the outline, a GeoJSON <c>Polygon</c> or <c>MultiPolygon</c>
 /// in EPSG:4326. The key is required; <c>"boundary": null</c> clears the outline.
 /// </summary>
-public sealed record UpdateCommuneBoundaryRequest
+public sealed class UpdateCommuneBoundaryRequest
 {
     /// <summary>A GeoJSON <c>Polygon</c> or <c>MultiPolygon</c> geometry object, or <c>null</c> to clear the outline.</summary>
     /// <remarks>A <see cref="JsonElement"/> so JSON <c>null</c> arrives as <c>ValueKind.Null</c> while a missing key is still a 400.</remarks>

@@ -416,9 +416,11 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   suy xã cho sự cố không cột (phần còn lại của Q17) là quyết định riêng — đổi BE-18 quy tắc 2.
 - 🔴 **`GET /map/communes` tự áp phạm vi.** `AdministrativeUnit` không có query filter, mà `CommuneFilter.Narrow` trả `null` nghĩa là
   "để query filter lo" — trên bảng này `null` thành **mọi xã**. `CommuneLayerService` luôn giới hạn caller không system-wide vào id
-  trong claim (claim rỗng → không gì). Canh bằng `A_manager_gets_only_the_outlines_of_their_own_communes` (đã phá thử).
+  trong claim (claim rỗng → không gì). Canh bằng `A_manager_gets_only_the_outlines_of_their_own_communes` và
+  `An_empty_scope_gets_no_outlines_not_all_of_them` (token ký đúng, không claim xã) — cả hai đã phá thử.
 - Đọc GeoJSON polygon bằng **`CommuneBoundaryReader`** (Admin), không thêm package GeoJSON — cùng lý do `AssetGeometry`. Polygon đơn bọc
   thành MultiPolygon, SRID gắn tường minh, hợp lệ kiểm bằng `IsValidOp` (lý do lỗi trả về FE) và DB CHECK `ST_IsValid`.
+  Vị trí nhận 2 hoặc 3 số (độ cao bị bỏ); đừng nới thành "bỏ qua phần thừa" — `[lng, lat, null]` phải là 400 (Codex review 13/11).
 - `/auth/me` và `/admin/communes` vẫn đọc cả entity, nên polygon được kéo theo dù không trả ra. Vài xã × vài trăm đỉnh thì không đáng kể;
   nếu số xã lớn lên, chiếu cột (`Select`) ở hai chỗ đó.
 - Test dùng tiền tố riêng `bnd-test-` (xã) và `bnd-` (tài khoản). Tài khoản không phải admin chỉ giữ **một** xã (ACCT-1).

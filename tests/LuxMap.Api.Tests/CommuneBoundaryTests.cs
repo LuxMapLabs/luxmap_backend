@@ -1,10 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Errors;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 
 namespace LuxMap.Api.Tests;
@@ -95,6 +98,39 @@ public class CommuneBoundaryTests(AccountTestFactory factory) : IClassFixture<Ac
         Assert.Contains(ErrorCodes.CommuneForbidden, await asked.Content.ReadAsStringAsync());
     }
 
+    /// <summary>Asking for one's own commune AND another's is refused whole — never answered with the allowed half.</summary>
+    [Fact]
+    public async Task Asking_for_own_and_foreign_communes_together_is_403()
+    {
+        var admin = await AdminAsync();
+        var mine = await CreateAsync(admin);
+        var theirs = await CreateAsync(admin);
+        var manager = await ManagerAsync(admin, mine);
+
+        var response = await manager.GetAsync($"{MapRoute}?commune_id={mine}&commune_id={theirs}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains(ErrorCodes.CommuneForbidden, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// 🔴 The anchor table has no query filter, so an empty scope must mean NO outlines — not every one. A signed token with
+    /// a manager role and no commune claim is the empty scope (CommuneScope.Empty).
+    /// </summary>
+    [Fact]
+    public async Task An_empty_scope_gets_no_outlines_not_all_of_them()
+    {
+        var admin = await AdminAsync();
+        var outlined = await CreateAsync(admin);
+        await admin.PutAsJsonAsync($"{AdminRoute}/{outlined}/boundary", new { boundary = Polygon(Square) });
+        var client = Bearer(EmptyScopeToken());
+
+        var response = await client.GetAsync(MapRoute);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty((await Json(response)).GetProperty("features").EnumerateArray());
+    }
+
     public static TheoryData<string, string> BadOutlines() => new()
     {
         { "unclosed ring", """{"type":"Polygon","coordinates":[[[107.20,10.50],[107.21,10.50],[107.21,10.51],[107.20,10.51]]]}""" },
@@ -103,7 +139,44 @@ public class CommuneBoundaryTests(AccountTestFactory factory) : IClassFixture<Ac
         { "not a polygon", """{"type":"Point","coordinates":[107.20,10.50]}""" },
         { "no rings", """{"type":"Polygon","coordinates":[]}""" },
         { "not a number", """{"type":"Polygon","coordinates":[[["a",10.50],[107.21,10.50],[107.21,10.51],["a",10.50]]]}""" },
+        { "empty multipolygon", """{"type":"MultiPolygon","coordinates":[]}""" },
+        { "empty multipolygon member", """{"type":"MultiPolygon","coordinates":[[]]}""" },
+        { "nesting one level short", """{"type":"Polygon","coordinates":[[107.20,10.50],[107.21,10.50],[107.21,10.51],[107.20,10.50]]}""" },
+        { "object where a position goes", """{"type":"Polygon","coordinates":[[{"lng":107.20,"lat":10.50},[107.21,10.50],[107.21,10.51],[107.20,10.50]]]}""" },
+        { "null in a ring", """{"type":"Polygon","coordinates":[[[107.20,10.50],null,[107.21,10.51],[107.20,10.50]]]}""" },
+        { "null altitude", """{"type":"Polygon","coordinates":[[[107.20,10.50,null],[107.21,10.50,null],[107.21,10.51,null],[107.20,10.50,null]]]}""" },
+        { "four values", """{"type":"Polygon","coordinates":[[[107.20,10.50,0,0],[107.21,10.50,0,0],[107.21,10.51,0,0],[107.20,10.50,0,0]]]}""" },
+        { "huge number", """{"type":"Polygon","coordinates":[[[1e400,10.50],[107.21,10.50],[107.21,10.51],[1e400,10.50]]]}""" },
+        { "hole outside the shell", """{"type":"Polygon","coordinates":[[[107.20,10.50],[107.21,10.50],[107.21,10.51],[107.20,10.51],[107.20,10.50]],[[107.30,10.60],[107.31,10.60],[107.31,10.61],[107.30,10.60]]]}""" },
+        { "too many vertices", TooManyVertices() },
     };
+
+    /// <summary>A valid ring with one vertex more than the cap allows.</summary>
+    private static string TooManyVertices()
+    {
+        var count = 10_001;
+        var ring = Enumerable.Range(0, count)
+            .Select(i => (Lng: 107.20 + 0.01 * Math.Cos(2 * Math.PI * i / count), Lat: 10.50 + 0.01 * Math.Sin(2 * Math.PI * i / count)))
+            .Append((Lng: 107.21, Lat: 10.50))
+            .Select(p => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"[{p.Lng:R},{p.Lat:R}]"));
+        return $$"""{"type":"Polygon","coordinates":[[{{string.Join(",", ring)}}]]}""";
+    }
+
+    /// <summary>RFC 7946 allows an altitude as a third number: accepted and dropped, never a 400.</summary>
+    [Fact]
+    public async Task A_numeric_altitude_is_accepted_and_dropped()
+    {
+        var admin = await AdminAsync();
+        var id = await CreateAsync(admin);
+        var withAltitude = Square.Select(ring => ring.Select(p => new[] { p[0], p[1], 12.5 }).ToArray()).ToArray();
+
+        var response = await admin.PutAsJsonAsync($"{AdminRoute}/{id}/boundary", new { boundary = Polygon(withAltitude) });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var drawn = (await Json(await admin.GetAsync($"{MapRoute}?commune_id={id}")))
+            .GetProperty("features")[0].GetProperty("geometry").GetProperty("coordinates")[0][0][0];
+        Assert.Equal(2, drawn.GetArrayLength());
+    }
 
     [Theory]
     [MemberData(nameof(BadOutlines))]
@@ -148,6 +221,26 @@ public class CommuneBoundaryTests(AccountTestFactory factory) : IClassFixture<Ac
 
         Assert.Equal(first.GetProperty("updated_at").GetString(), again.GetProperty("updated_at").GetString());
     }
+
+    /// <summary>A real change moves updated_at: a different outline, then clearing it; clearing twice does not.</summary>
+    [Fact]
+    public async Task Replacing_or_clearing_the_outline_moves_updated_at()
+    {
+        var admin = await AdminAsync();
+        var id = await CreateAsync(admin);
+        var first = await Json(await admin.PutAsJsonAsync($"{AdminRoute}/{id}/boundary", new { boundary = Polygon(Square) }));
+        var moved = Square.Select(ring => ring.Select(p => new[] { p[0] + 0.05, p[1] }).ToArray()).ToArray();
+
+        var replaced = await Json(await admin.PutAsJsonAsync($"{AdminRoute}/{id}/boundary", new { boundary = Polygon(moved) }));
+        var cleared = await Json(await admin.PutAsJsonAsync($"{AdminRoute}/{id}/boundary", new { boundary = (object?)null }));
+        var clearedAgain = await Json(await admin.PutAsJsonAsync($"{AdminRoute}/{id}/boundary", new { boundary = (object?)null }));
+
+        Assert.True(UpdatedAt(replaced) > UpdatedAt(first));
+        Assert.True(UpdatedAt(cleared) > UpdatedAt(replaced));
+        Assert.Equal(UpdatedAt(cleared), UpdatedAt(clearedAgain));
+    }
+
+    private static DateTime UpdatedAt(JsonElement item) => item.GetProperty("updated_at").GetDateTime();
 
     [Fact]
     public async Task An_unknown_commune_is_404()
@@ -211,6 +304,19 @@ public class CommuneBoundaryTests(AccountTestFactory factory) : IClassFixture<Ac
         var tokens = await (await factory.CreateClient().PostLoginAsync(username, Password)).ReadTokensAsync();
         return Bearer(tokens.AccessToken);
     }
+
+    /// <summary>A correctly signed manager token with no <c>commune_ids</c> claim — the empty scope.</summary>
+    private static string EmptyScopeToken()
+        => new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = "luxmap-api",
+            Audience = "luxmap-clients",
+            Expires = DateTime.UtcNow.AddMinutes(10),
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(AuthTestExtensions.SeedPassword("JWT_SIGNING_KEY"))),
+                SecurityAlgorithms.HmacSha256),
+            Claims = new Dictionary<string, object> { ["sub"] = "USR-EMPTY-SCOPE", ["role"] = "manager" },
+        });
 
     private async Task<HttpClient> AdminAsync()
         => Bearer((await factory.CreateClient().LoginAsync("admin", "SEED_ADMIN_PASSWORD")).AccessToken);
