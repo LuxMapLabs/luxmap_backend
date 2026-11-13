@@ -40,6 +40,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageSettings` | Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện đã lưu của node trong phạm vi xã, phân trang theo `after` và `next_cursor`. |
 | `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW; trạng thái `online`, `offline`, `no_data`. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | `normal`, `anomaly`, `stale`, `no_data`; chẩn đoán mất áp riêng và tùy chọn hiệu chuẩn 10 bóng. |
 
