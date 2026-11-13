@@ -106,6 +106,32 @@ d["tags"] = [{"name": k, "description": v} for k, v in TAGS.items()]
 # ── helpers ────────────────────────────────────────────────────────────────────
 S = d["components"]["schemas"]
 
+# The bridge DTOs use strings on the wire. Publish their accepted values for client generation.
+iot_values = {
+    ("IotServerStatus", "status"): ["online", "offline", "unconfigured", "broker_down", "unreachable"],
+    ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
+    ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
+    ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
+    ("IotAnomaly", "code"): [
+        "telemetry_stale", "current_when_off", "voltage_loss", "voltage_deviation",
+        "current_deviation", "power_deviation", "lamp_count_shortfall",
+    ],
+    ("LampCountEstimate", "status"): ["insufficient_samples", "undetermined", "estimated"],
+}
+for (schema, field), values in iot_values.items():
+    S[schema]["properties"][field]["enum"] = values
+
+for schema in ("IotCommandRequest", "IotCommandStatus"):
+    properties = S[schema]["properties"]
+    properties["mode"]["enum"] = ["AUTO", "MANUAL"]
+    properties["command"]["enum"] = ["ON", "OFF", None]
+    properties["auto_schedule"] = {
+        "type": "object", "nullable": True,
+        "allOf": [{"$ref": "#/components/schemas/IotAutoSchedule"}],
+    }
+
+S["NodeProfile"]["properties"]["relay_no"]["enum"] = [1]
+
 def err_content():
     return {"application/json": {"schema": {"$ref": "#/components/schemas/ApiErrorResponse"}}}
 

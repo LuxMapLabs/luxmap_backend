@@ -25,8 +25,10 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 .ConfigurePrimaryHttpMessageHandler(() => new InvalidUpstream()));
         });
         var rig = await new LightingTestRig(fixture).RigAsync(issueSecret: false);
-        var pole = await fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters()
+        var relayTwoPole = await fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters()
             .Where(p => p.FeederId == rig.Feeders[1]).Select(p => p.PoleId).SingleAsync());
+        var pole = await fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters()
+            .Where(p => p.FeederId == rig.Feeders[0]).Select(p => p.PoleId).SingleAsync());
         using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
         using var managerToken = await fixture.ManagerClientAsync();
         using var foreignToken = await fixture.ForeignCommuneClientAsync();
@@ -40,8 +42,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var nodePath = $"{root}/nodes/{rig.Node}";
         var profile = new
         {
-            server_id = id, device_id = "probe", feeder_id = rig.Feeders[1], pole_id = pole,
-            relay_no = 2, nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
+            server_id = id, device_id = "probe", feeder_id = rig.Feeders[0], pole_id = pole,
+            relay_no = 1, nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
         };
 
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsJsonAsync($"{root}/servers", server)).StatusCode);
@@ -62,6 +64,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var credential = await admin.PostAsync(credentialPath, null);
         Assert.Equal(HttpStatusCode.OK, credential.StatusCode);
         Assert.True(credential.Headers.CacheControl?.NoStore == true);
+        var relayTwo = new
+        {
+            profile.server_id, profile.device_id, feeder_id = rig.Feeders[1], pole_id = relayTwoPole,
+            relay_no = 2, profile.nominal_voltage, profile.nominal_current_ma, profile.nominal_power_mw,
+        };
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PostAsJsonAsync($"{nodePath}/source", relayTwo)).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await manager.PostAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await manager.PostAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         var auditCount = await fixture.QueryAsync(db => db.Database.SqlQuery<int>(
@@ -97,6 +105,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.DeleteAsync($"{nodePath}/source")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync($"{nodePath}/source", relayTwo)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);

@@ -1,6 +1,6 @@
 # Tích hợp IoT LuxMap cho Frontend
 
-FE gọi [Backend LuxMap cổng 5142](http://localhost:5142/swagger/index.html) bằng header `Authorization: Bearer <access_token>`. Khi deploy, thay localhost bằng địa chỉ backend của môi trường tương ứng.
+FE gọi [Backend LuxMap cổng 5141](http://localhost:5141/swagger/index.html) bằng header `Authorization: Bearer <access_token>`. Khi deploy, thay localhost bằng địa chỉ backend của môi trường tương ứng.
 
 ```text
 FE ↔ HTTP API LuxMap ↔ HTTP nội bộ IoT Bridge ↔ MQTT ↔ ESP32 gateway ↔ LoRa ↔ ESP32 node
@@ -16,6 +16,8 @@ FE ↔ HTTP API LuxMap ↔ HTTP nội bộ IoT Bridge ↔ MQTT ↔ ESP32 gateway
 | `node_id` | `NODE-001` | ID tài sản do backend sinh, dùng trong API điều khiển và đọc dữ liệu. |
 
 ## 2. Đăng ký một bộ IoT mới
+
+Môi trường local cần cấu hình khóa bridge, khóa provisioning và origin bridge theo [hướng dẫn chạy backend](development.md#chạy-iot-bridge-local).
 
 Chuẩn bị tủ điện có GPS, feeder thuộc tủ đó và một trụ đèn thuộc feeder. Mỗi tủ hiện gắn tối đa một IoT node. Các ID và tọa độ dưới đây là ví dụ cho bộ thứ hai.
 
@@ -101,7 +103,22 @@ Manager chỉ gán nguồn cho node và server cùng xã, với thiết bị đ�
 
 Danh sách node trả `page`, `page_size`, `total` và `items`. Trang bắt đầu từ 1. Mặc định 50 mục, tối đa 200. Trang vượt quá tổng số trả `items: []`.
 
-Gateway báo `online` theo heartbeat. Node báo `online` theo độ mới của mẫu điện. Một gateway có thể online khi node chưa có dữ liệu mới. FE hiện nút điều khiển khi `can_control_feeder: true` và người dùng có quyền `ControlLighting`. Khi control_channel là iot_bridge, gọi endpoint ở mục 4. Nút tác động lên **cả feeder**, ví dụ **Tắt mạch FDR-001**. Điều khiển qua bridge hiện hỗ trợ relay 1.
+Gateway báo `online` theo heartbeat. Node báo `online` theo độ mới của mẫu điện. Một gateway có thể online khi node chưa có dữ liệu mới. FE hiện nút điều khiển khi `can_control_feeder: true` và người dùng có quyền `ControlLighting`. Khi control_channel là iot_bridge, gọi endpoint ở mục 4. Nút tác động lên **cả feeder**, ví dụ **Tắt mạch FDR-001**. Mỗi node qua bridge chỉ dùng relay 1. Khi tạo hoặc sửa nguồn đo, gửi `relay_no: 1`.
+
+| API | Giá trị `status` | Ý nghĩa |
+|---|---|---|
+| `GET /iot/servers` | `online` | Bridge nhận heartbeat gateway trong thời gian chờ. |
+| | `offline` | Gateway đã được ánh xạ nhưng heartbeat vắng hoặc quá hạn. |
+| | `unconfigured` | Chưa xác định được thiết bị hoặc tuyến gateway cho server. |
+| | `broker_down` | Broker MQTT của bridge chưa hoạt động. |
+| | `unreachable` | Backend không đọc được phản hồi trạng thái hợp lệ từ bridge. |
+| `GET /iot/nodes` | `online` | Mẫu điện gần nhất còn trong ngưỡng thời gian của node. |
+| | `offline` | Mẫu điện gần nhất đã quá ngưỡng thời gian của node. |
+| | `no_data` | Nguồn đã cấu hình và chưa có mẫu điện. |
+| | `unconfigured` | Node chưa có ánh xạ nguồn đo hợp lệ. |
+| | `source_unavailable` | Bridge lỗi hoặc đã hết ngân sách chờ 5 giây của trang. |
+
+Các đường dẫn rút gọn trong bảng dùng tiền tố `/api/v1`.
 
 ## 4. Gửi lệnh và đặt lịch AUTO
 
@@ -112,6 +129,8 @@ Gateway báo `online` theo heartbeat. Node báo `online` theo độ mới của 
 | Bật | `{"mode":"MANUAL","command":"ON"}` |
 | Tắt | `{"mode":"MANUAL","command":"OFF"}` |
 | AUTO theo lịch hiện có | `{"mode":"AUTO","command":null}` |
+
+Giữ nguyên chữ HOA trong `mode` và `command` của kênh IoT bridge. Đây là ngoại lệ so với enum chữ thường của Contract. `auto_schedule` trong phản hồi có thể là `null` khi chưa từng đặt lịch.
 
 Để đặt lịch mới, gửi hai mốc khác nhau theo định dạng 24 giờ `HH:mm`.
 
@@ -143,4 +162,33 @@ Lệnh mới có `expires_at` theo UTC và hết hạn sau 5 phút. Nếu đến
 | `GET /api/v1/iot/nodes/{nodeId}/electrical/history?after=0&limit=100` | Đọc lịch sử. Dùng `next_cursor` làm `after` cho trang sau hoặc lần lấy mẫu mới. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
 
-`400` thường là dữ liệu đầu vào hoặc ánh xạ relay không hợp lệ. `401` là cần đăng nhập. `403` là thiếu quyền. `404` là tài sản không tồn tại hoặc ngoài phạm vi truy cập. `409` là cấu hình trùng. `503` là nguồn IoT chưa cấu hình hoặc backend chưa gọi được bridge. Hiển thị thông báo từ `error.message` khi có.
+Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA) và `measurement.power_mw` (mW). Lịch sử dùng `items[].reading.data.{voltage,current,power,lux}` theo thứ tự V, mA, mW, lx. `timestamp` trong dữ liệu lịch sử là giờ đo theo RTC DS3231 của node. `received_at` là giờ UTC khi server nhận mẫu. Dữ liệu gửi bù có thể được nhận muộn hơn lúc đo.
+
+| Trường | Giá trị | Ý nghĩa |
+|---|---|---|
+| `electrical.status` | `online` | Mẫu điện gần nhất còn trong ngưỡng thời gian. |
+| | `offline` | Mẫu điện gần nhất quá ngưỡng thời gian. |
+| | `no_data` | Chưa có mẫu điện. |
+| `diagnostics.status` | `normal` | Chưa phát hiện bất thường theo cấu hình hiện tại. |
+| | `anomaly` | Có ít nhất một bất thường trong `anomalies`. |
+| | `stale` | Mẫu đã cũ và không dùng để chẩn đoán điện hiện tại. |
+| | `no_data` | Chưa có mẫu để chẩn đoán. |
+| `anomalies[].code` | `telemetry_stale` | Thời gian từ mẫu cuối vượt ngưỡng. |
+| | `current_when_off` | Dòng điện vượt ngưỡng cho phép khi đèn ở trạng thái OFF. |
+| | `voltage_loss` | Điện áp gần 0 khi đèn được yêu cầu bật. |
+| | `voltage_deviation` | Điện áp lệch khỏi giá trị tham chiếu quá ngưỡng. |
+| | `current_deviation` | Dòng điện lệch khỏi giá trị tham chiếu quá ngưỡng. |
+| | `power_deviation` | Công suất lệch khỏi giá trị tham chiếu quá ngưỡng. |
+| | `lamp_count_shortfall` | Số bóng sáng ước lượng thấp hơn số bóng hiệu chuẩn. |
+| `lamp_count.status` | `insufficient_samples` | Chưa đủ 25 mẫu hợp lệ. |
+| | `undetermined` | Đủ 25 mẫu nhưng chưa đủ phiếu để chọn một khung dòng. |
+| | `estimated` | Một khung đủ phiếu để ước lượng số bóng sáng và số bóng thiếu. |
+
+| HTTP | `error.code` | Ý nghĩa |
+|---|---|---|
+| 400 | `VALIDATION_FAILED` | Dữ liệu đầu vào, origin hoặc ánh xạ relay không hợp lệ. |
+| 404 | `ASSET_NOT_FOUND` | Tài sản không tồn tại hoặc nằm ngoài phạm vi truy cập. |
+| 409 | `IOT_REGISTRATION_CONFLICT` | Đăng ký xung đột với cấu hình hiện có. |
+| 503 | `IOT_SOURCE_UNAVAILABLE` | Nguồn chưa dùng được hoặc bridge không trả phản hồi hợp lệ. |
+
+`401` là cần đăng nhập. `403` là thiếu quyền. Hiển thị thông báo từ `error.message` khi có.
