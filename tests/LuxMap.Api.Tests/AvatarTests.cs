@@ -247,6 +247,24 @@ public sealed class AvatarTests(AvatarTestFactory factory) : IClassFixture<Avata
     }
 
     [Fact]
+    public async Task Upload_holds_account_lock_while_writing_objects()
+    {
+        var (client, id) = await Account(UserRole.Manager);
+        var observed = false;
+        factory.Photos.DuringWrite = async () =>
+        {
+            // A separate connection must conflict with the upload's lock before any object is written.
+            var error = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => factory.QueryAsync(db =>
+                db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM app_user WHERE user_id = {id} FOR NO KEY UPDATE NOWAIT")));
+            Assert.Equal(Npgsql.PostgresErrorCodes.LockNotAvailable, error.SqlState);
+            observed = true;
+        };
+        Assert.Equal(HttpStatusCode.OK, (await Upload(client, PhotoStore.Jpeg())).StatusCode);
+        Assert.True(observed);
+        AssertStored(await Row(id));
+    }
+
+    [Fact]
     public async Task Storage_failure_never_publishes_a_row_before_objects()
     {
         var (client, id) = await Account(UserRole.Manager);

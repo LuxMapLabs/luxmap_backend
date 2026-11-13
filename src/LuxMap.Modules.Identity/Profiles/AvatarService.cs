@@ -41,16 +41,18 @@ public sealed class AvatarService(
 
     public async Task<AvatarResponse> UploadAsync(Stream content, CancellationToken ct)
     {
-        var user = await db.Set<AppUser>().SingleOrDefaultAsync(u => u.UserId == OwnUserId, ct)
+        var user = await db.Set<AppUser>().AsNoTracking().SingleOrDefaultAsync(u => u.UserId == OwnUserId, ct)
             ?? throw Missing();
         var clean = await sanitizer.SanitizeJpegAsync(content, AvatarLimits.Image, ct);
         using var image = new MemoryStream(clean, writable: false);
         // Sanitizing (the slow, model-free CPU work) stays outside the lock. The keys are fixed per user, so the object
         // write is last-writer-wins independent of the row: two overlapping uploads could leave the row of one pointing
-        // at the byte counts of the other. The lock spans only the write of the already-buffered bytes and the row
-        // commit, serializing uploads of one account; objects are still written before the row commits.
+        // at the byte counts of the other. The lock spans thumbnail preparation, the write of the already-buffered
+        // bytes and the row commit, serializing uploads of one account; objects are written before the row commits.
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM app_user WHERE user_id = {user.UserId} FOR UPDATE", ct);
+        user = await db.Set<AppUser>().SingleOrDefaultAsync(u => u.UserId == OwnUserId, ct)
+            ?? throw Missing();
         var stored = await store.StoreImageAsync(StorageBucket.Avatar, user.UserId, image, ct);
         user.AvatarObjectKey = stored.OriginalKey;
         user.AvatarByteCount = stored.OriginalBytes;
