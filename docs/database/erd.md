@@ -37,7 +37,7 @@ gọn hơn đề xuất gốc (32 bảng mới → 22). Nguồn phạm vi: [Phi�
 | Q14 | Dataset gán nhãn: **manifest có phiên bản ngoài DB** (object store), chưa làm bảng | Deliverable nhưng chưa có UI gán nhãn; Codex + Claude |
 | Q15 | Không tạo bảng aggregate (`feeder_runtime_night`, độ phủ theo tuyến) — **tính từ nguồn trước**, materialize khi đo thấy cần | Codex + Claude |
 | Q16 | `external_ref` tạm → mã kiểm kê thật: **cập nhật trên cùng ID** theo bảng ánh xạ đã duyệt, không alias | D-R10; Codex phương án A |
-| Q17 | `administrative_unit` thêm **ranh giới nullable** (nguồn OSM, đã dùng thật ở khảo sát 28/09) — để suy xã cho sự cố không có cột | BE-18 quy tắc 2 ghi "chưa có nguồn ranh giới" — nay đã có |
+| Q17 | `administrative_unit` thêm **ranh giới nullable** (nguồn OSM, đã dùng thật ở khảo sát 28/09) — để suy xã cho sự cố không có cột | BE-18 quy tắc 2 ghi "chưa có nguồn ranh giới" — nay đã có. **13/11: cột `boundary` đã thêm, mới dùng để vẽ** (drift COMMUNE-BOUNDARY); suy xã chưa làm |
 | Q18 | `fixture.slot smallint NOT NULL` 1..2 + UNIQUE `(pole_id, slot) WHERE removed_date IS NULL` thay "một bóng đang dùng mỗi cột" (D-11): **một cột tối đa hai bản ghi bóng đang dùng**; trạng thái, baseline vẫn theo cột | MULTI-FIXTURE (drift MF-1), Mỹ 11/11/2026; SELF-SIGNED |
 
 **POLE-SEGMENT-NULL (Mỹ, 02/11/2026):** `pole.segment_id` nullable, quan hệ cột → tuyến optional;

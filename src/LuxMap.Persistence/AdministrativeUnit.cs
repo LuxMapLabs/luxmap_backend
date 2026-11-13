@@ -3,6 +3,7 @@ using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Communes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using NetTopologySuite.Geometries;
 
 namespace LuxMap.Persistence;
 
@@ -25,10 +26,10 @@ namespace LuxMap.Persistence;
 /// query the <c>commune_ids</c> claim explicitly. Do not "fix" this for consistency.
 /// </para>
 /// <para>
-/// No boundary polygon column: section 7 compares the claim against the <c>commune_id</c> column
-/// rather than doing spatial containment, and there is still no source of real boundaries. What it does
-/// carry is a map FRAME (COMMUNE-BBOX): four numbers an administrator types in, so a user's map opens on
-/// their commune and stays there. Nothing is filtered or refused for lying outside it.
+/// Two optional shapes, both for DRAWING only: a map FRAME (COMMUNE-BBOX) — four numbers an administrator types in, so a
+/// user's map opens on their commune and stays there — and a BOUNDARY polygon (COMMUNE-BOUNDARY), the outline the map
+/// draws around the commune. Neither decides anything: section 7 compares the claim against the <c>commune_id</c> column,
+/// never spatial containment, so nothing is filtered, hidden or refused for lying outside either.
 /// </para>
 /// </remarks>
 public class AdministrativeUnit
@@ -63,6 +64,12 @@ public class AdministrativeUnit
     public double? BboxMaxLng { get; set; }
 
     public double? BboxMaxLat { get; set; }
+
+    /// <summary>
+    /// The commune's outline, EPSG:4326, stored as a MultiPolygon (a single Polygon is wrapped). <c>NULL</c> until an
+    /// administrator sets one. A drawing aid, not a scope — see the remarks.
+    /// </summary>
+    public MultiPolygon? Boundary { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
@@ -115,12 +122,17 @@ public sealed class AdministrativeUnitConfiguration : IEntityTypeConfiguration<A
                 + "AND bbox_max_lng <> 'NaN'::float8 AND bbox_max_lat <> 'NaN'::float8 "
                 + "AND bbox_min_lng >= -180 AND bbox_max_lng <= 180 AND bbox_min_lat >= -90 AND bbox_max_lat <= 90 "
                 + "AND bbox_min_lng < bbox_max_lng AND bbox_min_lat < bbox_max_lat)");
+            // The service refuses an invalid outline with a reason; this catches any writer that skips it.
+            table.HasCheckConstraint("ck_administrative_unit_boundary_valid",
+                "boundary IS NULL OR (ST_IsValid(boundary) AND NOT ST_IsEmpty(boundary))");
         });
         builder.HasKey(unit => unit.CommuneId);
 
         builder.Property(unit => unit.CommuneId).HasPrefixedId(PrefixedIds.AdministrativeUnit);
         builder.Property(unit => unit.Name).HasColumnType("text").IsRequired();
         builder.Property(unit => unit.SeedKey).HasColumnType("text");
+        // No GIST index: the outline is only read back for drawing, never searched spatially.
+        builder.Property(unit => unit.Boundary).HasColumnType($"geometry(MultiPolygon,{SpatialConstants.Srid})");
         builder.Property(unit => unit.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(unit => unit.UpdatedAt).HasDefaultValueSql("now()");
 

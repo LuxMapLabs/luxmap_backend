@@ -53,7 +53,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="wo-upload-fixes">
     <strong>Sửa hai lỗi upload của phiếu công việc, 13/11/2026</strong>
-    <span class="tag t-next">Code xong, commit trên <code>fix/pole-video-replay-evidence-limit</code> (từ <code>origin/dev</code> e89cc5a) · chưa push · chưa báo WP5 / WP6</span>
+    <span class="tag t-next">PR #249 vào <code>dev</code> (nhánh <code>fix/pole-video-replay-evidence-limit</code>, từ <code>origin/dev</code> e89cc5a) · chưa merge · chưa báo WP5 / WP6</span>
     <p>Codex khảo sát upload ảnh theo phiếu (đọc, không sửa) và tìm ra hai lỗi; Claude kiểm lại trong code rồi sửa.
     <b>1. Gửi lại clip cột</b> (<code>PUT /work-orders/{id}/pole-videos/{client_op_id}</code>): hạn <code>captured_at</code> ≤ 7 ngày được kiểm
     <em>trước</em> bước replay, nên app gửi lại một clip server đã lưu, khi clip đã cũ hơn 7 ngày, nhận 400 thay vì 200 + bản đã lưu (trái PV-6).
@@ -64,8 +64,20 @@
     <p>Kiểm (Claude): test mới <code>A_retry_of_a_stored_clip_is_answered_after_its_capture_has_aged_past_the_week_but_a_new_clip_is_not</code>
     và <code>A_photo_of_exactly_16_MiB_is_taken_with_its_form_around_it_and_one_byte_more_is_a_413</code>; phá thử 3 chốt ⇒ đều đỏ;
     toàn bộ suite xanh (427 + 45 + 83 + 1688, 7 skip có sẵn), mã thoát 0.</p>
-    <p class="muted"><b>Còn:</b> push + PR vào <code>dev</code> khi Mỹ cho. Caddy chưa có matcher chặn sớm Content-Length &gt; 17 MiB cho hai route ảnh này
+    <p class="muted"><b>Còn:</b> merge #249, báo WP5 / WP6. Caddy chưa có matcher chặn sớm Content-Length &gt; 17 MiB cho hai route ảnh này
     (như PP-8 làm cho <code>/pole-photos</code>) — body khai lớn hơn có thể ra 502 thay vì 413, lỗi có từ trước. Upload ảnh / video vẫn không đi qua <code>/sync/push</code>.</p>
+  </div>
+  <div class="card" id="ci-shard">
+    <strong>CI — chia regression test thành hai shard song song + bỏ qua PR chỉ đổi văn bản, 13/11/2026</strong>
+    <span class="tag t-next">Nhánh <code>ci/shard-api-tests</code> (từ <code>origin/dev</code> 73707cb) · commit xong, chưa push · chưa chạy trên GitHub</span>
+    <p>15 run gần nhất mất 8.5–14 phút; bước test chiếm 7–11 phút, gần hết là <code>LuxMap.Api.Tests</code>. Wall time = <code>AssetDatabaseCollection</code> (tuần tự có chủ ý, ~595 s),
+    trong đó riêng <code>WorkOrderTests</code> ~298 s (79 s thân test + ~0.77 s setup × 284 test).
+    <b>Shard:</b> matrix <code>work-orders</code> (<code>WorkOrderTests</code> + test Python + xuất / lint spec) và <code>rest</code> (mọi test còn lại), mỗi shard một VM ⇒ PostGIS và <code>pole_id_seq</code> riêng;
+    hai filter là phần bù đúng của nhau — đã kiểm bằng <code>--list-tests</code>: 284 + 1956 = 2240, trùng 0, thiếu 0. Cả hai shard dựng EMQX. Artifact TRX tách tên theo shard. Chạy riêng shard <code>work-orders</code> trên máy (container PostGIS mới): 282 passed / 2 skip (sẵn có, ACCT-1 / D-6b) / 0 fail, mã thoát 0, 2 m 36–50 s. Shard <code>rest</code> chưa chạy riêng trên máy.
+    <b>Bỏ qua:</b> <code>paths</code> loại <code>docs/**</code> (trừ <code>docs/openapi/**</code>), <code>.ai/**</code>, <code>*.md</code> — không test / generator / build nào đọc chúng.
+    Tên check đổi thành <code>Merge result / work-orders</code> và <code>Merge result / rest</code>; <code>dev</code> chưa có required check nên không chặn merge. Files: <code>.github/workflows/ci.yml</code>, <code>docs/development.md</code>.</p>
+    <p class="muted"><b>Còn:</b> push + PR khi Mỹ cho, đo thời gian thật trên GitHub (ước tính ~6–7 phút). Bật required check thì phải thay <code>paths</code> bằng bước kiểm thay đổi trong job.
+    Tiếp theo đáng làm: setup ~0.77 s mỗi test của <code>WorkOrderTests</code> (<code>InitializeAsync</code>) — đường găng của shard <code>work-orders</code>.</p>
   </div>
   <div class="card" id="asset-segment-length-null">
     <strong>ASSET-SEGMENT-LENGTH-NULL — <code>length_m</code> của tuyến null khi chưa có hình, 12/11/2026</strong>
@@ -1244,6 +1256,9 @@
 
   <h2>MAIL-LAYOUT — giao diện email mời / đặt lại mật khẩu, 13/11/2026</h2>
   <div class="card"><p><span class="tag t-next">Nhánh <code>fix/invite-mail-layout</code>, chưa PR</span> Theo góp ý của Mỹ trên email mời thật: bỏ khối "Nút không hoạt động? Sao chép liên kết…" ở bản HTML (link thô vẫn nằm ở phần plain-text của thư multipart); câu "Nếu bạn không yêu cầu việc này" vô nghĩa với thư mời (người nhận không yêu cầu gì) ⇒ tách theo mục đích: mời — "Tài khoản chưa dùng được cho tới khi mật khẩu được đặt" (đúng: <code>PasswordHash</code> null thì không đăng nhập được); đặt lại — "Mật khẩu hiện tại vẫn giữ nguyên". Bố cục mới: wordmark ngoài thẻ, thẻ trắng viền vàng trên, nhãn nhỏ theo mục đích, ô tên đăng nhập một dòng, nút full-width, chân trang gom khẩu hiệu. File: <code>AccountMailTemplate.cs</code>, <code>AccountMailTemplateTests.cs</code> (+2 test, phá thử với template cũ: 3 đỏ). 9/9 test template xanh; xem trước HTML ở 800 px và 375 px. <strong>Codex review</strong> (<code>gpt-6.1-sol</code> high, chỉ đọc, ~49.5k token): 3 P2 đều đúng và đã sửa — nhãn vàng 4.44:1 → <code>#9c6000</code> 5.14:1, chân thư 2.64:1 → 4.79:1, khoảng cách bằng padding trên <code>p</code>/<code>div</code> (Outlook bỏ) chuyển sang ô bảng / margin; <code>.ai/reviews/MAIL-LAYOUT-by-codex.md</code>. <strong>Còn:</strong> chưa thử trên Gmail / Outlook thật, dark mode tự đảo màu tuỳ client; không migration, không chạm API.</p></div>
+
+  <h2>COMMUNE-BOUNDARY — ranh giới xã để khoanh vùng trên bản đồ, 13/11/2026</h2>
+  <div class="card"><p><span class="tag t-next">Nhánh <code>feat/COMMUNE-BOUNDARY</code>, chưa PR</span> FE đang khoanh vùng bằng hình chữ nhật <code>bbox</code>; nay xã có <strong>ranh giới polygon</strong> (hiện thực Q17 của ERD, phần vẽ). Drift <strong>COMMUNE-BOUNDARY CBD-1…CBD-6</strong> (SELF-SIGNED 13/11, chạm API, chỉ thêm). Cột <code>administrative_unit.boundary geometry(MultiPolygon,4326)</code> + CHECK <code>ST_IsValid</code>; <code>PUT /admin/communes/{id}/boundary</code> (<code>ManageCommunes</code>, GeoJSON Polygon / MultiPolygon, <code>null</code> xoá, kiểm vòng khép, tự cắt, đảo lat/lng, ≤ 10 000 đỉnh); <code>has_boundary</code> trên item xã; <code>GET /map/communes</code> (<code>ReadNetwork</code>) chỉ trả xã trong phạm vi người gọi — tự áp scope vì bảng xã không có query filter. Ranh giới <strong>chỉ để vẽ</strong>: phân quyền vẫn theo <code>commune_id</code> (staff đã chỉ thấy tài sản xã mình từ trước). Dữ liệu OSM Long Phước / Long Bình ở <code>scripts/data/commune-boundaries.geojson</code>, nạp bằng <code>scripts/load_commune_boundaries.py --apply</code> (qua API). Migration <code>CommuneBoundary</code>, chưa áp <code>luxmap_dev</code> / VPS. Test: 26 ca (<code>CommuneBoundaryTests.cs</code>), phá thử chốt scope → đỏ đúng test; hai test migration cũ chuyển sang <code>OldSchemaCommune</code> (chèn xã bằng SQL); toàn bộ 1698 + 424 + 45 + 83 xanh (7 skip có sẵn), mã thoát 0; OpenAPI xuất lại (186 operation), lint 10 cảnh báo như cũ. <strong>Codex review (gpt-6.1-sol high, 13/11):</strong> 0 P1 · 3 P2 · 2 P3, đã sửa hết — chặn <code>null</code> / giá trị thứ tư trong vị trí (độ cao số vẫn nhận), thêm 14 ca test (scope rỗng bằng token không claim xã, 9 ca polygon sai, <code>updated_at</code>), DTO sang <code>sealed class</code>; phá thử 4 chốt đều đỏ đúng test (<code>.ai/reviews/COMMUNE-BOUNDARY-by-codex.md</code>). <strong>Còn:</strong> áp migration + nạp ranh giới trên <code>luxmap_dev</code> / VPS; báo WP5 (lớp <code>/map/communes</code>, ghi nguồn © OpenStreetMap); suy xã từ toạ độ là quyết định riêng.</p></div>
 
   <h2>CI — advisory ImageSharp 3.1.12, 08/10/2026</h2>
   <div class="card"><p><span class="tag t-next">Đã merge (PR #120) — tạm, chờ license key để lên 4.1.2</span> 07/10 GitHub công bố 5 advisory (3 high) cho ImageSharp ≤ 4.1.1; <code>dotnet restore -warnaserror</code> làm đỏ MỌI PR. Bản vá chỉ ở 4.1.2, mà 4.x cần <code>SixLaborsLicenseKey</code>. Mỹ chọn tắt đúng 5 mã (<code>Directory.Build.props</code>) — hợp lệ vì mọi decode đi qua cấu hình chỉ-JPEG; <code>JpegOnlyDecodeTests</code> canh tiền đề đó. <strong>Còn:</strong> xin license key Six Labors → lên 4.1.2 → gỡ suppress.</p></div>

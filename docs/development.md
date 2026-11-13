@@ -54,9 +54,20 @@ regression test (không benchmark). CI tạo `.env` tạm và dựng EMQX từ C
 nạp FO-26 (BE-36, `TestDatabase`), giống hệt trên máy dev. Mật khẩu seed đọc từ biến môi trường sau khi nạp `.env`.
 Không dùng DB dev chung cho CI.
 
-**Cần cấu hình trên GitHub:** đặt `Merge result / build, tests, OpenAPI` làm required check của
-`dev` và bật **Require branches to be up to date before merging**, hoặc dùng merge queue
-(workflow đã nhận `merge_group`). Nếu thiếu ràng buộc này, check xanh cũ vẫn có thể được dùng sau
+**Hai shard song song.** Regression test chia thành hai job, mỗi job một VM nên có container PostGIS
+và `pole_id_seq` riêng: `Merge result / work-orders` chạy `WorkOrderTests`, kèm test Python và xuất / lint spec;
+`Merge result / rest` chạy mọi test còn lại. Hai filter là phần bù đúng của nhau, nên mỗi test chạy
+đúng một lần. `AssetDatabaseCollection` vẫn tuần tự **trong** từng shard. Thêm shard thì chia theo
+**nguyên class** và giữ hai filter là phần bù của nhau.
+
+**PR chỉ đổi văn bản không chạy CI:** `docs/**` (trừ `docs/openapi/**`), `.ai/**`, `*.md`. Không test,
+generator hay bước build nào đọc các đường dẫn này.
+
+**Cần cấu hình trên GitHub:** hiện `dev` chưa có required check. Khi bật, đặt **cả hai**
+`Merge result / work-orders` và `Merge result / rest` làm required check, và bật **Require branches to be up to date before merging**
+hoặc dùng merge queue (workflow đã nhận `merge_group`). Workflow bị bỏ qua theo đường dẫn thì
+không báo check nào, nên PR chỉ đổi docs sẽ chờ required check mãi. Khi bật required check, thay `paths`
+bằng bước kiểm thay đổi bên trong job. Nếu thiếu ràng buộc up-to-date, check xanh cũ vẫn có thể được dùng sau
 khi PR khác đổi `dev`, tái diễn lỗi #46/#47. Khi check spec đỏ, chạy lại các lệnh ở mục
 [Xuất OpenAPI spec ra file](#xuất-openapi-spec-ra-file) rồi commit cả hai file sinh; không sửa tay.
 

@@ -10,8 +10,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace LuxMap.Modules.Admin.Communes;
 
 /// <summary>
-/// Communes and their map frames for the system admin (COMMUNE-BBOX). A user's map opens on the frames of their communes —
-/// <c>GET /auth/me</c> → <c>communes[]</c>, <c>map_bounds</c>. Assigning people to communes is <c>/admin/users</c>.
+/// Communes, their map frames and outlines for the system admin (COMMUNE-BBOX, COMMUNE-BOUNDARY). A user's map opens on the
+/// frames of their communes — <c>GET /auth/me</c> → <c>communes[]</c>, <c>map_bounds</c>. Assigning people to communes is <c>/admin/users</c>.
 /// </summary>
 [ApiController]
 [ApiVersion("1.0")]
@@ -51,4 +51,17 @@ public sealed class AdminCommunesController(CommuneAdminService service) : Contr
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     public Task<CommuneItem> Update(string id, [FromBody] UpdateCommuneRequest request, CancellationToken ct)
         => service.UpdateAsync(id, request, ct);
+
+    /// <summary>
+    /// Sets the commune's outline (COMMUNE-BOUNDARY) from a GeoJSON <c>Polygon</c> or <c>MultiPolygon</c>, EPSG:4326,
+    /// <c>[lng, lat]</c>; <c>"boundary": null</c> clears it. A separate call from <c>PUT /{id}</c> so the name-and-frame form
+    /// never has to carry the polygon. Drawing only — assets outside the outline are neither hidden nor refused.
+    /// </summary>
+    [HttpPut("{id}/boundary")]
+    [Authorize(Policy = LuxMapPolicies.ManageCommunes)]
+    [ProducesResponseType<CommuneItem>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public Task<CommuneItem> UpdateBoundary(string id, [FromBody] UpdateCommuneBoundaryRequest request, CancellationToken ct)
+        => service.UpdateBoundaryAsync(id, request, ct);
 }

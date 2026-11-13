@@ -54,9 +54,9 @@ public class Fault : ICommuneScoped, IAudited
     /// <item>With a pole, the server reads it from the pole. The write guard checks that a commune is
     /// inside the caller's scope; it does NOT check that it matches the pole's, so a client-supplied
     /// value could pass both checks and still file the fault under the wrong commune.</item>
-    /// <item>Without a pole, it comes from the caller's JWT scope. <c>administrative_unit</c> carries
-    /// no boundary geometry — deliberately, Branch C has no source for real boundaries — so deriving
-    /// it from <c>lat</c>/<c>lng</c> is not possible.</item>
+    /// <item>Without a pole, it comes from the caller's JWT scope. <c>administrative_unit</c> now carries an
+    /// optional outline (COMMUNE-BOUNDARY), but for drawing only: deriving the commune from <c>lat</c>/<c>lng</c>
+    /// would change BE-18 rule 2 and is a separate decision.</item>
     /// </list>
     /// A caller scoped to several communes has to say which, since neither source can decide for
     /// them. Registered as drift: Contract section 2.8 has no <c>commune_id</c> in the body.
