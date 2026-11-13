@@ -11,14 +11,16 @@ namespace LuxMap.Modules.Identity.Accounts;
 /// Written the way mail clients need it, not the way a web page would be: layout with tables, every
 /// style inline (some clients and forwarding paths drop or ignore <c>&lt;style&gt;</c> blocks), no images
 /// (often blocked), line heights in px (Outlook's Word engine mishandles unitless ones), and a button
-/// that is a link inside a coloured cell, with <c>mso-padding-alt</c> so Outlook keeps its size. Every value from an account is
+/// that is a link inside a coloured cell, with <c>mso-padding-alt</c> so Outlook keeps its size. Gaps and borders sit on table
+/// cells or paragraph margins, never padding on a <c>p</c> / <c>div</c> (Outlook drops it); every text colour passes WCAG AA
+/// against its background. Every value from an account is
 /// HTML-encoded: a display name is typed by an admin and must not become markup in someone's inbox.
 /// </remarks>
 public static class AccountMailTemplate
 {
     private const string Navy = "#0f2a44";
     private const string Amber = "#f5a623";
-    private const string AmberText = "#a86a00";
+    private const string AmberText = "#9c6000";
     private const string Ink = "#1f2933";
     private const string Muted = "#5f6b7a";
     private const string Line = "#e3e8ef";
@@ -87,7 +89,7 @@ public static class AccountMailTemplate
                     </table>
                   </td></tr>
                   <tr><td style="background-color:#ffffff;border:1px solid {Line};border-top:4px solid {Amber};border-radius:12px;padding:32px 32px 28px;color:{Ink};font-size:15px;line-height:24px;">
-                    <div style="font-size:12px;line-height:16px;font-weight:700;color:{AmberText};text-transform:uppercase;letter-spacing:1px;padding-bottom:8px;">{e.Encode(eyebrow)}</div>
+                    <p style="margin:0 0 8px;font-size:12px;line-height:16px;font-weight:700;color:{AmberText};text-transform:uppercase;letter-spacing:1px;">{e.Encode(eyebrow)}</p>
                     <h1 style="margin:0 0 20px;font-size:24px;line-height:30px;font-weight:700;color:{Navy};">{e.Encode(heading)}</h1>
                     <p style="margin:0 0 8px;">Chào <strong>{e.Encode(fullName)}</strong>,</p>
                     <p style="margin:0 0 24px;">{e.Encode(opening)}</p>
@@ -107,9 +109,13 @@ public static class AccountMailTemplate
                       </td></tr>
                     </table>
                     <p style="margin:0 0 24px;font-size:13px;line-height:20px;color:{Muted};text-align:center;">Liên kết có hiệu lực đến <strong style="color:{Ink};">{e.Encode(expires)}</strong> (giờ Việt Nam) và chỉ dùng được một lần.</p>
-                    <p style="margin:0;padding-top:18px;border-top:1px solid {Line};font-size:13px;line-height:20px;color:{Muted};">{e.Encode(ignoreNote)}</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr><td style="border-top:1px solid {Line};padding-top:18px;">
+                        <p style="margin:0;font-size:13px;line-height:20px;color:{Muted};">{e.Encode(ignoreNote)}</p>
+                      </td></tr>
+                    </table>
                   </td></tr>
-                  <tr><td align="center" style="padding:20px 8px 0;font-size:12px;line-height:18px;color:#8a96a8;">
+                  <tr><td align="center" style="padding:20px 8px 0;font-size:12px;line-height:18px;color:{Muted};">
                     LuxMap · Quản lý chiếu sáng đường giao thông nông thôn<br>
                     Email tự động — vui lòng không trả lời.
                   </td></tr>
