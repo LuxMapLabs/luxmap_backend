@@ -37,6 +37,8 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/servers` | `ReadNetwork` | Chỉ hiện server có node thuộc xã được xem. `online` khi broker nhận heartbeat của gateway trong 30 giây gần nhất, `offline` khi chưa nhận hoặc đã quá hạn. `unconfigured` khi chưa xác định được gateway duy nhất từ ánh xạ thiết bị, `broker_down` khi broker dừng và `unreachable` khi nguồn trạng thái không truy cập được hoặc trả dữ liệu không hợp lệ. |
 | `POST /api/v1/iot/nodes/{nodeId}/command` | `ControlLighting` | Gửi ON, OFF hoặc AUTO qua nguồn IoT đã đăng ký của node trong phạm vi xã. Trả 202 khi nguồn chấp nhận lệnh. |
 | `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại và ACK của node trong phạm vi xã. |
+| `PUT /api/v1/iot/servers/{serverId}/location` | `ManageSettings` | Lưu xã/phường và GPS gateway. GET servers trả vị trí trong phạm vi xã. |
+| `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node/relay của trụ. Điều khiển từ bridge hiện hỗ trợ relay 1 của node cho phép điều khiển. |
 | `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageSettings` | Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
@@ -2211,6 +2213,6 @@ Không đổi: kiểm tra hành lang 25 m (`POLE_OFF_SEGMENT`); tuyến đã có
 
 PAP/CAP dùng lại Evidence. §4.10 ghi **năm bucket** theo ACCT-5: chỉ sửa chữ cho khớp runtime,
 không thay hành vi và không tạo deviation bucket mới. Giữ v1.22, cập nhật changelog v1.21 phần A;
-167 →177 operation (sau merge `dev`, 13/11/2026: +1 IoT electrical history của dev, +10 ảnh tài sản), không xoá operation ngoài ticket (D-14).
+169 →179 operation (sau merge `dev`, 13/11/2026: +3 IoT của dev, +10 ảnh tài sản), không xoá operation ngoài ticket (D-14).
 WP5/WP6 còn xác nhận thumbnail 320/q80, online-only, thông điệp không xoá cha sau upload đầu tiên,
 `cover_photo=null` và gallery rỗng `[]`; object nullable có thể là `$ref` trần (SPEC-NULLABLE).

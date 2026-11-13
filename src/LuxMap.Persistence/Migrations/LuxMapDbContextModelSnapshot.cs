@@ -1627,8 +1627,23 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("base_url");
 
+                    b.Property<string>("CommuneId")
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
                     b.HasKey("ServerId")
                         .HasName("pk_iot_server_registration");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_iot_server_registration_commune_id");
 
                     b.ToTable("iot_server_registration", (string)null);
                 });
@@ -5438,6 +5453,15 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_fault_cluster_road_segment_segment_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.IotServerRegistration", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_iot_server_registration_administrative_unit_commune_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.IOT.IotSourceRegistration", b =>
