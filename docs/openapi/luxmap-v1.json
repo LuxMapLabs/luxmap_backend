@@ -7438,6 +7438,140 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route": {
+      "put": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "serverId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gatewayId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IotGatewayRouteRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IotGatewayRouteRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/IotGatewayRouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_settings",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/iot/servers/{serverId}/location": {
       "put": {
         "tags": [
@@ -19559,6 +19693,20 @@
         },
         "additionalProperties": false
       },
+      "IotAutoSchedule": {
+        "type": "object",
+        "properties": {
+          "day_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "night_start": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "IotCommandRequest": {
         "type": "object",
         "properties": {
@@ -19569,6 +19717,9 @@
           "command": {
             "type": "string",
             "nullable": true
+          },
+          "auto_schedule": {
+            "$ref": "#/components/schemas/IotAutoSchedule"
           }
         },
         "additionalProperties": false
@@ -19592,6 +19743,9 @@
           },
           "command_acknowledged": {
             "type": "boolean"
+          },
+          "auto_schedule": {
+            "$ref": "#/components/schemas/IotAutoSchedule"
           }
         },
         "additionalProperties": false
@@ -19644,6 +19798,16 @@
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotGatewayRouteRequest": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

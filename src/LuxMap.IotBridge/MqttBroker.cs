@@ -5,16 +5,44 @@ using MQTTnet;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
 
-sealed class MqttBroker(DeviceStore store, IConfiguration configuration, ILogger<MqttBroker> logger) : IHostedService, IDisposable
+sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConfiguration configuration,
+    IHostEnvironment environment, ILogger<MqttBroker> logger) : IHostedService, IDisposable
 {
     private const string ServerId = "__luxmap-server";
     private readonly SemaphoreSlim commandGate = new(1, 1);
     private readonly JsonSerializerOptions json = new(JsonSerializerDefaults.Web);
     private MqttServer? broker;
-    private Dictionary<string, string[]> gateways = new();
+    private volatile Dictionary<string, string[]> gateways = new(StringComparer.Ordinal);
+    private readonly object registrationGate = new();
+    private readonly string registrationPath = Path.Combine(environment.ContentRootPath, "data", "gateway-routes.json");
     private readonly ConcurrentDictionary<string, long> lastHeartbeats = new(StringComparer.Ordinal);
     public bool IsRunning => broker?.IsStarted == true;
     public IReadOnlyDictionary<string, string[]> Gateways => gateways;
+
+    public bool RegisterGateway(string gatewayId, string nodeId)
+    {
+        lock (registrationGate)
+        {
+            if (gateways.TryGetValue(gatewayId, out var assigned)) return assigned.Contains(nodeId);
+            if (gateways.Values.Any(nodes => nodes.Contains(nodeId))) return false;
+            var saved = ReadRegistrations();
+            saved.Add(gatewayId, [nodeId]);
+            Directory.CreateDirectory(Path.GetDirectoryName(registrationPath)!);
+            using (var file = File.Create(registrationPath + ".tmp"))
+            {
+                JsonSerializer.Serialize(file, saved);
+                file.Flush(flushToDisk: true);
+            }
+            File.Move(registrationPath + ".tmp", registrationPath, overwrite: true);
+            gateways = new(gateways, StringComparer.Ordinal) { [gatewayId] = [nodeId] };
+            return true;
+        }
+    }
+
+    private Dictionary<string, string[]> ReadRegistrations() => File.Exists(registrationPath)
+        ? JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(registrationPath))
+            ?? throw new InvalidDataException("Invalid gateway routes.")
+        : new(StringComparer.Ordinal);
 
     public string GatewayStatus(string deviceId)
     {
@@ -29,8 +57,13 @@ sealed class MqttBroker(DeviceStore store, IConfiguration configuration, ILogger
     {
         gateways = configuration.GetSection("Mqtt:Gateways").Get<Dictionary<string, string[]>>()
             ?? new() { ["LUXMAP-GW001"] = ["LUXMAP-P001"] };
+        foreach (var (gateway, nodes) in ReadRegistrations())
+            if (!gateways.TryAdd(gateway, nodes) && !gateways[gateway].SequenceEqual(nodes))
+                throw new InvalidDataException("Conflicting MQTT gateway routes.");
         if (gateways.Any(pair => !DeviceRules.ValidId(pair.Key) || pair.Value.Length == 0 ||
-            pair.Value.Any(id => !DeviceRules.ValidId(id)))) throw new InvalidDataException("Invalid gateway/node configuration.");
+            pair.Value.Any(id => !DeviceRules.ValidId(id))) ||
+            gateways.Values.SelectMany(nodes => nodes).GroupBy(id => id).Any(group => group.Count() > 1))
+            throw new InvalidDataException("Invalid or duplicate gateway/node configuration.");
         var port = configuration.GetValue("Mqtt:Port", 1883);
         broker = new MqttFactory().CreateMqttServer(new MqttServerOptionsBuilder()
             .WithDefaultEndpoint().WithDefaultEndpointPort(port).Build());
@@ -39,6 +72,11 @@ sealed class MqttBroker(DeviceStore store, IConfiguration configuration, ILogger
             if (!gateways.TryGetValue(e.ClientId, out var nodes))
             {
                 e.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
+                return;
+            }
+            if (!credentials.Validate(e.ClientId, e.UserName, e.Password))
+            {
+                e.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                 return;
             }
             await commandGate.WaitAsync(cancellationToken);
@@ -126,7 +164,8 @@ sealed class MqttBroker(DeviceStore store, IConfiguration configuration, ILogger
     private Task PublishCommandAsync(string id, LampCommand command) => PublishAsync(id, "command", new
     {
         kind = "command", deviceId = id, mode = command.Mode, command = command.Command,
-        commandId = command.CommandId ?? "initial-auto", version = command.Version
+        commandId = command.CommandId ?? "initial-auto", version = command.Version,
+        autoSchedule = command.AutoSchedule
     }, true);
     private Task PublishAsync(string id, string kind, object value, bool retained) => broker!.InjectApplicationMessage(
         new InjectedMqttApplicationMessage(new MqttApplicationMessageBuilder()

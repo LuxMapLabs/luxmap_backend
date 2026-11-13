@@ -45,6 +45,21 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
     public sealed record ServerLocationRequest(string CommuneId, IotLocation Location);
 
+    [HttpPut("servers/{serverId}/gateways/{gatewayId}/route")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RegisterGatewayRouteAsync(string serverId, string gatewayId,
+        IotGatewayRouteRequest request, [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration,
+        CancellationToken ct)
+    {
+        await diagnostics.RegisterGatewayRouteAsync(serverId, gatewayId, request, configuration["Mqtt:ProvisioningKey"], ct);
+        return NoContent();
+    }
+
     [HttpPut("servers/{serverId}/location")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

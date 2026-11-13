@@ -3,6 +3,7 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<DeviceStore>();
+builder.Services.AddSingleton<GatewayCredentials>();
 builder.Services.AddSingleton<MqttBroker>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<MqttBroker>());
 builder.Services.AddEndpointsApiExplorer();
@@ -54,7 +55,9 @@ api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest reques
         return Results.BadRequest(new { error = "mode must be AUTO or MANUAL." });
     if (mode == "MANUAL" && command != "ON" && command != "OFF")
         return Results.BadRequest(new { error = "MANUAL requires command ON or OFF." });
-    var desired = new LampCommand(mode, mode == "AUTO" ? null : command);
+    if (request.AutoSchedule is { } schedule && (mode != "AUTO" || !schedule.IsValid()))
+        return Results.BadRequest(new { error = "AUTO schedule needs two distinct minutes between 0 and 1439." });
+    var desired = new LampCommand(mode, mode == "AUTO" ? null : command, AutoSchedule: request.AutoSchedule);
     try
     {
         var saved = await mqtt.SetCommandAsync(deviceId, desired, cancellationToken);
@@ -92,4 +95,26 @@ app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/status", (string deviceId,
 
 app.MapGet("/api/luxmap/gateways", (MqttBroker mqtt) => Results.Ok(mqtt.Gateways))
     .WithTags("MQTT").WithSummary("Danh sách gateway và node được phép chuyển tiếp");
+app.MapPut("/api/luxmap/gateways/{gatewayId}/route", (string gatewayId, GatewayRouteRequest request,
+    HttpContext context, MqttBroker mqtt, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    if (!DeviceRules.ValidId(gatewayId) || request.DeviceId is null || !DeviceRules.ValidId(request.DeviceId))
+        return Results.BadRequest();
+    return mqtt.RegisterGateway(gatewayId, request.DeviceId) ? Results.NoContent() : Results.Conflict();
+}).WithTags("MQTT");
+app.MapPost("/api/luxmap/gateways/{gatewayId}/credential", (string gatewayId, HttpContext context,
+    MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    if (!mqtt.Gateways.TryGetValue(gatewayId, out var nodes)) return Results.NotFound();
+    var secret = credentials.Issue(gatewayId);
+    if (secret is null) return Results.Conflict(new { error = "Credential already issued." });
+    return Results.Ok(new { clientId = gatewayId, username = gatewayId, password = secret, nodeIds = nodes });
+}).WithTags("MQTT").WithSummary("Cấp secret một lần cho gateway đã đăng ký");
 app.Run();
+
+record GatewayRouteRequest(string? DeviceId);

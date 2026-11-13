@@ -39,6 +39,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại và ACK của node trong phạm vi xã. |
 | `PUT /api/v1/iot/servers/{serverId}/location` | `ManageSettings` | Lưu xã/phường và GPS gateway. GET servers trả vị trí trong phạm vi xã. |
 | `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node/relay của trụ. Điều khiển từ bridge hiện hỗ trợ relay 1 của node cho phép điều khiển. |
+| `PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route` | `ManageSettings` | Gán Gateway ID với Device ID qua bridge đang chạy. |
 | `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageSettings` | Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
