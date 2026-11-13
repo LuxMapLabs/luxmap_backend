@@ -85,9 +85,11 @@ public sealed record IotArchivedReading(IotArchivedData Data, DateTimeOffset Rec
 public sealed record IotArchivedData(string? Timestamp, string? SessionId, long? SequenceNumber,
     string? Mode, string? LampCommand, double? Lux, double? Voltage, double? Current, double? Power);
 
-public sealed record IotCommandRequest(string? Mode, string? Command);
+public sealed record IotAutoSchedule(string? DayStart, string? NightStart);
+public sealed record IotCommandRequest(string? Mode, string? Command, IotAutoSchedule? AutoSchedule = null);
+public sealed record IotGatewayRouteRequest(string? DeviceId);
 public sealed record IotCommandStatus(
-    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged);
+    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null);
 
 public sealed class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry)
@@ -133,6 +135,40 @@ public sealed class IotDiagnosticsService(
             : diagnosis with { LampCount = estimate };
     }
 
+    public async Task RegisterGatewayRouteAsync(string serverId, string gatewayId, IotGatewayRouteRequest request,
+        string? provisioningKey, CancellationToken ct)
+    {
+        static bool ValidId(string? id) => id is { Length: > 0 and <= 64 } &&
+            char.IsAsciiLetterOrDigit(id[0]) && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
+        if (!ValidId(gatewayId) || !ValidId(request.DeviceId))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Gateway ID hoặc Device ID không hợp lệ.");
+
+        var settings = await registry.ReadAsync([], ct);
+        if (!settings.Servers.TryGetValue(serverId, out var server))
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy IoT server.");
+        if (!IotOrigin.TryAllowed(settings, server.BaseUrl, out var uri) || provisioningKey is not { Length: >= 32 })
+            throw Unavailable("Chưa cấu hình địa chỉ hoặc khóa quản trị IoT Bridge.");
+
+        using var message = new HttpRequestMessage(HttpMethod.Put,
+            new Uri(uri, $"api/luxmap/gateways/{Uri.EscapeDataString(gatewayId)}/route"));
+        message.Headers.Add("X-Iot-Provisioning-Key", provisioningKey);
+        message.Content = JsonContent.Create(request);
+        try
+        {
+            using var response = await client.SendAsync(message, ct);
+            if (response.StatusCode == HttpStatusCode.Conflict)
+                throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict,
+                    "Gateway hoặc thiết bị đã được gán cho một tuyến MQTT khác.");
+            if (response.StatusCode != HttpStatusCode.NoContent)
+                throw Unavailable("IoT Bridge không xác nhận đăng ký tuyến MQTT.");
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không đăng ký được tuyến MQTT trên IoT Bridge.");
+        }
+    }
+
     public async Task<IotPoleControl> PoleControlAsync(string poleId, CancellationToken ct)
     {
         var pole = await db.Set<Pole>().AsNoTracking().Where(row => row.PoleId == poleId)
@@ -174,16 +210,27 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "Dùng MANUAL với ON hoặc OFF, hoặc AUTO với command null.");
 
+        BridgeAutoSchedule? bridgeSchedule = null;
+        if (request.AutoSchedule is { } schedule)
+        {
+            if (mode != "AUTO" || !TryParseClock(schedule.DayStart, out var day) ||
+                !TryParseClock(schedule.NightStart, out var night) || day == night)
+                throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                    "Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.");
+
+            bridgeSchedule = new(day.Hour * 60 + day.Minute, night.Hour * 60 + night.Minute);
+        }
+
         var endpoint = new Uri(uri, $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/command");
         try
         {
-            using var response = await client.PostAsJsonAsync(endpoint, new IotCommandRequest(mode, command), ct);
+            using var response = await client.PostAsJsonAsync(endpoint, new { mode, command, autoSchedule = bridgeSchedule }, ct);
             response.EnsureSuccessStatusCode();
             if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
             var saved = await response.Content.ReadFromJsonAsync<PrototypeCommand>(cancellationToken: ct);
             if (saved is null || string.IsNullOrWhiteSpace(saved.CommandId) || saved.Mode != mode || saved.Command != command)
                 throw Unavailable("Server IoT trả về lệnh không khớp yêu cầu.");
-            return new(nodeId, saved.CommandId, mode!, command, false);
+            return new(nodeId, saved.CommandId, mode!, command, false, saved.AutoSchedule?.ToApi());
         }
         catch (Exception ex) when (IsSourceFailure(ex, ct))
         {
@@ -197,7 +244,7 @@ public sealed class IotDiagnosticsService(
         var device = await ReadDeviceAsync(uri, deviceId, ct);
         if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
-        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged);
+        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi());
     }
 
     public async Task<IotTelemetryPage> TelemetryHistoryAsync(
@@ -504,7 +551,20 @@ public sealed class IotDiagnosticsService(
     private sealed record PrototypeDevice(
         string? DeviceId, PrototypeReading? LatestTelemetry, PrototypeReading[]? History,
         PrototypeCommand? DesiredCommand, bool CommandAcknowledged);
-    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId);
+    private static bool TryParseClock(string? value, out TimeOnly time) =>
+        TimeOnly.TryParseExact(value, "HH:mm", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out time);
+
+    private sealed record BridgeAutoSchedule(int DayStartMinute, int NightStartMinute)
+    {
+        public IotAutoSchedule? ToApi() =>
+            DayStartMinute is >= 0 and < 1440 && NightStartMinute is >= 0 and < 1440
+                ? new(Format(DayStartMinute), Format(NightStartMinute)) : null;
+
+        private static string Format(int minute) => FormattableString.Invariant($"{minute / 60:00}:{minute % 60:00}");
+    }
+
+    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId, BridgeAutoSchedule? AutoSchedule);
     private sealed record PrototypeReading(DateTimeOffset ReceivedAt, PrototypeSample? Data);
     private sealed record PrototypeSample(
         string? LampCommand, double? Voltage, double? Current, double? Power, string? SessionId, long? SequenceNumber);
