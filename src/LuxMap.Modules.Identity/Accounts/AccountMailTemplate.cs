@@ -11,15 +11,21 @@ namespace LuxMap.Modules.Identity.Accounts;
 /// Written the way mail clients need it, not the way a web page would be: layout with tables, every
 /// style inline (some clients and forwarding paths drop or ignore <c>&lt;style&gt;</c> blocks), no images
 /// (often blocked), line heights in px (Outlook's Word engine mishandles unitless ones), and a button
-/// that is a link inside a coloured cell, with <c>mso-padding-alt</c> so Outlook keeps its size. Every value from an account is
+/// that is a link inside a coloured cell, with <c>mso-padding-alt</c> so Outlook keeps its size. Gaps and borders sit on table
+/// cells or paragraph margins, never padding on a <c>p</c> / <c>div</c> (Outlook drops it); every text colour passes WCAG AA
+/// against its background. Every value from an account is
 /// HTML-encoded: a display name is typed by an admin and must not become markup in someone's inbox.
 /// </remarks>
 public static class AccountMailTemplate
 {
     private const string Navy = "#0f2a44";
     private const string Amber = "#f5a623";
+    private const string AmberText = "#9c6000";
     private const string Ink = "#1f2933";
     private const string Muted = "#5f6b7a";
+    private const string Line = "#e3e8ef";
+    private const string Page = "#eef1f5";
+    private const string Font = "'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
     /// <summary>Encodes markup characters but keeps Vietnamese letters as they are, not as <c>&amp;#x...;</c>.</summary>
     private static readonly HtmlEncoder Encoder = HtmlEncoder.Create(UnicodeRanges.All);
@@ -29,11 +35,17 @@ public static class AccountMailTemplate
     {
         var invite = purpose == AccountTokenPurpose.Invite;
         var subject = invite ? "LuxMap — Lời mời tạo tài khoản" : "LuxMap — Đặt lại mật khẩu";
+        var eyebrow = invite ? "Lời mời tham gia" : "Bảo mật tài khoản";
         var heading = invite ? "Chào mừng bạn đến với LuxMap" : "Đặt lại mật khẩu";
         var opening = invite
             ? "Quản trị hệ thống LuxMap đã tạo tài khoản cho bạn. Hãy đặt mật khẩu để bắt đầu sử dụng."
             : "Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.";
         var action = invite ? "Đặt mật khẩu" : "Đặt mật khẩu mới";
+        // Invited: no password yet, so sign-in is impossible until the link is used. Reset: the request
+        // changes nothing until the link is used, so the current password still works.
+        var ignoreNote = invite
+            ? "Nếu bạn không nhận ra lời mời này, hãy bỏ qua email. Tài khoản chưa dùng được cho tới khi mật khẩu được đặt."
+            : "Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email. Mật khẩu hiện tại của bạn vẫn giữ nguyên.";
         var preheader = invite
             ? $"Tài khoản {username} đã sẵn sàng — đặt mật khẩu trước {expires}."
             : $"Liên kết đặt lại mật khẩu cho {username}, hết hạn lúc {expires}.";
@@ -45,10 +57,10 @@ public static class AccountMailTemplate
 
             Tên đăng nhập: {username}
 
-            {action} tại liên kết sau (hết hạn lúc {expires}, giờ Việt Nam):
+            {action} tại liên kết sau (hết hạn lúc {expires}, giờ Việt Nam, chỉ dùng được một lần):
             {link}
 
-            Liên kết chỉ dùng được một lần. Nếu bạn không yêu cầu việc này, hãy bỏ qua email.
+            {ignoreNote}
 
             LuxMap
             """;
@@ -63,37 +75,51 @@ public static class AccountMailTemplate
             <meta name="color-scheme" content="light">
             <title>{e.Encode(subject)}</title>
             </head>
-            <body style="margin:0;padding:0;background-color:#f3f5f8;">
-            <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f3f5f8;">{e.Encode(preheader)}</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f5f8;">
-              <tr><td align="center" style="padding:32px 16px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border:1px solid #e3e8ef;border-radius:8px;overflow:hidden;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-                  <tr><td style="background-color:{Navy};padding:24px 32px;border-bottom:4px solid {Amber};">
-                    <div style="font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.3px;">LuxMap</div>
-                    <div style="font-size:13px;color:#c9d4e2;padding-top:4px;">Quản lý chiếu sáng đường giao thông nông thôn</div>
+            <body style="margin:0;padding:0;background-color:{Page};">
+            <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:{Page};">{e.Encode(preheader)}</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:{Page};">
+              <tr><td align="center" style="padding:36px 16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;font-family:{Font};">
+                  <tr><td style="padding:0 4px 18px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td valign="middle" style="width:12px;"><div style="width:12px;height:12px;border-radius:6px;background-color:{Amber};font-size:0;line-height:0;">&nbsp;</div></td>
+                        <td style="padding-left:10px;font-size:20px;line-height:24px;font-weight:700;color:{Navy};letter-spacing:0.2px;">LuxMap</td>
+                      </tr>
+                    </table>
                   </td></tr>
-                  <tr><td style="padding:32px;color:{Ink};font-size:15px;line-height:24px;">
-                    <h1 style="margin:0 0 16px;font-size:20px;line-height:26px;color:{Navy};">{e.Encode(heading)}</h1>
-                    <p style="margin:0 0 12px;">Chào <strong>{e.Encode(fullName)}</strong>,</p>
-                    <p style="margin:0 0 20px;">{e.Encode(opening)}</p>
+                  <tr><td style="background-color:#ffffff;border:1px solid {Line};border-top:4px solid {Amber};border-radius:12px;padding:32px 32px 28px;color:{Ink};font-size:15px;line-height:24px;">
+                    <p style="margin:0 0 8px;font-size:12px;line-height:16px;font-weight:700;color:{AmberText};text-transform:uppercase;letter-spacing:1px;">{e.Encode(eyebrow)}</p>
+                    <h1 style="margin:0 0 20px;font-size:24px;line-height:30px;font-weight:700;color:{Navy};">{e.Encode(heading)}</h1>
+                    <p style="margin:0 0 8px;">Chào <strong>{e.Encode(fullName)}</strong>,</p>
+                    <p style="margin:0 0 24px;">{e.Encode(opening)}</p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
-                      <tr><td style="background-color:#f6f8fb;border-left:4px solid {Amber};padding:12px 16px;">
-                        <div style="font-size:12px;color:{Muted};text-transform:uppercase;letter-spacing:0.5px;">Tên đăng nhập</div>
-                        <div style="font-size:16px;font-weight:600;color:{Navy};font-family:Consolas,'Courier New',monospace;padding-top:2px;">{e.Encode(username)}</div>
+                      <tr><td style="background-color:#f6f8fb;border:1px solid {Line};border-radius:8px;padding:14px 18px;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td style="font-size:13px;line-height:20px;color:{Muted};">Tên đăng nhập</td>
+                            <td align="right" style="font-size:16px;line-height:20px;font-weight:700;color:{Navy};font-family:Consolas,Menlo,'Courier New',monospace;">{e.Encode(username)}</td>
+                          </tr>
+                        </table>
                       </td></tr>
                     </table>
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;">
-                      <tr><td align="center" bgcolor="{Navy}" style="border-radius:6px;mso-padding-alt:12px 28px;">
-                        <a href="{e.Encode(link.AbsoluteUri)}" target="_blank" style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">{e.Encode(action)}</a>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
+                      <tr><td align="center" bgcolor="{Navy}" style="border-radius:8px;mso-padding-alt:14px 24px;">
+                        <a href="{e.Encode(link.AbsoluteUri)}" target="_blank" style="display:block;padding:14px 24px;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">{e.Encode(action)}</a>
                       </td></tr>
                     </table>
-                    <p style="margin:0 0 20px;font-size:14px;color:{Muted};">Liên kết hết hạn lúc <strong style="color:{Ink};">{e.Encode(expires)}</strong> (giờ Việt Nam) và chỉ dùng được một lần.</p>
-                    <p style="margin:0 0 6px;font-size:13px;color:{Muted};">Nút không hoạt động? Sao chép liên kết sau vào trình duyệt:</p>
-                    <p style="margin:0 0 24px;font-size:13px;word-break:break-all;"><a href="{e.Encode(link.AbsoluteUri)}" target="_blank" style="color:#1a5fa8;">{e.Encode(link.AbsoluteUri)}</a></p>
-                    <p style="margin:0;padding-top:16px;border-top:1px solid #e3e8ef;font-size:13px;color:{Muted};">Nếu bạn không yêu cầu việc này, hãy bỏ qua email.</p>
+                    <p style="margin:0 0 24px;font-size:13px;line-height:20px;color:{Muted};text-align:center;">Liên kết có hiệu lực đến <strong style="color:{Ink};">{e.Encode(expires)}</strong> (giờ Việt Nam) và chỉ dùng được một lần.</p>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr><td style="border-top:1px solid {Line};padding-top:18px;">
+                        <p style="margin:0;font-size:13px;line-height:20px;color:{Muted};">{e.Encode(ignoreNote)}</p>
+                      </td></tr>
+                    </table>
+                  </td></tr>
+                  <tr><td align="center" style="padding:20px 8px 0;font-size:12px;line-height:18px;color:{Muted};">
+                    LuxMap · Quản lý chiếu sáng đường giao thông nông thôn<br>
+                    Email tự động — vui lòng không trả lời.
                   </td></tr>
                 </table>
-                <p style="margin:16px 0 0;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:#8a96a8;">Email tự động từ hệ thống LuxMap. Vui lòng không trả lời email này.</p>
               </td></tr>
             </table>
             </body>
