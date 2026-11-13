@@ -2201,6 +2201,22 @@ Không đổi: kiểm tra hành lang 25 m (`POLE_OFF_SEGMENT`); tuyến đã có
 
 **Cần báo:** WP5 (model `length_m` nullable ở list / detail / bundle; form tạo tuyến không gửi `length_m` khi chưa có hình; 400 `length_m` khi có hình mà thiếu) và WP6 (bundle: `length_m` có thể `null`). OpenAPI cần CODEOWNERS. **Chưa báo ai.**
 
+
+### APH-1 — ảnh tài sản cột và tủ (12/11/2026)
+
+- **Decision:** D-01…D-06 của ASSET-PHOTOS: hai bảng PAP/CAP, Evidence, mười endpoint gallery, UploadAssetPhotos,
+  summary/bìa ở inventory và map cabinets; gallery ở chi tiết cột/tủ và map pole detail. `DELETE` ảnh = ẩn, giữ row/key/bytes;
+  **tài sản đã có ảnh không xoá được nữa**, kể cả ảnh ẩn (409 `ASSET_IN_USE`). Không AI/publication/fault/sync.
+- **Decision maker:** Mỹ (Dylan), chốt 28/10/2026; chạm API là **SELF-SIGNED**, nền tạm tới FW kế tiếp.
+- **Date:** 28/10/2026 (thiết kế); 12/11/2026 (hiện thực phần A, bổ sung D-13/D-14 được Claude kiểm lại).
+- **Scope:** Contract §1.2/1.4/1.6, §2/3.3, §5.1/5.3/5.8; các route ảnh và response đọc tài sản. B đã merge, FPS-1 giữ nguyên.
+
+PAP/CAP dùng lại Evidence. §4.10 ghi **năm bucket** theo ACCT-5: chỉ sửa chữ cho khớp runtime,
+không thay hành vi và không tạo deviation bucket mới. Giữ v1.22, cập nhật changelog v1.21 phần A;
+169 →179 operation (sau merge `dev`, 13/11/2026: +3 IoT của dev, +10 ảnh tài sản), không xoá operation ngoài ticket (D-14).
+WP5/WP6 còn xác nhận thumbnail 320/q80, online-only, thông điệp không xoá cha sau upload đầu tiên,
+`cover_photo=null` và gallery rỗng `[]`; object nullable có thể là `$ref` trần (SPEC-NULLABLE).
+
 ## WO-POLE-GPS — lịch "Cập nhật vị trí cột": dán tem QR + lấy GPS, duyệt rồi mới vào GIS (13/11/2026)
 
 | | |

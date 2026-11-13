@@ -41,7 +41,7 @@ public sealed class PoleDetailEndpointTests(AssetImportFixture fixture)
 
         Assert.Equal(JsonValueKind.Null, body.GetProperty("fixture").ValueKind);
         Assert.Equal(JsonValueKind.Null, body.GetProperty("luminance_baseline").ValueKind);
-        foreach (var list in new[] { "luminance_baselines", "luminance_history", "runtime_history", "open_faults", "recent_frames" })
+        foreach (var list in new[] { "luminance_baselines", "luminance_history", "runtime_history", "open_faults", "recent_frames", "asset_photos" })
             Assert.Equal(0, body.GetProperty(list).GetArrayLength());
 
         // IoT hangs off the feeder cabinet, never a pole (drift I-1/I-8): the key stays, the value is null.
@@ -62,7 +62,7 @@ public sealed class PoleDetailEndpointTests(AssetImportFixture fixture)
         {
             "pole_id", "segment_id", "segment_name", "commune_id", "location", "fixture", "fixtures", "current_status",
             "iot_node", "luminance_baseline", "luminance_baselines", "luminance_history", "runtime_history",
-            "open_faults", "recent_frames", "note",
+            "open_faults", "recent_frames", "note", "asset_photos",
         }.ToHashSet(StringComparer.Ordinal), keys);
 
         Assert.Equal(poleId, body.GetProperty("pole_id").GetString());

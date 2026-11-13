@@ -496,3 +496,15 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   — đừng gộp hai truy vấn thành một: hoặc mất cột ẩn (xanh giả), hoặc lộ ID xã khác. Vì đo sau khi ghi nên `UpdateSegmentAsync`
   **luôn** mở transaction, kể cả khi vắng `pole_ids`; bỏ transaction là 409 trả về nhưng tuyến đã lưu.
   Chỉ đo khi hình học **thật sự đổi** (`EqualsExact`): đo mọi PUT sẽ khoá việc đổi tên những tuyến có cột lệch sẵn.
+
+## ASSET-PHOTOS — gallery và khoá quota
+
+Upload/hide PAP/CAP lấy cùng khoá cha sau lookup có scope; **không** giữ khoá khi decode hoặc ghi storage.
+Đọc lại cha/scope/nguồn sau khoá; replay ưu tiên trước quota. Ảnh giữ snapshot nguồn lúc upload;
+đổi data_source cha/import/dời cột không sửa ảnh. Không đặt IAudited lên cha chỉ để audit ảnh.
+Bìa/list/gallery dùng `created_at, length(photo_id), photo_id`, bỏ ảnh ẩn. Dùng AssetPhotoReader theo lô;
+không kéo summary vào PoleProperties/bundle. Cha còn ảnh ẩn vẫn 409 ASSET_IN_USE, không cascade.
+
+Khoá `(uploaded_by, client_op_id)` là toàn bảng của từng loại ảnh. Sau lỗi unique operation phải rollback
+trước lookup có scope; row cũ nay ngoài scope vẫn là 409 IDEMPOTENCY_CONFLICT, không truy vấn bỏ scope
+và không để lỗi thành 500. Snapshot audit trước/sau ẩn giữ cả cha, xã và nguồn ảnh, không chỉ cặp deleted.

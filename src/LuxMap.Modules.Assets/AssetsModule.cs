@@ -1,4 +1,6 @@
 using LuxMap.Modules.Assets.Crud;
+using LuxMap.Modules.Assets.Photos;
+using LuxMap.Shared.Storage;
 using LuxMap.Modules.Assets.Import;
 using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Shared.Modularity;
@@ -21,6 +23,12 @@ public sealed class AssetsModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddScoped<AssetPhotoService>();
+        services.AddScoped<AssetPhotoReader>();
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "pole_asset_photo"));
+        services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "pole_asset_photo"));
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "cabinet_asset_photo"));
+        services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "cabinet_asset_photo"));
         services.AddScoped<AssetCrudService>();
         services.AddScoped<PoleRelocation>();
         services.AddScoped<AssetImportService>();

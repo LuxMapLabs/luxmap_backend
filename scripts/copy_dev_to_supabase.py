@@ -93,6 +93,8 @@ PLAN = [
     ("electrical_cabinet", IN_COMMUNES, "cabinet_id"),
     ("feeder", IN_COMMUNES, "feeder_id"),
     ("pole", IN_COMMUNES, "pole_id"),
+    ("pole_asset_photo", f"{IN_COMMUNES} AND uploaded_by IN {COPIED_USERS} AND (deleted_by IS NULL OR deleted_by IN {COPIED_USERS}) AND pole_id IN (SELECT pole_id FROM public.pole WHERE {IN_COMMUNES})", "created_at, length(photo_id), photo_id"),
+    ("cabinet_asset_photo", f"{IN_COMMUNES} AND uploaded_by IN {COPIED_USERS} AND (deleted_by IS NULL OR deleted_by IN {COPIED_USERS}) AND cabinet_id IN (SELECT cabinet_id FROM public.electrical_cabinet WHERE {IN_COMMUNES})", "created_at, length(photo_id), photo_id"),
     ("fixture", IN_COMMUNES, "fixture_id"),
     ("iot_node", IN_COMMUNES, "node_id"),
     # BE-34: a device's firmware changes, append-only; holds the device and the registry with RESTRICT.
