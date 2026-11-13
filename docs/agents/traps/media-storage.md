@@ -147,3 +147,12 @@ Avatar dùng `IImageSanitizer` như ảnh công dân: JPEG-only, xoay orientatio
 đọc tối đa 1 MiB và 16 triệu pixel. Khác survey/evidence: original avatar cũng đã sanitize. Bucket thứ năm `luxmap-avatar`,
 hai key cố định theo user, upload lại ghi đè. DELETE chỉ gỡ năm cột liên kết; byte vẫn còn tới upload kế tiếp, chưa có xoá thật.
 Phục vụ thumbnail qua API có Bearer, không URL S3. `StoredObjectColumn` khai tên cột avatar tường minh trong IdentityModule.
+
+## WO-POLE-GPS — PDF đính kèm phiếu (13/11/2026, drift PG-6…PG-9)
+
+- Loại media **thứ ba** sau JPEG và video: PDF Quản lý gửi kỹ sư. Quyết bằng magic bytes `%PDF-` (`WorkOrderAttachmentService`), không tin
+  `Content-Type` / đuôi; **không phân tích nội dung PDF** ở server (không có thư viện PDF nào được nạp — giữ vậy).
+- Đệm toàn file (≤ 20 MiB) để server tự tính độ dài + SHA-256 rồi ghi qua `StoreStreamAsync` — `StreamUpload` đòi hai giá trị đó, không lấy từ client.
+- Bucket `luxmap-evidence`, key `attachment/{ATT-…}.pdf`, khai `StoredObjectColumn.Original(Evidence, "work_order_attachment")`.
+- Tải về luôn `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff`: file do người dùng gửi lên, không để trình duyệt hiển thị cùng origin API.
+- Gỡ là **gỡ mềm** (`removed_at`/`removed_by`); object ở lại kho (không có xoá object — xem BE-35 ở trên).

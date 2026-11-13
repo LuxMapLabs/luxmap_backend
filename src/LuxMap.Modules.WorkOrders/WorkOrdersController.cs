@@ -16,7 +16,7 @@ namespace LuxMap.Modules.WorkOrders;
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/work-orders")]
 public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPoleService poles, WorkOrderEvidenceService evidence,
-    WorkOrderAgendaService agenda, AutoDispatchQueries dispatch) : ControllerBase
+    WorkOrderAgendaService agenda, AutoDispatchQueries dispatch, WorkOrderAttachmentService attachments) : ControllerBase
 {
     /// <summary>Read-only inspection schedule suggestions (WO-AUTODISPATCH-1, SELF-SIGNED).</summary>
     [HttpPost("auto-dispatch/preview")]
@@ -110,6 +110,43 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     public Task<PagedResult<EvidenceItem>> Evidence(string id, PageQuery page, CancellationToken ct)
         => evidence.ListAsync(id, page.ToPageRequest(), ct);
 
+    /// <summary>
+    /// The manager attaches one PDF (the QR labels to print) to a pole_gps_update order while it can still be edited — one file per
+    /// request (drift WO-POLE-GPS PG-6). PDF decided by magic bytes; at most 20 MiB and 10 active files.
+    /// </summary>
+    [HttpPost("{id}/attachments")]
+    [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(WorkOrderAttachmentService.MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = WorkOrderAttachmentService.MaxRequestBytes)]
+    [ProducesResponseType(typeof(WorkOrderAttachmentItem), 201)]
+    public async Task<ActionResult<WorkOrderAttachmentItem>> UploadAttachment(string id, IFormFile? file, CancellationToken ct)
+    {
+        var item = await attachments.UploadAsync(id, file, ct);
+        return Created(item.DownloadUrl, item);
+    }
+
+    /// <summary>The PDF bytes, visible exactly when the order is (PG-7). Through the API, never presigned.</summary>
+    [HttpGet("{id}/attachments/{attachmentId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
+    [ProducesResponseType(typeof(FileResult), 200, WorkOrderAttachmentService.PdfContentType)]
+    public async Task<IActionResult> Attachment(string id, string attachmentId, CancellationToken ct)
+    {
+        var (content, fileName) = await attachments.OpenAsync(id, attachmentId, ct);
+        Response.Headers.XContentTypeOptions = "nosniff";
+        return File(content, WorkOrderAttachmentService.PdfContentType, fileName);
+    }
+
+    /// <summary>Soft removal while the order can still be edited (PG-8).</summary>
+    [HttpDelete("{id}/attachments/{attachmentId}")]
+    [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
+    [ProducesResponseType(204)]
+    public async Task<IActionResult> RemoveAttachment(string id, string attachmentId, CancellationToken ct)
+    {
+        await attachments.RemoveAsync(id, attachmentId, ct);
+        return NoContent();
+    }
+
     [HttpGet("assignees")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
     public Task<PagedResult<WorkOrderAssignee>> Assignees([FromQuery(Name = "commune_id")] string[]? communes,
@@ -155,7 +192,8 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     [HttpPost("{id}/complete")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     public Task<WorkOrderDetail> Complete(string id, CompleteWorkOrderRequest request, CancellationToken ct)
-        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed, request.PerformedAt);
+        => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed, request.PerformedAt,
+            request.PoleLocations);
 
     [HttpPost("{id}/verify")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]

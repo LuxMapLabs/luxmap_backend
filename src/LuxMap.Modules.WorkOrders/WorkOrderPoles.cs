@@ -83,9 +83,14 @@ public sealed class WorkOrderPoleService(LuxMapDbContext db)
 {
     private static readonly FaultStatus[] OpenStatuses = [.. FaultStatusSets.Open];
 
+    /// <remarks>
+    /// A pole_gps_update order names its poles (WO-POLE-GPS PG-5): its <c>segment_id</c> only says which road they stand on, so the
+    /// whole-road branch skips it and only <c>work_order_pole_target</c> counts.
+    /// </remarks>
     internal IQueryable<Pole> Targets(string id) => db.Set<Pole>().Where(p =>
-        (p.SegmentId != null && (db.Set<WorkOrder>().Any(w => w.WorkOrderId == id && w.SegmentId == p.SegmentId)
+        (p.SegmentId != null && (db.Set<WorkOrder>().Any(w => w.WorkOrderId == id && w.TaskKind != TaskKind.PoleGpsUpdate && w.SegmentId == p.SegmentId)
             || db.Set<WorkOrderSegment>().Any(s => s.WorkOrderId == id && s.SegmentId == p.SegmentId)))
+        || db.Set<WorkOrderPoleTarget>().Any(t => t.WorkOrderId == id && t.PoleId == p.PoleId)
         || (from link in db.Set<WorkOrderFault>() join fault in db.Set<Fault>() on link.FaultId equals fault.FaultId
             where link.WorkOrderId == id && fault.PoleId == p.PoleId select link).Any());
 

@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. v1.21 (ASSET-PHOTOS phần B, SELF-SIGNED — FPS-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A ảnh tài sản chưa hiện thực. v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 166 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. v1.21 (ASSET-PHOTOS phần B, SELF-SIGNED — FPS-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A ảnh tài sản chưa hiện thực. v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm /work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 169 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.22"
   },
   "paths": {
@@ -16198,7 +16198,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)",
+        "summary": "[TẠM — WO-1…WO-12] Tạo inspection/repair/survey/pole_gps_update; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15); pole_gps_update: segment_id + pole_ids (PG-2)",
         "operationId": "postWorkOrders",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -16896,6 +16896,221 @@
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
       }
     },
+    "/api/v1/work-orders/{id}/attachments": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAttachmentItem"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAttachmentItem"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkOrderAttachmentItem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — WO-1…WO-12] [PG-6] Quản lý đính kèm một PDF (tem QR) vào lệnh pole_gps_update còn sửa được; PDF theo magic bytes, ≤ 20 MiB, tối đa 10 file",
+        "operationId": "postWorkOrdersIdAttachments",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
+    "/api/v1/work-orders/{id}/attachments/{attachmentId}": {
+      "get": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_work_orders",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — WO-1…WO-12] [PG-7] Tải PDF qua API, thấy được khi thấy được lệnh",
+        "operationId": "getWorkOrdersIdAttachmentsAttachmentid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      },
+      "delete": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — WO-1…WO-12] [PG-8] Gỡ mềm một PDF khi lệnh còn sửa được",
+        "operationId": "deleteWorkOrdersIdAttachmentsAttachmentid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      }
+    },
     "/api/v1/work-orders/assignees": {
       "get": {
         "tags": [
@@ -17464,7 +17679,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Người được giao nộp báo cáo và kết quả kiểm tra",
+        "summary": "[TẠM — WO-1…WO-12] Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10), chưa vào GIS",
         "operationId": "postWorkOrdersIdComplete",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -17551,7 +17766,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault",
+        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)",
         "operationId": "postWorkOrdersIdVerify",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -17906,6 +18121,7 @@
           "case_id",
           "commune_id",
           "fault_ids",
+          "pole_ids",
           "title",
           "work_order_id"
         ],
@@ -17939,6 +18155,12 @@
             "type": "string"
           },
           "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pole_ids": {
             "type": "array",
             "items": {
               "type": "string"
@@ -19368,6 +19590,14 @@
             },
             "description": "Required exactly once per linked fault for inspection; forbidden for repair or segment-only inspection."
           },
+          "pole_locations": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleLocationReport"
+            },
+            "description": "WO-POLE-GPS PG-10: required for pole_gps_update (each a pole of the order, once); forbidden for other kinds. Kept on the order until verify."
+          },
           "performed_at": {
             "type": "string",
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
@@ -19889,6 +20119,13 @@
             },
             "nullable": true
           },
+          "pole_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
           "assigned_to": {
             "type": "string",
             "nullable": true
@@ -19919,7 +20156,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "WO-5 (provisional): repair requires fault_ids; inspection requires fault_ids OR segment_id; survey (BE-15, provisional) requires commune_id and an ordered segment_ids. Server-owned fields are rejected."
+        "description": "WO-5 (provisional): repair requires fault_ids; inspection requires fault_ids OR segment_id; survey (BE-15, provisional) requires commune_id and an ordered segment_ids; pole_gps_update (WO-POLE-GPS PG-2, provisional) requires segment_id and 1..200 pole_ids on it. Server-owned fields are rejected."
       },
       "CurrentUserResponse": {
         "type": "object",
@@ -22332,6 +22569,37 @@
             "items": {
               "$ref": "#/components/schemas/PoleListItem"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleLocationReport": {
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "accuracy_m": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "captured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -25231,7 +25499,8 @@
         "enum": [
           "inspection",
           "repair",
-          "survey"
+          "survey",
+          "pole_gps_update"
         ],
         "type": "string"
       },
@@ -25891,6 +26160,30 @@
         },
         "additionalProperties": false
       },
+      "WorkOrderAttachmentItem": {
+        "type": "object",
+        "properties": {
+          "attachment_id": {
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "byte_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uploaded_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "download_url": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "WorkOrderDetail": {
         "required": [
           "allowed_actions",
@@ -25899,6 +26192,7 @@
           "created_by",
           "fault_ids",
           "faults",
+          "pole_ids",
           "title",
           "work_order_id"
         ],
@@ -25932,6 +26226,12 @@
             "type": "string"
           },
           "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pole_ids": {
             "type": "array",
             "items": {
               "type": "string"
@@ -26063,6 +26363,18 @@
             "items": {
               "$ref": "#/components/schemas/WorkOrderFaultDetail"
             }
+          },
+          "pole_locations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderPoleLocation"
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkOrderAttachmentItem"
+            }
           }
         },
         "additionalProperties": false
@@ -26104,6 +26416,7 @@
           "case_id",
           "commune_id",
           "fault_ids",
+          "pole_ids",
           "title",
           "work_order_id"
         ],
@@ -26137,6 +26450,12 @@
             "type": "string"
           },
           "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pole_ids": {
             "type": "array",
             "items": {
               "type": "string"
@@ -26311,6 +26630,32 @@
           "note": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkOrderPoleLocation": {
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lng": {
+            "type": "number",
+            "format": "double"
+          },
+          "accuracy_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "captured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
           }
         },
         "additionalProperties": false

@@ -6,7 +6,11 @@ namespace LuxMap.Modules.WorkOrders.Entities;
 
 public enum CancellationRequestStatus { None, Pending, Rejected }
 
-public enum TaskKind { Inspection, Repair, Survey }
+/// <remarks>
+/// <c>PoleGpsUpdate</c> (drift WO-POLE-GPS PG-1): stick QR labels on chosen poles and take their GPS. A single stage — never in a
+/// follow-up chain — and it carries no faults. Appended last: the statistics order kinds explicitly, not by declaration.
+/// </remarks>
+public enum TaskKind { Inspection, Repair, Survey, PoleGpsUpdate }
 public enum InspectionOutcome { FaultPresent, FaultAbsent, Inconclusive }
 
 public class WorkOrder : ICommuneScoped, IAssigneeScoped, IAudited
@@ -76,4 +80,32 @@ public class WorkOrderSegment : ICommuneScoped, IAudited
     public int Position { get; set; }
     public required string SegmentId { get; set; }
     public required string CommuneId { get; set; }
+}
+
+/// <summary>
+/// One pole a <c>pole_gps_update</c> order was created for (drift WO-POLE-GPS PG-2), and what the engineer reported for it.
+/// Access through the scoped parent work order.
+/// </summary>
+/// <remarks>
+/// The reported position stays HERE until a manager verifies the order (PG-10…PG-12): only then does it reach <c>pole.geom</c>.
+/// The four <c>Reported*</c> columns are all set or all null; a later <c>complete</c> replaces the whole report.
+/// </remarks>
+public class WorkOrderPoleTarget : ICommuneScoped, IAudited
+{
+    public required string WorkOrderId { get; set; }
+
+    /// <summary>0-based, the order the manager sent <c>pole_ids</c> in.</summary>
+    public int Position { get; set; }
+
+    public required string PoleId { get; set; }
+    public required string CommuneId { get; set; }
+    public double? ReportedLat { get; set; }
+    public double? ReportedLng { get; set; }
+    public double? ReportedAccuracyM { get; set; }
+
+    /// <summary>When the phone took the fix, as the client says (UTC, microseconds).</summary>
+    public DateTime? ReportedCapturedAt { get; set; }
+
+    /// <summary>Set when the order is verified or cancelled; while NULL no other open order may target the pole (PG-3).</summary>
+    public DateTime? ReleasedAt { get; set; }
 }

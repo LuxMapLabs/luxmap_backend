@@ -52,6 +52,7 @@ internal static class WorkOrderNotices
     {
         TaskKind.Repair => "sửa chữa",
         TaskKind.Inspection => "kiểm tra",
+        TaskKind.PoleGpsUpdate => "cập nhật vị trí cột",
         _ => "khảo sát",
     };
 }

@@ -70,6 +70,8 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.HasSequence("user_id_seq");
 
+            modelBuilder.HasSequence("work_order_attachment_id_seq");
+
             modelBuilder.HasSequence("work_order_id_seq");
 
             modelBuilder.Entity("LuxMap.Modules.Admin.Monitoring.StorageAlert", b =>
@@ -4001,17 +4003,109 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_materials_used_not_blank", "materials_used IS NULL OR btrim(materials_used) <> ''");
 
+                            t.HasCheckConstraint("ck_work_order_pole_gps_target", "task_kind <> 'pole_gps_update' OR (segment_id IS NOT NULL AND cluster_id IS NULL AND parent_work_order_id IS NULL)");
+
                             t.HasCheckConstraint("ck_work_order_schedule_before_due", "scheduled_date IS NULL OR due_date IS NULL OR scheduled_date <= due_date");
 
                             t.HasCheckConstraint("ck_work_order_started", "wo_status NOT IN ('in_progress','done','verified') OR started_at IS NOT NULL");
 
                             t.HasCheckConstraint("ck_work_order_survey_target", "task_kind <> 'survey' OR (segment_id IS NULL AND cluster_id IS NULL)");
 
-                            t.HasCheckConstraint("ck_work_order_task_kind", "\"task_kind\" IN ('inspection', 'repair', 'survey')");
+                            t.HasCheckConstraint("ck_work_order_task_kind", "\"task_kind\" IN ('inspection', 'repair', 'survey', 'pole_gps_update')");
 
                             t.HasCheckConstraint("ck_work_order_title_not_blank", "btrim(title) <> ''");
 
                             t.HasCheckConstraint("ck_work_order_wo_status", "\"wo_status\" IN ('open', 'assigned', 'in_progress', 'done', 'verified', 'cancelled')");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderAttachment", b =>
+                {
+                    b.Property<string>("AttachmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("attachment_id")
+                        .HasDefaultValueSql("luxmap_format_id('ATT', nextval('work_order_attachment_id_seq'), 4)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "work_order_attachment_id_seq");
+
+                    b.Property<long>("ByteCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_count");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("file_name");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("removed_at");
+
+                    b.Property<string>("RemovedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("removed_by");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sha256");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploaded_by");
+
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("AttachmentId")
+                        .HasName("pk_work_order_attachment");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_work_order_attachment_commune_id");
+
+                    b.HasIndex("RemovedBy")
+                        .HasDatabaseName("ix_work_order_attachment_removed_by");
+
+                    b.HasIndex("UploadedBy")
+                        .HasDatabaseName("ix_work_order_attachment_uploaded_by");
+
+                    b.HasIndex("WorkOrderId", "CommuneId")
+                        .HasDatabaseName("ix_work_order_attachment_work_order_id_commune_id");
+
+                    b.ToTable("work_order_attachment", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_work_order_attachment_bytes", "byte_count > 0");
+
+                            t.HasCheckConstraint("ck_work_order_attachment_file_name", "btrim(file_name) <> '' AND char_length(file_name) <= 200");
+
+                            t.HasCheckConstraint("ck_work_order_attachment_key_not_blank", "btrim(object_key) <> ''");
+
+                            t.HasCheckConstraint("ck_work_order_attachment_removed_after_upload", "removed_at IS NULL OR removed_at >= uploaded_at");
+
+                            t.HasCheckConstraint("ck_work_order_attachment_removed_together", "(removed_at IS NULL) = (removed_by IS NULL)");
+
+                            t.HasCheckConstraint("ck_work_order_attachment_sha256", "sha256 ~ '^[0-9a-f]{64}$'");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -4384,6 +4478,83 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_pole_photo_video_viewed", "(video_viewed_by IS NULL AND video_viewed_at IS NULL) OR (video_viewed_by IS NOT NULL AND video_viewed_at IS NOT NULL AND video_object_key IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_work_order_pole_photo_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPoleTarget", b =>
+                {
+                    b.Property<string>("WorkOrderId")
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<DateTime?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<double?>("ReportedAccuracyM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("reported_accuracy_m");
+
+                    b.Property<DateTime?>("ReportedCapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reported_captured_at");
+
+                    b.Property<double?>("ReportedLat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("reported_lat");
+
+                    b.Property<double?>("ReportedLng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("reported_lng");
+
+                    b.HasKey("WorkOrderId", "Position")
+                        .HasName("pk_work_order_pole_target");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_work_order_pole_target_commune_id");
+
+                    b.HasIndex("PoleId")
+                        .HasDatabaseName("ix_work_order_pole_target_pole_id");
+
+                    b.HasIndex("WorkOrderId", "CommuneId")
+                        .HasDatabaseName("ix_work_order_pole_target_work_order_id_commune_id");
+
+                    b.HasIndex("WorkOrderId", "PoleId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_work_order_pole_target_work_order_id_pole_id");
+
+                    b.HasIndex(new[] { "PoleId" }, "ux_work_order_pole_target_pole_id_active")
+                        .IsUnique()
+                        .HasDatabaseName("ux_work_order_pole_target_pole_id_active")
+                        .HasFilter("released_at IS NULL");
+
+                    b.ToTable("work_order_pole_target", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_work_order_pole_target_accuracy", "reported_accuracy_m IS NULL OR (reported_accuracy_m >= 0 AND reported_accuracy_m <> 'NaN'::float8 AND reported_accuracy_m <> 'Infinity'::float8)");
+
+                            t.HasCheckConstraint("ck_work_order_pole_target_lat", "reported_lat IS NULL OR (reported_lat >= -90 AND reported_lat <= 90 AND reported_lat <> 'NaN'::float8)");
+
+                            t.HasCheckConstraint("ck_work_order_pole_target_lng", "reported_lng IS NULL OR (reported_lng >= -180 AND reported_lng <= 180 AND reported_lng <> 'NaN'::float8)");
+
+                            t.HasCheckConstraint("ck_work_order_pole_target_position", "position >= 0");
+
+                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_accuracy_m IS NOT NULL AND reported_captured_at IS NOT NULL)");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -5872,6 +6043,37 @@ namespace LuxMap.Persistence.Migrations
                         .HasConstraintName("fk_work_order_work_order_root_work_order_id_commune_id");
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderAttachment", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_attachment_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("RemovedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_work_order_attachment_app_user_removed_by");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_attachment_app_user_uploaded_by");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId", "CommuneId")
+                        .HasPrincipalKey("WorkOrderId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_attachment_work_order_work_order_id_commune_id");
+                });
+
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderFault", b =>
                 {
                     b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
@@ -5969,6 +6171,31 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_work_order_pole_photo_work_order_work_order_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPoleTarget", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_target_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_target_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId", "CommuneId")
+                        .HasPrincipalKey("WorkOrderId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_pole_target_work_order_work_order_id_commune_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderSegment", b =>

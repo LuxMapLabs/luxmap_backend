@@ -5,8 +5,10 @@ namespace LuxMap.Modules.WorkOrders;
 
 public static class WorkOrderRules
 {
+    /// <summary>Only inspection and repair carry faults; a survey finds them and a pole_gps_update has none (WO-POLE-GPS PG-1).</summary>
     public static bool Eligible(TaskKind kind, FaultStatus status)
-        => kind != TaskKind.Survey && FaultStatusSets.IsOpen(status) && (kind == TaskKind.Inspection || status != FaultStatus.Detected);
+        => kind is TaskKind.Inspection or TaskKind.Repair && FaultStatusSets.IsOpen(status)
+            && (kind == TaskKind.Inspection || status != FaultStatus.Detected);
 
     public static bool Allows(WorkOrderStatus status, string action,
         CancellationRequestStatus cancellation = CancellationRequestStatus.None) => action switch

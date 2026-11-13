@@ -16,6 +16,9 @@ public sealed class WorkOrderConfiguration : IEntityTypeConfiguration<WorkOrder>
         builder.ToTable("work_order", table =>
         {
             table.HasCheckConstraint("ck_work_order_survey_target", "task_kind <> 'survey' OR (segment_id IS NULL AND cluster_id IS NULL)");
+            // WO-POLE-GPS PG-1/PG-2: one road, no cluster, never a step of a chain.
+            table.HasCheckConstraint("ck_work_order_pole_gps_target",
+                "task_kind <> 'pole_gps_update' OR (segment_id IS NOT NULL AND cluster_id IS NULL AND parent_work_order_id IS NULL)");
             table.HasCheckConstraint("ck_work_order_title_not_blank", "btrim(title) <> ''");
             table.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
             table.HasCheckConstraint("ck_work_order_assigned_at_matches", "(assigned_to IS NULL) = (assigned_at IS NULL)");
@@ -101,6 +104,69 @@ public sealed class WorkOrderSegmentConfiguration : IEntityTypeConfiguration<Wor
         builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
             .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RoadSegment>().WithMany().HasForeignKey(x => x.SegmentId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class WorkOrderPoleTargetConfiguration : IEntityTypeConfiguration<WorkOrderPoleTarget>
+{
+    public const string ActiveIndex = "ux_work_order_pole_target_pole_id_active";
+
+    public void Configure(EntityTypeBuilder<WorkOrderPoleTarget> builder)
+    {
+        builder.ToTable("work_order_pole_target", table =>
+        {
+            table.HasCheckConstraint("ck_work_order_pole_target_position", "position >= 0");
+            // A report is all four values or none — each named, so a NULL operand cannot let a half report through.
+            table.HasCheckConstraint("ck_work_order_pole_target_report_complete", """
+                (reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)
+                OR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_accuracy_m IS NOT NULL AND reported_captured_at IS NOT NULL)
+                """);
+            // Measured floats: NaN sorts above every number in Postgres, so each bound is spelled out (migrations.md).
+            table.HasCheckConstraint("ck_work_order_pole_target_lat", "reported_lat IS NULL OR (reported_lat >= -90 AND reported_lat <= 90 AND reported_lat <> 'NaN'::float8)");
+            table.HasCheckConstraint("ck_work_order_pole_target_lng", "reported_lng IS NULL OR (reported_lng >= -180 AND reported_lng <= 180 AND reported_lng <> 'NaN'::float8)");
+            table.HasCheckConstraint("ck_work_order_pole_target_accuracy", "reported_accuracy_m IS NULL OR (reported_accuracy_m >= 0 AND reported_accuracy_m <> 'NaN'::float8 AND reported_accuracy_m <> 'Infinity'::float8)");
+        });
+        builder.HasKey(x => new { x.WorkOrderId, x.Position });
+        builder.HasIndex(x => new { x.WorkOrderId, x.PoleId }).IsUnique();
+        builder.HasCommuneScope();
+        builder.HasCommuneReference(x => x.CommuneId);
+        builder.HasIndex(x => x.CommuneId);
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        // Same-commune pole FK is DB-only (migration), as for pole photos: Pole.CommuneId stays mutable in EF.
+        builder.HasOne<Pole>().WithMany().HasForeignKey(x => x.PoleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.PoleId);
+        // PG-3: one open pole_gps_update order per pole. The service recognises the conflict by this name.
+        builder.HasIndex(x => x.PoleId, ActiveIndex).HasDatabaseName(ActiveIndex).IsUnique().HasFilter("released_at IS NULL");
+    }
+}
+
+public sealed class WorkOrderAttachmentConfiguration : IEntityTypeConfiguration<WorkOrderAttachment>
+{
+    public void Configure(EntityTypeBuilder<WorkOrderAttachment> builder)
+    {
+        builder.ToTable("work_order_attachment", table =>
+        {
+            table.HasCheckConstraint("ck_work_order_attachment_bytes", "byte_count > 0");
+            table.HasCheckConstraint("ck_work_order_attachment_file_name", "btrim(file_name) <> '' AND char_length(file_name) <= 200");
+            table.HasCheckConstraint("ck_work_order_attachment_key_not_blank", "btrim(object_key) <> ''");
+            table.HasCheckConstraint("ck_work_order_attachment_sha256", "sha256 ~ '^[0-9a-f]{64}$'");
+            table.HasCheckConstraint("ck_work_order_attachment_removed_together", "(removed_at IS NULL) = (removed_by IS NULL)");
+            table.HasCheckConstraint("ck_work_order_attachment_removed_after_upload", "removed_at IS NULL OR removed_at >= uploaded_at");
+        });
+        builder.HasKey(x => x.AttachmentId);
+        builder.Property(x => x.AttachmentId).HasPrefixedId(PrefixedIds.WorkOrderAttachment);
+        builder.Property(x => x.UploadedAt).HasDefaultValueSql("now()");
+        builder.HasCommuneScope();
+        builder.HasCommuneReference(x => x.CommuneId);
+        builder.HasIndex(x => x.CommuneId);
+        builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => new { x.WorkOrderId, x.CommuneId });
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UploadedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<AppUser>().WithMany().HasForeignKey(x => x.RemovedBy).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(x => x.UploadedBy);
+        builder.HasIndex(x => x.RemovedBy);
     }
 }
 

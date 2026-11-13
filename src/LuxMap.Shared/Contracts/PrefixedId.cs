@@ -96,10 +96,14 @@ public static class PrefixedIds
 
     public static readonly PrefixedIdSpec SurveyRecurringSchedule = new("SSCH", 4, "survey_recurring_schedule_id_seq");
 
+    /// <summary>A PDF attached to a work order for the engineer (drift WO-POLE-GPS PG-6, provisional).</summary>
+    public static readonly PrefixedIdSpec WorkOrderAttachment = new("ATT", 4, "work_order_attachment_id_seq");
+
     public static IReadOnlyList<PrefixedIdSpec> All { get; } =
     [
         Pole, Fault, RoadSegment, AdministrativeUnit, Fixture, Feeder, IotNode, SurveySweep,
         SurveyFrame, Detection, LuxReading, WorkOrder, RepairEvidence, ExternalUnit, AppUser, FaultCluster,
         SurveyRecurringSchedule, Notification, ElectricalCabinet, LightingCommand, QrCode, CitizenReport, CitizenSubmission, CitizenPhoto, WorkOrderPolePhoto,
+        WorkOrderAttachment,
     ];
 }

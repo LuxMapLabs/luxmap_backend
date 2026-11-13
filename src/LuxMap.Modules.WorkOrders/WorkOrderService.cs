@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Faults.Entities;
@@ -20,7 +21,7 @@ using Npgsql;
 namespace LuxMap.Modules.WorkOrders;
 
 public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor actor,
-    IAuditTrail audit, FaultTransitions transitions, ISurveyFindingLookup surveys)
+    IAuditTrail audit, FaultTransitions transitions, ISurveyFindingLookup surveys, PoleRelocation relocation)
 {
     private string ActorId => actor.UserId ?? throw new LuxMapException("UNAUTHENTICATED", HttpStatusCode.Unauthorized, "Authentication required.");
 
@@ -81,6 +82,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                              where ids.Contains(link.WorkOrderId)
                              orderby fault.CreatedAt, fault.FaultId.Length, fault.FaultId
                              select new { link.WorkOrderId, fault.FaultId, fault.PriorityScore }).ToListAsync(ct);
+        var targets = await db.Set<WorkOrderPoleTarget>().AsNoTracking().Where(x => ids.Contains(x.WorkOrderId))
+            .OrderBy(x => x.Position).Select(x => new { x.WorkOrderId, x.PoleId }).ToListAsync(ct);
         return orders.Select(wo => new WorkOrderItem
         {
             WorkOrderId = wo.WorkOrderId, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
@@ -91,6 +94,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             CancellationRejectedAt = wo.CancellationRejectedAt,
             ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
             FaultIds = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.FaultId).ToArray(),
+            PoleIds = targets.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.PoleId).ToArray(),
             PriorityScore = members.Where(x => x.WorkOrderId == wo.WorkOrderId).Select(x => x.PriorityScore).DefaultIfEmpty().Max(),
         }).ToArray();
     }
@@ -108,6 +112,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                                  // Geom test: backstop only — a pole without a position cannot carry a fault (POLE-GEOM-NULL G-4).
                                  Lat = fault.Lat ?? (pole == null || pole.Geom == null ? 0 : pole.Geom.Y),
                                  Lng = fault.Lng ?? (pole == null || pole.Geom == null ? 0 : pole.Geom.X) }).ToListAsync(ct);
+        var targets = await db.Set<WorkOrderPoleTarget>().AsNoTracking().Where(x => x.WorkOrderId == id)
+            .OrderBy(x => x.Position).ToListAsync(ct);
         return new WorkOrderDetail
         {
             WorkOrderId = id, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
@@ -119,6 +125,10 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             ParentWorkOrderId = wo.ParentWorkOrderId, CaseId = wo.RootWorkOrderId ?? wo.WorkOrderId,
             SegmentIds = await db.Set<WorkOrderSegment>().Where(x => x.WorkOrderId == id).OrderBy(x => x.Position).Select(x => x.SegmentId).ToArrayAsync(ct),
             FaultIds = members.Select(x => x.Fault.FaultId).ToArray(),
+            PoleIds = targets.Select(x => x.PoleId).ToArray(),
+            PoleLocations = targets.Where(x => x.ReportedLat is not null).Select(x => new WorkOrderPoleLocation(x.PoleId,
+                x.ReportedLat!.Value, x.ReportedLng!.Value, x.ReportedAccuracyM!.Value, x.ReportedCapturedAt!.Value)).ToArray(),
+            Attachments = await WorkOrderAttachmentService.ItemsAsync(db, id, ct),
             PriorityScore = members.Select(x => x.Fault.PriorityScore).DefaultIfEmpty().Max(),
             Note = wo.Note, ReviewNote = wo.ReviewNote, ReportNote = wo.ReportNote, CreatedBy = wo.CreatedBy,
             MaterialsNote = wo.MaterialsNote, MaterialsUsed = wo.MaterialsUsed,
@@ -176,6 +186,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var title = ValidTitle(request.Title);
         Schedule(request.ScheduledDate, request.DueDate);
         var kind = request.TaskKind ?? throw OptionalJson.Invalid("task_kind");
+        if (kind == TaskKind.PoleGpsUpdate) return await CreatePoleGpsCore(request, title, ct);
+        if (request.PoleIds is not null) throw OptionalJson.Invalid("pole_ids");
         if (kind == TaskKind.Survey) return await CreateSurveyCore(request, title, ct);
         if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
         if (request.SegmentIds is not null) throw OptionalJson.Invalid("segment_ids");
@@ -217,6 +229,55 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             UtcMicrosecondClock.UtcNow(), ct);
         await db.SaveChangesAsync(ct);
         return await Detail(wo.WorkOrderId, ct);
+    }
+
+    /// <summary>
+    /// WO-POLE-GPS PG-2/PG-3: chosen poles of one road, to label and locate. The commune is the road's, as for an inspection by segment;
+    /// every pole must stand on that road, in that commune, and in no other open pole_gps_update order.
+    /// </summary>
+    private async Task<WorkOrderDetail> CreatePoleGpsCore(CreateWorkOrderRequest request, string title, CancellationToken ct)
+    {
+        if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
+        if (request.SegmentIds is not null) throw OptionalJson.Invalid("segment_ids");
+        if (request.FaultIds is { Length: > 0 }) throw OptionalJson.Invalid("fault_ids");
+        var ids = request.PoleIds ?? [];
+        if (string.IsNullOrWhiteSpace(request.SegmentId)) throw OptionalJson.Invalid("segment_id");
+        if (ids.Length is 0 or > 200 || ids.Any(string.IsNullOrWhiteSpace) || ids.Distinct(StringComparer.Ordinal).Count() != ids.Length)
+            throw OptionalJson.Invalid("pole_ids");
+        var road = await db.Set<RoadSegment>().AsNoTracking().FirstOrDefaultAsync(x => x.SegmentId == request.SegmentId, ct)
+            ?? throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound, ("segment_id", request.SegmentId));
+        var poles = await db.Set<Pole>().AsNoTracking().Where(x => ids.Contains(x.PoleId))
+            .Select(x => new { x.PoleId, x.SegmentId, x.CommuneId }).ToListAsync(ct);
+        var missing = ids.Except(poles.Select(x => x.PoleId)).ToArray();
+        if (missing.Length != 0) throw Error("ASSET_NOT_FOUND", HttpStatusCode.NotFound, ("pole_ids", missing));
+        var elsewhere = ids.Where(x => poles.Single(p => p.PoleId == x).SegmentId != road.SegmentId).ToArray();
+        if (elsewhere.Length != 0) throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest,
+            ("field", "pole_ids"), ("segment_id", road.SegmentId), ("pole_ids_not_on_segment", elsewhere));
+        if (poles.Any(x => x.CommuneId != road.CommuneId)) throw Error("CROSS_COMMUNE_REFERENCE", HttpStatusCode.Conflict);
+        var busy = await db.Set<WorkOrderPoleTarget>().AsNoTracking()
+            .FirstOrDefaultAsync(x => ids.Contains(x.PoleId) && x.ReleasedAt == null, ct);
+        if (busy is not null) throw PoleConflict(busy);
+        if (request.AssignedTo is not null) await RequireAssignee(request.AssignedTo, road.CommuneId, ct);
+
+        var now = UtcMicrosecondClock.UtcNow();
+        // SQL is constructed exclusively from the server's immutable prefixed-ID specification.
+        var idSql = $"SELECT {PrefixedIds.WorkOrder.DefaultValueSql} AS \"Value\"";
+        var id = await db.Database.SqlQueryRaw<string>(idSql).SingleAsync(ct);
+        var wo = new WorkOrder
+        {
+            WorkOrderId = id, CommuneId = road.CommuneId, TaskKind = TaskKind.PoleGpsUpdate, Title = title, SegmentId = road.SegmentId,
+            CreatedBy = ActorId, AssignedTo = request.AssignedTo, AssignedAt = request.AssignedTo is null ? null : now,
+            WoStatus = request.AssignedTo is null ? WorkOrderStatus.Open : WorkOrderStatus.Assigned,
+            DueDate = request.DueDate, ScheduledDate = request.ScheduledDate, Note = request.Note,
+            MaterialsNote = Materials(request.MaterialsNote), CreatedAt = now, UpdatedAt = now,
+        };
+        db.Add(wo);
+        for (var position = 0; position < ids.Length; position++)
+            db.Add(new WorkOrderPoleTarget { WorkOrderId = id, Position = position, PoleId = ids[position], CommuneId = road.CommuneId });
+        Record(wo, AuditAction.Created, null, new { work_order = Snapshot(wo), pole_ids = ids }, now, request.Note);
+        Notify(WorkOrderNotices.Assigned(wo), [wo.AssignedTo], now);
+        await Save(id, [], ct, ids);
+        return await Detail(id, ct);
     }
 
     // Both the request and recurring job stage the SAME write; the caller saves with its occurrence, if any.
@@ -376,7 +437,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     public async Task<WorkOrderDetail> Patch(string id, PatchWorkOrderRequest request, CancellationToken ct)
     {
         if (OptionalJson.Present(request.CommuneId)) throw Error("SERVER_OWNED_FIELD", HttpStatusCode.BadRequest);
-        if (new[] { request.WoStatus, request.AssignedTo, request.FaultIds, request.TaskKind, request.SegmentId, request.SegmentIds }.Any(OptionalJson.Present))
+        if (new[] { request.WoStatus, request.AssignedTo, request.FaultIds, request.TaskKind, request.SegmentId, request.SegmentIds, request.PoleIds }.Any(OptionalJson.Present))
             throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("endpoint", "Use /assignee or a status action; targets and task_kind are immutable."));
         if (!new[] { request.Title, request.DueDate, request.ScheduledDate, request.MaterialsNote }.Any(OptionalJson.Present)) throw OptionalJson.Invalid("body");
         var title = OptionalJson.Present(request.Title) ? ValidTitle(OptionalJson.Text(request.Title, "title", false)) : null;
@@ -505,7 +566,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     }
 
     public async Task<WorkOrderDetail> Act(string id, string action, string? note,
-        JsonElement outcomes, CancellationToken ct, string? materialsUsed = null, DateTime? performedAt = null)
+        JsonElement outcomes, CancellationToken ct, string? materialsUsed = null, DateTime? performedAt = null,
+        JsonElement poleLocations = default)
     {
         note = note?.Trim();
         if ((action == "complete" && (note?.Length ?? 0) < 10)
@@ -523,7 +585,12 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             throw Error("AFTER_EVIDENCE_REQUIRED", HttpStatusCode.Conflict);
         var links = await db.Set<WorkOrderFault>().Where(x => x.WorkOrderId == id).ToListAsync(ct);
         var ids = links.Select(x => x.FaultId).ToArray();
+        var targets = await db.Set<WorkOrderPoleTarget>().Where(x => x.WorkOrderId == id).OrderBy(x => x.Position).ToListAsync(ct);
         var before = Snapshot(wo, ids, links: links);
+        // PG-12: the poles move and the order closes together, or neither happens.
+        await using var poleMove = wo.TaskKind == TaskKind.PoleGpsUpdate && action == "verify"
+            ? await db.Database.BeginTransactionAsync(ct) : null;
+        if (poleMove is not null) await MovePolesAsync(wo, targets, ct);
         if (action == "complete")
         {
             if (wo.TaskKind == TaskKind.Inspection && links.Count > 0)
@@ -537,6 +604,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                 foreach (var link in links) link.InspectionOutcome = reports.Single(x => x.FaultId == link.FaultId).Outcome;
             }
             else if (OptionalJson.Present(outcomes)) throw OptionalJson.Invalid("fault_outcomes");
+            if (wo.TaskKind == TaskKind.PoleGpsUpdate) Report(targets, poleLocations);
+            else if (OptionalJson.Present(poleLocations)) throw OptionalJson.Invalid("pole_locations");
         }
         var now = UtcMicrosecondClock.UtcNow();
         var changes = new List<FaultChange>();
@@ -581,14 +650,21 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             case "cancel": wo.WoStatus = WorkOrderStatus.Cancelled; wo.ReviewNote = note; wo.ClosedAt = now; break;
         }
         if (action is "start" or "complete" or "verify" or "cancel") ResetCancellation(wo);
-        if (wo.ClosedAt is not null) foreach (var link in links) link.ReleasedAt = now;
+        if (wo.ClosedAt is not null)
+        {
+            foreach (var link in links) link.ReleasedAt = now;
+            foreach (var target in targets) target.ReleasedAt = now;
+        }
         wo.UpdatedAt = now;
         var auditAction = action switch
         {
             "start" => AuditAction.Started, "complete" => AuditAction.Completed,
             "return" => AuditAction.Returned, "verify" => AuditAction.Verified, _ => AuditAction.Cancelled,
         };
-        Record(wo, auditAction, before, Snapshot(wo, ids, changes.ToArray(), skipped.ToArray(), links), now, note);
+        var after = Snapshot(wo, ids, changes.ToArray(), skipped.ToArray(), links);
+        if (wo.TaskKind == TaskKind.PoleGpsUpdate && action == "complete")
+            Record(wo, auditAction, before, new { work_order = after, pole_locations = Reported(targets) }, now, note);
+        else Record(wo, auditAction, before, after, now, note);
         switch (action)
         {
             case "complete": Notify(WorkOrderNotices.Completed(wo), await Notifier.ManagersCoveringAsync(db, [wo.CommuneId], ct), now); break;
@@ -597,7 +673,81 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             case "cancel": Notify(WorkOrderNotices.Cancelled(wo, note), [wo.AssignedTo], now); break;
         }
         await Save(id, [], ct);
+        if (poleMove is not null) await poleMove.CommitAsync(ct);
         return await Detail(id, ct);
+    }
+
+    private static WorkOrderPoleLocation[] Reported(IEnumerable<WorkOrderPoleTarget> targets)
+        => targets.Where(x => x.ReportedLat is not null).Select(x => new WorkOrderPoleLocation(x.PoleId,
+            x.ReportedLat!.Value, x.ReportedLng!.Value, x.ReportedAccuracyM!.Value, x.ReportedCapturedAt!.Value)).ToArray();
+
+    /// <summary>
+    /// PG-10/PG-11: what the engineer measured, kept on the order — NOT the GIS. At least one pole (a pole not found is left out, never
+    /// invented), each a target of this order, once. Replaces the previous report as a whole.
+    /// </summary>
+    private static void Report(List<WorkOrderPoleTarget> targets, JsonElement body)
+    {
+        PoleLocationReport[]? reports;
+        try { reports = body.ValueKind == JsonValueKind.Undefined ? null : body.Deserialize<PoleLocationReport[]>(LuxMapJsonOptions.Default); }
+        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException)
+        { throw OptionalJson.Invalid("pole_locations"); }
+        if (reports is null || reports.Length == 0 || reports.Any(x => x is null)
+            || reports.Select(x => x.PoleId).Distinct(StringComparer.Ordinal).Count() != reports.Length)
+            throw OptionalJson.Invalid("pole_locations");
+        var latest = UtcMicrosecondClock.UtcNow() + FaultReportService.FutureTolerance;
+        var accepted = new Dictionary<string, (double Lat, double Lng, double Accuracy, DateTime At)>(StringComparer.Ordinal);
+        foreach (var report in reports)
+        {
+            if (report.PoleId is null || targets.All(x => x.PoleId != report.PoleId)
+                || report.Lat is not { } lat || !double.IsFinite(lat) || Math.Abs(lat) > 90
+                || report.Lng is not { } lng || !double.IsFinite(lng) || Math.Abs(lng) > 180
+                || report.AccuracyM is not { } accuracy || !double.IsFinite(accuracy) || accuracy < 0
+                || report.CapturedAt is not { } captured)
+                throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "pole_locations"), ("pole_id", report.PoleId));
+            var utc = UtcNormalization.ToUtc(captured);
+            // timestamptz keeps microseconds; trim so the response equals what is stored.
+            var at = new DateTime(utc.Ticks / 10 * 10, DateTimeKind.Utc);
+            if (at > latest) throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "pole_locations"), ("pole_id", report.PoleId));
+            accepted[report.PoleId] = (lat, lng, accuracy, at);
+        }
+        foreach (var target in targets)
+        {
+            var found = accepted.TryGetValue(target.PoleId, out var value);
+            target.ReportedLat = found ? value.Lat : null;
+            target.ReportedLng = found ? value.Lng : null;
+            target.ReportedAccuracyM = found ? value.Accuracy : null;
+            target.ReportedCapturedAt = found ? value.At : null;
+        }
+    }
+
+    /// <summary>
+    /// PG-12: write each reported position into <c>pole.geom</c> by the same rule as <c>PUT /assets/poles/{id}/location</c> — inside the
+    /// caller's transaction, all or nothing. The poles are locked in one fixed order and saved with their own <c>relocated</c> audit events
+    /// BEFORE the order changes: one save may carry only one audit event once an audited row is in it.
+    /// </summary>
+    private async Task MovePolesAsync(WorkOrder wo, List<WorkOrderPoleTarget> targets, CancellationToken ct)
+    {
+        var reported = targets.Where(x => x.ReportedLat is not null).ToList();
+        var poleIds = reported.Select(x => x.PoleId).OrderBy(x => x.Length).ThenBy(x => x, StringComparer.Ordinal).ToArray();
+        // Order first, then poles — the order every pole-photo path takes them in, so the two cannot deadlock. A change to the
+        // order since it was read still surfaces as CONCURRENT_MODIFICATION at the save (xmin): FOR UPDATE leaves xmin alone.
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order WHERE work_order_id = {wo.WorkOrderId} FOR UPDATE", ct);
+        foreach (var poleId in poleIds)
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {poleId} FOR UPDATE", ct);
+        var poles = await db.Set<Pole>().Where(x => poleIds.Contains(x.PoleId)).ToDictionaryAsync(x => x.PoleId, StringComparer.Ordinal, ct);
+        var moves = new List<PoleRelocation.Measured>(reported.Count);
+        foreach (var target in reported)
+            moves.Add(await relocation.MeasureAsync(poles[target.PoleId], target.ReportedLat!.Value, target.ReportedLng!.Value, ct));
+        var off = moves.Where(relocation.IsOffSegment).ToArray();
+        if (off.Length != 0)
+            throw Error("POLE_OFF_SEGMENT", HttpStatusCode.Conflict, ("work_order_id", wo.WorkOrderId),
+                ("poles", off.Select(x => new
+                {
+                    pole_id = x.Pole.PoleId, segment_id = x.Pole.SegmentId,
+                    distance_m = Math.Round(x.SegmentDistanceM!.Value, 1), corridor_m = relocation.CorridorM,
+                }).ToArray()));
+        foreach (var move in moves) relocation.Stage(move, wo.WorkOrderId);
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>
@@ -649,7 +799,10 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
     private static LuxMapException LinkConflict(WorkOrderFault link) => Error("FAULT_ALREADY_IN_WORK_ORDER",
         HttpStatusCode.Conflict, ("fault_id", link.FaultId), ("work_order_id", link.WorkOrderId));
 
-    private async Task Save(string id, string[] faultIds, CancellationToken ct)
+    private static LuxMapException PoleConflict(WorkOrderPoleTarget target) => Error("POLE_ALREADY_IN_WORK_ORDER",
+        HttpStatusCode.Conflict, ("pole_id", target.PoleId), ("work_order_id", target.WorkOrderId));
+
+    private async Task Save(string id, string[] faultIds, CancellationToken ct, string[]? poleIds = null)
     {
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException)
@@ -668,6 +821,14 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             db.ChangeTracker.Clear();
             var link = await db.Set<WorkOrderFault>().FirstAsync(x => faultIds.Contains(x.FaultId) && x.ReleasedAt == null, ct);
             throw LinkConflict(link);
+        }
+        catch (DbUpdateException error) when (poleIds is not null && error.InnerException is PostgresException
+            { SqlState: "23505", ConstraintName: Configurations.WorkOrderPoleTargetConfiguration.ActiveIndex })
+        {
+            if (db.Database.CurrentTransaction is { } open) await open.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var target = await db.Set<WorkOrderPoleTarget>().AsNoTracking().FirstAsync(x => poleIds.Contains(x.PoleId) && x.ReleasedAt == null, ct);
+            throw PoleConflict(target);
         }
     }
 
