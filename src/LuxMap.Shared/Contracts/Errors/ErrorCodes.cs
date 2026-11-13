@@ -6,6 +6,8 @@ namespace LuxMap.Shared.Contracts.Errors;
 /// </summary>
 public static class ErrorCodes
 {
+    public const string AssetPhotoNotFound = "ASSET_PHOTO_NOT_FOUND";
+    public const string AssetPhotoLimitReached = "ASSET_PHOTO_LIMIT_REACHED";
     // SURVEY-SCHED-1, SELF-SIGNED 09/11/2026.
     public const string SurveyScheduleNotFound = "SURVEY_SCHEDULE_NOT_FOUND";
     public const string SurveyScheduleExists = "SURVEY_SCHEDULE_EXISTS";

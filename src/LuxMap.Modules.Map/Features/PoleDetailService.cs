@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets.Photos;
 using System.Net;
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
@@ -83,6 +84,7 @@ public sealed class PoleDetailService(
 
         return new PoleMapDetail
         {
+            AssetPhotos = (await new AssetPhotoReader(db).PolesAsync([poleId], ct)).GetValueOrDefault(poleId) ?? [],
             PoleId = pole.PoleId,
             SegmentId = pole.SegmentId,
             SegmentName = pole.SegmentName,

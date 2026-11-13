@@ -52,7 +52,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
         string[] expected =
         [
-            "cabinet_id", "external_ref", "cabinet_name", "commune_id", "commune_name", "data_source", "location",
+            "cabinet_id", "external_ref", "cabinet_name", "commune_id", "commune_name", "data_source", "location", "photo_count", "cover_photo",
             "feeder_ids", "iot_node_id", "updated_at", "updated_by", "updated_by_name",
         ];
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], Keys(row));
@@ -83,7 +83,8 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
         var detail = await GetAsync(client, $"{Cabinets}/{cabinetId}");
 
-        Assert.Equal(["cabinet", "created_at", "geom_wkt"], Keys(detail));
+        Assert.Equal(["asset_photos", "cabinet", "created_at", "geom_wkt"], Keys(detail));
+        Assert.Empty(detail.GetProperty("asset_photos").EnumerateArray());
         Assert.Equal(cabinetId, detail.GetProperty("cabinet").GetProperty("cabinet_id").GetString());
         Assert.Equal("POINT (108.8 12.8)", detail.GetProperty("geom_wkt").GetString());
     }
@@ -306,7 +307,9 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(Lat, coordinates[1].GetDouble(), 6);
 
         var properties = feature.GetProperty("properties");
-        Assert.Equal(["cabinet_id", "cabinet_name", "commune_id", "feeder_ids", "feeders", "iot_node_id"], Keys(properties));
+        Assert.Equal(["cabinet_id", "cabinet_name", "commune_id", "cover_photo", "feeder_ids", "feeders", "iot_node_id", "photo_count"], Keys(properties));
+        Assert.Equal(0, properties.GetProperty("photo_count").GetInt32());
+        Assert.Equal(JsonValueKind.Null, properties.GetProperty("cover_photo").ValueKind);
         Assert.Equal([feederId], Strings(properties.GetProperty("feeder_ids")));
         Assert.Equal(JsonValueKind.Null, properties.GetProperty("iot_node_id").ValueKind);
     }

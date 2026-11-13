@@ -1,4 +1,5 @@
 using System.Net;
+using LuxMap.Modules.Assets.Photos;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Assets.Import;
 using LuxMap.Modules.Assets.Warranty;
@@ -29,7 +30,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// </remarks>
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
-    WarrantyCalendar warranty, ISurveyCorridor corridor, IAuditTrail audit, IFeederControlLookup controls)
+    WarrantyCalendar warranty, ISurveyCorridor corridor, IAuditTrail audit, IFeederControlLookup controls, AssetPhotoReader photos)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -83,7 +84,12 @@ public sealed class AssetCrudService(
         };
         var result = await ListAsync(communes, page, (Pole pole) => pole.PoleId, PoleRow, filter, ct);
         var window = warranty.Window();
-        return result with { Items = [.. result.Items.Select(item => WithWarranty(item, window))] };
+        var galleries = await photos.PolesAsync([.. result.Items.Select(p => p.PoleId)], ct);
+        return result with { Items = [.. result.Items.Select(item =>
+        {
+            var gallery = galleries.GetValueOrDefault(item.PoleId) ?? [];
+            return WithWarranty(item, window) with { PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) };
+        })] };
     }
 
     /// <summary>Cabinets, with the device mounted in each (CAB-8).</summary>
@@ -96,10 +102,15 @@ public sealed class AssetCrudService(
     {
         var result = await ListAsync(communes, page, (ElectricalCabinet cabinet) => cabinet.CabinetId, CabinetRow, null, ct);
         var mounted = await devices.DevicesAsync([.. result.Items.Select(item => item.CabinetId)], ct);
+        var galleries = await photos.CabinetsAsync([.. result.Items.Select(item => item.CabinetId)], ct);
 
         return result with
         {
-            Items = [.. result.Items.Select(item => item with { IotNodeId = mounted.GetValueOrDefault(item.CabinetId) })],
+            Items = [.. result.Items.Select(item =>
+            {
+                var gallery = galleries.GetValueOrDefault(item.CabinetId) ?? [];
+                return item with { IotNodeId = mounted.GetValueOrDefault(item.CabinetId), PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) };
+            })],
         };
     }
 
@@ -136,9 +147,11 @@ public sealed class AssetCrudService(
             })
             .FirstAsync(ct);
 
+        var gallery = (await photos.PolesAsync([poleId], ct)).GetValueOrDefault(poleId) ?? [];
         return new PoleDetail
         {
-            Pole = item,
+            Pole = item with { PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) },
+            AssetPhotos = gallery,
 
             // No segment, or an inter-commune road hidden by scope: keep the name null.
             SegmentName = extra.SegmentName,
@@ -206,9 +219,11 @@ public sealed class AssetCrudService(
 
         var mounted = await devices.DevicesAsync([cabinetId], ct);
 
+        var gallery = (await photos.CabinetsAsync([cabinetId], ct)).GetValueOrDefault(cabinetId) ?? [];
         return new CabinetDetail
         {
-            Cabinet = item with { IotNodeId = mounted.GetValueOrDefault(cabinetId) },
+            Cabinet = item with { IotNodeId = mounted.GetValueOrDefault(cabinetId), PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) },
+            AssetPhotos = gallery,
             GeomWkt = Wkt(extra.Geom),
             CreatedAt = extra.CreatedAt,
         };

@@ -48,10 +48,12 @@ public sealed class AssetReadShapeTests(AssetImportFixture fixture)
         [
             "pole_id", "external_ref", "segment_id", "feeder_id", "commune_id", "commune_name", "data_source",
             "near_sensitive_poi", "location", "active_fixture", "active_fixtures", "note", "updated_at", "updated_by", "updated_by_name",
-            "feeder_source", "cabinet_id", "cabinet_name", "cabinet_source",
+            "feeder_source", "cabinet_id", "cabinet_name", "cabinet_source", "photo_count", "cover_photo",
         ];
 
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], [.. keys.Order(StringComparer.Ordinal)]);
+        Assert.Equal(0, row.GetProperty("photo_count").GetInt32());
+        Assert.Equal(JsonValueKind.Null, row.GetProperty("cover_photo").ValueKind);
 
         // The operational view's fields, which belong to Contract section 5.1 and must never appear
         // here. Listed by name rather than inferred, so adding one has to argue with a red test.

@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets.Photos;
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Shared.Contracts.Enums;
 
@@ -13,6 +14,8 @@ namespace LuxMap.Modules.Map.Features;
 /// </remarks>
 public sealed record PoleMapDetail
 {
+    public IReadOnlyList<PoleAssetPhotoItem> AssetPhotos { get; init; } = [];
+
     public required string PoleId { get; init; }
     public required string? SegmentId { get; init; }
     public required string? SegmentName { get; init; }

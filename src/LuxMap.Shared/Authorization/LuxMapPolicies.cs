@@ -29,6 +29,7 @@ namespace LuxMap.Shared.Authorization;
 /// </remarks>
 public static class LuxMapPolicies
 {
+    public const string UploadAssetPhotos = "cap:upload_asset_photos";
     /// <summary>Read the lighting network: map layers, asset inventory, topology.</summary>
     public const string ReadNetwork = "cap:read_network";
 
@@ -139,6 +140,7 @@ public static class LuxMapPolicies
             [ReviewSurveys] = [UserRole.Manager],
             [ReadNetwork] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
             [ReadLuxReadings] = [UserRole.Superior, UserRole.Manager, UserRole.FieldEngineer, UserRole.SystemAdmin],
+            [UploadAssetPhotos] = [UserRole.Manager, UserRole.FieldEngineer],
             [ManageAssets] = [UserRole.Manager],
             [EditPoleNotes] = [UserRole.Manager, UserRole.FieldEngineer],
             [EditPoleLocation] = [UserRole.Manager, UserRole.FieldEngineer],

@@ -775,3 +775,11 @@ GET cùng đường dẫn phục vụ thumbnail; DELETE trả 204, chỉ gỡ li
 GET `/api/v1/admin/users/{id}/avatar`. `avatar_url` của `/auth/me` và dòng tài khoản admin là relative URL + `?v=<Unix giây UTC>`,
 null khi chưa có avatar. Mọi GET đòi Bearer: FE fetch → blob URL; cache private 86400 giây, có ETag/304.
 Claude cần sinh migration năm cột avatar và CHECK trước khi chạy API/test trên DB; xem `.ai/results/ACCT-AVATAR.md`.
+
+### Khi host tooling/test treo ở IHost trong worktree (ASSET-PHOTOS)
+
+Nếu `dotnet ef` / WebApplicationFactory timeout lúc dựng IHost, có thể chạy với
+`DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false` để tắt watcher cấu hình cho **lượt lệnh** đó.
+Không sửa cấu hình runtime/deploy. Nếu NuGet HTTP cache ngoài sandbox bị từ chối ghi, đặt
+`NUGET_HTTP_CACHE_PATH` vào thư mục tạm được phép và restore lại với `--force -warnaserror`;
+không tắt NuGet audit.

@@ -48,6 +48,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["ReviewSurveys"] = ("GET", "/api/v1/_scope/review-surveys", ["manager"]),
         ["ReadNetwork"] = ("GET", "/api/v1/assets/segments", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ReadLuxReadings"] = ("GET", "/api/v1/lux-readings", ["system_admin", "superior", "manager", "field_engineer"]),
+        ["UploadAssetPhotos"] = ("POST", "/api/v1/assets/poles/POLE-0000/photos", ["manager", "field_engineer"]),
         ["ManageAssets"] = ("POST", "/api/v1/assets/segments", ["manager"]),
         ["EditPoleNotes"] = ("PUT", "/api/v1/assets/poles/POLE-0/note", ["manager", "field_engineer"]),
         ["EditPoleLocation"] = ("PUT", "/api/v1/assets/poles/POLE-0/location", ["manager", "field_engineer"]),
@@ -99,7 +100,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         using var request = new HttpRequestMessage(new HttpMethod(method), url);
         if (method is "POST" or "PATCH" or "PUT")
         {
-            request.Content = capability == "ManageOwnProfile" ? new MultipartFormDataContent() : JsonContent.Create(new { });
+            request.Content = capability is "ManageOwnProfile" or "UploadAssetPhotos" ? new MultipartFormDataContent() : JsonContent.Create(new { });
         }
 
         var response = await client.SendAsync(request);

@@ -24,6 +24,8 @@ namespace LuxMap.Persistence.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("cabinet_asset_photo_id_seq");
+
             modelBuilder.HasSequence("cabinet_id_seq");
 
             modelBuilder.HasSequence("citizen_photo_id_seq");
@@ -55,6 +57,8 @@ namespace LuxMap.Persistence.Migrations
             modelBuilder.HasSequence("node_id_seq");
 
             modelBuilder.HasSequence("notification_id_seq");
+
+            modelBuilder.HasSequence("pole_asset_photo_id_seq");
 
             modelBuilder.HasSequence("pole_id_seq");
 
@@ -166,6 +170,119 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_storage_reconciliation_samples", "cardinality(orphan_sample) <= LEAST(orphan_count, 20) AND cardinality(missing_sample) <= LEAST(missing_count, 20)");
                         });
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Assets.Entities.CabinetAssetPhoto", b =>
+                {
+                    b.Property<string>("PhotoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id")
+                        .HasDefaultValueSql("luxmap_format_id('CAP', nextval('cabinet_asset_photo_id_seq'), 6)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "cabinet_asset_photo_id_seq");
+
+                    b.Property<long>("ByteCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_count");
+
+                    b.Property<string>("CabinetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cabinet_id");
+
+                    b.Property<Guid>("ClientOpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_op_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.Property<long>("ThumbnailBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("thumbnail_bytes");
+
+                    b.Property<string>("ThumbnailKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("thumbnail_key");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploaded_by");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("PhotoId")
+                        .HasName("pk_cabinet_asset_photo");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_cabinet_asset_photo_commune_id");
+
+                    b.HasIndex("DeletedBy")
+                        .HasDatabaseName("ix_cabinet_asset_photo_deleted_by");
+
+                    b.HasIndex("CabinetId", "CommuneId")
+                        .HasDatabaseName("ix_cabinet_asset_photo_cabinet_id_commune_id");
+
+                    b.HasIndex("UploadedBy", "ClientOpId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_cabinet_asset_photo_user_operation");
+
+                    b.HasIndex("CabinetId", "CreatedAt", "PhotoId")
+                        .HasDatabaseName("ix_cabinet_asset_photo_parent_order");
+
+                    b.ToTable("cabinet_asset_photo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_cabinet_asset_photo_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_cabinet_asset_photo_deleted", "(deleted_at IS NULL) = (deleted_by IS NULL)");
+
+                            t.HasCheckConstraint("ck_cabinet_asset_photo_hash", "request_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_cabinet_asset_photo_keys", "object_key = 'original/' || photo_id || '.jpg' AND thumbnail_key = 'thumb/' || photo_id || '.jpg'");
+
+                            t.HasCheckConstraint("ck_cabinet_asset_photo_operation", "client_op_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_cabinet_asset_photo_sizes", "byte_count BETWEEN 1 AND 16777216 AND thumbnail_bytes > 0 AND width > 0 AND height > 0 AND width::bigint * height <= 40000000");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.ElectricalCabinet", b =>
@@ -538,6 +655,116 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_pole_feeder_source_matches_feeder", "(feeder_id IS NULL) = (feeder_source IS NULL)");
 
                             t.HasCheckConstraint("ck_pole_note_length", "char_length(note) <= 1000");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Assets.Entities.PoleAssetPhoto", b =>
+                {
+                    b.Property<string>("PhotoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id")
+                        .HasDefaultValueSql("luxmap_format_id('PAP', nextval('pole_asset_photo_id_seq'), 6)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "pole_asset_photo_id_seq");
+
+                    b.Property<long>("ByteCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("byte_count");
+
+                    b.Property<Guid>("ClientOpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_op_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("DeletedBy")
+                        .HasColumnType("text")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.Property<long>("ThumbnailBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("thumbnail_bytes");
+
+                    b.Property<string>("ThumbnailKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("thumbnail_key");
+
+                    b.Property<string>("UploadedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploaded_by");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
+                    b.HasKey("PhotoId")
+                        .HasName("pk_pole_asset_photo");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_pole_asset_photo_commune_id");
+
+                    b.HasIndex("DeletedBy")
+                        .HasDatabaseName("ix_pole_asset_photo_deleted_by");
+
+                    b.HasIndex("UploadedBy", "ClientOpId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_pole_asset_photo_user_operation");
+
+                    b.HasIndex("PoleId", "CreatedAt", "PhotoId")
+                        .HasDatabaseName("ix_pole_asset_photo_parent_order");
+
+                    b.ToTable("pole_asset_photo", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_pole_asset_photo_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_pole_asset_photo_deleted", "(deleted_at IS NULL) = (deleted_by IS NULL)");
+
+                            t.HasCheckConstraint("ck_pole_asset_photo_hash", "request_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_pole_asset_photo_keys", "object_key = 'original/' || photo_id || '.jpg' AND thumbnail_key = 'thumb/' || photo_id || '.jpg'");
+
+                            t.HasCheckConstraint("ck_pole_asset_photo_operation", "client_op_id <> '00000000-0000-0000-0000-000000000000'::uuid");
+
+                            t.HasCheckConstraint("ck_pole_asset_photo_sizes", "byte_count BETWEEN 1 AND 16777216 AND thumbnail_bytes > 0 AND width > 0 AND height > 0 AND width::bigint * height <= 40000000");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -4604,7 +4831,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_audit_event_before_state_object", "before_state IS NULL OR jsonb_typeof(before_state) = 'object'");
 
-                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report', 'pole', 'survey_recurring_schedule')");
+                            t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('pole_asset_photo', 'cabinet_asset_photo', 'work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report', 'pole', 'survey_recurring_schedule')");
 
                             t.HasCheckConstraint("ck_audit_event_has_state", "before_state IS NOT NULL OR after_state IS NOT NULL");
                         });
@@ -4822,6 +5049,44 @@ namespace LuxMap.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.Assets.Entities.CabinetAssetPhoto", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Assets.Entities.ElectricalCabinet", null)
+                        .WithMany()
+                        .HasForeignKey("CabinetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cabinet_asset_photo_electrical_cabinet_cabinet_id");
+
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cabinet_asset_photo_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_cabinet_asset_photo_app_user_deleted_by");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cabinet_asset_photo_app_user_uploaded_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.ElectricalCabinet", null)
+                        .WithMany()
+                        .HasForeignKey("CabinetId", "CommuneId")
+                        .HasPrincipalKey("CabinetId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cabinet_asset_photo_electrical_cabinet_cabinet_id_commune_id");
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.ElectricalCabinet", b =>
                 {
                     b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
@@ -4917,6 +5182,36 @@ namespace LuxMap.Persistence.Migrations
                     b.Navigation("Feeder");
 
                     b.Navigation("Segment");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Assets.Entities.PoleAssetPhoto", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pole_asset_photo_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("DeletedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pole_asset_photo_app_user_deleted_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pole_asset_photo_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_pole_asset_photo_app_user_uploaded_by");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Assets.Entities.PoleCurrentStatus", b =>

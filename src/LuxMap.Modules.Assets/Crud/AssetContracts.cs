@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using LuxMap.Modules.Assets.Photos;
 using System.Net;
 using System.Text.Json;
 using LuxMap.Shared.Contracts.Enums;
@@ -551,6 +552,9 @@ public sealed record AssetLocation
 /// </remarks>
 public sealed record PoleListItem
 {
+    public int PhotoCount { get; init; }
+    public AssetPhotoCover? CoverPhoto { get; init; }
+
     public required string PoleId { get; init; }
 
     public string? ExternalRef { get; init; }
@@ -691,6 +695,8 @@ public sealed record PoleLocationResponse(
 /// <summary>One pole read on its own — the list row plus what only a detail view needs.</summary>
 public sealed record PoleDetail
 {
+    public IReadOnlyList<PoleAssetPhotoItem> AssetPhotos { get; init; } = [];
+
     public required PoleListItem Pole { get; init; }
 
     /// <summary>Resolved for display. The list omits it: one join per row for a label.</summary>
@@ -847,6 +853,9 @@ public sealed record FeederCabinet
 /// </remarks>
 public sealed record CabinetListItem
 {
+    public int PhotoCount { get; init; }
+    public AssetPhotoCover? CoverPhoto { get; init; }
+
     public required string CabinetId { get; init; }
 
     public string? ExternalRef { get; init; }
@@ -886,6 +895,8 @@ public sealed record CabinetListItem
 /// <summary>One cabinet read on its own.</summary>
 public sealed record CabinetDetail
 {
+    public IReadOnlyList<CabinetAssetPhotoItem> AssetPhotos { get; init; } = [];
+
     public required CabinetListItem Cabinet { get; init; }
 
     /// <summary>WKT <c>POINT</c> in EPSG:4326 — what a <c>PUT</c> body wants back.</summary>
