@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Identity.Entities;
 using MimeKit;
@@ -37,6 +38,27 @@ public class AccountMailTemplateTests
 
         Assert.Contains(Link.AbsoluteUri, text);
         Assert.Contains("href=\"http://localhost:5173/set-password?token=abc-DEF_123&amp;x=1\"", html);
+    }
+
+    /// <summary>The button is the only place the link appears in the HTML; the raw URL lives in the plain-text part.</summary>
+    [Fact]
+    public void The_html_links_only_through_the_button_without_printing_the_raw_url()
+    {
+        var (_, _, html) = AccountMailTemplate.Render(AccountTokenPurpose.Invite, "An", "an", Link, "14:09 ngày 08/10/2026");
+
+        Assert.Single(Regex.Matches(html, "set-password\\?token="));
+    }
+
+    [Theory]
+    [InlineData(AccountTokenPurpose.Invite, "Tài khoản chưa dùng được cho tới khi mật khẩu được đặt.")]
+    [InlineData(AccountTokenPurpose.Reset, "Mật khẩu hiện tại của bạn vẫn giữ nguyên.")]
+    public void The_ignore_note_says_what_happens_if_the_mail_is_ignored(AccountTokenPurpose purpose, string note)
+    {
+        var (_, text, html) = AccountMailTemplate.Render(purpose, "An", "an", Link, "14:09 ngày 08/10/2026");
+
+        Assert.Contains(note, text);
+        Assert.Contains(note, html);
+        Assert.DoesNotContain("Nếu bạn không yêu cầu việc này", html);
     }
 
     [Theory]
