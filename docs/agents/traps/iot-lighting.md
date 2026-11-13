@@ -132,3 +132,12 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
   `uncontrollable_pole_count` vẫn dựa trên mạch/rơ-le.
 - `unassigned_segment_pole_count` đếm cột chưa tuyến trong các mạch thực sự được điều khiển, tính lúc lập kế hoạch.
   Không có cột lưu bền: preview/tạo mới trả số, đọc lại hoặc replay request trả null (không ghi lại), không suy từ tài sản hiện tại.
+
+## Đường bridge (IOT-DIAGNOSTICS) chưa ghi phiên bản — drift BE-34 VR-10…VR-12 (13/11/2026)
+
+- Có **hai** đường IoT song song: `Modules.Telemetry` (kênh `http` / `mqtt`, `iot_node`, `lighting_command`, ghi firmware qua heartbeat
+  MQTT khi `Lighting__Channel=mqtt`) và `Modules.IOT` + `LuxMap.IotBridge` (telemetry trong `telemetry.sqlite` của bridge). Sửa firmware /
+  phiên bản ở một đường **không** phủ đường kia.
+- Bridge hiện không lưu firmware: heartbeat gateway là `"1"`, `TelemetryRequest` không có trường phiên bản. Thêm bất kỳ kết quả lưu lại
+  nào từ bridge (mẫu điện, chẩn đoán, sự cố) phải mang phiên bản firmware / thuật toán **lúc sinh ra** (VR-10, VR-12); mẫu cũ ghi
+  "không rõ", không suy từ bản hiện tại.
