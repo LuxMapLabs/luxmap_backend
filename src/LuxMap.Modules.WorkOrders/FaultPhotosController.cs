@@ -25,8 +25,9 @@ public sealed class FaultPhotosController(WorkOrderEvidenceService evidence) : C
     [HttpPost("{id}/photos")]
     [Authorize(Policy = LuxMapPolicies.ReportFaults)]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(WorkOrderEvidenceService.MaxUploadBytes)]
-    [RequestFormLimits(MultipartBodyLengthLimit = WorkOrderEvidenceService.MaxUploadBytes)]
+    [RequestSizeLimit(WorkOrderEvidenceService.MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = WorkOrderEvidenceService.MaxRequestBytes)]
+    [UploadBodyLimit(WorkOrderEvidenceService.MaxRequestBytes)]
     [ProducesResponseType(typeof(EvidenceItem), 201)]
     [ProducesResponseType(typeof(EvidenceItem), 200)]
     public async Task<ActionResult<EvidenceItem>> Upload(string id, IFormFile? file,

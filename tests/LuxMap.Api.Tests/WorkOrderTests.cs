@@ -1085,6 +1085,19 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
     }
 
+    [Fact]
+    public async Task A_photo_of_exactly_16_MiB_is_taken_with_its_form_around_it_and_one_byte_more_is_a_413()
+    {
+        var id = await StartedRepair();
+        byte[] Padded(long length) { var bytes = new byte[length]; Jpeg().CopyTo(bytes, 0); return bytes; }
+
+        var (status, body) = await Upload("a", id, "before", Padded(WorkOrderEvidenceService.MaxUploadBytes));
+        Assert.True(status == 201, $"expected 201, got {status} {body}");
+        (status, body) = await Upload("a", id, "before", Padded(WorkOrderEvidenceService.MaxUploadBytes + 1));
+        Assert.Equal((413, "UPLOAD_TOO_LARGE"), (status, Code(body)));
+        Assert.Equal(1, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
     [Theory]
     [InlineData("captured_at", "not a time")]
     [InlineData("captured_at", "13:30")]

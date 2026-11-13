@@ -91,8 +91,9 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     [HttpPost("{id}/evidence")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(WorkOrderEvidenceService.MaxUploadBytes)]
-    [RequestFormLimits(MultipartBodyLengthLimit = WorkOrderEvidenceService.MaxUploadBytes)]
+    [RequestSizeLimit(WorkOrderEvidenceService.MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = WorkOrderEvidenceService.MaxRequestBytes)]
+    [UploadBodyLimit(WorkOrderEvidenceService.MaxRequestBytes)]
     [ProducesResponseType(typeof(EvidenceItem), 201)]
     [ProducesResponseType(typeof(EvidenceItem), 200)]
     public async Task<ActionResult<EvidenceItem>> UploadEvidence(string id, IFormFile? file,
