@@ -94,6 +94,18 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal("unreachable", visible.GetProperty("status").GetString());
         var hidden = await foreign.GetFromJsonAsync<JsonElement>($"{root}/servers");
         Assert.DoesNotContain(hidden.EnumerateArray(), item => item.GetProperty("server_id").GetString() == id);
+
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.DeleteAsync($"{nodePath}/source")).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);
+        var empty = await manager.GetFromJsonAsync<JsonElement>($"{root}/nodes?page=2147483647&page_size=200");
+        Assert.Empty(empty.GetProperty("items").EnumerateArray());
+        var routesPath = $"{root}/servers/{id}/gateways/routes";
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(routesPath)).StatusCode);
+        var routes = await admin.GetFromJsonAsync<JsonElement>(routesPath);
+        Assert.True(Assert.Single(routes.EnumerateArray()).GetProperty("credential_issued").GetBoolean());
     }
 
     private static HttpClient AuthorizedClient(HttpClient client, HttpClient source)
@@ -107,6 +119,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/gateways/routes", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new[] { new { gatewayId = "TEST-GW", deviceIds = new[] { "probe" },
+                        credentialIssued = true } }),
+                });
             if (path.EndsWith("/authorization", StringComparison.Ordinal))
                 return Task.FromResult(new HttpResponseMessage(path.EndsWith("/probe/authorization", StringComparison.Ordinal)
                     ? HttpStatusCode.NoContent : HttpStatusCode.NotFound));

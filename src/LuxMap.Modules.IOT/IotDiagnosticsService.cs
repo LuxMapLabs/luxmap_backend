@@ -88,6 +88,7 @@ public sealed record IotArchivedData(string? Timestamp, string? SessionId, long?
 public sealed record IotAutoSchedule(string? DayStart, string? NightStart);
 public sealed record IotCommandRequest(string? Mode, string? Command, IotAutoSchedule? AutoSchedule = null);
 public sealed record IotGatewayRouteRequest(string? DeviceId);
+public sealed record IotGatewayRoute(string GatewayId, string[] DeviceIds, bool CredentialIssued);
 public sealed record IotGatewayCredential(string ClientId, string Username, string Password, string[] NodeIds);
 public sealed record IotCommandStatus(
     string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null);
@@ -204,6 +205,24 @@ public sealed class IotDiagnosticsService(
         var request = new HttpRequestMessage(method, new Uri(uri, $"api/luxmap/{path}"));
         request.Headers.Add("X-Iot-Provisioning-Key", key);
         return request;
+    }
+
+    public async Task<IReadOnlyList<IotGatewayRoute>> GatewayRoutesAsync(string serverId, string? key, CancellationToken ct)
+    {
+        var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
+        using var request = ProvisioningRequest(HttpMethod.Get, uri, "gateways/routes", key!);
+        try
+        {
+            using var response = await client.SendAsync(request, ct);
+            if (response.StatusCode != HttpStatusCode.OK || !IsJson(response))
+                throw Unavailable("IoT Bridge không trả được danh sách tuyến MQTT.");
+            return await response.Content.ReadFromJsonAsync<IotGatewayRoute[]>(cancellationToken: ct)
+                ?? throw Unavailable("Danh sách tuyến MQTT không hợp lệ.");
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không đọc được danh sách tuyến MQTT từ IoT Bridge.");
+        }
     }
 
     public async Task RegisterGatewayRouteAsync(string serverId, string gatewayId, IotGatewayRouteRequest request,
@@ -384,6 +403,8 @@ public sealed class IotDiagnosticsService(
     {
         var nodes = db.Set<IotNode>().AsNoTracking();
         var total = await nodes.CountAsync(ct);
+        if (((long)page.Page - 1) * page.PageSize >= total)
+            return PagedResult<IotNodeStatus>.From(page, total, []);
         var ids = await nodes.OrderBy(node => node.CreatedAt).ThenBy(node => node.NodeId.Length)
             .ThenBy(node => node.NodeId).Skip(page.Skip).Take(page.PageSize)
             .Select(node => node.NodeId).ToListAsync(ct);

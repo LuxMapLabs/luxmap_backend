@@ -131,7 +131,7 @@ public sealed class IotRegistrationStore(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy xã/phường.");
     }
 
-    internal async Task RegisterSourceAsync(string nodeId, NodeProfile profile, CancellationToken ct)
+    internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool replace, CancellationToken ct)
     {
         var id = profile.ServerId!.ToLowerInvariant();
         var settings = await ReadAsync([nodeId], ct);
@@ -139,16 +139,38 @@ public sealed class IotRegistrationStore(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "IoT server chưa được đăng ký.");
         if (!IotOrigin.TryAllowed(settings, server.BaseUrl, out _))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Địa chỉ IoT server chưa được allowlist.");
-        if (settings.Nodes.ContainsKey(nodeId) ||
+        var existing = await db.Set<IotSourceRegistration>().SingleOrDefaultAsync(row => row.NodeId == nodeId, ct);
+        if (replace && existing is null) throw MissingSource(nodeId);
+        if ((!replace && (existing is not null || settings.Nodes.ContainsKey(nodeId))) ||
             options.Value.Nodes.Values.Any(node => string.Equals(node.ServerId, id, StringComparison.OrdinalIgnoreCase) &&
                                                     node.DeviceId == profile.DeviceId))
             throw Conflict();
 
         var details = JsonSerializer.Serialize(profile with { ServerId = id }, LuxMapJsonOptions.Default);
-        db.Add(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
+        if (existing is null) db.Add(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
+        else db.Entry(existing).CurrentValues.SetValues(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
         RecordRegistration(id, nodeId, details);
         await SaveAsync(ct);
     }
+
+    internal async Task DeleteSourceAsync(string nodeId, CancellationToken ct)
+    {
+        if (!await db.Set<IotNode>().AnyAsync(node => node.NodeId == nodeId, ct))
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
+        var row = await db.Set<IotSourceRegistration>().SingleOrDefaultAsync(source => source.NodeId == nodeId, ct)
+            ?? throw MissingSource(nodeId);
+        if (options.Value.Nodes.ContainsKey(nodeId)) throw MissingSource(nodeId);
+        db.Remove(row);
+        RecordRegistration(row.ServerId, nodeId, JsonSerializer.Serialize(new
+        {
+            action = "source_removed", device_id = row.DeviceId,
+        }, LuxMapJsonOptions.Default));
+        await SaveAsync(ct);
+    }
+
+    private LuxMapException MissingSource(string nodeId) => options.Value.Nodes.ContainsKey(nodeId)
+        ? new("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict, "Nguồn đo được khai báo trong cấu hình triển khai.")
+        : new(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Node chưa có nguồn đo đã đăng ký.");
 
     internal Task AuditCommandAsync(string serverId, string nodeId, object details, CancellationToken ct)
     {
@@ -168,6 +190,10 @@ public sealed class IotRegistrationStore(
     private async Task SaveAsync(CancellationToken ct)
     {
         try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw Conflict();
+        }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             throw Conflict();

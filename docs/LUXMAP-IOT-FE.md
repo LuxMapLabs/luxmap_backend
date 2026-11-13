@@ -85,13 +85,21 @@ Lấy `node_id` từ header `Location`, ví dụ `/api/v1/assets/iot-nodes/NODE-
 
 Manager chỉ gán nguồn cho node và server cùng xã, với thiết bị đã được Admin đăng ký tuyến và cấp secret MQTT. Nhập chỉ số danh định thực tế để API chẩn đoán so sánh. Backend kiểm tra trụ thuộc feeder đã gán vào relay của node.
 
+### Quản lý tuyến và nguồn đo
+
+- Admin gọi `GET /api/v1/iot/servers/{serverId}/gateways/routes` để đọc `gateway_id`, `device_ids` và `credential_issued`. Nếu nhiều server dùng chung bridge, danh sách phản ánh toàn bộ tuyến của bridge đó.
+- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}/source` với đầy đủ JSON như khi tạo nguồn. Thành công trả `204`. Backend kiểm tra lại xã, feeder/relay và quyền MQTT.
+- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/source` để gỡ liên kết. Thành công trả `204`. Lịch sử trên bridge, tuyến MQTT và secret vẫn được giữ. Nguồn chỉ khai báo trong cấu hình triển khai trả `409` khi sửa hoặc gỡ.
+
 ## 3. Hiển thị trên bản đồ
 
 | API | Dữ liệu FE dùng |
 |---|---|
 | `GET /api/v1/iot/servers` | Marker gateway từ `server_id`, `commune_id`, `location.lat/lng` và `status`. `location: null` nghĩa là chưa có tọa độ hiển thị. |
-| `GET /api/v1/iot/nodes` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status` và `last_received_at`. |
+| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status` và `last_received_at`. |
 | `GET /api/v1/iot/poles/{poleId}/control` | Khi bấm trụ, lấy `feeder_id`, `node_id`, `relay_no` và `can_control_feeder`. |
+
+Danh sách node trả `page`, `page_size`, `total` và `items`. Trang bắt đầu từ 1. Mặc định 50 mục, tối đa 200. Trang vượt quá tổng số trả `items: []`.
 
 Gateway báo `online` theo heartbeat. Node báo `online` theo độ mới của mẫu điện. Một gateway có thể online khi node chưa có dữ liệu mới. FE hiện nút điều khiển khi `can_control_feeder: true` và người dùng có quyền `ControlLighting`. Khi control_channel là iot_bridge, gọi endpoint ở mục 4. Nút tác động lên **cả feeder**, ví dụ **Tắt mạch FDR-001**. Điều khiển qua bridge hiện hỗ trợ relay 1.
 

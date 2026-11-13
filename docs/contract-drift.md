@@ -41,6 +41,9 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node/relay của trụ. control_channel là iot_bridge khi hỗ trợ điều khiển qua bridge. Điều khiển từ bridge hiện hỗ trợ relay 1 của node cho phép điều khiển. |
 | `PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route` | `ManageSettings` | Gán Gateway ID với Device ID qua bridge đang chạy. |
 | `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
+| `GET /api/v1/iot/servers/{serverId}/gateways/routes` | `ManageSettings` | Liệt kê tuyến của bridge và cờ credential_issued. |
+| `PUT /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Thay toàn bộ ánh xạ đã lưu trong DB, kiểm tra xã, feeder/relay và quyền MQTT. |
+| `DELETE /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Gỡ ánh xạ DB của node trong phạm vi xã, giữ lịch sử đo và tuyến MQTT. |
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` | `ManageSettings` | Cấp secret gateway một lần qua bridge. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Kiểm tra server cùng xã và thiết bị đã có tuyến cùng secret MQTT.  Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
