@@ -45,6 +45,15 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
     public sealed record ServerLocationRequest(string CommuneId, IotLocation Location);
 
+    [HttpGet("servers/{serverId}/gateways/routes")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType<IReadOnlyList<IotGatewayRoute>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IReadOnlyList<IotGatewayRoute>> GatewayRoutesAsync(string serverId,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+        => diagnostics.GatewayRoutesAsync(serverId, configuration["Mqtt:ProvisioningKey"], ct);
+
     [HttpPut("servers/{serverId}/gateways/{gatewayId}/route")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -115,6 +124,44 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromServices] LuxMapDbContext db, [FromServices] IotRegistrationStore registry,
         [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
     {
+        await ValidateNodeSourceAsync(nodeId, profile, db, configuration["Mqtt:ProvisioningKey"], ct);
+        await registry.SaveSourceAsync(nodeId, profile, replace: false, ct);
+        return Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical",
+            new RegisteredSource(nodeId, profile.ServerId!.ToLowerInvariant(), profile.DeviceId));
+    }
+
+    [HttpPut("nodes/{nodeId}/source")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> UpdateNodeSourceAsync(string nodeId, NodeProfile profile,
+        [FromServices] LuxMapDbContext db, [FromServices] IotRegistrationStore registry,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+    {
+        await ValidateNodeSourceAsync(nodeId, profile, db, configuration["Mqtt:ProvisioningKey"], ct);
+        await registry.SaveSourceAsync(nodeId, profile, replace: true, ct);
+        return NoContent();
+    }
+
+    [HttpDelete("nodes/{nodeId}/source")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> DeleteNodeSourceAsync(string nodeId,
+        [FromServices] IotRegistrationStore registry, CancellationToken ct)
+    {
+        await registry.DeleteSourceAsync(nodeId, ct);
+        return NoContent();
+    }
+
+    private async Task ValidateNodeSourceAsync(string nodeId, NodeProfile profile,
+        LuxMapDbContext db, string? provisioningKey, CancellationToken ct)
+    {
         if (!profile.IsValid() || !ValidServerId(profile.ServerId) ||
             profile.DeviceId.Length > 128 || profile.DeviceId is "." or ".." ||
             profile.DeviceId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_' && c != '.'))
@@ -135,10 +182,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             throw Invalid("Trụ đèn phải thuộc feeder được gán cho relay của node IoT.");
 
         await diagnostics.RequireMqttAuthorizationAsync(profile.ServerId!, profile.DeviceId, communeId,
-            configuration["Mqtt:ProvisioningKey"], ct);
-        await registry.RegisterSourceAsync(nodeId, profile, ct);
-        return Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical",
-            new RegisteredSource(nodeId, profile.ServerId!.ToLowerInvariant(), profile.DeviceId));
+            provisioningKey, ct);
     }
 
     private static bool ValidServerId(string? id) =>
@@ -196,12 +240,16 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotElectricalResult> ElectricalAsync(string nodeId, CancellationToken ct)
         => diagnostics.ElectricalAsync(nodeId, ct);
 
+    /// <summary>Danh sách node theo xã, mặc định 50 và tối đa 200 mục mỗi trang.</summary>
     [HttpGet("nodes")]
+    [ProducesResponseType<PagedResult<IotNodeStatus>>(StatusCodes.Status200OK)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    public Task<PagedResult<IotNodeStatus>> NodesAsync(PageQuery page, CancellationToken ct)
-        => diagnostics.NodesAsync(page.ToPageRequest(), ct);
+    public Task<PagedResult<IotNodeStatus>> NodesAsync(CancellationToken ct,
+        [FromQuery(Name = "page")] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null)
+        => diagnostics.NodesAsync(PageRequest.Create(page, pageSize), ct);
 
     [HttpGet("servers")]
+    [ProducesResponseType<IReadOnlyList<IotServerStatus>>(StatusCodes.Status200OK)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     public Task<IReadOnlyList<IotServerStatus>> ServersAsync(CancellationToken ct)
         => diagnostics.ServersAsync(ct);

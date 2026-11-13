@@ -115,6 +115,16 @@ app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/status", (string deviceId,
 
 app.MapGet("/api/luxmap/gateways", (MqttBroker mqtt) => Results.Ok(mqtt.Gateways))
     .WithTags("MQTT").WithSummary("Danh sách gateway và node được phép chuyển tiếp");
+app.MapGet("/api/luxmap/gateways/routes", (HttpContext context, MqttBroker mqtt,
+    GatewayCredentials credentials, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    return Results.Ok(mqtt.Gateways.OrderBy(route => route.Key, StringComparer.Ordinal)
+        .Select(route => new { gatewayId = route.Key, deviceIds = route.Value, credentialIssued = credentials.IsIssued(route.Key) })
+        .ToArray());
+}).WithTags("MQTT");
+
 app.MapPut("/api/luxmap/gateways/{gatewayId}/route", (string gatewayId, GatewayRouteRequest request,
     HttpContext context, MqttBroker mqtt, IConfiguration configuration) =>
 {
