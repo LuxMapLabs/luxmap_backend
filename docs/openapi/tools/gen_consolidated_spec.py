@@ -46,6 +46,7 @@ d["info"]["description"] = (
     "CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). "
     "BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). "
     "COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. "
+    "COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Chỉ để vẽ — phân quyền vẫn theo commune_id. "
     "POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. "
     "v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). "
     "v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. "
@@ -189,6 +190,7 @@ SUMMARY = {
     ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được",
     ("delete", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Xoá trụ; còn mạch hay thiết bị trỏ vào thì 409 ASSET_IN_USE",
     ("get", "/api/v1/map/cabinets/{cabinetId}/topology"): "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source hiện ở tooltip của cạnh (TI-7). Sơ đồ logic, không phải tuyến cáp; cột chưa tuyến → 409 POLE_SEGMENT_REQUIRED (operation=cabinet_topology, pole_ids tối đa 100, pole_count)",
+    ("get", "/api/v1/map/communes"): "[TẠM — COMMUNE-BOUNDARY] Ranh giới các xã trong phạm vi người gọi: FeatureCollection MultiPolygon, properties {commune_id, name}; không bbox; xã chưa có ranh giới bị bỏ qua",
     ("get", "/api/v1/map/cabinets"): "[TẠM — CABINET] Bản đồ trụ điện tổng theo bbox, kể cả trụ không có IoT; feeder_ids[] tính lúc đọc, iot_node_id | null",
     # BE-14 — endpoint bản đồ, đặc tả đầy đủ ở Contract mục 5.1–5.2.
     ("get", "/api/v1/map/poles"): "Bản đồ cột theo bbox; FeatureCollection, properties phẳng; quá 2000 cột → 413 BBOX_TOO_LARGE",
@@ -224,6 +226,7 @@ SUMMARY = {
     ("post", "/api/v1/admin/communes"): "[COMMUNE-BBOX] Quản trị tạo xã; bbox {min_lng, min_lat, max_lng, max_lat} tuỳ chọn",
     ("get", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Chi tiết một xã",
     ("put", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Thay tên + khung bản đồ; cả hai khoá bắt buộc, bbox null = xoá khung",
+    ("put", "/api/v1/admin/communes/{id}/boundary"): "[TẠM — COMMUNE-BOUNDARY] Đặt ranh giới xã (GeoJSON Polygon | MultiPolygon, EPSG:4326); khoá bắt buộc, null = xoá. Chỉ để vẽ, không lọc tài sản",
     ("get", "/api/v1/admin/system/status"): "[BE-35] Quản trị: job nền, xử lý sweep, đĩa trống, database và dung lượng theo bucket",
     ("get", "/api/v1/admin/settings"): "[BE-33] Quản trị: cấu hình hệ thống — giá trị, mặc định, miền nhận",
     ("put", "/api/v1/admin/settings/{key}"): "[BE-33] Quản trị đổi một cấu hình; có hiệu lực ngay, lưu lịch sử kèm note",

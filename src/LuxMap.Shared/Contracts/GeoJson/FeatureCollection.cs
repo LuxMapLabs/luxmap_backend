@@ -58,7 +58,7 @@ public sealed record Feature<TProperties>
 }
 
 /// <summary>
-/// A <c>Point</c> or a <c>LineString</c>, the only two shapes Branch C stores.
+/// A <c>Point</c>, a <c>LineString</c>, or — for a commune outline only (COMMUNE-BOUNDARY) — a <c>MultiPolygon</c>.
 /// </summary>
 /// <remarks>
 /// One type rather than a hierarchy: <c>coordinates</c> is <c>[lng, lat]</c> for a point and a list
@@ -69,7 +69,7 @@ public sealed record Geometry
 {
     public required string Type { get; init; }
 
-    /// <summary><c>double[]</c> for a Point, <c>double[][]</c> for a LineString.</summary>
+    /// <summary><c>double[]</c> for a Point, <c>double[][]</c> for a LineString, <c>double[][][][]</c> for a MultiPolygon.</summary>
     public required object Coordinates { get; init; }
 
     public static Geometry Point(double lng, double lat)
@@ -77,4 +77,14 @@ public sealed record Geometry
 
     public static Geometry LineString(IEnumerable<(double Lng, double Lat)> points)
         => new() { Type = "LineString", Coordinates = points.Select(p => new[] { p.Lng, p.Lat }).ToArray() };
+
+    /// <summary>Polygons, each a list of closed rings (outer ring first, then holes), each a list of <c>[lng, lat]</c>.</summary>
+    public static Geometry MultiPolygon(IEnumerable<IEnumerable<IEnumerable<(double Lng, double Lat)>>> polygons)
+        => new()
+        {
+            Type = "MultiPolygon",
+            Coordinates = polygons
+                .Select(rings => rings.Select(ring => ring.Select(p => new[] { p.Lng, p.Lat }).ToArray()).ToArray())
+                .ToArray(),
+        };
 }

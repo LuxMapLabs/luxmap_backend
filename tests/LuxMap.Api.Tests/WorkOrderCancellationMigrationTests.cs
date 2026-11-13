@@ -35,12 +35,11 @@ public sealed class WorkOrderCancellationMigrationTests(AssetImportFixture fixtu
         var migrator = db.GetService<IMigrator>();
         await migrator.MigrateAsync(previous);
         using var system = db.EnterUnscopedSystemWriteBackdoor();
-        var commune = new AdministrativeUnit { Name = "Cancellation rollback" };
         var user = new AppUser { Username = "wocr" + Guid.NewGuid().ToString("N"), FullName = "Rollback actor", Email = "wocr@example.invalid",
             Role = UserRole.FieldEngineer, PasswordHash = "unused", PasswordAlgorithm = "pbkdf2-aspnetcore-v3", PasswordSetAt = DateTime.UtcNow };
-        db.Add(commune); await db.SaveChangesAsync(); await OldSchemaUser.InsertAsync(db, user);
+        var communeId = await OldSchemaCommune.InsertAsync(db, "Cancellation rollback"); await OldSchemaUser.InsertAsync(db, user);
         // Insert with SQL while the model has columns which the previous schema does not have yet.
-        var id = await db.Database.SqlQuery<string>($"INSERT INTO work_order (commune_id,title,created_by,task_kind,wo_status,assigned_to,assigned_at) VALUES ({commune.CommuneId},'Old row',{user.UserId},'inspection','assigned',{user.UserId},now()) RETURNING work_order_id AS \"Value\"").ToListAsync();
+        var id = await db.Database.SqlQuery<string>($"INSERT INTO work_order (commune_id,title,created_by,task_kind,wo_status,assigned_to,assigned_at) VALUES ({communeId},'Old row',{user.UserId},'inspection','assigned',{user.UserId},now()) RETURNING work_order_id AS \"Value\"").ToListAsync();
         var woId = Assert.Single(id);
         await migrator.MigrateAsync();
         Assert.False(db.Database.HasPendingModelChanges());
@@ -78,7 +77,7 @@ public sealed class WorkOrderCancellationMigrationTests(AssetImportFixture fixtu
         // All historical members still pass the actual database CHECKs (including citizen, overdue, relocated).
         foreach (var type in Enum.GetValues<NotificationType>())
         {
-            var notice = new Notification { CommuneId = commune.CommuneId, RecipientUserId = user.UserId, Type = type,
+            var notice = new Notification { CommuneId = communeId, RecipientUserId = user.UserId, Type = type,
                 EntityType = NotificationEntityType.WorkOrder, EntityId = woId, Title = "Test", Body = "Test" };
             db.Add(notice); await db.SaveChangesAsync();
             if (type is NotificationType.WorkOrderCancellationRequested or NotificationType.WorkOrderCancellationRejected)
@@ -97,13 +96,13 @@ public sealed class WorkOrderCancellationMigrationTests(AssetImportFixture fixtu
         foreach (var action in Enum.GetValues<AuditAction>().Where(x => x is not AuditAction.CancellationRequested and not AuditAction.CancellationRejected and not AuditAction.Viewed and not AuditAction.Deleted))
         {
             db.Add(new AuditEvent { Action = action, ActorKind = AuditActorKind.User, ActorUserId = user.UserId, ActorRole = UserRole.FieldEngineer, AfterState = "{}",
-                EntityType = AuditEntityType.WorkOrder, EntityId = woId, CommuneId = commune.CommuneId, CorrelationId = "rollback-old" });
+                EntityType = AuditEntityType.WorkOrder, EntityId = woId, CommuneId = communeId, CorrelationId = "rollback-old" });
             await db.SaveChangesAsync();
         }
         foreach (var action in new[] { AuditAction.CancellationRequested, AuditAction.CancellationRejected })
         {
             db.Add(new AuditEvent { Action = action, ActorKind = AuditActorKind.User, ActorUserId = user.UserId, ActorRole = UserRole.FieldEngineer, AfterState = "{}",
-                EntityType = AuditEntityType.WorkOrder, EntityId = woId, CommuneId = commune.CommuneId, CorrelationId = "rollback-new" });
+                EntityType = AuditEntityType.WorkOrder, EntityId = woId, CommuneId = communeId, CorrelationId = "rollback-new" });
             await db.SaveChangesAsync();
         }
         var auditError = await Assert.ThrowsAsync<PostgresException>(() => migrator.MigrateAsync(previous));

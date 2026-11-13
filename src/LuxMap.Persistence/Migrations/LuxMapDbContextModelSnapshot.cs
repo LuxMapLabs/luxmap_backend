@@ -4871,6 +4871,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("bbox_min_lng");
 
+                    b.Property<MultiPolygon>("Boundary")
+                        .HasColumnType("geometry(MultiPolygon,4326)")
+                        .HasColumnName("boundary");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -4908,6 +4912,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_administrative_unit_bbox_together", "(bbox_min_lng IS NULL) = (bbox_min_lat IS NULL) AND (bbox_min_lng IS NULL) = (bbox_max_lng IS NULL) AND (bbox_min_lng IS NULL) = (bbox_max_lat IS NULL)");
 
                             t.HasCheckConstraint("ck_administrative_unit_bbox_valid", "bbox_min_lng IS NULL OR (bbox_min_lng <> 'NaN'::float8 AND bbox_min_lat <> 'NaN'::float8 AND bbox_max_lng <> 'NaN'::float8 AND bbox_max_lat <> 'NaN'::float8 AND bbox_min_lng >= -180 AND bbox_max_lng <= 180 AND bbox_min_lat >= -90 AND bbox_max_lat <= 90 AND bbox_min_lng < bbox_max_lng AND bbox_min_lat < bbox_max_lat)");
+
+                            t.HasCheckConstraint("ck_administrative_unit_boundary_valid", "boundary IS NULL OR (ST_IsValid(boundary) AND NOT ST_IsEmpty(boundary))");
                         });
                 });
 

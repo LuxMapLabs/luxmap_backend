@@ -34,6 +34,7 @@ public sealed class MapController(
     MapQueryService service,
     PoleDetailService poleDetail,
     CabinetTopologyService topology,
+    CommuneLayerService communes,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
     /// <summary>
@@ -168,6 +169,23 @@ public sealed class MapController(
     public async Task<ActionResult<CabinetTopology>> CabinetTopologyAsync(
         string cabinetId, CancellationToken ct)
         => Ok(await topology.TopologyAsync(cabinetId, ct));
+
+    /// <summary>
+    /// The outlines of the caller's communes, as a <c>FeatureCollection</c> of MultiPolygons (COMMUNE-BOUNDARY), so the map can
+    /// draw the area each user works in.
+    /// </summary>
+    /// <remarks>
+    /// ⚠️ SELF-SIGNED (drift COMMUNE-BOUNDARY), not yet in the Contract. Drawing only: what a user sees is still decided by
+    /// <c>commune_id</c>, never by the outline. Communes without an outline are left out. No <c>bbox</c> — a user holds a
+    /// handful of communes. <c>commune_id</c> narrows as on the other layers; one outside the caller's scope is 403.
+    /// </remarks>
+    [HttpGet("communes")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<FeatureCollection<CommuneProperties>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult<FeatureCollection<CommuneProperties>>> CommunesAsync(
+        [FromQuery(Name = "commune_id")] string[]? communeId, CancellationToken ct)
+        => Ok(await communes.CommunesAsync(CommuneFilter.Narrow(scopeAccessor.Scope, communeId), ct));
 
     /// <summary>Electrical cabinets inside a bounding box, as a <c>FeatureCollection</c> of points (CAB-7).</summary>
     /// <remarks>
