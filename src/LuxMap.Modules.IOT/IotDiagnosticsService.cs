@@ -70,6 +70,12 @@ public sealed record IotElectricalResult(
 
 public sealed record IotServerStatus(string ServerId, string Status);
 
+public sealed record IotTelemetryPage(IReadOnlyList<IotArchivedSample> Items, long NextCursor, bool HasMore);
+public sealed record IotArchivedSample(long Cursor, IotArchivedReading Reading);
+public sealed record IotArchivedReading(IotArchivedData Data, DateTimeOffset ReceivedAt, string? GatewayId);
+public sealed record IotArchivedData(string? Timestamp, string? SessionId, long? SequenceNumber,
+    string? Mode, string? LampCommand, double? Lux, double? Voltage, double? Current, double? Power);
+
 public sealed record IotCommandRequest(string? Mode, string? Command);
 public sealed record IotCommandStatus(
     string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged);
@@ -121,7 +127,7 @@ public sealed class IotDiagnosticsService(
     public async Task<IotCommandStatus> SendCommandAsync(
         string nodeId, IotCommandRequest request, CancellationToken ct)
     {
-        var (uri, deviceId) = await CommandSourceAsync(nodeId, ct);
+        var (uri, deviceId) = await DeviceSourceAsync(nodeId, ct);
         var mode = request.Mode?.Trim().ToUpperInvariant();
         var command = request.Command?.Trim().ToUpperInvariant();
         if (!(mode == "AUTO" && command is null || mode == "MANUAL" && command is ("ON" or "OFF")))
@@ -147,14 +153,40 @@ public sealed class IotDiagnosticsService(
 
     public async Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
     {
-        var (uri, deviceId) = await CommandSourceAsync(nodeId, ct);
+        var (uri, deviceId) = await DeviceSourceAsync(nodeId, ct);
         var device = await ReadDeviceAsync(uri, deviceId, ct);
         if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
         return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged);
     }
 
-    private async Task<(Uri Uri, string DeviceId)> CommandSourceAsync(string nodeId, CancellationToken ct)
+    public async Task<IotTelemetryPage> TelemetryHistoryAsync(
+        string nodeId, long after, int limit, CancellationToken ct)
+    {
+        if (after < 0 || limit is < 1 or > 1000)
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "after phải từ 0 và limit phải từ 1 đến 1000.");
+
+        var (uri, deviceId) = await DeviceSourceAsync(nodeId, ct);
+        var path = FormattableString.Invariant(
+            $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history?after={after}&limit={limit}");
+        try
+        {
+            using var response = await client.GetAsync(new Uri(uri, path), ct);
+            if (response.StatusCode == HttpStatusCode.NotFound) return new([], after, false);
+            response.EnsureSuccessStatusCode();
+            if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
+            var page = await response.Content.ReadFromJsonAsync<IotTelemetryPage>(cancellationToken: ct);
+            return page is { Items: not null } && page.NextCursor >= after
+                ? page : throw Unavailable("Server IoT trả về trang dữ liệu không hợp lệ.");
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không đọc được lịch sử đo từ server IoT.");
+        }
+    }
+
+    private async Task<(Uri Uri, string DeviceId)> DeviceSourceAsync(string nodeId, CancellationToken ct)
     {
         await RequireNodeAsync(nodeId, ct);
         var settings = await registry.ReadAsync([nodeId], ct);

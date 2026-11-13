@@ -354,6 +354,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",
+    ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện đã lưu của node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
 })

@@ -40,6 +40,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageSettings` | Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện đã lưu của node trong phạm vi xã, phân trang theo `after` và `next_cursor`. |
 | `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW; trạng thái `online`, `offline`, `no_data`. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | `normal`, `anomaly`, `stale`, `no_data`; chẩn đoán mất áp riêng và tùy chọn hiệu chuẩn 10 bóng. |
 
@@ -2210,6 +2211,6 @@ Không đổi: kiểm tra hành lang 25 m (`POLE_OFF_SEGMENT`); tuyến đã có
 
 PAP/CAP dùng lại Evidence. §4.10 ghi **năm bucket** theo ACCT-5: chỉ sửa chữ cho khớp runtime,
 không thay hành vi và không tạo deviation bucket mới. Giữ v1.22, cập nhật changelog v1.21 phần A;
-166 →176 operation, không xoá operation ngoài ticket (D-14).
+167 →177 operation (sau merge `dev`, 13/11/2026: +1 IoT electrical history của dev, +10 ảnh tài sản), không xoá operation ngoài ticket (D-14).
 WP5/WP6 còn xác nhận thumbnail 320/q80, online-only, thông điệp không xoá cha sau upload đầu tiên,
 `cover_photo=null` và gallery rỗng `[]`; object nullable có thể là `$ref` trần (SPEC-NULLABLE).

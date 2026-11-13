@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/LuxMap.Api/LuxMap.Api.csproj" />
     <Project Path="src/LuxMap.Infrastructure.Storage/LuxMap.Infrastructure.Storage.csproj" />
+    <Project Path="src/LuxMap.IotBridge/LuxMap.IotBridge.csproj" />
     <Project Path="src/LuxMap.Modules.Admin/LuxMap.Modules.Admin.csproj" />
     <Project Path="src/LuxMap.Modules.AI/LuxMap.Modules.AI.csproj" />
     <Project Path="src/LuxMap.Modules.Assets/LuxMap.Modules.Assets.csproj" />
