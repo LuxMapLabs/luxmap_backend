@@ -235,12 +235,33 @@ public sealed class AvatarTests(AvatarTestFactory factory) : IClassFixture<Avata
         factory.Photos.DuringWrite = async () =>
         {
             if (Interlocked.Increment(ref count) == 2) entered.TrySetResult();
-            await entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            // Overlap the writes if the service lets them; a service that serializes uploads of one account never lets
+            // the second in while the first waits here, so the barrier gives up instead of deadlocking.
+            try { await entered.Task.WaitAsync(TimeSpan.FromSeconds(1)); }
+            catch (TimeoutException) { }
         };
         var responses = await Task.WhenAll(Upload(client, PhotoStore.Jpeg(10)), Upload(client, PhotoStore.Jpeg(200)));
         Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
         AssertStored(await Row(id));
         Assert.Equal(2, Objects(id).Count());
+    }
+
+    [Fact]
+    public async Task Upload_holds_account_lock_while_writing_objects()
+    {
+        var (client, id) = await Account(UserRole.Manager);
+        var observed = false;
+        factory.Photos.DuringWrite = async () =>
+        {
+            // A separate connection must conflict with the upload's lock before any object is written.
+            var error = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => factory.QueryAsync(db =>
+                db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM app_user WHERE user_id = {id} FOR NO KEY UPDATE NOWAIT")));
+            Assert.Equal(Npgsql.PostgresErrorCodes.LockNotAvailable, error.SqlState);
+            observed = true;
+        };
+        Assert.Equal(HttpStatusCode.OK, (await Upload(client, PhotoStore.Jpeg())).StatusCode);
+        Assert.True(observed);
+        AssertStored(await Row(id));
     }
 
     [Fact]

@@ -148,6 +148,16 @@ Avatar dùng `IImageSanitizer` như ảnh công dân: JPEG-only, xoay orientatio
 hai key cố định theo user, upload lại ghi đè. DELETE chỉ gỡ năm cột liên kết; byte vẫn còn tới upload kế tiếp, chưa có xoá thật.
 Phục vụ thumbnail qua API có Bearer, không URL S3. `StoredObjectColumn` khai tên cột avatar tường minh trong IdentityModule.
 
+🔴 **Upload avatar khoá hàng `app_user` quanh lượt ghi object + commit row (12/11/2026).** Key cố định theo user nên ghi object là
+last-writer-wins, độc lập với row: hai upload chồng nhau có thể để row của lượt này trỏ vào byte của lượt kia.
+Đọc LINQ không tracking trước, `SELECT 1 … FOR UPDATE`, rồi đọc lại LINQ có tracking sau khoá; không bỏ query filter.
+`AppUser` không có commune query filter: upload chỉ tra `OwnUserId` từ actor, không nhận ID từ client.
+Khoá chỉ bọc lượt ghi ảnh đã buffer/sanitize và commit row; không giữ qua đọc stream của client hay sanitize.
+`StoreImageAsync` vẫn tạo thumbnail và ghi S3 dưới khoá: cần giữ cùng thứ tự object/row vì hai key bị ghi đè.
+Đây là trường hợp avatar nhỏ, cố định key; không áp dụng cho upload video/sweep. Vẫn ghi object trước, commit row sau.
+Hook `DuringWrite` không được chờ vô hạn writer thứ hai vì writer đó đang chờ khoá. Test NOWAIT trên connection riêng kiểm khoá
+ngay trong hook; dùng `FOR NO KEY UPDATE` để không nhầm với khoá KEY SHARE từ FK.
+
 ## ASSET-PHOTOS — Evidence nay có ba nguồn ảnh
 
 Evidence chứa repair/fault evidence, ảnh cột trong phiếu (`PPH`) và gallery tài sản (`PAP` / `CAP`).

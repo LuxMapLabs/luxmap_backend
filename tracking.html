@@ -135,6 +135,11 @@
     OldSchemaUser (test migration lùi), docs drift/traps/development/deploy.</p>
     <p>Claude đã chạy: build 0 cảnh báo, toàn bộ suite xanh (1499 test API, 7 skip), phá thử bảy chốt đều làm test đỏ,
     OpenAPI sinh lại (151 operation, lint hợp lệ). Bàn giao <code>.ai/results/ACCT-AVATAR.md</code>.</p>
+    <p><strong>Sửa 13/11/2026 (fix/avatar-concurrent-upload-race-2):</strong> hai upload đồng thời của một tài khoản có thể để row trỏ vào byte
+    của lượt kia (key cố định, ghi object last-writer-wins). Upload nay khoá hàng <code>app_user</code> quanh ghi object + commit row;
+    hook DuringWrite có timeout để không chờ writer đang bị khoá. Codex rà lại và thêm: đọc lại LINQ sau khoá (luật Khoá hàng) và
+    test <code>Upload_holds_account_lock_while_writing_objects</code> (NOWAIT trên connection riêng — phá thử chắc chắn, không phụ thuộc thời điểm).
+    Kiểm (Claude): <code>AvatarTests</code> 20/20 xanh (trước sửa đỏ 1/5); bỏ dòng <code>FOR UPDATE</code> → test khoá đỏ; toàn bộ 1686 + 424 + 45 + 83 xanh, mã thoát 0.</p>
   </div>
   <div class="card" id="asset-segment-poles">
     <strong>ASSET-SEGMENT-POLES — phase 2, 09/11/2026</strong>
