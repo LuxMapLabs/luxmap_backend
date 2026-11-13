@@ -19,6 +19,8 @@ public record WorkOrderItem
     /// <summary>The ID of the chain's first work order — the same for every step (drift FR-2).</summary>
     public required string CaseId { get; init; }
     public required string[] FaultIds { get; init; }
+    /// <summary>The poles of a pole_gps_update order, in the order they were sent; empty for other kinds (WO-POLE-GPS PG-4).</summary>
+    public required string[] PoleIds { get; init; }
     public WorkOrderStatus WoStatus { get; init; }
     public CancellationRequestStatus CancellationRequestStatus { get; init; }
     public string? CancellationRequestNote { get; init; }
@@ -50,7 +52,21 @@ public sealed record WorkOrderDetail : WorkOrderItem
     public bool? AssigneeEligible { get; init; }
     public required string[] AllowedActions { get; init; }
     public required WorkOrderFaultDetail[] Faults { get; init; }
+
+    /// <summary>
+    /// What the engineer reported at the last <c>complete</c> of a pole_gps_update order, in <c>pole_ids</c> order (PG-11). Not yet in
+    /// the GIS: <c>verify</c> writes it there (PG-12).
+    /// </summary>
+    public WorkOrderPoleLocation[] PoleLocations { get; init; } = [];
+
+    /// <summary>The PDFs handed to the engineer, oldest first (PG-9).</summary>
+    public WorkOrderAttachmentItem[] Attachments { get; init; } = [];
 }
+
+public sealed record WorkOrderPoleLocation(string PoleId, double Lat, double Lng, double AccuracyM, DateTime CapturedAt);
+
+/// <param name="DownloadUrl">Relative path through the API, never presigned (BE-11 rule 1).</param>
+public sealed record WorkOrderAttachmentItem(string AttachmentId, string FileName, long ByteCount, DateTime UploadedAt, string DownloadUrl);
 
 public sealed record WorkOrderLocation(double Lat, double Lng);
 public sealed record WorkOrderFaultDetail(string FaultId, string? PoleId, string? SegmentId,

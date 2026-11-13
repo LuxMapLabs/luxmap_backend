@@ -2216,3 +2216,38 @@ không thay hành vi và không tạo deviation bucket mới. Giữ v1.22, cập
 169 →179 operation (sau merge `dev`, 13/11/2026: +3 IoT của dev, +10 ảnh tài sản), không xoá operation ngoài ticket (D-14).
 WP5/WP6 còn xác nhận thumbnail 320/q80, online-only, thông điệp không xoá cha sau upload đầu tiên,
 `cover_photo=null` và gallery rỗng `[]`; object nullable có thể là `$ref` trần (SPEC-NULLABLE).
+
+## WO-POLE-GPS — lịch "Cập nhật vị trí cột": dán tem QR + lấy GPS, duyệt rồi mới vào GIS (13/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 13/11/2026**, theo yêu cầu + prototype của FE (WP5, `work_schedule_gps_update_prototype.html`). Q1–Q4 và hai điểm phụ (xoá PDF, bỏ mã QR đã quét) chốt cùng ngày theo khuyến nghị |
+| **Chạm API** | **Có** — thêm một giá trị `task_kind`, thêm trường và endpoint; không đổi / bỏ field hay enum cũ |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract. Im lặng 3 ngày làm việc = **ESCALATE** (chạm API). Migration `AddPoleGpsUpdateWorkOrders`, chưa áp lên `luxmap_dev` / VPS |
+
+| Mã | Quyết định |
+|---|---|
+| PG-1 | `task_kind` thêm **`pole_gps_update`**. Lệnh **đơn lẻ**: không bao giờ có cha / con (`follow-up` từ nó hoặc sang nó → 409 `INVALID_STATE_TRANSITION` với `allowed_follow_up_kinds`; CHECK `ck_work_order_pole_gps_target` cấm `parent_work_order_id`). Không mang sự cố: `fault_ids` gửi kèm → 400. ⚠️ FE đã hardcode enum `task_kind` — **phải thêm giá trị này** ở lọc, nhãn, thống kê (ST-12 sắp `repair, inspection, survey, pole_gps_update`) |
+| PG-2 | `POST /work-orders` với `task_kind = pole_gps_update`: bắt buộc `segment_id` + `pole_ids[]` (1…200, không trùng, không rỗng; thứ tự gửi = thứ tự lưu). Mọi cột phải tồn tại trong scope (thiếu → 404 `ASSET_NOT_FOUND`, `details.pole_ids`), đang thuộc `segment_id` (lệch → 400 `VALIDATION_FAILED`, `details {field: "pole_ids", pole_ids_not_on_segment}`), cùng xã với tuyến (khác → 409 `CROSS_COMMUNE_REFERENCE`). Cột **đã có GPS vẫn chọn được** (đo lại). `commune_id`, `segment_ids`, `fault_ids` → 400. `pole_ids` gửi cho loại khác → 400. `POST /work-orders/batch` cùng luật |
+| PG-3 | **Q3:** một cột chỉ nằm trong **một** lệnh `pole_gps_update` chưa đóng (`open…done`). Trùng → 409 **`POLE_ALREADY_IN_WORK_ORDER`** `details {pole_id, work_order_id}` (mã mới, khuôn `FAULT_ALREADY_IN_WORK_ORDER`). Canh ở DB bằng unique index một phần `ux_work_order_pole_target_pole_id_active` (`released_at IS NULL`); `verify` / `cancel` giải phóng |
+| PG-4 | `WorkOrderItem` **và** `WorkOrderDetail` thêm `pole_ids: string[]` (theo thứ tự tạo; `[]` ở loại khác). Mục tiêu bất biến: `PATCH` có `pole_ids` → 400 như `fault_ids` |
+| PG-5 | `GET /work-orders/{id}/poles` với lệnh `pole_gps_update`: **chỉ** các cột trong `pole_ids` (không cả tuyến), cùng hình dạng `WorkOrderPole`; cột chưa GPS `location: null`, `position: null` (GN-6). `location` là vị trí **đang lưu trong GIS** (= "GPS cũ" của prototype) — chưa đổi cho tới `verify` |
+| PG-6 | **File PDF gửi kỹ sư** — `POST /work-orders/{id}/attachments` (`ManageWorkOrders`, `multipart/form-data`, trường `file`, **một file mỗi request** — nhiều file thì gọi nhiều lần) → 201 `{attachment_id, file_name, byte_count, uploaded_at, download_url}`. Chỉ ở lệnh `pole_gps_update` (khác → 409 **`ATTACHMENT_NOT_ALLOWED`**), chỉ khi `open / assigned / in_progress` (khác → 409 `INVALID_STATE_TRANSITION`). Nhận PDF theo **magic bytes `%PDF-`**, không tin `Content-Type` / đuôi (sai → 415 `UNSUPPORTED_MEDIA_TYPE`); ≤ **20 MiB** (vượt → 413); tối đa **10** file đang dùng mỗi lệnh (vượt → 409 **`ATTACHMENT_LIMIT_REACHED`**). `file_name` lấy tên gốc (bỏ đường dẫn, ký tự điều khiển; cắt 200 ký tự). ID prefix mới **`ATT`** (4 chữ số) |
+| PG-7 | `GET /work-orders/{id}/attachments/{attachmentId}` (`ReadWorkOrders`) → bytes `application/pdf`, `Content-Disposition: attachment; filename=…`. Thấy được đúng khi thấy được lệnh (xã + người được giao); ngoài ra / đã gỡ → 404 **`ATTACHMENT_NOT_FOUND`**. Qua API, không presigned (BE-11 quy tắc 1) — FE / mobile tải bằng `fetch` có Bearer rồi mở blob |
+| PG-8 | **Điểm phụ, đã chốt:** `DELETE /work-orders/{id}/attachments/{attachmentId}` (`ManageWorkOrders`) → 204, chỉ khi `open / assigned / in_progress`. **Gỡ mềm** (`removed_at`, `removed_by`): biến mất khỏi chi tiết và tải về, dòng giữ lại; byte còn trong kho (chưa có xoá object — `media-storage.md` BE-35) |
+| PG-9 | `WorkOrderDetail.attachments[]` = các file đang dùng, cũ trước. **Q4:** `GET /sync/bundle` đã mang chi tiết phiếu nên tự có `attachments` — WP6 **tải PDF lúc có mạng** theo `download_url` trước khi ra hiện trường |
+| PG-10 | `POST /work-orders/{id}/complete` (và op `work_order_complete` của `/sync/push`) thêm **`pole_locations[]`** `{pole_id, lat, lng, accuracy_m, captured_at}`. Lệnh `pole_gps_update`: **bắt buộc ≥ 1 phần tử**; loại khác: có khoá này → 400. **Q1: được báo một phần** — cột không tìm thấy thì bỏ ra, không bịa toạ độ; Quản lý thấy thiếu thì `return`. Mỗi `pole_id` phải thuộc `pole_ids` và xuất hiện một lần; `lat` ±90, `lng` ±180, `accuracy_m ≥ 0` (đều hữu hạn), `captured_at` ISO 8601 UTC (đọc như `performed_at`), không quá 5 phút tương lai. Sai → 400 `VALIDATION_FAILED`, `details.field = "pole_locations"`. **Không đụng `pole.geom`** |
+| PG-11 | `WorkOrderDetail.pole_locations[]` = toạ độ kỹ sư báo ở lần `complete` gần nhất, theo thứ tự `pole_ids` — dữ liệu cho bảng báo cáo và nút "Xem GIS". `return` **giữ** báo cáo cũ để kỹ sư xem lại; `complete` lần sau **thay toàn bộ** (cột không gửi lần này mất toạ độ báo cũ). Bỏ `scanned_qr` của prototype (điểm phụ đã chốt) |
+| PG-12 | `POST /work-orders/{id}/verify` với `pole_gps_update`: trong **một** transaction, khoá các cột (thứ tự cố định) rồi ghi `pole_locations` vào `pole.geom` **bằng đúng luật của `PUT /assets/poles/{id}/location`** (PL-3/PL-4: hành lang tuyến, một audit `pole / relocated` mỗi cột thật sự đổi, `after` thêm `work_order_id`), rồi `wo_status → verified`. **Q2: tất cả hoặc không**: có cột lệch hành lang → 409 **`POLE_OFF_SEGMENT`** với `details {work_order_id, poles: [{pole_id, segment_id, distance_m, corridor_m}]}` (⚠️ khác hình dạng `details` của PL-3 — FE đọc theo endpoint), không cột nào đổi, lệnh vẫn `done` để Quản lý `return`. Toạ độ ghi đè vị trí hiện tại kể cả khi ai đó đã dời cột sau lúc kỹ sư báo — audit `before` giữ vị trí bị thay |
+| PG-13 | `return`, `cancel`, `assign`, `start`, thông báo: không đổi. `cancel` giải phóng mục tiêu (PG-3) như `verify` |
+
+**Lược đồ:** migration `AddPoleGpsUpdateWorkOrders` — dựng lại `ck_work_order_task_kind` (+`pole_gps_update`), thêm `ck_work_order_pole_gps_target`;
+bảng `work_order_pole_target` (mục tiêu + toạ độ báo, CHECK hữu hạn / phạm vi / đủ-hoặc-không, FK cùng xã tới phiếu và cột) và `work_order_attachment`
+(object ở bucket `luxmap-evidence`, key `attachment/{ATT-…}.pdf`); sequence `work_order_attachment_id_seq`. `Down()` từ chối khi đã có phiếu `pole_gps_update`.
+
+⚠️ **Đường vòng chưa đóng:** `EditPoleLocation` (PL-2) vẫn cấp cho Kỹ sư hiện trường — kỹ sư gọi thẳng `PUT /assets/poles/{id}/location` được, bỏ qua bước duyệt
+của lệnh này. **Không** đổi trong ticket này (có thể WP6 đang dùng); nhóm chốt ở FW kế tiếp.
+
+**Phải báo:** WP5 (enum `task_kind`; form tạo gửi `segment_id` + `pole_ids`, rồi upload từng PDF sau khi có `work_order_id`; bảng báo cáo đọc `pole_locations`,
+"GPS cũ" đọc `/poles`; 409 `POLE_OFF_SEGMENT` khi duyệt), WP6 (enum; `/poles` chỉ trả cột mục tiêu; tải PDF trước ca; `complete` gửi `pole_locations`, kể cả qua
+`/sync/push`). **Chưa báo.**

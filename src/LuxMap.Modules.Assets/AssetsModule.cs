@@ -30,6 +30,7 @@ public sealed class AssetsModule : ILuxMapModule
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "cabinet_asset_photo"));
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "cabinet_asset_photo"));
         services.AddScoped<AssetCrudService>();
+        services.AddScoped<PoleRelocation>();
         services.AddScoped<AssetImportService>();
 
         // BE-31 — the zone comes from the agenda's key so "today" and "tonight" cannot disagree (WarrantyOptions.TimeZoneKey).

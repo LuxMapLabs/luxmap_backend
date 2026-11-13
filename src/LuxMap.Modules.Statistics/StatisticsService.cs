@@ -290,9 +290,12 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
         {
             AsOf = clock.GetUtcNow().UtcDateTime,
             GroupBy = query.GroupBy.Select(WireEnum.Name).ToArray(),
-            // Only aggregated rows leave SQL. TaskKind's declaration order is inspection, repair, survey.
+            // Only aggregated rows leave SQL. Kinds in the order ST-12 publishes, pole_gps_update last (WO-POLE-GPS PG-1).
             Rows = groups.OrderBy(r => r.CommuneId?.Length).ThenBy(r => r.CommuneId, StringComparer.Ordinal)
-                .ThenBy(r => r.TaskKind == TaskKind.Repair ? 0 : r.TaskKind == TaskKind.Inspection ? 1 : 2)
+                .ThenBy(r => r.TaskKind switch
+                {
+                    TaskKind.Repair => 0, TaskKind.Inspection => 1, TaskKind.Survey => 2, TaskKind.PoleGpsUpdate => 3, _ => 4,
+                })
                 .ToArray(),
         };
     }

@@ -228,6 +228,9 @@ public sealed class SyncPushService(
 
         public JsonElement FaultOutcomes { get; init; }
 
+        /// <summary>WO-POLE-GPS PG-10: checked by the same service as the HTTP endpoint.</summary>
+        public JsonElement PoleLocations { get; init; }
+
         public DateTime? PerformedAt { get; init; }
     }
 
@@ -383,7 +386,7 @@ public sealed class SyncPushService(
                 break;
             case CompletePayload complete:
                 await workOrders.Act(parsed.EntityId!, "complete", complete.ReportNote, complete.FaultOutcomes, ct,
-                    complete.MaterialsUsed, complete.PerformedAt);
+                    complete.MaterialsUsed, complete.PerformedAt, complete.PoleLocations);
                 break;
         }
 

@@ -30,6 +30,7 @@ public sealed class WorkOrdersModule : ILuxMapModule
         services.AddSingleton(agenda);
         services.AddScoped<WorkOrderAgendaService>();
         services.AddScoped<WorkOrderEvidenceService>();
+        services.AddScoped<WorkOrderAttachmentService>();
         services.AddScoped<WorkOrderPolePhotoService>();
         services.AddScoped<IActiveWorkOrderLookup, ActiveWorkOrderLookup>();
 
@@ -42,6 +43,8 @@ public sealed class WorkOrdersModule : ILuxMapModule
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "repair_evidence"));
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "work_order_pole_photo"));
         services.AddSingleton(StoredObjectColumn.Thumbnail(StorageBucket.Evidence, "work_order_pole_photo"));
+        // WO-POLE-GPS PG-6: the PDFs a manager hands the engineer, in the same bucket under attachment/.
+        services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "work_order_attachment"));
         // POLE-VIDEO D-1: the clip lives in the video bucket, named by the same row's video_* columns.
         services.AddSingleton(new StoredObjectColumn(StorageBucket.Video, "work_order_pole_photo", "video_object_key", "video_bytes"));
 

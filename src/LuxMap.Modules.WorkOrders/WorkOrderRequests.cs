@@ -19,6 +19,8 @@ public sealed class CreateWorkOrderRequest
     public string? SegmentId { get; init; }
     /// <summary>SELF-SIGNED BE-15: ordered survey routes; commune_id is the explicit anchor.</summary>
     public string[]? SegmentIds { get; init; }
+    /// <summary>WO-POLE-GPS PG-2: the poles of a pole_gps_update order, all on <see cref="SegmentId"/>; forbidden for other kinds.</summary>
+    public string[]? PoleIds { get; init; }
     public string? AssignedTo { get; init; }
     public DateOnly? DueDate { get; init; }
     public DateOnly? ScheduledDate { get; init; }
@@ -44,6 +46,7 @@ public sealed class PatchWorkOrderRequest
     public JsonElement TaskKind { get; init; }
     public JsonElement SegmentId { get; init; }
     public JsonElement SegmentIds { get; init; }
+    public JsonElement PoleIds { get; init; }
 }
 
 public sealed class AssignWorkOrderRequest
@@ -62,6 +65,9 @@ public sealed class CompleteWorkOrderRequest
     [Required] public string ReportNote { get; init; } = null!;
     public string? MaterialsUsed { get; init; }
     public JsonElement FaultOutcomes { get; init; }
+
+    /// <summary>WO-POLE-GPS PG-10: the positions taken on site; required for pole_gps_update, forbidden otherwise.</summary>
+    public JsonElement PoleLocations { get; init; }
 
     /// <summary>When the work was actually finished, for a step sent later from the offline queue (BE-43 D-6). Defaults to now.</summary>
     public DateTime? PerformedAt { get; init; }
@@ -108,3 +114,6 @@ public sealed class ReviewWorkOrderRequest
 }
 
 public sealed record FaultOutcomeRequest(string FaultId, InspectionOutcome? Outcome);
+
+/// <summary>One position an engineer took at a pole (WO-POLE-GPS PG-10). Nullable members so an omitted value is missing, not 0.</summary>
+public sealed record PoleLocationReport(string? PoleId, double? Lat, double? Lng, double? AccuracyM, DateTime? CapturedAt);

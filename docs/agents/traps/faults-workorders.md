@@ -360,3 +360,19 @@ Lịch có audit nội bộ `SurveyRecurringSchedule`, action `Created` / `Detai
   theo `created_at, length(pole_id), pole_id`. `WorkOrderPoleOrdering.Along` đã trả 0 khi không có `line`; `AutoDispatchQueries` dùng cùng cách (không bao giờ dựng `LengthIndexedLine(null)`).
 - `GET /work-orders/agenda` (RG-9): nhóm giữ `segment_name`; `location` và `distance_m` null; xếp sau nhóm đo được (`OrderBy(DistanceM is null)` sẵn có). `roadDistance` lọc `Geom != null` **trước** `DistanceMeters`
   (NULL vào `double` ném), và `roadDistance[segmentId]` đổi thành `TryGetValue` — tuyến không hình vắng trong từ điển. `Location` của **từng phiếu** vẫn ưu tiên toạ độ sự cố nếu có.
+
+## WO-POLE-GPS — lệnh "Cập nhật vị trí cột" (13/11/2026, drift PG-1…PG-13)
+
+- **Mục tiêu nằm ở `work_order_pole_target`, không ở `segment_id`.** Lệnh `pole_gps_update` vẫn lưu `segment_id` (lọc, agenda, gói sync cần), nên
+  `WorkOrderPoleService.Targets` phải **bỏ nhánh "cả tuyến"** cho loại này (`w.TaskKind != TaskKind.PoleGpsUpdate`) và chỉ nhận cột qua bảng mục tiêu.
+  Bỏ điều kiện đó thì `/poles` trả cả tuyến — `A_pole_gps_order_names_its_poles_and_its_pole_list_is_only_those` đỏ.
+- **Toạ độ kỹ sư báo KHÔNG chạm `pole.geom` ở `complete`**; chỉ `verify` ghi, qua `PoleRelocation` của Assets (đúng luật `PUT …/location`: hành lang,
+  một audit `pole / relocated` mỗi cột thật sự đổi). Không chép phép đo hay kiểm hành lang sang WorkOrders.
+- 🔴 **Audit guard đếm theo `SaveChanges`:** có dòng `IAudited` (phiếu, mục tiêu) thay đổi thì đúng **một** audit mới. `verify` cần N audit `relocated` + 1
+  audit phiếu, nên `MovePolesAsync` **save các cột trước** (lúc đó chưa có dòng `IAudited` nào đổi), rồi mới đổi phiếu và save lần hai — cả hai trong
+  **một transaction** mở ở `Act`. Đổi thứ tự (sửa phiếu / `released_at` trước khi save cột) là guard ném lỗi.
+- **Tất cả hoặc không:** đo mọi cột (`MeasureAsync`) và gom cột lệch hành lang **trước** khi stage cột nào. Khoá cột theo `length(pole_id), pole_id`.
+- **Báo cáo thay toàn bộ** ở mỗi `complete`; `return` giữ nguyên. `verify` / `cancel` đặt `released_at` cho mục tiêu như với `work_order_fault`;
+  unique index một phần `ux_work_order_pole_target_pole_id_active` là chốt chặn đua của PG-3 (`Save` nhận diện theo tên).
+- `/sync/push` op `work_order_complete` chuyển `pole_locations` thẳng vào `WorkOrderService.Act` — kiểm tra nằm ở service, không ở controller.
+- FK cùng xã từ mục tiêu tới cột chỉ có ở DB (`fk_work_order_pole_target_same_commune`, dùng lại `ak_pole_photo_target`), như ảnh cột.

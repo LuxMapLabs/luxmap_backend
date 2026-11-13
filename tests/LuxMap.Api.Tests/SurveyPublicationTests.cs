@@ -705,7 +705,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     // WO-SURVEY-CHAIN (drift WSC-1…WSC-5): a verified survey follows up into an inspection carrying the open faults
     // on the poles its latest accepted result found out / dim, in its anchor commune only.
     private WorkOrderService Orders(LuxMapDbContext db) => new(db, new Actor(user), new AuditTrail(db, new Correlation()),
-        new FaultTransitions(), new SurveyFindingLookup(db));
+        new FaultTransitions(), new SurveyFindingLookup(db), new LuxMap.Modules.Assets.Crud.PoleRelocation(db, new Actor(user),
+            new LuxMap.Modules.Survey.Processing.SurveyCorridor(Options.Create(new LuxMap.Modules.Survey.Processing.SurveyProcessingOptions())), new AuditTrail(db, new Correlation())));
 
     private async Task VerifyOrder()
     {

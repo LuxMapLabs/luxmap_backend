@@ -116,6 +116,10 @@ PLAN = [
     ("survey_recurring_schedule", IN_COMMUNES, "created_at, length(schedule_id), schedule_id"),
     ("survey_recurring_occurrence", IN_COMMUNES, "schedule_id, scheduled_date"),
     ("work_order_segment", IN_COMMUNES, "work_order_id, position"),
+    # WO-POLE-GPS: the poles of a pole_gps_update order (with what the engineer reported) and the PDFs handed over. Same
+    # communes as their order; the PDF bytes live in luxmap-evidence and are not copied by this script (no object is).
+    ("work_order_pole_target", IN_COMMUNES, "work_order_id, position"),
+    ("work_order_attachment", IN_COMMUNES, "uploaded_at, length(attachment_id), attachment_id"),
     # BE-26: "already reported overdue for this due date" — copied so the target does not tell everyone again.
     ("work_order_overdue_notice", IN_COMMUNES, "work_order_id, due_date"),
     # survey_sweep <-> survey_processing_run is a CYCLE (accepted_run_id one way, sweep_id the other); see TWO_PASS.

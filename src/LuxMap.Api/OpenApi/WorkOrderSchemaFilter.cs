@@ -33,11 +33,12 @@ public sealed class WorkOrderSchemaFilter : ISchemaFilter
                 Description = "Survey only (required): the anchor commune. Rejected for inspection and repair, whose commune comes from the faults or segment.",
             };
             concrete.Description = "WO-5 (provisional): repair requires fault_ids; inspection requires fault_ids OR segment_id; "
-                + "survey (BE-15, provisional) requires commune_id and an ordered segment_ids. Server-owned fields are rejected.";
+                + "survey (BE-15, provisional) requires commune_id and an ordered segment_ids; "
+                + "pole_gps_update (WO-POLE-GPS PG-2, provisional) requires segment_id and 1..200 pole_ids on it. Server-owned fields are rejected.";
         }
         if (context.Type == typeof(PatchWorkOrderRequest))
         {
-            foreach (var name in new[] { "commune_id", "wo_status", "assigned_to", "fault_ids", "task_kind", "segment_id", "segment_ids" }) concrete.Properties.Remove(name);
+            foreach (var name in new[] { "commune_id", "wo_status", "assigned_to", "fault_ids", "task_kind", "segment_id", "segment_ids", "pole_ids" }) concrete.Properties.Remove(name);
             concrete.Properties["title"] = new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 1, MaxLength = 200 };
             foreach (var name in new[] { "due_date", "scheduled_date" }) concrete.Properties[name] = new OpenApiSchema
             {
@@ -59,6 +60,13 @@ public sealed class WorkOrderSchemaFilter : ISchemaFilter
                 Description = "Required exactly once per linked fault for inspection; forbidden for repair or segment-only inspection.",
             };
             concrete.Properties["report_note"] = new OpenApiSchema { Type = JsonSchemaType.String, MinLength = 10 };
+            concrete.Properties["pole_locations"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.Array,
+                MinItems = 1,
+                Items = context.SchemaGenerator.GenerateSchema(typeof(PoleLocationReport), context.SchemaRepository),
+                Description = "WO-POLE-GPS PG-10: required for pole_gps_update (each a pole of the order, once); forbidden for other kinds. Kept on the order until verify.",
+            };
         }
     }
     private static OpenApiSchema WireValues(bool nullable, params string[] values) => new()

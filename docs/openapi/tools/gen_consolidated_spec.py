@@ -55,6 +55,8 @@ d["info"]["description"] = (
     "v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. "
     "v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. "
     "v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. "
+    "WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm "
+    "/work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -253,12 +255,15 @@ for method, suffix, summary in [
     ("get", "/{id}/evidence", "[BE-24] Ảnh của phiếu theo thời điểm chụp, kèm đường dẫn ảnh qua API"),
     ("get", "/{id}/poles", "[WO-12] Cột trên đoạn được giao + trạng thái đèn lần khảo sát đã duyệt gần nhất, theo thứ tự dọc đường — biết TRƯỚC khi đi"),
     ("get", "/agenda", "[BE-25] Việc đêm nay của một kỹ sư, gom theo tuyến, tuyến gần nhất trước khi có near=lat,lng; kỹ sư xem của mình, vai trò khác phải truyền assigned_to"),
-    ("post", "", "Tạo inspection/repair/survey; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15)"),
+    ("post", "", "Tạo inspection/repair/survey/pole_gps_update; task_kind bắt buộc. survey: commune_id làm xã neo + segment_ids có thứ tự (BE-15); pole_gps_update: segment_id + pole_ids (PG-2)"),
+    ("post", "/{id}/attachments", "[PG-6] Quản lý đính kèm một PDF (tem QR) vào lệnh pole_gps_update còn sửa được; PDF theo magic bytes, ≤ 20 MiB, tối đa 10 file"),
+    ("get", "/{id}/attachments/{attachmentId}", "[PG-7] Tải PDF qua API, thấy được khi thấy được lệnh"),
+    ("delete", "/{id}/attachments/{attachmentId}", "[PG-8] Gỡ mềm một PDF khi lệnh còn sửa được"),
     ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
     ("post", "/{id}/start", "Người được giao bắt đầu việc"),
-    ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra"),
-    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault"),
+    ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10), chưa vào GIS"),
+    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault; pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)"),
     ("post", "/{id}/return", "Quản lý trả việc để làm tiếp"),
     ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),
     ("post", "/{id}/follow-up", "[FR-2, WSC] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu, chung case_id: kiểm tra → sửa chữa mang sự cố fault_present; khảo sát → kiểm tra mang sự cố mở trên cột mà lần khảo sát đã duyệt thấy out/dim (xã neo)"),
