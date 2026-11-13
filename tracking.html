@@ -486,14 +486,19 @@
   </div>
   <div class="card">
     <strong>BE-34 — registry phiên bản, firmware, Phase 2, 24/10/2026</strong>
-    <p><span class="tag t-done">Đã merge · #186 (23/10) · còn mở: D-6 (header firmware, chờ Đạt), D-7 (chờ WP6) · chưa báo WP5 / WP6 / Đạt / WP4</span>
+    <p><span class="tag t-next">Đã merge · #186 (23/10) · 95% · còn chờ nhóm IoT (VR-10, VR-11 = D-6) và WP6 (D-7) · chưa báo WP5 / WP6 / Đạt / WP4</span>
     Registry <code>artifact_version</code> xuống Persistence, thêm firmware; heartbeat MQTT nay <strong>lưu</strong> firmware (con trỏ trên
     <code>iot_node</code> + lịch sử bất biến <code>iot_node_firmware</code>, chỉ ghi khi đổi); 5 trường nguồn gốc của file khảo sát được lưu;
     <code>/admin/artifact-versions</code> (liệt kê, đăng ký firmware, <strong>đếm kết quả theo phiên bản</strong> qua 14 khai báo
     <code>VersionedResultColumn</code>). Migration <code>AddVersionTraceability</code> chỉ thêm; phép thử bắt được CHECK để lọt <code>cv_model</code>
     không hash (NULL CHECK = qua) và <code>AlterColumn</code> bị trigger bất biến chặn. Contract <strong>v1.18</strong>, drift VR-1…VR-9.
     Codex (<code>-p river</code>) review: 2 P1 + 5 P2 + 6 P3 đã sửa, 2 P2 giữ có lý do (~1,26M token). Toàn suite <strong>1.684 pass</strong>,
-    2 skip, exit 0; 28 lượt test mới, 8 phá thử đều đỏ đúng test; spec 136 → 139 op. <a href=".ai/results/BE-34-p2.md">Kết quả Phase 2</a>.</p>
+    2 skip, exit 0; 28 lượt test mới, 8 phá thử đều đỏ đúng test; spec 136 → 139 op. <a href=".ai/results/BE-34-p2.md">Kết quả Phase 2</a>.
+    <strong>Rà lại 13/11/2026:</strong> đã migrate <code>luxmap_dev</code> (24/10) và VPS (31/10); DB nháp <code>luxmap_be34_scratch</code> đã xoá.
+    Lỗ mới: đường IoT bridge (#213 / #235 / #239 / #240) <strong>không ghi firmware</strong> — telemetry nằm trong SQLite của bridge, heartbeat gateway
+    là <code>"1"</code>; heartbeat MQTT có firmware chỉ chạy khi <code>Lighting__Channel=mqtt</code> (VPS đang <code>http</code>) ⇒ production chưa ghi firmware
+    ở đâu. Ghi drift <strong>VR-10…VR-12</strong> kèm đề xuất cho nhóm IoT; D-6 thành câu hỏi "đường cũ hay bridge" (VR-11). Không còn việc code
+    backend tự làm được tới khi Đạt / WP6 trả lời.</p>
   </div>
   <div class="card">
     <strong>BE-34 — phiên bản firmware và model AI, Phase 1, 23/10/2026</strong>
