@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Communes;
@@ -8,13 +9,14 @@ using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NetTopologySuite.Geometries;
 using Npgsql;
 
 namespace LuxMap.Modules.Admin.Communes;
 
 /// <summary>
-/// Communes for the system admin (COMMUNE-BBOX): the name and the map frame. No delete — every scoped table holds its commune
-/// with <c>Restrict</c>, and a commune with nothing in it is harmless.
+/// Communes for the system admin (COMMUNE-BBOX, COMMUNE-BOUNDARY): the name, the map frame and the outline. No delete — every
+/// scoped table holds its commune with <c>Restrict</c>, and a commune with nothing in it is harmless.
 /// </summary>
 /// <remarks>
 /// <see cref="AdministrativeUnit"/> is the scope anchor and is never filtered (see its remarks), so these reads see every
@@ -76,10 +78,37 @@ public sealed class CommuneAdminService(LuxMapDbContext db, ICurrentActorAccesso
         return Item(unit);
     }
 
+    /// <summary>
+    /// Sets or clears the outline (COMMUNE-BOUNDARY). Drawing only: nothing is filtered, hidden or refused for lying outside it,
+    /// and the frame (<c>bbox</c>) is left as it is.
+    /// </summary>
+    public async Task<CommuneItem> UpdateBoundaryAsync(string communeId, UpdateCommuneBoundaryRequest request, CancellationToken ct)
+    {
+        MultiPolygon? boundary = null;
+        if (request.Boundary.ValueKind != JsonValueKind.Null
+            && !CommuneBoundaryReader.TryRead(request.Boundary, out boundary, out var error))
+        {
+            throw Invalid("boundary", error!);
+        }
+
+        var unit = await FindAsync(communeId, tracked: true, ct);
+        unit.Boundary = boundary;
+        // The geometry comparer is exact, so sending the same outline again is not an edit either.
+        if (db.Entry(unit).State == EntityState.Modified)
+        {
+            unit.UpdatedAt = UtcMicrosecondClock.UtcNow();
+            await SaveAsync(ct);
+            logger.LogInformation("Commune {CommuneId} boundary {Action} by {AdminId}.",
+                unit.CommuneId, boundary is null ? "cleared" : $"set ({boundary.NumPoints} vertices)", actor.UserId);
+        }
+
+        return Item(unit);
+    }
+
     private static CommuneItem Item(AdministrativeUnit unit)
     {
         var bbox = unit.GetBbox();
-        return new CommuneItem(unit.CommuneId, unit.Name, bbox, bbox?.Center(), unit.CreatedAt, unit.UpdatedAt);
+        return new CommuneItem(unit.CommuneId, unit.Name, bbox, bbox?.Center(), unit.Boundary is not null, unit.CreatedAt, unit.UpdatedAt);
     }
 
     private static string ValidName(string? requested)

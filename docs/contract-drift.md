@@ -1765,6 +1765,31 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 **Phải báo:** WP5 (màn Quản trị → Xã: danh sách / tạo / sửa khung; bản đồ đọc `map_bounds` từ `/auth/me`), WP6 (mở bản đồ ở `map_bounds.center`). **Chưa báo.**
 Ba xã trên `luxmap_dev` (`COM-070`, `COM-001`, `COM-002`) **chưa có khung** — Quản trị nhập sau khi deploy, hoặc tính từ toạ độ cột hiện có.
 
+### COMMUNE-BOUNDARY — ranh giới (polygon) của xã để khoanh vùng trên bản đồ (13/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 13/11/2026 — FE đang khoanh vùng bằng hình chữ nhật `bbox`; cần vẽ đúng ranh giới khu vực người dùng làm việc. Hiện thực quyết định Q17 của `docs/database/erd.md` (chỉ phần **vẽ**). **SELF-SIGNED**, chạm API (chỉ thêm), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (lớp ranh giới trên bản đồ; màn Quản trị → Xã), WP6 (tuỳ chọn). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| CBD-1 | `administrative_unit` thêm `boundary geometry(MultiPolygon,4326) NULL` — **chỉ để vẽ**. Phân quyền vẫn theo `commune_id` (§7); tài sản ngoài ranh giới **không** bị ẩn, lọc hay từ chối, và **không** suy `commune_id` từ ranh giới (phần "suy xã" của Q17 chưa làm, cần quyết định riêng vì đổi BE-18 quy tắc 2) |
+| CBD-2 | `PUT /api/v1/admin/communes/{id}/boundary` (`ManageCommunes`), body `{"boundary": <GeoJSON Polygon \| MultiPolygon> \| null}` — khoá **bắt buộc** (thiếu → 400), `null` xoá ranh giới. Polygon đơn được lưu thành MultiPolygon. → 200 `CommuneItem`. Tách khỏi `PUT /{id}` để form tên + khung không phải mang polygon |
+| CBD-3 | Kiểm: toạ độ `[lng, lat]` hữu hạn trong ±180 / ±90 (số thứ ba = độ cao theo RFC 7946 được nhận rồi bỏ; `null` hay giá trị thứ tư → 400), vòng khép kín ≥ 4 điểm, hình hợp lệ OGC (không tự cắt), tối đa 10 000 đỉnh → sai là 400 `VALIDATION_FAILED` kèm lý do; id lạ → 404 `COMMUNE_NOT_FOUND`. DB có CHECK `ck_administrative_unit_boundary_valid` (`ST_IsValid` và không rỗng). Gửi lại đúng polygon cũ không đổi `updated_at` |
+| CBD-4 | `CommuneItem` (mọi response `/admin/communes`) **thêm** `has_boundary: bool`. Polygon không nằm trong item, không nằm trong `/auth/me` |
+| CBD-5 | `GET /api/v1/map/communes` (`ReadNetwork`) → `FeatureCollection`, mỗi feature một xã **trong phạm vi của người gọi** có ranh giới: `geometry` MultiPolygon, `properties {commune_id, name}`, không `feature.id`. Không có `bbox` (một người giữ vài xã). `?commune_id=` thu hẹp như các lớp khác, xã ngoài phạm vi → 403 `COMMUNE_FORBIDDEN`. Xã chưa có ranh giới bị bỏ qua |
+| CBD-6 | `bbox` / `map_bounds` (CB-1…CB-5) **giữ nguyên**: FE vẫn dùng `map_bounds.bbox` cho `maxBounds`, vẽ viền từ CBD-5 |
+
+**Lược đồ:** migration `CommuneBoundary` — cột `boundary` + CHECK. Không index (chỉ đọc ra để vẽ). `Down()` xoá cột (mất ranh giới đã
+nạp; nạp lại bằng script).
+
+**Dữ liệu:** `scripts/data/commune-boundaries.geojson` — COM-001 Phường Long Phước (OSM relation 7342308), COM-002 Phường Long Bình
+(OSM relation 7342307), tải 01/10/2026; © OpenStreetMap contributors, ODbL — phải ghi nguồn khi hiển thị. Nạp bằng
+`python3 scripts/load_commune_boundaries.py --apply` (đi qua API, cần `LUXMAP_ADMIN_PASSWORD`).
+
+**Phải báo:** WP5 (thêm lớp `GET /map/communes`, thay khung chữ nhật đứt nét; ghi nguồn OSM trên bản đồ). **Chưa báo.**
+
 ### POLE-LOCATION — dời cột tới vị trí thật (14/10/2026)
 
 | | |

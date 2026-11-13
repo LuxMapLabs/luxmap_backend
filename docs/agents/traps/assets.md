@@ -396,7 +396,7 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
 ## COMMUNE-BBOX — khung bản đồ của xã (14/10/2026, drift CB-1…CB-6)
 
 - **bbox là KHUNG NHÌN, không phải ranh giới.** Đừng dùng nó để lọc, ẩn hay từ chối tài sản, và đừng suy `commune_id` từ nó: phân quyền
-  vẫn một nguồn là cột `commune_id` (`CLAUDE.md`, mục Phạm vi xã). Ranh giới thật (polygon) vẫn chưa có nguồn.
+  vẫn một nguồn là cột `commune_id` (`CLAUDE.md`, mục Phạm vi xã). Ranh giới thật (polygon) ở mục COMMUNE-BOUNDARY bên dưới.
 - Bốn cột `bbox_*` trên `administrative_unit` đọc/ghi qua **`GetBbox()` / `SetBbox()`** (EF không dịch được — đọc sau truy vấn). Trung điểm
   (`center`) và khung gộp (`CommuneBbox.Union`) **tính lúc đọc, không lưu**.
 - `/admin/communes` nằm ở **module Admin** (nay tham chiếu Persistence). `AdministrativeUnit` không bị lọc theo xã — capability
@@ -409,6 +409,21 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   Class khác dùng chung tiền tố hay gọi chung hàm đó sẽ xoá tài khoản của nhau khi chạy song song → test đỏ ngẫu nhiên và
   `40P01 deadlock` ở teardown (chạy riêng từng class có thể che race). Class mới: **tiền tố riêng** (`cbx-`)
   và chỉ xoá tiền tố đó. Cũng đừng assert **tổng số** xã / tài khoản — class khác tạo cùng lúc; kiểm theo id hoặc tên.
+
+## COMMUNE-BOUNDARY — ranh giới xã (13/11/2026, drift CBD-1…CBD-6)
+
+- **Ranh giới cũng chỉ để VẼ**, như bbox: không lọc, không ẩn, không từ chối tài sản theo nó, không suy `commune_id` từ nó. Muốn
+  suy xã cho sự cố không cột (phần còn lại của Q17) là quyết định riêng — đổi BE-18 quy tắc 2.
+- 🔴 **`GET /map/communes` tự áp phạm vi.** `AdministrativeUnit` không có query filter, mà `CommuneFilter.Narrow` trả `null` nghĩa là
+  "để query filter lo" — trên bảng này `null` thành **mọi xã**. `CommuneLayerService` luôn giới hạn caller không system-wide vào id
+  trong claim (claim rỗng → không gì). Canh bằng `A_manager_gets_only_the_outlines_of_their_own_communes` và
+  `An_empty_scope_gets_no_outlines_not_all_of_them` (token ký đúng, không claim xã) — cả hai đã phá thử.
+- Đọc GeoJSON polygon bằng **`CommuneBoundaryReader`** (Admin), không thêm package GeoJSON — cùng lý do `AssetGeometry`. Polygon đơn bọc
+  thành MultiPolygon, SRID gắn tường minh, hợp lệ kiểm bằng `IsValidOp` (lý do lỗi trả về FE) và DB CHECK `ST_IsValid`.
+  Vị trí nhận 2 hoặc 3 số (độ cao bị bỏ); đừng nới thành "bỏ qua phần thừa" — `[lng, lat, null]` phải là 400 (Codex review 13/11).
+- `/auth/me` và `/admin/communes` vẫn đọc cả entity, nên polygon được kéo theo dù không trả ra. Vài xã × vài trăm đỉnh thì không đáng kể;
+  nếu số xã lớn lên, chiếu cột (`Select`) ở hai chỗ đó.
+- Test dùng tiền tố riêng `bnd-test-` (xã) và `bnd-` (tài khoản). Tài khoản không phải admin chỉ giữ **một** xã (ACCT-1).
 
 ## POLE-LOCATION — dời cột (14/10/2026, drift PL-1…PL-5)
 
