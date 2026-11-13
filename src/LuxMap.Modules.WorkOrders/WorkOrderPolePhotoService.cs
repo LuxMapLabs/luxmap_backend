@@ -26,7 +26,8 @@ namespace LuxMap.Modules.WorkOrders;
 
 public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurrentActorAccessor actor,
     IObjectStore store, IOriginalJpegReader images, ISingleLampPhotoHinter hinter, IAuditTrail audit,
-    WorkOrderPoleService poles, IPolePhotoPublication publication, IClipFrameSampler sampler, IOptions<PoleVideoOptions> videoOptions)
+    WorkOrderPoleService poles, IPolePhotoPublication publication, IClipFrameSampler sampler, IOptions<PoleVideoOptions> videoOptions,
+    TimeProvider clock)
 {
     public const long MaxUploadBytes = 16 * 1024 * 1024;
     public const long MaxRequestBytes = 17 * 1024 * 1024;

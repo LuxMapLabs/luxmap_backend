@@ -139,6 +139,30 @@ public partial class WorkOrderTests
     }
 
     [Fact]
+    public async Task A_retry_of_a_stored_clip_is_answered_after_its_capture_has_aged_past_the_week_but_a_new_clip_is_not()
+    {
+        FramesSay("on");
+        poleClock = new(DateTimeOffset.UtcNow);
+        var (order, pole) = await ClipTarget();
+        var clip = await PoleVideoTestClips.MakeAsync(4);
+        var op = Guid.NewGuid();
+        var first = await PutClip(order, pole, clip, op: op);
+        Assert.Equal(201, first.Status);
+        var captured = first.Body.GetProperty("captured_at").GetString();
+
+        // The phone never saw the 201 and retries a week later: the server already has the clip.
+        poleClock.Advance(TimeSpan.FromDays(8));
+        var again = await PutClip(order, pole, clip, op: op, time: captured);
+        Assert.True(again.Status == 200, $"expected 200, got {again.Status} {again.Body}");
+        Assert.Equal(first.Body.GetProperty("photo_id").GetString(), again.Body.GetProperty("photo_id").GetString());
+
+        // The same capture under a new operation is a new clip, and too old.
+        var fresh = await PutClip(order, pole, clip, time: captured);
+        Assert.Equal((400, "VALIDATION_FAILED"), (fresh.Status, fresh.Body.GetProperty("error").GetProperty("code").GetString()));
+        Assert.Single(await Rows(order));
+    }
+
+    [Fact]
     public async Task Parallel_attempts_of_one_operation_end_on_one_row()
     {
         FramesSay("on");

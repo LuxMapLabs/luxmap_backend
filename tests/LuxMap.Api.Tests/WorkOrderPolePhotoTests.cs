@@ -33,6 +33,8 @@ public partial class WorkOrderTests
     private readonly HintStub poleHints = new();
     private readonly PhotoSaveProbe poleSave = new();
     private readonly PhotoStore poleStore = new();
+    /// <summary>The server's clock in the pole-photo host, when a test sets it before its first request; the real clock otherwise.</summary>
+    private Microsoft.Extensions.Time.Testing.FakeTimeProvider? poleClock;
     private sealed class HintStub : ISingleLampPhotoHinter
     {
         public SingleLampPhotoHint? Result = new("off", 0.91, "model-test-v1", "model-test-v1+cq-legacy");
@@ -58,6 +60,7 @@ public partial class WorkOrderTests
                 s.Replace(ServiceDescriptor.Singleton<IObjectStore>(poleStore));
                 s.Replace(ServiceDescriptor.Singleton<ISingleLampPhotoHinter>(poleHints));
                 s.AddDbContext<LuxMapDbContext>((_, o) => o.AddInterceptors(poleSave, photoCommands));
+                if (poleClock is not null) { s.RemoveAll<TimeProvider>(); s.AddSingleton<TimeProvider>(poleClock); }
             }));
             if (polePhotoClients.TryGetValue(who, out var prior)) return prior;
             var client = polePhotoHost.CreateClient();
