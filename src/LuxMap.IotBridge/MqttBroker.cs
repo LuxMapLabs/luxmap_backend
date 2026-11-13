@@ -161,12 +161,17 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         }
         finally { commandGate.Release(); }
     }
-    private Task PublishCommandAsync(string id, LampCommand command) => PublishAsync(id, "command", new
+    private Task PublishCommandAsync(string id, LampCommand command)
+    {
+        if (command.ExpiresAtUnixSeconds is { } expiry && expiry <= DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            return Task.CompletedTask;
+        return PublishAsync(id, "command", new
     {
         kind = "command", deviceId = id, mode = command.Mode, command = command.Command,
         commandId = command.CommandId ?? "initial-auto", version = command.Version,
-        autoSchedule = command.AutoSchedule
-    }, true);
+        autoSchedule = command.AutoSchedule, expiresAtUnixSeconds = command.ExpiresAtUnixSeconds
+        }, true);
+    }
     private Task PublishAsync(string id, string kind, object value, bool retained) => broker!.InjectApplicationMessage(
         new InjectedMqttApplicationMessage(new MqttApplicationMessageBuilder()
             .WithTopic($"luxmap/{id}/{kind}").WithPayload(JsonSerializer.Serialize(value, json))

@@ -213,6 +213,7 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR user_id = @e OR token_hash = ANY(@h);",
                 "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w OR user_id = @e;",
                 "DELETE FROM app_user WHERE user_id = @u OR user_id = @w OR user_id = @e;",
+                "DELETE FROM iot_server_registration WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM administrative_unit WHERE commune_id = @c OR commune_id = @f;",
             })
             {

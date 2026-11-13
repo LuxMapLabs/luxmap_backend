@@ -60,6 +60,20 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         return NoContent();
     }
 
+    [HttpPost("servers/{serverId}/gateways/{gatewayId}/credential")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType<IotGatewayCredential>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IotGatewayCredential> IssueGatewayCredentialAsync(string serverId, string gatewayId,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return diagnostics.IssueGatewayCredentialAsync(serverId, gatewayId, configuration["Mqtt:ProvisioningKey"], ct);
+    }
+
     [HttpPut("servers/{serverId}/location")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -91,21 +105,24 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         => diagnostics.PoleControlAsync(poleId, ct);
 
     [HttpPost("nodes/{nodeId}/source")]
-    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
     [ProducesResponseType<RegisteredSource>(StatusCodes.Status201Created)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> RegisterNodeSourceAsync(string nodeId, NodeProfile profile,
-        [FromServices] LuxMapDbContext db, [FromServices] IotRegistrationStore registry, CancellationToken ct)
+        [FromServices] LuxMapDbContext db, [FromServices] IotRegistrationStore registry,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
     {
         if (!profile.IsValid() || !ValidServerId(profile.ServerId) ||
             profile.DeviceId.Length > 128 || profile.DeviceId is "." or ".." ||
             profile.DeviceId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_' && c != '.'))
             throw Invalid("Thiếu server ID, thông tin thiết bị, tài sản hoặc ngưỡng đo hợp lệ.");
 
-        if (!await db.Set<IotNode>().AnyAsync(node => node.NodeId == nodeId, ct))
+        var communeId = await db.Set<IotNode>().Where(node => node.NodeId == nodeId)
+            .Select(node => node.CommuneId).SingleOrDefaultAsync(ct);
+        if (communeId is null)
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
 
         var validTopology = await (
@@ -117,6 +134,8 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         if (!validTopology)
             throw Invalid("Trụ đèn phải thuộc feeder được gán cho relay của node IoT.");
 
+        await diagnostics.RequireMqttAuthorizationAsync(profile.ServerId!, profile.DeviceId, communeId,
+            configuration["Mqtt:ProvisioningKey"], ct);
         await registry.RegisterSourceAsync(nodeId, profile, ct);
         return Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical",
             new RegisteredSource(nodeId, profile.ServerId!.ToLowerInvariant(), profile.DeviceId));
