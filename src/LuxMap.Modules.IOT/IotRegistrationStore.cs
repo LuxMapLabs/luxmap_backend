@@ -14,7 +14,12 @@ using Npgsql;
 
 namespace LuxMap.Modules.IOT;
 
-internal sealed record IotServerRegistration(string ServerId, string BaseUrl);
+internal sealed record IotServerRegistration(string ServerId, string BaseUrl)
+{
+    public string? CommuneId { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+}
 internal sealed record IotSourceRegistration(string NodeId, string ServerId, string DeviceId, string Profile);
 
 internal sealed class IotRegistrationAudit : IImmutableRecord
@@ -44,6 +49,8 @@ internal sealed class IotServerRegistrationConfiguration : IEntityTypeConfigurat
     {
         builder.ToTable("iot_server_registration");
         builder.HasKey(row => row.ServerId);
+        builder.HasOne<AdministrativeUnit>().WithMany().HasForeignKey(row => row.CommuneId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -68,7 +75,7 @@ public sealed class IotRegistrationStore(
         var configured = options.Value;
         var servers = new Dictionary<string, IotServerProfile>(configured.Servers, StringComparer.OrdinalIgnoreCase);
         foreach (var row in await db.Set<IotServerRegistration>().AsNoTracking().ToListAsync(ct))
-            servers[row.ServerId] = new(row.BaseUrl);
+            servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude);
 
         var nodes = new Dictionary<string, NodeProfile>(StringComparer.Ordinal);
         foreach (var id in scopedNodeIds)
@@ -85,14 +92,43 @@ public sealed class IotRegistrationStore(
         return new() { BaseUrl = configured.BaseUrl, Servers = servers, Nodes = nodes, AllowedOrigins = configured.AllowedOrigins };
     }
 
-    internal async Task RegisterServerAsync(string id, Uri uri, CancellationToken ct)
+    internal async Task RegisterServerAsync(string id, Uri uri, string? communeId, IotLocation? location, CancellationToken ct)
     {
         if (options.Value.Servers.Keys.Contains(id, StringComparer.OrdinalIgnoreCase))
             throw Conflict();
         var origin = uri.GetLeftPart(UriPartial.Authority);
-        db.Add(new IotServerRegistration(id, origin));
-        RecordRegistration(id, null, JsonSerializer.Serialize(new { base_url = origin }, LuxMapJsonOptions.Default));
+        if (communeId is not null) await RequireCommuneAsync(communeId, ct);
+        db.Add(new IotServerRegistration(id, origin)
+        {
+            CommuneId = communeId, Latitude = location?.Lat, Longitude = location?.Lng,
+        });
+        RecordRegistration(id, null, JsonSerializer.Serialize(new { base_url = origin, commune_id = communeId, location }, LuxMapJsonOptions.Default));
         await SaveAsync(ct);
+    }
+
+    internal async Task UpdateServerLocationAsync(string id, string communeId, IotLocation location, CancellationToken ct)
+    {
+        await RequireCommuneAsync(communeId, ct);
+        var row = await db.Set<IotServerRegistration>().SingleOrDefaultAsync(server => server.ServerId == id, ct);
+        if (row is null)
+        {
+            if (!options.Value.Servers.TryGetValue(id, out var configured) ||
+                !IotOrigin.TryAllowed(options.Value, configured.BaseUrl, out var uri))
+                throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy IoT server.");
+            row = new(id, uri.GetLeftPart(UriPartial.Authority));
+            db.Add(row);
+        }
+        row.CommuneId = communeId;
+        row.Latitude = location.Lat;
+        row.Longitude = location.Lng;
+        RecordRegistration(id, null, JsonSerializer.Serialize(new { commune_id = communeId, location }, LuxMapJsonOptions.Default));
+        await SaveAsync(ct);
+    }
+
+    private async Task RequireCommuneAsync(string communeId, CancellationToken ct)
+    {
+        if (!await db.Set<AdministrativeUnit>().AnyAsync(unit => unit.CommuneId == communeId, ct))
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy xã/phường.");
     }
 
     internal async Task RegisterSourceAsync(string nodeId, NodeProfile profile, CancellationToken ct)

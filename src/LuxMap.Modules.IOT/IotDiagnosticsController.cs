@@ -20,7 +20,7 @@ namespace LuxMap.Modules.IOT;
 [Route("api/v{version:apiVersion}/iot")]
 public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
 {
-    public sealed record RegisterServerRequest(string ServerId, string BaseUrl);
+    public sealed record RegisterServerRequest(string ServerId, string BaseUrl, string? CommuneId = null, IotLocation? Location = null);
     public sealed record RegisteredServer(string ServerId);
     public sealed record RegisteredSource(string NodeId, string ServerId, string DeviceId);
 
@@ -37,9 +37,43 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             throw Invalid("Server ID không hợp lệ hoặc địa chỉ IoT server chưa được allowlist.");
 
         var id = request.ServerId.ToLowerInvariant();
-        await registry.RegisterServerAsync(id, uri, ct);
+        if (request.CommuneId is not null || request.Location is not null)
+            ValidateLocation(request.CommuneId, request.Location);
+        await registry.RegisterServerAsync(id, uri, request.CommuneId, request.Location, ct);
         return StatusCode(StatusCodes.Status201Created, new RegisteredServer(id));
     }
+
+    public sealed record ServerLocationRequest(string CommuneId, IotLocation Location);
+
+    [HttpPut("servers/{serverId}/location")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> UpdateServerLocationAsync(string serverId, ServerLocationRequest request,
+        [FromServices] IotRegistrationStore registry, CancellationToken ct)
+    {
+        if (!ValidServerId(serverId)) throw Invalid("Server ID không hợp lệ.");
+        ValidateLocation(request.CommuneId, request.Location);
+        await registry.UpdateServerLocationAsync(serverId.ToLowerInvariant(), request.CommuneId, request.Location, ct);
+        return NoContent();
+    }
+
+    private static void ValidateLocation(string? communeId, IotLocation? location)
+    {
+        if (string.IsNullOrWhiteSpace(communeId) ||
+            location is not { Lat: >= -90 and <= 90, Lng: >= -180 and <= 180 })
+            throw Invalid("Cần xã/phường và tọa độ GPS hợp lệ.");
+    }
+
+    [HttpGet("poles/{poleId}/control")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<IotPoleControl>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public Task<IotPoleControl> PoleControlAsync(string poleId, CancellationToken ct)
+        => diagnostics.PoleControlAsync(poleId, ct);
 
     [HttpPost("nodes/{nodeId}/source")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
