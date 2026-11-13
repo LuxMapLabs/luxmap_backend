@@ -4,7 +4,6 @@ using LuxMap.Modules.Assets.Import;
 using LuxMap.Modules.Assets.Warranty;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Persistence;
-using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
@@ -29,7 +28,7 @@ namespace LuxMap.Modules.Assets.Crud;
 /// </remarks>
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
-    WarrantyCalendar warranty, ISurveyCorridor corridor, IAuditTrail audit, IFeederControlLookup controls)
+    WarrantyCalendar warranty, ISurveyCorridor corridor, IFeederControlLookup controls, PoleRelocation relocation)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -819,10 +818,9 @@ public sealed class AssetCrudService(
     /// </summary>
     /// <remarks>
     /// <para>
-    /// No cap on how far it moves: a position first taken from a photo's GPS can be tens of metres out, and correcting that
-    /// is the point. The one limit is the survey corridor of the pole's OWN segment (<see cref="ISurveyCorridor"/>): past
-    /// it, the survey's pole query no longer sees the pole and it silently drops out of every later sweep. A drop onto
-    /// another road is refused for the same reason; moving a pole to another segment is the full edit (<see cref="ManageAssets"/>).
+    /// The rule — no cap on the move, only the pole's own survey corridor — is <see cref="PoleRelocation"/>, shared with verifying a
+    /// <c>pole_gps_update</c> order (WO-POLE-GPS PG-12). A drop onto another road is refused; moving a pole to another segment is the
+    /// full edit (<see cref="ManageAssets"/>).
     /// </para>
     /// <para>
     /// Read through the commune filter first — out of scope is a 404 before any lock — then lock the row, so the audit's
@@ -847,44 +845,21 @@ public sealed class AssetCrudService(
         await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
         await dbContext.Database.ExecuteSqlRawAsync("SELECT 1 FROM pole WHERE pole_id = {0} FOR UPDATE", [poleId], ct);
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
-        var target = new Point(lng, lat) { SRID = 4326 };
-
-        // First position of a pole known only from the books (POLE-GEOM-NULL G-2, GN-9): nothing to measure a move from.
-        double? moved = pole.Geom is null ? null : await dbContext.Set<Pole>().Where(candidate => candidate.PoleId == poleId)
-            .Select(candidate => SpatialFunctions.DistanceMeters(candidate.Geom!, target)).SingleAsync(ct);
-        // Unfiltered on purpose: an inter_commune segment may belong to another commune than its pole (BE-REVIEW-02
-        // constraint 1). Only a distance leaves the query, never the segment.
-        // A segment not drawn yet has no route to measure against (ROAD-SEGMENT-GEOM-NULL RG-11): filtered out BEFORE the call
-        // (a NULL distance materialised into a double throws), so no row comes back and offSegment stays null — the move is
-        // accepted. The safety net is the corridor check when the segment is first drawn (UpdateSegmentAsync).
-        double? offSegment = pole.SegmentId is null ? null : await dbContext.Set<RoadSegment>().IgnoreQueryFilters()
-            .Where(segment => segment.SegmentId == pole.SegmentId && segment.Geom != null)
-            .Select(segment => (double?)SpatialFunctions.DistanceMeters(segment.Geom!, target)).SingleOrDefaultAsync(ct);
-
-        var before = pole.Geom is null ? null : new { lat = pole.Geom.Y, lng = pole.Geom.X };
-        pole.Geom = target;
-        if (AssetStamp.Touch(dbContext, pole, actor))
+        var measured = await relocation.MeasureAsync(pole, lat, lng, ct);
+        if (relocation.IsOffSegment(measured))
         {
-            if (offSegment is { } distance && distance > corridor.RouteCorridorM)
-            {
-                throw new LuxMapException(ErrorCodes.PoleOffSegment, HttpStatusCode.Conflict,
-                    $"That position is {offSegment:0.#} m from the pole's road segment; a survey only sees poles within "
-                    + $"{corridor.RouteCorridorM:0.#} m of it. To put the pole on another segment, edit the pole.",
-                    new Dictionary<string, object?>
-                    {
-                        ["pole_id"] = pole.PoleId, ["segment_id"] = pole.SegmentId,
-                        ["distance_m"] = Math.Round(distance, 1), ["corridor_m"] = corridor.RouteCorridorM,
-                    });
-            }
+            var distance = measured.SegmentDistanceM!.Value;
+            throw new LuxMapException(ErrorCodes.PoleOffSegment, HttpStatusCode.Conflict,
+                $"That position is {distance:0.#} m from the pole's road segment; a survey only sees poles within "
+                + $"{relocation.CorridorM:0.#} m of it. To put the pole on another segment, edit the pole.",
+                new Dictionary<string, object?>
+                {
+                    ["pole_id"] = pole.PoleId, ["segment_id"] = pole.SegmentId,
+                    ["distance_m"] = Math.Round(distance, 1), ["corridor_m"] = relocation.CorridorM,
+                });
+        }
 
-            audit.Record(new AuditChange(pole.UpdatedAt, AuditActorKind.User, actor.UserId, actor.Role, pole.CommuneId,
-                AuditEntityType.Pole, pole.PoleId, AuditAction.Relocated, before,
-                new { lat, lng, moved_m = moved is { } metres ? (double?)Math.Round(metres, 2) : null, pole.SegmentId, segment_distance_m = offSegment is { } measured ? (double?)Math.Round(measured, 2) : null }));
-        }
-        else
-        {
-            moved = 0;
-        }
+        var moved = relocation.Stage(measured, workOrderId: null) ? measured.MovedM : 0;
 
         await dbContext.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
