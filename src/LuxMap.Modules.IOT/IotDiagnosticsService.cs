@@ -19,7 +19,7 @@ public sealed class IotOptions
     public Dictionary<string, NodeProfile> Nodes { get; set; } = new(StringComparer.Ordinal);
 }
 
-public sealed record IotServerProfile(string? BaseUrl);
+public sealed record IotServerProfile(string? BaseUrl, string? CommuneId = null, double? Latitude = null, double? Longitude = null);
 
 public sealed record NodeProfile
 {
@@ -63,12 +63,21 @@ public sealed record IotDiagnosticResult(
 }
 
 public sealed record IotNodeStatus(
-    string NodeId, string? ServerId, string Status, DateTime? LastReceivedAt);
+    string NodeId, string? ServerId, string Status, DateTime? LastReceivedAt)
+{
+    public string? CabinetId { get; init; }
+    public string? CommuneId { get; init; }
+    public IotLocation? Location { get; init; }
+}
 
 public sealed record IotElectricalResult(
     string NodeId, string ServerId, string Status, IotMeasurement? Measurement);
 
-public sealed record IotServerStatus(string ServerId, string Status);
+public sealed record IotLocation(
+    [property: System.Text.Json.Serialization.JsonRequired] double Lat,
+    [property: System.Text.Json.Serialization.JsonRequired] double Lng);
+public sealed record IotServerStatus(string ServerId, string Status, string? CommuneId = null, IotLocation? Location = null);
+public sealed record IotPoleControl(string PoleId, string? FeederId, string? NodeId, short? RelayNo, bool CanControlFeeder);
 
 public sealed record IotTelemetryPage(IReadOnlyList<IotArchivedSample> Items, long NextCursor, bool HasMore);
 public sealed record IotArchivedSample(long Cursor, IotArchivedReading Reading);
@@ -124,10 +133,41 @@ public sealed class IotDiagnosticsService(
             : diagnosis with { LampCount = estimate };
     }
 
+    public async Task<IotPoleControl> PoleControlAsync(string poleId, CancellationToken ct)
+    {
+        var pole = await db.Set<Pole>().AsNoTracking().Where(row => row.PoleId == poleId)
+            .Select(row => new { row.PoleId, row.FeederId }).SingleOrDefaultAsync(ct);
+        if (pole is null)
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy trụ đèn.");
+
+        var control = await (
+            from row in db.Set<FeederControl>().AsNoTracking()
+            join node in db.Set<IotNode>() on row.NodeId equals node.NodeId
+            where row.FeederId == pole.FeederId
+            select new { row.NodeId, row.RelayNo, node.SupportsRemoteControl }).SingleOrDefaultAsync(ct);
+        if (control is null) return new(poleId, pole.FeederId, null, null, false);
+
+        var settings = await registry.ReadAsync([control.NodeId], ct);
+        var canControl = control.SupportsRemoteControl &&
+            settings.Nodes.TryGetValue(control.NodeId, out var profile) &&
+            profile.FeederId == pole.FeederId && profile.RelayNo == control.RelayNo && control.RelayNo == 1 &&
+            TryServer(settings, profile, out _, out _);
+        return new(poleId, pole.FeederId, control.NodeId, control.RelayNo, canControl);
+    }
+
     public async Task<IotCommandStatus> SendCommandAsync(
         string nodeId, IotCommandRequest request, CancellationToken ct)
     {
-        var (uri, deviceId) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, profile) = await DeviceSourceAsync(nodeId, ct);
+        var canControl = profile.RelayNo == 1 && await (
+            from node in db.Set<IotNode>()
+            join control in db.Set<FeederControl>() on node.NodeId equals control.NodeId
+            where node.NodeId == nodeId && node.SupportsRemoteControl &&
+                  control.RelayNo == profile.RelayNo && control.FeederId == profile.FeederId
+            select control.FeederId).AnyAsync(ct);
+        if (!canControl)
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "Node chưa hỗ trợ điều khiển hoặc feeder chưa được gán đúng relay 1.");
         var mode = request.Mode?.Trim().ToUpperInvariant();
         var command = request.Command?.Trim().ToUpperInvariant();
         if (!(mode == "AUTO" && command is null || mode == "MANUAL" && command is ("ON" or "OFF")))
@@ -153,7 +193,7 @@ public sealed class IotDiagnosticsService(
 
     public async Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
     {
-        var (uri, deviceId) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
         var device = await ReadDeviceAsync(uri, deviceId, ct);
         if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
@@ -167,7 +207,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "after phải từ 0 và limit phải từ 1 đến 1000.");
 
-        var (uri, deviceId) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
         var path = FormattableString.Invariant(
             $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history?after={after}&limit={limit}");
         try
@@ -186,13 +226,13 @@ public sealed class IotDiagnosticsService(
         }
     }
 
-    private async Task<(Uri Uri, string DeviceId)> DeviceSourceAsync(string nodeId, CancellationToken ct)
+    private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(string nodeId, CancellationToken ct)
     {
         await RequireNodeAsync(nodeId, ct);
         var settings = await registry.ReadAsync([nodeId], ct);
         if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out _, out var uri))
             throw Unavailable("Chưa cấu hình nguồn điều khiển cho thiết bị IoT.");
-        return (uri, profile.DeviceId);
+        return (uri, profile.DeviceId, profile);
     }
 
     public async Task<IotElectricalResult> ElectricalAsync(string nodeId, CancellationToken ct)
@@ -233,6 +273,19 @@ public sealed class IotDiagnosticsService(
         {
             // Unprobed rows retain source_unavailable rather than extending the request by another batch.
         }
+        var positions = await (
+            from node in nodes
+            join cabinet in db.Set<ElectricalCabinet>().AsNoTracking() on node.CabinetId equals cabinet.CabinetId
+            where ids.Contains(node.NodeId)
+            select new { node.NodeId, node.CabinetId, node.CommuneId, Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X })
+            .ToDictionaryAsync(row => row.NodeId, ct);
+        for (var index = 0; index < result.Length; index++)
+            if (positions.TryGetValue(ids[index], out var position))
+                result[index] = result[index] with
+                {
+                    CabinetId = position.CabinetId, CommuneId = position.CommuneId,
+                    Location = new(position.Lat, position.Lng),
+                };
         return PagedResult<IotNodeStatus>.From(page, total, result);
     }
 
@@ -247,6 +300,11 @@ public sealed class IotDiagnosticsService(
             if (TryServer(settings, profile, out var id, out var uri))
                 servers.TryAdd(id, (uri, profile.DeviceId));
 
+        foreach (var (id, profile) in settings.Servers)
+            if (profile.CommuneId is { } communeId && db.CurrentCommuneScope.Allows(communeId) &&
+                IotOrigin.TryAllowed(settings, profile.BaseUrl, out var uri))
+                servers.TryAdd(id, (uri, ""));
+
         var entries = servers.ToArray();
         var result = new IotServerStatus[entries.Length];
         await Parallel.ForEachAsync(Enumerable.Range(0, entries.Length), new ParallelOptions
@@ -256,7 +314,13 @@ public sealed class IotDiagnosticsService(
         }, async (index, token) =>
         {
             var (id, (uri, deviceId)) = entries[index];
-            result[index] = new(id, await ServerStatusAsync(uri, deviceId, token));
+            settings.Servers.TryGetValue(id, out var profile);
+            var communeId = profile?.CommuneId;
+            var visible = communeId is not null && db.CurrentCommuneScope.Allows(communeId);
+            var location = visible && profile is { Latitude: double lat, Longitude: double lng }
+                ? new IotLocation(lat, lng) : null;
+            var status = deviceId.Length == 0 ? "unconfigured" : await ServerStatusAsync(uri, deviceId, token);
+            result[index] = new(id, status, visible ? communeId : null, location);
         });
         return result;
     }
