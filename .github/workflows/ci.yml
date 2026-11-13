@@ -5,6 +5,16 @@ name: CI
 on:
   pull_request:
     branches: [dev]
+    # A PR that changes only prose skips the run: no build input, test, or generator reads these paths. Order matters — a later
+    # pattern overrides an earlier one, so docs/openapi/** (read by OpenApiSpecTests and the stale-spec check) is put back last.
+    # A skipped run reports no check at all: if this job ever becomes a required check, a docs-only PR will wait on it forever —
+    # replace this filter with an in-job change check at that point. merge_group ignores path filters, so the queue always runs.
+    paths:
+      - '**'
+      - '!docs/**'
+      - '!.ai/**'
+      - '!**/*.md'
+      - 'docs/openapi/**'
   # A queue tests the candidate INCLUDING earlier queued PRs; omitting this trigger leaves
   # required checks pending on the queue's SHA. Enable the queue in repository settings.
   merge_group:
@@ -22,10 +32,25 @@ concurrency:
 
 jobs:
   verify:
-    name: Merge result / build, tests, OpenAPI
+    name: Merge result / ${{ matrix.shard }}
     # Compose has fixed container/volume names. A fresh hosted VM per job is load-bearing:
     # self-hosted runners or a shared external DB would race sequence resets and teardown.
     runs-on: ubuntu-24.04
+    # The suite's wall time is AssetDatabaseCollection, which runs one class after another by design (see that file), and
+    # WorkOrderTests is half of it. Each shard is its own VM, so each gets its own Testcontainers PostGIS and its own
+    # pole_id_seq: the collection stays serial INSIDE a shard, and no two shards ever share a database.
+    # The two filters are exact complements, so every test runs in exactly one shard. A shard is a whole class or more —
+    # never split a class, and keep a class's fixtures on the shard of the class.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: work-orders
+            target: tests/LuxMap.Api.Tests/LuxMap.Api.Tests.csproj
+            filter: FullyQualifiedName~LuxMap.Api.Tests.WorkOrderTests.
+          - shard: rest
+            target: LuxMap.slnx
+            filter: FullyQualifiedName!~LuxMap.Api.Tests.WorkOrderTests.
     timeout-minutes: 30
     defaults:
       run:
@@ -56,6 +81,8 @@ jobs:
           python-version: '3.12'
 
       - name: Test photo survey tool (standard library, offline)
+        # Checks that do not depend on the shard run once, on the work-orders shard (with the OpenAPI steps below).
+        if: ${{ matrix.shard == 'work-orders' }}
         run: python3 -m unittest discover -s scripts/tests
 
       - name: Create ephemeral configuration
@@ -131,6 +158,7 @@ jobs:
 
       - name: Re-export and regenerate OpenAPI
         id: spec
+        if: ${{ matrix.shard == 'work-orders' }}
         # Only host-building tools need these values. Job-level CORS configuration contaminates
         # the regression test that deliberately starts with no allowlist.
         env:
@@ -168,22 +196,24 @@ jobs:
         # tests wait for that themselves.
         run: docker compose --profile mqtt up -d --wait --wait-timeout 180 emqx
 
-      - name: Run full regression suite
+      - name: Run regression suite shard
         if: ${{ !cancelled() && steps.services.outcome == 'success' }}
-        # One invocation, no shards/matrix: the run shares one database and fixtures reset global sequences.
-        # Keep the existing xUnit AssetDatabaseCollection serialization intact.
-        # Runsettings excludes Category=Benchmark. A CLI --filter is ANDed with that filter,
-        # not a replacement; do not add one or switch to luxmap.benchmark.runsettings here.
-        # LUXMAP_MQTT_E2E turns the broker end-to-end tests on (they skip without it, e.g. on a laptop with no EMQX).
+        # One database per shard (see the matrix). Keep the existing xUnit AssetDatabaseCollection serialization intact.
+        # Runsettings excludes Category=Benchmark. The shard's --filter is ANDed with that filter, not a replacement — which is
+        # what a shard needs, and also why a CLI filter can never select benchmarks; use luxmap.benchmark.runsettings for those.
+        # LUXMAP_MQTT_E2E turns the broker end-to-end tests on (they skip without it, e.g. on a laptop with no EMQX). Both shards
+        # start the broker, so an end-to-end test cannot silently skip by landing on the other shard.
         env:
           LUXMAP_MQTT_E2E: "1"
-        run: dotnet test LuxMap.slnx --no-build --no-restore --settings luxmap.runsettings --logger trx --results-directory .github/test-results -m:1
+        run: >-
+          dotnet test "${{ matrix.target }}" --no-build --no-restore --settings luxmap.runsettings
+          --filter "${{ matrix.filter }}" --logger trx --results-directory .github/test-results -m:1
 
       - name: Preserve test failures
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.shard }}
           path: .github/test-results/*.trx
           if-no-files-found: ignore
           retention-days: 7

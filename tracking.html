@@ -51,6 +51,18 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="ci-shard">
+    <strong>CI — chia regression test thành hai shard song song + bỏ qua PR chỉ đổi văn bản, 13/11/2026</strong>
+    <span class="tag t-next">Nhánh <code>ci/shard-api-tests</code> (từ <code>origin/dev</code> 73707cb) · commit xong, chưa push · chưa chạy trên GitHub</span>
+    <p>15 run gần nhất mất 8.5–14 phút; bước test chiếm 7–11 phút, gần hết là <code>LuxMap.Api.Tests</code>. Wall time = <code>AssetDatabaseCollection</code> (tuần tự có chủ ý, ~595 s),
+    trong đó riêng <code>WorkOrderTests</code> ~298 s (79 s thân test + ~0.77 s setup × 284 test).
+    <b>Shard:</b> matrix <code>work-orders</code> (<code>WorkOrderTests</code> + test Python + xuất / lint spec) và <code>rest</code> (mọi test còn lại), mỗi shard một VM ⇒ PostGIS và <code>pole_id_seq</code> riêng;
+    hai filter là phần bù đúng của nhau — đã kiểm bằng <code>--list-tests</code>: 284 + 1956 = 2240, trùng 0, thiếu 0. Cả hai shard dựng EMQX. Artifact TRX tách tên theo shard. Chạy riêng shard <code>work-orders</code> trên máy (container PostGIS mới): 282 passed / 2 skip (sẵn có, ACCT-1 / D-6b) / 0 fail, mã thoát 0, 2 m 36–50 s. Shard <code>rest</code> chưa chạy riêng trên máy.
+    <b>Bỏ qua:</b> <code>paths</code> loại <code>docs/**</code> (trừ <code>docs/openapi/**</code>), <code>.ai/**</code>, <code>*.md</code> — không test / generator / build nào đọc chúng.
+    Tên check đổi thành <code>Merge result / work-orders</code> và <code>Merge result / rest</code>; <code>dev</code> chưa có required check nên không chặn merge. Files: <code>.github/workflows/ci.yml</code>, <code>docs/development.md</code>.</p>
+    <p class="muted"><b>Còn:</b> push + PR khi Mỹ cho, đo thời gian thật trên GitHub (ước tính ~6–7 phút). Bật required check thì phải thay <code>paths</code> bằng bước kiểm thay đổi trong job.
+    Tiếp theo đáng làm: setup ~0.77 s mỗi test của <code>WorkOrderTests</code> (<code>InitializeAsync</code>) — đường găng của shard <code>work-orders</code>.</p>
+  </div>
   <div class="card" id="asset-segment-length-null">
     <strong>ASSET-SEGMENT-LENGTH-NULL — <code>length_m</code> của tuyến null khi chưa có hình, 12/11/2026</strong>
     <span class="tag t-next">Mỹ chốt theo FE (12/11) · đảo RG-3 · code xong, chưa push · migration chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6</span>
