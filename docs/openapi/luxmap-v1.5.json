@@ -19331,6 +19331,9 @@
                   },
                   "client_op_id": {
                     "type": "string"
+                  },
+                  "pole_id": {
+                    "type": "string"
                   }
                 }
               },
@@ -19351,6 +19354,9 @@
                   "style": "form"
                 },
                 "client_op_id": {
+                  "style": "form"
+                },
+                "pole_id": {
                   "style": "form"
                 }
               }
@@ -19524,7 +19530,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] [BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra, khảo sát, cập nhật GPS cột); JPEG theo magic bytes; client_op_id cho lần gửi lại",
+        "summary": "[TẠM — WO-1…WO-12] [BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra, khảo sát, cập nhật GPS cột); JPEG theo magic bytes; pole_id tuỳ chọn, cột thuộc phiếu và cùng xã (geom NULL hợp lệ); client_op_id so cả cột kể cả NULL khi gửi lại (EV-4)",
         "operationId": "postWorkOrdersIdEvidence",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -19547,6 +19553,13 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/PageQuery"
+            }
+          },
+          {
+            "name": "pole_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -19600,7 +19613,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] [BE-24] Ảnh của phiếu theo thời điểm chụp, kèm đường dẫn ảnh qua API",
+        "summary": "[TẠM — WO-1…WO-12] [BE-24 / EV-4] Ảnh của phiếu theo thời điểm chụp, kèm pole_id nullable và đường dẫn qua API; pole_id? lọc trước count/phân trang, không khớp trả trang rỗng",
         "operationId": "getWorkOrdersIdEvidence",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -23305,6 +23318,10 @@
             "nullable": true
           },
           "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "pole_id": {
             "type": "string",
             "nullable": true
           },

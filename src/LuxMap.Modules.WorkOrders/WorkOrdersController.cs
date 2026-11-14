@@ -87,7 +87,7 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     /// <summary>
     /// The assigned engineer adds a photo while the order is in progress (BE-24): <c>before</c>/<c>after</c> on a
     /// repair, <c>observation</c> on every other kind. JPEG decided by magic bytes; <c>client_op_id</c> makes a retry
-    /// return the same photo (200) instead of a second one (201).
+    /// return the same photo (200) instead of a second one (201). Optional <c>pole_id</c> links a target in the order's commune (EV-4).
     /// </summary>
     [HttpPost("{id}/evidence")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
@@ -105,17 +105,17 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     public async Task<ActionResult<EvidenceItem>> UploadEvidence(string id, [Required] IFormFile? file,
         [Required, FromForm(Name = "kind")] string? kind, [Required, FromForm(Name = "captured_at")] string? capturedAt,
         [Required, FromForm(Name = "lat")] string? lat, [Required, FromForm(Name = "lng")] string? lng,
-        [FromForm(Name = "client_op_id")] string? clientOpId, CancellationToken ct)
+        [FromForm(Name = "client_op_id")] string? clientOpId, [FromForm(Name = "pole_id")] string? poleId, CancellationToken ct)
     {
-        var (item, created) = await evidence.UploadAsync(id, file, kind, capturedAt, lat, lng, clientOpId, ct);
+        var (item, created) = await evidence.UploadAsync(id, file, kind, capturedAt, lat, lng, clientOpId, poleId, ct);
         return created ? StatusCode(201, item) : Ok(item);
     }
 
-    /// <summary>The order's photos, oldest capture first, with API paths to each image (BE-24).</summary>
+    /// <summary>The order's photos, oldest capture first, with API paths to each image; optionally filtered by pole_id (EV-4).</summary>
     [HttpGet("{id}/evidence")]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
-    public Task<PagedResult<EvidenceItem>> Evidence(string id, PageQuery page, CancellationToken ct)
-        => evidence.ListAsync(id, page.ToPageRequest(), ct);
+    public Task<PagedResult<EvidenceItem>> Evidence(string id, PageQuery page, [FromQuery(Name = "pole_id")] string? poleId, CancellationToken ct)
+        => evidence.ListAsync(id, page.ToPageRequest(), poleId, ct);
 
     /// <summary>
     /// The manager attaches one PDF (the QR labels to print) to a pole_gps_update order while it can still be edited — one file per

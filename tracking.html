@@ -51,6 +51,22 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="evidence-pole">
+    <strong>EVIDENCE-POLE — ảnh bằng chứng gắn cột tuỳ chọn, 14/11/2026</strong>
+    <p><span class="tag t-next">PHA 2 xong · Claude đã chạy test + phá thử · commit trên <code>feat/EVIDENCE-POLE</code> · chưa push · migration chưa áp lên <code>luxmap_dev</code> / VPS · <code>luxmap-v1.json</code> cần CODEOWNERS</span></p>
+    <p>Theo Mỹ D-1…D-8 (D-3 A): <code>pole_id</code> nullable ở multipart / DTO / DB; cột thuộc toàn bộ WO-12 và cùng xã phiếu,
+    nhận <code>geom NULL</code>. Kiểm trước / sau storage, khoá phiếu → cột; replay so chính xác cả NULL ở mọi đường;
+    GET lọc trước count / phân trang. Ảnh sự cố giữ pole_id NULL, không backfill, không đổi luật nhãn / hoàn thành / pole-photos.</p>
+    <p><strong>Đã sửa:</strong> WorkOrderEvidence, WorkOrdersController, RepairEvidence + cấu hình;
+    migration <code>20261114044112_AddEvidencePole</code> + Designer / snapshot (FK ghép DB-only Restrict, index, CHECK, Down từ chối mất liên kết);
+    WorkOrderTests (hai partial mới), FaultReportTests, OpenApiSpecTests; OpenAPI sinh lại + generator, drift EV-4 / BE-24 và ERD.
+    Bàn giao: <a href=".ai/results/EVIDENCE-POLE-p2.md">kết quả PHA 2</a>.</p>
+    <p><strong>Kiểm chứng (Claude, 14/11):</strong> build 0 warning / 0 error; toàn bộ suite xanh (427 + 45 + 83 + 1747, 7 skip có sẵn), mã thoát 0.
+    Phá thử 5 chốt (thuộc phiếu, cùng xã, kiểm lại sau storage, so <code>pole_id</code> khi replay, khoá cột) ⇒ mỗi lần đúng test đỏ, khôi phục bằng <code>cp</code>.
+    Spec xuất lại trùng byte với file đã sửa. Claude sửa một lỗi test của Codex: test migration truyền <code>users["a"]</code> vào <code>OldSchemaUser</code>
+    (ghi đè <code>UserId</code>) ⇒ teardown lớp <code>WorkOrderTests</code> hỏng; nay dùng tài khoản riêng.</p>
+    <p class="muted"><b>Còn:</b> push + PR khi Mỹ cho; áp migration <code>AddEvidencePole</code> lên <code>luxmap_dev</code> / VPS khi deploy; báo WP5 / WP6 (EV-4 SELF-SIGNED, nền tạm tới FW).</p>
+  </div>
   <div class="card" id="iot-bridge-vps">
     <strong>IOT-BRIDGE-VPS — IoT bridge chạy trên VPS, gateway nối MQTT qua TLS 8883, 14/11/2026</strong>
     <span class="tag t-next"><span class="tag t-done">Đã merge #252 + #253 · VPS chạy <code>fb503d2</code> (14/11)</span> · Mỹ chọn TLS 8883 (đảo một phần V-5) · firmware chưa đổi sang TLS · chưa có gateway nào nối</span>

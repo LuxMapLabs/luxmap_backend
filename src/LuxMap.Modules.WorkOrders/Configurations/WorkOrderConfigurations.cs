@@ -183,6 +183,7 @@ public sealed class RepairEvidenceConfiguration : IEntityTypeConfiguration<Repai
             // One parent, never two and never none; a fault photo is what was SEEN, so it is always an observation.
             table.HasCheckConstraint("ck_repair_evidence_one_parent", "(work_order_id IS NULL) <> (fault_id IS NULL)");
             table.HasCheckConstraint("ck_repair_evidence_fault_observation", "fault_id IS NULL OR kind = 'observation'");
+            table.HasCheckConstraint("ck_repair_evidence_fault_no_pole", "fault_id IS NULL OR pole_id IS NULL");
         });
         builder.HasKey(x => x.EvidenceId);
         builder.Property(x => x.EvidenceId).HasPrefixedId(PrefixedIds.RepairEvidence);
@@ -191,6 +192,8 @@ public sealed class RepairEvidenceConfiguration : IEntityTypeConfiguration<Repai
         builder.HasCommuneScope();
         builder.HasCommuneReference(x => x.CommuneId);
         builder.HasIndex(x => x.CommuneId);
+        // Composite pole/commune FK is DB-only: do not freeze Pole.CommuneId as an EF alternate key.
+        builder.HasIndex(x => x.PoleId);
         // Same commune as the order, by schema (khuôn O-7), so a photo can never sit in another commune.
         builder.HasOne<WorkOrder>().WithMany().HasForeignKey(x => new { x.WorkOrderId, x.CommuneId })
             .HasPrincipalKey(x => new { x.WorkOrderId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);

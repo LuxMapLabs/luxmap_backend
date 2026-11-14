@@ -3866,6 +3866,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("object_key");
 
+                    b.Property<string>("PoleId")
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
                     b.Property<long>("ThumbnailBytes")
                         .HasColumnType("bigint")
                         .HasColumnName("thumbnail_bytes");
@@ -3896,6 +3900,9 @@ namespace LuxMap.Persistence.Migrations
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_repair_evidence_commune_id");
 
+                    b.HasIndex("PoleId")
+                        .HasDatabaseName("ix_repair_evidence_pole_id");
+
                     b.HasIndex("UploadedBy")
                         .HasDatabaseName("ix_repair_evidence_uploaded_by");
 
@@ -3913,6 +3920,8 @@ namespace LuxMap.Persistence.Migrations
                     b.ToTable("repair_evidence", null, t =>
                         {
                             t.HasCheckConstraint("ck_repair_evidence_bytes", "byte_count > 0 AND thumbnail_bytes > 0");
+
+                            t.HasCheckConstraint("ck_repair_evidence_fault_no_pole", "fault_id IS NULL OR pole_id IS NULL");
 
                             t.HasCheckConstraint("ck_repair_evidence_fault_observation", "fault_id IS NULL OR kind = 'observation'");
 
