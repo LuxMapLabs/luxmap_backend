@@ -1,8 +1,8 @@
 ---
 ticket: EVIDENCE-POLE
 title: Ảnh của phiếu (`POST /work-orders/{id}/evidence`) gắn được với một cột — thêm `pole_id`
-status: ready
-phase: 1
+status: in_progress
+phase: 2
 owner: codex
 branch: feat/EVIDENCE-POLE
 contract_refs:
@@ -80,3 +80,36 @@ Cuối file: danh sách **D-item** (`D-1`, `D-2`, …) mỗi cái có phương �
 ## Pha 1 dừng ở đâu
 
 Khảo sát xong thì **dừng hẳn**: trả báo cáo pha 1, chờ Mỹ chốt D-item. Không viết code ở pha 1, kể cả khi đã rõ phải sửa gì.
+
+---
+
+## PHA 2 — Mỹ chốt D-item (14/11/2026) ⇒ implement
+
+Báo cáo pha 1: `.ai/results/EVIDENCE-POLE-p1.md`. Mỹ chốt **theo đề xuất**, riêng **D-3 chọn phương án A (cùng xã)**:
+
+| D | Quyết định |
+|---|---|
+| D-1 | `pole_id` **tuỳ chọn** ở form, DB, DTO. Thiếu ⇒ lưu / trả `null`. Không backfill, không suy từ lat/lng |
+| D-2 | Cột phải thuộc **toàn bộ** `WorkOrderPoleService.Targets(id)` (gọi trực tiếp, không chép predicate). Cột không tồn tại / ngoài scope ⇒ **404 `POLE_NOT_FOUND`**; thấy được nhưng ngoài tập ⇒ **409 `POLE_NOT_IN_WORK_ORDER`** (dùng lại mã của `/pole-photos`, không mã mới). **Nhận cột `geom` NULL** (không tái dùng chốt geometry của `/pole-photos`). Kiểm quyền phiếu trước (404 `WORK_ORDER_NOT_FOUND` giữ nguyên) |
+| D-3 | **Phương án A: cột phải cùng xã với phiếu.** Service: cột khác `commune_id` của phiếu ⇒ **409 `POLE_NOT_IN_WORK_ORDER`** (không mã mới). DB: FK ghép **DB-only** `(pole_id, commune_id)` → `pole(pole_id, commune_id)` tái dùng `ak_pole_photo_target` (`20261015153829_AddWorkOrderPolePhotos.cs:137`), `ON DELETE RESTRICT`; **không** thêm alternate key EF làm khoá `Pole.CommuneId`. `commune_id` của ảnh vẫn suy từ phiếu. Không cần kiểm scope cột riêng ở list / media / replay (ảnh và cột cùng xã) |
+| D-4 | Kiểm cột **trước** khi ghi object và **kiểm lại** sau khi ghi, trong transaction: đọc qua filter trước → khoá **phiếu → cột** (`SELECT 1 … FOR UPDATE` qua `ExecuteSql`) → đọc lại bằng LINQ. Không giữ khoá qua upload / decode. Replay vẫn chạy trước các kiểm dành cho ảnh mới |
+| D-5 | Replay so thêm `pole_id` **chính xác, kể cả NULL** ở **mọi** đường replay (sớm, sau storage, nhánh bắt unique violation): khác cột, `NULL→cột`, `cột→NULL` ⇒ **409 `IDEMPOTENCY_CONFLICT`** |
+| D-6 | `GET /work-orders/{id}/evidence?pole_id=` tuỳ chọn, lọc **trước** count / phân trang, giữ thứ tự hiện tại; không khớp ⇒ trang rỗng (không tra cột) |
+| D-7 | `POST /faults/{id}/photos` **không** nhận `pole_id`; row ảnh sự cố giữ `pole_id` NULL; CHECK mới `fault_id IS NULL OR pole_id IS NULL` (tên do pha 2 đặt, khai `HasCheckConstraint`) |
+| D-8 | Migration: thêm cột `pole_id text NULL`, FK (D-3), index dẫn đầu `pole_id`, CHECK (D-7). Không backfill. `Down()` đối xứng nhưng **từ chối** (RAISE) khi còn `pole_id IS NOT NULL`, theo tiền lệ `20261004153825_AttachPhotosToFaults.cs:54`. Đọc `Up()` / `Down()` trước khi xong: không `DropIndex` / `DropColumn` / `AlterColumn` ngoài yêu cầu, không `xmin` |
+
+### Phải làm (pha 2)
+
+1. Entity `RepairEvidence.PoleId`, cấu hình, migration + snapshot (`dotnet ef migrations add AddEvidencePole …`), FK ghép bằng `migrationBuilder.Sql` như tiền lệ.
+2. Controller: form field `pole_id` tuỳ chọn ở POST evidence; query `pole_id` tuỳ chọn ở GET evidence. `EvidenceItem` thêm `pole_id` (nullable), mapping chung cho POST / replay / GET / ảnh sự cố.
+3. Service theo D-2…D-6. Kiểm nằm trong service (không dựa DataAnnotations).
+4. Test (trong `WorkOrderTests` / `FaultReportTests`, giữ `AssetDatabaseCollection`, không ghim ID literal, teardown xoá evidence trước pole): theo kế hoạch mục 12 của báo cáo pha 1, bỏ các ca liên xã (D-3 A) và thay bằng: cột khác xã ⇒ 409 + raw SQL chứng minh FK ghép chặn. Ca bắt buộc: không gửi `pole_id` (app cũ) vẫn 201 + `pole_id: null`; cột thuộc phiếu ⇒ 201, trả / liệt kê / lọc đúng; 404 / 409 các ca D-2; geom NULL nhận; đổi tập cột trong lúc ghi object (`DuringWrite`) ⇒ không row; replay D-5 cả ba chiều; filter D-6 đếm trước phân trang; ảnh sự cố `pole_id` null + CHECK chặn; xoá cột đang có ảnh ⇒ 409 `ASSET_IN_USE`; migration Down từ chối khi còn liên kết.
+5. OpenAPI: build `src/LuxMap.Api`, xuất `docs/openapi/luxmap-v1.json`, chạy `docs/openapi/tools/gen_consolidated_spec.py` (lệnh ở `.ai/context/commands.md`), cập nhật summary POST / GET evidence trong generator. Không viết tay schema đè schema sinh.
+6. Drift: mục mới **EV-4** ngay sau EV-3 trong `docs/contract-drift.md` (Mỹ 14/11/2026, SELF-SIGNED, chạm API ⇒ nền tạm tới FW, WP5 / WP6 chưa báo) + cập nhật dòng `POST /work-orders/{id}/evidence` / `GET` trong bảng BE-24. `docs/database/erd.md`: thêm cột + quan hệ. `tracking.html`: card mới ngay dưới `<h1>`.
+7. `.ai/results/EVIDENCE-POLE-p2.md`: đã làm gì, file nào, output build / test **chép từ terminal**, Up / Down của migration, và những gì chưa chạy được.
+
+### Lệnh và giới hạn môi trường
+
+- Build / test: `dotnet build --disable-build-servers`, `dotnet test … --disable-build-servers`. Test cần Docker (Testcontainers). Nếu sandbox không chạy được Docker / test thì **ghi rõ** trong p2 là chưa chạy — Claude sẽ chạy và phá thử.
+- **Không commit, không push, không tạo branch** — để nguyên thay đổi trong cây làm việc; Claude review rồi commit.
+- Giữ nguyên mục KHÔNG ĐƯỢC làm ở trên (trừ dòng "pha 1 không sửa file"); thêm: không đổi `/pole-photos`, không đổi luật hoàn thành, không sửa `docs/api-contract-v1.1.md`.
