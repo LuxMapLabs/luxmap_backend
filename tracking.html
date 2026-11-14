@@ -53,7 +53,7 @@
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="iot-bridge-vps">
     <strong>IOT-BRIDGE-VPS — IoT bridge chạy trên VPS, gateway nối MQTT qua TLS 8883, 14/11/2026</strong>
-    <span class="tag t-next">Nhánh <code>feat/IOT-BRIDGE-VPS</code> (từ <code>origin/dev</code> 20d0ae8) · Mỹ chọn TLS 8883 (đảo một phần V-5) · chưa lên VPS · firmware chưa đổi sang TLS</span>
+    <span class="tag t-next"><span class="tag t-done">Đã merge #252 + #253 · VPS chạy <code>fb503d2</code> (14/11)</span> · Mỹ chọn TLS 8883 (đảo một phần V-5) · firmware chưa đổi sang TLS · chưa có gateway nào nối</span>
     <p>Để Quản lý điều khiển đèn testbed từ web, API phải gọi được bridge, mà bridge trước đây chỉ chạy trong LAN testbed với MQTT trần 1883.
     Nay: service <code>iot-bridge</code> trong <code>deploy/compose.yml</code> (stage <code>bridge</code> riêng trong <code>Dockerfile</code>), API gọi <code>http://iot-bridge:5000</code>,
     chỉ publish <b>8883 MQTT TLS</b>. Bridge có listener TLS mới (<code>Mqtt:Tls:*</code>, <code>PemCertificateProvider</code>) đọc cặp chứng chỉ Let's Encrypt của Caddy và đọc lại khi file đổi;
@@ -62,7 +62,11 @@
     <p>Kiểm (Claude, Docker local, chuỗi giả root → trung gian → leaf EC, key 0600 root, container hardened như compose): <code>openssl s_client</code> với chỉ root CA ⇒ gửi leaf + trung gian, <code>Verify 0 (ok)</code>, TLS 1.2;
     phá thử (bỏ bước thêm trung gian vào kho) ⇒ chỉ gửi leaf, <code>Verify 21</code>; thay cặp chứng chỉ khi bridge đang chạy ⇒ kết nối kế tiếp nhận serial mới, không restart;
     MQTT CONNECT qua TLS ⇒ <code>BadUserNameOrPassword</code> / <code>ClientIdentifierNotValid</code> đúng như luật xác thực gateway. MQTTnet 4.3.7 gọi <code>GetCertificate()</code> mỗi kết nối (đo bằng probe).</p>
-    <p class="muted"><b>Còn:</b> deploy + đặt <code>IotDiagnostics__AllowedOrigins__0=http://iot-bridge:5000</code> trên VPS; firmware ESP32 chuyển sang TLS <code>luxmap.com.vn:8883</code> với CA ISRG Root X1 + X2;
+    <p><b>Deploy 14/11 (Claude):</b> <code>63deed0</code> → <code>885ebc4</code> (kèm migration <code>CommuneBoundary</code> của #247, backup <code>20261114T035501Z</code>), rồi <code>fb503d2</code>.
+    Lần đầu bridge crash-loop: Caddy để file dưới <code>caddy/</code> trong volume, đường dẫn thiếu một tầng (test local mount thẳng thư mục cert nên không lộ) — sửa ở #253, chỉ recreate <code>iot-bridge</code>.
+    Kiểm trên VPS: bridge nạp cert thật (hạn 18/01/2027), 0 restart, 0 lỗi; API gọi <code>http://iot-bridge:5000</code> ⇒ 401 không key, 200 với <code>BridgeKey</code>; từ internet 8883 mở, 1883 / 5000 đóng;
+    MQTT CONNECT qua TLS tới <code>luxmap.com.vn:8883</code> (client chỉ tin X1 + X2) ⇒ <code>BadUserNameOrPassword</code> / <code>ClientIdentifierNotValid</code>; chỉ tin X1 ⇒ lỗi chuỗi (bridge gửi tới <code>Root YE</code>, do X2 cấp). API <code>auth/me</code> 401, web 200, 0 lỗi.</p>
+    <p class="muted"><b>Còn:</b> Quản lý đăng ký server <code>base_url=http://iot-bridge:5000</code> + cấp secret gateway + gán node; firmware ESP32 chuyển sang TLS <code>luxmap.com.vn:8883</code> với CA ISRG Root X1 + <b>X2</b> (bắt buộc);
     <code>backup.sh</code> chưa sao lưu volume <code>bridge_data</code> (hash secret gateway, telemetry); Caddy đổi sang ZeroSSL thì đường dẫn chứng chỉ trong compose phải sửa tay.</p>
   </div>
   <div class="card" id="evidence-all-kinds">

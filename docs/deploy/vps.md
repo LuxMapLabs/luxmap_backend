@@ -249,8 +249,9 @@ Sửa xong: `docker compose up -d --force-recreate api iot-bridge`. Rồi Quản
 
 **Chứng chỉ.** Bridge đọc thẳng cặp `.crt` / `.key` Let's Encrypt của Caddy trong volume `caddy_data` (mount chỉ đọc) và đọc
 lại khi file đổi, nên Caddy gia hạn là kết nối kế tiếp nhận chứng chỉ mới, không cần restart. Bridge gửi kèm chứng chỉ
-trung gian. Chuỗi Caddy nhận 14/11/2026: `luxmap.com.vn` → `YE2` → `Root YE` → `ISRG Root X2` → `ISRG Root X1`. Image .NET
-tin sẵn X2 nên chuỗi bridge gửi có thể dừng ở X2: firmware nạp **cả ISRG Root X1 lẫn ISRG Root X2** làm CA. Nếu Caddy chuyển sang nhà cấp khác (ZeroSSL) thì thư mục chứng chỉ đổi tên và bridge tiếp tục dùng cặp cũ tới
+trung gian. Chuỗi Caddy nhận 14/11/2026: `luxmap.com.vn` → `YE2` → `Root YE` → `ISRG Root X2` → `ISRG Root X1`, nhưng image .NET
+tin sẵn X2 nên bridge chỉ gửi leaf → `YE2` → `Root YE` (đo 14/11: client chỉ tin X1 ⇒ `unable to get local issuer
+certificate`; tin X2 hoặc X1 + X2 ⇒ OK). Firmware nạp **cả ISRG Root X1 lẫn ISRG Root X2** làm CA — thiếu X2 là không nối được. Nếu Caddy chuyển sang nhà cấp khác (ZeroSSL) thì thư mục chứng chỉ đổi tên và bridge tiếp tục dùng cặp cũ tới
 khi hết hạn — sửa đường dẫn trong `compose.yml`.
 
 **Quyền.** Caddy ghi key `0600 root`, nên container chạy `user: 0:0` nhưng `cap_drop: ALL`, `no-new-privileges`, root
@@ -260,6 +261,7 @@ filesystem chỉ đọc: tiến trình đọc được key và ghi `data/`, khô
 ⚠️ `backup.sh` **chưa** sao lưu volume này.
 
 Kiểm tra từ máy bất kỳ: `openssl s_client -connect luxmap.com.vn:8883 -servername luxmap.com.vn </dev/null` → `Verify return code: 0 (ok)`.
+Caddy giữ file trong volume dưới `caddy/` (nó mount volume ở `/data`), nên bridge đọc `/caddy-data/caddy/certificates/…`.
 
 ## Vận hành
 
