@@ -118,19 +118,25 @@ iot_values = {
     ],
     ("LampCountEstimate", "status"): ["insufficient_samples", "undetermined", "estimated"],
 }
+def iot_property(schema, field):
+    properties = S.get(schema, {}).get("properties", {})
+    if field not in properties:
+        raise ValueError(f"IoT OpenAPI override requires {schema}.{field}; check the Swagger export")
+    return properties[field]
+
+
 for (schema, field), values in iot_values.items():
-    S[schema]["properties"][field]["enum"] = values
+    iot_property(schema, field)["enum"] = values
 
 for schema in ("IotCommandRequest", "IotCommandStatus"):
-    properties = S[schema]["properties"]
-    properties["mode"]["enum"] = ["AUTO", "MANUAL"]
-    properties["command"]["enum"] = ["ON", "OFF", None]
-    properties["auto_schedule"] = {
-        "type": "object", "nullable": True,
-        "allOf": [{"$ref": "#/components/schemas/IotAutoSchedule"}],
-    }
+    iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
+    iot_property(schema, "command")["enum"] = ["ON", "OFF", None]
+    iot_property(schema, "auto_schedule")
 
-S["NodeProfile"]["properties"]["relay_no"]["enum"] = [1]
+if "IotAutoSchedule" not in S:
+    raise ValueError("IoT OpenAPI override requires schema IotAutoSchedule; check the Swagger export")
+S["IotAutoSchedule"]["nullable"] = True
+iot_property("NodeProfile", "relay_no")["enum"] = [1]
 
 def err_content():
     return {"application/json": {"schema": {"$ref": "#/components/schemas/ApiErrorResponse"}}}

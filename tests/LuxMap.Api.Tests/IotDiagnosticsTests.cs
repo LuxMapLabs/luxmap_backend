@@ -69,7 +69,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             profile.server_id, profile.device_id, feeder_id = rig.Feeders[1], pole_id = relayTwoPole,
             relay_no = 2, profile.nominal_voltage, profile.nominal_current_ma, profile.nominal_power_mw,
         };
-        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PostAsJsonAsync($"{nodePath}/source", relayTwo)).StatusCode);
+        await AssertInvalidRelayAsync(await manager.PostAsJsonAsync($"{nodePath}/source", relayTwo));
         Assert.Equal(HttpStatusCode.Created, (await manager.PostAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await manager.PostAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         var auditCount = await fixture.QueryAsync(db => db.Database.SqlQuery<int>(
@@ -105,16 +105,37 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.DeleteAsync($"{nodePath}/source")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync($"{nodePath}/source", relayTwo)).StatusCode);
+        await AssertInvalidRelayAsync(await manager.PutAsJsonAsync($"{nodePath}/source", relayTwo));
         Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"{nodePath}/source", profile)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);
+        var legacyDeviceId = "legacy-probe";
+        var legacyProfile = JsonSerializer.Serialize(new { relayTwo.server_id, device_id = legacyDeviceId, relayTwo.feeder_id, relayTwo.pole_id, relayTwo.relay_no, relayTwo.nominal_voltage, relayTwo.nominal_current_ma, relayTwo.nominal_power_mw });
+        await fixture.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO iot_source_registration (node_id, server_id, device_id, profile) VALUES ({rig.Node}, {id}, {legacyDeviceId}, CAST({legacyProfile} AS jsonb))"));
+        using var legacy = await manager.GetAsync($"{nodePath}/diagnostics");
+        var legacyJson = await legacy.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(legacy.IsSuccessStatusCode, legacyJson.GetRawText());
+        Assert.Equal(2, legacyJson.GetProperty("relay_no").GetInt32());
+        Assert.Equal("no_data", legacyJson.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync($"{nodePath}/source")).StatusCode);
         var empty = await manager.GetFromJsonAsync<JsonElement>($"{root}/nodes?page=2147483647&page_size=200");
         Assert.Empty(empty.GetProperty("items").EnumerateArray());
         var routesPath = $"{root}/servers/{id}/gateways/routes";
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(routesPath)).StatusCode);
         var routes = await admin.GetFromJsonAsync<JsonElement>(routesPath);
         Assert.True(Assert.Single(routes.EnumerateArray()).GetProperty("credential_issued").GetBoolean());
+    }
+
+    private static async Task AssertInvalidRelayAsync(HttpResponseMessage response)
+    {
+        using (response)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            var error = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+            Assert.Equal("VALIDATION_FAILED", error.GetProperty("code").GetString());
+            Assert.Equal("relay_no", error.GetProperty("details").GetProperty("field").GetString());
+        }
     }
 
     private static HttpClient AuthorizedClient(HttpClient client, HttpClient source)
@@ -143,6 +164,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                     Content = JsonContent.Create(new { clientId = "TEST-GW", username = "TEST-GW",
                         password = new string('A', 64), nodeIds = new[] { "probe" } }),
                 });
+            if (path.EndsWith("/devices/legacy-probe", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             var content = new StringContent("unexpected upstream response", Encoding.UTF8, "text/plain");
             if (request.RequestUri!.AbsolutePath.EndsWith("/mqtt", StringComparison.Ordinal))
                 content.Headers.ContentType = null;

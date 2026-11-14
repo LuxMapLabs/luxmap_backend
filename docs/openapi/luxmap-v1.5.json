@@ -23737,7 +23737,8 @@
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "nullable": true
       },
       "IotCommandRequest": {
         "type": "object",
@@ -23760,13 +23761,7 @@
             ]
           },
           "auto_schedule": {
-            "type": "object",
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IotAutoSchedule"
-              }
-            ]
+            "$ref": "#/components/schemas/IotAutoSchedule"
           }
         },
         "additionalProperties": false
@@ -23801,13 +23796,7 @@
             "type": "boolean"
           },
           "auto_schedule": {
-            "type": "object",
-            "nullable": true,
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/IotAutoSchedule"
-              }
-            ]
+            "$ref": "#/components/schemas/IotAutoSchedule"
           },
           "expires_at": {
             "type": "string",

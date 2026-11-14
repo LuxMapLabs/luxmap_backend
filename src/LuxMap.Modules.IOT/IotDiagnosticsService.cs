@@ -40,7 +40,7 @@ public sealed record NodeProfile
 
     internal bool IsValid() =>
         !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrWhiteSpace(FeederId) &&
-        !string.IsNullOrWhiteSpace(PoleId) && RelayNo == 1 &&
+        !string.IsNullOrWhiteSpace(PoleId) && RelayNo is >= 1 and <= 32 &&
         Positive(NominalVoltage) && Positive(NominalCurrentMa) && Positive(NominalPowerMw) &&
         Tolerance(VoltageTolerancePercent) && Tolerance(CurrentTolerancePercent) &&
         Tolerance(PowerTolerancePercent) && Positive(OffCurrentLimitMa) && MaxSilenceSeconds > 0;

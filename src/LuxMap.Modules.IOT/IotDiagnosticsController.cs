@@ -162,6 +162,11 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     private async Task ValidateNodeSourceAsync(string nodeId, NodeProfile profile,
         LuxMapDbContext db, string? provisioningKey, CancellationToken ct)
     {
+        if (profile.RelayNo != 1)
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "Nguồn đo IoT Bridge chỉ hỗ trợ relay 1.",
+                new Dictionary<string, object?> { ["field"] = "relay_no" });
+
         if (!profile.IsValid() || !ValidServerId(profile.ServerId) ||
             profile.DeviceId.Length > 128 || profile.DeviceId is "." or ".." ||
             profile.DeviceId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_' && c != '.'))
