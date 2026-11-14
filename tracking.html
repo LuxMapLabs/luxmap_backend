@@ -41,6 +41,20 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>IOT-CONSOLIDATION — khảo sát phase 2 bỏ relay / hợp nhất Telemetry · 15/11/2026</strong>
+    <p><span class="tag t-next">Khảo sát xong sau phase 1 f46364d · D-1…D-8 chờ Mỹ chốt</span>
+    Không có bảng relay riêng; <code>feeder_control</code> giữ mapping và state, <code>lighting_command.relay_no</code> là snapshot lịch sử.
+    Đề xuất A: chuyển trách nhiệm Telemetry sang IOT, giữ hành vi/schema/API;
+    B: mapping chuẩn một node–một feeder + adapter Bridge có lịch sử/ACK/AUTO/idempotency, liveness và firmware;
+    C: gỡ legacy sau xác nhận consumer. <b>Chưa hiện thực phase 2, chưa đề xuất DROP bảng nào trong bước đầu.</b></p>
+    <p>Khoảng trống hiện có: Bridge chưa cập nhật last_report_at cho map/job offline (<code>IOT-CONS-1</code>),
+    thiếu firmware trên mẫu (<code>VR-10…12</code>), backup chưa sao lưu <code>bridge_data</code> (runbook VPS đã ghi).
+    Chỉ kiểm source/spec/scripts; chưa kiểm DB/VPS, firmware thật hoặc FE/mobile ngoài repo.
+    <a href=".ai/results/IOT-CONSOLIDATION-p1.md">Khảo sát, bảng ảnh hưởng, lộ trình/rollback và D-item</a>.
+    Phase 1 giữ nguyên; push/PR vẫn chờ xác nhận.</p>
+  </div>
+
+  <div class="card">
     <strong>CABINET-MULTI-NODE-DEV — phase 1 tích hợp dev sau PR #256 · 15/11/2026</strong>
     <p><span class="tag t-done">Kiểm chứng xong · commit local · chưa push/deploy</span>
     Nền <code>df35665</code>; một tủ chứa nhiều node, list/detail/map thêm <code>iot_node_ids[]</code> và giữ scalar cũ.
@@ -1074,6 +1088,12 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATION</code> Khảo sát phase 2 sau phase 1: module/model/API/auth/history/firmware/offline/backup; lộ trình A→B→C, D-1…D-8 chờ chốt. Chưa sửa code/schema phase 2.</td>
+        <td><code>.ai/tasks/IOT-CONSOLIDATION.md</code>, <code>.ai/results/IOT-CONSOLIDATION-p1.md</code>, nháp PR <code>CABINET-MULTI-NODE-DEV-pr.md</code>, drift <code>IOT-CONS-1</code>, tracking</td>
+        <td><code>docs(iot): assess relay removal and module consolidation</code></td>
+      </tr>
       <tr>
         <td>15/11/2026</td>
         <td><code>CABINET-MULTI-NODE-DEV</code> Phase 1 lên nền dev #256, giải conflict ảnh/feeder state; guard Bridge↔relay 409 có concurrency. 2317 test .NET pass, 5 skip nền + 20 Python pass; chưa push/deploy.</td>

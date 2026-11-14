@@ -2370,3 +2370,20 @@ Phase 1 vẫn giữ hai kênh; đây không phải quyết định bỏ relay ho
 - Các GET feeder/power/map và preview/poll có thể trả 409 khi gặp cấu hình mâu thuẫn; OpenAPI khai response lỗi tương ứng. Không đổi body thành công, capability, enum, MQTT hoặc bí mật.
 
 Quyết định trên nền CABINET / IOT-BRIDGE **SELF-SIGNED** hiện có; cần WP5/WP6/Đạt xác nhận ở FW kế tiếp. Chưa gửi thông báo ngoài repo.
+
+### IOT-CONS-1 — trạng thái Bridge chưa nối vào last_report_at của registry/map/job (15/11/2026)
+
+**Phát hiện khi khảo sát, chưa sửa; cần chốt khi hợp nhất hai đường IoT (VR-11).**
+`Modules.IOT` đọc mẫu từ Bridge để trả status/electrical; Bridge giữ heartbeat gateway trong bộ nhớ và lịch sử mẫu trong SQLite.
+Hai đường này **không ghi `iot_node.last_report_at` về Postgres**. Writer hiện tại là `LightingCommandService.TouchLockedAsync`
+của kênh HTTP Device / MQTT LC-12; map `NodeSilence` và job `node_offline` cùng đọc trường Postgres đó.
+Vì vậy node chỉ chạy Bridge có thể có mẫu mới ở `/iot/nodes` trong khi map vẫn `never_reported` (hoặc offline theo dấu cũ);
+job không suy được lần im lặng mới từ mẫu Bridge. Đây là khoảng trống của hai đường hiện có, không phải thay đổi hành vi của phase 1.
+
+Ba tín hiệu hiện khác nhau: heartbeat gateway của Bridge (30 giây), độ mới số đo theo `NodeProfile.MaxSilenceSeconds`
+(mặc định 60 giây), và liveness node theo `system_setting.iot_offline_after_minutes` (mặc định 60 phút).
+**Chưa quyết định** gộp ngưỡng hoặc lấy heartbeat gateway thay heartbeat node. Phương án cần Mỹ/Đạt chốt: báo cáo có identity/version
+của node, cập nhật last-report/firmware qua service có scope, giữ `NodeSilence` + chống trùng một fault/lần im lặng;
+replay mẫu cũ không làm node sống giả. Firmware/mẫu đo vẫn cần VR-10, không suy phiên bản cũ từ bản hiện tại.
+
+Chưa đổi API, payload hoặc job trong khảo sát này; chưa báo WP5/WP6/Đạt. Chỉ hiện thực sau khi chốt phương án và tương thích consumer.
