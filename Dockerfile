@@ -28,6 +28,21 @@ RUN ConnectionStrings__LuxMap="Host=build-only;Database=none;Username=none;Passw
     WEB_APP_BASE_URL="https://build-only.invalid" Cors__AllowedOrigins__0="https://build-only.invalid" \
     dotnet ef migrations bundle -p src/LuxMap.Persistence -s src/LuxMap.Api --configuration Release -o /out/efbundle
 
+# IOT-BRIDGE-VPS — the IoT bridge (MQTT broker for the testbed gateways), built only with `--target bridge`. It has
+# its own build stage so an API build never compiles it. Kept ABOVE the api stage: the last stage is the default
+# target, and the api service builds without naming one.
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS bridge-build
+WORKDIR /src
+COPY Directory.Build.props BannedSymbols.txt .editorconfig luxmap.runsettings ./
+COPY src/LuxMap.IotBridge src/LuxMap.IotBridge
+RUN dotnet publish src/LuxMap.IotBridge -c Release -o /out
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:d5633778c754e89a386882eddf8dbee6942447a8a4b8267c19cf1e1158d0b0ac AS bridge
+WORKDIR /app
+COPY --from=bridge-build /out .
+EXPOSE 5000 1883 8883
+ENTRYPOINT ["dotnet", "LuxMap.IotBridge.dll"]
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:d5633778c754e89a386882eddf8dbee6942447a8a4b8267c19cf1e1158d0b0ac AS api
 
 # The survey worker cuts frames out of uploaded clips with ffmpeg, in-process (FFMPEG_NOT_INSTALLED otherwise).

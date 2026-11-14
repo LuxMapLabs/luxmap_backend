@@ -1,11 +1,13 @@
 # VPS — triển khai LuxMap lên một máy chủ
 
-Toàn bộ hệ thống chạy trên **một VPS** bằng Docker Compose: Caddy (HTTPS) → API → PostGIS + MinIO. Web SPA và API dùng
+Toàn bộ hệ thống chạy trên **một VPS** bằng Docker Compose: Caddy (HTTPS) → API → PostGIS + MinIO, cộng IoT bridge (MQTT TLS cho testbed, mục 10). Web SPA và API dùng
 **chung một origin**: `https://<tên miền>/` là web, `https://<tên miền>/api/v1` là API. File nằm ở [`deploy/`](../../deploy).
 
 ```
 internet ──443──▶ caddy ──┬─ /api/*  ──▶ api:8080 ──┬─▶ postgres (PostGIS)
-           80 → 443       └─ còn lại ─▶ /srv/web    └─▶ minio
+           80 → 443       └─ còn lại ─▶ /srv/web    ├─▶ minio
+                                                    └─▶ iot-bridge:5000 (HTTP)
+internet ─8883 (MQTT TLS)─▶ iot-bridge ◀── gateway ESP32 ở testbed
                           (mạng riêng 172.30.0.0/24; postgres/minio chỉ mở 127.0.0.1, đi vào bằng SSH)
 ```
 
@@ -17,7 +19,7 @@ internet ──443──▶ caddy ──┬─ /api/*  ──▶ api:8080 ──
 | V-2 | Đặt ở **Singapore** |
 | V-3 | **PostGIS trên chính VPS** — **thay việc đặt DB trên Supabase** ([supabase.md](supabase.md), OPS-SUPABASE). DB cạnh API (NFR bbox < 500 ms), không bị tạm dừng vì gói free, không pooler. Cách chép của D-1/D-4/D-5 **giữ nguyên**: `copy_dev_to_supabase.py` chạy qua SSH tunnel (bước 6) |
 | V-4 | **Tên miền riêng `luxmap.com.vn`** (Mỹ thuê 19/10/2026), **web chạy cùng server, cùng origin với API.** Cookie refresh của web (`__Secure-luxmap_rt`, `SameSite=Lax`) luôn là first-party, trình duyệt không gửi preflight CORS |
-| V-5 | **Không triển khai EMQX.** Thiết bị testbed dùng kênh HTTP (`Lighting__Channel=http`, `/api/v1/device/…` qua HTTPS). MQTT trên internet cần listener TLS riêng — làm khi thật sự cần |
+| V-5 | **Không triển khai EMQX.** Thiết bị testbed dùng kênh HTTP (`Lighting__Channel=http`, `/api/v1/device/…` qua HTTPS). MQTT trên internet cần listener TLS riêng — làm khi thật sự cần. **Cập nhật 14/11/2026 (Mỹ, IOT-BRIDGE-VPS):** IoT bridge chạy trên VPS, gateway nối vào broker MQTT của bridge **chỉ qua TLS cổng 8883** bằng chứng chỉ của Caddy; MQTT trần 1883 không ra internet (mục 10) |
 | V-6 | Migration chạy bằng **EF bundle của cùng bản build**, **sau** một lần backup — `deploy.sh` giữ thứ tự đó |
 
 Cấu hình máy đề xuất: **4 vCPU / 8 GB RAM / ≥ 100 GB SSD**, Ubuntu 24.04. RAM vì worker khảo sát chạy ffmpeg + YOLO trong
@@ -33,7 +35,7 @@ tiến trình API; đĩa vì một đêm khảo sát là vài GB video (100–15
    ```bash
    sudo ufw allow OpenSSH && sudo ufw allow 80/tcp && sudo ufw allow 443 && sudo ufw enable
    ```
-   ⚠️ Docker tự mở cổng nó publish, **vượt qua ufw**. Vì vậy `compose.yml` chỉ publish 80/443; postgres và minio bind
+   ⚠️ Docker tự mở cổng nó publish, **vượt qua ufw**. Vì vậy `compose.yml` chỉ publish 80/443 và 8883 (MQTT TLS của IoT bridge); postgres và minio bind
    `127.0.0.1`. Đừng sửa thành `"5432:5432"`.
 
 ## 2. Cài Docker, lấy mã nguồn
@@ -223,12 +225,49 @@ cd /opt/luxmap && git pull && deploy/deploy.sh
 Quay lui mã: `git checkout <commit cũ> && deploy/deploy.sh`. Migration **không** tự lùi; một migration đã áp mà cần bỏ thì
 khôi phục từ dump `deploy.sh` vừa tạo (bước 8) — đó là lý do backup đứng trước migration.
 
+## 10. IoT bridge — MQTT TLS cho testbed (IOT-BRIDGE-VPS, 14/11/2026)
+
+Service `iot-bridge` (`src/LuxMap.IotBridge`, image build bằng `--target bridge`) là broker MQTT của gateway ESP32 và API HTTP
+mà backend gọi để đọc / điều khiển node. `deploy.sh` build và khởi động nó cùng `api`.
+
+| Cổng | Ra đâu | Dùng cho |
+|---|---|---|
+| 8883 | **internet** | Gateway kết nối MQTT **qua TLS** (`luxmap.com.vn:8883`) |
+| 1883 | chỉ mạng `backend` | MQTT trần — không publish |
+| 5000 | chỉ mạng `backend` | API của bridge; backend gọi `http://iot-bridge:5000` |
+
+**`deploy/.env`** (cùng giá trị cho API và bridge — compose chỉ đưa ba key này vào bridge, không đưa cả file):
+
+```
+Mqtt__BridgeKey=<≥ 32 ký tự, openssl rand -hex 32>
+Mqtt__ProvisioningKey=<≥ 32 ký tự, khác BridgeKey>
+IotDiagnostics__AllowedOrigins__0=http://iot-bridge:5000
+```
+
+Sửa xong: `docker compose up -d --force-recreate api iot-bridge`. Rồi Quản lý đăng ký server với `base_url` đúng
+`http://iot-bridge:5000` (`POST /api/v1/iot/servers`).
+
+**Chứng chỉ.** Bridge đọc thẳng cặp `.crt` / `.key` Let's Encrypt của Caddy trong volume `caddy_data` (mount chỉ đọc) và đọc
+lại khi file đổi, nên Caddy gia hạn là kết nối kế tiếp nhận chứng chỉ mới, không cần restart. Bridge gửi kèm chứng chỉ
+trung gian. Chuỗi Caddy nhận 14/11/2026: `luxmap.com.vn` → `YE2` → `Root YE` → `ISRG Root X2` → `ISRG Root X1`. Image .NET
+tin sẵn X2 nên chuỗi bridge gửi có thể dừng ở X2: firmware nạp **cả ISRG Root X1 lẫn ISRG Root X2** làm CA. Nếu Caddy chuyển sang nhà cấp khác (ZeroSSL) thì thư mục chứng chỉ đổi tên và bridge tiếp tục dùng cặp cũ tới
+khi hết hạn — sửa đường dẫn trong `compose.yml`.
+
+**Quyền.** Caddy ghi key `0600 root`, nên container chạy `user: 0:0` nhưng `cap_drop: ALL`, `no-new-privileges`, root
+filesystem chỉ đọc: tiến trình đọc được key và ghi `data/`, không làm được gì khác. Đừng bỏ các dòng đó khi sửa service.
+
+**Dữ liệu.** `data/` của bridge (hash secret gateway, `telemetry.sqlite`, lệnh) nằm trong volume `bridge_data`.
+⚠️ `backup.sh` **chưa** sao lưu volume này.
+
+Kiểm tra từ máy bất kỳ: `openssl s_client -connect luxmap.com.vn:8883 -servername luxmap.com.vn </dev/null` → `Verify return code: 0 (ok)`.
+
 ## Vận hành
 
 | Việc | Lệnh (trong `deploy/`) |
 |---|---|
 | Trạng thái | `docker compose ps` |
 | Log API | `docker compose logs -f api` (file JSON trong volume `api_logs`, xoay vòng 14 ngày) |
+| Log IoT bridge | `docker compose logs -f iot-bridge` |
 | Console MinIO | `ssh -L 9001:127.0.0.1:9001 <vps>` rồi mở http://localhost:9001 |
 | psql | `docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'` |
 | Sửa `caddy/Caddyfile` | `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` |
