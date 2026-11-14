@@ -23,6 +23,15 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ## Quyết định đã đăng ký
 
+### IOT-BRIDGE-RELAY-1 — giới hạn relay khi ghi nguồn đo
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | POST/PUT nguồn đo chỉ nhận relay 1. OpenAPI khai `relay_no` enum `[1]`. Relay khác trả 400 `VALIDATION_FAILED` với `details.field: relay_no`. |
+| **Decision maker** | Chủ PR #246 đề xuất. Chờ maintainer duyệt. |
+| **Date** | 14/11/2026 |
+| **Scope** | Ghi nguồn đo IoT Bridge. Profile cũ relay 2–32 vẫn chẩn đoán được nếu liên kết tài sản hợp lệ. Điều khiển qua bridge dùng relay 1. |
+
 ### IOT-DIAGNOSTICS — đăng ký và chẩn đoán nguồn đo IoT (11/11/2026)
 
 | Trường | Nội dung |
@@ -52,10 +61,10 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | `normal`, `anomaly`, `stale`, `no_data`; chẩn đoán mất áp riêng và tùy chọn hiệu chuẩn 10 bóng. |
 
 - Hai GET chi tiết trả 404 nếu node không tồn tại hoặc ngoài xã, và 503 `IOT_SOURCE_UNAVAILABLE` nếu cấu hình không dùng được hoặc upstream không trả JSON hợp lệ.
-- `unconfigured` là chưa có ánh xạ hợp lệ; `no_data` là đã cấu hình nhưng nguồn chưa có mẫu; `source_unavailable` là nguồn lỗi hoặc hết ngân sách truy vấn của trang. Danh sách node giới hạn tổng thời gian chờ upstream 5 giây.
+- `unconfigured` là chưa có ánh xạ hợp lệ; `no_data` là đã cấu hình nhưng nguồn chưa có mẫu; `source_unavailable` là nguồn lỗi hoặc hết ngân sách truy vấn của trang. Danh sách node giới hạn tổng thời gian chờ upstream 5 giây. OpenAPI hợp nhất khai enum cho trạng thái server, node, mẫu điện, chẩn đoán, mã bất thường và kết quả đếm bóng. Kênh lệnh bridge giữ wire format `AUTO`/`MANUAL`, `ON`/`OFF` hoặc `null`.
 - Origin phải khớp chính xác scheme/host/port trong `IotDiagnostics:AllowedOrigins` do bên triển khai cấp. Mặc định danh sách rỗng. Chỉ allowlist origin do bên triển khai kiểm soát, bao gồm DNS nếu dùng hostname; client tắt redirect và proxy.
 - Đăng ký mới được ghi vào PostgreSQL cùng người tạo, thời điểm UTC và correlation ID. Ánh xạ khai sẵn trong cấu hình vẫn đọc được nếu origin đã được allowlist. Triển khai dùng cấu hình từ bản thử cũ cần chuyển ánh xạ vào DB hoặc cấp qua cấu hình tĩnh.
-- Registry thiết bị và relay vẫn do Telemetry sở hữu. Module chẩn đoán đọc qua nguồn HTTP của testbed. `relay_no` mặc định 1 và có thể chọn 1–32. `use_ten_lamp_calibration` mặc định tắt; khi bật, dùng 25 mẫu / 15 phiếu cho cụm 10 bóng đã hiệu chuẩn, và `voltage_loss` không tính là thiếu bóng.
+- Registry thiết bị và relay vẫn do Telemetry sở hữu. Module chẩn đoán đọc qua nguồn HTTP của testbed. `relay_no` mặc định 1. POST và PUT nguồn đo của IoT Bridge chỉ chấp nhận 1, giá trị khác trả 400 `VALIDATION_FAILED`. Nguồn cũ dùng relay 2–32 vẫn đọc và chẩn đoán được khi ánh xạ feeder/trụ hợp lệ. Muốn sửa nguồn hoặc điều khiển qua bridge, nối lại feeder về relay 1. Endpoint relay của Telemetry giữ phạm vi riêng. `use_ten_lamp_calibration` mặc định tắt; khi bật, dùng 25 mẫu / 15 phiếu cho cụm 10 bóng đã hiệu chuẩn, và `voltage_loss` không tính là thiếu bóng.
 
 
 

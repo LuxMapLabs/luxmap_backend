@@ -23884,7 +23884,16 @@
         "type": "object",
         "properties": {
           "code": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "telemetry_stale",
+              "current_when_off",
+              "voltage_loss",
+              "voltage_deviation",
+              "current_deviation",
+              "power_deviation",
+              "lamp_count_shortfall"
+            ]
           },
           "observed": {
             "type": "number",
@@ -23998,18 +24007,28 @@
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "nullable": true
       },
       "IotCommandRequest": {
         "type": "object",
         "properties": {
           "mode": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "enum": [
+              "AUTO",
+              "MANUAL"
+            ]
           },
           "command": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "enum": [
+              "ON",
+              "OFF",
+              null
+            ]
           },
           "auto_schedule": {
             "$ref": "#/components/schemas/IotAutoSchedule"
@@ -24028,11 +24047,20 @@
             "nullable": true
           },
           "mode": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "MANUAL"
+            ]
           },
           "command": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "enum": [
+              "ON",
+              "OFF",
+              null
+            ]
           },
           "command_acknowledged": {
             "type": "boolean"
@@ -24065,7 +24093,13 @@
             "format": "int32"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "normal",
+              "anomaly",
+              "stale",
+              "no_data"
+            ]
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
@@ -24092,7 +24126,12 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "no_data"
+            ]
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
@@ -24423,7 +24462,14 @@
             "nullable": true
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "no_data",
+              "unconfigured",
+              "source_unavailable"
+            ]
           },
           "last_received_at": {
             "type": "string",
@@ -24505,7 +24551,14 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "unconfigured",
+              "broker_down",
+              "unreachable"
+            ]
           },
           "commune_id": {
             "type": "string",
@@ -24610,7 +24663,12 @@
         "type": "object",
         "properties": {
           "status": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "insufficient_samples",
+              "undetermined",
+              "estimated"
+            ]
           },
           "samples": {
             "type": "integer",
@@ -25188,7 +25246,10 @@
           },
           "relay_no": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "enum": [
+              1
+            ]
           },
           "device_id": {
             "type": "string"

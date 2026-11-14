@@ -86,8 +86,10 @@ api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest reques
     catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
 }).WithSummary("Điều khiển đèn: ON / OFF / AUTO")
   .WithDescription("Nhập deviceId LUXMAP-P001, chọn ví dụ ON, OFF hoặc AUTO, bấm Try it out và Execute. " +
-      "MANUAL giữ trạng thái bật/tắt. AUTO từ 06:00 đến hết 18:00: dưới 50 lux bật, trên 50 lux tắt sau một mẫu; " +
-      "đúng 50 lux giữ trạng thái. Từ 18:01 đến 05:59, AUTO luôn bật.")
+      "MANUAL giữ trạng thái bật/tắt. Lịch AUTO mặc định dùng cảm biến từ 06:00 đến hết 18:00. " +
+      "Dưới 50 lux bật, trên 50 lux tắt sau một mẫu, đúng 50 lux giữ trạng thái. " +
+      "Từ 18:01 đến 05:59, AUTO luôn bật. Gửi autoSchedule với dayStartMinute và nightStartMinute " +
+      "(phút tính từ 00:00 theo giờ RTC của node) để đổi lịch. API LuxMap dùng auto_schedule theo định dạng HH:mm.")
   .Produces<LampCommand>().Produces(400);
 
 api.MapGet("/{deviceId}/telemetry", (string deviceId, int? limit, DeviceStore store) =>
