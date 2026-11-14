@@ -51,16 +51,25 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="evidence-all-kinds">
+    <strong>EV-3 — mọi loại phiếu công việc đều upload được ảnh qua <code>/evidence</code>, 14/11/2026</strong>
+    <span class="tag t-next">Mỹ chốt 14/11 (SELF-SIGNED, chạm API) · nhánh <code>feat/evidence-survey-observation</code> (từ <code>origin/dev</code> 20d0ae8) · chưa push · chưa báo WP5 / WP6</span>
+    <p><code>POST /work-orders/{id}/evidence</code> trước chỉ nhận sửa chữa (<code>before</code> / <code>after</code>) và kiểm tra (<code>observation</code>); khảo sát và
+    cập nhật GPS cột bị <code>400 EVIDENCE_KIND_NOT_ALLOWED</code>. Nay mọi phiếu không sửa chữa nhận <code>observation</code> (<code>WorkOrderEvidenceService.AllowedKinds</code>).
+    Không thêm enum, không migration, luật hoàn thành giữ nguyên. Spec: chỉ đổi summary ở <code>luxmap-v1.5.json</code>; <code>luxmap-v1.json</code> không đổi. Drift <b>EV-3</b>.</p>
+    <p>Kiểm (Claude): test mới <code>An_order_that_fixes_nothing_takes_observation_photos_only</code> (khảo sát, GPS cột); trả quy tắc cũ ⇒ 2 ca đỏ.</p>
+    <p class="muted"><b>Còn:</b> push + PR khi Mỹ cho; báo WP5 / WP6 (app được gửi <code>observation</code> cho phiếu khảo sát / GPS cột).</p>
+  </div>
   <div class="card" id="evidence-openapi">
     <strong>OpenAPI của <code>POST /work-orders/{id}/evidence</code> khai đủ field bắt buộc và mã lỗi, 14/11/2026</strong>
-    <span class="tag t-next">Nhánh <code>docs/evidence-openapi</code> (từ <code>origin/dev</code> 8ac1820) · commit xong, chưa push · <code>luxmap-v1.json</code> cần CODEOWNERS · chưa báo WP5 / WP6</span>
+    <span class="tag t-next"><span class="tag t-done">Đã merge · #250</span> · chưa báo WP5 / WP6</span>
     <p>Codex kiểm route (đọc, không sửa): upload chạy đủ, nhưng spec không đánh dấu field nào bắt buộc và chỉ khai 200 / 201 / 401 / 403.
     Nay <code>file</code>, <code>kind</code>, <code>captured_at</code>, <code>lat</code>, <code>lng</code> mang <code>[Required]</code> (như <code>/pole-photos</code>) và action khai
     400 / 404 / 409 / 413 / 415. Hành vi không đổi: thiếu field vẫn 400 <code>VALIDATION_FAILED</code> (trước do service, nay do model validation cùng mã).
     Drift ghi thêm giới hạn cả request 17 MiB. Spec xuất lại chỉ đổi đúng operation này (+107 dòng mỗi file); lint hợp lệ, 10 warning như trên <code>dev</code>.</p>
     <p>Kiểm (Claude): test mới <code>A_missing_field_is_400_VALIDATION_FAILED_and_nothing_is_stored</code> (5 ca); <code>WorkOrderTests</code> + <code>OpenApiSpecTests</code> +
     <code>CapabilityPolicyCoverageTests</code> 324 xanh / 2 skip có sẵn, mã thoát 0.</p>
-    <p class="muted"><b>Còn:</b> push + PR khi Mỹ cho. <code>POST /faults/{id}/photos</code> cùng service nhưng spec vẫn thiếu như cũ. Contract §5.5 vẫn ghi <code>kind=before|after</code>, chưa có
+    <p class="muted"><b>Còn:</b> <code>POST /faults/{id}/photos</code> cùng service nhưng spec vẫn thiếu như cũ. Contract §5.5 vẫn ghi <code>kind=before|after</code>, chưa có
     <code>client_op_id</code> — sửa Contract cần duyệt + tăng version.</p>
   </div>
   <div class="card" id="wo-upload-fixes">
