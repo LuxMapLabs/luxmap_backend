@@ -177,8 +177,8 @@ public sealed record IotNodeProperties
 
 /// <summary>The flat <c>properties</c> block of one cabinet on the map (CAB-8, SELF-SIGNED).</summary>
 /// <remarks>
-/// A cabinet without a device is drawn too — that is the reason the table exists. <c>iot_node_id</c> names the
-/// device and nothing more: its status and last report are <see cref="IotNodeProperties"/>, one answer per question.
+/// A cabinet without a device is drawn too — that is the reason the table exists. <c>iot_node_ids</c> names the
+/// devices and nothing more: their status and last report are <see cref="IotNodeProperties"/>, one answer per question.
 /// </remarks>
 public sealed record CabinetProperties
 {
@@ -197,8 +197,11 @@ public sealed record CabinetProperties
     /// <summary>Every visible feeder, in the same order as feeder_ids, including unconnected feeders.</summary>
     public required IReadOnlyList<CabinetFeederState> Feeders { get; init; }
 
-    /// <summary>The device mounted in the cabinet, or <c>null</c>.</summary>
-    public string? IotNodeId { get; init; }
+    /// <summary>All devices mounted in the cabinet, ordered by creation time, id length, then id; empty when none.</summary>
+    public required IReadOnlyList<string> IotNodeIds { get; init; }
+
+    /// <summary>Legacy compatibility: the first of <c>iot_node_ids</c>, or <c>null</c>. Use the array for all devices.</summary>
+    public string? IotNodeId => IotNodeIds.FirstOrDefault();
 }
 
 /// <summary>A cabinet feeder with its last reported mode and measured power availability.</summary>

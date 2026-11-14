@@ -24,6 +24,7 @@ public sealed class LightingController(LightingCommandService service) : Control
 {
     /// <summary>What pressing would switch, what it would leave out and why, which segments it would also light. Writes nothing.</summary>
     [HttpGet("preview")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ControlLighting)]
     [ProducesResponseType<LightingPreview>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

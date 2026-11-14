@@ -8,18 +8,22 @@ namespace LuxMap.Modules.Telemetry;
 /// <summary>Answers <see cref="ICabinetDeviceLookup"/> from <c>iot_node</c> and <c>feeder_control</c>.</summary>
 public sealed class CabinetDeviceLookup(LuxMapDbContext db) : ICabinetDeviceLookup
 {
-    public async Task<IReadOnlyDictionary<string, string>> DevicesAsync(
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> DevicesAsync(
         IReadOnlyCollection<string> cabinetIds, CancellationToken ct)
     {
         if (cabinetIds.Count == 0)
         {
-            return new Dictionary<string, string>();
+            return new Dictionary<string, IReadOnlyList<string>>();
         }
 
-        // At most one device per cabinet (ux_iot_node_cabinet_id), so the dictionary cannot collide.
-        return await db.Set<IotNode>().AsNoTracking()
+        var nodes = await db.Set<IotNode>().AsNoTracking()
             .Where(node => cabinetIds.Contains(node.CabinetId))
-            .ToDictionaryAsync(node => node.CabinetId, node => node.NodeId, StringComparer.Ordinal, ct);
+            .OrderBy(node => node.CreatedAt).ThenBy(node => node.NodeId.Length).ThenBy(node => node.NodeId)
+            .Select(node => new { node.CabinetId, node.NodeId })
+            .ToListAsync(ct);
+
+        return nodes.GroupBy(node => node.CabinetId).ToDictionary(
+            group => group.Key, group => (IReadOnlyList<string>)[.. group.Select(node => node.NodeId)], StringComparer.Ordinal);
     }
 
     public async Task<IReadOnlyDictionary<string, string>> ControllersAsync(

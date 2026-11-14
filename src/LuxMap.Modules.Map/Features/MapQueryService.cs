@@ -383,7 +383,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
     /// </summary>
     /// <remarks>
     /// No size limit, like segments and devices: a commune has a handful of cabinets. <c>feeder_ids</c> through the
-    /// query filter and in id order; <c>iot_node_id</c> is the device's id only — its state stays on
+    /// query filter and in id order; <c>iot_node_ids</c> contains device ids only — their state stays on
     /// <c>GET /map/iot-nodes</c>, one answer per question.
     /// </remarks>
     public async Task<FeatureCollection<CabinetProperties>> CabinetsAsync(CabinetMapQuery query, CancellationToken ct)
@@ -407,10 +407,13 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                                ControlMode = control == null ? null : control.ControlMode,
                                ModeReportedAt = control == null ? null : control.ModeReportedAt,
                            }).ToList(),
-                IotNodeId = dbContext.Set<IotNode>()
+                IotNodeIds = dbContext.Set<IotNode>()
                     .Where(node => node.CabinetId == cabinet.CabinetId)
+                    .OrderBy(node => node.CreatedAt)
+                    .ThenBy(node => node.NodeId.Length)
+                    .ThenBy(node => node.NodeId)
                     .Select(node => node.NodeId)
-                    .FirstOrDefault(),
+                    .ToList(),
             })
             .ToListAsync(ct);
 
@@ -431,7 +434,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                     CommuneId = row.CommuneId,
                     FeederIds = [.. row.Feeders.Select(feeder => feeder.FeederId)],
                     Feeders = [.. row.Feeders.Select(feeder => feeder with { PowerState = states?.GetValueOrDefault(feeder.FeederId) ?? FeederPowerState.Unknown })],
-                    IotNodeId = row.IotNodeId,
+                    IotNodeIds = row.IotNodeIds,
                 },
             })],
         };

@@ -94,7 +94,7 @@ public sealed class AssetCrudService(
         })] };
     }
 
-    /// <summary>Cabinets, with the device mounted in each (CAB-8).</summary>
+    /// <summary>Cabinets, with the devices mounted in each (CAB-8 / CABINET-MULTI-NODE).</summary>
     /// <remarks>
     /// The device comes from a second query through <see cref="ICabinetDeviceLookup"/>: this module cannot see
     /// <c>iot_node</c>. One query for the whole page, not one per row.
@@ -111,7 +111,7 @@ public sealed class AssetCrudService(
             Items = [.. result.Items.Select(item =>
             {
                 var gallery = galleries.GetValueOrDefault(item.CabinetId) ?? [];
-                return item with { IotNodeId = mounted.GetValueOrDefault(item.CabinetId), PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) };
+                return item with { IotNodeIds = mounted.GetValueOrDefault(item.CabinetId) ?? [], PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) };
             })],
         };
     }
@@ -225,7 +225,7 @@ public sealed class AssetCrudService(
         var gallery = (await photos.CabinetsAsync([cabinetId], ct)).GetValueOrDefault(cabinetId) ?? [];
         return new CabinetDetail
         {
-            Cabinet = item with { IotNodeId = mounted.GetValueOrDefault(cabinetId), PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) },
+            Cabinet = item with { IotNodeIds = mounted.GetValueOrDefault(cabinetId) ?? [], PhotoCount = gallery.Count, CoverPhoto = AssetPhotoReader.Cover(gallery) },
             AssetPhotos = gallery,
             GeomWkt = Wkt(extra.Geom),
             CreatedAt = extra.CreatedAt,
@@ -1260,7 +1260,7 @@ public sealed class AssetCrudService(
         };
 
     /// <remarks>
-    /// <c>iot_node_id</c> is left <c>null</c> here and filled by the caller from <see cref="ICabinetDeviceLookup"/>:
+    /// <c>iot_node_ids</c> is left empty here and filled by the caller from <see cref="ICabinetDeviceLookup"/>:
     /// <c>iot_node</c> belongs to Telemetry, which this module does not reference.
     /// </remarks>
     private System.Linq.Expressions.Expression<Func<ElectricalCabinet, CabinetListItem>> CabinetRow =>
@@ -1283,6 +1283,7 @@ public sealed class AssetCrudService(
                 .ThenBy(feeder => feeder.FeederId)
                 .Select(feeder => feeder.FeederId)
                 .ToList(),
+            IotNodeIds = Array.Empty<string>(),
             UpdatedAt = cabinet.UpdatedAt,
             UpdatedBy = cabinet.UpdatedBy,
             UpdatedByName = dbContext.Set<AppUser>().Where(user => user.UserId == cabinet.UpdatedBy).Select(user => user.FullName).FirstOrDefault(),

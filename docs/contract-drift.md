@@ -1504,12 +1504,14 @@ theo đêm; P6 ghi đúng là BE **không** có sửa ghép cột nào — duy�
 |---|---|---|
 | **CAB-1** | Bảng `electrical_cabinet`: `cabinet_id` prefix **`CAB`**, độ rộng tối thiểu 3 (`CAB-001`), `cabinet_name`, `commune_id`, `external_ref` (partial unique theo xã), **`geom` Point 4326 bắt buộc**, `data_source`. `external_ref` dạng `CAB-HVC-A` không xung đột với ID — không parse nó như ID | Có (§0.2 prefix mới) |
 | **CAB-2** | `feeder.cabinet_id` nullable (trụ nào cấp mạch này). `feeder.geom` (LineString) **giữ**, không bỏ | Có |
-| **CAB-3** | `iot_node.cabinet_id` **bắt buộc**, tối đa **một** thiết bị / trụ (UNIQUE đầy đủ — node chưa có trạng thái ngừng dùng). **`iot_node.geom` bỏ**, toạ độ thiết bị = toạ độ trụ. `GET /map/iot-nodes` **giữ nguyên hình dạng** | Không (hình dạng giữ) |
+| **CAB-3** | `iot_node.cabinet_id` **bắt buộc**. ~~Tối đa **một** thiết bị / trụ~~ → **một trụ có 0..n thiết bị** (Mỹ duyệt 14/11/2026, CAB-MN-1 bên dưới). **`iot_node.geom` bỏ**, toạ độ thiết bị = toạ độ trụ. `GET /map/iot-nodes` **giữ nguyên hình dạng** | Không (hình dạng giữ) |
 | **CAB-4** | Rơ-le chỉ điều khiển feeder **cùng trụ** với thiết bị. DB (FK ghép qua `feeder_control.cabinet_id NOT NULL`) + service | Không |
 | **CAB-5** | ~~Thiết bị **không** gắn lên trụ `data_source = field` (D-R10). DB (FK ghép tới `(cabinet_id, data_source)` + CHECK) + service~~ **GỠ 07/10/2026 (Mỹ): không cần luật này.** Migration `DropFieldCabinetRule` bỏ ba ràng buộc + cột `iot_node.cabinet_data_source`; trụ mang thiết bị đổi sang `field` được. Thiết bị tự nó vẫn không bao giờ `field` (`ck_iot_node_data_source_not_field`) | Không |
 | **CAB-6** | `GET /assets/feeders` (list + detail) thêm `cabinet: {cabinet_id, cabinet_name, location{lat,lng}} \| null` — tiền lệ `active_fixture`. `PUT /assets/feeders/{id}`: `cabinet_id` **vắng = giữ**, `null` = tháo — ngoại lệ thứ hai của thay thế toàn phần, khuôn `note` | Có (§5.3.1) |
 | **CAB-7** | Nhóm `/assets/cabinets` (CRUD + `POST /assets/import/cabinets`, nạp trụ **trước** feeder, feeder tham chiếu `cabinet_external_ref`); `GET /map/cabinets` (bbox bắt buộc, trụ không IoT cũng hiện) | Có (endpoint mới) |
 | **CAB-8** | Hình dạng đọc (Mỹ, 07/10/2026). `GET /assets/cabinets` item: `cabinet_id, external_ref, cabinet_name, commune_id, data_source, location{lat,lng}, feeder_ids[], iot_node_id\|null, updated_at, updated_by, updated_by_name`; chi tiết `{cabinet, geom_wkt, created_at}`; `/map/cabinets` properties `cabinet_id, cabinet_name, commune_id, feeder_ids[], iot_node_id\|null`. `iot_node_id` **trần** — trạng thái thiết bị chỉ ở `/map/iot-nodes` (không hai nguồn sự thật). `feeder_ids[]` tính lúc đọc, **trong phạm vi xã của người gọi**, `[]` khi rỗng | Có (§5.3.1, endpoint mới) |
+
+**Cập nhật 15/11/2026:** hình dạng đọc CAB-8 được mở rộng bằng `iot_node_ids[]` ở **CAB-MN-2**; giữ scalar cũ để tương thích. Ảnh tài sản / `feeders[]` / `power_state` đã công bố vẫn giữ nguyên.
 
 **Hiện thực 07/10/2026** (nhánh `feat/CABINET-electrical-cabinet`, migration `AddElectricalCabinet`; chi tiết + bằng chứng ở
 `.ai/results/CABINET-p2.md`). Chốt thêm lúc hiện thực — đều chạm API, cùng nền SELF-SIGNED:
@@ -2333,3 +2335,55 @@ của lệnh này. **Không** đổi trong ticket này (có thể WP6 đang dùn
 **Phải báo:** WP5 (enum `task_kind`; form tạo gửi `segment_id` + `pole_ids`, rồi upload từng PDF sau khi có `work_order_id`; bảng báo cáo đọc `pole_locations`,
 "GPS cũ" đọc `/poles`; 409 `POLE_OFF_SEGMENT` khi duyệt), WP6 (enum; `/poles` chỉ trả cột mục tiêu; tải PDF trước ca; `complete` gửi `pole_locations`, kể cả qua
 `/sync/push`). **Chưa báo.**
+
+### CABINET-MULTI-NODE — một tủ chứa nhiều node, phase 1 (14/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Mỹ yêu cầu làm trước quan hệ một cabinet chứa nhiều IoT node; phase 2 bỏ relay để sau. Mỹ chọn thêm danh sách node và giữ trường đơn cũ để tương thích |
+| **Decision maker / Date** | Mỹ, xác nhận trong chat 14/11/2026 |
+| **Status** | Quyết định BE đã duyệt; API xây trên nền CABINET **SELF-SIGNED**, chưa hợp nhất Contract; cần WP5/WP6 xác nhận ở FW kế tiếp |
+| **Scope** | Schema / registry / đọc tủ trong assets và map; không đổi MQTT, relay, quyền hoặc enum |
+
+| Mã | Quyết định | Chạm API |
+|---|---|---|
+| **CAB-MN-1** | Thay phần cardinality của CAB-3: một cabinet chứa **0..n IoT node**; mỗi node vẫn bắt buộc thuộc đúng một cabinet cùng xã. Đổi `ux_iot_node_cabinet_id` thành index **không unique** `ix_iot_node_cabinet_id`; giữ mọi FK cùng xã / cùng tủ và Restrict | Có (đăng ký node thứ hai không còn 409) |
+| **CAB-MN-2** | Bổ sung `iot_node_ids: string[]` vào item `GET /assets/cabinets`, `cabinet` trong chi tiết và `properties` của `GET /map/cabinets`; `[]` khi không có node. Tính lúc đọc, trong phạm vi xã, thứ tự **`created_at, length(node_id), node_id`**. Giữ `iot_node_id` = phần tử đầu hoặc `null` cho client cũ; đây **không** phải node chính hay node ưu tiên điều khiển | Có (chỉ thêm trường, giữ kiểu / trường cũ) |
+| **CAB-MN-3** | Phase 1 **giữ nguyên relay**: một node vẫn có thể nối nhiều feeder, mỗi feeder tối đa một rơ-le; hai node cùng tủ có thể cùng dùng `relay_no = 1` cho hai feeder khác nhau. Bí mật, trạng thái, lệnh và MQTT vẫn theo `node_id`, không theo cabinet | Không |
+| **CAB-MN-4** | Migration `AllowMultipleIotNodesPerCabinet` không thêm / xóa bảng hoặc cột, không sửa dữ liệu. `Down` khôi phục unique chỉ khi mỗi tủ có tối đa một node; nếu không, từ chối rõ ràng trong transaction, không tự xóa / gộp node | Không |
+
+**WP5/WP6:** dùng `iot_node_ids[]` để liệt kê đủ thiết bị; `iot_node_id` cũ chỉ là giá trị tương thích.
+MapLibre có thể trả mảng properties dưới dạng chuỗi JSON (cùng lưu ý I-18).
+**Đạt:** phase 1 không đổi topic hoặc payload firmware. **Chưa gửi thông báo ngoài repo.**
+
+
+### CAB-MN-5 — guard tạm giữa Bridge và relay (15/11/2026)
+
+Mỹ chốt trong chat: **chặn thao tác mâu thuẫn, trả lỗi rõ ràng** khi hai kênh gán khác node cho cùng feeder.
+Phase 1 vẫn giữ hai kênh; đây không phải quyết định bỏ relay hoặc bỏ module Telemetry.
+
+- Bridge và `feeder_control` có thể cùng tham chiếu một feeder **nếu cùng `node_id`**; feeder chưa nối relay vẫn gán nguồn Bridge được.
+- Ghi source hoặc nối relay sang node khác → **409 `IOT_REGISTRATION_CONFLICT`**, `details` gồm `feeder_id`, `node_id`, `controller_node_id`. Kiểm trong service, cùng transaction; thứ tự khóa **node → feeder**.
+- Nguồn tĩnh và nguồn DB cùng gán một feeder cho hai node → cùng lỗi 409, không lỗi dictionary 500. Dữ liệu đã mâu thuẫn bị chặn khi đọc power/control hoặc gửi/giao lệnh; không tự chọn một nguồn hay xóa dữ liệu. Cấu hình hợp lệ vẫn trả response như trước.
+- Đường relay kiểm lúc lập kế hoạch và lúc giao lệnh (HTTP / MQTT); Bridge kiểm trước khi gửi lệnh. Port nhận DbContext đã scope của caller, kể cả MQTT không có HTTP principal.
+- UNIQUE `ux_iot_source_registration_feeder_id` (PR #256, DB-only) vẫn là backstop cho hai source DB. Phase 1 không bỏ index này.
+- Các GET feeder/power/map và preview/poll có thể trả 409 khi gặp cấu hình mâu thuẫn; OpenAPI khai response lỗi tương ứng. Không đổi body thành công, capability, enum, MQTT hoặc bí mật.
+
+Quyết định trên nền CABINET / IOT-BRIDGE **SELF-SIGNED** hiện có; cần WP5/WP6/Đạt xác nhận ở FW kế tiếp. Chưa gửi thông báo ngoài repo.
+
+### IOT-CONS-1 — trạng thái Bridge chưa nối vào last_report_at của registry/map/job (15/11/2026)
+
+**Phát hiện khi khảo sát, chưa sửa; cần chốt khi hợp nhất hai đường IoT (VR-11).**
+`Modules.IOT` đọc mẫu từ Bridge để trả status/electrical; Bridge giữ heartbeat gateway trong bộ nhớ và lịch sử mẫu trong SQLite.
+Hai đường này **không ghi `iot_node.last_report_at` về Postgres**. Writer hiện tại là `LightingCommandService.TouchLockedAsync`
+của kênh HTTP Device / MQTT LC-12; map `NodeSilence` và job `node_offline` cùng đọc trường Postgres đó.
+Vì vậy node chỉ chạy Bridge có thể có mẫu mới ở `/iot/nodes` trong khi map vẫn `never_reported` (hoặc offline theo dấu cũ);
+job không suy được lần im lặng mới từ mẫu Bridge. Đây là khoảng trống của hai đường hiện có, không phải thay đổi hành vi của phase 1.
+
+Ba tín hiệu hiện khác nhau: heartbeat gateway của Bridge (30 giây), độ mới số đo theo `NodeProfile.MaxSilenceSeconds`
+(mặc định 60 giây), và liveness node theo `system_setting.iot_offline_after_minutes` (mặc định 60 phút).
+**Chưa quyết định** gộp ngưỡng hoặc lấy heartbeat gateway thay heartbeat node. Phương án cần Mỹ/Đạt chốt: báo cáo có identity/version
+của node, cập nhật last-report/firmware qua service có scope, giữ `NodeSilence` + chống trùng một fault/lần im lặng;
+replay mẫu cũ không làm node sống giả. Firmware/mẫu đo vẫn cần VR-10, không suy phiên bản cũ từ bản hiện tại.
+
+Chưa đổi API, payload hoặc job trong khảo sát này; chưa báo WP5/WP6/Đạt. Chỉ hiện thực sau khi chốt phương án và tương thích consumer.

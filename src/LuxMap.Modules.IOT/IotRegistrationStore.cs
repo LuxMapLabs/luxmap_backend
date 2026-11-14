@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.Telemetry;
+using LuxMap.Modules.Telemetry.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
@@ -70,9 +72,12 @@ internal sealed class IotSourceRegistrationConfiguration : IEntityTypeConfigurat
 public sealed class IotRegistrationStore(
     LuxMapDbContext db, IOptions<IotOptions> options, ICurrentActorAccessor actor, ICorrelationIdAccessor correlation)
 {
-    internal async Task<IotOptions> ReadAsync(IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct)
+    internal Task<IotOptions> ReadAsync(IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct)
+        => ReadAsync(db, options.Value, scopedNodeIds, ct);
+
+    internal static async Task<IotOptions> ReadAsync(
+        LuxMapDbContext db, IotOptions configured, IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct)
     {
-        var configured = options.Value;
         var servers = new Dictionary<string, IotServerProfile>(configured.Servers, StringComparer.OrdinalIgnoreCase);
         foreach (var row in await db.Set<IotServerRegistration>().AsNoTracking().ToListAsync(ct))
             servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude);
@@ -133,6 +138,16 @@ public sealed class IotRegistrationStore(
 
     internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool replace, CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var node = await LightingCommandService.LockDeviceAsync(db, nodeId, ct);
+        var feeder = await FeederControllerBinding.LockFeederAsync(db, profile.FeederId, ct);
+        if (feeder.CabinetId != node.CabinetId || feeder.CommuneId != node.CommuneId)
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "Feeder phải thuộc cùng tủ điện và xã với node IoT.");
+        var controller = await db.Set<FeederControl>().Where(control => control.FeederId == profile.FeederId)
+            .Select(control => control.NodeId).SingleOrDefaultAsync(ct);
+        FeederControllerBinding.RequireCompatible(profile.FeederId, nodeId, controller);
+
         var id = profile.ServerId!.ToLowerInvariant();
         var settings = await ReadAsync([nodeId], ct);
         if (!settings.Servers.TryGetValue(id, out var server))
@@ -152,6 +167,7 @@ public sealed class IotRegistrationStore(
         else db.Entry(existing).CurrentValues.SetValues(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
         RecordRegistration(id, nodeId, details);
         await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     internal async Task DeleteSourceAsync(string nodeId, CancellationToken ct)

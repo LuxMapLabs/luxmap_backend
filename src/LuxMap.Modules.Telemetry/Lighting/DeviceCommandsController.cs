@@ -26,6 +26,7 @@ public sealed class DeviceCommandsController(LightingCommandService service, Lig
     /// <c>command_id</c> and anything with a <c>seq</c> not above the last executed on that relay.
     /// </summary>
     [HttpGet]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<DeviceCommandBatch>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<DeviceCommandBatch>> PollAsync(CancellationToken ct)

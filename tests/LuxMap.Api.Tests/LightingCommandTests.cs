@@ -278,6 +278,53 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
         Assert.Null(expiry.ActorUserId);
     }
 
+    [Fact]
+    public async Task Nodes_in_the_same_cabinet_receive_and_acknowledge_only_their_own_relay_commands()
+    {
+        var rig = await Rigs.RigAsync();
+        var manager = await fixture.ManagerClientAsync();
+        var unwired = await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Node}/relays/2", new { feeder_id = (string?)null });
+        Assert.Equal(HttpStatusCode.NoContent, unwired.StatusCode);
+        var created = await manager.PostAsJsonAsync("/api/v1/assets/iot-nodes",
+            new { cabinet_id = rig.Cabinet, data_source = "calibration_rig", supports_remote_control = true });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var sibling = created.Headers.Location!.OriginalString.Split('/')[^1];
+        var wired = await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{sibling}/relays/1", new { feeder_id = rig.Feeders[1] });
+        Assert.Equal(HttpStatusCode.NoContent, wired.StatusCode);
+        var credential = await Rigs.JsonAsync(await manager.PostAsync($"/api/v1/assets/iot-nodes/{sibling}/credential", null));
+        var siblingRig = rig with { Node = sibling, Secret = credential.GetProperty("secret").GetString()! };
+
+        var response = await manager.PostAsJsonAsync(Commands, new { segment_id = rig.Segment, mode = "off", client_op_id = Guid.NewGuid() });
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var commands = (await Rigs.JsonAsync(response)).GetProperty("commands").EnumerateArray().ToArray();
+        Assert.Equal(2, commands.Length);
+        Assert.All(commands, command => Assert.Equal(1, command.GetProperty("relay_no").GetInt32()));
+        Assert.Equal(new[] { rig.Node, sibling }.Order(StringComparer.Ordinal),
+            commands.Select(command => command.GetProperty("node_id").GetString()).Order(StringComparer.Ordinal));
+
+        var firstDevice = Rigs.DeviceClient(rig);
+        var secondDevice = Rigs.DeviceClient(siblingRig);
+        var firstCommand = Assert.Single(await Rigs.PollAsync(firstDevice));
+        var secondCommand = Assert.Single(await Rigs.PollAsync(secondDevice));
+        Assert.NotEqual(firstCommand.CommandId, secondCommand.CommandId);
+        var refused = await secondDevice.PostAsJsonAsync($"{Device}/{firstCommand.CommandId}/ack",
+            new { seq = firstCommand.Seq, result = "applied", reported_mode = "off" });
+        Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+        Assert.Equal("COMMAND_NOT_FOUND", (await Rigs.JsonAsync(refused)).GetProperty("error").GetProperty("code").GetString());
+
+        var firstAck = await firstDevice.PostAsJsonAsync($"{Device}/{firstCommand.CommandId}/ack",
+            new { seq = firstCommand.Seq, result = "applied", reported_mode = "off" });
+        Assert.Equal(HttpStatusCode.OK, firstAck.StatusCode);
+        Assert.Equal("off", await Rigs.ModeAsync(rig.Feeders[0]));
+        Assert.Null(await Rigs.ModeAsync(rig.Feeders[1]));
+        Assert.Equal("delivered", await Rigs.StatusAsync(secondCommand.CommandId));
+
+        var secondAck = await secondDevice.PostAsJsonAsync($"{Device}/{secondCommand.CommandId}/ack",
+            new { seq = secondCommand.Seq, result = "applied", reported_mode = "off" });
+        Assert.Equal(HttpStatusCode.OK, secondAck.StatusCode);
+        Assert.Equal("off", await Rigs.ModeAsync(rig.Feeders[1]));
+    }
+
     /// <summary>Same commune is not the same device: every device query is narrowed to the authenticated node (3.2).</summary>
     [Fact]
     public async Task A_device_never_sees_or_acknowledges_another_devices_command_in_the_same_commune()

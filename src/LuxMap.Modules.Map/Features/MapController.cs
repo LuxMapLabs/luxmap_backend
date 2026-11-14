@@ -57,6 +57,7 @@ public sealed class MapController(
     /// </para>
     /// </remarks>
     [HttpGet("poles")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<FeatureCollection<PoleProperties>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
@@ -92,6 +93,7 @@ public sealed class MapController(
     /// scope is 404, never 403 (Contract section 7).
     /// </remarks>
     [HttpGet("poles/{pole_id}")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<PoleMapDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -194,6 +196,7 @@ public sealed class MapController(
     /// rules as the other layers: the testbed cabinet appears only when <c>calibration_rig</c> is asked for.
     /// </remarks>
     [HttpGet("cabinets")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<FeatureCollection<CabinetProperties>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

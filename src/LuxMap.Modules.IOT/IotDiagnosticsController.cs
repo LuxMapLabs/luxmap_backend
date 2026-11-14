@@ -107,6 +107,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     }
 
     [HttpGet("poles/{poleId}/control")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<IotPoleControl>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -203,6 +204,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
     /// <summary>Gửi ON, OFF hoặc AUTO đến node. Đọc GET command để xem ACK.</summary>
     [HttpPost("nodes/{nodeId}/command")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ControlLighting)]
     [ProducesResponseType<IotCommandStatus>(StatusCodes.Status202Accepted)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]

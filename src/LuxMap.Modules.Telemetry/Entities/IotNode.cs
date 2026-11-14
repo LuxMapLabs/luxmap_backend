@@ -35,8 +35,8 @@ public class IotNode : ICommuneScoped
     public NodeRole NodeRole { get; set; } = NodeRole.SegmentController;
 
     /// <summary>
-    /// The cabinet the device is mounted in (CAB-3): REQUIRED, and at most one device per cabinet
-    /// (<c>ux_iot_node_cabinet_id</c>). Same commune as the cabinet — composite foreign key.
+    /// The cabinet the device is mounted in (CAB-3): REQUIRED; a cabinet may carry multiple devices
+    /// (CABINET-MULTI-NODE). Same commune as the cabinet — composite foreign key.
     /// </summary>
     public required string CabinetId { get; set; }
 

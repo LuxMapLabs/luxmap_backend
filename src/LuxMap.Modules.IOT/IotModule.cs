@@ -12,6 +12,8 @@ public sealed class IotModule : ILuxMapModule
     {
         services.Configure<IotOptions>(configuration.GetSection("IotDiagnostics"));
         services.AddScoped<IotRegistrationStore>();
+        services.AddSingleton<IotFeederSourceLookup>();
+        services.AddSingleton<LuxMap.Modules.Telemetry.IFeederSourceLookup>(provider => provider.GetRequiredService<IotFeederSourceLookup>());
         services.AddScoped<LuxMap.Modules.Assets.IFeederPowerLookup>(provider => provider.GetRequiredService<IotDiagnosticsService>());
         services.AddHttpClient<IotDiagnosticsService>(client =>
         {

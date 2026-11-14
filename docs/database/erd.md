@@ -30,7 +30,7 @@ gọn hơn đề xuất gốc (32 bảng mới → 22). Nguồn phạm vi: [Phi�
 | Q7 | **Tuyến liên xã:** phiếu neo vào **một xã**, nhưng được chứa tuyến/cột của các xã khác **trong phạm vi của người tạo**; kết quả theo cột mang **xã của cột**. Cột ngoài phạm vi → không xử lý, báo rõ trong độ phủ. **ACCT-1 (29/10): tài khoản thường chỉ một xã, nên phạm vi cho phép chỉ còn xã của người giao; giữ mô hình/logic Q7 cho dữ liệu cũ. Giới hạn hiện thực: processor có thể từ chối cả job `JOB_SCOPE_INVALID` khi tuyến có cột cùng nguồn xã khác, xem ACCT-1** | Dữ liệu thật 28/09: Nguyễn Xiển & Phước Thiện chạy qua cả Long Phước và Long Bình. Claude quyết (Codex nghiêng "một phiếu một xã" — chia tuyến thực tế sẽ cắt ngang các đoạn đường) |
 | Q8 | **Một registry phiên bản chung `artifact_version`** (model CV, thuật toán ghép, gom cụm, firmware module/node, profile) — không hai bảng | BE-34; Codex nghiêng "registry tối thiểu". ✅ **Hiện thực 23/10/2026** (BE-34, migration `AddVersionTraceability`, drift VR-1…VR-9): thêm `node_firmware`, `lux_module_firmware`; code ở `LuxMap.Persistence.Versions`; lịch sử firmware thiết bị ở `iot_node_firmware` |
 | Q9 | Cấu hình (ngưỡng dim, ngưỡng offline, …) ở **`system_setting`** key/value có audit; mỗi run **chụp lại** giá trị đã dùng | BE-33, Phiếu dòng 157; đơn giản hơn bảng config có version. ✅ **Hiện thực 22/10/2026** (migration `AddSystemSettings`, drift SET-1…SET-7): hai khoá; "audit" là bảng append-only riêng `system_setting_change` vì `audit_event` bắt buộc `commune_id` |
-| Q10 | **Thêm `electrical_cabinet`** (tủ điện): `feeder.cabinet_id` nullable, `iot_node.cabinet_id` **bắt buộc** (≤ 1 thiết bị / trụ), `iot_node.geom` **bỏ** — toạ độ thuộc trụ. ✅ **Hiện thực 07/10/2026** (migration `AddElectricalCabinet`, drift CAB-1…CAB-8; Mỹ sửa 3 điểm của bản đầu: `cabinet_id` của node bắt buộc, `geom` của trụ bắt buộc, trụ ↔ node `0..1`) | Phiếu dòng 215/239 liệt kê *electrical cabinets* là tài sản được quản lý; Claude quyết, Mỹ chốt 07/10 |
+| Q10 | **Thêm `electrical_cabinet`** (tủ điện): `feeder.cabinet_id` nullable, `iot_node.cabinet_id` **bắt buộc**, `iot_node.geom` **bỏ** — toạ độ thuộc trụ. Hiện thực 07/10/2026 (`AddElectricalCabinet`, CAB-1…CAB-8). **Mỹ sửa 14/11/2026:** trụ ↔ node **0..n** thay cho 0..1 (`AllowMultipleIotNodesPerCabinet`, CAB-MN-1…CAB-MN-4); phase 1 giữ mô hình relay | Phiếu dòng 215/239 liệt kê *electrical cabinets* là tài sản được quản lý; Mỹ chốt 07/10, sửa cardinality 14/11 |
 | Q11 | Nguồn của fault tự động: **cột FK nullable trên `fault`** (`origin_observation_id`, `origin_node_id`) — không bảng `fault_origin` | Codex phương án A. ⚠️ **Đính chính 02/10:** bản đầu ghi "một fault mở / cột / loại đã chặn sinh trùng" — **sai**: `fault` chỉ có unique `client_op_id` (`FaultConfigurations.cs:160–162`). Chống trùng phải làm ở khâu công bố (khoá cột + `FaultStatusSets.Open`), xem BE-15 D-12 |
 | Q12 | **FX-1 (Mỹ chọn):** `fixture_type`, `lamp_watt`, `install_date` **nullable khi chưa xác minh** (114 bóng thực địa về NULL) + enum thêm giá trị cho **đèn cao áp sodium** | Mỹ 01/10/2026; chạm Contract §1/§5.1 → SELF-SIGNED, đưa ra FW |
 | Q13 | **Bỏ `ExternalUnit`/SLA** khỏi domain model; prefix `EXT` để trống | Phiếu v1.4 chỉ giao việc cho Kỹ sư hiện trường; WO-1/5 đã loại ở BE-23 |
@@ -127,7 +127,7 @@ erDiagram
     }
     iot_node {
         text node_id PK "SỬA: + cabinet_id, - geom"
-        text cabinet_id FK "BẮT BUỘC, UNIQUE (CAB-3)"
+        text cabinet_id FK "BẮT BUỘC, nhiều node / tủ (CAB-MN-1)"
         text credential_hash "nullable — SHA-256 hex của bí mật thiết bị (LIGHT-CTRL 2a)"
         timestamptz credential_set_at "nullable — NULL cùng credential_hash (CHECK)"
     }
@@ -319,7 +319,7 @@ erDiagram
     }
 
     electrical_cabinet ||--o{ feeder : "cấp"
-    electrical_cabinet ||--o| iot_node : "đặt tại (≤ 1)"
+    electrical_cabinet ||--o{ iot_node : "chứa"
     road_segment |o--o{ pole : "chưa phân tuyến khi null"
     feeder ||--o{ pole : ""
     pole ||--o{ fixture : ""

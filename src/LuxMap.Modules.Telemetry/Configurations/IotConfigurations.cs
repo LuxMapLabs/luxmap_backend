@@ -37,13 +37,13 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
 
         builder.HasCommuneScope();
 
-        // CAB-3: the device takes its point from its cabinet, and a cabinet carries at most one device.
+        // CAB-3 / CABINET-MULTI-NODE: devices take their point from the cabinet; a cabinet may carry many.
         // The bbox of GET /map/iot-nodes now rides ix_electrical_cabinet_geom.
         builder.HasOne<ElectricalCabinet>().WithMany()
             .HasForeignKey(node => new { node.CabinetId, node.CommuneId })
             .HasPrincipalKey(cabinet => new { cabinet.CabinetId, cabinet.CommuneId })
             .OnDelete(DeleteBehavior.Restrict);
-        builder.HasIndex(node => node.CabinetId).IsUnique().HasDatabaseName("ux_iot_node_cabinet_id");
+        builder.HasIndex(node => node.CabinetId).HasDatabaseName("ix_iot_node_cabinet_id");
 
         // Target of feeder_control's composite key, the same load-bearing "redundant" key as
         // ak_feeder_feeder_id_commune_id (O-7 trap 2). Do not drop it as dead weight.

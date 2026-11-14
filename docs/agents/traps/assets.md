@@ -347,6 +347,10 @@ Trường mới trong properties bản đồ phải cập nhật schema viết t
 
 ## CABINET — trụ điện tổng là tài sản, IoT là thiết bị gắn lên trụ (07/10/2026, drift CAB-1…CAB-8)
 
+**CAB-MN-1…4 (14/11/2026): một tủ có 0..n IoT node.** `ICabinetDeviceLookup.DevicesAsync` trả danh sách node
+cho mỗi tủ, không dictionary tủ → một node (nhiều node sẽ đụng khóa). List / detail / map thêm `iot_node_ids[]`
+có thứ tự `created_at, length(node_id), node_id`; `iot_node_id` cũ là phần tử đầu hoặc null, không phải node chính.
+
 **Toạ độ thuộc `electrical_cabinet`, không thuộc `iot_node` nữa** — `iot_node.geom` đã bỏ. Mọi chỗ cần vị trí thiết bị
 (bản đồ, IOT-11 sinh `node_offline` / `runtime_decline` với `location` = toạ độ tủ theo I-9) phải join trụ qua
 `iot_node.cabinet_id`. Lọc bbox thì `ST_Intersects` trên **`electrical_cabinet.geom` trần** (`MapQueryService.IotNodeQuery`),

@@ -41,6 +41,38 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>IOT-CONSOLIDATION — khảo sát phase 2 bỏ relay / hợp nhất Telemetry · 15/11/2026</strong>
+    <p><span class="tag t-next">Khảo sát xong sau phase 1 f46364d · D-1…D-8 chờ Mỹ chốt</span>
+    Không có bảng relay riêng; <code>feeder_control</code> giữ mapping và state, <code>lighting_command.relay_no</code> là snapshot lịch sử.
+    Đề xuất A: chuyển trách nhiệm Telemetry sang IOT, giữ hành vi/schema/API;
+    B: mapping chuẩn một node–một feeder + adapter Bridge có lịch sử/ACK/AUTO/idempotency, liveness và firmware;
+    C: gỡ legacy sau xác nhận consumer. <b>Chưa hiện thực phase 2, chưa đề xuất DROP bảng nào trong bước đầu.</b></p>
+    <p>Khoảng trống hiện có: Bridge chưa cập nhật last_report_at cho map/job offline (<code>IOT-CONS-1</code>),
+    thiếu firmware trên mẫu (<code>VR-10…12</code>), backup chưa sao lưu <code>bridge_data</code> (runbook VPS đã ghi).
+    Chỉ kiểm source/spec/scripts; chưa kiểm DB/VPS, firmware thật hoặc FE/mobile ngoài repo.
+    <a href=".ai/results/IOT-CONSOLIDATION-p1.md">Khảo sát, bảng ảnh hưởng, lộ trình/rollback và D-item</a>.
+    Phase 1 giữ nguyên; đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> vào dev theo xác nhận của Mỹ ngày 15/11. Chưa merge/deploy.</p>
+  </div>
+
+  <div class="card">
+    <strong>CABINET-MULTI-NODE-DEV — phase 1 tích hợp dev sau PR #256 · 15/11/2026</strong>
+    <p><span class="tag t-done">Đã push · PR #257 vào dev · chưa merge/deploy</span>
+    Nền <code>df35665</code>; một tủ chứa nhiều node, list/detail/map thêm <code>iot_node_ids[]</code> và giữ scalar cũ.
+    Giữ ảnh tài sản, <code>feeders[]</code>, <code>power_state</code>, relay, Telemetry, credential/MQTT và lịch sử.
+    Mỹ chốt guard tạm: Bridge và relay gán khác node cho cùng feeder → <b>409 IOT_REGISTRATION_CONFLICT</b>;
+    khóa node → feeder, chặn cả hai thứ tự ghi và cấu hình tĩnh trùng DB. Trang 1/200 feeder đều 6 SQL.
+    Migration <code>20261114171551_AllowMultipleIotNodesPerCabinet</code> chỉ thay index cabinet unique→thường;
+    rollback từ chối khi tủ còn nhiều node, không xóa bảng/cột/dữ liệu.</p>
+    <p><b>2317 .NET pass, 0 fail, 5 skip nền dev + 20 Python pass</b>, MQTT E2E qua broker riêng;
+    build 0 warning/error, 3 mutation check đỏ đúng chỗ, HTTP thật trên DB tạm, OpenAPI hợp lệ (10 warning như dev),
+    review độc lập không còn finding. Năm skip là ACCT-1/D-6b nhiều xã, không thêm skip mới.
+    <b>PR:</b> <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">#257 → dev</a>, đã push theo xác nhận của Mỹ ngày 15/11; xem CI/review trên PR. Chưa merge, apply dev/VPS, deploy hoặc báo WP5/WP6.
+    Phase 2 bỏ relay / hợp nhất Telemetry chỉ khảo sát sau commit này, chưa hiện thực.
+    Bằng chứng: <a href=".ai/results/CABINET-MULTI-NODE-DEV-p2.md">kết quả tích hợp</a>;
+    quyết định CAB-MN-1…5; kết quả nhánh cũ 14/11 chỉ là lịch sử.</p>
+  </div>
+
+  <div class="card">
     <strong>Đồng bộ trạng thái — 11/11/2026</strong>
     <p><span class="tag t-next">Đối chiếu với <code>origin/dev</code> (970e300) · chỉ sửa nhãn trạng thái, không đụng nội dung card</span>
     Các card từ 24/10 đến 11/11 còn ghi "chờ PR / chờ merge / chưa push" trong khi PR đã merge: nay ghi theo số PR và ngày merge.
@@ -1056,6 +1088,30 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>CABINET-MULTI-NODE-DEV</code> Publish nhánh và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> vào dev theo Mỹ xác nhận; gồm phase 1 và khảo sát phase 2. Chưa merge/deploy.</td>
+        <td><code>tracking.html</code>; bằng chứng publish bổ sung trong <code>CABINET-MULTI-NODE-DEV-p2.md</code></td>
+        <td><code>docs(tracking): record cabinet phase 1 PR 257</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATION</code> Khảo sát phase 2 sau phase 1: module/model/API/auth/history/firmware/offline/backup; lộ trình A→B→C, D-1…D-8 chờ chốt. Chưa sửa code/schema phase 2.</td>
+        <td><code>.ai/tasks/IOT-CONSOLIDATION.md</code>, <code>.ai/results/IOT-CONSOLIDATION-p1.md</code>, nháp PR <code>CABINET-MULTI-NODE-DEV-pr.md</code>, drift <code>IOT-CONS-1</code>, tracking</td>
+        <td><code>docs(iot): assess relay removal and module consolidation</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>CABINET-MULTI-NODE-DEV</code> Phase 1 lên nền dev #256, giải conflict ảnh/feeder state; guard Bridge↔relay 409 có concurrency. 2317 test .NET pass, 5 skip nền + 20 Python pass; đã push, PR #257 vào dev, chưa merge/deploy.</td>
+        <td>Asset/map DTO + query, Telemetry registry/lighting, IOT source lookup/store, migration/snapshot, regression, OpenAPI, drift/traps/development, bằng chứng <code>.ai/</code></td>
+        <td><code>feat(iot): integrate multi-node cabinets with dev</code></td>
+      </tr>
+      <tr>
+        <td>14/11/2026</td>
+        <td><code>CABINET-MULTI-NODE</code> Phase 1: một cabinet nhiều node; mảng ID mới và scalar tương thích; relay giữ nguyên. 1691 test .NET + 20 Python xanh; migration và HTTP kiểm trên DB tạm, chưa chạm dev/VPS.</td>
+        <td><code>IotConfigurations.cs</code>, registry, <code>ICabinetDeviceLookup</code>, asset/map DTO + query, migration/snapshot, test cabinet/registry/lighting, ERD/DBML, OpenAPI, drift, traps, development và bằng chứng <code>.ai/</code></td>
+        <td><code>feat(iot): allow multiple nodes per cabinet</code></td>
+      </tr>
       <tr>
         <td>26/09/2026</td>
         <td><code>REG-v1.2</code> Ghép <code>dev</code> sau PR #48–50: giữ response BE-12b, thêm <code>ReadNetwork</code> cho 3 endpoint chi tiết, chuyển test sang Manager. Build 0 warning/error; <strong>606/606 test xanh trên luxmap_test</strong>; OpenAPI sinh lại: 35 implemented + 13 planned, lint 0 lỗi / 3 warning nền. Không chạy seed hoặc migration trên dev.</td>

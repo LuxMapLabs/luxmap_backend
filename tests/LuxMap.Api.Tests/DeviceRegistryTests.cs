@@ -62,18 +62,59 @@ public sealed class DeviceRegistryTests(AssetImportFixture fixture, DeviceProbeF
     }
 
     [Fact]
-    public async Task A_cabinet_carries_one_device_and_a_foreign_cabinet_is_a_404()
+    public async Task A_cabinet_accepts_multiple_devices_including_concurrent_registrations()
     {
         var client = await fixture.ManagerClientAsync();
         var cabinet = await NewCabinetAsync(fixture.CommuneId);
-        await CreateNodeAsync(client, cabinet, "simulated");
+        var first = await CreateNodeAsync(client, cabinet, "simulated");
+        var others = await Task.WhenAll(
+            CreateNodeAsync(client, cabinet, "simulated"),
+            CreateNodeAsync(client, cabinet, "calibration_rig", remote: true));
 
-        var second = await client.PostAsJsonAsync(Nodes, new { cabinet_id = cabinet, data_source = "simulated" });
-        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
-        Assert.Equal("ux_iot_node_cabinet_id", (await ErrorAsync(second)).GetProperty("details").GetProperty("constraint").GetString());
+        var ids = new[] { first, others[0], others[1] };
+        Assert.Equal(3, ids.Distinct(StringComparer.Ordinal).Count());
+        foreach (var id in ids)
+        {
+            var row = await GetAsync(client, $"{Nodes}/{id}");
+            Assert.Equal(cabinet, row.GetProperty("cabinet_id").GetString());
+            Assert.Equal(fixture.CommuneId, row.GetProperty("commune_id").GetString());
+        }
+    }
 
+    [Fact]
+    public async Task Registering_a_device_in_a_foreign_cabinet_is_still_a_404()
+    {
+        var client = await fixture.ManagerClientAsync();
         var foreign = await client.PostAsJsonAsync(Nodes, new { cabinet_id = await NewCabinetAsync(fixture.ForeignCommuneId), data_source = "simulated" });
         Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+    }
+
+    [Fact]
+    public async Task Devices_sharing_a_cabinet_keep_their_own_relays_and_credentials()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var cabinet = await NewCabinetAsync(fixture.CommuneId);
+        var first = await CreateNodeAsync(client, cabinet, "calibration_rig", remote: true);
+        var second = await CreateNodeAsync(client, cabinet, "calibration_rig", remote: true);
+        var firstFeeder = await NewFeederAsync(cabinet);
+        var secondFeeder = await NewFeederAsync(cabinet);
+        await PutAsync(client, $"{Nodes}/{first}/relays/1", new { feeder_id = firstFeeder });
+        await PutAsync(client, $"{Nodes}/{second}/relays/1", new { feeder_id = secondFeeder });
+
+        var held = await client.PutAsJsonAsync($"{Nodes}/{second}/relays/2", new { feeder_id = firstFeeder });
+        Assert.Equal(HttpStatusCode.Conflict, held.StatusCode);
+        var error = await ErrorAsync(held);
+        Assert.Equal("ASSET_IN_USE", error.GetProperty("code").GetString());
+        Assert.Equal(first, error.GetProperty("details").GetProperty("node_id").GetString());
+        Assert.Equal([(1, firstFeeder)], await RelaysAsync(client, first));
+        Assert.Equal([(1, secondFeeder)], await RelaysAsync(client, second));
+
+        var firstSecret = await IssueAsync(client, first);
+        var secondSecret = await IssueAsync(client, second);
+        Assert.Equal(HttpStatusCode.OK, (await ProbeAsync($"{first}.{firstSecret}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await ProbeAsync($"{second}.{secondSecret}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await ProbeAsync($"{first}.{secondSecret}")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await ProbeAsync($"{second}.{firstSecret}")).StatusCode);
     }
 
     [Fact]

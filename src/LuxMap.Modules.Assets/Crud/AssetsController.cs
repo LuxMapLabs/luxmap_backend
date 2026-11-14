@@ -67,6 +67,7 @@ public sealed class AssetsController(
 
     /// <summary>Feeders in the caller's communes, paged.</summary>
     [HttpGet("feeders")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<PagedResult<FeederListItem>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
@@ -76,6 +77,7 @@ public sealed class AssetsController(
 
     /// <summary>One feeder. <c>geom_wkt</c> is null for the usual case of no surveyed cable route.</summary>
     [HttpGet("feeders/{feederId}")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<FeederDetail>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
