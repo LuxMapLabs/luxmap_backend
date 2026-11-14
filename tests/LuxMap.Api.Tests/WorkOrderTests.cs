@@ -1042,6 +1042,35 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         Assert.Equal(201, (await Upload("a", inspection, "observation")).Status);
     }
 
+    [Theory]
+    [InlineData(TaskKind.Survey)] [InlineData(TaskKind.PoleGpsUpdate)]
+    public async Task An_order_that_fixes_nothing_takes_observation_photos_only(TaskKind kind)
+    {
+        var id = await Plant(WorkOrderStatus.InProgress);
+        await Db(async db =>
+        {
+            using var fixture = db.EnterUnscopedSystemWriteBackdoor();
+            var order = await db.Set<WorkOrder>().IgnoreQueryFilters().SingleAsync(w => w.WorkOrderId == id);
+            order.TaskKind = kind;
+            if (kind == TaskKind.Survey)
+            {
+                order.SegmentId = null;
+                db.Add(new WorkOrderSegment { WorkOrderId = id, CommuneId = home, SegmentId = segment, Position = 0 });
+            }
+            await db.SaveChangesAsync(); return 0;
+        });
+
+        foreach (var label in new[] { "before", "after" })
+        {
+            var (status, body) = await Upload("a", id, label);
+            Assert.Equal((400, "EVIDENCE_KIND_NOT_ALLOWED"), (status, Code(body)));
+        }
+        var (created, photo) = await Upload("a", id, "observation");
+        Assert.Equal(201, created);
+        Assert.Equal(("observation", id), (photo.GetProperty("kind").GetString(), photo.GetProperty("work_order_id").GetString()));
+        Assert.Equal(1, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
     [Fact]
     public async Task Only_the_assigned_engineer_uploads_and_only_while_the_order_is_in_progress()
     {

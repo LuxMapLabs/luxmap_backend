@@ -19524,7 +19524,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] [BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra); JPEG theo magic bytes; client_op_id cho lần gửi lại",
+        "summary": "[TẠM — WO-1…WO-12] [BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra, khảo sát, cập nhật GPS cột); JPEG theo magic bytes; client_op_id cho lần gửi lại",
         "operationId": "postWorkOrdersIdEvidence",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
