@@ -21,10 +21,10 @@ if ! { mkdir -p "$backup_dir" 2>/dev/null && [ -w "$backup_dir" ]; }; then
   exit 1
 fi
 
-docker compose build api
+docker compose build api iot-bridge
 docker compose up -d --wait postgres minio
 docker compose run --rm minio-mc
 ./backup.sh
 docker compose run --rm migrate
-docker compose up -d --remove-orphans api caddy
+docker compose up -d --remove-orphans api caddy iot-bridge
 docker compose ps

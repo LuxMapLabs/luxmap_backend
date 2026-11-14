@@ -9,3 +9,5 @@
 **/bin/
 **/obj/
 **/logs/
+# The bridge's runtime state (gateway credential hashes, telemetry) lives in a volume, never in an image.
+src/LuxMap.IotBridge/data/

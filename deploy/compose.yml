@@ -3,8 +3,8 @@
 # Run from this directory: `./deploy.sh` (build, back up, migrate, start). Configuration: `cp .env.example .env`.
 #
 # What differs from the development docker-compose.yml at the root, on purpose:
-#   - no Redis (no code uses it), no Mailpit (real SMTP), no EMQX (devices use the HTTP channel over HTTPS — MQTT on
-#     the open internet would need its own TLS listener, see vps.md);
+#   - no Redis (no code uses it), no Mailpit (real SMTP), no EMQX. The testbed gateways reach the IoT bridge's own MQTT
+#     broker over TLS only (8883, Caddy's certificate); its plain 1883 and HTTP 5000 stay on the private network;
 #   - postgres and minio publish NOTHING to the internet: their ports bind 127.0.0.1, reachable only through SSH;
 #   - the API is reached only through Caddy, whose address is fixed so the API can trust exactly that one proxy.
 
@@ -132,6 +132,42 @@ services:
         condition: service_healthy
     networks: [backend]
 
+  # IOT-BRIDGE-VPS (14/11/2026) — the IoT bridge: MQTT broker for the testbed gateways + the HTTP API the backend calls
+  # (IotDiagnostics__AllowedOrigins__0=http://iot-bridge:5000 in .env). Only MQTT over TLS is published.
+  iot-bridge:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: bridge
+    image: luxmap-iot-bridge:latest
+    restart: unless-stopped
+    # Only the keys the bridge reads — not env_file, which would hand it the database and storage secrets as well.
+    environment:
+      Mqtt__BridgeKey: "${Mqtt__BridgeKey:-}"
+      Mqtt__ProvisioningKey: "${Mqtt__ProvisioningKey:-}"
+      # Caddy's own Let's Encrypt files, renewed in place; the bridge re-reads them when they change. If Caddy ever
+      # falls back to another issuer (ZeroSSL) the directory name changes and this path keeps serving the old pair.
+      Mqtt__Tls__CertificatePath: /caddy/certificates/acme-v02.api.letsencrypt.org-directory/${LUXMAP_DOMAIN}/${LUXMAP_DOMAIN}.crt
+      Mqtt__Tls__KeyPath: /caddy/certificates/acme-v02.api.letsencrypt.org-directory/${LUXMAP_DOMAIN}/${LUXMAP_DOMAIN}.key
+      # Where .NET keeps the CurrentUser certificate store the intermediates go into (PemCertificateProvider).
+      HOME: /tmp
+    # Runs as root ONLY to read Caddy's key, which Caddy writes 0600 root. Owning the file needs no capability, so every
+    # capability is dropped and the root filesystem is read-only: the process can read that key and write data/, nothing else.
+    user: "0:0"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: [/tmp]
+    volumes:
+      - bridge_data:/app/data
+      - caddy_data:/caddy:ro
+    ports:
+      # Docker opens a published port itself, past ufw (vps.md step 2) — nothing else to allow on the host.
+      - "8883:8883"
+    depends_on:
+      - caddy
+    networks: [backend]
+
   caddy:
     image: caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d
     restart: unless-stopped
@@ -168,3 +204,4 @@ volumes:
   api_logs:
   caddy_data:
   caddy_config:
+  bridge_data:

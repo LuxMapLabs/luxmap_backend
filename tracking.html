@@ -51,6 +51,20 @@
   </div>
 
   <h1>LuxMap — Backend (WP2)</h1>
+  <div class="card" id="iot-bridge-vps">
+    <strong>IOT-BRIDGE-VPS — IoT bridge chạy trên VPS, gateway nối MQTT qua TLS 8883, 14/11/2026</strong>
+    <span class="tag t-next">Nhánh <code>feat/IOT-BRIDGE-VPS</code> (từ <code>origin/dev</code> 20d0ae8) · Mỹ chọn TLS 8883 (đảo một phần V-5) · chưa lên VPS · firmware chưa đổi sang TLS</span>
+    <p>Để Quản lý điều khiển đèn testbed từ web, API phải gọi được bridge, mà bridge trước đây chỉ chạy trong LAN testbed với MQTT trần 1883.
+    Nay: service <code>iot-bridge</code> trong <code>deploy/compose.yml</code> (stage <code>bridge</code> riêng trong <code>Dockerfile</code>), API gọi <code>http://iot-bridge:5000</code>,
+    chỉ publish <b>8883 MQTT TLS</b>. Bridge có listener TLS mới (<code>Mqtt:Tls:*</code>, <code>PemCertificateProvider</code>) đọc cặp chứng chỉ Let's Encrypt của Caddy và đọc lại khi file đổi;
+    chứng chỉ trung gian được đưa vào kho CA của tiến trình để Linux gửi kèm. Container chạy root chỉ để đọc key 0600 của Caddy, nhưng <code>cap_drop: ALL</code>, read-only, chỉ nhận 2 key IoT (không <code>env_file</code>).
+    Files: <code>src/LuxMap.IotBridge/{PemCertificateProvider.cs,MqttBroker.cs,README.md}</code>, <code>Dockerfile</code>, <code>.dockerignore</code>, <code>deploy/{compose.yml,deploy.sh,.env.example}</code>, <code>docs/deploy/vps.md</code> (V-5, mục 10).</p>
+    <p>Kiểm (Claude, Docker local, chuỗi giả root → trung gian → leaf EC, key 0600 root, container hardened như compose): <code>openssl s_client</code> với chỉ root CA ⇒ gửi leaf + trung gian, <code>Verify 0 (ok)</code>, TLS 1.2;
+    phá thử (bỏ bước thêm trung gian vào kho) ⇒ chỉ gửi leaf, <code>Verify 21</code>; thay cặp chứng chỉ khi bridge đang chạy ⇒ kết nối kế tiếp nhận serial mới, không restart;
+    MQTT CONNECT qua TLS ⇒ <code>BadUserNameOrPassword</code> / <code>ClientIdentifierNotValid</code> đúng như luật xác thực gateway. MQTTnet 4.3.7 gọi <code>GetCertificate()</code> mỗi kết nối (đo bằng probe).</p>
+    <p class="muted"><b>Còn:</b> deploy + đặt <code>IotDiagnostics__AllowedOrigins__0=http://iot-bridge:5000</code> trên VPS; firmware ESP32 chuyển sang TLS <code>luxmap.com.vn:8883</code> với CA ISRG Root X1 + X2;
+    <code>backup.sh</code> chưa sao lưu volume <code>bridge_data</code> (hash secret gateway, telemetry); Caddy đổi sang ZeroSSL thì đường dẫn chứng chỉ trong compose phải sửa tay.</p>
+  </div>
   <div class="card" id="evidence-all-kinds">
     <strong>EV-3 — mọi loại phiếu công việc đều upload được ảnh qua <code>/evidence</code>, 14/11/2026</strong>
     <span class="tag t-next">Mỹ chốt 14/11 (SELF-SIGNED, chạm API) · nhánh <code>feat/evidence-survey-observation</code> (từ <code>origin/dev</code> 20d0ae8) · chưa push · chưa báo WP5 / WP6</span>
