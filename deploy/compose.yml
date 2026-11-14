@@ -147,8 +147,8 @@ services:
       Mqtt__ProvisioningKey: "${Mqtt__ProvisioningKey:-}"
       # Caddy's own Let's Encrypt files, renewed in place; the bridge re-reads them when they change. If Caddy ever
       # falls back to another issuer (ZeroSSL) the directory name changes and this path keeps serving the old pair.
-      Mqtt__Tls__CertificatePath: /caddy/certificates/acme-v02.api.letsencrypt.org-directory/${LUXMAP_DOMAIN}/${LUXMAP_DOMAIN}.crt
-      Mqtt__Tls__KeyPath: /caddy/certificates/acme-v02.api.letsencrypt.org-directory/${LUXMAP_DOMAIN}/${LUXMAP_DOMAIN}.key
+      Mqtt__Tls__CertificatePath: /caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${LUXMAP_DOMAIN}/${LUXMAP_DOMAIN}.crt
+      Mqtt__Tls__KeyPath: /caddy-data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/${LUXMAP_DOMAIN}/${LUXMAP_DOMAIN}.key
       # Where .NET keeps the CurrentUser certificate store the intermediates go into (PemCertificateProvider).
       HOME: /tmp
     # Runs as root ONLY to read Caddy's key, which Caddy writes 0600 root. Owning the file needs no capability, so every
@@ -160,7 +160,8 @@ services:
     tmpfs: [/tmp]
     volumes:
       - bridge_data:/app/data
-      - caddy_data:/caddy:ro
+      # Caddy's /data, mounted under another name: its files sit one level down, in caddy/certificates/.
+      - caddy_data:/caddy-data:ro
     ports:
       # Docker opens a published port itself, past ufw (vps.md step 2) — nothing else to allow on the host.
       - "8883:8883"
