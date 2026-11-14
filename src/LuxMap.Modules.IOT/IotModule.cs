@@ -12,6 +12,7 @@ public sealed class IotModule : ILuxMapModule
     {
         services.Configure<IotOptions>(configuration.GetSection("IotDiagnostics"));
         services.AddScoped<IotRegistrationStore>();
+        services.AddScoped<LuxMap.Modules.Assets.IFeederPowerLookup>(provider => provider.GetRequiredService<IotDiagnosticsService>());
         services.AddHttpClient<IotDiagnosticsService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(5);

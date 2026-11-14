@@ -143,7 +143,8 @@ public sealed class IotRegistrationStore(
         if (replace && existing is null) throw MissingSource(nodeId);
         if ((!replace && (existing is not null || settings.Nodes.ContainsKey(nodeId))) ||
             options.Value.Nodes.Values.Any(node => string.Equals(node.ServerId, id, StringComparison.OrdinalIgnoreCase) &&
-                                                    node.DeviceId == profile.DeviceId))
+                                                    node.DeviceId == profile.DeviceId) ||
+            options.Value.Nodes.Any(pair => pair.Key != nodeId && pair.Value.FeederId == profile.FeederId))
             throw Conflict();
 
         var details = JsonSerializer.Serialize(profile with { ServerId = id }, LuxMapJsonOptions.Default);

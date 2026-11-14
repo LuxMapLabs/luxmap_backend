@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using LuxMap.Modules.Assets;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Modules.Telemetry.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Errors;
@@ -24,10 +26,8 @@ public sealed record IotServerProfile(string? BaseUrl, string? CommuneId = null,
 public sealed record NodeProfile
 {
     public string? ServerId { get; init; }
-    public short RelayNo { get; init; } = 1;
     public string DeviceId { get; init; } = "";
     public string FeederId { get; init; } = "";
-    public string PoleId { get; init; } = "";
     public double NominalVoltage { get; init; }
     public double NominalCurrentMa { get; init; }
     public double NominalPowerMw { get; init; }
@@ -40,7 +40,6 @@ public sealed record NodeProfile
 
     internal bool IsValid() =>
         !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrWhiteSpace(FeederId) &&
-        !string.IsNullOrWhiteSpace(PoleId) && RelayNo is >= 1 and <= 32 &&
         Positive(NominalVoltage) && Positive(NominalCurrentMa) && Positive(NominalPowerMw) &&
         Tolerance(VoltageTolerancePercent) && Tolerance(CurrentTolerancePercent) &&
         Tolerance(PowerTolerancePercent) && Positive(OffCurrentLimitMa) && MaxSilenceSeconds > 0;
@@ -56,7 +55,7 @@ public sealed record IotAnomaly(
     string Code, double? Observed, double? Reference, double? DeviationPercent, double? Limit);
 
 public sealed record IotDiagnosticResult(
-    string NodeId, string FeederId, string PoleId, short RelayNo, string Status,
+    string NodeId, string FeederId, string Status,
     IotMeasurement? Measurement, IReadOnlyList<IotAnomaly> Anomalies)
 {
     public LampCountEstimate? LampCount { get; init; }
@@ -71,13 +70,13 @@ public sealed record IotNodeStatus(
 }
 
 public sealed record IotElectricalResult(
-    string NodeId, string ServerId, string Status, IotMeasurement? Measurement);
+    string NodeId, string ServerId, string Status, IotMeasurement? Measurement, FeederPowerState PowerState = FeederPowerState.Unknown);
 
 public sealed record IotLocation(
     [property: System.Text.Json.Serialization.JsonRequired] double Lat,
     [property: System.Text.Json.Serialization.JsonRequired] double Lng);
 public sealed record IotServerStatus(string ServerId, string Status, string? CommuneId = null, IotLocation? Location = null);
-public sealed record IotPoleControl(string PoleId, string? FeederId, string? NodeId, short? RelayNo, bool CanControlFeeder, string? ControlChannel = null);
+public sealed record IotPoleControl(string PoleId, string? FeederId, string? NodeId, bool CanControlFeeder, string? ControlChannel = null);
 
 public sealed record IotTelemetryPage(IReadOnlyList<IotArchivedSample> Items, long NextCursor, bool HasMore);
 public sealed record IotArchivedSample(long Cursor, IotArchivedReading Reading);
@@ -91,10 +90,10 @@ public sealed record IotGatewayRouteRequest(string? DeviceId);
 public sealed record IotGatewayRoute(string GatewayId, string[] DeviceIds, bool CredentialIssued);
 public sealed record IotGatewayCredential(string ClientId, string Username, string Password, string[] NodeIds);
 public sealed record IotCommandStatus(
-    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null);
+    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null, FeederPowerState PowerState = FeederPowerState.Unknown);
 
 public sealed class IotDiagnosticsService(
-    LuxMapDbContext db, HttpClient client, IotRegistrationStore registry)
+    LuxMapDbContext db, HttpClient client, IotRegistrationStore registry) : IFeederPowerLookup
 {
     public async Task<IotDiagnosticResult> GetAsync(string nodeId, CancellationToken ct)
     {
@@ -104,19 +103,9 @@ public sealed class IotDiagnosticsService(
             !TryServer(settings, profile, out _, out var baseUri))
             throw Unavailable("Chưa cấu hình nguồn đo hoặc ngưỡng hợp lệ cho thiết bị IoT.");
 
-        var topology = await (
-            from control in db.Set<FeederControl>()
-            join feeder in db.Set<Feeder>() on control.FeederId equals feeder.FeederId
-            join pole in db.Set<Pole>() on feeder.FeederId equals pole.FeederId
-            where control.NodeId == nodeId && control.RelayNo == profile.RelayNo &&
-                  feeder.FeederId == profile.FeederId && pole.PoleId == profile.PoleId
-            select new { feeder.FeederId, pole.PoleId, control.RelayNo })
-            .SingleOrDefaultAsync(ct);
-        if (topology is null)
-            throw Unavailable("Trụ đèn phải thuộc feeder được gán cho relay của node IoT.");
-
-        var result = new IotDiagnosticResult(
-            nodeId, topology.FeederId, topology.PoleId, topology.RelayNo, "no_data", null, []);
+        if (!await CompatibleFeederAsync(nodeId, profile.FeederId, false, ct))
+            throw Unavailable("Feeder phải thuộc cùng tủ điện và xã với node IoT.");
+        var result = new IotDiagnosticResult(nodeId, profile.FeederId, "no_data", null, []);
         var device = await ReadDeviceAsync(baseUri, profile.DeviceId, ct);
         var measurement = ReadMeasurement(device);
         if (measurement is null) return result;
@@ -266,34 +255,106 @@ public sealed class IotDiagnosticsService(
         if (pole is null)
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy trụ đèn.");
 
-        var control = await (
-            from row in db.Set<FeederControl>().AsNoTracking()
-            join node in db.Set<IotNode>() on row.NodeId equals node.NodeId
-            where row.FeederId == pole.FeederId
-            select new { row.NodeId, row.RelayNo, node.SupportsRemoteControl }).SingleOrDefaultAsync(ct);
-        if (control is null) return new(poleId, pole.FeederId, null, null, false);
-
-        var settings = await registry.ReadAsync([control.NodeId], ct);
-        var canControl = control.SupportsRemoteControl &&
-            settings.Nodes.TryGetValue(control.NodeId, out var profile) &&
-            profile.FeederId == pole.FeederId && profile.RelayNo == control.RelayNo && control.RelayNo == 1 &&
-            TryServer(settings, profile, out _, out _);
-        return new(poleId, pole.FeederId, control.NodeId, control.RelayNo, canControl, canControl ? "iot_bridge" : null);
+        if (pole.FeederId is null) return new(poleId, null, null, false);
+        var (settings, links) = await FeederLinksAsync([pole.FeederId], ct);
+        if (!links.TryGetValue(pole.FeederId, out var link))
+            return new(poleId, pole.FeederId, null, false);
+        var canControl = link.RemoteControl && TryServer(settings, link.Profile, out _, out _);
+        return new(poleId, pole.FeederId, link.NodeId, canControl, canControl ? "iot_bridge" : null);
     }
+
+    private Task<bool> CompatibleFeederAsync(string nodeId, string feederId, bool remote, CancellationToken ct) =>
+        (from node in db.Set<IotNode>()
+         from feeder in db.Set<Feeder>()
+         where node.NodeId == nodeId && feeder.FeederId == feederId &&
+               node.CabinetId == feeder.CabinetId && node.CommuneId == feeder.CommuneId &&
+               (!remote || node.SupportsRemoteControl)
+         select feeder.FeederId).AnyAsync(ct);
+
+    private sealed record FeederLink(string NodeId, NodeProfile Profile, bool RemoteControl);
+
+    private async Task<(IotOptions Settings, Dictionary<string, FeederLink> Links)> FeederLinksAsync(
+        IReadOnlyCollection<string> feederIds, CancellationToken ct)
+    {
+        var candidates = await (
+            from feeder in db.Set<Feeder>().AsNoTracking()
+            from node in db.Set<IotNode>().AsNoTracking()
+            where feederIds.Contains(feeder.FeederId) && feeder.CabinetId == node.CabinetId &&
+                  feeder.CommuneId == node.CommuneId
+            select new { feeder.FeederId, node.NodeId, node.CommuneId, node.SupportsRemoteControl }).ToListAsync(ct);
+        var settings = await registry.ReadAsync(candidates.Select(row => row.NodeId).Distinct().ToArray(), ct);
+        var links = new Dictionary<string, FeederLink>(StringComparer.Ordinal);
+        foreach (var row in candidates)
+            if (settings.Nodes.TryGetValue(row.NodeId, out var profile) && profile.FeederId == row.FeederId &&
+                ServerMatchesCommune(settings, profile, row.CommuneId))
+                links.Add(row.FeederId, new(row.NodeId, profile, row.SupportsRemoteControl));
+        return (settings, links);
+    }
+
+    public async Task<IReadOnlyDictionary<string, FeederPowerState>> ReadAsync(
+        IReadOnlyCollection<string> feederIds, CancellationToken ct)
+    {
+        var result = new System.Collections.Concurrent.ConcurrentDictionary<string, FeederPowerState>();
+        if (feederIds.Count == 0) return result;
+        var (settings, links) = await FeederLinksAsync(feederIds, ct);
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            await Parallel.ForEachAsync(links, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 12, CancellationToken = budget.Token,
+            }, async (entry, token) =>
+            {
+                if (!TryServer(settings, entry.Value.Profile, out _, out var uri)) return;
+                try
+                {
+                    var device = await ReadDeviceAsync(uri, entry.Value.Profile.DeviceId, token);
+                    result[entry.Key] = PowerStateOf(device, entry.Value.Profile.MaxSilenceSeconds, DateTimeOffset.UtcNow);
+                }
+                catch (LuxMapException error) when (error.Code == "IOT_SOURCE_UNAVAILABLE") { }
+            });
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && budget.IsCancellationRequested) { }
+        return result;
+    }
+
+    private static FeederPowerState PowerStateOf(PrototypeDevice? device, int maxSilenceSeconds, DateTimeOffset now)
+    {
+        if (maxSilenceSeconds <= 0) return FeederPowerState.Unknown;
+        var ack = device?.LastCommandAck;
+        var sample = device?.LatestTelemetry;
+        var freshAfter = now.AddSeconds(-maxSilenceSeconds);
+        // RTC timestamps are local UTC+07:00. Archived samples can arrive long after they were measured.
+        if (sample?.Data is { } data &&
+            DateTime.TryParseExact(data.Timestamp, "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var local))
+        {
+            var measuredAt = new DateTimeOffset(local, TimeSpan.FromHours(7));
+            var power = DecodePower(data.LampCommand);
+            if (measuredAt >= freshAfter && measuredAt <= now &&
+                (ack is null || measuredAt > ack.ReceivedAt) && power != FeederPowerState.Unknown)
+                return power;
+        }
+        return ack is not null && ack.ReceivedAt >= freshAfter && ack.ReceivedAt <= now
+            ? DecodePower(ack.Data?.LampCommand) : FeederPowerState.Unknown;
+    }
+
+    private static FeederPowerState DecodePower(string? state) => state switch
+    {
+        "ON" => FeederPowerState.On,
+        "OFF" => FeederPowerState.Off,
+        _ => FeederPowerState.Unknown,
+    };
 
     public async Task<IotCommandStatus> SendCommandAsync(
         string nodeId, IotCommandRequest request, CancellationToken ct)
     {
         var (uri, deviceId, profile) = await DeviceSourceAsync(nodeId, ct);
-        var canControl = profile.RelayNo == 1 && await (
-            from node in db.Set<IotNode>()
-            join control in db.Set<FeederControl>() on node.NodeId equals control.NodeId
-            where node.NodeId == nodeId && node.SupportsRemoteControl &&
-                  control.RelayNo == profile.RelayNo && control.FeederId == profile.FeederId
-            select control.FeederId).AnyAsync(ct);
+        var canControl = await CompatibleFeederAsync(nodeId, profile.FeederId, true, ct);
         if (!canControl)
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                "Node chưa hỗ trợ điều khiển hoặc feeder chưa được gán đúng relay 1.");
+                "Node chưa hỗ trợ điều khiển hoặc feeder không thuộc tủ điện của node.");
         var mode = request.Mode?.Trim().ToUpperInvariant();
         var command = request.Command?.Trim().ToUpperInvariant();
         if (!(mode == "AUTO" && command is null || mode == "MANUAL" && command is ("ON" or "OFF")))
@@ -319,7 +380,7 @@ public sealed class IotDiagnosticsService(
         await registry.AuditCommandAsync(serverId, nodeId, new
         {
             event_type = "command_requested", command_id = commandId, mode, command,
-            device_id = deviceId, feeder_id = profile.FeederId, relay_no = profile.RelayNo,
+            device_id = deviceId, feeder_id = profile.FeederId,
             auto_schedule = request.AutoSchedule,
         }, ct);
 
@@ -346,11 +407,12 @@ public sealed class IotDiagnosticsService(
 
     public async Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
     {
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, profile) = await DeviceSourceAsync(nodeId, ct);
         var device = await ReadDeviceAsync(uri, deviceId, ct);
         if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
-        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi(), command.ExpiresAt);
+        return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi(), command.ExpiresAt,
+            PowerStateOf(device, profile.MaxSilenceSeconds, DateTimeOffset.UtcNow));
     }
 
     public async Task<IotTelemetryPage> TelemetryHistoryAsync(
@@ -395,8 +457,11 @@ public sealed class IotDiagnosticsService(
         if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out var id, out var uri))
             throw Unavailable("Chưa cấu hình nguồn đo cho thiết bị IoT.");
 
-        var measurement = await ReadMeasurementAsync(uri, profile.DeviceId, ct);
-        return new(nodeId, id, StatusOf(measurement, profile, DateTimeOffset.UtcNow), measurement);
+        var device = await ReadDeviceAsync(uri, profile.DeviceId, ct);
+        var measurement = ReadMeasurement(device);
+        var now = DateTimeOffset.UtcNow;
+        return new(nodeId, id, StatusOf(measurement, profile, now), measurement,
+            PowerStateOf(device, profile.MaxSilenceSeconds, now));
     }
 
     public async Task<PagedResult<IotNodeStatus>> NodesAsync(PageRequest page, CancellationToken ct)
@@ -516,6 +581,10 @@ public sealed class IotDiagnosticsService(
         if (!await db.Set<IotNode>().AnyAsync(node => node.NodeId == nodeId, ct))
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
     }
+
+    private static bool ServerMatchesCommune(IotOptions settings, NodeProfile profile, string communeId) =>
+        profile.ServerId is null || (settings.Servers.TryGetValue(profile.ServerId, out var server) &&
+            (server.CommuneId is null || server.CommuneId == communeId));
 
     private static bool TryServer(IotOptions settings, NodeProfile profile, out string id, out Uri uri)
     {
@@ -658,7 +727,9 @@ public sealed class IotDiagnosticsService(
     private sealed record GatewayHealth(string? Status);
     private sealed record PrototypeDevice(
         string? DeviceId, PrototypeReading? LatestTelemetry, PrototypeReading[]? History,
-        PrototypeCommand? DesiredCommand, bool CommandAcknowledged);
+        PrototypeCommand? DesiredCommand, bool CommandAcknowledged, PrototypeAck? LastCommandAck);
+    private sealed record PrototypeAck(PrototypeAckData? Data, DateTimeOffset ReceivedAt);
+    private sealed record PrototypeAckData(string? LampCommand);
     private static bool TryParseClock(string? value, out TimeOnly time) =>
         TimeOnly.TryParseExact(value, "HH:mm", System.Globalization.CultureInfo.InvariantCulture,
             System.Globalization.DateTimeStyles.None, out time);
@@ -679,5 +750,6 @@ public sealed class IotDiagnosticsService(
     }
     private sealed record PrototypeReading(DateTimeOffset ReceivedAt, PrototypeSample? Data);
     private sealed record PrototypeSample(
-        string? LampCommand, double? Voltage, double? Current, double? Power, string? SessionId, long? SequenceNumber);
+        string? LampCommand, double? Voltage, double? Current, double? Power, string? SessionId, long? SequenceNumber,
+        string? Timestamp);
 }

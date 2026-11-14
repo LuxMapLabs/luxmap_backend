@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets;
 using LuxMap.Modules.Assets.Photos;
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
@@ -38,7 +39,7 @@ namespace LuxMap.Modules.Map.Features;
 /// survives — never the other way round.
 /// </para>
 /// </remarks>
-public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider clock, WarrantyCalendar warranty)
+public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider clock, WarrantyCalendar warranty, IFeederPowerLookup? feederPower = null)
 {
     /// <summary>Past this many poles the client is told to zoom in rather than served (section 5.1).</summary>
     public const int MaxPoles = 2000;
@@ -108,6 +109,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                 pole.SegmentId,
                 pole.CommuneId,
                 pole.NearSensitivePoi,
+                pole.FeederId,
                 pole.Geom,
 
                 // Left joins, all of them. A pole with no status row, no lamp and no fault is a
@@ -151,6 +153,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
             .ToListAsync(ct);
 
         var window = warranty.Window();
+        var states = feederPower is null ? null : await feederPower.ReadAsync(rows.Select(row => row.FeederId).OfType<string>().Distinct().ToArray(), ct);
         return new FeatureCollection<PoleProperties>
         {
             Features = [.. rows.Select(row => new Feature<PoleProperties>
@@ -160,6 +163,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                 Properties = new PoleProperties
                 {
                     PoleId = row.PoleId,
+                    PowerState = row.FeederId is { } feederId ? states?.GetValueOrDefault(feederId) ?? FeederPowerState.Unknown : FeederPowerState.Unknown,
                     SegmentId = row.SegmentId,
 
                     // No status row means the latest sweep never covered this pole, which is what
@@ -411,6 +415,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
             .ToListAsync(ct);
 
         var galleries = await new AssetPhotoReader(dbContext).CabinetsAsync([.. rows.Select(r => r.CabinetId)], ct);
+        var states = feederPower is null ? null : await feederPower.ReadAsync(
+            rows.SelectMany(row => row.Feeders).Select(feeder => feeder.FeederId).Distinct().ToArray(), ct);
         return new FeatureCollection<CabinetProperties>
         {
             Features = [.. rows.Select(row => new Feature<CabinetProperties>
@@ -424,7 +430,7 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                     CabinetName = row.CabinetName,
                     CommuneId = row.CommuneId,
                     FeederIds = [.. row.Feeders.Select(feeder => feeder.FeederId)],
-                    Feeders = [.. row.Feeders.Select(feeder => feeder with { PowerState = FeederPower.State() })],
+                    Feeders = [.. row.Feeders.Select(feeder => feeder with { PowerState = states?.GetValueOrDefault(feeder.FeederId) ?? FeederPowerState.Unknown })],
                     IotNodeId = row.IotNodeId,
                 },
             })],

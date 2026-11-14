@@ -20553,6 +20553,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "power_state": {
+            "$ref": "#/components/schemas/FeederPowerState"
           }
         },
         "additionalProperties": false
@@ -20565,13 +20568,6 @@
           },
           "feeder_id": {
             "type": "string"
-          },
-          "pole_id": {
-            "type": "string"
-          },
-          "relay_no": {
-            "type": "integer",
-            "format": "int32"
           },
           "status": {
             "type": "string"
@@ -20605,6 +20601,9 @@
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
+          },
+          "power_state": {
+            "$ref": "#/components/schemas/FeederPowerState"
           }
         },
         "additionalProperties": false
@@ -20990,11 +20989,6 @@
           },
           "node_id": {
             "type": "string",
-            "nullable": true
-          },
-          "relay_no": {
-            "type": "integer",
-            "format": "int32",
             "nullable": true
           },
           "can_control_feeder": {
@@ -21695,17 +21689,10 @@
             "type": "string",
             "nullable": true
           },
-          "relay_no": {
-            "type": "integer",
-            "format": "int32"
-          },
           "device_id": {
             "type": "string"
           },
           "feeder_id": {
-            "type": "string"
-          },
-          "pole_id": {
             "type": "string"
           },
           "nominal_voltage": {
@@ -22285,6 +22272,9 @@
         ],
         "type": "object",
         "properties": {
+          "power_state": {
+            "$ref": "#/components/schemas/FeederPowerState"
+          },
           "asset_photos": {
             "type": "array",
             "items": {
@@ -22369,6 +22359,9 @@
         ],
         "type": "object",
         "properties": {
+          "power_state": {
+            "$ref": "#/components/schemas/FeederPowerState"
+          },
           "fixture_id": {
             "type": "string"
           },
@@ -22915,6 +22908,9 @@
         ],
         "type": "object",
         "properties": {
+          "power_state": {
+            "$ref": "#/components/schemas/FeederPowerState"
+          },
           "pole_id": {
             "type": "string"
           },
@@ -24877,6 +24873,9 @@
         ],
         "type": "object",
         "properties": {
+          "power_state": {
+            "$ref": "#/components/schemas/FeederPowerState"
+          },
           "pole_id": {
             "type": "string"
           },

@@ -30,7 +30,19 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | **Decision** | POST/PUT nguồn đo chỉ nhận relay 1. OpenAPI khai `relay_no` enum `[1]`. Relay khác trả 400 `VALIDATION_FAILED` với `details.field: relay_no`. |
 | **Decision maker** | Chủ PR #246 đề xuất. Chờ maintainer duyệt. |
 | **Date** | 14/11/2026 |
-| **Scope** | Ghi nguồn đo IoT Bridge. Profile cũ relay 2–32 vẫn chẩn đoán được nếu liên kết tài sản hợp lệ. Điều khiển qua bridge dùng relay 1. |
+| **Scope** | Quy tắc trước khi chuyển nguồn đo IoT Bridge sang liên kết trực tiếp node và feeder. Xem IOT-BRIDGE-FEEDER. |
+
+### IOT-BRIDGE-FEEDER — nguồn đo theo feeder và trạng thái cấp điện
+
+| Trường | Nội dung |
+|---|---|
+| **Decision** | Ghi nguồn IoT Bridge trực tiếp theo `feeder_id`. POST/PUT `/source` bỏ `relay_no` và `pole_id` khỏi hợp đồng. Một node có tối đa một nguồn và một feeder có tối đa một node qua bridge. |
+| **Decision maker** | Nhóm IoT đề xuất trên nhánh `iot`. Chờ maintainer duyệt. |
+| **Date** | 14/11/2026 |
+| **Scope** | API nguồn, điều khiển, chẩn đoán IoT Bridge và dữ liệu trạng thái cấp điện trên bản đồ. API relay của Telemetry tiếp tục phục vụ kênh điều khiển hiện có. |
+
+- Migration lấy `feeder_id` từ JSON của hồ sơ nguồn đã lưu và áp ràng buộc duy nhất cho feeder. Hồ sơ cũ tiếp tục dùng liên kết node và feeder khi feeder còn thuộc cùng tủ và xã. Hai thuộc tính lịch sử `relay_no`, `pole_id` trong hồ sơ cũ không còn ảnh hưởng đến chẩn đoán hay điều khiển.
+- `GET /map/poles` và `GET /map/poles/{poleId}` trả `power_state: on \| off \| unknown` cho trụ. Chi tiết trụ trả cùng trạng thái cho các fixture đang lắp. Danh sách và chi tiết `/assets/feeders` cùng `feeders[]` trong `/map/cabinets` dùng chung trạng thái. Trạng thái dựa trên đầu ra node báo trong ACK hoặc telemetry còn mới. `fixture_status` tiếp tục phản ánh tình trạng chiếu sáng.
 
 ### IOT-DIAGNOSTICS — đăng ký và chẩn đoán nguồn đo IoT (11/11/2026)
 
@@ -43,28 +55,28 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 | Endpoint | Capability | Hành vi |
 |---|---|---|
-| `GET /api/v1/iot/servers` | `ReadNetwork` | Chỉ hiện server có node thuộc xã được xem. `online` khi broker nhận heartbeat của gateway trong 30 giây gần nhất, `offline` khi chưa nhận hoặc đã quá hạn. `unconfigured` khi chưa xác định được gateway duy nhất từ ánh xạ thiết bị, `broker_down` khi broker dừng và `unreachable` khi nguồn trạng thái không truy cập được hoặc trả dữ liệu không hợp lệ. |
+| `GET /api/v1/iot/servers` | `ReadNetwork` | Hiện server có vị trí trong xã được xem hoặc có node thuộc xã được xem. `online` khi broker nhận heartbeat của gateway trong 30 giây gần nhất, `offline` khi chưa nhận hoặc đã quá hạn. `unconfigured` khi chưa xác định được gateway duy nhất từ ánh xạ thiết bị, `broker_down` khi broker dừng và `unreachable` khi nguồn trạng thái không truy cập được hoặc trả dữ liệu không hợp lệ. |
 | `POST /api/v1/iot/nodes/{nodeId}/command` | `ControlLighting` | Gửi ON, OFF hoặc AUTO qua nguồn IoT đã đăng ký của node trong phạm vi xã. Trả 202 khi bridge chấp nhận. Gateway phải online. Yêu cầu và phản hồi chấp nhận được audit theo mã lệnh. Lệnh có hạn 5 phút (expires_at). |
-| `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại và ACK của node trong phạm vi xã. |
+| `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại, ACK và `power_state` của node trong phạm vi xã. |
 | `PUT /api/v1/iot/servers/{serverId}/location` | `ManageSettings` | Lưu xã/phường và GPS gateway. GET servers trả vị trí trong phạm vi xã. |
-| `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node/relay của trụ. control_channel là iot_bridge khi hỗ trợ điều khiển qua bridge. Điều khiển từ bridge hiện hỗ trợ relay 1 của node cho phép điều khiển. |
+| `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node của trụ. `control_channel` là `iot_bridge` khi node cho phép điều khiển qua bridge. |
 | `PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route` | `ManageSettings` | Gán Gateway ID với Device ID qua bridge đang chạy. |
 | `POST /api/v1/iot/servers` | `ManageSettings` | Đăng ký server, trả 201; origin ngoài allowlist hoặc sai định dạng trả 400, ID trùng 409, lỗi lưu 503. |
 | `GET /api/v1/iot/servers/{serverId}/gateways/routes` | `ManageSettings` | Liệt kê tuyến của bridge và cờ credential_issued. |
-| `PUT /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Thay toàn bộ ánh xạ đã lưu trong DB, kiểm tra xã, feeder/relay và quyền MQTT. |
+| `PUT /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Thay toàn bộ ánh xạ đã lưu trong DB, kiểm tra feeder cùng tủ và xã với node, xã của server và quyền MQTT. |
 | `DELETE /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Gỡ ánh xạ DB của node trong phạm vi xã, giữ lịch sử đo và tuyến MQTT. |
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` | `ManageSettings` | Cấp secret gateway một lần qua bridge. |
-| `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Kiểm tra server cùng xã và thiết bị đã có tuyến cùng secret MQTT.  Ánh xạ node, relay, feeder, trụ và mã thiết bị; trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
+| `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Kiểm tra server cùng xã và thiết bị đã có tuyến cùng secret MQTT. Gán node với feeder thuộc cùng tủ và mã thiết bị. trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
 | `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện đã lưu của node trong phạm vi xã, phân trang theo `after` và `next_cursor`. |
-| `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW; trạng thái `online`, `offline`, `no_data`. |
-| `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | `normal`, `anomaly`, `stale`, `no_data`; chẩn đoán mất áp riêng và tùy chọn hiệu chuẩn 10 bóng. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW, với `status` là `online`, `offline` hoặc `no_data` và `power_state` theo đầu ra node. |
+| `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | Chẩn đoán cấp feeder với `normal`, `anomaly`, `stale`, `no_data`. Có cảnh báo mất áp và tùy chọn hiệu chuẩn 10 bóng. |
 
 - Hai GET chi tiết trả 404 nếu node không tồn tại hoặc ngoài xã, và 503 `IOT_SOURCE_UNAVAILABLE` nếu cấu hình không dùng được hoặc upstream không trả JSON hợp lệ.
 - `unconfigured` là chưa có ánh xạ hợp lệ; `no_data` là đã cấu hình nhưng nguồn chưa có mẫu; `source_unavailable` là nguồn lỗi hoặc hết ngân sách truy vấn của trang. Danh sách node giới hạn tổng thời gian chờ upstream 5 giây. OpenAPI hợp nhất khai enum cho trạng thái server, node, mẫu điện, chẩn đoán, mã bất thường và kết quả đếm bóng. Kênh lệnh bridge giữ wire format `AUTO`/`MANUAL`, `ON`/`OFF` hoặc `null`.
 - Origin phải khớp chính xác scheme/host/port trong `IotDiagnostics:AllowedOrigins` do bên triển khai cấp. Mặc định danh sách rỗng. Chỉ allowlist origin do bên triển khai kiểm soát, bao gồm DNS nếu dùng hostname; client tắt redirect và proxy.
 - Đăng ký mới được ghi vào PostgreSQL cùng người tạo, thời điểm UTC và correlation ID. Ánh xạ khai sẵn trong cấu hình vẫn đọc được nếu origin đã được allowlist. Triển khai dùng cấu hình từ bản thử cũ cần chuyển ánh xạ vào DB hoặc cấp qua cấu hình tĩnh.
-- Registry thiết bị và relay vẫn do Telemetry sở hữu. Module chẩn đoán đọc qua nguồn HTTP của testbed. `relay_no` mặc định 1. POST và PUT nguồn đo của IoT Bridge chỉ chấp nhận 1, giá trị khác trả 400 `VALIDATION_FAILED`. Nguồn cũ dùng relay 2–32 vẫn đọc và chẩn đoán được khi ánh xạ feeder/trụ hợp lệ. Muốn sửa nguồn hoặc điều khiển qua bridge, nối lại feeder về relay 1. Endpoint relay của Telemetry giữ phạm vi riêng. `use_ten_lamp_calibration` mặc định tắt; khi bật, dùng 25 mẫu / 15 phiếu cho cụm 10 bóng đã hiệu chuẩn, và `voltage_loss` không tính là thiếu bóng.
+- Registry thiết bị và relay vẫn do Telemetry sở hữu. Module chẩn đoán đọc qua nguồn HTTP của testbed. `use_ten_lamp_calibration` mặc định tắt. Khi bật, bộ ước lượng dùng 25 mẫu và ngưỡng 15 phiếu cho cụm 10 bóng đã hiệu chuẩn. Mẫu mất áp (`voltage_loss`) được xử lý ở chẩn đoán điện áp.
 
 
 
@@ -350,7 +362,7 @@ Mail giữ link một lần (72 giờ), username sinh được ghi trong mail; k
 
 | | |
 |---|---|
-| **Decision** | Thêm `control` + `power_state` trên item/detail `/assets/feeders`; thêm `feeders[]` trên `/map/cabinets`, giữ `feeder_ids[]` cùng tập/cùng thứ tự. Không migration; `power_state` tính lúc đọc qua một hàm chung, **luôn unknown** đến khi có telemetry đo điện được kiểm chứng, không suy từ control_mode/node online. Contract v1.21, 141 operation; phần A ảnh tài sản chưa hiện thực. |
+| **Decision** | Thêm `control` và `power_state` trên item/detail `/assets/feeders`; thêm `feeders[]` trên `/map/cabinets`, giữ `feeder_ids[]` cùng tập và thứ tự. Phiên bản này tính `power_state` là `unknown`. Xem IOT-BRIDGE-FEEDER để biết cách đọc trạng thái cấp điện của feeder gán nguồn IoT Bridge. Contract v1.21, 141 operation; phần A ảnh tài sản chưa hiện thực. |
 | **Decision maker** | **Mỹ (Dylan), ủy quyền Claude chốt 28/10** · `SELF-SIGNED`, nền tạm tới FW kế tiếp; WP5/WP6/BE2 chưa xác nhận |
 | **Date** | 28/10/2026 |
 | **Scope** | Assets-owned port, một truy vấn control theo lô cho page, giữ count + page; Telemetry hiện thực với filter xã của control/node. Map LEFT JOIN giữ mọi feeder. Enum FeederControlMode dời về Shared giữ wire on/off/auto, không tham chiếu Assets → Telemetry. Không đổi ingest, capability, settings, sync, map poles/segments. |

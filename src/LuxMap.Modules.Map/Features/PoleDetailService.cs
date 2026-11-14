@@ -34,7 +34,7 @@ namespace LuxMap.Modules.Map.Features;
 /// </para>
 /// </remarks>
 public sealed class PoleDetailService(
-    LuxMapDbContext db, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty)
+    LuxMapDbContext db, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty, LuxMap.Modules.Assets.IFeederPowerLookup? feederPower = null)
 {
     public const int HistoryPoints = 30;
     public const int RecentFrameCount = 10;
@@ -50,7 +50,7 @@ public sealed class PoleDetailService(
             .Where(p => p.PoleId == poleId)
             .Select(p => new
             {
-                p.PoleId, p.SegmentId, p.CommuneId, p.Geom,
+                p.PoleId, p.SegmentId, p.CommuneId, p.Geom, p.FeederId,
                 SegmentName = db.Set<RoadSegment>().Where(s => s.SegmentId == p.SegmentId)
                     .Select(s => s.SegmentName).FirstOrDefault(),
                 p.Note,
@@ -70,7 +70,13 @@ public sealed class PoleDetailService(
             })
             .ToListAsync(ct);
         var window = warranty.Window();
-        PoleMapFixture[] fixtures = [.. lamps.Select(lamp => lamp with { WarrantyStatus = window.Classify(lamp.WarrantyExpiry) })];
+        var powerState = feederPower is not null && pole.FeederId is { } feederId
+            ? (await feederPower.ReadAsync([feederId], ct)).GetValueOrDefault(feederId)
+            : FeederPowerState.Unknown;
+        PoleMapFixture[] fixtures = [.. lamps.Select(lamp => lamp with
+        {
+            WarrantyStatus = window.Classify(lamp.WarrantyExpiry), PowerState = powerState,
+        })];
 
         // The baseline belongs to the pole; it is keyed to the newest lamp in service so replacing either lamp retires it.
         var anchorId = await db.Set<Fixture>().AsNoTracking()
@@ -86,6 +92,7 @@ public sealed class PoleDetailService(
         {
             AssetPhotos = (await new AssetPhotoReader(db).PolesAsync([poleId], ct)).GetValueOrDefault(poleId) ?? [],
             PoleId = pole.PoleId,
+            PowerState = powerState,
             SegmentId = pole.SegmentId,
             SegmentName = pole.SegmentName,
             CommuneId = pole.CommuneId,

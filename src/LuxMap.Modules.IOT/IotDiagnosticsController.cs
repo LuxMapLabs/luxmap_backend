@@ -162,11 +162,6 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     private async Task ValidateNodeSourceAsync(string nodeId, NodeProfile profile,
         LuxMapDbContext db, string? provisioningKey, CancellationToken ct)
     {
-        if (profile.RelayNo != 1)
-            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                "Nguồn đo IoT Bridge chỉ hỗ trợ relay 1.",
-                new Dictionary<string, object?> { ["field"] = "relay_no" });
-
         if (!profile.IsValid() || !ValidServerId(profile.ServerId) ||
             profile.DeviceId.Length > 128 || profile.DeviceId is "." or ".." ||
             profile.DeviceId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_' && c != '.'))
@@ -178,13 +173,13 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
 
         var validTopology = await (
-            from control in db.Set<FeederControl>()
-            join pole in db.Set<Pole>() on control.FeederId equals pole.FeederId
-            where control.NodeId == nodeId && control.RelayNo == profile.RelayNo &&
-                control.FeederId == profile.FeederId && pole.PoleId == profile.PoleId
-            select pole.PoleId).AnyAsync(ct);
+            from node in db.Set<IotNode>()
+            from feeder in db.Set<Feeder>()
+            where node.NodeId == nodeId && feeder.FeederId == profile.FeederId &&
+                  feeder.CabinetId == node.CabinetId && feeder.CommuneId == node.CommuneId
+            select feeder.FeederId).AnyAsync(ct);
         if (!validTopology)
-            throw Invalid("Trụ đèn phải thuộc feeder được gán cho relay của node IoT.");
+            throw Invalid("Feeder phải thuộc cùng tủ điện và xã với node IoT.");
 
         await diagnostics.RequireMqttAuthorizationAsync(profile.ServerId!, profile.DeviceId, communeId,
             provisioningKey, ct);
