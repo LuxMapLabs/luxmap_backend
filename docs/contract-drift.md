@@ -1043,7 +1043,7 @@ sự cố trước rồi tải ảnh — mất sóng chỉ làm chậm ảnh, kh
 
 | Endpoint | Quyền | Ghi chú |
 |---|---|---|
-| `POST /work-orders/{id}/evidence` | `ExecuteWorkOrders`, **chỉ người được giao**, phiếu **`in_progress`** | multipart: `file` (JPEG theo magic bytes, ≤ 16 MiB), `kind`, `captured_at` (ISO 8601, có offset thì quy về UTC), `lat`, `lng`, **`client_op_id` (tuỳ chọn, mới)** — gửi lại cùng khoá trả **200** cùng ảnh, khác phiếu/nhãn → `409 IDEMPOTENCY_CONFLICT`. Mới tạo **201** |
+| `POST /work-orders/{id}/evidence` | `ExecuteWorkOrders`, **chỉ người được giao**, phiếu **`in_progress`** | multipart: `file` (JPEG theo magic bytes, ≤ 16 MiB; cả request ≤ 17 MiB, quá → `413 UPLOAD_TOO_LARGE`), `kind`, `captured_at` (ISO 8601, có offset thì quy về UTC), `lat`, `lng` — năm field này **bắt buộc**, thiếu → `400 VALIDATION_FAILED`; **`client_op_id` (tuỳ chọn, mới)** — gửi lại cùng khoá trả **200** cùng ảnh, khác phiếu/nhãn → `409 IDEMPOTENCY_CONFLICT`. Mới tạo **201**. OpenAPI khai `required` và 400 / 404 / 409 / 413 / 415 từ 14/11/2026 |
 | `GET /work-orders/{id}/evidence` | `ReadWorkOrders` | **Mới.** Phân trang, sắp theo `captured_at`; item `evidence_id, work_order_id, kind, captured_at, lat, lng, uploaded_by, uploaded_at, thumbnail_url, original_url` |
 | `GET /evidence/{evidence_id}/thumbnail`, `…/original` | `ReadWorkOrders` | **Mới.** JPEG qua API, không presigned; ảnh gốc **nguyên byte**. Quyền theo phiếu cha (xã **và** người được giao) → ngoài quyền `404 EVIDENCE_NOT_FOUND`; file mất trong kho `503 STORAGE_OBJECT_MISSING` |
 
