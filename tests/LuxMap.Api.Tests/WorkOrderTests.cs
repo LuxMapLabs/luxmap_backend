@@ -1120,6 +1120,28 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
     }
 
     [Theory]
+    [InlineData("file")] [InlineData("kind")] [InlineData("captured_at")] [InlineData("lat")] [InlineData("lng")]
+    public async Task A_missing_field_is_400_VALIDATION_FAILED_and_nothing_is_stored(string missing)
+    {
+        var id = await StartedRepair();
+        using var form = new MultipartFormDataContent();
+        if (missing != "file")
+        {
+            var file = new ByteArrayContent(Jpeg());
+            file.Headers.ContentType = new("image/jpeg");
+            form.Add(file, "file", "photo.jpg");
+        }
+        foreach (var (name, value) in new[] { ("kind", "before"), ("captured_at", "2026-10-04T13:30:00Z"), ("lat", "16.0001"), ("lng", "108.0001") })
+            if (name != missing) form.Add(new StringContent(value), name);
+
+        var response = await (await PhotoClient("a")).PostAsync($"{Route}/{id}/evidence", form);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+
+        Assert.Equal((400, "VALIDATION_FAILED"), ((int)response.StatusCode, Code(body)));
+        Assert.Equal(0, await Db(db => db.Set<RepairEvidence>().IgnoreQueryFilters().CountAsync(x => x.WorkOrderId == id)));
+    }
+
+    [Theory]
     [InlineData("reassigned")]
     [InlineData("cancelled")]
     public async Task An_order_changed_while_the_photo_uploads_is_checked_again_before_the_row_is_saved(string change)

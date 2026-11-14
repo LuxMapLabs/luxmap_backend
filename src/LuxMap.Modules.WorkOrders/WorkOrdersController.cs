@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Asp.Versioning;
 using LuxMap.Modules.WorkOrders.Entities;
@@ -96,9 +97,14 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
     [UploadBodyLimit(WorkOrderEvidenceService.MaxRequestBytes)]
     [ProducesResponseType(typeof(EvidenceItem), 201)]
     [ProducesResponseType(typeof(EvidenceItem), 200)]
-    public async Task<ActionResult<EvidenceItem>> UploadEvidence(string id, IFormFile? file,
-        [FromForm(Name = "kind")] string? kind, [FromForm(Name = "captured_at")] string? capturedAt,
-        [FromForm(Name = "lat")] string? lat, [FromForm(Name = "lng")] string? lng,
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 400)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 404)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 409)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 413)]
+    [ProducesResponseType(typeof(LuxMap.Shared.Contracts.Errors.ApiErrorResponse), 415)]
+    public async Task<ActionResult<EvidenceItem>> UploadEvidence(string id, [Required] IFormFile? file,
+        [Required, FromForm(Name = "kind")] string? kind, [Required, FromForm(Name = "captured_at")] string? capturedAt,
+        [Required, FromForm(Name = "lat")] string? lat, [Required, FromForm(Name = "lng")] string? lng,
         [FromForm(Name = "client_op_id")] string? clientOpId, CancellationToken ct)
     {
         var (item, created) = await evidence.UploadAsync(id, file, kind, capturedAt, lat, lng, clientOpId, ct);
