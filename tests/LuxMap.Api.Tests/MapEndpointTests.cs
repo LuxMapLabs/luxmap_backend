@@ -61,7 +61,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     }
 
     /// <summary>
-    /// The fifteen keys of section 5.1 plus <c>warranty_status</c> (BE-31, drift W-1), exactly — and the three that must
+    /// The keys of section 5.1 plus the documented warranty and power fields, exactly — and the three that must
     /// never appear.
     /// </summary>
     /// <remarks>
@@ -71,7 +71,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
     /// would undo the default that keeps the calibration rig off the map.
     /// </remarks>
     [Fact]
-    public async Task The_properties_are_exactly_the_contract_list_plus_warranty_status()
+    public async Task The_properties_match_the_documented_map_shape()
     {
         var client = await fixture.ManagerClientAsync();
         var segmentId = await NewSegmentAsync(fixture.CommuneId);
@@ -85,7 +85,7 @@ public sealed class MapEndpointTests(AssetImportFixture fixture)
             "pole_id", "segment_id", "fixture_status", "status_confidence", "power_source",
             "fixture_type", "lamp_watt", "lamp_count", "fixture_count", "install_date", "warranty_expiry", "commune_id",
             "last_seen_at", "last_sweep_id", "open_fault_count", "has_iot_node", "near_sensitive_poi",
-            "warranty_status",
+            "warranty_status", "power_state",
         ];
 
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], [.. keys.Order(StringComparer.Ordinal)]);

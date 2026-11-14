@@ -137,7 +137,6 @@ for schema in ("IotCommandRequest", "IotCommandStatus"):
 if "IotAutoSchedule" not in S:
     raise ValueError("IoT OpenAPI override requires schema IotAutoSchedule; check the Swagger export")
 S["IotAutoSchedule"]["nullable"] = True
-iot_property("NodeProfile", "relay_no")["enum"] = [1]
 
 def err_content():
     return {"application/json": {"schema": {"$ref": "#/components/schemas/ApiErrorResponse"}}}
@@ -474,6 +473,7 @@ S["PoleProperties"] = {
                  "fixture_count", "install_date", "warranty_status", "commune_id", "open_fault_count", "has_iot_node", "near_sensitive_poi"],
     "properties": OrderedDict([
         ("pole_id", {"$ref": "#/components/schemas/PoleId"}),
+        ("power_state", {"$ref": "#/components/schemas/FeederPowerState"}),
         ("segment_id", {"type": "string", "nullable": True, "allOf": [{"$ref": "#/components/schemas/SegmentId"}]}),
         ("fixture_status", {"$ref": "#/components/schemas/FixtureStatus"}),
         ("status_confidence", {"type": "number", "format": "double", "minimum": 0, "maximum": 1, "nullable": True,

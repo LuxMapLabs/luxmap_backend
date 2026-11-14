@@ -199,13 +199,18 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.True(cabinet.TryGetProperty("feeder_ids", out _));
         Assert.True(cabinet.TryGetProperty("feeders", out _));
         Assert.True(Schema("CabinetFeederState").GetProperty("properties").GetProperty("relay_no").GetProperty("nullable").GetBoolean());
+        foreach (var name in new[] { "PoleProperties", "PoleMapDetail", "PoleMapFixture", "IotCommandStatus", "IotElectricalResult" })
+            Assert.EndsWith("/FeederPowerState", Schema(name).GetProperty("properties")
+                .GetProperty("power_state").GetProperty("$ref").GetString());
+        Assert.False(Schema("SegmentProperties").GetProperty("properties").TryGetProperty("power_state", out _));
         foreach (var name in new[] { "PoleProperties", "SegmentProperties", "BundlePoleProperties" })
-        {
-            // Bundle inherits pole properties through allOf; neither surface gains electrical fields.
-            if (!Spec.GetProperty("components").GetProperty("schemas").TryGetProperty(name, out var schema)) continue;
-            Assert.DoesNotContain("power_state", schema.GetRawText());
-            Assert.DoesNotContain("control_mode", schema.GetRawText());
-        }
+            if (Spec.GetProperty("components").GetProperty("schemas").TryGetProperty(name, out var schema))
+                Assert.DoesNotContain("control_mode", schema.GetRawText());
+
+        var source = Schema("NodeProfile").GetProperty("properties");
+        Assert.True(source.TryGetProperty("feeder_id", out _));
+        Assert.False(source.TryGetProperty("relay_no", out _));
+        Assert.False(source.TryGetProperty("pole_id", out _));
     }
 
     [Fact]

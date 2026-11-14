@@ -23,6 +23,7 @@ namespace LuxMap.Modules.Map.Features;
 /// </remarks>
 public record PoleProperties
 {
+    public FeederPowerState PowerState { get; init; }
     public required string PoleId { get; init; }
 
     public required string? SegmentId { get; init; }

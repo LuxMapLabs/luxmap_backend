@@ -14,6 +14,7 @@ namespace LuxMap.Modules.Map.Features;
 /// </remarks>
 public sealed record PoleMapDetail
 {
+    public FeederPowerState PowerState { get; init; }
     public IReadOnlyList<PoleAssetPhotoItem> AssetPhotos { get; init; } = [];
 
     public required string PoleId { get; init; }
@@ -70,6 +71,7 @@ public sealed record PoleMapLocation(double Lat, double Lng);
 
 public sealed record PoleMapFixture
 {
+    public FeederPowerState PowerState { get; init; }
     public required string FixtureId { get; init; }
     public FixtureType FixtureType { get; init; }
     public PowerSource PowerSource { get; init; }
