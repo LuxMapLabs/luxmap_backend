@@ -1033,6 +1033,13 @@ phơi sáng (D-R24). Byte ảnh vẫn qua API (BE-11 quy tắc 1).
 (đèn lúc tới nơi) và `after` (sau khi sửa); phiếu **kiểm tra** chỉ nhận `observation` (đã thấy thế này — kiểm tra không sửa
 gì nên không có trước/sau); phiếu khảo sát không nhận ảnh. Sai nhãn → `400 EVIDENCE_KIND_NOT_ALLOWED`.
 
+**EV-3 — mọi loại phiếu đều nhận ảnh (Mỹ, 14/11/2026; SELF-SIGNED, chạm API ⇒ nền tạm tới FW; WP5 / WP6 chưa báo).**
+Thay câu "phiếu khảo sát không nhận ảnh" của EV-1: `POST /work-orders/{id}/evidence` nay nhận `observation` cho **mọi phiếu
+không sửa chữa** — kiểm tra, **khảo sát**, **cập nhật GPS cột** (`pole_gps_update`). Phiếu sửa chữa giữ `before` / `after`;
+loại khác gửi `before` / `after` → `400 EVIDENCE_KIND_NOT_ALLOWED`. Không thêm giá trị enum, không đổi DB (CHECK của
+`repair_evidence` không ràng `kind` theo loại phiếu), không đổi luật hoàn thành (chỉ sửa chữa bắt ảnh `after`). Ảnh khảo sát
+qua đường này vẫn là ảnh cho **người xem**, không vào dữ liệu chấm CV và không thay video / lux của phiên `/sweeps`.
+
 **EV-2 đã chốt (Mỹ, 04/10/2026) và hiện thực ở BE-41:** *tạo sự cố rồi gắn ảnh*. `POST /faults` giữ JSON như Contract; ảnh gửi
 sau qua `POST /faults/{fault_id}/photos`. Trên app vẫn là **một form** (chụp ảnh ngay trong form, bấm Gửi một lần); app tự gửi
 sự cố trước rồi tải ảnh — mất sóng chỉ làm chậm ảnh, không làm mất báo cáo. Trường `photo_frame_id` **bỏ**: gửi lên → 400.

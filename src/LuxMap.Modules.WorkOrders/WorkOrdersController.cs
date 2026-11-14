@@ -86,7 +86,7 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
 
     /// <summary>
     /// The assigned engineer adds a photo while the order is in progress (BE-24): <c>before</c>/<c>after</c> on a
-    /// repair, <c>observation</c> on an inspection. JPEG decided by magic bytes; <c>client_op_id</c> makes a retry
+    /// repair, <c>observation</c> on every other kind. JPEG decided by magic bytes; <c>client_op_id</c> makes a retry
     /// return the same photo (200) instead of a second one (201).
     /// </summary>
     [HttpPost("{id}/evidence")]
