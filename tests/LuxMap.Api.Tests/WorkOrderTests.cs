@@ -962,7 +962,7 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
     private static byte[] Jpeg(byte shade = 90) => PhotoStore.Jpeg(shade);
 
     private async Task<(int Status, JsonElement Body)> Upload(string who, string id, string kind, byte[]? bytes = null,
-        string capturedAt = "2026-10-04T13:30:00Z", string lat = "16.0001", string lng = "108.0001", string? clientOpId = null)
+        string capturedAt = "2026-10-04T13:30:00Z", string lat = "16.0001", string lng = "108.0001", string? clientOpId = null, string? poleId = null)
     {
         using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(bytes ?? Jpeg());
@@ -973,6 +973,7 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         form.Add(new StringContent(lat), "lat");
         form.Add(new StringContent(lng), "lng");
         if (clientOpId is not null) form.Add(new StringContent(clientOpId), "client_op_id");
+        if (poleId is not null) form.Add(new StringContent(poleId), "pole_id");
         var response = await (await PhotoClient(who)).PostAsync($"{Route}/{id}/evidence", form);
         var text = await response.Content.ReadAsStringAsync();
         return ((int)response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
@@ -1008,6 +1009,7 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         var original = Jpeg(17);
         var (status, after) = await Upload("a", id, "after", original, capturedAt: "2026-10-04T13:40:00Z");
         Assert.Equal(201, status);
+        Assert.Equal(JsonValueKind.Null, after.GetProperty("pole_id").ValueKind);
         var (_, before) = await Upload("a", id, "before", capturedAt: "2026-10-04T13:10:00+07:00"); // offset normalised to UTC
 
         var list = await Send("manager", "GET", "/" + id + "/evidence", null, 200);

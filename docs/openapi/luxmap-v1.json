@@ -16140,6 +16140,9 @@
                   },
                   "client_op_id": {
                     "type": "string"
+                  },
+                  "pole_id": {
+                    "type": "string"
                   }
                 }
               },
@@ -16160,6 +16163,9 @@
                   "style": "form"
                 },
                 "client_op_id": {
+                  "style": "form"
+                },
+                "pole_id": {
                   "style": "form"
                 }
               }
@@ -16332,6 +16338,13 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/PageQuery"
+            }
+          },
+          {
+            "name": "pole_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -19690,6 +19703,10 @@
             "nullable": true
           },
           "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "pole_id": {
             "type": "string",
             "nullable": true
           },

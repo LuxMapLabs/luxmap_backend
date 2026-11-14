@@ -282,16 +282,22 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
         Assert.Equal("2026-10-04T12:30:00Z", body.GetProperty("detected_at").GetString()); // queued offline: when it was SEEN
     }
 
-    [Fact]
-    public async Task The_reporter_attaches_photos_that_everyone_reading_the_fault_can_see()
+    [Theory]
+    [InlineData(true)] [InlineData(false)]
+    public async Task The_reporter_attaches_photos_that_everyone_reading_the_fault_can_see(bool onPole)
     {
-        var faultId = (await Report("crew", OnPole(pole))).Body.GetProperty("fault_id").GetString()!;
+        object report = onPole ? OnPole(pole) : new { client_op_id = Guid.NewGuid(), location = new { lat = 16.305, lng = 108.305 },
+            fault_type = "lamp_out", note = "Lamp is dark all night" };
+        var reported = await Report("crew", report);
+        Assert.Equal(201, reported.Status);
+        var faultId = reported.Body.GetProperty("fault_id").GetString()!;
         var original = PhotoStore.Jpeg(33);
 
         var (status, photo) = await Photo("crew", faultId, original);
         Assert.Equal(201, status);
         Assert.Equal(("observation", faultId), (photo.GetProperty("kind").GetString(), photo.GetProperty("fault_id").GetString()));
         Assert.Equal(JsonValueKind.Null, photo.GetProperty("work_order_id").ValueKind);
+        Assert.Equal(JsonValueKind.Null, photo.GetProperty("pole_id").ValueKind);
 
         var list = await clients["manager"].GetFromJsonAsync<JsonElement>($"/api/v1/faults/{faultId}/photos");
         Assert.Equal(1, list.GetProperty("total").GetInt32());
@@ -322,16 +328,17 @@ public sealed class FaultReportTests(AssetImportFixture factory) : IAsyncLifetim
     public async Task The_database_keeps_one_parent_per_photo_and_fault_photos_are_observations()
     {
         var faultId = (await Report("crew", OnPole(pole))).Body.GetProperty("fault_id").GetString()!;
-        async Task<string?> Insert(EvidenceKind kind, bool alsoWorkOrder) => await Db(async db =>
+        async Task<string?> Insert(EvidenceKind kind, bool alsoWorkOrder, string? directPole = null) => await Db(async db =>
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
-            db.Add(new RepairEvidence { FaultId = faultId, WorkOrderId = alsoWorkOrder ? "WO-0001" : null, CommuneId = home, Kind = kind,
+            db.Add(new RepairEvidence { FaultId = faultId, PoleId = directPole, WorkOrderId = alsoWorkOrder ? "WO-0001" : null, CommuneId = home, Kind = kind,
                 CapturedAt = DateTime.UtcNow, Lat = 16, Lng = 108, ObjectKey = "o", ThumbnailKey = "t", ByteCount = 1, ThumbnailBytes = 1,
                 UploadedBy = users["crew"].UserId });
             try { await db.SaveChangesAsync(); return null; }
             catch (DbUpdateException error) { return (error.InnerException as Npgsql.PostgresException)?.ConstraintName; }
         });
 
+        Assert.Equal("ck_repair_evidence_fault_no_pole", await Insert(EvidenceKind.Observation, false, pole));
         Assert.Equal("ck_repair_evidence_fault_observation", await Insert(EvidenceKind.After, false));
         Assert.Equal("ck_repair_evidence_one_parent", await Insert(EvidenceKind.Observation, true));
     }

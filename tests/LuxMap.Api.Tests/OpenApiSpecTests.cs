@@ -32,6 +32,25 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Evidence_has_an_optional_nullable_pole_and_a_query_filter_but_fault_upload_does_not()
+    {
+        var path = Spec.GetProperty("paths").GetProperty("/api/v1/work-orders/{id}/evidence");
+        var form = path.GetProperty("post").GetProperty("requestBody").GetProperty("content")
+            .GetProperty("multipart/form-data").GetProperty("schema");
+        Assert.Equal(new[] { "captured_at", "file", "kind", "lat", "lng" },
+            form.GetProperty("required").EnumerateArray().Select(x => x.GetString()!).Order(StringComparer.Ordinal));
+        Assert.Equal("string", form.GetProperty("properties").GetProperty("pole_id").GetProperty("type").GetString());
+        Assert.True(Schema("EvidenceItem").GetProperty("properties").GetProperty("pole_id").GetProperty("nullable").GetBoolean());
+        var filter = Assert.Single(path.GetProperty("get").GetProperty("parameters").EnumerateArray(),
+            p => p.GetProperty("name").GetString() == "pole_id");
+        Assert.Equal("query", filter.GetProperty("in").GetString());
+        Assert.False(filter.TryGetProperty("required", out var required) && required.GetBoolean());
+        var faultForm = Spec.GetProperty("paths").GetProperty("/api/v1/faults/{id}/photos").GetProperty("post")
+            .GetProperty("requestBody").GetProperty("content").GetProperty("multipart/form-data").GetProperty("schema");
+        Assert.False(faultForm.GetProperty("properties").TryGetProperty("pole_id", out _));
+    }
+
+    [Fact]
     public void Asset_photo_contract_has_exactly_ten_operations_and_separate_parent_shapes()
     {
         var paths = Spec.GetProperty("paths");

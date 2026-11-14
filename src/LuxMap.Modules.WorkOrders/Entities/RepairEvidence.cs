@@ -26,6 +26,8 @@ public class RepairEvidence : ICommuneScoped
 
     /// <summary>The reported fault the photo belongs to (BE-41, drift EV-2). Exactly one of the two parents is set.</summary>
     public string? FaultId { get; set; }
+    /// <summary>Optional pole of a work-order photo; same commune as the order (EV-4). Fault photos leave this null.</summary>
+    public string? PoleId { get; set; }
     public required string CommuneId { get; set; }
     public EvidenceKind Kind { get; set; }
 

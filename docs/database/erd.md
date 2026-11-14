@@ -291,7 +291,10 @@ erDiagram
     }
     repair_evidence {
         text evidence_id PK "MỚI EVD (BE-24)"
-        text work_order_id FK
+        text work_order_id FK "nullable, đúng một cha WO hoặc fault"
+        text fault_id FK "nullable, ảnh sự cố"
+        text pole_id FK "nullable, chỉ ảnh phiếu; cùng xã (EV-4)"
+        text commune_id FK "theo cha, không theo GPS"
         text kind "before / after / observation (EV-1)"
         text object_key
     }
@@ -352,7 +355,9 @@ erDiagram
     fault_cluster ||--o{ fault : ""
     work_order ||--o{ work_order_fault : ""
     fault ||--o{ work_order_fault : ""
-    work_order ||--o{ repair_evidence : ""
+    work_order |o--o{ repair_evidence : "một trong hai cha"
+    fault |o--o{ repair_evidence : "một trong hai cha"
+    pole |o--o{ repair_evidence : "EV-4 cùng xã, Restrict"
     pole ||--o{ citizen_report : ""
     fault ||--o{ citizen_report : ""
     pole ||--o{ field_verification : ""
@@ -390,3 +395,12 @@ Không phải đề xuất — là luật đã có trong `CLAUDE.md`, nhắc l�
 5. **Tài sản bổ sung** — `electrical_cabinet`, ranh giới xã (follow-up BE-12).
 6. **Notification** (BE-27, chốt tên cùng FE2) và **sync offline** (BE-43, cùng WP6) — chưa có trong ERD vì tên và
    hình dạng phải chốt cùng consumer.
+
+### EVIDENCE-POLE — liên kết cột của ảnh bằng chứng (EV-4, Mỹ 14/11/2026)
+
+`repair_evidence.pole_id text NULL`, không backfill. Ảnh phiếu có thể là tổng quan (NULL), hoặc gắn cột thuộc WO-12 **cùng xã
+phiếu** (D-3 A: ngoại lệ hẹp hơn Q7; xã ảnh vẫn từ phiếu). Nhận cột chưa định vị; không suy từ GPS. Ảnh fault giữ pole_id NULL,
+CHECK `ck_repair_evidence_fault_no_pole` (`fault_id IS NULL OR pole_id IS NULL`). FK ghép DB-only
+`fk_repair_evidence_pole_same_commune` `(pole_id, commune_id) → pole(pole_id, commune_id)` ON DELETE RESTRICT tái dùng
+`ak_pole_photo_target`, không thêm alternate key EF cho Pole.CommuneId. Index đầy đủ `ix_repair_evidence_pole_id`.
+`Down()` từ chối nếu còn liên kết cột, giữ dữ liệu để rollback ứng dụng với schema cộng thêm. SELF-SIGNED, nền tạm tới FW.

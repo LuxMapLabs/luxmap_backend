@@ -1040,6 +1040,27 @@ loại khác gửi `before` / `after` → `400 EVIDENCE_KIND_NOT_ALLOWED`. Khôn
 `repair_evidence` không ràng `kind` theo loại phiếu), không đổi luật hoàn thành (chỉ sửa chữa bắt ảnh `after`). Ảnh khảo sát
 qua đường này vẫn là ảnh cho **người xem**, không vào dữ liệu chấm CV và không thay video / lux của phiên `/sweeps`.
 
+**EV-4 — ảnh bằng chứng gắn cột tuỳ chọn (Mỹ, 14/11/2026; SELF-SIGNED, chạm API ⇒ nền tạm tới FW; WP5 / WP6 chưa báo).**
+Theo quyết định PHA 2 EVIDENCE-POLE (D-1…D-8):
+
+- `POST /work-orders/{id}/evidence` thêm form `pole_id` **tuỳ chọn**; thiếu ⇒ lưu/trả `null`. Không backfill, không suy từ lat/lng.
+  `EvidenceItem` thêm `pole_id` nullable ở upload/replay/list, kể cả ảnh sự cố (luôn `null`).
+- Cột phải nằm trong **toàn bộ** `WorkOrderPoleService.Targets(id)` (WO-12), **và cùng xã với phiếu** (D-3 phương án A, ngoại lệ
+  hẹp hơn Q7/WO-12). Nhận cột chưa có `geom`. Kiểm quyền phiếu trước: `404 WORK_ORDER_NOT_FOUND`; cột không tồn tại/ngoài scope ⇒
+  `404 POLE_NOT_FOUND`; cột thấy được nhưng ngoài tập hoặc khác xã phiếu ⇒ `409 POLE_NOT_IN_WORK_ORDER`.
+- Kiểm cột trước storage, kiểm lại sau storage trong transaction: đọc qua filter → khoá **phiếu → cột** qua `SELECT 1 … FOR UPDATE`
+  → đọc lại LINQ. Không giữ khoá qua upload/decode. Row chỉ lưu sau object; lỗi sau storage có thể để orphan cho đối chiếu kho.
+- Mọi đường replay so hai cha + nhãn + `pole_id` **chính xác, kể cả NULL**; khác cột / NULL→cột / cột→NULL ⇒
+  `409 IDEMPOTENCY_CONFLICT`. Replay có quyền vẫn được trả trước các kiểm dành cho ảnh mới, kể cả phiếu đã hoàn thành hoặc cột rời tập.
+- `GET /work-orders/{id}/evidence?pole_id=` lọc tuỳ chọn **trước count/phân trang**, giữ thứ tự capture hiện tại. Không khớp ⇒ trang
+  rỗng, không lookup cột. List/media/replay giữ kiểm quyền cha; FK cùng xã không đòi kiểm scope cột riêng.
+- DB: `repair_evidence.pole_id text NULL`, index đầy đủ `ix_repair_evidence_pole_id`, FK ghép **DB-only**
+  `(pole_id, commune_id) → pole(pole_id, commune_id)` Restrict, tái dùng `ak_pole_photo_target`; không thêm alternate key EF.
+  CHECK `ck_repair_evidence_fault_no_pole`: `fault_id IS NULL OR pole_id IS NULL`. `Down()` từ chối khi còn pole_id khác NULL;
+  rollback ứng dụng có thể giữ schema cộng thêm, không xoá liên kết để ép rollback.
+- `POST /faults/{id}/photos` **không nhận** `pole_id`, không chép từ fault. Không đổi `/pole-photos`, tập nhãn EV-3, điều kiện ảnh
+  `after` khi hoàn thành hay sync bundle/push; mobile giữ pole_id cùng file/UUID trong hàng chờ multipart riêng.
+
 **EV-2 đã chốt (Mỹ, 04/10/2026) và hiện thực ở BE-41:** *tạo sự cố rồi gắn ảnh*. `POST /faults` giữ JSON như Contract; ảnh gửi
 sau qua `POST /faults/{fault_id}/photos`. Trên app vẫn là **một form** (chụp ảnh ngay trong form, bấm Gửi một lần); app tự gửi
 sự cố trước rồi tải ảnh — mất sóng chỉ làm chậm ảnh, không làm mất báo cáo. Trường `photo_frame_id` **bỏ**: gửi lên → 400.
@@ -1050,8 +1071,8 @@ sự cố trước rồi tải ảnh — mất sóng chỉ làm chậm ảnh, kh
 
 | Endpoint | Quyền | Ghi chú |
 |---|---|---|
-| `POST /work-orders/{id}/evidence` | `ExecuteWorkOrders`, **chỉ người được giao**, phiếu **`in_progress`** | multipart: `file` (JPEG theo magic bytes, ≤ 16 MiB; cả request ≤ 17 MiB, quá → `413 UPLOAD_TOO_LARGE`), `kind`, `captured_at` (ISO 8601, có offset thì quy về UTC), `lat`, `lng` — năm field này **bắt buộc**, thiếu → `400 VALIDATION_FAILED`; **`client_op_id` (tuỳ chọn, mới)** — gửi lại cùng khoá trả **200** cùng ảnh, khác phiếu/nhãn → `409 IDEMPOTENCY_CONFLICT`. Mới tạo **201**. OpenAPI khai `required` và 400 / 404 / 409 / 413 / 415 từ 14/11/2026 |
-| `GET /work-orders/{id}/evidence` | `ReadWorkOrders` | **Mới.** Phân trang, sắp theo `captured_at`; item `evidence_id, work_order_id, kind, captured_at, lat, lng, uploaded_by, uploaded_at, thumbnail_url, original_url` |
+| `POST /work-orders/{id}/evidence` | `ExecuteWorkOrders`, **chỉ người được giao**, phiếu **`in_progress`** | multipart: `file` (JPEG theo magic bytes, ≤ 16 MiB; cả request ≤ 17 MiB, quá → `413 UPLOAD_TOO_LARGE`), `kind`, `captured_at` (ISO 8601, có offset thì quy về UTC), `lat`, `lng` — năm field này **bắt buộc**, thiếu → `400 VALIDATION_FAILED`; **`client_op_id` (tuỳ chọn, mới)** — gửi lại cùng khoá trả **200** cùng ảnh, khác phiếu/nhãn/**cột (kể cả NULL)** → `409 IDEMPOTENCY_CONFLICT`; **`pole_id` tuỳ chọn** theo EV-4, cột thuộc phiếu và cùng xã, nhận geom NULL. Mới tạo **201**. OpenAPI khai `required` và 400 / 404 / 409 / 413 / 415 từ 14/11/2026 |
+| `GET /work-orders/{id}/evidence` | `ReadWorkOrders` | **Mới.** Phân trang, sắp theo `captured_at`; `pole_id?` lọc trước count/phân trang (EV-4); item `evidence_id, work_order_id, fault_id, pole_id` (nullable), `kind, captured_at, lat, lng, uploaded_by, uploaded_at, thumbnail_url, original_url` |
 | `GET /evidence/{evidence_id}/thumbnail`, `…/original` | `ReadWorkOrders` | **Mới.** JPEG qua API, không presigned; ảnh gốc **nguyên byte**. Quyền theo phiếu cha (xã **và** người được giao) → ngoài quyền `404 EVIDENCE_NOT_FOUND`; file mất trong kho `503 STORAGE_OBJECT_MISSING` |
 
 Mã lỗi mới: `400 EVIDENCE_KIND_NOT_ALLOWED`, `409 WORK_ORDER_NOT_IN_PROGRESS`, **`409 AFTER_EVIDENCE_REQUIRED`** — `POST
