@@ -286,7 +286,7 @@ for method, suffix, summary in [
     ("get", "", "Danh sách việc trong phạm vi xã và người được giao"),
     ("get", "/{id}", "Chi tiết việc và các hành động được phép"),
     ("get", "/assignees", "Kỹ sư hiện trường đủ điều kiện trong xã"),
-    ("post", "/{id}/evidence", "[BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra); JPEG theo magic bytes; client_op_id cho lần gửi lại"),
+    ("post", "/{id}/evidence", "[BE-24] Kỹ sư được giao tải ảnh khi phiếu đang làm: before/after (sửa chữa), observation (kiểm tra, khảo sát, cập nhật GPS cột); JPEG theo magic bytes; client_op_id cho lần gửi lại"),
     ("get", "/{id}/evidence", "[BE-24] Ảnh của phiếu theo thời điểm chụp, kèm đường dẫn ảnh qua API"),
     ("get", "/{id}/poles", "[WO-12] Cột trên đoạn được giao + trạng thái đèn lần khảo sát đã duyệt gần nhất, theo thứ tự dọc đường — biết TRƯỚC khi đi"),
     ("get", "/agenda", "[BE-25] Việc đêm nay của một kỹ sư, gom theo tuyến, tuyến gần nhất trước khi có near=lat,lng; kỹ sư xem của mình, vai trò khác phải truyền assigned_to"),

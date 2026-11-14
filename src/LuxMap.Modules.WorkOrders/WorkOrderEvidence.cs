@@ -42,8 +42,8 @@ public sealed record EvidenceItem
 }
 
 /// <summary>
-/// Repair and inspection photos (BE-24). <c>before</c>/<c>after</c> only on a repair, <c>observation</c>
-/// only on an inspection (drift EV-1); only the assigned engineer, only while the order is in progress.
+/// Work-order photos (BE-24). <c>before</c>/<c>after</c> only on a repair, <c>observation</c> on every other
+/// kind (drift EV-1, EV-3); only the assigned engineer, only while the order is in progress.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -78,7 +78,8 @@ public sealed partial class WorkOrderEvidenceService(LuxMapDbContext db, ICurren
     public static EvidenceKind[] AllowedKinds(TaskKind kind) => kind switch
     {
         TaskKind.Repair => [EvidenceKind.Before, EvidenceKind.After],
-        TaskKind.Inspection => [EvidenceKind.Observation],
+        // Every other order fixes nothing, so its photos are what was seen: no before or after (EV-3).
+        TaskKind.Inspection or TaskKind.Survey or TaskKind.PoleGpsUpdate => [EvidenceKind.Observation],
         _ => [],
     };
 
