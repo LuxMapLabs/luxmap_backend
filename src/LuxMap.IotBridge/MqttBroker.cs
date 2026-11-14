@@ -65,8 +65,21 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
             gateways.Values.SelectMany(nodes => nodes).GroupBy(id => id).Any(group => group.Count() > 1))
             throw new InvalidDataException("Invalid or duplicate gateway/node configuration.");
         var port = configuration.GetValue("Mqtt:Port", 1883);
-        broker = new MqttFactory().CreateMqttServer(new MqttServerOptionsBuilder()
-            .WithDefaultEndpoint().WithDefaultEndpointPort(port).Build());
+        var optionsBuilder = new MqttServerOptionsBuilder().WithDefaultEndpoint().WithDefaultEndpointPort(port);
+        // The TLS listener is for gateways reaching the bridge over the internet; it opens only when a certificate is set.
+        var certificatePath = configuration["Mqtt:Tls:CertificatePath"];
+        var tlsPort = configuration.GetValue("Mqtt:Tls:Port", 8883);
+        PemCertificateProvider? certificates = null;
+        if (!string.IsNullOrWhiteSpace(certificatePath))
+        {
+            certificates = new PemCertificateProvider(certificatePath,
+                configuration["Mqtt:Tls:KeyPath"] ?? throw new InvalidDataException("Mqtt:Tls:KeyPath is not set."), logger);
+            certificates.GetCertificate(); // a wrong path or a mismatched pair stops startup instead of every handshake
+            optionsBuilder.WithEncryptedEndpoint().WithEncryptedEndpointPort(tlsPort);
+        }
+        var options = optionsBuilder.Build();
+        if (certificates is not null) options.TlsEndpointOptions.CertificateProvider = certificates;
+        broker = new MqttFactory().CreateMqttServer(options);
         broker.ValidatingConnectionAsync += async e =>
         {
             if (!gateways.TryGetValue(e.ClientId, out var nodes))
@@ -136,7 +149,8 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         };
         await broker.StartAsync();
         foreach (var device in store.ReadAll()) await PublishCommandAsync(device.DeviceId, device.DesiredCommand);
-        logger.LogInformation("MQTT broker listening on TCP {Port}; gateways: {Count}", port, gateways.Count);
+        logger.LogInformation("MQTT broker listening on TCP {Port}{Tls}; gateways: {Count}", port,
+            certificates is null ? "" : $" and TLS {tlsPort}", gateways.Count);
     }
 
     private bool TryRoute(string gatewayId, string topic, out string nodeId, out string kind)

@@ -8,3 +8,5 @@ Backend chính đọc lịch sử theo quyền và phạm vi xã qua `GET /api/v
 
 Cấp secret bằng POST /api/luxmap/gateways/{gatewayId}/credential trên bridge. Đặt Mqtt__ProvisioningKey (ít nhất 32 ký tự ngẫu nhiên) và gửi nó qua header X-Iot-Provisioning-Key từ localhost hoặc HTTPS nội bộ. Secret chỉ hiện một lần, hash được lưu trong data/gateway-credentials.json. MQTT TCP chỉ dành cho mạng nội bộ tin cậy.
 Đặt cùng Mqtt__BridgeKey (ít nhất 32 ký tự) trên BE và bridge. API đọc và điều khiển dùng X-Iot-Bridge-Key. API provisioning còn yêu cầu Mqtt__ProvisioningKey. Swagger bridge chỉ bật trong Development.
+
+MQTT qua TLS: đặt `Mqtt__Tls__CertificatePath` (PEM, chứng chỉ leaf trước, kèm chứng chỉ trung gian) và `Mqtt__Tls__KeyPath` thì bridge mở thêm listener TLS ở `Mqtt__Tls__Port` (mặc định 8883). Bridge đọc lại cặp file khi chúng đổi, nên chứng chỉ gia hạn tại chỗ không cần restart. Trên VPS bridge chạy trong `deploy/compose.yml` với chứng chỉ của Caddy và chỉ publish 8883 (`docs/deploy/vps.md` mục 10).
