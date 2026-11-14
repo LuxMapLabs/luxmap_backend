@@ -53,7 +53,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         string[] expected =
         [
             "cabinet_id", "external_ref", "cabinet_name", "commune_id", "commune_name", "data_source", "location", "photo_count", "cover_photo",
-            "feeder_ids", "iot_node_id", "updated_at", "updated_by", "updated_by_name",
+            "feeder_ids", "iot_node_id", "iot_node_ids", "updated_at", "updated_by", "updated_by_name",
         ];
         Assert.Equal([.. expected.Order(StringComparer.Ordinal)], Keys(row));
 
@@ -67,6 +67,7 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(JsonValueKind.Array, row.GetProperty("feeder_ids").ValueKind);
         Assert.Empty(row.GetProperty("feeder_ids").EnumerateArray());
         Assert.Equal(JsonValueKind.Null, row.GetProperty("iot_node_id").ValueKind);
+        Assert.Empty(row.GetProperty("iot_node_ids").EnumerateArray());
 
         // Device state is the map layer's answer, never this one's (Contract 5.3.1: one answer per question).
         foreach (var operational in new[] { "node_status", "last_report_at", "supports_remote_control" })
@@ -113,18 +114,28 @@ public sealed class CabinetTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task The_mounted_device_and_the_feeders_are_listed_on_the_cabinet()
+    public async Task All_mounted_devices_and_feeders_are_listed_in_inventory_and_on_the_map()
     {
         var client = await fixture.ManagerClientAsync();
         var cabinetId = await NewCabinetAsync(fixture.CommuneId);
         var first = await NewFeederAsync(fixture.CommuneId, cabinetId);
         var second = await NewFeederAsync(fixture.CommuneId, cabinetId);
         var node = await NewNodeAsync(cabinetId);
+        var otherNode = await NewNodeAsync(cabinetId);
 
         var cabinet = (await GetAsync(client, $"{Cabinets}/{cabinetId}")).GetProperty("cabinet");
 
         Assert.Equal([first, second], Strings(cabinet.GetProperty("feeder_ids")));
         Assert.Equal(node, cabinet.GetProperty("iot_node_id").GetString());
+        Assert.Equal([node, otherNode], Strings(cabinet.GetProperty("iot_node_ids")));
+
+        var row = await FindAsync(client, $"{Cabinets}?page_size=200", "cabinet_id", cabinetId);
+        Assert.Equal([node, otherNode], Strings(row.GetProperty("iot_node_ids")));
+        Assert.Equal(node, row.GetProperty("iot_node_id").GetString());
+
+        var map = Find(await GetAsync(client, MapCabinets + Box), "cabinet_id", cabinetId).GetProperty("properties");
+        Assert.Equal([node, otherNode], Strings(map.GetProperty("iot_node_ids")));
+        Assert.Equal(node, map.GetProperty("iot_node_id").GetString());
     }
 
     /// <summary>
@@ -137,7 +148,9 @@ public sealed class CabinetTests(AssetImportFixture fixture)
     {
         var client = await fixture.ManagerClientAsync();
         var cabinetId = await NewCabinetAsync(fixture.CommuneId);
-        var (shorter, longer) = await FreeStraddlingFeederIdsAsync();
+        var (shorter, longer) = await FreeStraddlingIdsAsync("FDR", (shorter, longer) =>
+            fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
+                .AnyAsync(feeder => feeder.FeederId == shorter || feeder.FeederId == longer)));
 
         try
         {
@@ -158,6 +171,43 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         {
             await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
                 $"DELETE FROM feeder WHERE feeder_id IN ({shorter}, {longer})"));
+        }
+    }
+
+    [Fact]
+    public async Task Mounted_node_ids_use_creation_time_then_numeric_id_order_on_all_cabinet_surfaces()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var cabinetId = await NewCabinetAsync(fixture.CommuneId);
+        var recent = await NewNodeAsync(cabinetId);
+        var (shorter, longer) = await FreeStraddlingIdsAsync("NODE", (shorter, longer) =>
+            fixture.QueryAsync(db => db.Set<IotNode>().IgnoreQueryFilters()
+                .AnyAsync(node => node.NodeId == shorter || node.NodeId == longer)));
+
+        try
+        {
+            // Same timestamp in one statement, reversed insertion order. These older nodes precede the recent,
+            // shorter id above; the width tiebreaker puts shorter before longer despite their text order.
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"""
+                INSERT INTO iot_node (node_id, cabinet_id, commune_id, node_role, data_source, created_at) VALUES
+                ({longer}, {cabinetId}, {fixture.CommuneId}, 'segment_controller', 'simulated', '2000-01-01T00:00:00Z'),
+                ({shorter}, {cabinetId}, {fixture.CommuneId}, 'segment_controller', 'simulated', '2000-01-01T00:00:00Z')
+                """));
+
+            var detail = (await GetAsync(client, $"{Cabinets}/{cabinetId}")).GetProperty("cabinet");
+            var row = await FindAsync(client, $"{Cabinets}?page_size=200", "cabinet_id", cabinetId);
+            var map = Find(await GetAsync(client, MapCabinets + Box), "cabinet_id", cabinetId).GetProperty("properties");
+            foreach (var surface in new[] { detail, row, map })
+            {
+                Assert.Equal([shorter, longer, recent], Strings(surface.GetProperty("iot_node_ids")));
+                Assert.Equal(shorter, surface.GetProperty("iot_node_id").GetString());
+            }
+        }
+        finally
+        {
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"DELETE FROM iot_node WHERE node_id IN ({shorter}, {longer})"));
         }
     }
 
@@ -307,11 +357,12 @@ public sealed class CabinetTests(AssetImportFixture fixture)
         Assert.Equal(Lat, coordinates[1].GetDouble(), 6);
 
         var properties = feature.GetProperty("properties");
-        Assert.Equal(["cabinet_id", "cabinet_name", "commune_id", "cover_photo", "feeder_ids", "feeders", "iot_node_id", "photo_count"], Keys(properties));
+        Assert.Equal(["cabinet_id", "cabinet_name", "commune_id", "cover_photo", "feeder_ids", "feeders", "iot_node_id", "iot_node_ids", "photo_count"], Keys(properties));
         Assert.Equal(0, properties.GetProperty("photo_count").GetInt32());
         Assert.Equal(JsonValueKind.Null, properties.GetProperty("cover_photo").ValueKind);
         Assert.Equal([feederId], Strings(properties.GetProperty("feeder_ids")));
         Assert.Equal(JsonValueKind.Null, properties.GetProperty("iot_node_id").ValueKind);
+        Assert.Empty(properties.GetProperty("iot_node_ids").EnumerateArray());
     }
 
     [Fact]
@@ -331,23 +382,29 @@ public sealed class CabinetTests(AssetImportFixture fixture)
 
     /// <summary>CAB-3 — the device is drawn where its cabinet stands, and follows the cabinet when it moves.</summary>
     [Fact]
-    public async Task A_device_is_drawn_at_its_cabinet_and_follows_it()
+    public async Task All_devices_are_drawn_at_their_shared_cabinet_and_follow_it()
     {
         var client = await fixture.ManagerClientAsync();
         var cabinetId = await NewCabinetAsync(fixture.CommuneId);
         var node = await NewNodeAsync(cabinetId);
+        var otherNode = await NewNodeAsync(cabinetId);
 
         var before = Find(await GetAsync(client, MapNodes + Box), "node_id", node);
         Assert.Equal(Lng, before.GetProperty("geometry").GetProperty("coordinates")[0].GetDouble(), 6);
 
         await PutAsync(client, $"{Cabinets}/{cabinetId}", CabinetReplacement("simulated", "POINT (108.85 12.85)"));
 
-        var after = Find(await GetAsync(client, MapNodes + Box), "node_id", node);
-        Assert.Equal(108.85, after.GetProperty("geometry").GetProperty("coordinates")[0].GetDouble(), 6);
-        Assert.Equal(12.85, after.GetProperty("geometry").GetProperty("coordinates")[1].GetDouble(), 6);
+        var nodes = await GetAsync(client, MapNodes + Box);
+        foreach (var id in new[] { node, otherNode })
+        {
+            var after = Find(nodes, "node_id", id);
+            Assert.Equal(108.85, after.GetProperty("geometry").GetProperty("coordinates")[0].GetDouble(), 6);
+            Assert.Equal(12.85, after.GetProperty("geometry").GetProperty("coordinates")[1].GetDouble(), 6);
+        }
 
         var cabinetFeature = Find(await GetAsync(client, MapCabinets + Box), "cabinet_id", cabinetId);
         Assert.Equal(node, cabinetFeature.GetProperty("properties").GetProperty("iot_node_id").GetString());
+        Assert.Equal([node, otherNode], Strings(cabinetFeature.GetProperty("properties").GetProperty("iot_node_ids")));
     }
 
     // ── Import (CAB-7) ──────────────────────────────────────────────────────────────────────────
@@ -479,14 +536,15 @@ public sealed class CabinetTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task A_cabinet_carries_at_most_one_device()
+    public async Task A_cabinet_accepts_multiple_devices_at_the_database_level()
     {
         var cabinetId = await NewCabinetAsync(fixture.CommuneId);
-        await NewNodeAsync(cabinetId);
+        var first = await NewNodeAsync(cabinetId);
+        var second = await NewNodeAsync(cabinetId);
 
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => NewNodeAsync(cabinetId));
-
-        Assert.Equal("ux_iot_node_cabinet_id", Assert.IsType<PostgresException>(error.InnerException).ConstraintName);
+        Assert.NotEqual(first, second);
+        Assert.Equal(2, await fixture.QueryAsync(db => db.Set<IotNode>().IgnoreQueryFilters()
+            .CountAsync(node => node.CabinetId == cabinetId)));
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────────────────────
@@ -596,24 +654,23 @@ public sealed class CabinetTests(AssetImportFixture fixture)
             .Where(cabinet => cabinet.ExternalRef == externalRef).Select(cabinet => cabinet.CabinetId).SingleAsync());
 
     /// <summary>
-    /// A pair like <c>FDR-999999</c> / <c>FDR-1000000</c> that no row holds, far above where <c>feeder_id_seq</c>
+    /// A pair like <c>FDR-999999</c> / <c>FDR-1000000</c> (or NODE) that no row holds, far above where the sequence
     /// stands — chosen from the LIVE table, never a literal (docs/agents/traps/testing.md: the shared sequence).
     /// </summary>
-    private async Task<(string Shorter, string Longer)> FreeStraddlingFeederIdsAsync()
+    private static async Task<(string Shorter, string Longer)> FreeStraddlingIdsAsync(
+        string prefix, Func<string, string, Task<bool>> isTaken)
     {
         for (var nines = 6; nines <= 12; nines++)
         {
-            var shorter = "FDR-" + new string('9', nines);
-            var longer = "FDR-1" + new string('0', nines);
-            var taken = await fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
-                .AnyAsync(feeder => feeder.FeederId == shorter || feeder.FeederId == longer));
-            if (!taken)
+            var shorter = prefix + "-" + new string('9', nines);
+            var longer = prefix + "-1" + new string('0', nines);
+            if (!await isTaken(shorter, longer))
             {
                 return (shorter, longer);
             }
         }
 
-        throw new InvalidOperationException("No free straddling pair of feeder ids between 6 and 12 digits.");
+        throw new InvalidOperationException($"No free straddling pair of {prefix} ids between 6 and 12 digits.");
     }
 
     /// <summary>Runs one raw statement that must fail, and returns PostgreSQL's refusal.</summary>

@@ -1,0 +1,143 @@
+diff --git a/tests/LuxMap.Api.Tests/IotDiagnosticsTests.cs b/tests/LuxMap.Api.Tests/IotDiagnosticsTests.cs
+index 5af5bd3..598cdb2 100644
+--- a/tests/LuxMap.Api.Tests/IotDiagnosticsTests.cs
++++ b/tests/LuxMap.Api.Tests/IotDiagnosticsTests.cs
+@@ -237,0 +238,138 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
++    [Fact]
++    public async Task PR256_phase1_should_not_expose_two_controllers_for_one_feeder()
++    {
++        var bridge = new ReportedPowerBridge();
++        using var factory = new LuxMapApiFactory();
++        using var host = factory.WithWebHostBuilder(builder =>
++        {
++            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
++            builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
++            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
++                .ConfigurePrimaryHttpMessageHandler(() => bridge));
++        });
++        using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
++        using var managerToken = await fixture.ManagerClientAsync();
++        using var admin = AuthorizedClient(host.CreateClient(), adminToken);
++        using var manager = AuthorizedClient(host.CreateClient(), managerToken);
++
++        var setup = new LightingTestRig(fixture);
++        var cabinet = await setup.NewCabinetAsync();
++        var feeder = await setup.NewFeederAsync(cabinet);
++        var otherFeeder = await setup.NewFeederAsync(cabinet);
++        var segment = await setup.NewSegmentAsync();
++        var server = "iot-" + Guid.NewGuid().ToString("N");
++        using var registration = await admin.PostAsJsonAsync("/api/v1/iot/servers",
++            new { server_id = server, base_url = "https://telemetry.example.test", commune_id = fixture.CommuneId,
++                location = new { lat = 13.5, lng = 109.5 } });
++        Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
++
++        using var created = await manager.PostAsJsonAsync("/api/v1/assets/iot-nodes",
++            new { cabinet_id = cabinet, data_source = "calibration_rig", supports_remote_control = true });
++        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
++        var node = created.Headers.Location!.OriginalString.Split('/')[^1];
++        var nodePath = $"/api/v1/iot/nodes/{node}";
++
++
++        // Simulate the phase-1 cabinet cardinality on this run's disposable database only.
++        // No dev database or phase-1 production file is changed.
++        await fixture.QueryAsync(db => db.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS ux_iot_node_cabinet_id"));
++        var legacyNode = await setup.AsSystemAsync(async db =>
++        {
++            var row = new LuxMap.Modules.Telemetry.Entities.IotNode
++            {
++                CabinetId = cabinet, CommuneId = fixture.CommuneId,
++                DataSource = LuxMap.Shared.Contracts.Enums.DataSource.CalibrationRig,
++                SupportsRemoteControl = true,
++            };
++            db.Add(row);
++            await db.SaveChangesAsync();
++            db.Add(new LuxMap.Modules.Telemetry.Entities.FeederControl
++            {
++                NodeId = row.NodeId, FeederId = feeder, CabinetId = cabinet,
++                CommuneId = fixture.CommuneId, RelayNo = 1,
++            });
++            await db.SaveChangesAsync();
++            return row.NodeId;
++        });
++
++        using var registeredSource = await manager.PostAsJsonAsync($"{nodePath}/source", new
++        {
++            server_id = server, device_id = "probe", feeder_id = feeder,
++            nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
++        });
++        Assert.Equal(HttpStatusCode.Created, registeredSource.StatusCode);
++        var pole = await setup.NewPoleAsync(segment, feeder);
++        var bridgeControl = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/poles/{pole}/control");
++        var inventory = await manager.GetFromJsonAsync<JsonElement>("/api/v1/assets/feeders?page_size=200");
++        var feederRow = inventory.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("feeder_id").GetString() == feeder);
++        var legacyController = feederRow.GetProperty("control").GetProperty("node_id").GetString();
++        var bridgeController = bridgeControl.GetProperty("node_id").GetString();
++        Assert.Equal(legacyNode, legacyController);
++        Assert.Equal(node, bridgeController);
++        Assert.Equal(legacyController, bridgeController);
++    }
++
++    [Fact]
++    public async Task PR256_phase1_duplicate_config_and_database_feeder_should_not_crash_reads()
++    {
++        var bridge = new ReportedPowerBridge();
++        using var factory = new LuxMapApiFactory();
++        using var host = factory.WithWebHostBuilder(builder =>
++        {
++            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
++            builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
++            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
++                .ConfigurePrimaryHttpMessageHandler(() => bridge));
++        });
++        using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
++        using var managerToken = await fixture.ManagerClientAsync();
++        using var admin = AuthorizedClient(host.CreateClient(), adminToken);
++        using var manager = AuthorizedClient(host.CreateClient(), managerToken);
++
++        var setup = new LightingTestRig(fixture);
++        var cabinet = await setup.NewCabinetAsync();
++        var feeder = await setup.NewFeederAsync(cabinet);
++        var otherFeeder = await setup.NewFeederAsync(cabinet);
++        var segment = await setup.NewSegmentAsync();
++        var server = "iot-" + Guid.NewGuid().ToString("N");
++        using var registration = await admin.PostAsJsonAsync("/api/v1/iot/servers",
++            new { server_id = server, base_url = "https://telemetry.example.test", commune_id = fixture.CommuneId,
++                location = new { lat = 13.5, lng = 109.5 } });
++        Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
++
++        using var created = await manager.PostAsJsonAsync("/api/v1/assets/iot-nodes",
++            new { cabinet_id = cabinet, data_source = "calibration_rig", supports_remote_control = true });
++        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
++        var node = created.Headers.Location!.OriginalString.Split('/')[^1];
++        var nodePath = $"/api/v1/iot/nodes/{node}";
++
++
++        await fixture.QueryAsync(db => db.Database.ExecuteSqlRawAsync("DROP INDEX IF EXISTS ux_iot_node_cabinet_id"));
++        var configuredNode = await setup.AsSystemAsync(async db =>
++        {
++            var row = new LuxMap.Modules.Telemetry.Entities.IotNode
++            {
++                CabinetId = cabinet, CommuneId = fixture.CommuneId,
++                DataSource = LuxMap.Shared.Contracts.Enums.DataSource.CalibrationRig,
++                SupportsRemoteControl = true,
++            };
++            db.Add(row);
++            await db.SaveChangesAsync();
++            return row.NodeId;
++        });
++        using var registered = await manager.PostAsJsonAsync($"{nodePath}/source", new
++        {
++            server_id = server, device_id = "probe", feeder_id = feeder,
++            nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
++        });
++        Assert.Equal(HttpStatusCode.Created, registered.StatusCode);
++        // Equivalent to an existing DB source plus a newly deployed static source for another node.
++        host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IotOptions>>().Value.Nodes[configuredNode] = new NodeProfile
++        {
++            ServerId = server, DeviceId = "configured-probe", FeederId = feeder,
++            NominalVoltage = 5, NominalCurrentMa = 100, NominalPowerMw = 500,
++        };
++        using var read = await manager.GetAsync("/api/v1/assets/feeders?page_size=200");
++        Assert.True(read.StatusCode == HttpStatusCode.OK, $"HTTP {(int)read.StatusCode}: {await read.Content.ReadAsStringAsync()}");
++    }
++

@@ -842,7 +842,7 @@ public sealed record FeederCabinet
 /// <summary>One cabinet in the inventory list (CAB-8).</summary>
 /// <remarks>
 /// <para>
-/// 🔴 <b><c>iot_node_id</c> only — no device state.</b> <c>node_status</c>, <c>last_report_at</c> and
+/// 🔴 <b>Device ids only — no device state.</b> <c>node_status</c>, <c>last_report_at</c> and
 /// <c>supports_remote_control</c> belong to <c>GET /map/iot-nodes</c>; two endpoints answering the same
 /// question is how they start disagreeing (Contract section 5.3.1).
 /// </para>
@@ -880,8 +880,11 @@ public sealed record CabinetListItem
     /// </summary>
     public required IReadOnlyList<string> FeederIds { get; init; }
 
-    /// <summary>The device mounted in the cabinet, or <c>null</c> — most cabinets carry none.</summary>
-    public string? IotNodeId { get; init; }
+    /// <summary>All devices mounted in the cabinet, ordered by creation time, id length, then id; empty when none.</summary>
+    public required IReadOnlyList<string> IotNodeIds { get; init; }
+
+    /// <summary>Legacy compatibility: the first of <c>iot_node_ids</c>, or <c>null</c>. Use the array for all devices.</summary>
+    public string? IotNodeId => IotNodeIds.FirstOrDefault();
 
     public required DateTime UpdatedAt { get; init; }
 

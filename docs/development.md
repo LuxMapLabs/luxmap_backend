@@ -241,6 +241,23 @@ model tìm mọi cột đã đánh dấu rồi tạo sequence tương ứng, nê
 
 Client KHÔNG tự đặt ID (Contract mục 0.4). Insert bỏ trống cột, DB sinh giá trị.
 
+### Một tủ điện chứa nhiều IoT node (CABINET-MULTI-NODE, 14/11/2026)
+
+Migration `20261114171551_AllowMultipleIotNodesPerCabinet` đổi unique index của `iot_node.cabinet_id` thành index thường;
+không xóa bảng, cột hay thiết bị. Áp bằng lệnh migration ở trên trước khi đăng ký nhiều node vào cùng tủ.
+Rollback chỉ được khi mỗi tủ còn tối đa một node; migration sẽ từ chối nếu có tủ chứa nhiều node, không tự gộp hoặc xóa.
+
+`POST /api/v1/assets/iot-nodes` giữ nguyên body, cho phép lặp `cabinet_id` để đăng ký thiết bị khác.
+API list / detail tủ và `/api/v1/map/cabinets` thêm `iot_node_ids[]`; dùng mảng này để liệt kê **tất cả** thiết bị.
+Mảng rỗng khi chưa có node; thứ tự `created_at, length(node_id), node_id`. Trường `iot_node_id` giữ để tương thích,
+bằng phần tử đầu hoặc null, không có nghĩa là node chính. Bản đồ IoT vẽ từng node tại cùng tọa độ tủ.
+Phase 1 giữ nguyên relay, MQTT, credential và lệnh theo từng node; bỏ relay là phase 2 riêng chưa thực hiện.
+Trong thời gian hai kênh cùng tồn tại, source Bridge và relay của cùng feeder phải dùng cùng node.
+Nguồn / relay mâu thuẫn hoặc nguồn tĩnh trùng nguồn DB trả 409 `IOT_REGISTRATION_CONFLICT`; sửa cấu hình thay vì xóa lịch sử.
+Hai đường ghi khóa node rồi feeder và đọc lại liên kết trong transaction. Migration được sinh lại theo model dev sau PR #256;
+không mang theo snapshot DBML từ nhánh tài liệu cũ.
+Quyết định API vẫn trên nền CABINET SELF-SIGNED: xem `docs/contract-drift.md`, CAB-MN-1…CAB-MN-5.
+
 ## Seed dữ liệu nền
 
 ```bash

@@ -235,6 +235,203 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task A_source_and_a_relay_cannot_assign_different_nodes_to_the_same_feeder(bool relayFirst)
+        => WithSharedCabinetAsync(async (client, rig, _) =>
+        {
+            HttpResponseMessage rejected;
+            if (relayFirst)
+            {
+                Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+                    $"/api/v1/assets/iot-nodes/{rig.Second}/relays/1", new { feeder_id = rig.Feeder })).StatusCode);
+                rejected = await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig));
+            }
+            else
+            {
+                Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+                    $"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig))).StatusCode);
+                rejected = await client.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Second}/relays/1", new { feeder_id = rig.Feeder });
+            }
+            await AssertBindingConflictAsync(rejected, rig.Feeder);
+        });
+
+    [Fact]
+    public Task Matching_sources_and_relays_keep_two_nodes_in_one_cabinet_independent()
+        => WithSharedCabinetAsync(async (client, rig, _) =>
+        {
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+                $"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig))).StatusCode);
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+                $"/api/v1/iot/nodes/{rig.Second}/source", SourceBody(rig, rig.OtherFeeder, "probe-2"))).StatusCode);
+            foreach (var (node, feeder) in new[] { (rig.First, rig.Feeder), (rig.Second, rig.OtherFeeder) })
+            {
+                Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+                    $"/api/v1/assets/iot-nodes/{node}/relays/1", new { feeder_id = feeder })).StatusCode);
+                Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync(
+                    "/api/v1/lighting/commands", new { feeder_id = feeder, mode = "off", client_op_id = Guid.NewGuid() })).StatusCode);
+            }
+            var cabinet = await client.GetFromJsonAsync<JsonElement>($"/api/v1/assets/cabinets/{rig.Cabinet}");
+            Assert.Equal(new[] { rig.First, rig.Second }, cabinet.GetProperty("cabinet").GetProperty("iot_node_ids")
+                .EnumerateArray().Select(id => id.GetString()).ToArray());
+            var control = await client.GetFromJsonAsync<JsonElement>($"/api/v1/iot/poles/{rig.Pole}/control");
+            Assert.Equal(rig.First, control.GetProperty("node_id").GetString());
+        });
+
+    [Fact]
+    public Task Configured_and_database_sources_for_one_feeder_return_a_clear_conflict_instead_of_500()
+        => WithSharedCabinetAsync(async (client, rig, services) =>
+        {
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+                $"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig))).StatusCode);
+            services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IotOptions>>().Value.Nodes[rig.Second] = new NodeProfile
+            {
+                ServerId = rig.Server, DeviceId = "configured-probe", FeederId = rig.Feeder,
+                NominalVoltage = 5, NominalCurrentMa = 100, NominalPowerMw = 500,
+            };
+
+            await AssertBindingConflictAsync(await client.GetAsync("/api/v1/assets/feeders?page_size=200"), rig.Feeder);
+            await AssertBindingConflictAsync(await client.GetAsync($"/api/v1/map/poles/{rig.Pole}"), rig.Feeder);
+            await AssertBindingConflictAsync(await client.GetAsync($"/api/v1/iot/poles/{rig.Pole}/control"), rig.Feeder);
+            await AssertBindingConflictAsync(await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/command",
+                new { mode = "MANUAL", command = "OFF" }), rig.Feeder);
+            await AssertBindingConflictAsync(await client.PostAsJsonAsync("/api/v1/lighting/commands",
+                new { feeder_id = rig.Feeder, mode = "off", client_op_id = Guid.NewGuid() }), rig.Feeder);
+
+            using var foreignToken = await fixture.ForeignCommuneClientAsync();
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/assets/feeders?page_size=200");
+            request.Headers.Authorization = foreignToken.DefaultRequestHeaders.Authorization;
+            using var foreignRead = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, foreignRead.StatusCode);
+            Assert.DoesNotContain((await foreignRead.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("items").EnumerateArray(),
+                item => item.GetProperty("feeder_id").GetString() == rig.Feeder);
+        });
+
+    [Fact]
+    public Task An_existing_cross_channel_conflict_blocks_reads_commands_and_MQTT_delivery()
+        => WithSharedCabinetAsync(async (client, rig, services) =>
+        {
+            Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
+                $"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig))).StatusCode);
+            // Simulate a conflicting mapping imported before the guard existed.
+            await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
+                $"INSERT INTO feeder_control (feeder_id,node_id,commune_id,cabinet_id,relay_no) VALUES ({rig.Feeder},{rig.Second},{fixture.CommuneId},{rig.Cabinet},1)"));
+            try
+            {
+                await AssertBindingConflictAsync(await client.GetAsync("/api/v1/assets/feeders?page_size=200"), rig.Feeder);
+                await AssertBindingConflictAsync(await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/command",
+                    new { mode = "MANUAL", command = "OFF" }), rig.Feeder);
+                await AssertBindingConflictAsync(await client.PostAsJsonAsync("/api/v1/lighting/commands",
+                    new { feeder_id = rig.Feeder, mode = "off", client_op_id = Guid.NewGuid() }), rig.Feeder);
+
+                await using var scope = services.GetRequiredService<LuxMap.Modules.Telemetry.Mqtt.LightingScopeFactory>()
+                    .Open(fixture.CommuneId, "binding-guard-test");
+                var error = await Assert.ThrowsAsync<LuxMap.Shared.Http.LuxMapException>(
+                    () => scope.Service.PollAsync(rig.Second, CancellationToken.None));
+                Assert.Equal("IOT_REGISTRATION_CONFLICT", error.Code);
+            }
+            finally
+            {
+                await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync($"DELETE FROM feeder_control WHERE feeder_id = {rig.Feeder}"));
+            }
+        });
+
+    [Fact]
+    public Task Concurrent_bridge_sources_cannot_take_the_same_feeder()
+        => WithSharedCabinetAsync(async (client, rig, _) =>
+        {
+            var responses = await Task.WhenAll(
+                client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig)),
+                client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}/source", SourceBody(rig, device: "probe-2")));
+            Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Created);
+            var rejected = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
+            Assert.Equal("IOT_REGISTRATION_CONFLICT", (await rejected.Content.ReadFromJsonAsync<JsonElement>())
+                .GetProperty("error").GetProperty("code").GetString());
+        });
+
+    [Fact]
+    public Task Concurrent_source_and_relay_writes_wait_for_the_feeder_and_leave_one_controller()
+        => WithSharedCabinetAsync(async (client, rig, services) =>
+        {
+            await using var scope = services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<LuxMap.Persistence.LuxMapDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM feeder WHERE feeder_id = {rig.Feeder} FOR NO KEY UPDATE");
+            var source = client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig));
+            var relay = client.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Second}/relays/1", new { feeder_id = rig.Feeder });
+            try
+            {
+                await Task.Delay(250);
+                Assert.False(source.IsCompleted, "The source write bypassed the feeder lock.");
+                Assert.False(relay.IsCompleted, "The relay write bypassed the feeder lock.");
+            }
+            finally
+            {
+                await transaction.RollbackAsync();
+            }
+            var responses = await Task.WhenAll(source, relay);
+            Assert.Single(responses, response => response.StatusCode is HttpStatusCode.Created or HttpStatusCode.NoContent);
+            await AssertBindingConflictAsync(Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict), rig.Feeder);
+        });
+
+    private sealed record SharedCabinet(string Cabinet, string Feeder, string OtherFeeder, string Pole, string First, string Second, string Server);
+
+    private static object SourceBody(SharedCabinet rig, string? feeder = null, string device = "probe") => new
+    {
+        server_id = rig.Server, device_id = device, feeder_id = feeder ?? rig.Feeder,
+        nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
+    };
+
+    private static async Task AssertBindingConflictAsync(HttpResponseMessage response, string feeder)
+    {
+        using (response)
+        {
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var error = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+            Assert.Equal("IOT_REGISTRATION_CONFLICT", error.GetProperty("code").GetString());
+            Assert.Equal(feeder, error.GetProperty("details").GetProperty("feeder_id").GetString());
+        }
+    }
+
+    private async Task WithSharedCabinetAsync(Func<HttpClient, SharedCabinet, IServiceProvider, Task> check)
+    {
+        using var factory = new LuxMapApiFactory();
+        using var host = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
+            builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
+            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
+                .ConfigurePrimaryHttpMessageHandler(() => new ReportedPowerBridge()));
+        });
+        using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
+        using var managerToken = await fixture.ManagerClientAsync();
+        using var admin = AuthorizedClient(host.CreateClient(), adminToken);
+        using var client = AuthorizedClient(host.CreateClient(), managerToken);
+        var setup = new LightingTestRig(fixture);
+        var cabinet = await setup.NewCabinetAsync();
+        var feeder = await setup.NewFeederAsync(cabinet);
+        var other = await setup.NewFeederAsync(cabinet);
+        var pole = await setup.NewPoleAsync(await setup.NewSegmentAsync(), feeder);
+        var nodes = new List<string>();
+        for (var i = 0; i < 2; i++)
+        {
+            using var created = await client.PostAsJsonAsync("/api/v1/assets/iot-nodes",
+                new { cabinet_id = cabinet, data_source = "calibration_rig", supports_remote_control = true });
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            var node = created.Headers.Location!.OriginalString.Split('/')[^1];
+            nodes.Add(node);
+            Assert.Equal(HttpStatusCode.OK, (await client.PostAsync($"/api/v1/assets/iot-nodes/{node}/credential", null)).StatusCode);
+        }
+        var server = "iot-" + Guid.NewGuid().ToString("N");
+        Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync("/api/v1/iot/servers", new
+        {
+            server_id = server, base_url = "https://telemetry.example.test", commune_id = fixture.CommuneId,
+            location = new { lat = 13.5, lng = 109.5 },
+        })).StatusCode);
+        await check(client, new(cabinet, feeder, other, pole, nodes[0], nodes[1], server), host.Services);
+    }
+
     private sealed class ReportedPowerBridge : HttpMessageHandler
     {
         private JsonElement? desired;
@@ -261,7 +458,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         {
             return request.RequestUri!.AbsolutePath switch
             {
-                "/api/luxmap/gateways/by-device/probe/authorization" => new(HttpStatusCode.NoContent),
+                "/api/luxmap/gateways/by-device/probe/authorization" or "/api/luxmap/gateways/by-device/probe-2/authorization" => new(HttpStatusCode.NoContent),
                 "/api/luxmap/gateways/by-device/probe/status" => Json(new { status = "online" }),
                 "/api/luxmap/devices/probe/command" => Json(await SaveCommandAsync(request, ct)),
                 "/api/luxmap/devices/probe" => Json(new

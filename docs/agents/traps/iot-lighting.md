@@ -7,6 +7,12 @@ Không thay yêu cầu này bằng một version ứng dụng chung.
 
 ## BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 
+**Một cabinet có nhiều node (CAB-MN-1…4, 14/11/2026).** `iot_node.cabinet_id` bắt buộc nhưng **không unique**.
+Không khôi phục kiểm tra "tủ đã có thiết bị" ở service, và không gom trạng thái / credential / lệnh theo cabinet:
+chúng thuộc từng node. Phase 1 giữ nguyên relay và giao thức MQTT; không suy ra mỗi node chỉ có một feeder.
+Đọc tủ lấy đủ `iot_node_ids[]` theo `created_at, length(node_id), node_id`; scalar `iot_node_id` chỉ là phần tử đầu
+cho client cũ. `Down` migration từ chối khi tủ có nhiều node, không xóa thiết bị để tạo lại unique.
+
 **Schema và quyền ghi tách nhau như `pole_current_status`.** `feeder_control` là bảng riêng khoá theo
 `feeder_id`, KHÔNG phải cột trên `feeder`: chế độ ON/OFF/AUTO do thiết bị báo, còn `PUT
 /assets/feeders/{id}` là thay thế toàn phần và sẽ xoá mất nó. Cả hai FK của `feeder_control` mang
@@ -141,3 +147,12 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 - Bridge hiện không lưu firmware: heartbeat gateway là `"1"`, `TelemetryRequest` không có trường phiên bản. Thêm bất kỳ kết quả lưu lại
   nào từ bridge (mẫu điện, chẩn đoán, sự cố) phải mang phiên bản firmware / thuật toán **lúc sinh ra** (VR-10, VR-12); mẫu cũ ghi
   "không rõ", không suy từ bản hiện tại.
+
+
+## CAB-MN-5 — guard đồng bộ hai kênh (15/11/2026)
+
+- Bridge source và relay của một feeder phải cùng node. Ghi ở cả hai phía dùng transaction, khóa **node → feeder**, rồi kiểm lại; khóa feeder bằng `FOR UPDATE`.
+- Đọc nguồn / power và gửi / giao lệnh gặp config tĩnh trùng nguồn DB hoặc khác controller → 409 `IOT_REGISTRATION_CONFLICT`; không chọn nguồn đầu tiên. `FeederControllerBinding` là chỗ duy nhất tạo lỗi này.
+- `IFeederSourceLookup` ở Telemetry, IOT hiện thực. DbContext do caller truyền: MQTT có fixed commune context riêng. Singleton lookup chỉ giữ IOptions, không giữ DbContext hoặc principal HTTP.
+- UNIQUE expression `ux_iot_source_registration_feeder_id` chỉ có ở DB (PR #256), không hiện trong model/snapshot: giữ khi squash migration, không suy là thiếu backstop chỉ vì không có HasIndex.
+- `FeederPower.State()` là fallback unknown; PR #256 dùng `IFeederPowerLookup` đọc đầu ra được Bridge báo còn mới. Không suy power từ yêu cầu lệnh hoặc heartbeat online.

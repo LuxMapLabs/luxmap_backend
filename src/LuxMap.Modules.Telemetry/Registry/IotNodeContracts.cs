@@ -61,7 +61,7 @@ public sealed record IotNodeRelay
 /// <summary><c>POST /assets/iot-nodes</c>. The commune is copied from the cabinet, never sent.</summary>
 public sealed record CreateIotNodeRequest
 {
-    /// <summary>The cabinet the device is mounted in (CAB-3). At most one device per cabinet.</summary>
+    /// <summary>The cabinet the device is mounted in (CAB-3). A cabinet may carry multiple devices.</summary>
     [Required]
     [MaxLength(32)]
     public string? CabinetId { get; init; }

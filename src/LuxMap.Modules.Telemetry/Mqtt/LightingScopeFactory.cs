@@ -16,13 +16,13 @@ namespace LuxMap.Modules.Telemetry.Mqtt;
 /// run exactly as for the device's own HTTP requests.
 /// </summary>
 public sealed class LightingScopeFactory(
-    NpgsqlDataSource dataSource, ModuleAssemblyCatalog catalog, TimeProvider clock, LightingOptions options)
+    NpgsqlDataSource dataSource, ModuleAssemblyCatalog catalog, TimeProvider clock, LightingOptions options, IFeederSourceLookup sources)
 {
     /// <summary>A context + service scoped to <paramref name="communeId"/>. Dispose it.</summary>
     public LightingScope Open(string communeId, string correlationId)
     {
         var db = Context(CommuneScope.ForCommunes([communeId]));
-        var service = new LightingCommandService(db, new AuditTrail(db, new FixedCorrelation(correlationId)), NoActor.Instance, clock, options);
+        var service = new LightingCommandService(db, new AuditTrail(db, new FixedCorrelation(correlationId)), NoActor.Instance, clock, options, sources);
         return new LightingScope(db, service);
     }
 

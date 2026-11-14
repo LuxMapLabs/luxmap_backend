@@ -38,7 +38,7 @@ public sealed class IotNodeRegistryController(IotNodeRegistryService service, IC
     public async Task<ActionResult<IotNodeItem>> NodeAsync(string nodeId, CancellationToken ct)
         => Ok(await service.NodeAsync(nodeId, ct));
 
-    /// <summary>Registers a device in a cabinet. 409 when the cabinet already carries one; the commune comes from the cabinet.</summary>
+    /// <summary>Registers a device in a cabinet, which may carry multiple devices; the commune comes from the cabinet.</summary>
     [HttpPost]
     [Authorize(Policy = LuxMapPolicies.ManageAssets)]
     [ProducesResponseType(StatusCodes.Status201Created)]

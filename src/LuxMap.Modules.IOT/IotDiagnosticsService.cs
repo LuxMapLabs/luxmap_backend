@@ -5,6 +5,7 @@ using LuxMap.Modules.Assets;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.Telemetry;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
@@ -93,7 +94,7 @@ public sealed record IotCommandStatus(
     string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null, FeederPowerState PowerState = FeederPowerState.Unknown);
 
 public sealed class IotDiagnosticsService(
-    LuxMapDbContext db, HttpClient client, IotRegistrationStore registry) : IFeederPowerLookup
+    LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources) : IFeederPowerLookup
 {
     public async Task<IotDiagnosticResult> GetAsync(string nodeId, CancellationToken ct)
     {
@@ -256,7 +257,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy trụ đèn.");
 
         if (pole.FeederId is null) return new(poleId, null, null, false);
-        var (settings, links) = await FeederLinksAsync([pole.FeederId], ct);
+        var (settings, links) = await sources.LinksAsync(db, [pole.FeederId], ct);
         if (!links.TryGetValue(pole.FeederId, out var link))
             return new(poleId, pole.FeederId, null, false);
         var canControl = link.RemoteControl && TryServer(settings, link.Profile, out _, out _);
@@ -271,32 +272,12 @@ public sealed class IotDiagnosticsService(
                (!remote || node.SupportsRemoteControl)
          select feeder.FeederId).AnyAsync(ct);
 
-    private sealed record FeederLink(string NodeId, NodeProfile Profile, bool RemoteControl);
-
-    private async Task<(IotOptions Settings, Dictionary<string, FeederLink> Links)> FeederLinksAsync(
-        IReadOnlyCollection<string> feederIds, CancellationToken ct)
-    {
-        var candidates = await (
-            from feeder in db.Set<Feeder>().AsNoTracking()
-            from node in db.Set<IotNode>().AsNoTracking()
-            where feederIds.Contains(feeder.FeederId) && feeder.CabinetId == node.CabinetId &&
-                  feeder.CommuneId == node.CommuneId
-            select new { feeder.FeederId, node.NodeId, node.CommuneId, node.SupportsRemoteControl }).ToListAsync(ct);
-        var settings = await registry.ReadAsync(candidates.Select(row => row.NodeId).Distinct().ToArray(), ct);
-        var links = new Dictionary<string, FeederLink>(StringComparer.Ordinal);
-        foreach (var row in candidates)
-            if (settings.Nodes.TryGetValue(row.NodeId, out var profile) && profile.FeederId == row.FeederId &&
-                ServerMatchesCommune(settings, profile, row.CommuneId))
-                links.Add(row.FeederId, new(row.NodeId, profile, row.SupportsRemoteControl));
-        return (settings, links);
-    }
-
     public async Task<IReadOnlyDictionary<string, FeederPowerState>> ReadAsync(
         IReadOnlyCollection<string> feederIds, CancellationToken ct)
     {
         var result = new System.Collections.Concurrent.ConcurrentDictionary<string, FeederPowerState>();
         if (feederIds.Count == 0) return result;
-        var (settings, links) = await FeederLinksAsync(feederIds, ct);
+        var (settings, links) = await sources.LinksAsync(db, feederIds, ct);
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(TimeSpan.FromSeconds(5));
         try
@@ -351,6 +332,8 @@ public sealed class IotDiagnosticsService(
         string nodeId, IotCommandRequest request, CancellationToken ct)
     {
         var (uri, deviceId, profile) = await DeviceSourceAsync(nodeId, ct);
+        var owners = await sources.ControllersAsync(db, [profile.FeederId], ct);
+        FeederControllerBinding.RequireCompatible(profile.FeederId, nodeId, owners.GetValueOrDefault(profile.FeederId));
         var canControl = await CompatibleFeederAsync(nodeId, profile.FeederId, true, ct);
         if (!canControl)
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
@@ -582,7 +565,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
     }
 
-    private static bool ServerMatchesCommune(IotOptions settings, NodeProfile profile, string communeId) =>
+    internal static bool ServerMatchesCommune(IotOptions settings, NodeProfile profile, string communeId) =>
         profile.ServerId is null || (settings.Servers.TryGetValue(profile.ServerId, out var server) &&
             (server.CommuneId is null || server.CommuneId == communeId));
 

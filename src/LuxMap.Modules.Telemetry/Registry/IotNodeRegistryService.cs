@@ -28,13 +28,13 @@ namespace LuxMap.Modules.Telemetry.Registry;
 /// state again, so two wirings of one device cannot interleave. Lighting commands (2b) take the same lock.
 /// </para>
 /// <para>
-/// The database backs every rule here and answers for paths that skip this service: one device per cabinet
-/// (<c>ux_iot_node_cabinet_id</c>), one relay per feeder (PK of <c>feeder_control</c>), a relay only in its device's cabinet
+/// The database backs every rule here and answers for paths that skip this service: one relay per feeder
+/// (PK of <c>feeder_control</c>), a relay only in its device's cabinet
 /// (<c>fk_feeder_control_feeder_same_cabinet</c>), never field data (<c>ck_iot_node_data_source_not_field</c>).
 /// </para>
 /// </remarks>
 public sealed class IotNodeRegistryService(
-    LuxMapDbContext db, TimeProvider clock, LightingCommandService lighting, Mqtt.IMqttBrokerAdmin broker)
+    LuxMapDbContext db, TimeProvider clock, LightingCommandService lighting, Mqtt.IMqttBrokerAdmin broker, IFeederSourceLookup sources)
 {
     /// <summary>Relays a pilot device may number. The CHECK only asks <c>relay_no &gt; 0</c>; this keeps a typo off the table.</summary>
     public const int MaxRelayNo = 32;
@@ -69,11 +69,6 @@ public sealed class IotNodeRegistryService(
             .Select(candidate => new { candidate.CabinetId, candidate.CommuneId })
             .FirstOrDefaultAsync(ct) ?? throw NotFound("cabinet");
 
-        if (await db.Set<IotNode>().AnyAsync(node => node.CabinetId == cabinet.CabinetId, ct))
-        {
-            throw CabinetTaken(cabinet.CabinetId);
-        }
-
         var node = new IotNode
         {
             CabinetId = cabinet.CabinetId,
@@ -83,16 +78,7 @@ public sealed class IotNodeRegistryService(
         };
         db.Add(node);
 
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException failure) when (Constraint(failure) == "ux_iot_node_cabinet_id")
-        {
-            // Two registrations raced past the check above; the unique index settled it.
-            db.ChangeTracker.Clear();
-            throw CabinetTaken(cabinet.CabinetId);
-        }
+        await db.SaveChangesAsync(ct);
 
         return node.NodeId;
     }
@@ -163,15 +149,7 @@ public sealed class IotNodeRegistryService(
 
         if (feederId is not null)
         {
-            if (current?.FeederId == feederId)
-            {
-                return;
-            }
-
-            var feeder = await db.Set<Feeder>().AsNoTracking()
-                .Where(candidate => candidate.FeederId == feederId)
-                .Select(candidate => new { candidate.FeederId, candidate.CabinetId })
-                .FirstOrDefaultAsync(ct) ?? throw NotFound("feeder");
+            var feeder = await FeederControllerBinding.LockFeederAsync(db, feederId, ct);
 
             if (!string.Equals(feeder.CabinetId, node.CabinetId, StringComparison.Ordinal))
             {
@@ -187,6 +165,13 @@ public sealed class IotNodeRegistryService(
                     });
             }
 
+            var owners = await sources.ControllersAsync(db, [feederId], ct);
+            FeederControllerBinding.RequireCompatible(feederId, nodeId, owners.GetValueOrDefault(feederId));
+            if (current?.FeederId == feederId)
+            {
+                return;
+            }
+
             if (await db.Set<FeederControl>().AsNoTracking()
                     .Where(control => control.FeederId == feeder.FeederId)
                     .Select(control => new { control.NodeId, control.RelayNo })
@@ -198,6 +183,7 @@ public sealed class IotNodeRegistryService(
                     "That feeder is already switched by another relay. Unwire it there first.",
                     new Dictionary<string, object?> { ["feeder_id"] = feeder.FeederId, ["node_id"] = held.NodeId, ["relay_no"] = held.RelayNo });
             }
+
         }
 
         // 3.8: a command still open on this relay must never switch the feeder the relay no longer (or newly) carries.
@@ -304,10 +290,6 @@ public sealed class IotNodeRegistryService(
             : throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "A device is testbed hardware (calibration_rig) or demo data (simulated) — never field or public_imagery.",
                 new Dictionary<string, object?> { ["data_source"] = WireEnum.Name(source) });
-
-    private static LuxMapException CabinetTaken(string cabinetId)
-        => new(ErrorCodes.AssetInUse, HttpStatusCode.Conflict, "That cabinet already carries a device (one per cabinet).",
-            new Dictionary<string, object?> { ["cabinet_id"] = cabinetId, ["constraint"] = "ux_iot_node_cabinet_id" });
 
     private static LuxMapException NotFound(string what)
         => new(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound,

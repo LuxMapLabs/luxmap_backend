@@ -35,7 +35,7 @@ namespace LuxMap.Modules.Telemetry.Lighting;
 /// </para>
 /// </remarks>
 public sealed class LightingCommandService(
-    LuxMapDbContext db, IAuditTrail audit, ICurrentActorAccessor actor, TimeProvider clock, LightingOptions options)
+    LuxMapDbContext db, IAuditTrail audit, ICurrentActorAccessor actor, TimeProvider clock, LightingOptions options, IFeederSourceLookup sources)
 {
     // ── Manager ────────────────────────────────────────────────────────────────────────────────
 
@@ -333,6 +333,9 @@ public sealed class LightingCommandService(
         var wiring = await db.Set<FeederControl>().AsNoTracking()
             .Where(control => control.NodeId == nodeId)
             .ToDictionaryAsync(control => control.RelayNo, control => control.FeederId, ct);
+        var owners = await sources.ControllersAsync(db, wiring.Values.ToArray(), ct);
+        foreach (var feederId in wiring.Values)
+            FeederControllerBinding.RequireCompatible(feederId, nodeId, owners.GetValueOrDefault(feederId));
         var open = await db.Set<LightingCommand>()
             .Where(command => command.NodeId == nodeId
                 && (command.Status == LightingCommandStatus.Pending || command.Status == LightingCommandStatus.Delivered))
@@ -526,11 +529,14 @@ public sealed class LightingCommandService(
     /// order), then <c>FOR UPDATE</c>, then read again, tracked. Every write that touches the device's commands or relays uses it.
     /// Call inside a transaction.
     /// </summary>
-    public async Task<IotNode> LockDeviceAsync(string nodeId, CancellationToken ct)
+    public Task<IotNode> LockDeviceAsync(string nodeId, CancellationToken ct) => LockDeviceAsync(db, nodeId, ct);
+
+    public static async Task<IotNode> LockDeviceAsync(LuxMapDbContext db, string nodeId, CancellationToken ct)
     {
         var communeId = await db.Set<IotNode>().Where(node => node.NodeId == nodeId)
             .Select(node => node.CommuneId).FirstOrDefaultAsync(ct) ?? throw NotFound("device");
-        await LockAsync(nodeId, communeId, ct);
+        await db.Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM iot_node WHERE node_id = {0} AND commune_id = {1} FOR UPDATE", [nodeId, communeId], ct);
         return await db.Set<IotNode>().SingleAsync(node => node.NodeId == nodeId, ct);
     }
 
@@ -635,6 +641,10 @@ public sealed class LightingCommandService(
                 })
             .AsNoTracking()
             .ToDictionaryAsync(row => row.FeederId, ct);
+
+        var owners = await sources.ControllersAsync(db, feeders, ct);
+        foreach (var (targetFeederId, control) in wiring)
+            FeederControllerBinding.RequireCompatible(targetFeederId, control.NodeId, owners.GetValueOrDefault(targetFeederId));
 
         var relays = new List<PlannedRelay>();
         var excluded = new List<LightingExclusion>();

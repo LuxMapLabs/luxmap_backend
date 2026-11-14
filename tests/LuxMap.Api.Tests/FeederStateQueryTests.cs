@@ -32,9 +32,11 @@ public sealed class FeederStateQueryTests(AssetImportFixture fixture, ITestOutpu
         probe.Enabled = false;
         output.WriteLine($"Inventory page 1: {one.Length} SQL; page 200: {many.Length} SQL");
         Assert.Equal(one.Length, many.Length);
-        Assert.Single(one, c => c.Sql.Contains("FROM feeder_control", StringComparison.Ordinal));
-        Assert.Single(many, c => c.Sql.Contains("FROM feeder_control", StringComparison.Ordinal));
-        Assert.Contains("JOIN", many.Single(c => c.Sql.Contains("FROM feeder_control", StringComparison.Ordinal)).Sql);
+        // Relay state and the Bridge/relay ownership guard each use one bulk query, for either page size.
+        Assert.Equal(2, one.Count(c => c.Sql.Contains("FROM feeder_control", StringComparison.Ordinal)));
+        var controlQueries = many.Where(c => c.Sql.Contains("FROM feeder_control", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(2, controlQueries.Length);
+        Assert.All(controlQueries, command => Assert.Contains("JOIN", command.Sql));
     }
 
     [Fact]

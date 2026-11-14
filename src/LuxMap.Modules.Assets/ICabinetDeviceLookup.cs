@@ -17,8 +17,11 @@ namespace LuxMap.Modules.Assets;
 /// </remarks>
 public interface ICabinetDeviceLookup
 {
-    /// <summary>cabinet_id → node_id for those of <paramref name="cabinetIds"/> that carry a device.</summary>
-    Task<IReadOnlyDictionary<string, string>> DevicesAsync(IReadOnlyCollection<string> cabinetIds, CancellationToken ct);
+    /// <summary>
+    /// cabinet_id → mounted node ids for those of <paramref name="cabinetIds"/> that carry devices,
+    /// ordered by creation time, id length, then id.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> DevicesAsync(IReadOnlyCollection<string> cabinetIds, CancellationToken ct);
 
     /// <summary>
     /// feeder_id → node_id for those of <paramref name="feederIds"/> a device switches. Such a feeder cannot move

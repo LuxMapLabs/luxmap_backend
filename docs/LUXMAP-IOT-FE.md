@@ -19,7 +19,7 @@ FE ↔ HTTP API LuxMap ↔ HTTP nội bộ IoT Bridge ↔ MQTT ↔ ESP32 gateway
 
 Môi trường local cần cấu hình khóa bridge, khóa provisioning và origin bridge theo [hướng dẫn chạy backend](development.md#chạy-iot-bridge-local).
 
-Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán nguồn khi feeder chưa có trụ. Mỗi tủ hiện gắn tối đa một IoT node. Các ID và tọa độ dưới đây là ví dụ cho bộ thứ hai.
+Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán nguồn khi feeder chưa có trụ. Một tủ có thể chứa nhiều IoT node; từng node vẫn thuộc đúng một tủ cùng xã. Các ID và tọa độ dưới đây là ví dụ cho bộ thứ hai.
 
 Admin thực hiện bước 2.1–2.2. Manager thực hiện bước 2.3–2.4 trong xã được cấp quyền.
 
@@ -191,3 +191,15 @@ Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA
 | 503 | `IOT_SOURCE_UNAVAILABLE` | Nguồn chưa dùng được hoặc bridge không trả phản hồi hợp lệ. |
 
 `401` là cần đăng nhập. `403` là thiếu quyền. Hiển thị thông báo từ `error.message` khi có.
+
+
+## Nhiều node trong cùng tủ — phase 1 (15/11/2026)
+
+API đọc tủ trong assets và map trả đủ `iot_node_ids[]`, thứ tự `created_at, length(node_id), node_id`.
+`iot_node_id` cũ bằng phần tử đầu hoặc null, không phải thiết bị chính. Giữ ảnh và trạng thái các feeder đã có.
+
+Hai kênh Bridge và relay đang cùng tồn tại. Nếu feeder đã gắn relay của một node, source Bridge phải dùng cùng node.
+Nối relay hoặc gán source trái quy tắc trả **409 `IOT_REGISTRATION_CONFLICT`** kèm `feeder_id` và hai node trong details.
+Nguồn tĩnh + nguồn DB trùng feeder cũng trả 409 khi đọc power/map/control hoặc gửi lệnh; FE hiển thị thông báo cấu hình
+và yêu cầu người quản lý sửa liên kết, không diễn giải là mất điện hoặc tự đổi nguồn.
+Phase 2 hợp nhất đường điều khiển sẽ được đặc tả riêng; phase 1 giữ relay và các endpoint hiện hành.

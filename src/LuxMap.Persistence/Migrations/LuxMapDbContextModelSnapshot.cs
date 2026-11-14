@@ -3530,8 +3530,7 @@ namespace LuxMap.Persistence.Migrations
                         .HasName("ak_iot_node_node_id_commune_id");
 
                     b.HasIndex("CabinetId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_iot_node_cabinet_id");
+                        .HasDatabaseName("ix_iot_node_cabinet_id");
 
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_iot_node_commune_id");
