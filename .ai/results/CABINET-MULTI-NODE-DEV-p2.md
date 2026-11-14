@@ -130,3 +130,23 @@ Các review DeepSeek/PR256 từ nhánh cũ là bằng chứng lịch sử, khôn
 
 Không sửa workspace gốc (vẫn 3 tracked files dirty như đầu phiên), không push hoặc gửi thông báo ngoài repo.
 Fetch cuối vẫn xác nhận `origin/dev = df35665`. Chờ xác nhận riêng trước push theo AGENTS.md §5.
+
+
+## Publish được Mỹ xác nhận 15/11/2026
+
+Sau khi hoàn tất phần kiểm chứng ở trên, Mỹ trả lời “ok” cho push nhánh và mở PR vào dev.
+
+```text
+$ git push -u origin feat/CABINET-multiple-iot-nodes-dev
+[new branch] feat/CABINET-multiple-iot-nodes-dev -> feat/CABINET-multiple-iot-nodes-dev
+$ gh pr create --base dev --head feat/CABINET-multiple-iot-nodes-dev --title 'feat(iot): support multiple nodes per cabinet on dev' --body-file .ai/results/CABINET-MULTI-NODE-DEV-pr.md
+https://github.com/LuxMapLabs/luxmap_backend/pull/257
+$ gh pr view 257 --json state,baseRefName,headRefName,mergeable
+state: OPEN
+baseRefName: dev
+headRefName: feat/CABINET-multiple-iot-nodes-dev
+mergeable: MERGEABLE
+```
+
+PR gồm phase 1 `f46364d` và khảo sát phase 2 `c533052`; cập nhật tracking publish là commit docs riêng.
+CI được GitHub khởi chạy; kết quả CI hiện hành xem trên PR. Chưa merge PR, apply DB hoặc deploy.
