@@ -92,6 +92,11 @@ public sealed record IotGatewayCredential(string ClientId, string Username, stri
 public sealed record IotCommandStatus(
     string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null, FeederPowerState PowerState = FeederPowerState.Unknown);
 
+public sealed record IotCommandHistoryItem(
+    string CommandId, string NodeId, string FeederId, string ServerId, string DeviceId,
+    string Mode, string? Command, IotAutoSchedule? AutoSchedule,
+    string RequestedBy, DateTime RequestedAt, DateTime? BridgeAcceptedAt);
+
 public sealed class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources) : IFeederPowerLookup
 {
@@ -429,6 +434,13 @@ public sealed class IotDiagnosticsService(
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
         return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi(), command.ExpiresAt,
             PowerStateOf(device, profile.MaxSilenceSeconds, DateTimeOffset.UtcNow));
+    }
+
+    public async Task<PagedResult<IotCommandHistoryItem>> CommandHistoryAsync(
+        string nodeId, PageRequest page, CancellationToken ct)
+    {
+        await RequireNodeAsync(nodeId, ct);
+        return await registry.ReadCommandHistoryAsync(nodeId, page, ct);
     }
 
     public async Task<IotTelemetryPage> TelemetryHistoryAsync(

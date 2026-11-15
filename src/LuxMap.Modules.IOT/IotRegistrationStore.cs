@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 using System.Text.Json;
 using LuxMap.Modules.IOT.Entities;
@@ -7,6 +8,7 @@ using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Errors;
+using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -244,6 +246,54 @@ public sealed class IotRegistrationStore(
         RecordRegistration(serverId, nodeId, JsonSerializer.Serialize(details, LuxMapJsonOptions.Default));
         return SaveAsync(ct);
     }
+
+    internal async Task<PagedResult<IotCommandHistoryItem>> ReadCommandHistoryAsync(
+        string nodeId, PageRequest page, CancellationToken ct)
+    {
+        var requests = db.Database.SqlQuery<CommandHistoryRow>($"""
+            SELECT requested.id, requested.node_id, requested.server_id, requested.details::text AS details,
+                   requested.created_by, requested.created_at,
+                   (
+                       SELECT min(accepted.created_at)
+                       FROM iot_registration_audit accepted
+                       WHERE accepted.node_id = requested.node_id AND accepted.server_id = requested.server_id
+                         AND accepted.details ->> 'event_type' = 'command_accepted'
+                         AND accepted.details ->> 'command_id' = requested.details ->> 'command_id'
+                   ) AS bridge_accepted_at
+            FROM iot_registration_audit requested
+            WHERE requested.node_id = {nodeId} AND requested.details ->> 'event_type' = 'command_requested'
+            """)
+            .Where(row => db.Set<IotNode>().Any(node => node.NodeId == row.NodeId));
+
+        var total = await requests.CountAsync(ct);
+        if (((long)page.Page - 1) * page.PageSize >= total)
+            return PagedResult<IotCommandHistoryItem>.From(page, total, []);
+
+        var rows = await requests.OrderByDescending(row => row.CreatedAt).ThenByDescending(row => row.Id)
+            .Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
+        var items = rows.Select(row =>
+        {
+            var details = JsonSerializer.Deserialize<RequestedCommandDetails>(row.Details, LuxMapJsonOptions.Default)!;
+            return new IotCommandHistoryItem(details.CommandId, row.NodeId, details.FeederId, row.ServerId,
+                details.DeviceId, details.Mode, details.Command, details.AutoSchedule,
+                row.CreatedBy, row.CreatedAt, row.BridgeAcceptedAt);
+        }).ToArray();
+        return PagedResult<IotCommandHistoryItem>.From(page, total, items);
+    }
+
+    private sealed class CommandHistoryRow
+    {
+        [Column("id")] public long Id { get; init; }
+        [Column("node_id")] public required string NodeId { get; init; }
+        [Column("server_id")] public required string ServerId { get; init; }
+        [Column("details")] public required string Details { get; init; }
+        [Column("created_by")] public required string CreatedBy { get; init; }
+        [Column("created_at")] public DateTime CreatedAt { get; init; }
+        [Column("bridge_accepted_at")] public DateTime? BridgeAcceptedAt { get; init; }
+    }
+
+    private sealed record RequestedCommandDetails(
+        string CommandId, string FeederId, string DeviceId, string Mode, string? Command, IotAutoSchedule? AutoSchedule);
 
     // No FK to the registered objects: deleting a node must not erase its registration history.
     private void RecordRegistration(string serverId, string? nodeId, string details) =>

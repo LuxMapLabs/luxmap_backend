@@ -131,6 +131,14 @@ Từ 07:00 đến trước 19:00, AUTO điều khiển theo cảm biến ánh s�
 
 Lệnh mới có `expires_at` theo UTC và hết hạn sau 5 phút. Nếu đến hạn mà chưa nhận ACK cho đúng mã lệnh, hiển thị **Hết hạn chờ xác nhận**. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
 
+### Lịch sử điều khiển
+
+`GET /api/v1/iot/nodes/{nodeId}/command/history?page=1&page_size=20` · quyền `ReadNetwork`.
+
+Response có `page`, `page_size`, `total` và `items`. Mới nhất ở đầu. Mặc định 50, tối đa 200 mục mỗi trang. Tăng `page` để lấy trang tiếp theo. Khi node chưa có lệnh đã ghi audit, API trả trang rỗng.
+
+Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, `mode`, `command`, lịch đã gửi trong `auto_schedule`, mã tài khoản `requested_by` và giờ UTC `requested_at`. `bridge_accepted_at` có giá trị khi backend đã lưu xác nhận từ Bridge, và bằng `null` nếu chưa ghi nhận xác nhận. Để xem ACK của node cho lệnh hiện tại, gọi `GET …/command`. Lịch sử đọc từ DB LuxMap và có thể truy cập khi gateway offline.
+
 ## 5. Dữ liệu điện và lỗi
 
 | API | Cách dùng |

@@ -284,7 +284,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         bridge.Acknowledge("OFF");
         await AssertPowerAsync("off", off, true);
 
-        var auto = await SubmitAsync("AUTO", null);
+        var auto = await SubmitAsync("AUTO", null, new { day_start = "07:00", night_start = "19:00" });
         bridge.Acknowledge("ON");
         await AssertPowerAsync("on", auto, true);
         bridge.ReportTelemetry("OFF", DateTimeOffset.UtcNow.AddSeconds(-10));
@@ -292,9 +292,44 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         bridge.AgeReports();
         await AssertPowerAsync("unknown", auto, true);
 
-        async Task<string?> SubmitAsync(string mode, string? command)
+        bridge.RejectCommand = true;
+        using var rejected = await manager.PostAsJsonAsync($"{nodePath}/command", new { mode = "MANUAL", command = "OFF" });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, rejected.StatusCode);
+        using var removed = await manager.DeleteAsync($"{nodePath}/source");
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+
+        var history = $"{nodePath}/command/history";
+        var page1 = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=1&page_size=2");
+        Assert.Equal(1, page1.GetProperty("page").GetInt32());
+        Assert.Equal(2, page1.GetProperty("page_size").GetInt32());
+        Assert.Equal(4, page1.GetProperty("total").GetInt32());
+        var newest = page1.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal(2, newest.Length);
+        Assert.Equal("OFF", newest[0].GetProperty("command").GetString());
+        Assert.Equal(JsonValueKind.Null, newest[0].GetProperty("bridge_accepted_at").ValueKind);
+        var acceptedAuto = newest[1];
+        Assert.Equal(auto, acceptedAuto.GetProperty("command_id").GetString());
+        Assert.Equal("AUTO", acceptedAuto.GetProperty("mode").GetString());
+        Assert.Equal(JsonValueKind.Null, acceptedAuto.GetProperty("command").ValueKind);
+        Assert.Equal("07:00", acceptedAuto.GetProperty("auto_schedule").GetProperty("day_start").GetString());
+        Assert.Equal(feeder, acceptedAuto.GetProperty("feeder_id").GetString());
+        Assert.Equal(server, acceptedAuto.GetProperty("server_id").GetString());
+        Assert.False(string.IsNullOrEmpty(acceptedAuto.GetProperty("requested_by").GetString()));
+        Assert.True(acceptedAuto.GetProperty("bridge_accepted_at").GetDateTimeOffset() >=
+            acceptedAuto.GetProperty("requested_at").GetDateTimeOffset());
+
+        var page2 = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=2&page_size=2");
+        Assert.Equal(new[] { off, on }, page2.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("command_id").GetString()));
+        var empty = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=2147483647&page_size=200");
+        Assert.Empty(empty.GetProperty("items").EnumerateArray());
+        using var foreignToken = await fixture.ForeignCommuneClientAsync();
+        using var foreign = AuthorizedClient(host.CreateClient(), foreignToken);
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync(history)).StatusCode);
+
+        async Task<string?> SubmitAsync(string mode, string? command, object? autoSchedule = null)
         {
-            using var response = await manager.PostAsJsonAsync($"{nodePath}/command", new { mode, command });
+            using var response = await manager.PostAsJsonAsync($"{nodePath}/command", new { mode, command, auto_schedule = autoSchedule });
             Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.False(result.GetProperty("command_acknowledged").GetBoolean());
@@ -519,6 +554,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
     private sealed class ReportedPowerBridge : HttpMessageHandler
     {
+        public bool RejectCommand { get; set; }
         private JsonElement? desired;
         private Ack? lastAck;
         private Sample? latestTelemetry;
@@ -545,6 +581,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             {
                 "/api/luxmap/gateways/by-device/probe/authorization" or "/api/luxmap/gateways/by-device/probe-2/authorization" => new(HttpStatusCode.NoContent),
                 "/api/luxmap/gateways/by-device/probe/status" => Json(new { status = "online" }),
+                "/api/luxmap/devices/probe/command" when RejectCommand => new(HttpStatusCode.ServiceUnavailable),
                 "/api/luxmap/devices/probe/command" => Json(await SaveCommandAsync(request, ct)),
                 "/api/luxmap/devices/probe" => Json(new
                 {
