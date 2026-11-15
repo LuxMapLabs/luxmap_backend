@@ -12,13 +12,13 @@ using NetTopologySuite.Geometries;
 namespace LuxMap.Api.Tests;
 
 /// <summary>
-/// MULTI-FIXTURE (drift MF-1, replacing BE-REVIEW-02 D-11) — a pole carries AT MOST TWO lamps in service, one per
-/// slot; retired lamps are history and do not count. Three paths, one rule: CRUD, import, and the database itself.
+/// ONE-FIXTURE (drift OF-1, restoring BE-REVIEW-02 D-11 after the MULTI-FIXTURE window) — a pole carries ONE fitting
+/// in service; retired fittings are history and do not count. Three paths, one rule: CRUD, import, and the database.
 /// </summary>
 /// <remarks>
-/// Every case is sabotaged both ways: the third lamp is refused AND the second one, and the legitimate replacement
-/// (retire first, then install), go through. A check that refused every second lamp — the old rule — would pass
-/// half of each test and nobody would notice until the first double-arm pole.
+/// Every case is sabotaged both ways: the second fitting is refused AND the legitimate replacement (retire first,
+/// then install) and the already-retired history row go through. A check that refused every fitting would pass half
+/// of each test and nobody would notice until the first replacement.
 /// </remarks>
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
@@ -28,33 +28,31 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
     // ── CRUD ───────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task A_second_active_lamp_is_accepted_and_a_third_is_409()
+    public async Task A_second_fitting_in_service_is_409()
     {
         var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId))).StatusCode);
-        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId))).StatusCode);
 
-        var third = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
-        var body = await ReadErrorAsync(third);
+        var second = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
+        var body = await ReadErrorAsync(second);
 
-        Assert.Equal(HttpStatusCode.Conflict, third.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         Assert.Equal(ErrorCodes.PoleHasActiveFixture, body.GetProperty("code").GetString());
         Assert.Equal(poleId, body.GetProperty("details").GetProperty("pole_id").GetString());
-        Assert.Equal(2, await ActiveLampsAsync(poleId));
-        Assert.Equal([(short)1, (short)2], await ActiveSlotsAsync(poleId));
+        Assert.Equal(1, await ActiveLampsAsync(poleId));
+        Assert.Equal([(short)1], await ActiveSlotsAsync(poleId));
     }
 
     [Fact]
-    public async Task Retiring_one_of_two_lamps_frees_its_slot_for_the_replacement()
+    public async Task Retiring_the_fitting_frees_the_pole_for_its_replacement()
     {
         var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
         var first = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
         var firstId = first.Headers.Location!.ToString().Split('/').Last();
-        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId))).StatusCode);
 
         var retire = await client.PutAsJsonAsync(
             $"{FixtureRoute}/{firstId}/removal", new { removed_date = "2026-01-15" });
@@ -63,47 +61,45 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
         var replacement = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId, installDate: "2026-01-16"));
 
         Assert.Equal(HttpStatusCode.Created, replacement.StatusCode);
-        Assert.Equal(2, await ActiveLampsAsync(poleId));
-        Assert.Equal(3, await AllLampsAsync(poleId));
-        Assert.Equal([(short)1, (short)2], await ActiveSlotsAsync(poleId));
+        Assert.Equal(1, await ActiveLampsAsync(poleId));
+        Assert.Equal(2, await AllLampsAsync(poleId));
+        Assert.Equal([(short)1], await ActiveSlotsAsync(poleId));
     }
 
     [Fact]
-    public async Task A_historical_row_that_arrives_already_retired_may_coexist_with_two_active_lamps()
+    public async Task A_historical_row_that_arrives_already_retired_may_coexist_with_the_fitting_in_service()
     {
         var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
 
-        Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId))).StatusCode);
         Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId))).StatusCode);
 
         var history = await client.PostAsJsonAsync(
             FixtureRoute, LampBody(poleId, installDate: "2019-03-01", removedDate: "2022-03-01"));
 
         Assert.Equal(HttpStatusCode.Created, history.StatusCode);
-        Assert.Equal(2, await ActiveLampsAsync(poleId));
+        Assert.Equal(1, await ActiveLampsAsync(poleId));
+        Assert.Equal(2, await AllLampsAsync(poleId));
     }
 
     // ── read side ──────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task The_pole_detail_lists_both_lamps_and_the_inventory_and_map_say_how_many()
+    public async Task The_published_list_shapes_still_carry_the_one_fitting()
     {
         var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
-        await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId, lampWatt: 80));
-        await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId, lampWatt: 120));
+        await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId, lampWatt: 80, lampCount: 2));
 
         var detail = JsonDocument.Parse(await client.GetStringAsync($"/api/v1/map/poles/{poleId}")).RootElement;
         var lamps = detail.GetProperty("fixtures");
-        Assert.Equal(2, lamps.GetArrayLength());
-        Assert.Equal([80, 120], lamps.EnumerateArray().Select(l => l.GetProperty("lamp_watt").GetInt32()));
-        Assert.NotEqual(lamps[0].GetProperty("fixture_id").GetString(), lamps[1].GetProperty("fixture_id").GetString());
-        // The singular field a one-lamp reader uses stays, and is the first lamp.
+        Assert.Equal(1, lamps.GetArrayLength());
+        Assert.Equal(80, lamps[0].GetProperty("lamp_watt").GetInt32());
+        Assert.Equal(2, lamps[0].GetProperty("lamp_count").GetInt32());
         Assert.Equal(80, detail.GetProperty("fixture").GetProperty("lamp_watt").GetInt32());
 
         var inventory = await InventoryRowAsync(client, poleId);
-        Assert.Equal(2, inventory.GetProperty("active_fixtures").GetArrayLength());
+        Assert.Equal(1, inventory.GetProperty("active_fixtures").GetArrayLength());
         Assert.Equal(80, inventory.GetProperty("active_fixture").GetProperty("lamp_watt").GetInt32());
 
         var map = JsonDocument.Parse(await client.GetStringAsync(
@@ -111,43 +107,39 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
         var props = map.GetProperty("features").EnumerateArray()
             .Select(f => f.GetProperty("properties"))
             .Single(p => p.GetProperty("pole_id").GetString() == poleId);
-        Assert.Equal(2, props.GetProperty("fixture_count").GetInt32());
-        Assert.Equal(80, props.GetProperty("lamp_watt").GetInt32());
+        Assert.Equal(1, props.GetProperty("fixture_count").GetInt32());
+        Assert.Equal(2, props.GetProperty("lamp_count").GetInt32());
     }
 
     [Fact]
-    public async Task The_baseline_anchor_is_the_newest_lamp_so_replacing_either_lamp_moves_it()
+    public async Task Replacing_the_fitting_moves_the_baseline_anchor()
     {
         var client = await fixture.ManagerClientAsync();
         var poleId = await NewPoleAsync();
         var first = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
         var firstId = first.Headers.Location!.ToString().Split('/').Last();
-        var second = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId));
-        var secondId = second.Headers.Location!.ToString().Split('/').Last();
-        Assert.Equal(secondId, await AnchorAsync(poleId));
+        Assert.Equal(firstId, await AnchorAsync(poleId));
 
-        // Replace the OLDER lamp: its replacement is newer than both, so the anchor — and with it the baseline — moves.
         await client.PutAsJsonAsync($"{FixtureRoute}/{firstId}/removal", new { removed_date = "2026-02-01" });
         var replacement = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId, installDate: "2026-02-02"));
         var replacementId = replacement.Headers.Location!.ToString().Split('/').Last();
 
         Assert.Equal(replacementId, await AnchorAsync(poleId));
-        Assert.NotEqual(secondId, await AnchorAsync(poleId));
     }
 
     [Fact]
-    public void First_free_slot_takes_the_lowest_and_runs_out_after_two()
+    public void First_free_slot_is_slot_one_and_runs_out_after_it()
     {
         Assert.Equal((short)1, FixtureSlots.FirstFree([]));
-        Assert.Equal((short)2, FixtureSlots.FirstFree([1]));
+        Assert.Null(FixtureSlots.FirstFree([1]));
+        // A stray slot-2 row from the MULTI-FIXTURE window does not occupy slot 1.
         Assert.Equal((short)1, FixtureSlots.FirstFree([2]));
-        Assert.Null(FixtureSlots.FirstFree([1, 2]));
     }
 
     // ── import ─────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Import_fills_both_slots_then_refuses_a_third_lamp_until_one_is_retired()
+    public async Task Import_records_one_fitting_then_refuses_another_until_it_is_retired()
     {
         var client = await fixture.ManagerClientAsync();
         var tag = $"T{Guid.NewGuid():N}"[..9].ToUpperInvariant();
@@ -157,26 +149,25 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
             "pole_external_ref,fixture_type,power_source,lamp_watt,install_date,removed_date,warranty_expiry,data_source";
         var row = $"{tag}-P1,led_road_lamp,grid,100,2026-02-01,,,public_imagery";
 
-        // Three active rows for one pole in a single file: the first two take the slots, the third has none left.
-        var filled = await AssetImportTests.ImportAsync(client, "fixtures", "fixtures.csv",
-            header + $"\n{row}\n{row}\n{row}");
-        Assert.Equal(2, filled.GetProperty("inserted").GetInt32());
+        // Two active rows for one pole in a single file: the first takes the pole, the second is refused.
+        var filled = await AssetImportTests.ImportAsync(client, "fixtures", "fixtures.csv", header + $"\n{row}\n{row}");
+        Assert.Equal(1, filled.GetProperty("inserted").GetInt32());
         Assert.Equal(1, filled.GetProperty("failed").GetInt32());
-        Assert.Contains("2 lamps in service", filled.GetProperty("rows")[0].GetProperty("message").GetString()!);
-        Assert.Equal([(short)1, (short)2], await ActiveSlotsAsync(poleId));
+        Assert.Contains("already has a fitting in service", filled.GetProperty("rows")[0].GetProperty("message").GetString()!);
+        Assert.Equal([(short)1], await ActiveSlotsAsync(poleId));
 
-        // With both slots held by lamps already in the database, one more is refused.
+        // With the fitting already in the database, one more is refused.
         var refused = await AssetImportTests.ImportAsync(client, "fixtures", "fixtures.csv", header + $"\n{row}");
         Assert.Equal(0, refused.GetProperty("inserted").GetInt32());
         Assert.Equal(1, refused.GetProperty("failed").GetInt32());
 
-        // Retire the slot-1 lamp as the system, and the same file goes through into the freed slot.
+        // Retire it as the system, and the same file goes through as the replacement.
         await fixture.QueryAsync(async db =>
         {
             using (db.EnterUnscopedSystemWriteBackdoor())
             {
                 var lamp = await db.Set<Fixture>().IgnoreQueryFilters()
-                    .SingleAsync(candidate => candidate.PoleId == poleId && candidate.RemovedDate == null && candidate.Slot == 1);
+                    .SingleAsync(candidate => candidate.PoleId == poleId && candidate.RemovedDate == null);
                 lamp.RemovedDate = new DateOnly(2026, 3, 1);
                 return await db.SaveChangesAsync();
             }
@@ -184,43 +175,50 @@ public sealed class FixtureCardinalityTests(AssetImportFixture fixture)
 
         var replaced = await AssetImportTests.ImportAsync(client, "fixtures", "fixtures.csv", header + $"\n{row}");
         Assert.Equal(1, replaced.GetProperty("inserted").GetInt32());
-        Assert.Equal([(short)1, (short)2], await ActiveSlotsAsync(poleId));
+        Assert.Equal([(short)1], await ActiveSlotsAsync(poleId));
     }
 
     // ── database ───────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The rule holds with no application code in the way: two active rows in the SAME slot trip
-    /// <c>ux_fixture_pole_slot_active</c>, a third slot is refused by <c>ck_fixture_slot</c>, and a retired row holds no slot.
+    /// The rule holds with no application code in the way: a second active row in slot 1 trips
+    /// <c>ux_fixture_pole_slot_active</c>, an active row in slot 2 trips <c>ck_fixture_active_slot</c>, and
+    /// <c>ck_fixture_slot</c> still bounds every row.
     /// </summary>
     [Fact]
-    public async Task The_database_allows_two_slots_and_refuses_a_repeated_or_third_slot()
+    public async Task The_database_allows_one_fitting_in_service_and_keeps_slot_two_for_history_only()
     {
         var poleId = await NewPoleAsync();
 
         await WriteLampAsync(poleId, removedDate: null, slot: 1);
-        await WriteLampAsync(poleId, removedDate: null, slot: 2);
 
-        var repeated = await Assert.ThrowsAsync<DbUpdateException>(() => WriteLampAsync(poleId, removedDate: null, slot: 2));
+        var repeated = await Assert.ThrowsAsync<DbUpdateException>(() => WriteLampAsync(poleId, removedDate: null, slot: 1));
         Assert.Contains("ux_fixture_pole_slot_active", repeated.InnerException?.Message);
 
-        var third = await Assert.ThrowsAsync<DbUpdateException>(() => WriteLampAsync(poleId, removedDate: null, slot: 3));
-        Assert.Contains("ck_fixture_slot", third.InnerException?.Message);
+        var secondSlot = await Assert.ThrowsAsync<DbUpdateException>(() => WriteLampAsync(poleId, removedDate: null, slot: 2));
+        Assert.Contains("ck_fixture_active_slot", secondSlot.InnerException?.Message);
 
-        // Sabotage the other way: a retired row is NOT a collision, even in an occupied slot.
+        var thirdSlot = await Assert.ThrowsAsync<DbUpdateException>(
+            () => WriteLampAsync(poleId, removedDate: new DateOnly(2020, 1, 1), slot: 3));
+        Assert.Contains("ck_fixture_slot", thirdSlot.InnerException?.Message);
+
+        // Sabotage the other way: retired rows in slot 1 or slot 2 are history, not a collision.
         await WriteLampAsync(poleId, removedDate: new DateOnly(2020, 1, 1), slot: 1);
+        await WriteLampAsync(poleId, removedDate: new DateOnly(2020, 1, 1), slot: 2);
         Assert.Equal(3, await AllLampsAsync(poleId));
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────
 
     private static object LampBody(
-        string poleId, string installDate = "2026-01-04", string? removedDate = null, int lampWatt = 100) => new
+        string poleId, string installDate = "2026-01-04", string? removedDate = null, int lampWatt = 100,
+        int lampCount = 1) => new
     {
         pole_id = poleId,
         fixture_type = "led_road_lamp",
         power_source = "grid",
         lamp_watt = lampWatt,
+        lamp_count = lampCount,
         install_date = installDate,
         removed_date = removedDate,
         data_source = "public_imagery",

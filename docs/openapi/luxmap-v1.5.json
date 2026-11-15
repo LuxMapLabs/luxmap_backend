@@ -27265,7 +27265,7 @@
             "format": "int32",
             "minimum": 0,
             "maximum": 2,
-            "description": "MULTI-FIXTURE MF-3: số bóng đang dùng trên cột (0–2); lamp_watt / lamp_count / install_date / warranty_* mô tả bóng ĐẦU TIÊN (theo slot), bóng thứ hai đọc ở GET /map/poles/{id} (fixtures[])"
+            "description": "MULTI-FIXTURE MF-3, ONE-FIXTURE OF-3: số bộ đèn đang dùng trên cột, 0 hoặc 1 (một cột một bộ); lamp_watt / lamp_count / install_date / warranty_* mô tả bộ đó"
           },
           "install_date": {
             "type": "string",

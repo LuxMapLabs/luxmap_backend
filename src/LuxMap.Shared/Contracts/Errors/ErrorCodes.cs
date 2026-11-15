@@ -120,11 +120,13 @@ public static class ErrorCodes
     public const string RoleForbidden = "ROLE_FORBIDDEN";
 
     /// <summary>
-    /// 409 — the pole already carries two lamps in service; retire one first (MULTI-FIXTURE, drift MF-1; was "one lamp", D-11).
+    /// 409 — the pole already carries a fitting in service; retire it first (ONE-FIXTURE, drift OF-1, back to D-11
+    /// after the MULTI-FIXTURE window that allowed two).
     /// </summary>
     /// <remarks>
     /// Enforced by the partial unique index <c>ux_fixture_pole_slot_active</c>
-    /// (<c>(pole_id, slot) WHERE removed_date IS NULL</c>, slot limited to 1..2), so the database says no
+    /// (<c>(pole_id, slot) WHERE removed_date IS NULL</c>) with <c>ck_fixture_active_slot</c> pinning a fitting in
+    /// service to slot 1, so the database says no
     /// however the row arrives. A lamp with <c>removed_date</c> already set is history, holds no slot and is
     /// not refused. The code name is kept — it is published.
     /// </remarks>

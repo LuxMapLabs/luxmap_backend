@@ -380,8 +380,8 @@ public sealed class AssetCrudService(
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == request.PoleId, "pole", ct);
 
-        // At most TWO lamps in service per pole, one per slot (MULTI-FIXTURE, drift MF-1). A row that
-        // arrives already retired is history, holds no slot and may coexist with any number of others. The
+        // ONE fitting in service per pole (ONE-FIXTURE, drift OF-1). A row that arrives already retired is
+        // history, holds no slot and may coexist with any number of others. The
         // friendly check is here; the partial unique index ux_fixture_pole_slot_active is the guard that
         // cannot be raced past — see the catch around SaveChanges below.
         short slot = FixtureSlots.First;
@@ -1514,7 +1514,7 @@ public sealed class AssetCrudService(
         }
     }
 
-    /// <summary>The lowest free slot on the pole, or 409 when both lamp positions are taken.</summary>
+    /// <summary>The lowest free slot on the pole, or 409 when the pole already has a fitting in service.</summary>
     private async Task<short> FreeSlotOrRejectAsync(string poleId, CancellationToken ct)
     {
         var inUse = await dbContext.Set<Fixture>().AsNoTracking()
@@ -1529,7 +1529,7 @@ public sealed class AssetCrudService(
         => new(
             ErrorCodes.PoleHasActiveFixture,
             HttpStatusCode.Conflict,
-            $"That pole already carries {FixtureSlots.MaxInService} lamps in service. Retire one (PUT /assets/fixtures/{{id}}/removal) before recording another.",
+            "That pole already has a fitting in service. Retire it (PUT /assets/fixtures/{id}/removal) before recording its replacement.",
             new Dictionary<string, object?> { ["pole_id"] = poleId });
 
     /// <summary>PostgreSQL <c>23505</c> on the lamps-in-service index.</summary>

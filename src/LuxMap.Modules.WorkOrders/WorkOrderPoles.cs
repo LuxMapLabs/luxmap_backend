@@ -47,7 +47,7 @@ public sealed record WorkOrderPole
     public int? LampWatt { get; init; }
     public int? LampCount { get; init; }
 
-    /// <summary>Lamps in service, 0 to 2 (MULTI-FIXTURE); the lamp fields above describe the first (slot order).</summary>
+    /// <summary>Fittings in service, 0 or 1 since ONE-FIXTURE (drift OF-1); the lamp fields above describe it.</summary>
     public int FixtureCount { get; init; }
 
     /// <summary>Faults of THIS work order standing on the pole — the poles to repair or inspect.</summary>

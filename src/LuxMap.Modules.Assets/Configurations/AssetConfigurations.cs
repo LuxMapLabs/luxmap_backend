@@ -297,16 +297,18 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
         // "The lamps currently in service on this pole" is the lookup BE-14 makes for every pole in a
         // bbox, so it gets its own partial index rather than filtering the full history each time.
         //
-        // UNIQUE on (pole_id, slot) since MULTI-FIXTURE (drift MF-1), which replaced BE-REVIEW-02's D-11
-        // "one lamp per pole" on 11/11/2026 (Mỹ): a pole carries AT MOST TWO lamps in service, one per slot.
-        // Modelling the limit as a slot rather than counting rows is what lets the database refuse a third
-        // lamp even when two requests race past the service's own check. The history is untouched:
-        // replacing a lamp still keeps the old row with a removed_date, and the index only sees rows where
-        // removed_date IS NULL. Status, baseline and fixture_status stay per POLE — CV cannot tell two lamps
-        // on one pole apart (see Fixture).
+        // UNIQUE on (pole_id, slot) since MULTI-FIXTURE (drift MF-1, 11/11/2026), which allowed two lamps in
+        // service per pole. ONE-FIXTURE (drift OF-1, 15/11/2026, Mỹ) restored BE-REVIEW-02's D-11: a pole carries
+        // ONE fitting in service, its lamps identical (lamp_count), replaced as a whole. ck_fixture_active_slot pins
+        // a fitting in service to slot 1, so together with the unique index the database refuses a second one even
+        // when two requests race past the service's own check. ck_fixture_slot still admits slot 2 for RETIRED rows
+        // only — history from the MULTI-FIXTURE window. Status, baseline and fixture_status stay per POLE.
         builder.Property(fixture => fixture.Slot).HasColumnType("smallint").IsRequired();
         builder.ToTable(table => table.HasCheckConstraint(
-            "ck_fixture_slot", $"slot BETWEEN {FixtureSlots.First} AND {FixtureSlots.MaxInService}"));
+            "ck_fixture_slot", $"slot BETWEEN {FixtureSlots.First} AND {FixtureSlots.MaxRecorded}"));
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_fixture_active_slot",
+            $"removed_date IS NOT NULL OR slot BETWEEN {FixtureSlots.First} AND {FixtureSlots.MaxInService}"));
 
         builder.HasIndex(fixture => new { fixture.PoleId, fixture.Slot })
             .IsUnique()

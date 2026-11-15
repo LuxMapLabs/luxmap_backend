@@ -483,6 +483,16 @@
   </div>
 
   <div class="card">
+    <strong>ONE-FIXTURE — một trụ một bộ đèn, hỏng bóng nào thay cả bộ, 15/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/ONE-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>RestrictFixtureToOneInService</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.5.json</code></span>
+    Mỹ chốt theo đề xuất của FE: đảo MULTI-FIXTURE, khôi phục D-11 bằng cách khoá còn 1 slot (không revert schema). CHECK mới <code>ck_fixture_active_slot</code>: bộ đang dùng ở slot 1;
+    slot 2 chỉ còn trên bộ đã ngừng dùng. Bộ thứ hai → 409 <code>POLE_HAS_ACTIVE_FIXTURE</code>, import báo theo dòng. Hình dạng đọc (<code>fixtures[]</code>, <code>fixture_count</code>) giữ, nay tối đa một bộ.
+    Trước migration đã đếm: 0 cột hai bộ trên <code>luxmap_dev</code> và VPS. 76 test (asset, map, chi tiết cột, bảo hành, import) đạt; phá thử CHECK trong migration → đúng test DB đỏ.
+    Drift OF-1…OF-7, SELF-SIGNED; MF-5 đóng. <strong>Còn mở:</strong> OF-7 — ảnh cột chỉ có nhãn on/off nên bộ sáng một phần không hạ được cột xuống <code>dim</code>.</p>
+    <p class="muted">Commit: <code>feat(assets): limit a pole to one fitting in service again</code>.</p>
+  </div>
+
+  <div class="card">
     <strong>MULTI-FIXTURE — một cột mang tối đa hai bóng, mỗi bóng một bản ghi, 11/11/2026</strong>
     <p><span class="tag t-done">Đã merge · #226 (11/11) · migration <code>AddFixtureSlot</code> chưa lên VPS · chưa báo WP5 / WP6</span>
     Mỹ chọn hướng B (đảo D-11 và hướng A của LAMP-COUNT): hai bản ghi <code>fixture</code> riêng mỗi cột. Giới hạn nằm ở DB: <code>fixture.slot</code> (1..2) + UNIQUE

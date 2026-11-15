@@ -529,9 +529,9 @@ public sealed class AssetImportService(
     /// <remarks>
     /// There is no natural key to upsert on. A pole carries several lamps over its life and the
     /// history is the point, so nothing in the file identifies a particular installation. Re-running
-    /// a fixtures file therefore reports one error per ACTIVE row beyond a pole's two slots rather than silently
-    /// doubling the equipment history (MULTI-FIXTURE: at most two lamps in service per pole). Replacing a lamp
-    /// goes through CRUD, which can say which row it means.
+    /// a fixtures file therefore reports one error per ACTIVE row beyond a pole's one fitting rather than silently
+    /// doubling the equipment history (ONE-FIXTURE: one fitting in service per pole). Replacing a fitting goes
+    /// through CRUD, which can say which row it means.
     /// </remarks>
     private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
@@ -554,9 +554,9 @@ public sealed class AssetImportService(
             var warranty = reader.Date("warranty_expiry", required: false);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
 
-            // At most two lamps in service per pole, one per slot (MULTI-FIXTURE). A row with removed_date is
-            // history and neither takes a slot nor is refused by a lamp already there; only an ACTIVE row can
-            // run out of slots, whether the other lamps are in the database or earlier in this file.
+            // One fitting in service per pole (ONE-FIXTURE). A row with removed_date is history and neither takes
+            // a slot nor is refused by a fitting already there; only an ACTIVE row can be refused, whether the
+            // fitting in service is in the database or earlier in this file.
             if (installDate is not null && removedDate is not null && removedDate < installDate)
             {
                 reader.Fail("removed_date", $"'{removedDate:yyyy-MM-dd}' is before install_date '{installDate:yyyy-MM-dd}'.");
@@ -579,9 +579,9 @@ public sealed class AssetImportService(
                 {
                     reader.Fail(
                         "pole_external_ref",
-                        $"That pole already carries {FixtureSlots.MaxInService} lamps in service. Import creates "
-                        + "equipment records, it never replaces them — retire one lamp "
-                        + "(PUT /assets/fixtures/{id}/removal) before recording another.");
+                        "That pole already has a fitting in service. Import creates equipment records, it never "
+                        + "replaces them — retire the fitting (PUT /assets/fixtures/{id}/removal) before recording "
+                        + "its replacement.");
                 }
             }
 

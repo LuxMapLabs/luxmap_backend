@@ -542,6 +542,8 @@ namespace LuxMap.Persistence.Migrations
 
                     b.ToTable("fixture", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fixture_active_slot", "removed_date IS NOT NULL OR slot BETWEEN 1 AND 1");
+
                             t.HasCheckConstraint("ck_fixture_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
 
                             t.HasCheckConstraint("ck_fixture_fixture_type", "\"fixture_type\" IN ('led_road_lamp')");
@@ -1575,6 +1577,215 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.IOT.Entities.FeederControl", b =>
+                {
+                    b.Property<string>("FeederId")
+                        .HasColumnType("text")
+                        .HasColumnName("feeder_id");
+
+                    b.Property<string>("CabinetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cabinet_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<string>("ControlMode")
+                        .HasColumnType("text")
+                        .HasColumnName("control_mode");
+
+                    b.Property<DateTime?>("ModeReportedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("mode_reported_at");
+
+                    b.Property<long?>("ModeSeq")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mode_seq");
+
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("node_id");
+
+                    b.Property<short>("RelayNo")
+                        .HasColumnType("smallint")
+                        .HasColumnName("relay_no");
+
+                    b.HasKey("FeederId")
+                        .HasName("pk_feeder_control");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_feeder_control_commune_id");
+
+                    b.HasIndex("FeederId", "CommuneId")
+                        .HasDatabaseName("ix_feeder_control_feeder_id_commune_id");
+
+                    b.HasIndex("NodeId", "CommuneId")
+                        .HasDatabaseName("ix_feeder_control_node_id_commune_id");
+
+                    b.HasIndex("NodeId", "RelayNo")
+                        .IsUnique()
+                        .HasDatabaseName("ux_feeder_control_node_id_relay_no");
+
+                    b.ToTable("feeder_control", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_feeder_control_control_mode", "\"control_mode\" IS NULL OR \"control_mode\" IN ('on', 'off', 'auto')");
+
+                            t.HasCheckConstraint("ck_feeder_control_mode_reported", "(control_mode IS NULL) = (mode_reported_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_feeder_control_mode_seq_has_mode", "mode_seq IS NULL OR control_mode IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_feeder_control_relay_no_positive", "relay_no > 0");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Entities.IotNode", b =>
+                {
+                    b.Property<string>("NodeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("node_id")
+                        .HasDefaultValueSql("luxmap_format_id('NODE', nextval('node_id_seq'), 3)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "node_id_seq");
+
+                    b.Property<string>("CabinetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cabinet_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("CredentialHash")
+                        .HasColumnType("text")
+                        .HasColumnName("credential_hash");
+
+                    b.Property<DateTime?>("CredentialSetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("credential_set_at");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<long?>("FirmwareVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("firmware_version_id");
+
+                    b.Property<DateTime?>("LastReportAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_report_at");
+
+                    b.Property<string>("NodeRole")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("node_role");
+
+                    b.Property<bool>("SupportsRemoteControl")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("supports_remote_control");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("NodeId")
+                        .HasName("pk_iot_node");
+
+                    b.HasAlternateKey("NodeId", "CommuneId")
+                        .HasName("ak_iot_node_node_id_commune_id");
+
+                    b.HasIndex("CabinetId")
+                        .HasDatabaseName("ix_iot_node_cabinet_id");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_iot_node_commune_id");
+
+                    b.HasIndex("FirmwareVersionId")
+                        .HasDatabaseName("ix_iot_node_firmware_version_id");
+
+                    b.HasIndex("CabinetId", "CommuneId")
+                        .HasDatabaseName("ix_iot_node_cabinet_id_commune_id");
+
+                    b.ToTable("iot_node", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_iot_node_credential_set_together", "(credential_hash IS NULL) = (credential_set_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_iot_node_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_iot_node_data_source_not_field", "data_source IN ('calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_iot_node_node_role", "\"node_role\" IN ('segment_controller')");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Entities.IotNodeFirmware", b =>
+                {
+                    b.Property<long>("ChangeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("change_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ChangeId"));
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<long>("FirmwareVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("firmware_version_id");
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("node_id");
+
+                    b.HasKey("ChangeId")
+                        .HasName("pk_iot_node_firmware");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_iot_node_firmware_commune_id");
+
+                    b.HasIndex("FirmwareVersionId")
+                        .HasDatabaseName("ix_iot_node_firmware_firmware_version_id");
+
+                    b.HasIndex("NodeId", "CommuneId")
+                        .HasDatabaseName("ix_iot_node_firmware_node_id_commune_id");
+
+                    b.HasIndex("NodeId", "FirstSeenAt")
+                        .HasDatabaseName("ix_iot_node_firmware_node_id_first_seen_at");
+
+                    b.ToTable("iot_node_firmware", (string)null);
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.IOT.IotRegistrationAudit", b =>
                 {
                     b.Property<long>("Id")
@@ -1679,6 +1890,221 @@ namespace LuxMap.Persistence.Migrations
                         .HasDatabaseName("ix_iot_source_registration_server_id_device_id");
 
                     b.ToTable("iot_source_registration", (string)null);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Lighting.LightingCommand", b =>
+                {
+                    b.Property<string>("CommandId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasColumnName("command_id")
+                        .HasDefaultValueSql("luxmap_format_id('CMD', nextval('command_id_seq'), 6)")
+                        .HasAnnotation("LuxMap:PrefixedIdSequence", "command_id_seq");
+
+                    b.Property<string>("CabinetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cabinet_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("FeederId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("feeder_id");
+
+                    b.Property<string>("NodeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("node_id");
+
+                    b.Property<short>("RelayNo")
+                        .HasColumnType("smallint")
+                        .HasColumnName("relay_no");
+
+                    b.Property<string>("ReportedMode")
+                        .HasColumnType("text")
+                        .HasColumnName("reported_mode");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("RequestedMode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("requested_mode");
+
+                    b.Property<long>("Seq")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("seq");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Seq"));
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("status");
+
+                    b.HasKey("CommandId")
+                        .HasName("pk_lighting_command");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_lighting_command_commune_id");
+
+                    b.HasIndex("RequestId")
+                        .HasDatabaseName("ix_lighting_command_request_id");
+
+                    b.HasIndex("Seq")
+                        .IsUnique()
+                        .HasDatabaseName("ux_lighting_command_seq");
+
+                    b.HasIndex("FeederId", "CommuneId")
+                        .HasDatabaseName("ix_lighting_command_feeder_id_commune_id");
+
+                    b.HasIndex("NodeId", "CommuneId")
+                        .HasDatabaseName("ix_lighting_command_node_id_commune_id");
+
+                    b.HasIndex("NodeId", "Status")
+                        .HasDatabaseName("ix_lighting_command_node_id_status");
+
+                    b.ToTable("lighting_command", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_lighting_command_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_lighting_command_data_source_not_field", "data_source IN ('calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_lighting_command_error_length", "error IS NULL OR char_length(error) BETWEEN 1 AND 500");
+
+                            t.HasCheckConstraint("ck_lighting_command_relay_no_positive", "relay_no > 0");
+
+                            t.HasCheckConstraint("ck_lighting_command_reported_mode", "\"reported_mode\" IS NULL OR \"reported_mode\" IN ('on', 'off', 'auto')");
+
+                            t.HasCheckConstraint("ck_lighting_command_requested_mode", "\"requested_mode\" IN ('on', 'off', 'auto')");
+
+                            t.HasCheckConstraint("ck_lighting_command_status", "\"status\" IN ('pending', 'delivered', 'applied', 'failed', 'expired', 'superseded')");
+
+                            t.HasCheckConstraint("ck_lighting_command_status_columns", "CASE status WHEN 'pending' THEN delivered_at IS NULL AND completed_at IS NULL AND reported_mode IS NULL AND error IS NULL WHEN 'delivered' THEN delivered_at IS NOT NULL AND completed_at IS NULL AND reported_mode IS NULL AND error IS NULL WHEN 'applied' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND reported_mode IS NOT NULL AND reported_mode = requested_mode AND error IS NULL WHEN 'failed' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND error IS NOT NULL ELSE completed_at IS NOT NULL AND reported_mode IS NULL AND error IS NULL END");
+
+                            t.HasCheckConstraint("ck_lighting_command_times_ordered", "expires_at > created_at AND (delivered_at IS NULL OR delivered_at >= created_at) AND (completed_at IS NULL OR completed_at >= COALESCE(delivered_at, created_at))");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Lighting.LightingRequest", b =>
+                {
+                    b.Property<Guid>("RequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.PrimitiveCollection<string[]>("AffectedSegmentIds")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("affected_segment_ids");
+
+                    b.Property<Guid>("ClientOpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("client_op_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<string>("Excluded")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("excluded");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_hash");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("requested_by");
+
+                    b.Property<string>("RequestedMode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("requested_mode");
+
+                    b.Property<string>("TargetId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetKind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("target_kind");
+
+                    b.Property<int>("UncontrollablePoleCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("uncontrollable_pole_count");
+
+                    b.HasKey("RequestId")
+                        .HasName("pk_lighting_request");
+
+                    b.HasIndex("ClientOpId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_lighting_request_client_op_id");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_lighting_request_commune_id");
+
+                    b.HasIndex("RequestedBy")
+                        .HasDatabaseName("ix_lighting_request_requested_by");
+
+                    b.ToTable("lighting_request", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_lighting_request_excluded_array", "jsonb_typeof(excluded) = 'array'");
+
+                            t.HasCheckConstraint("ck_lighting_request_requested_mode", "\"requested_mode\" IN ('on', 'off', 'auto')");
+
+                            t.HasCheckConstraint("ck_lighting_request_target_kind", "\"target_kind\" IN ('feeder', 'segment')");
+
+                            t.HasCheckConstraint("ck_lighting_request_uncontrollable_pole_count", "uncontrollable_pole_count >= 0");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AccountToken", b =>
@@ -3393,430 +3819,6 @@ namespace LuxMap.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.FeederControl", b =>
-                {
-                    b.Property<string>("FeederId")
-                        .HasColumnType("text")
-                        .HasColumnName("feeder_id");
-
-                    b.Property<string>("CabinetId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("cabinet_id");
-
-                    b.Property<string>("CommuneId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("commune_id");
-
-                    b.Property<string>("ControlMode")
-                        .HasColumnType("text")
-                        .HasColumnName("control_mode");
-
-                    b.Property<DateTime?>("ModeReportedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("mode_reported_at");
-
-                    b.Property<long?>("ModeSeq")
-                        .HasColumnType("bigint")
-                        .HasColumnName("mode_seq");
-
-                    b.Property<string>("NodeId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("node_id");
-
-                    b.Property<short>("RelayNo")
-                        .HasColumnType("smallint")
-                        .HasColumnName("relay_no");
-
-                    b.HasKey("FeederId")
-                        .HasName("pk_feeder_control");
-
-                    b.HasIndex("CommuneId")
-                        .HasDatabaseName("ix_feeder_control_commune_id");
-
-                    b.HasIndex("FeederId", "CommuneId")
-                        .HasDatabaseName("ix_feeder_control_feeder_id_commune_id");
-
-                    b.HasIndex("NodeId", "CommuneId")
-                        .HasDatabaseName("ix_feeder_control_node_id_commune_id");
-
-                    b.HasIndex("NodeId", "RelayNo")
-                        .IsUnique()
-                        .HasDatabaseName("ux_feeder_control_node_id_relay_no");
-
-                    b.ToTable("feeder_control", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_feeder_control_control_mode", "\"control_mode\" IS NULL OR \"control_mode\" IN ('on', 'off', 'auto')");
-
-                            t.HasCheckConstraint("ck_feeder_control_mode_reported", "(control_mode IS NULL) = (mode_reported_at IS NULL)");
-
-                            t.HasCheckConstraint("ck_feeder_control_mode_seq_has_mode", "mode_seq IS NULL OR control_mode IS NOT NULL");
-
-                            t.HasCheckConstraint("ck_feeder_control_relay_no_positive", "relay_no > 0");
-                        });
-
-                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.IotNode", b =>
-                {
-                    b.Property<string>("NodeId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasColumnName("node_id")
-                        .HasDefaultValueSql("luxmap_format_id('NODE', nextval('node_id_seq'), 3)")
-                        .HasAnnotation("LuxMap:PrefixedIdSequence", "node_id_seq");
-
-                    b.Property<string>("CabinetId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("cabinet_id");
-
-                    b.Property<string>("CommuneId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("commune_id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<string>("CredentialHash")
-                        .HasColumnType("text")
-                        .HasColumnName("credential_hash");
-
-                    b.Property<DateTime?>("CredentialSetAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("credential_set_at");
-
-                    b.Property<string>("DataSource")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("data_source");
-
-                    b.Property<long?>("FirmwareVersionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("firmware_version_id");
-
-                    b.Property<DateTime?>("LastReportAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_report_at");
-
-                    b.Property<string>("NodeRole")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("node_role");
-
-                    b.Property<bool>("SupportsRemoteControl")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("supports_remote_control");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("NodeId")
-                        .HasName("pk_iot_node");
-
-                    b.HasAlternateKey("NodeId", "CommuneId")
-                        .HasName("ak_iot_node_node_id_commune_id");
-
-                    b.HasIndex("CabinetId")
-                        .HasDatabaseName("ix_iot_node_cabinet_id");
-
-                    b.HasIndex("CommuneId")
-                        .HasDatabaseName("ix_iot_node_commune_id");
-
-                    b.HasIndex("FirmwareVersionId")
-                        .HasDatabaseName("ix_iot_node_firmware_version_id");
-
-                    b.HasIndex("CabinetId", "CommuneId")
-                        .HasDatabaseName("ix_iot_node_cabinet_id_commune_id");
-
-                    b.ToTable("iot_node", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_iot_node_credential_set_together", "(credential_hash IS NULL) = (credential_set_at IS NULL)");
-
-                            t.HasCheckConstraint("ck_iot_node_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
-
-                            t.HasCheckConstraint("ck_iot_node_data_source_not_field", "data_source IN ('calibration_rig', 'simulated')");
-
-                            t.HasCheckConstraint("ck_iot_node_node_role", "\"node_role\" IN ('segment_controller')");
-                        });
-
-                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.IotNodeFirmware", b =>
-                {
-                    b.Property<long>("ChangeId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("change_id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("ChangeId"));
-
-                    b.Property<string>("CommuneId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("commune_id");
-
-                    b.Property<long>("FirmwareVersionId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("firmware_version_id");
-
-                    b.Property<DateTime>("FirstSeenAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("first_seen_at");
-
-                    b.Property<string>("NodeId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("node_id");
-
-                    b.HasKey("ChangeId")
-                        .HasName("pk_iot_node_firmware");
-
-                    b.HasIndex("CommuneId")
-                        .HasDatabaseName("ix_iot_node_firmware_commune_id");
-
-                    b.HasIndex("FirmwareVersionId")
-                        .HasDatabaseName("ix_iot_node_firmware_firmware_version_id");
-
-                    b.HasIndex("NodeId", "CommuneId")
-                        .HasDatabaseName("ix_iot_node_firmware_node_id_commune_id");
-
-                    b.HasIndex("NodeId", "FirstSeenAt")
-                        .HasDatabaseName("ix_iot_node_firmware_node_id_first_seen_at");
-
-                    b.ToTable("iot_node_firmware", (string)null);
-
-                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Lighting.LightingCommand", b =>
-                {
-                    b.Property<string>("CommandId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
-                        .HasColumnName("command_id")
-                        .HasDefaultValueSql("luxmap_format_id('CMD', nextval('command_id_seq'), 6)")
-                        .HasAnnotation("LuxMap:PrefixedIdSequence", "command_id_seq");
-
-                    b.Property<string>("CabinetId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("cabinet_id");
-
-                    b.Property<string>("CommuneId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("commune_id");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("DataSource")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("data_source");
-
-                    b.Property<DateTime?>("DeliveredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("delivered_at");
-
-                    b.Property<string>("Error")
-                        .HasColumnType("text")
-                        .HasColumnName("error");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<string>("FeederId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("feeder_id");
-
-                    b.Property<string>("NodeId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("node_id");
-
-                    b.Property<short>("RelayNo")
-                        .HasColumnType("smallint")
-                        .HasColumnName("relay_no");
-
-                    b.Property<string>("ReportedMode")
-                        .HasColumnType("text")
-                        .HasColumnName("reported_mode");
-
-                    b.Property<Guid>("RequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("request_id");
-
-                    b.Property<string>("RequestedMode")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("requested_mode");
-
-                    b.Property<long>("Seq")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("seq");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Seq"));
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.HasKey("CommandId")
-                        .HasName("pk_lighting_command");
-
-                    b.HasIndex("CommuneId")
-                        .HasDatabaseName("ix_lighting_command_commune_id");
-
-                    b.HasIndex("RequestId")
-                        .HasDatabaseName("ix_lighting_command_request_id");
-
-                    b.HasIndex("Seq")
-                        .IsUnique()
-                        .HasDatabaseName("ux_lighting_command_seq");
-
-                    b.HasIndex("FeederId", "CommuneId")
-                        .HasDatabaseName("ix_lighting_command_feeder_id_commune_id");
-
-                    b.HasIndex("NodeId", "CommuneId")
-                        .HasDatabaseName("ix_lighting_command_node_id_commune_id");
-
-                    b.HasIndex("NodeId", "Status")
-                        .HasDatabaseName("ix_lighting_command_node_id_status");
-
-                    b.ToTable("lighting_command", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_lighting_command_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
-
-                            t.HasCheckConstraint("ck_lighting_command_data_source_not_field", "data_source IN ('calibration_rig', 'simulated')");
-
-                            t.HasCheckConstraint("ck_lighting_command_error_length", "error IS NULL OR char_length(error) BETWEEN 1 AND 500");
-
-                            t.HasCheckConstraint("ck_lighting_command_relay_no_positive", "relay_no > 0");
-
-                            t.HasCheckConstraint("ck_lighting_command_reported_mode", "\"reported_mode\" IS NULL OR \"reported_mode\" IN ('on', 'off', 'auto')");
-
-                            t.HasCheckConstraint("ck_lighting_command_requested_mode", "\"requested_mode\" IN ('on', 'off', 'auto')");
-
-                            t.HasCheckConstraint("ck_lighting_command_status", "\"status\" IN ('pending', 'delivered', 'applied', 'failed', 'expired', 'superseded')");
-
-                            t.HasCheckConstraint("ck_lighting_command_status_columns", "CASE status WHEN 'pending' THEN delivered_at IS NULL AND completed_at IS NULL AND reported_mode IS NULL AND error IS NULL WHEN 'delivered' THEN delivered_at IS NOT NULL AND completed_at IS NULL AND reported_mode IS NULL AND error IS NULL WHEN 'applied' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND reported_mode IS NOT NULL AND reported_mode = requested_mode AND error IS NULL WHEN 'failed' THEN delivered_at IS NOT NULL AND completed_at IS NOT NULL AND error IS NOT NULL ELSE completed_at IS NOT NULL AND reported_mode IS NULL AND error IS NULL END");
-
-                            t.HasCheckConstraint("ck_lighting_command_times_ordered", "expires_at > created_at AND (delivered_at IS NULL OR delivered_at >= created_at) AND (completed_at IS NULL OR completed_at >= COALESCE(delivered_at, created_at))");
-                        });
-
-                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Lighting.LightingRequest", b =>
-                {
-                    b.Property<Guid>("RequestId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("request_id");
-
-                    b.PrimitiveCollection<string[]>("AffectedSegmentIds")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("affected_segment_ids");
-
-                    b.Property<Guid>("ClientOpId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("client_op_id");
-
-                    b.Property<string>("CommuneId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("commune_id");
-
-                    b.Property<string>("Excluded")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("excluded");
-
-                    b.Property<string>("RequestHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("request_hash");
-
-                    b.Property<DateTime>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<string>("RequestedBy")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("requested_by");
-
-                    b.Property<string>("RequestedMode")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("requested_mode");
-
-                    b.Property<string>("TargetId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("target_id");
-
-                    b.Property<string>("TargetKind")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("target_kind");
-
-                    b.Property<int>("UncontrollablePoleCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("uncontrollable_pole_count");
-
-                    b.HasKey("RequestId")
-                        .HasName("pk_lighting_request");
-
-                    b.HasIndex("ClientOpId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_lighting_request_client_op_id");
-
-                    b.HasIndex("CommuneId")
-                        .HasDatabaseName("ix_lighting_request_commune_id");
-
-                    b.HasIndex("RequestedBy")
-                        .HasDatabaseName("ix_lighting_request_requested_by");
-
-                    b.ToTable("lighting_request", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_lighting_request_excluded_array", "jsonb_typeof(excluded) = 'array'");
-
-                            t.HasCheckConstraint("ck_lighting_request_requested_mode", "\"requested_mode\" IN ('on', 'off', 'auto')");
-
-                            t.HasCheckConstraint("ck_lighting_request_target_kind", "\"target_kind\" IN ('feeder', 'segment')");
-
-                            t.HasCheckConstraint("ck_lighting_request_uncontrollable_pole_count", "uncontrollable_pole_count >= 0");
-                        });
-
-                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
-                });
-
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.RepairEvidence", b =>
                 {
                     b.Property<string>("EvidenceId")
@@ -4239,7 +4241,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
 
-                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\r\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\r\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\r\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\r\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\r\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
+                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
 
                             t.HasCheckConstraint("ck_work_order_cancellation_request_status", "\"cancellation_request_status\" IN ('none', 'pending', 'rejected')");
 
@@ -5601,7 +5603,7 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_fault_road_segment_segment_id");
 
-                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
+                    b.HasOne("LuxMap.Modules.IOT.Entities.IotNode", null)
                         .WithMany()
                         .HasForeignKey("OriginNodeId", "CommuneId")
                         .HasPrincipalKey("NodeId", "CommuneId")
@@ -5640,6 +5642,81 @@ namespace LuxMap.Persistence.Migrations
                         .HasConstraintName("fk_fault_cluster_road_segment_segment_id");
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.IOT.Entities.FeederControl", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_feeder_control_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Feeder", null)
+                        .WithMany()
+                        .HasForeignKey("FeederId", "CommuneId")
+                        .HasPrincipalKey("FeederId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_feeder_control_feeder_feeder_id_commune_id");
+
+                    b.HasOne("LuxMap.Modules.IOT.Entities.IotNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId", "CommuneId")
+                        .HasPrincipalKey("NodeId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_feeder_control_iot_node_node_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Entities.IotNode", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("FirmwareVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_iot_node_artifact_version_firmware_version_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.ElectricalCabinet", null)
+                        .WithMany()
+                        .HasForeignKey("CabinetId", "CommuneId")
+                        .HasPrincipalKey("CabinetId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_electrical_cabinet_cabinet_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Entities.IotNodeFirmware", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_firmware_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("FirmwareVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_firmware_artifact_version_firmware_version_id");
+
+                    b.HasOne("LuxMap.Modules.IOT.Entities.IotNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId", "CommuneId")
+                        .HasPrincipalKey("NodeId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_iot_node_firmware_iot_node_node_id_commune_id");
+                });
+
             modelBuilder.Entity("LuxMap.Modules.IOT.IotServerRegistration", b =>
                 {
                     b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
@@ -5651,12 +5728,62 @@ namespace LuxMap.Persistence.Migrations
 
             modelBuilder.Entity("LuxMap.Modules.IOT.IotSourceRegistration", b =>
                 {
-                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
+                    b.HasOne("LuxMap.Modules.IOT.Entities.IotNode", null)
                         .WithOne()
                         .HasForeignKey("LuxMap.Modules.IOT.IotSourceRegistration", "NodeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_iot_source_registration_iot_node_node_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Lighting.LightingCommand", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lighting_command_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.IOT.Lighting.LightingRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lighting_command_lighting_request_request_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Feeder", null)
+                        .WithMany()
+                        .HasForeignKey("FeederId", "CommuneId")
+                        .HasPrincipalKey("FeederId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lighting_command_feeder_feeder_id_commune_id");
+
+                    b.HasOne("LuxMap.Modules.IOT.Entities.IotNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId", "CommuneId")
+                        .HasPrincipalKey("NodeId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lighting_command_iot_node_node_id_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.IOT.Lighting.LightingRequest", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lighting_request_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lighting_request_app_user_requested_by");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Identity.Entities.AccountToken", b =>
@@ -6113,131 +6240,6 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_sync_operation_app_user_user_id");
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.FeederControl", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_feeder_control_administrative_unit_commune_id");
-
-                    b.HasOne("LuxMap.Modules.Assets.Entities.Feeder", null)
-                        .WithMany()
-                        .HasForeignKey("FeederId", "CommuneId")
-                        .HasPrincipalKey("FeederId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_feeder_control_feeder_feeder_id_commune_id");
-
-                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
-                        .WithMany()
-                        .HasForeignKey("NodeId", "CommuneId")
-                        .HasPrincipalKey("NodeId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_feeder_control_iot_node_node_id_commune_id");
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.IotNode", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_iot_node_administrative_unit_commune_id");
-
-                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
-                        .WithMany()
-                        .HasForeignKey("FirmwareVersionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_iot_node_artifact_version_firmware_version_id");
-
-                    b.HasOne("LuxMap.Modules.Assets.Entities.ElectricalCabinet", null)
-                        .WithMany()
-                        .HasForeignKey("CabinetId", "CommuneId")
-                        .HasPrincipalKey("CabinetId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_iot_node_electrical_cabinet_cabinet_id_commune_id");
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Entities.IotNodeFirmware", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_iot_node_firmware_administrative_unit_commune_id");
-
-                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
-                        .WithMany()
-                        .HasForeignKey("FirmwareVersionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_iot_node_firmware_artifact_version_firmware_version_id");
-
-                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
-                        .WithMany()
-                        .HasForeignKey("NodeId", "CommuneId")
-                        .HasPrincipalKey("NodeId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_iot_node_firmware_iot_node_node_id_commune_id");
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Lighting.LightingCommand", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lighting_command_administrative_unit_commune_id");
-
-                    b.HasOne("LuxMap.Modules.Telemetry.Lighting.LightingRequest", null)
-                        .WithMany()
-                        .HasForeignKey("RequestId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lighting_command_lighting_request_request_id");
-
-                    b.HasOne("LuxMap.Modules.Assets.Entities.Feeder", null)
-                        .WithMany()
-                        .HasForeignKey("FeederId", "CommuneId")
-                        .HasPrincipalKey("FeederId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lighting_command_feeder_feeder_id_commune_id");
-
-                    b.HasOne("LuxMap.Modules.Telemetry.Entities.IotNode", null)
-                        .WithMany()
-                        .HasForeignKey("NodeId", "CommuneId")
-                        .HasPrincipalKey("NodeId", "CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lighting_command_iot_node_node_id_commune_id");
-                });
-
-            modelBuilder.Entity("LuxMap.Modules.Telemetry.Lighting.LightingRequest", b =>
-                {
-                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
-                        .WithMany()
-                        .HasForeignKey("CommuneId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lighting_request_administrative_unit_commune_id");
-
-                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
-                        .WithMany()
-                        .HasForeignKey("RequestedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_lighting_request_app_user_requested_by");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.RepairEvidence", b =>

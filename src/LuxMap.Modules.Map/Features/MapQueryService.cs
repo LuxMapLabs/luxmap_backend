@@ -125,8 +125,8 @@ public sealed class MapQueryService(LuxMapDbContext dbContext, TimeProvider cloc
                     })
                     .FirstOrDefault(),
 
-                // The flat lamp fields describe the FIRST lamp in service (slot order). A pole may carry two
-                // (MULTI-FIXTURE, drift MF-1); fixture_count says so, and GET /map/poles/{id} lists both.
+                // The flat lamp fields describe the fitting in service — one per pole since ONE-FIXTURE (drift
+                // OF-1); slot order still picks it, should the limit ever be widened again.
                 Lamp = pole.Fixtures
                     .Where(lamp => lamp.RemovedDate == null)
                     .OrderBy(lamp => lamp.Slot)

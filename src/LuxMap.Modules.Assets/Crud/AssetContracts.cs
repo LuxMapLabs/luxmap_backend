@@ -476,10 +476,9 @@ public sealed record TopologyPole
 /// </summary>
 /// <remarks>
 /// <para>
-/// A pole carries up to TWO of these (MULTI-FIXTURE, drift MF-1): <c>ux_fixture_pole_slot_active</c>
-/// allows one lamp with no <c>removed_date</c> per slot. <see cref="PoleListItem.ActiveFixtures"/> lists them in slot
-/// order; <see cref="PoleListItem.ActiveFixture"/> is the first of them, kept so a reader written for one lamp
-/// keeps working.
+/// A pole carries ONE of these in service (ONE-FIXTURE, drift OF-1; two were allowed during MULTI-FIXTURE).
+/// <see cref="PoleListItem.ActiveFixtures"/> keeps its published list shape and holds at most that one;
+/// <see cref="PoleListItem.ActiveFixture"/> is the same fitting.
 /// </para>
 /// <para>
 /// <b>Nested here, flat in Contract section 5.1 — and that is deliberate, not drift.</b> The map
@@ -605,7 +604,7 @@ public sealed record PoleListItem
     /// </summary>
     public ActiveFixture? ActiveFixture { get; init; }
 
-    /// <summary>Every lamp in service, in slot order — at most two (MULTI-FIXTURE). Empty when none; <see cref="ActiveFixture"/> is its first item.</summary>
+    /// <summary>The fitting in service as a list — at most one since ONE-FIXTURE (drift OF-1). Empty when none; <see cref="ActiveFixture"/> is its first item.</summary>
     public IReadOnlyList<ActiveFixture> ActiveFixtures { get; init; } = [];
 
     /// <summary>The free-text note on this spot (POLE-NOTE); <c>null</c> when there is none.</summary>

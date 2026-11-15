@@ -486,7 +486,7 @@ S["PoleProperties"] = {
         ("lamp_count", {"type": "integer", "format": "int32", "minimum": 1, "maximum": 4, "nullable": True,
                         "description": "LAMP-COUNT LMC-1: số bóng giống nhau của bộ đèn đang dùng (cột cần đôi = 2); lamp_watt là công suất MỘT bóng; null khi cột không có bóng đang dùng"}),
         ("fixture_count", {"type": "integer", "format": "int32", "minimum": 0, "maximum": 2,
-                           "description": "MULTI-FIXTURE MF-3: số bóng đang dùng trên cột (0–2); lamp_watt / lamp_count / install_date / warranty_* mô tả bóng ĐẦU TIÊN (theo slot), bóng thứ hai đọc ở GET /map/poles/{id} (fixtures[])"}),
+                           "description": "MULTI-FIXTURE MF-3, ONE-FIXTURE OF-3: số bộ đèn đang dùng trên cột, 0 hoặc 1 (một cột một bộ); lamp_watt / lamp_count / install_date / warranty_* mô tả bộ đó"}),
         ("install_date", {"type": "string", "format": "date"}),
         ("warranty_expiry", {"type": "string", "format": "date", "nullable": True}),
         ("warranty_status", {"$ref": "#/components/schemas/WarrantyStatus",

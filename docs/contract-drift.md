@@ -2184,6 +2184,9 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 
 ## MULTI-FIXTURE — một cột mang tối đa HAI bóng đang dùng, mỗi bóng một bản ghi `fixture` (11/11/2026)
 
+> ⚠️ **Giới hạn hai bóng đã bị thay bởi ONE-FIXTURE (15/11/2026)** — một cột một bộ đèn đang dùng. Mục này giữ làm lịch sử;
+> MF-3 (hình dạng đọc) và MF-7 (`lamp_count`) còn hiệu lực, MF-1 / MF-2 / MF-5 / MF-6 đọc theo ONE-FIXTURE.
+
 | | |
 |---|---|
 | **Decision maker** | **Mỹ (Dylan), 11/11/2026**: tách thành hai `fixture` riêng (hướng B của LAMP-COUNT), **đảo D-11** (BE-REVIEW-02) và hướng A của 21/10. Ba lựa chọn chốt cùng lúc: trạng thái theo cột, thêm mảng `fixtures[]` giữ field cũ, giữ `lamp_count` |
@@ -2412,3 +2415,24 @@ không có API nào gỡ được chặn.
   (FK giữ `Restrict`; xoá do service làm, có audit).
 
 Quyết định nội bộ BE, Mỹ chốt trong chat 15/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
+
+## ONE-FIXTURE — một cột MỘT bộ đèn đang dùng; hỏng bóng nào thay cả bộ (15/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 15/11/2026**, theo đề xuất của FE (WP5): một trụ một bộ đèn, các bóng trong bộ **giống nhau** (loại, công suất, ngày lắp, bảo hành); hỏng bóng nào thì **thay cả bộ** — tháo bộ cũ, gắn bộ mới, mã mới, bảo hành mới. Lý do: đèn LED đường phố là bộ liền khối; hai bóng khác trạng thái trên một trụ không có cách hiện đúng trên GIS (một trụ một chấm). **Đảo MULTI-FIXTURE (11/11), khôi phục D-11** (BE-REVIEW-02). Cách làm: **khoá còn 1 slot**, không revert schema |
+| **Chạm API** | **Có, chỉ hành vi** — không bỏ / đổi trường nào: bóng thứ hai đang dùng trên một cột nay bị 409 (trước đó được nhận). **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract |
+| **Scope** | Assets (giới hạn, thông điệp, import), migration `RestrictFixtureToOneInService`; comment ở Map / WorkOrders / Statistics; `CLAUDE.md`, `traps/assets.md`, `erd.md` Q18, `templates/README.md` |
+| **Consumer** | WP5 (form / import bộ đèn: chỉ một bộ mỗi trụ; thay = ngừng dùng bộ cũ rồi thêm bộ mới), WP6 (chi tiết cột). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| OF-1 | Một cột có tối đa **một** bản ghi `fixture` đang dùng. Giữ cột `slot` và UNIQUE `ux_fixture_pole_slot_active`; thêm CHECK **`ck_fixture_active_slot`** = `removed_date IS NOT NULL OR slot BETWEEN 1 AND 1` ⇒ bộ đang dùng luôn ở slot 1, nên DB từ chối bộ thứ hai kể cả khi hai request đua nhau. `ck_fixture_slot` vẫn `1..2`: **slot 2 chỉ hợp lệ trên bộ đã ngừng dùng** (lịch sử của giai đoạn MULTI-FIXTURE). Hằng số ở `FixtureSlots` (`MaxInService = 1`, `MaxRecorded = 2`). Kiểm dữ liệu 15/11 trước migration: 0 cột hai bộ đang dùng, 0 dòng slot 2 trên `luxmap_dev` (276 bộ) và VPS (175 bộ) |
+| OF-2 | `POST /assets/fixtures` khi cột đã có bộ đang dùng → **409 `POLE_HAS_ACTIVE_FIXTURE`** (mã giữ nguyên, thông điệp nay "already has a fitting in service"). Import: dòng đang dùng thứ hai cho một cột (trong file hoặc đã có trong DB) lỗi **theo dòng**. Dòng mang `removed_date` vẫn là lịch sử, không bị chặn |
+| OF-3 | **Hình dạng đọc giữ nguyên** để không phá FE / mobile: `fixtures[]`, `active_fixtures[]` còn, nay tối đa 1 phần tử; `fixture_count` nay `0..1`; `fixture` / `active_fixture` / trường phẳng là chính bộ đó. `GET /statistics/warranty` lại một hàng mỗi cột (MF-6 thôi áp). Bỏ hẳn các mảng này nếu muốn là việc của FW khi hợp nhất Contract |
+| OF-4 | **Thay bóng = thay cả bộ:** `PUT /assets/fixtures/{id}/removal` cho bộ cũ rồi `POST` bộ mới (mã `FIX-…` mới, `install_date`, `warranty_expiry` mới). Số bóng trong bộ vẫn là `lamp_count` (LMC-1). Bộ thực tế có bóng khác loại là trường hợp đặc biệt, ghi vào ghi chú của bộ (FIXTURE-NOTE), không tách bản ghi |
+| OF-5 | **MF-5 đóng:** baseline neo vào bộ mới nhất đang dùng, mà nay chỉ có một bộ ⇒ không còn ca "ngừng bóng cũ hơn mà baseline vẫn hiệu lực". Thay bộ ⇒ neo đổi ⇒ baseline cũ ngừng khớp (giữ luật) |
+| OF-6 | **Bộ sáng một phần là `dim`, không phải `out`.** `out` = trụ không có ánh sáng nào; bộ nhiều bóng tắt một phần vẫn sáng nhưng kém hơn baseline của chính trụ ⇒ `dim` (cùng luật LMC-4). Trạng thái vẫn theo cột, không theo bóng |
+| OF-7 | **Lỗ hổng đã biết của OF-6:** nhãn ảnh cột chỉ có `on` / `off` (PHOTO-REVIEW), nên ảnh một bộ sáng một nửa sẽ được gắn `on` và **không** hạ cột xuống `dim`. Báo cáo tại chỗ của kỹ sư (`POST /faults`, `lamp_dim`, `field_report`) tạo sự cố mở nhưng **không** ghi `pole_current_status` (chỉ sweep được duyệt và ảnh được xác nhận ghi). Chưa quyết: thêm nhãn "sáng một phần" cho ảnh, hay để lux kế tay quyết `dim` — cả hai chạm bề mặt API, cần FW |
+
+**Cần báo / cần quyết:** WP5, WP6 (409 ở bộ thứ hai; hình dạng đọc không đổi); OF-7 cần chốt kênh phát hiện bộ sáng một phần.
