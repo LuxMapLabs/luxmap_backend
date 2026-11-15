@@ -41,6 +41,23 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>IOT-CONSOLIDATE-MODULE — phase 2-A hợp nhất Telemetry vào IOT · 15/11/2026</strong>
+    <p><span class="tag t-done">Kiểm chứng xong · commit local · chưa push/deploy</span>
+    Nền <code>66e1c83</code> (PR #257 đã merge). Chuyển 26 implementation sang IOT, gộp service/job/version registration vào
+    <code>IotModule</code>, gỡ project Telemetry và cập nhật references/catalogs. Giữ port Assets và MQTTnet 5.2.0.1603.</p>
+    <p><b>Schema SQL và raw OpenAPI khớp từng byte với dev; EF không pending model changes.</b>
+    Không có migration/schema/API/protocol mới; relay và hai đường điều khiển còn nguyên.
+    Build 0 warning/error; <b>2317 .NET pass, 0 fail, 5 skip nền + 20 Python pass</b>, MQTT E2E qua EMQX riêng;
+    121 test liên quan trực tiếp pass, review độc lập không finding. Publish sạch không còn DLL/deps Telemetry;
+    HTTP thật trên DB tạm: registry/Bridge/lighting/map 200, Device không credential 401.</p>
+    <p><b>Known issue:</b> lượt tổng đầu đỏ một test ProfileTests/SystemAdmin do so hai snapshot danh sách xã đang đổi;
+    code/test đó giữ nguyên từ dev. Kiểm riêng 35 test hồ sơ/xã và lượt tổng thứ hai xanh; chưa sửa race ngoài scope.
+    <b>Còn:</b> push/PR A cần Mỹ xác nhận; bước B/C và VR-10…12/IOT-CONS-1/backup Bridge chưa thực hiện.
+    <a href=".ai/results/IOT-CONSOLIDATE-MODULE-p2.md">Bằng chứng</a> ·
+    <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-by-reviewer.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>IOT-CONSOLIDATION — khảo sát phase 2 bỏ relay / hợp nhất Telemetry · 15/11/2026</strong>
     <p><span class="tag t-next">Khảo sát xong sau phase 1 f46364d · D-1…D-8 chờ Mỹ chốt</span>
     Không có bảng relay riêng; <code>feeder_control</code> giữ mapping và state, <code>lighting_command.relay_no</code> là snapshot lịch sử.
@@ -51,12 +68,12 @@
     thiếu firmware trên mẫu (<code>VR-10…12</code>), backup chưa sao lưu <code>bridge_data</code> (runbook VPS đã ghi).
     Chỉ kiểm source/spec/scripts; chưa kiểm DB/VPS, firmware thật hoặc FE/mobile ngoài repo.
     <a href=".ai/results/IOT-CONSOLIDATION-p1.md">Khảo sát, bảng ảnh hưởng, lộ trình/rollback và D-item</a>.
-    Phase 1 giữ nguyên; đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> vào dev theo xác nhận của Mỹ ngày 15/11. Chưa merge/deploy.</p>
+    Phase 1 đã merge vào dev qua <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> ngày 15/11; bước A đã thực hiện ở task IOT-CONSOLIDATE-MODULE phía trên. B/C còn chờ chốt; chưa deploy.</p>
   </div>
 
   <div class="card">
     <strong>CABINET-MULTI-NODE-DEV — phase 1 tích hợp dev sau PR #256 · 15/11/2026</strong>
-    <p><span class="tag t-done">Đã push · PR #257 vào dev · chưa merge/deploy</span>
+    <p><span class="tag t-done">Đã merge dev · PR #257 · chưa deploy</span>
     Nền <code>df35665</code>; một tủ chứa nhiều node, list/detail/map thêm <code>iot_node_ids[]</code> và giữ scalar cũ.
     Giữ ảnh tài sản, <code>feeders[]</code>, <code>power_state</code>, relay, Telemetry, credential/MQTT và lịch sử.
     Mỹ chốt guard tạm: Bridge và relay gán khác node cho cùng feeder → <b>409 IOT_REGISTRATION_CONFLICT</b>;
@@ -66,7 +83,7 @@
     <p><b>2317 .NET pass, 0 fail, 5 skip nền dev + 20 Python pass</b>, MQTT E2E qua broker riêng;
     build 0 warning/error, 3 mutation check đỏ đúng chỗ, HTTP thật trên DB tạm, OpenAPI hợp lệ (10 warning như dev),
     review độc lập không còn finding. Năm skip là ACCT-1/D-6b nhiều xã, không thêm skip mới.
-    <b>PR:</b> <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">#257 → dev</a>, đã push theo xác nhận của Mỹ ngày 15/11; xem CI/review trên PR. Chưa merge, apply dev/VPS, deploy hoặc báo WP5/WP6.
+    <b>PR:</b> <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">#257 → dev</a>, đã merge ngày 15/11 tại <code>66e1c83</code>. Chưa apply dev/VPS, deploy hoặc báo WP5/WP6 trong phiên này.
     Phase 2 bỏ relay / hợp nhất Telemetry chỉ khảo sát sau commit này, chưa hiện thực.
     Bằng chứng: <a href=".ai/results/CABINET-MULTI-NODE-DEV-p2.md">kết quả tích hợp</a>;
     quyết định CAB-MN-1…5; kết quả nhánh cũ 14/11 chỉ là lịch sử.</p>
@@ -1090,6 +1107,12 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE</code> Phase 2-A: gộp Telemetry vào IOT, giữ hành vi/schema/API. 2317 .NET pass/5 skip nền + 20 Python pass; byte-equal schema/spec, HTTP publish sạch, review độc lập. Chưa push/deploy.</td>
+        <td>26 implementation, IotModule/project refs/catalogs, README/development/traps/walkthrough, bằng chứng/review/nháp PR <code>.ai/</code>, tracking</td>
+        <td><code>refactor(iot): consolidate telemetry into IOT module</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
         <td><code>CABINET-MULTI-NODE-DEV</code> Publish nhánh và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> vào dev theo Mỹ xác nhận; gồm phase 1 và khảo sát phase 2. Chưa merge/deploy.</td>
         <td><code>tracking.html</code>; bằng chứng publish bổ sung trong <code>CABINET-MULTI-NODE-DEV-p2.md</code></td>
         <td><code>docs(tracking): record cabinet phase 1 PR 257</code></td>
@@ -1472,6 +1495,7 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>ProfileTests/SystemAdmin có race snapshot xã (15/11, IOT-CONSOLIDATE-MODULE).</strong> PATCH/GET profile so toàn bộ JSON trong lúc CommuneAdminTests tạo/xóa/đổi <code>bbox-test-*</code>; một lượt full đỏ, kiểm riêng 35 test và lượt full sau xanh. Code/test chưa sửa trong bước A; xem <code>docs/agents/traps/testing.md</code>.</li>
       <li><strong>🔴 <code>luxmap.com.vn</code> không phân giải được trên resolver kiểm DNSSEC (22/10/2026 ~10:40).</strong> Google 8.8.8.8, Cloudflare
       1.1.1.1, Quad9, OpenDNS trả <code>SERVFAIL</code>; tắt kiểm (<code>dig +cd</code>) thì ra đúng <code>15.235.242.213</code>. NS của iNET trả lời đúng.
       Nguyên nhân ở phía registry: <code>com.vn</code> có ký DNSSEC, nhưng NS của VNNIC (<code>c.dns-servers.vn</code>) trả lời truy vấn

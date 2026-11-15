@@ -5,7 +5,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LuxMap.Modules.Telemetry\LuxMap.Modules.Telemetry.csproj" />
+    <ProjectReference Include="..\LuxMap.Shared\LuxMap.Shared.csproj" />
+    <ProjectReference Include="..\LuxMap.Persistence\LuxMap.Persistence.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Assets\LuxMap.Modules.Assets.csproj" />
+    <ProjectReference Include="..\LuxMap.Modules.Faults\LuxMap.Modules.Faults.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- LC-12 M-13: the MQTT client of the device channel (MIT). -->
+    <PackageReference Include="MQTTnet" Version="5.2.0.1603" />
   </ItemGroup>
 </Project>

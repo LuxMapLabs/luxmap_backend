@@ -1,6 +1,5 @@
 using LuxMap.Modules.Assets.Entities;
-using LuxMap.Modules.Telemetry;
-using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.IOT.Entities;
 using LuxMap.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

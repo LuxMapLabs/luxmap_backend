@@ -2,7 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
-using LuxMap.Modules.Telemetry.Mqtt;
+using LuxMap.Modules.IOT.Mqtt;
 using LuxMap.Shared.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;

@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
-using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.IOT.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;

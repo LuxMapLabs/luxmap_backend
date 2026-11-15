@@ -272,8 +272,8 @@ so theo **nội dung**, không theo `updated_at` (giờ đó đổi khi sửa b�
 - 🔴 **Test chạy job với đồng hồ năm 2001 và trồng dữ liệu 2000–2001.** Job quét MỌI xã của DB dùng chung: chạy với giờ thật sẽ ghi dấu
   quá hạn cho phiếu của class khác, và teardown của class đó vấp FK `Restrict`. `LuxMapTestHost.CreateHost` **ép** `Jobs:Enabled=false`
   và từ chối host nào vẫn bật — đừng gỡ để "test worker thật"; test worker dựng `ScheduledJobWorker` trực tiếp với job giả.
-- `fault.origin_node_id` cấu hình ở **Telemetry** (`FaultOriginNodeConfiguration`), như `origin_observation_id` ở Survey: Faults không
-  tham chiếu Telemetry; Telemetry nay tham chiếu Faults. FK ghép `(origin_node_id, commune_id)` → `iot_node`; index FK khai tường minh
+- `fault.origin_node_id` cấu hình ở **IOT** (`FaultOriginNodeConfiguration`), như `origin_observation_id` ở Survey: Faults không
+  tham chiếu IOT; IOT tham chiếu Faults. FK ghép `(origin_node_id, commune_id)` → `iot_node`; index FK khai tường minh
   cạnh unique partial (quy tắc partial index). CHECK `ck_fault_node_source`: có thiết bị ⇒ `iot` và không cột.
 - Teardown xoá `fault` (giữ `iot_node`) và `work_order_overdue_notice` (giữ `work_order`) **trước** cha. Rollback `AddScheduledJobs`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 - 🔴 **Mọi lời gọi DB của worker nằm TRONG vòng retry, kể cả bước tạo dòng lúc khởi động.** Exception thoát khỏi

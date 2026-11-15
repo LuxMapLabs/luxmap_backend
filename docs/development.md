@@ -258,6 +258,18 @@ Hai đường ghi khóa node rồi feeder và đọc lại liên kết trong tra
 không mang theo snapshot DBML từ nhánh tài liệu cũ.
 Quyết định API vẫn trên nền CABINET SELF-SIGNED: xem `docs/contract-drift.md`, CAB-MN-1…CAB-MN-5.
 
+## IoT — hợp nhất module, phase 2-A (15/11/2026)
+
+`Modules.Telemetry` đã được chuyển vào `src/LuxMap.Modules.IOT`: `Entities`, `Configurations`, `Registry`,
+`Lighting`, `Mqtt`, `Jobs` và các lookup. Host chỉ đăng ký `IotModule`; module đăng ký đủ registry node, job
+`node_offline`, firmware usage, port Assets, hai kênh HTTP/MQTT và Bridge diagnostics. `MQTTnet` giữ phiên bản
+`5.2.0.1603`, nay khai trong project IOT; không thêm dependency phiên bản mới.
+
+Đây là bước chuyển code: schema/FK/index, API, credential, cấu hình và giao thức thiết bị giữ nguyên.
+Không có migration mới hoặc thao tác chuyển/xóa dữ liệu cho bước này. Namespace Telemetry còn trong snapshot/
+designer của migration lịch sử là metadata cũ; không đổi tên chúng để khớp namespace hiện tại.
+Rollback bằng code cũ vẫn dùng cùng schema/dữ liệu. Phần siết một feeder/node và gỡ relay/kênh cũ là bước B/C riêng.
+
 ## Seed dữ liệu nền
 
 ```bash
@@ -570,7 +582,7 @@ Tóm tắt mã lỗi:
 | `src/LuxMap.Modules.Survey` | SurveySweep, SurveyFrame, Detection, LuxReading (BE-15..BE-17, BE-42) |
 | `src/LuxMap.Modules.Faults` | Fault, FaultHistory, luồng trạng thái (BE-18..BE-20, BE-41) |
 | `src/LuxMap.Modules.WorkOrders` | WorkOrder, ExternalUnit, RepairEvidence (BE-21..BE-24) |
-| `src/LuxMap.Modules.Telemetry` | IotNode, TelemetryReading |
+| `src/LuxMap.Modules.IOT` | Node/firmware, registry, điều khiển HTTP/MQTT, job offline và Bridge diagnostics |
 | `src/LuxMap.Modules.Admin` | Danh mục, ngưỡng, model version, dashboard (BE-28..BE-35) |
 | `src/LuxMap.Modules.Notifications` | Notification — thông báo trong ứng dụng, polling (BE-27) |
 | `tests/LuxMap.Shared.Tests` | Khoá lại quy ước contract |

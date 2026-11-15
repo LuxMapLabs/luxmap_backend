@@ -2371,6 +2371,10 @@ Phase 1 vẫn giữ hai kênh; đây không phải quyết định bỏ relay ho
 
 Quyết định trên nền CABINET / IOT-BRIDGE **SELF-SIGNED** hiện có; cần WP5/WP6/Đạt xác nhận ở FW kế tiếp. Chưa gửi thông báo ngoài repo.
 
+**Cập nhật cấu trúc 15/11/2026 — phase 2-A:** code `Modules.Telemetry` trong các ghi chép lịch sử đã chuyển sang
+`Modules.IOT/Lighting`, `Mqtt`, `Registry`, `Entities`, `Configurations`, `Jobs` và lookup. Hai đường thiết bị vẫn tồn tại;
+API/schema/quyền/giao thức không đổi. VR-10…12 và IOT-CONS-1 vẫn mở; hợp nhất project không đồng nghĩa đã gỡ kênh cũ.
+
 ### IOT-CONS-1 — trạng thái Bridge chưa nối vào last_report_at của registry/map/job (15/11/2026)
 
 **Phát hiện khi khảo sát, chưa sửa; cần chốt khi hợp nhất hai đường IoT (VR-11).**

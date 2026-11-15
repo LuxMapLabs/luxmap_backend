@@ -1,20 +1,56 @@
+using LuxMap.Modules.Assets;
 using LuxMap.Shared.Modularity;
+using LuxMap.Shared.Versions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace LuxMap.Modules.IOT;
 
+/// <summary>Cabinet devices, lighting, firmware, offline detection and Bridge diagnostics.</summary>
 public sealed class IotModule : ILuxMapModule
 {
     public string Name => "IOT";
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddSingleton(new VersionedResultColumn("iot_node", "iot_node", "firmware_version_id", VersionReference.Id, "data_source"));
+        services.AddSingleton(new VersionedResultColumn("iot_node_firmware_change", "iot_node_firmware", "firmware_version_id", VersionReference.Id));
+        services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.NodeOfflineJob>();
+
+        var lighting = configuration.GetSection(Lighting.LightingOptions.SectionName).Get<Lighting.LightingOptions>()
+            ?? new Lighting.LightingOptions();
+        lighting.Validate();
+        services.AddSingleton(lighting);
+        services.AddScoped<Lighting.LightingCommandService>();
+
+        // Keep the existing HTTP/MQTT channel selection while the Bridge cutover is specified separately.
+        var mqtt = configuration.GetSection(Mqtt.MqttOptions.SectionName).Get<Mqtt.MqttOptions>() ?? new Mqtt.MqttOptions();
+        services.AddSingleton(mqtt);
+        services.AddSingleton<Mqtt.LightingScopeFactory>();
+        services.AddSingleton<Mqtt.MqttLightingHandler>();
+        if (lighting.Channel == Lighting.LightingOptions.Mqtt)
+        {
+            mqtt.Validate();
+            services.AddHostedService<Mqtt.MqttLightingChannel>();
+        }
+
+        if (mqtt.AdminUrl is not null)
+        {
+            services.AddHttpClient<Mqtt.IMqttBrokerAdmin, Mqtt.EmqxBrokerAdmin>(client => client.Timeout = TimeSpan.FromSeconds(5));
+        }
+        else
+        {
+            services.AddSingleton<Mqtt.IMqttBrokerAdmin, Mqtt.NoMqttBrokerAdmin>();
+        }
+        services.AddScoped<ICabinetDeviceLookup, CabinetDeviceLookup>();
+        services.AddScoped<IFeederControlLookup, FeederControlLookup>();
+        services.AddScoped<Registry.IotNodeRegistryService>();
+
         services.Configure<IotOptions>(configuration.GetSection("IotDiagnostics"));
         services.AddScoped<IotRegistrationStore>();
         services.AddSingleton<IotFeederSourceLookup>();
-        services.AddSingleton<LuxMap.Modules.Telemetry.IFeederSourceLookup>(provider => provider.GetRequiredService<IotFeederSourceLookup>());
-        services.AddScoped<LuxMap.Modules.Assets.IFeederPowerLookup>(provider => provider.GetRequiredService<IotDiagnosticsService>());
+        services.AddSingleton<IFeederSourceLookup>(provider => provider.GetRequiredService<IotFeederSourceLookup>());
+        services.AddScoped<IFeederPowerLookup>(provider => provider.GetRequiredService<IotDiagnosticsService>());
         services.AddHttpClient<IotDiagnosticsService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(5);

@@ -366,9 +366,9 @@ chứa một cột người ta sửa được; khai `HasAlternateKey` là biến
 - **Viết `feeder_control` thì `cabinet_id` phải là trụ của CẢ thiết bị lẫn feeder** — gắn feeder vào trụ trước. Hệ quả ngược:
   feeder đang có rơ-le **không đổi trụ / tháo trụ được**, thiết bị đang có rơ-le không chuyển trụ được (FK `NO ACTION`).
   Service trả 409 `ASSET_IN_USE`; import báo lỗi theo dòng — **phải** bắt ở bước kiểm, FK ở bước ghi làm hỏng cả mẻ (500).
-- **Assets không thấy `iot_node` / `feeder_control`** (Telemetry tham chiếu Assets, không ngược lại): hỏi qua port
-  **`ICabinetDeviceLookup`** (Telemetry hiện thực), khuôn `IActiveWorkOrderLookup`. Đừng thêm project reference, đừng
-  `SqlQuery` thẳng bảng của Telemetry từ Assets.
+- **Assets không thấy `iot_node` / `feeder_control`** (IOT tham chiếu Assets, không ngược lại): hỏi qua port
+  **`ICabinetDeviceLookup`** (IOT hiện thực), khuôn `IActiveWorkOrderLookup`. Đừng thêm project reference, đừng
+  `SqlQuery` thẳng bảng của IOT từ Assets.
 - **`PUT /assets/feeders/{id}`: `cabinet_id` vắng = GIỮ** — ngoại lệ thứ hai của thay thế toàn phần, cùng khuôn `note` của cột.
   Import feeder: ô trống / thiếu cột = giữ, import không bao giờ tháo trụ. Đừng "sửa cho nhất quán" với `feeder_id` của cột.
 - **Teardown xoá `feeder_control` → `iot_node` → `feeder` → `electrical_cabinet`** (tất cả `Restrict`). Fixture tài sản đã làm;

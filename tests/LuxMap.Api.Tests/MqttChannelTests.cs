@@ -1,9 +1,9 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using LuxMap.Modules.Telemetry.Entities;
-using LuxMap.Modules.Telemetry.Lighting;
-using LuxMap.Modules.Telemetry.Mqtt;
+using LuxMap.Modules.IOT.Entities;
+using LuxMap.Modules.IOT.Lighting;
+using LuxMap.Modules.IOT.Mqtt;
 using LuxMap.Persistence.Versions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

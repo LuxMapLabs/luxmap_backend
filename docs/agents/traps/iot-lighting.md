@@ -5,6 +5,17 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi thiết bị 
 **Phát hiện tự động từ IoT phải truy vết phiên bản firmware**, cùng yêu cầu model/artifact ở core (BE-34, ERD Q8).
 Không thay yêu cầu này bằng một version ứng dụng chung.
 
+## Phase 2-A — một module IOT, hai đường thiết bị còn tồn tại (15/11/2026)
+
+- `IotModule` sở hữu entity/config/registry/lighting/MQTT/job của project Telemetry cũ và cả Bridge diagnostics;
+  không đăng ký lại `TelemetryModule` hoặc thêm project ref Telemetry. Assets vẫn hỏi qua các port của chính Assets.
+- Chuyển module không được làm mất `NodeOfflineJob`, `VersionedResultColumn`, controller ApplicationPart,
+  `FaultOriginNodeConfiguration`, lifetime MQTT hoặc fixed-commune DbContext của `LightingScopeFactory`.
+- Snapshot/designer migration lịch sử còn chuỗi CLR `LuxMap.Modules.Telemetry.*` là bình thường. Chỉ đổi namespace
+  runtime không cần migration; kiểm `has-pending-model-changes`, SQL schema và OpenAPI so với nền trước khi kết luận.
+- Bước A chưa gỡ relay, HTTP Device, MQTT LC-12 hoặc đổi firmware; Bridge vẫn là đường thứ hai. VR-10…12 và
+  IOT-CONS-1 chưa được sửa chỉ bằng việc hợp nhất project. Không xóa credential/lịch sử/mẫu đo vì project cũ đã bỏ.
+
 ## BE-14b — thiết bị IoT ở tủ điện (28/09/2026)
 
 **Một cabinet có nhiều node (CAB-MN-1…4, 14/11/2026).** `iot_node.cabinet_id` bắt buộc nhưng **không unique**.
@@ -125,8 +136,8 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 
 ## ASSET-PHOTOS Phase 2-B — đọc trạng thái mạch (FPS-1)
 
-- `FeederControlMode` ở Shared để port Assets dùng cùng kiểu với Telemetry, wire vẫn on/off/auto. Assets không tham chiếu Telemetry.
-- `FeederPower.State()` là định nghĩa duy nhất, hiện trả Unknown vô điều kiện. Mode/heartbeat online không phải phép đo điện.
+- `FeederControlMode` ở Shared để port Assets dùng cùng kiểu với IOT, wire vẫn on/off/auto. Assets không tham chiếu IOT.
+- `FeederPower.State()` là fallback Unknown; power có báo cáo còn mới đi qua `IFeederPowerLookup` (PR #256). Mode/heartbeat online không phải phép đo điện.
 - 🔴 `FeederPowerState.Unknown` **khai đầu** để là giá trị mặc định của CLR: `FeederRow` dựng `FeederListItem` mà không gán `PowerState`; đặt `On` đầu thì mọi
   đường quên gán sẽ nói "có điện" (`FeederPowerTests`). Đừng sắp lại thứ tự enum.
 - Inventory lấy control một batch cho page qua `IFeederControlLookup`, giữ filter xã control/node. Map LEFT JOIN giữ feeder chưa nối relay;
@@ -141,7 +152,7 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 
 ## Đường bridge (IOT-DIAGNOSTICS) chưa ghi phiên bản — drift BE-34 VR-10…VR-12 (13/11/2026)
 
-- Có **hai** đường IoT song song: `Modules.Telemetry` (kênh `http` / `mqtt`, `iot_node`, `lighting_command`, ghi firmware qua heartbeat
+- Có **hai** đường IoT song song: `Modules.IOT/Lighting` + `Modules.IOT/Mqtt` (kênh `http` / `mqtt`, `iot_node`, `lighting_command`, ghi firmware qua heartbeat
   MQTT khi `Lighting__Channel=mqtt`) và `Modules.IOT` + `LuxMap.IotBridge` (telemetry trong `telemetry.sqlite` của bridge). Sửa firmware /
   phiên bản ở một đường **không** phủ đường kia.
 - Bridge hiện không lưu firmware: heartbeat gateway là `"1"`, `TelemetryRequest` không có trường phiên bản. Thêm bất kỳ kết quả lưu lại
@@ -153,6 +164,6 @@ bằng); đổi định dạng làm diff của WP5/WP6 thành vô nghĩa.
 
 - Bridge source và relay của một feeder phải cùng node. Ghi ở cả hai phía dùng transaction, khóa **node → feeder**, rồi kiểm lại; khóa feeder bằng `FOR UPDATE`.
 - Đọc nguồn / power và gửi / giao lệnh gặp config tĩnh trùng nguồn DB hoặc khác controller → 409 `IOT_REGISTRATION_CONFLICT`; không chọn nguồn đầu tiên. `FeederControllerBinding` là chỗ duy nhất tạo lỗi này.
-- `IFeederSourceLookup` ở Telemetry, IOT hiện thực. DbContext do caller truyền: MQTT có fixed commune context riêng. Singleton lookup chỉ giữ IOptions, không giữ DbContext hoặc principal HTTP.
+- `IFeederSourceLookup` và implementation đều ở IOT (chuyển từ Telemetry trong phase 2-A). DbContext do caller truyền: MQTT có fixed commune context riêng. Singleton lookup chỉ giữ IOptions, không giữ DbContext hoặc principal HTTP.
 - UNIQUE expression `ux_iot_source_registration_feeder_id` chỉ có ở DB (PR #256), không hiện trong model/snapshot: giữ khi squash migration, không suy là thiếu backstop chỉ vì không có HasIndex.
 - `FeederPower.State()` là fallback unknown; PR #256 dùng `IFeederPowerLookup` đọc đầu ra được Bridge báo còn mới. Không suy power từ yêu cầu lệnh hoặc heartbeat online.
