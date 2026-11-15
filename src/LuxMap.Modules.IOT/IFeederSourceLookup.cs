@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.IOT;
 
-/// <summary>Scoped Bridge ownership shared by device registration and both lighting channels.</summary>
+/// <summary>Commune-scoped Bridge ownership through the caller's context; the singleton lookup retains no DbContext.</summary>
 public interface IFeederSourceLookup
 {
     /// <summary>The caller supplies its scoped context, including the fixed commune context used by MQTT.</summary>

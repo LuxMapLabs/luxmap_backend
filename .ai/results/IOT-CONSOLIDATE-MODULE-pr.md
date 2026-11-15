@@ -21,7 +21,7 @@ Bước A giữ hai đường điều khiển và relay hiện tại; binding m�
   **After:** chỉ IotModule; fresh publish không có DLL/deps Telemetry. API TCP thật trên PostGIS tạm trả 200 cho registry/Bridge/lighting/map, Device thiếu credential vẫn 401, Swagger đủ 146 paths.
 - SQL schema và raw OpenAPI **byte-identical** với dev 66e1c83; EF `has-pending-model-changes` exit 0; migration/snapshot/spec không có diff.
 - Build 0 warning/error; full regression **2317 pass, 0 fail, 5 skip nền dev** với MQTT E2E; focused 121 test pass; 20 Python pass. Kết quả và giới hạn tại `.ai/results/IOT-CONSOLIDATE-MODULE-p2.md`.
-  Review độc lập không còn finding; 26 implementation khớp sau chuẩn hóa namespace/import/XML docs.
+  Review độc lập không còn finding; 26 implementation khớp sau chuẩn hóa namespace/import/XML docs. Claude Opus 5.5/high kiểm hai trục: Spec 0 finding; Standards 3 P3 chú thích/docs đã sửa và được Claude follow-up xác nhận, không có P0–P2.
 - Lượt full đầu có một ProfileTests/SystemAdmin race ở so JSON chứa danh sách xã đang được test khác sửa; các file đó không đổi so với dev.
   Kiểm riêng ProfileTests + CommuneAdminTests: 35 pass. Giữ bằng chứng lỗi đầu và kết quả full cuối; không thêm skip hoặc sửa test ngoài phạm vi.
 

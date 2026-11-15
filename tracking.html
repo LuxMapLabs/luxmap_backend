@@ -41,6 +41,18 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>IOT-CONSOLIDATE-MODULE — Claude Opus 5.5 / high review · 15/11/2026</strong>
+    <p><span class="tag t-done">Hai trục review xong · 3 P3 đã sửa và Claude kiểm lại</span>
+    Model <code>claude-opus-5-5</code>, effort <code>high</code>, Claude Code 2.1.325; review source <code>9ec7815</code> so với dev <code>66e1c83</code>.
+    <b>Standards:</b> 0 vi phạm quy chuẩn, 3 P3 chú thích/docs; <b>Spec:</b> 0 finding. Không có P0–P2.
+    Đã khôi phục giải thích bind MQTT options, làm rõ singleton/context scope và sửa code fence;
+    Claude follow-up xác nhận cả 3 đã giải quyết, không có vấn đề mới.</p>
+    <p>Build sau sửa 0 warning/error, mã thực thi giữ nguyên; kết quả regression triển khai 2317 pass/5 skip +20 Python giữ nguyên,
+    reviewer không chạy lại test. <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-by-claude-opus-5-5.md">Biên bản, model/session và follow-up</a>.
+    Commit local; chưa push/deploy; bước B/C còn chờ chốt.</p>
+  </div>
+
+  <div class="card">
     <strong>IOT-CONSOLIDATE-MODULE — phase 2-A hợp nhất Telemetry vào IOT · 15/11/2026</strong>
     <p><span class="tag t-done">Kiểm chứng xong · commit local · chưa push/deploy</span>
     Nền <code>66e1c83</code> (PR #257 đã merge). Chuyển 26 implementation sang IOT, gộp service/job/version registration vào
@@ -1105,6 +1117,12 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE</code> Claude Opus 5.5/high: Standards 3 P3 chú thích/docs đã sửa và follow-up xác nhận, Spec 0; không có P0–P2. Build 0 warning/error, không đổi mã thực thi.</td>
+        <td><code>IotModule.cs</code>, <code>IFeederSourceLookup.cs</code>, p2/nháp PR, <code>.ai/reviews/IOT-CONSOLIDATE-MODULE-by-claude-opus-5-5.md</code>, tracking</td>
+        <td><code>docs(iot): address Claude Opus 5.5 review</code></td>
+      </tr>
       <tr>
         <td>15/11/2026</td>
         <td><code>IOT-CONSOLIDATE-MODULE</code> Phase 2-A: gộp Telemetry vào IOT, giữ hành vi/schema/API. 2317 .NET pass/5 skip nền + 20 Python pass; byte-equal schema/spec, HTTP publish sạch, review độc lập. Chưa push/deploy.</td>

@@ -13,8 +13,10 @@ public sealed class IotModule : ILuxMapModule
 
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
+        // BE-34: the current firmware and its append-only change history remain versioned results.
         services.AddSingleton(new VersionedResultColumn("iot_node", "iot_node", "firmware_version_id", VersionReference.Id, "data_source"));
         services.AddSingleton(new VersionedResultColumn("iot_node_firmware_change", "iot_node_firmware", "firmware_version_id", VersionReference.Id));
+        // BE-26: a silent device raises node_offline under the existing scheduled job runner.
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.NodeOfflineJob>();
 
         var lighting = configuration.GetSection(Lighting.LightingOptions.SectionName).Get<Lighting.LightingOptions>()
@@ -23,7 +25,9 @@ public sealed class IotModule : ILuxMapModule
         services.AddSingleton(lighting);
         services.AddScoped<Lighting.LightingCommandService>();
 
-        // Keep the existing HTTP/MQTT channel selection while the Bridge cutover is specified separately.
+        // LC-12: options are always bound because the broker callback reads them on either channel.
+        // Complete MQTT transport configuration is required only when MQTT is the selected channel.
+        // Keep the existing HTTP/MQTT selection while the Bridge cutover is specified separately.
         var mqtt = configuration.GetSection(Mqtt.MqttOptions.SectionName).Get<Mqtt.MqttOptions>() ?? new Mqtt.MqttOptions();
         services.AddSingleton(mqtt);
         services.AddSingleton<Mqtt.LightingScopeFactory>();

@@ -129,7 +129,8 @@ Kiểm cả file publish/deps manifest để không bị DLL Telemetry cũ trong
   },
   "device_without_credential": 401,
   "swagger_paths": 146
-}```
+}
+```
 
 Đã dừng API và PostGIS tạm; không chạy trên luxmap_dev/VPS. Registry/Bridge/lighting/map là controller đã chuyển vào cùng ApplicationPart IOT;
 endpoint Device vẫn trả 401 khi chưa cấp credential.
@@ -138,6 +139,11 @@ endpoint Device vẫn trả 401 khi chưa cấp credential.
 
 Review độc lập: `.ai/reviews/IOT-CONSOLIDATE-MODULE-by-reviewer.md`; không còn actionable finding.
 Reviewer kiểm source/DI/discovery/graph/migration preservation, tự so 26 implementation và XML cleanup; không lặp build/test của người thực thi.
+
+**Claude Opus 5.5 / high (Mỹ yêu cầu 15/11):** Standards không có P0–P2 hoặc vi phạm quy chuẩn, có 3 P3 về chú thích/fence;
+Spec không finding. Đã sửa 3 P3 và chạy Claude follow-up xác nhận đều giải quyết, không đổi mã thực thi.
+Build sau sửa 0 warning/error; không lặp full suite cho thay đổi comment/docs.
+Biên bản nguyên văn và model/session evidence: `.ai/reviews/IOT-CONSOLIDATE-MODULE-by-claude-opus-5-5.md`.
 
 ✅ Verified: build, schema/spec so byte, không pending model changes, full regression 2317 pass/5 skip, focused regression/Python, publish sạch và HTTP thật trên DB tạm, review độc lập.
 ⚠️ Could not verify: firmware vật lý, FE/mobile/VPS ngoài repo; ProfileTests có race snapshot xã trong lượt tổng đầu.
