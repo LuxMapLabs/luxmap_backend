@@ -1,3 +1,4 @@
+using LuxMap.Modules.Assets;
 using LuxMap.Shared.Modularity;
 using LuxMap.Shared.Storage;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +15,7 @@ public sealed class CitizenModule : ILuxMapModule
     public void RegisterServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<QrCodeService>();
+        services.AddScoped<IPoleQrCodes>(provider => provider.GetRequiredService<QrCodeService>());
 
         // P2b — the public form.
         var options = configuration.GetSection(CitizenOptions.SectionName).Get<CitizenOptions>() ?? new CitizenOptions();

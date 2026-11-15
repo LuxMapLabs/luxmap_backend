@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using LuxMap.Modules.Assets;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Citizen.Entities;
 using LuxMap.Modules.Identity.Accounts;
@@ -15,9 +16,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.Citizen;
 
-/// <summary>Issue, revoke and list the QR codes on poles (CITIZEN-QR P2a, CQ-1 / CQ-10, D-3).</summary>
+/// <summary>
+/// Issue, revoke and list the QR codes on poles (CITIZEN-QR P2a, CQ-1 / CQ-10, D-3); delete them with their pole
+/// (POLE-DELETE-QR, <see cref="IPoleQrCodes"/>).
+/// </summary>
 public sealed class QrCodeService(
-    LuxMapDbContext db, ICurrentActorAccessor actor, IAuditTrail audit, EmailOptions web, TimeProvider clock)
+    LuxMapDbContext db, ICurrentActorAccessor actor, IAuditTrail audit, EmailOptions web, TimeProvider clock) : IPoleQrCodes
 {
     /// <summary>The public report page of the web app (D-12); the code follows it.</summary>
     public const string PublicPath = "/r/";
@@ -118,6 +122,23 @@ public sealed class QrCodeService(
         return PagedResult<QrCodeItem>.From(page, total, [.. found.Select(Item)]);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Oldest first, so the audit trail reads in the order the codes were issued. The audit row carries ids only, never
+    /// the code (D-16). The caller holds the pole lock and owns the transaction.
+    /// </remarks>
+    public async Task RemoveAllAsync(string poleId, CancellationToken ct)
+    {
+        var codes = await db.Set<QrCode>().Where(qr => qr.PoleId == poleId)
+            .OrderBy(qr => qr.CreatedAt).ThenBy(qr => qr.QrId.Length).ThenBy(qr => qr.QrId).ToListAsync(ct);
+        foreach (var qr in codes)
+        {
+            db.Remove(qr);
+            Record(qr, AuditAction.Deleted, new { qr.QrId, qr.PoleId, active = qr.RevokedAt is null }, null);
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
     private void Revoke(QrCode qr, DateTime now, string? replacedBy)
     {
         qr.RevokedAt = now;
@@ -125,7 +146,7 @@ public sealed class QrCodeService(
         Record(qr, AuditAction.Revoked, new { revoked_at = (DateTime?)null }, new { qr.QrId, qr.PoleId, qr.RevokedAt, replaced_by = replacedBy });
     }
 
-    private void Record(QrCode qr, AuditAction action, object? before, object after)
+    private void Record(QrCode qr, AuditAction action, object? before, object? after)
         => audit.Record(new(UtcMicrosecondClock.UtcNow(clock), AuditActorKind.User, ActorId, actor.Role, qr.CommuneId,
             AuditEntityType.QrCode, qr.QrId, action, before, after));
 

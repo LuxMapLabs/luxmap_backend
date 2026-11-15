@@ -18,6 +18,10 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi mã QR, endpo
   cấp mới đọc mã là "đang dùng" trước khi thu hồi commit, rồi ghi đè người / thời điểm thu hồi kèm audit `revoked` thứ hai (bảng
   không có row version). Canh bằng `Issue_and_revoke_both_wait_for_the_pole_lock` (giữ khoá `FOR NO KEY UPDATE`; phá thử → đỏ).
 - `commune_id` của mã **chép từ cột** ở server, như `fixture`; client không gửi được.
+- **Xoá cột xoá mã QR của cột** (POLE-DELETE-QR, port `IPoleQrCodes` khai ở Assets, `QrCodeService` hiện thực). FK `qr_code → pole` giữ
+  `Restrict` — xoá là việc của service, mỗi mã **một `SaveChanges` + một audit `deleted`**, sau khi `DeletePoleAsync` đã khoá hàng `pole`
+  (cùng thứ tự pole → mã như cấp / thu hồi). Đừng đổi FK sang `Cascade`: DB cascade đi vòng audit và `CommuneWriteGuard`. Báo cáo công dân
+  vẫn chặn (`citizen_submission → qr_code` `Restrict`). Phá thử bỏ khoá → `Deleting_a_pole_waits_for_the_pole_lock_before_touching_its_codes` đỏ.
 - Teardown xoá `qr_code` **trước** `pole` và tài khoản (FK `Restrict` tới cả hai). Rollback `AddQrCodes`: xem `docs/agents/traps/migrations.md`, mục Rollback dựng lại CHECK cũ.
 
 ## CITIZEN-QR P2b — form công khai, không token (13/10/2026, drift PB-1…PB-8)
