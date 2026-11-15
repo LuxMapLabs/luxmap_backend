@@ -490,3 +490,6 @@ logs/
 # OPS-DEPLOY-VPS — the web SPA build copied onto the server
 deploy/web/
 deploy/web.prev/
+
+# Brand icon set lives in a directory named "icon" (the macOS Icon rule above would hide it)
+!/assets/branding/icon/

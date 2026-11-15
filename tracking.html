@@ -373,6 +373,12 @@
     BE-16 / BE-29 / BE-30 (tạm dừng), BE-32, BE-37, BE-38 (chưa bắt đầu). Các dòng "chưa báo WP4 / WP5 / WP6" giữ nguyên như đã ghi — chưa xác minh lại.</p>
   </div>
 
+  <div class="card">
+    <strong>Nhận diện dự án — bộ icon ứng dụng LuxMap, 15/11/2026</strong>
+    <p><span class="tag t-done">Hoàn thành</span> Bộ icon vuông tách từ biểu tượng ghim + đèn của logo tại <code>assets/branding/icon/</code>: SVG (mark, app icon, maskable, mono, favicon), PNG 16–1024, <code>favicon.ico</code>, cây <code>res/</code> Android (adaptive + monochrome + mipmap) và <code>README.md</code>. Sinh lại bằng <code>scripts/branding/render-icons.sh</code>. Màu lấy từ logo: navy <code>#00294E</code>, teal <code>#016975</code>, vàng <code>#FCA81D</code>.</p>
+    <p><span class="tag t-todo">Còn lại</span> Gắn vào <code>luxmap-web</code> (thay icon "C" của boilerplate, <code>index.html</code>) và Android (<code>wt-mobile-dev</code>); chưa thử hiển thị trên thiết bị Android thật. <code>.gitignore</code> thêm ngoại lệ vì rule <code>Icon</code> của macOS nuốt thư mục <code>icon/</code>.</p>
+  </div>
+
   <h1>LuxMap — Backend (WP2)</h1>
   <div class="card" id="evidence-pole">
     <strong>EVIDENCE-POLE — ảnh bằng chứng gắn cột tuỳ chọn, 14/11/2026</strong>
