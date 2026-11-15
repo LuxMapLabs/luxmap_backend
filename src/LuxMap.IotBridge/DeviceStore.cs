@@ -47,6 +47,9 @@ sealed class DeviceStore
     public DeviceState[] ReadAll() { lock (gate) return devices.Values.ToArray(); }
     public TelemetryPage ReadTelemetryHistory(string id, long after, int limit) =>
         archive.ReadPage(id, after, limit);
+    public TelemetryHistoryPage ReadTelemetryHistoryPage(string id, int page, int pageSize, bool measuredAt) =>
+        archive.ReadHistoryPage(id, page, pageSize, measuredAt);
+
     private void Commit(DeviceState state)
     {
         var next = new Dictionary<string, DeviceState>(devices) { [state.DeviceId] = state };

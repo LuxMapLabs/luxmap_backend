@@ -46,6 +46,10 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ### IOT-DIAGNOSTICS — đăng ký và chẩn đoán nguồn đo IoT (11/11/2026)
 
+**Mở rộng đăng ký gộp (15/11/2026, SELF-SIGNED theo luồng testbed, chờ maintainer duyệt).** Admin gọi
+`POST /api/v1/iot/nodes/register` với `server_id`, thông tin tủ, feeder và thiết bị MQTT. BE tạo node và lưu nguồn đo trong cùng giao dịch DB; Bridge bổ sung tuyến vào gateway đã cấp secret. Gửi lại cùng cấu hình trả `200` và cùng `node_id`; tạo mới trả `201`; xung đột trả `409`. Với nhiều gateway đủ điều kiện, thiết bị chưa có tuyến cần `gateway_id`. Nếu Bridge đã lưu tuyến mà commit DB thất bại, gửi lại request để hoàn tất cấu hình; tuyến đã cấp được dùng lại. Secret cấp một lần theo gateway và hỗ trợ cấp trước khi thêm node. `POST /iot/servers` cho phép bỏ `base_url` khi có địa chỉ mặc định hợp lệ. MQTT gateway lấy danh sách giới hạn theo Client ID đã xác thực, tối đa 32 node. Các API nguồn và tuyến riêng tiếp tục phục vụ cấu hình hiện có.
+
+
 | Trường | Nội dung |
 |---|---|
 | **Decision** | Ghi nhận sáu route IoT của PR #213 để review trước khi hợp nhất Contract. |
@@ -58,6 +62,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/servers` | `ReadNetwork` | Hiện server có vị trí trong xã được xem hoặc có node thuộc xã được xem. `online` khi broker nhận heartbeat của gateway trong 30 giây gần nhất, `offline` khi chưa nhận hoặc đã quá hạn. `unconfigured` khi chưa xác định được gateway duy nhất từ ánh xạ thiết bị, `broker_down` khi broker dừng và `unreachable` khi nguồn trạng thái không truy cập được hoặc trả dữ liệu không hợp lệ. |
 | `POST /api/v1/iot/nodes/{nodeId}/command` | `ControlLighting` | Gửi ON, OFF hoặc AUTO qua nguồn IoT đã đăng ký của node trong phạm vi xã. Trả 202 khi bridge chấp nhận. Gateway phải online. Yêu cầu và phản hồi chấp nhận được audit theo mã lệnh. Lệnh có hạn 5 phút (expires_at). |
 | `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại, ACK và `power_state` của node trong phạm vi xã. |
+| `GET /api/v1/iot/nodes/{nodeId}/command/history` | `ReadNetwork` | Lịch sử lệnh qua IoT Bridge theo node và phạm vi xã, mới nhất trước. Đọc audit theo `page` và `page_size`, có thời điểm BE gửi yêu cầu và Bridge chấp nhận. ACK cho lệnh hiện tại đọc ở `GET …/command`. |
 | `PUT /api/v1/iot/servers/{serverId}/location` | `ManageSettings` | Lưu xã/phường và GPS gateway. GET servers trả vị trí trong phạm vi xã. |
 | `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node của trụ. `control_channel` là `iot_bridge` khi node cho phép điều khiển qua bridge. |
 | `PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route` | `ManageSettings` | Gán Gateway ID với Device ID qua bridge đang chạy. |
@@ -68,7 +73,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` | `ManageSettings` | Cấp secret gateway một lần qua bridge. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Kiểm tra server cùng xã và thiết bị đã có tuyến cùng secret MQTT. Gán node với feeder thuộc cùng tủ và mã thiết bị. trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
-| `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện đã lưu của node trong phạm vi xã, phân trang theo `after` và `next_cursor`. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện của node trong phạm vi xã. Mặc định trả `page`, `page_size`, `total` và `items`; thứ tự giảm dần theo `sort_by=received_at` (giờ Bridge nhận) hoặc `measured_at` (giờ RTC của node). Mẫu thiếu giờ đo nằm cuối ở chế độ `measured_at`. Truy vấn cũ với `after` hoặc `limit` tiếp tục trả kết quả theo cursor. |
 | `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW, với `status` là `online`, `offline` hoặc `no_data` và `power_state` theo đầu ra node. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | Chẩn đoán cấp feeder với `normal`, `anomaly`, `stale`, `no_data`. Có cảnh báo mất áp và tùy chọn hiệu chuẩn 10 bóng. |
 

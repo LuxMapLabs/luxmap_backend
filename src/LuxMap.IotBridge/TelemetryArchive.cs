@@ -4,6 +4,8 @@ using Microsoft.Data.Sqlite;
 record ArchivedTelemetry(long Cursor, TelemetryReading Reading);
 record TelemetryPage(IReadOnlyList<ArchivedTelemetry> Items, long NextCursor, bool HasMore);
 
+record TelemetryHistoryPage(int Page, int PageSize, int Total, IReadOnlyList<ArchivedTelemetry> Items);
+
 sealed class TelemetryArchive
 {
     private readonly string connectionString;
@@ -27,6 +29,10 @@ sealed class TelemetryArchive
                 UNIQUE (device_id, sample_key)
             );
             CREATE INDEX IF NOT EXISTS telemetry_device_id ON telemetry (device_id, id);
+            CREATE INDEX IF NOT EXISTS telemetry_device_measured_at
+                ON telemetry (device_id, json_extract(reading, '$.data.timestamp') DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS telemetry_device_received_at
+                ON telemetry (device_id, json_extract(reading, '$.receivedAt') DESC, id DESC);
             """;
         schema.ExecuteNonQuery();
 
@@ -94,6 +100,38 @@ sealed class TelemetryArchive
         while (items.Count < limit && reader.Read())
             items.Add(new(reader.GetInt64(0), Read(reader.GetString(1))));
         return new(items, items.Count == 0 ? after : items[^1].Cursor, reader.Read());
+    }
+
+    public TelemetryHistoryPage ReadHistoryPage(string deviceId, int page, int pageSize, bool measuredAt)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: true);
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.Parameters.AddWithValue("$device", deviceId);
+        command.CommandText = "SELECT count(*) FROM telemetry WHERE device_id = $device;";
+        var total = Convert.ToInt32(command.ExecuteScalar());
+
+        var offset = ((long)page - 1) * pageSize;
+        if (offset >= total) return new(page, pageSize, total, []);
+
+        // RTC uses a sortable local timestamp. Receipt timestamps are serialized in UTC by DeviceStore.
+        // The archive ID orders ties and SQLite places missing RTC timestamps last.
+        command.CommandText = measuredAt
+            ? """
+                SELECT id, reading FROM telemetry WHERE device_id = $device
+                ORDER BY json_extract(reading, '$.data.timestamp') DESC, id DESC LIMIT $take OFFSET $offset;
+                """
+            : """
+                SELECT id, reading FROM telemetry WHERE device_id = $device
+                ORDER BY json_extract(reading, '$.receivedAt') DESC, id DESC LIMIT $take OFFSET $offset;
+                """;
+        command.Parameters.AddWithValue("$take", pageSize);
+        command.Parameters.AddWithValue("$offset", offset);
+        using var reader = command.ExecuteReader();
+        var items = new List<ArchivedTelemetry>();
+        while (reader.Read()) items.Add(new(reader.GetInt64(0), Read(reader.GetString(1))));
+        return new(page, pageSize, total, items);
     }
 
     private static TelemetryReading Read(string? value) =>

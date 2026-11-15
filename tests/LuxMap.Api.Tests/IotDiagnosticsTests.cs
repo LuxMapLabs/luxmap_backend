@@ -13,6 +13,91 @@ namespace LuxMap.Api.Tests;
 public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 {
     [Fact]
+    public async Task Admin_registers_two_feeders_on_one_gateway_and_retries_without_creating_another_node()
+    {
+        var bridge = new RegistrationBridge();
+        using var factory = new LuxMapApiFactory();
+        using var host = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://registration.example.test");
+            builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
+            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
+                .ConfigurePrimaryHttpMessageHandler(() => bridge));
+        });
+        using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
+        using var managerToken = await fixture.ManagerClientAsync();
+        using var admin = AuthorizedClient(host.CreateClient(), adminToken);
+        using var manager = AuthorizedClient(host.CreateClient(), managerToken);
+        var setup = new LightingTestRig(fixture);
+        var cabinet = await setup.NewCabinetAsync();
+        var feeder = await setup.NewFeederAsync(cabinet);
+        var otherFeeder = await setup.NewFeederAsync(cabinet);
+        var server = "iot-" + Guid.NewGuid().ToString("N");
+        const string register = "/api/v1/iot/nodes/register";
+        using var serverResponse = await admin.PostAsJsonAsync("/api/v1/iot/servers", new
+        {
+            server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
+        });
+        Assert.Equal(HttpStatusCode.Created, serverResponse.StatusCode);
+
+        object Payload(string feederId, string deviceId) => new
+        {
+            server_id = server, cabinet_id = cabinet, feeder_id = feederId, device_id = deviceId,
+            data_source = "calibration_rig", supports_remote_control = true,
+            nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
+        };
+
+        using var forbidden = await manager.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        bridge.RejectAppend = true;
+        using var failed = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.True(failed.StatusCode == HttpStatusCode.ServiceUnavailable, await failed.Content.ReadAsStringAsync());
+        Assert.Equal(0, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters()
+            .CountAsync(node => node.CabinetId == cabinet)));
+
+        bridge.RejectAppend = false;
+        using var first = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.True(first.StatusCode == HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("GW-TEST", firstBody.GetProperty("gateway_id").GetString());
+        using var repeat = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
+        var repeatBody = await repeat.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(firstBody.GetProperty("node_id").GetString(), repeatBody.GetProperty("node_id").GetString());
+
+        using var conflict = await admin.PostAsJsonAsync(register, Payload(otherFeeder, "P001"));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        using var second = await admin.PostAsJsonAsync(register, Payload(otherFeeder, "P002"));
+        Assert.True(second.StatusCode == HttpStatusCode.Created, await second.Content.ReadAsStringAsync());
+        Assert.Equal(new[] { "P001", "P002" }, bridge.Devices);
+        Assert.Equal(2, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters()
+            .CountAsync(node => node.CabinetId == cabinet)));
+    }
+
+    private sealed class RegistrationBridge : HttpMessageHandler
+    {
+        public List<string> Devices { get; } = [];
+        public bool RejectAppend { get; set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Assert.Equal("registration.example.test", request.RequestUri!.Host);
+            Assert.True(request.Headers.Contains("X-Iot-Provisioning-Key"));
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == "/api/luxmap/gateways/routes")
+                return new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new[] { new { gatewayId = "GW-TEST", deviceIds = Devices, credentialIssued = true } }),
+                };
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("/api/luxmap/gateways/GW-TEST/route", request.RequestUri.AbsolutePath);
+            if (RejectAppend) return new(HttpStatusCode.ServiceUnavailable);
+            var route = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
+            Devices.Add(route.GetProperty("deviceId").GetString()!);
+            return new(HttpStatusCode.NoContent);
+        }
+    }
+
+    [Fact]
     public async Task Registration_requires_admin_and_allowlisted_origin_and_reads_are_commune_scoped()
     {
         using var factory = new LuxMapApiFactory();
@@ -166,6 +251,21 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         });
         Assert.Equal(HttpStatusCode.Created, source.StatusCode);
 
+        var telemetry = $"{nodePath}/electrical/history";
+        var received = await manager.GetFromJsonAsync<JsonElement>(telemetry);
+        Assert.Equal(1, received.GetProperty("page").GetInt32());
+        Assert.Equal(50, received.GetProperty("page_size").GetInt32());
+        Assert.Equal(3, received.GetProperty("total").GetInt32());
+        Assert.Equal(3, received.GetProperty("items")[0].GetProperty("cursor").GetInt64());
+        var measured = await manager.GetFromJsonAsync<JsonElement>($"{telemetry}?page=2&page_size=1&sort_by=measured_at");
+        Assert.Equal(2, measured.GetProperty("page").GetInt32());
+        Assert.Equal(1, Assert.Single(measured.GetProperty("items").EnumerateArray()).GetProperty("cursor").GetInt64());
+        var legacy = await manager.GetFromJsonAsync<JsonElement>($"{telemetry}?after=0&limit=1");
+        Assert.Equal(1, legacy.GetProperty("next_cursor").GetInt64());
+        Assert.True(legacy.GetProperty("has_more").GetBoolean());
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.GetAsync($"{telemetry}?sort_by=unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.GetAsync($"{telemetry}?page=1&after=0")).StatusCode);
+
         // Registration and diagnostics work before the feeder has any poles or a relay assignment.
         var diagnosis = await manager.GetFromJsonAsync<JsonElement>($"{nodePath}/diagnostics");
         Assert.Equal(feeder, diagnosis.GetProperty("feeder_id").GetString());
@@ -199,7 +299,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         bridge.Acknowledge("OFF");
         await AssertPowerAsync("off", off, true);
 
-        var auto = await SubmitAsync("AUTO", null);
+        var auto = await SubmitAsync("AUTO", null, new { day_start = "07:00", night_start = "19:00" });
         bridge.Acknowledge("ON");
         await AssertPowerAsync("on", auto, true);
         bridge.ReportTelemetry("OFF", DateTimeOffset.UtcNow.AddSeconds(-10));
@@ -207,9 +307,44 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         bridge.AgeReports();
         await AssertPowerAsync("unknown", auto, true);
 
-        async Task<string?> SubmitAsync(string mode, string? command)
+        bridge.RejectCommand = true;
+        using var rejected = await manager.PostAsJsonAsync($"{nodePath}/command", new { mode = "MANUAL", command = "OFF" });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, rejected.StatusCode);
+        using var removed = await manager.DeleteAsync($"{nodePath}/source");
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+
+        var history = $"{nodePath}/command/history";
+        var page1 = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=1&page_size=2");
+        Assert.Equal(1, page1.GetProperty("page").GetInt32());
+        Assert.Equal(2, page1.GetProperty("page_size").GetInt32());
+        Assert.Equal(4, page1.GetProperty("total").GetInt32());
+        var newest = page1.GetProperty("items").EnumerateArray().ToArray();
+        Assert.Equal(2, newest.Length);
+        Assert.Equal("OFF", newest[0].GetProperty("command").GetString());
+        Assert.Equal(JsonValueKind.Null, newest[0].GetProperty("bridge_accepted_at").ValueKind);
+        var acceptedAuto = newest[1];
+        Assert.Equal(auto, acceptedAuto.GetProperty("command_id").GetString());
+        Assert.Equal("AUTO", acceptedAuto.GetProperty("mode").GetString());
+        Assert.Equal(JsonValueKind.Null, acceptedAuto.GetProperty("command").ValueKind);
+        Assert.Equal("07:00", acceptedAuto.GetProperty("auto_schedule").GetProperty("day_start").GetString());
+        Assert.Equal(feeder, acceptedAuto.GetProperty("feeder_id").GetString());
+        Assert.Equal(server, acceptedAuto.GetProperty("server_id").GetString());
+        Assert.False(string.IsNullOrEmpty(acceptedAuto.GetProperty("requested_by").GetString()));
+        Assert.True(acceptedAuto.GetProperty("bridge_accepted_at").GetDateTimeOffset() >=
+            acceptedAuto.GetProperty("requested_at").GetDateTimeOffset());
+
+        var page2 = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=2&page_size=2");
+        Assert.Equal(new[] { off, on }, page2.GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("command_id").GetString()));
+        var empty = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=2147483647&page_size=200");
+        Assert.Empty(empty.GetProperty("items").EnumerateArray());
+        using var foreignToken = await fixture.ForeignCommuneClientAsync();
+        using var foreign = AuthorizedClient(host.CreateClient(), foreignToken);
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync(history)).StatusCode);
+
+        async Task<string?> SubmitAsync(string mode, string? command, object? autoSchedule = null)
         {
-            using var response = await manager.PostAsJsonAsync($"{nodePath}/command", new { mode, command });
+            using var response = await manager.PostAsJsonAsync($"{nodePath}/command", new { mode, command, auto_schedule = autoSchedule });
             Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.False(result.GetProperty("command_acknowledged").GetBoolean());
@@ -434,6 +569,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
     private sealed class ReportedPowerBridge : HttpMessageHandler
     {
+        public bool RejectCommand { get; set; }
         private JsonElement? desired;
         private Ack? lastAck;
         private Sample? latestTelemetry;
@@ -460,6 +596,17 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             {
                 "/api/luxmap/gateways/by-device/probe/authorization" or "/api/luxmap/gateways/by-device/probe-2/authorization" => new(HttpStatusCode.NoContent),
                 "/api/luxmap/gateways/by-device/probe/status" => Json(new { status = "online" }),
+                "/api/luxmap/devices/probe/telemetry/history/page" => request.RequestUri.Query switch
+                {
+                    "?page=1&pageSize=50&sortBy=received_at" => Json(new { page = 1, pageSize = 50, total = 3,
+                        items = new[] { Archived(3), Archived(2), Archived(1) } }),
+                    "?page=2&pageSize=1&sortBy=measured_at" => Json(new { page = 2, pageSize = 1, total = 3,
+                        items = new[] { Archived(1) } }),
+                    _ => new(HttpStatusCode.BadRequest),
+                },
+                "/api/luxmap/devices/probe/telemetry/history" when request.RequestUri.Query == "?after=0&limit=1"
+                    => Json(new { items = new[] { Archived(1) }, nextCursor = 1, hasMore = true }),
+                "/api/luxmap/devices/probe/command" when RejectCommand => new(HttpStatusCode.ServiceUnavailable),
                 "/api/luxmap/devices/probe/command" => Json(await SaveCommandAsync(request, ct)),
                 "/api/luxmap/devices/probe" => Json(new
                 {
@@ -485,6 +632,11 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 _ => new(HttpStatusCode.NotFound),
             };
         }
+
+        private static object Archived(int cursor) => new
+        {
+            cursor, reading = new { data = new { voltage = 5 }, receivedAt = DateTimeOffset.UtcNow, gatewayId = "TEST-GW" },
+        };
 
         private async Task<JsonElement> SaveCommandAsync(HttpRequestMessage request, CancellationToken ct)
         {

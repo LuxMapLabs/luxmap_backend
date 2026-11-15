@@ -129,7 +129,7 @@ def iot_property(schema, field):
 for (schema, field), values in iot_values.items():
     iot_property(schema, field)["enum"] = values
 
-for schema in ("IotCommandRequest", "IotCommandStatus"):
+for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
     iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
     iot_property(schema, "command")["enum"] = ["ON", "OFF", None]
     iot_property(schema, "auto_schedule")
@@ -387,6 +387,7 @@ SECTION = {
 }
 
 SUMMARY.update({
+    ("post", "/api/v1/iot/nodes/register"): "Đăng ký node, nguồn đo và tuyến MQTT trong một lần",
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("put", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route"): "Đăng ký tuyến MQTT cho gateway và node",
@@ -400,7 +401,8 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",
-    ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện đã lưu của node IoT",
+    ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
+    ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện của node theo trang hoặc cursor",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
 })
