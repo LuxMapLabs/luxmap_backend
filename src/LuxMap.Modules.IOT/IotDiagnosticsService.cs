@@ -150,8 +150,7 @@ public sealed class IotDiagnosticsService(
     public async Task<IotGatewayCredential> IssueGatewayCredentialAsync(string serverId, string gatewayId,
         string? key, CancellationToken ct)
     {
-        if (gatewayId.Length is < 1 or > 64 || !char.IsAsciiLetterOrDigit(gatewayId[0]) ||
-            gatewayId.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not ('-' or '_')))
+        if (!ValidMqttId(gatewayId))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Gateway ID không hợp lệ.");
 
         var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
@@ -168,7 +167,7 @@ public sealed class IotDiagnosticsService(
                 throw Unavailable("IoT Bridge không cấp được secret.");
             var credential = await response.Content.ReadFromJsonAsync<IotGatewayCredential>(cancellationToken: ct);
             if (credential is null || credential.ClientId != gatewayId || credential.Username != gatewayId ||
-                credential.Password is not { Length: 64 } || credential.NodeIds is not { Length: > 0 })
+                credential.Password is not { Length: 64 } || credential.NodeIds is null || credential.NodeIds.Any(id => !ValidMqttId(id)))
                 throw Unavailable("IoT Bridge trả thông tin xác thực không hợp lệ.");
             return credential;
         }
@@ -199,14 +198,24 @@ public sealed class IotDiagnosticsService(
     public async Task<IReadOnlyList<IotGatewayRoute>> GatewayRoutesAsync(string serverId, string? key, CancellationToken ct)
     {
         var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
-        using var request = ProvisioningRequest(HttpMethod.Get, uri, "gateways/routes", key!);
+        return await ReadGatewayRoutesAsync(uri, key!, ct);
+    }
+
+    private async Task<IReadOnlyList<IotGatewayRoute>> ReadGatewayRoutesAsync(Uri uri, string key, CancellationToken ct)
+    {
+        using var request = ProvisioningRequest(HttpMethod.Get, uri, "gateways/routes", key);
         try
         {
             using var response = await client.SendAsync(request, ct);
             if (response.StatusCode != HttpStatusCode.OK || !IsJson(response))
                 throw Unavailable("IoT Bridge không trả được danh sách tuyến MQTT.");
-            return await response.Content.ReadFromJsonAsync<IotGatewayRoute[]>(cancellationToken: ct)
-                ?? throw Unavailable("Danh sách tuyến MQTT không hợp lệ.");
+            var routes = await response.Content.ReadFromJsonAsync<IotGatewayRoute[]>(cancellationToken: ct);
+            if (routes is null || routes.Any(route => route is null || !ValidMqttId(route.GatewayId) ||
+                route.DeviceIds is null || route.DeviceIds.Any(id => !ValidMqttId(id))) ||
+                routes.Select(route => route.GatewayId).Distinct(StringComparer.Ordinal).Count() != routes.Length ||
+                routes.SelectMany(route => route.DeviceIds).GroupBy(id => id, StringComparer.Ordinal).Any(group => group.Count() > 1))
+                throw Unavailable("Danh sách tuyến MQTT không hợp lệ.");
+            return routes;
         }
         catch (Exception ex) when (IsSourceFailure(ex, ct))
         {
@@ -214,13 +223,38 @@ public sealed class IotDiagnosticsService(
         }
     }
 
+    internal static bool ValidMqttId(string? id) => id is { Length: > 0 and <= 64 } &&
+        char.IsAsciiLetterOrDigit(id[0]) && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
+    internal async Task<string> EnsureGatewayRouteAsync(string serverId, string deviceId, string? gatewayId,
+        string communeId, string? key, CancellationToken ct)
+    {
+        var uri = await ProvisioningOriginAsync(serverId, communeId, key, ct);
+        var routes = await ReadGatewayRoutesAsync(uri, key!, ct);
+        var owner = routes.SingleOrDefault(route => route.DeviceIds.Contains(deviceId));
+        var candidates = routes.Where(route => route.CredentialIssued &&
+            (gatewayId is null || route.GatewayId == gatewayId)).ToArray();
+        if (owner is not null)
+        {
+            if (gatewayId is not null && gatewayId != owner.GatewayId)
+                throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict,
+                    "Thiết bị đã thuộc gateway MQTT khác.");
+            if (owner.CredentialIssued) return owner.GatewayId;
+        }
+        else if (candidates.Length == 1)
+        {
+            await RegisterGatewayRouteAsync(serverId, candidates[0].GatewayId, new(deviceId), key, ct);
+            return candidates[0].GatewayId;
+        }
+        throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+            candidates.Length > 1 ? "Có nhiều gateway đã cấp secret. Hãy chọn gateway_id." :
+                "Gateway cần có MQTT secret trước khi thêm node.");
+    }
+
     public async Task RegisterGatewayRouteAsync(string serverId, string gatewayId, IotGatewayRouteRequest request,
         string? provisioningKey, CancellationToken ct)
     {
-        static bool ValidId(string? id) => id is { Length: > 0 and <= 64 } &&
-            char.IsAsciiLetterOrDigit(id[0]) && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
-
-        if (!ValidId(gatewayId) || !ValidId(request.DeviceId))
+        if (!ValidMqttId(gatewayId) || !ValidMqttId(request.DeviceId))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Gateway ID hoặc Device ID không hợp lệ.");
 
         var settings = await registry.ReadAsync([], ct);

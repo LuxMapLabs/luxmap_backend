@@ -1,9 +1,12 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using Asp.Versioning;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.IOT.Entities;
+using LuxMap.Modules.IOT.Registry;
 using LuxMap.Persistence;
 using LuxMap.Shared.Authorization;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
@@ -20,7 +23,7 @@ namespace LuxMap.Modules.IOT;
 [Route("api/v{version:apiVersion}/iot")]
 public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
 {
-    public sealed record RegisterServerRequest(string ServerId, string BaseUrl, string? CommuneId = null, IotLocation? Location = null);
+    public sealed record RegisterServerRequest(string ServerId, string? BaseUrl = null, string? CommuneId = null, IotLocation? Location = null);
     public sealed record RegisteredServer(string ServerId);
     public sealed record RegisteredSource(string NodeId, string ServerId, string DeviceId);
 
@@ -33,7 +36,10 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public async Task<IActionResult> RegisterServerAsync(RegisterServerRequest request,
         [FromServices] IotRegistrationStore registry, [FromServices] IOptions<IotOptions> options, CancellationToken ct)
     {
-        if (!ValidServerId(request.ServerId) || !IotOrigin.TryAllowed(options.Value, request.BaseUrl, out var uri))
+        var settings = options.Value;
+        var baseUrl = request.BaseUrl ?? settings.BaseUrl;
+        if (baseUrl is null && settings.AllowedOrigins.Length == 1) baseUrl = settings.AllowedOrigins[0];
+        if (!ValidServerId(request.ServerId) || !IotOrigin.TryAllowed(settings, baseUrl, out var uri))
             throw Invalid("Server ID không hợp lệ hoặc địa chỉ IoT server chưa được allowlist.");
 
         var id = request.ServerId.ToLowerInvariant();
@@ -113,6 +119,61 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     public Task<IotPoleControl> PoleControlAsync(string poleId, CancellationToken ct)
         => diagnostics.PoleControlAsync(poleId, ct);
+
+    public sealed record RegisterNodeRequest
+    {
+        [Required] public string ServerId { get; init; } = "";
+        [Required, MaxLength(32)] public string CabinetId { get; init; } = "";
+        [Required, MaxLength(32)] public string FeederId { get; init; } = "";
+        [Required] public string DeviceId { get; init; } = "";
+        [Required] public DataSource? DataSource { get; init; }
+        public bool SupportsRemoteControl { get; init; }
+        [Required] public double NominalVoltage { get; init; }
+        [Required] public double NominalCurrentMa { get; init; }
+        [Required] public double NominalPowerMw { get; init; }
+        public string? GatewayId { get; init; }
+    }
+
+    public sealed record RegisteredNode(string NodeId, string ServerId, string DeviceId, string FeederId, string GatewayId);
+
+    [HttpPost("nodes/register")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType<RegisteredNode>(StatusCodes.Status200OK)]
+    [ProducesResponseType<RegisteredNode>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RegisterNodeAsync(RegisterNodeRequest request,
+        [FromServices] IotRegistrationStore registry, [FromServices] IotNodeRegistryService nodes,
+        [FromServices] IotFeederSourceLookup sources,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+    {
+        if (!ValidServerId(request.ServerId) || !IotDiagnosticsService.ValidMqttId(request.DeviceId) ||
+            (request.GatewayId is not null && !IotDiagnosticsService.ValidMqttId(request.GatewayId)))
+            throw Invalid("Server ID, Gateway ID hoặc Device ID không hợp lệ.");
+        var profile = new NodeProfile
+        {
+            ServerId = request.ServerId.ToLowerInvariant(),
+            DeviceId = request.DeviceId,
+            FeederId = request.FeederId,
+            NominalVoltage = request.NominalVoltage,
+            NominalCurrentMa = request.NominalCurrentMa,
+            NominalPowerMw = request.NominalPowerMw,
+        };
+        if (!profile.IsValid() || request.DataSource is not (DataSource.CalibrationRig or DataSource.Simulated))
+            throw Invalid("Thông tin feeder, nguồn dữ liệu hoặc ngưỡng đo không hợp lệ.");
+
+        var (nodeId, gatewayId, created) = await registry.RegisterNodeAsync(new CreateIotNodeRequest
+        {
+            CabinetId = request.CabinetId, DataSource = request.DataSource,
+            SupportsRemoteControl = request.SupportsRemoteControl,
+        }, profile, nodes, sources, (communeId, token) =>
+            diagnostics.EnsureGatewayRouteAsync(profile.ServerId, request.DeviceId, request.GatewayId, communeId,
+                configuration["Mqtt:ProvisioningKey"], token), ct);
+        var result = new RegisteredNode(nodeId, profile.ServerId, profile.DeviceId, profile.FeederId, gatewayId);
+        return created ? Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical", result) : Ok(result);
+    }
 
     [HttpPost("nodes/{nodeId}/source")]
     [Authorize(Policy = LuxMapPolicies.ManageAssets)]

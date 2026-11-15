@@ -21,70 +21,48 @@ Môi trường local cần cấu hình khóa bridge, khóa provisioning và orig
 
 Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán nguồn khi feeder chưa có trụ. Một tủ có thể chứa nhiều IoT node; từng node vẫn thuộc đúng một tủ cùng xã. Các ID và tọa độ dưới đây là ví dụ cho bộ thứ hai.
 
-Admin thực hiện bước 2.1–2.2. Manager thực hiện bước 2.3–2.4 trong xã được cấp quyền.
-
-### 2.1 Đăng ký server và vị trí gateway
+### 2.1 Admin đăng ký server và vị trí gateway
 
 `POST /api/v1/iot/servers` · quyền `ManageSettings` · thành công `201`
 
 ```json
 {
-  "server_id": "iot-server-02",
-  "base_url": "http://127.0.0.1:5000",
-  "commune_id": "COM-001",
-  "location": { "lat": 10.78, "lng": 106.7 }
+  "server_id": "iot-server-01",
+  "commune_id": "COM-070",
+  "location": { "lat": 10.965681, "lng": 106.504581 }
 }
 ```
 
-`base_url` là HTTP origin của IoT Bridge nhìn từ backend và phải nằm trong allowlist. Ví dụ loopback dùng khi hai dịch vụ chạy trực tiếp trên cùng máy. Để chỉnh GPS hoặc xã/phường của server đã có, gọi `PUT /api/v1/iot/servers/{serverId}/location` với `commune_id` và `location`. Thành công trả `204`.
+Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. Gửi `base_url` rõ ràng khi cần chọn một origin khác trong allowlist. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường và GPS.
 
-### 2.2 Đăng ký tuyến MQTT
+ESP32 gateway dùng địa chỉ broker TLS, Gateway ID, MQTT username và secret đã cấp. Firmware tự yêu cầu danh sách node trên MQTT sau khi kết nối và làm mới mỗi 10 giây. Với gateway vật lý mới, Admin gọi `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` một lần và nhập `password` từ phản hồi trên trang cấu hình ESP32. Gateway có thể kết nối khi danh sách node còn rỗng. Tránh lưu secret vào log hoặc bộ nhớ của FE.
 
-`PUT /api/v1/iot/servers/iot-server-02/gateways/LUXMAP-GW002/route` · quyền `ManageSettings`
+### 2.2 Admin tạo node và gán feeder
 
-```json
-{ "device_id": "LUXMAP-P002" }
-```
-
-`204` nghĩa là tuyến có hiệu lực ngay trên bridge đang chạy. Gửi lại đúng cặp vẫn trả `204`. Nếu gateway hoặc thiết bị đã thuộc cặp khác, API trả `409`. Firmware gateway hiện chuyển tiếp một node.
-
-Backend gửi khóa quản trị cho bridge ở phía server. FE chỉ gửi Bearer token. Người vận hành cấp secret bằng API backend `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` với quyền `ManageSettings`, rồi nhập địa chỉ broker, Gateway ID, Node ID, username và secret trên trang cấu hình ESP32. API trả client_id, username, password và node_ids. Hiển thị password cho Admin ngay khi cấp và tránh lưu vào localStorage hoặc log. Cấp lại trả 409. Node dùng LoRa và `DEVICE_ID` của firmware phải khớp `device_id` đã đăng ký.
-
-### 2.3 Tạo node cho tủ điện
-
-`POST /api/v1/assets/iot-nodes` · quyền `ManageAssets` · thành công `201`
+`POST /api/v1/iot/nodes/register` · quyền `ManageSettings`
 
 ```json
 {
-  "cabinet_id": "CAB-002",
+  "server_id": "iot-server-01",
+  "cabinet_id": "CAB-011",
+  "feeder_id": "FDR-009",
+  "device_id": "LUXMAP-P001",
   "data_source": "calibration_rig",
-  "supports_remote_control": true
-}
-```
-
-Lấy `node_id` từ header `Location`, ví dụ `/api/v1/assets/iot-nodes/NODE-002`. Tiếp theo chọn feeder thuộc tủ của node khi gán nguồn đo.
-
-### 2.4 Gán nguồn MQTT và feeder cho node
-
-`POST /api/v1/iot/nodes/{nodeId}/source` · quyền `ManageAssets` · thành công `201`
-
-```json
-{
-  "server_id": "iot-server-02",
-  "device_id": "LUXMAP-P002",
-  "feeder_id": "FDR-002",
+  "supports_remote_control": true,
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
   "nominal_power_mw": 500
 }
 ```
 
-Manager chỉ gán nguồn cho node và server cùng xã, với thiết bị đã được Admin đăng ký tuyến và cấp secret MQTT. Backend kiểm tra feeder thuộc cùng xã và cùng tủ với node. Nhập chỉ số danh định của cả mạch để API chẩn đoán so sánh. Mỗi nguồn đo của IoT Bridge liên kết một node với một feeder. Feeder xác định các trụ và bóng sẽ hiển thị trạng thái cấp điện. Hồ sơ cũ tiếp tục dùng `feeder_id` đã lưu.
+Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Nếu thiết bị đã thuộc một gateway có secret, backend dùng lại tuyến đó. Nếu bridge có nhiều gateway đã cấp secret và thiết bị chưa có tuyến, gửi thêm `gateway_id`, ví dụ `LUXMAP-GW001`. Mỗi gateway hỗ trợ tối đa 32 node được phép.
+
+API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response có `node_id`, `server_id`, `device_id`, `feeder_id` và `gateway_id`. Dùng `node_id` cho API điều khiển và đọc dữ liệu. Thêm node bằng API này tự thêm tuyến, dùng lại secret và liên kết trực tiếp với feeder. Các trụ và bóng được xác định theo feeder.
 
 ### Quản lý tuyến và nguồn đo
 
 - Admin gọi `GET /api/v1/iot/servers/{serverId}/gateways/routes` để đọc `gateway_id`, `device_ids` và `credential_issued`. Nếu nhiều server dùng chung bridge, danh sách phản ánh toàn bộ tuyến của bridge đó.
-- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}/source` với đầy đủ JSON như khi tạo nguồn. Thành công trả `204`. Backend kiểm tra lại xã, feeder, tủ điện và quyền MQTT.
+- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}/source` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo. Thành công trả `204`. Backend kiểm tra lại xã, feeder, tủ điện và quyền MQTT.
 - Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/source` để gỡ liên kết. Thành công trả `204`. Lịch sử trên bridge, tuyến MQTT và secret vẫn được giữ. Nguồn chỉ khai báo trong cấu hình triển khai trả `409` khi sửa hoặc gỡ.
 
 ## 3. Hiển thị trên bản đồ

@@ -387,6 +387,7 @@ SECTION = {
 }
 
 SUMMARY.update({
+    ("post", "/api/v1/iot/nodes/register"): "Đăng ký node, nguồn đo và tuyến MQTT trong một lần",
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("put", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route"): "Đăng ký tuyến MQTT cho gateway và node",

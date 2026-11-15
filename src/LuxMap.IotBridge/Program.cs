@@ -127,14 +127,14 @@ app.MapGet("/api/luxmap/gateways/routes", (HttpContext context, MqttBroker mqtt,
         .ToArray());
 }).WithTags("MQTT");
 
-app.MapPut("/api/luxmap/gateways/{gatewayId}/route", (string gatewayId, GatewayRouteRequest request,
+app.MapPut("/api/luxmap/gateways/{gatewayId}/route", async (string gatewayId, GatewayRouteRequest request,
     HttpContext context, MqttBroker mqtt, IConfiguration configuration) =>
 {
     if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
         context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
     if (!DeviceRules.ValidId(gatewayId) || request.DeviceId is null || !DeviceRules.ValidId(request.DeviceId))
         return Results.BadRequest();
-    return mqtt.RegisterGateway(gatewayId, request.DeviceId) ? Results.NoContent() : Results.Conflict();
+    return await mqtt.RegisterGatewayAsync(gatewayId, request.DeviceId) ? Results.NoContent() : Results.Conflict();
 }).WithTags("MQTT");
 app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/authorization", (string deviceId,
     HttpContext context, MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
@@ -151,10 +151,11 @@ app.MapPost("/api/luxmap/gateways/{gatewayId}/credential", (string gatewayId, Ht
     context.Response.Headers.CacheControl = "no-store";
     if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
         context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
-    if (!mqtt.Gateways.TryGetValue(gatewayId, out var nodes)) return Results.NotFound();
+    if (!DeviceRules.ValidId(gatewayId)) return Results.BadRequest();
+    mqtt.EnsureGateway(gatewayId);
     var secret = credentials.Issue(gatewayId);
     if (secret is null) return Results.Conflict(new { error = "Credential already issued." });
-    return Results.Ok(new { clientId = gatewayId, username = gatewayId, password = secret, nodeIds = nodes });
+    return Results.Ok(new { clientId = gatewayId, username = gatewayId, password = secret, nodeIds = mqtt.Gateways[gatewayId] });
 }).WithTags("MQTT").WithSummary("Cấp secret một lần cho gateway đã đăng ký");
 app.Run();
 

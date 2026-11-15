@@ -13,6 +13,91 @@ namespace LuxMap.Api.Tests;
 public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 {
     [Fact]
+    public async Task Admin_registers_two_feeders_on_one_gateway_and_retries_without_creating_another_node()
+    {
+        var bridge = new RegistrationBridge();
+        using var factory = new LuxMapApiFactory();
+        using var host = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://registration.example.test");
+            builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
+            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
+                .ConfigurePrimaryHttpMessageHandler(() => bridge));
+        });
+        using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
+        using var managerToken = await fixture.ManagerClientAsync();
+        using var admin = AuthorizedClient(host.CreateClient(), adminToken);
+        using var manager = AuthorizedClient(host.CreateClient(), managerToken);
+        var setup = new LightingTestRig(fixture);
+        var cabinet = await setup.NewCabinetAsync();
+        var feeder = await setup.NewFeederAsync(cabinet);
+        var otherFeeder = await setup.NewFeederAsync(cabinet);
+        var server = "iot-" + Guid.NewGuid().ToString("N");
+        const string register = "/api/v1/iot/nodes/register";
+        using var serverResponse = await admin.PostAsJsonAsync("/api/v1/iot/servers", new
+        {
+            server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
+        });
+        Assert.Equal(HttpStatusCode.Created, serverResponse.StatusCode);
+
+        object Payload(string feederId, string deviceId) => new
+        {
+            server_id = server, cabinet_id = cabinet, feeder_id = feederId, device_id = deviceId,
+            data_source = "calibration_rig", supports_remote_control = true,
+            nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
+        };
+
+        using var forbidden = await manager.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        bridge.RejectAppend = true;
+        using var failed = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.True(failed.StatusCode == HttpStatusCode.ServiceUnavailable, await failed.Content.ReadAsStringAsync());
+        Assert.Equal(0, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters()
+            .CountAsync(node => node.CabinetId == cabinet)));
+
+        bridge.RejectAppend = false;
+        using var first = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.True(first.StatusCode == HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
+        var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("GW-TEST", firstBody.GetProperty("gateway_id").GetString());
+        using var repeat = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
+        Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
+        var repeatBody = await repeat.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(firstBody.GetProperty("node_id").GetString(), repeatBody.GetProperty("node_id").GetString());
+
+        using var conflict = await admin.PostAsJsonAsync(register, Payload(otherFeeder, "P001"));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        using var second = await admin.PostAsJsonAsync(register, Payload(otherFeeder, "P002"));
+        Assert.True(second.StatusCode == HttpStatusCode.Created, await second.Content.ReadAsStringAsync());
+        Assert.Equal(new[] { "P001", "P002" }, bridge.Devices);
+        Assert.Equal(2, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters()
+            .CountAsync(node => node.CabinetId == cabinet)));
+    }
+
+    private sealed class RegistrationBridge : HttpMessageHandler
+    {
+        public List<string> Devices { get; } = [];
+        public bool RejectAppend { get; set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Assert.Equal("registration.example.test", request.RequestUri!.Host);
+            Assert.True(request.Headers.Contains("X-Iot-Provisioning-Key"));
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == "/api/luxmap/gateways/routes")
+                return new(HttpStatusCode.OK)
+                {
+                    Content = JsonContent.Create(new[] { new { gatewayId = "GW-TEST", deviceIds = Devices, credentialIssued = true } }),
+                };
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("/api/luxmap/gateways/GW-TEST/route", request.RequestUri.AbsolutePath);
+            if (RejectAppend) return new(HttpStatusCode.ServiceUnavailable);
+            var route = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
+            Devices.Add(route.GetProperty("deviceId").GetString()!);
+            return new(HttpStatusCode.NoContent);
+        }
+    }
+
+    [Fact]
     public async Task Registration_requires_admin_and_allowlisted_origin_and_reads_are_commune_scoped()
     {
         using var factory = new LuxMapApiFactory();

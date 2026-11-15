@@ -8174,6 +8174,159 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/iot/nodes/register": {
+      "post": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterNodeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterNodeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterNodeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredNode"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredNode"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredNode"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredNode"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredNode"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredNode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_settings",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/iot/nodes/{nodeId}/source": {
       "post": {
         "tags": [
@@ -23434,6 +23587,62 @@
         },
         "additionalProperties": false
       },
+      "RegisterNodeRequest": {
+        "required": [
+          "cabinet_id",
+          "data_source",
+          "device_id",
+          "feeder_id",
+          "nominal_current_ma",
+          "nominal_power_mw",
+          "nominal_voltage",
+          "server_id"
+        ],
+        "type": "object",
+        "properties": {
+          "server_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "cabinet_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "feeder_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "device_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "supports_remote_control": {
+            "type": "boolean"
+          },
+          "nominal_voltage": {
+            "type": "number",
+            "format": "double"
+          },
+          "nominal_current_ma": {
+            "type": "number",
+            "format": "double"
+          },
+          "nominal_power_mw": {
+            "type": "number",
+            "format": "double"
+          },
+          "gateway_id": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "RegisterServerRequest": {
         "type": "object",
         "properties": {
@@ -23441,7 +23650,8 @@
             "type": "string"
           },
           "base_url": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "commune_id": {
             "type": "string",
@@ -23449,6 +23659,27 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RegisteredNode": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "feeder_id": {
+            "type": "string"
+          },
+          "gateway_id": {
+            "type": "string"
           }
         },
         "additionalProperties": false

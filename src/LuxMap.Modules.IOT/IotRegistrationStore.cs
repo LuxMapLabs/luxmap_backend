@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using LuxMap.Modules.IOT.Entities;
+using LuxMap.Modules.IOT.Registry;
 using LuxMap.Modules.IOT.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
@@ -135,9 +136,59 @@ public sealed class IotRegistrationStore(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy xã/phường.");
     }
 
-    internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool replace, CancellationToken ct)
+    internal async Task<(string NodeId, string GatewayId, bool Created)> RegisterNodeAsync(CreateIotNodeRequest request,
+        NodeProfile profile, IotNodeRegistryService nodes, IotFeederSourceLookup sources,
+        Func<string, CancellationToken, Task<string>> ensureGatewayRoute, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // The feeder serializes repeat registrations. A new node row is private to this transaction.
+        var feeder = await FeederControllerBinding.LockFeederAsync(db, profile.FeederId, ct);
+        if (feeder.CabinetId != request.CabinetId)
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "Feeder phải thuộc tủ điện đã chọn.");
+
+        var (settings, links) = await sources.LinksAsync(db, [profile.FeederId], ct);
+        if (links.TryGetValue(profile.FeederId, out var existing))
+        {
+            var node = await nodes.NodeAsync(existing.NodeId, ct);
+            if (existing.Profile.ServerId != profile.ServerId || existing.Profile.DeviceId != profile.DeviceId ||
+                existing.Profile.NominalVoltage != profile.NominalVoltage ||
+                existing.Profile.NominalCurrentMa != profile.NominalCurrentMa ||
+                existing.Profile.NominalPowerMw != profile.NominalPowerMw ||
+                node.DataSource != request.DataSource || node.SupportsRemoteControl != request.SupportsRemoteControl)
+                throw Conflict();
+            return (existing.NodeId, await ensureGatewayRoute(feeder.CommuneId, ct), false);
+        }
+
+        // One physical MQTT device per bridge origin, including server aliases on the same VPS.
+        if (!settings.Servers.TryGetValue(profile.ServerId!, out var target) || target.CommuneId != feeder.CommuneId)
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound,
+                "Không tìm thấy IoT server trong phạm vi.");
+        if (!IotOrigin.TryAllowed(settings, target.BaseUrl, out var targetUri))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "Địa chỉ IoT server chưa được allowlist.");
+        var serverIds = settings.Servers.Where(pair => IotOrigin.TryAllowed(settings, pair.Value.BaseUrl, out var uri) &&
+            uri == targetUri).Select(pair => pair.Key.ToLowerInvariant()).ToArray();
+        // Serialize registration of the same physical ID even across different feeders/server records.
+        var deviceKey = targetUri.AbsoluteUri + profile.DeviceId;
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({deviceKey}, 0))", ct);
+        if (await db.Set<IotSourceRegistration>().AnyAsync(row =>
+                serverIds.Contains(row.ServerId) && row.DeviceId == profile.DeviceId, ct) ||
+            options.Value.Nodes.Values.Any(source => source.DeviceId == profile.DeviceId &&
+                serverIds.Contains(source.ServerId?.ToLowerInvariant())))
+            throw Conflict();
+
+        var nodeId = await nodes.CreateAsync(request, ct);
+        await SaveSourceAsync(nodeId, profile, replace: false, ct);
+        var gatewayId = await ensureGatewayRoute(feeder.CommuneId, ct);
+        await transaction.CommitAsync(ct);
+        return (nodeId, gatewayId, true);
+    }
+
+    internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool replace, CancellationToken ct)
+    {
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct) : null;
         var node = await LightingCommandService.LockDeviceAsync(db, nodeId, ct);
         var feeder = await FeederControllerBinding.LockFeederAsync(db, profile.FeederId, ct);
         if (feeder.CabinetId != node.CabinetId || feeder.CommuneId != node.CommuneId)
@@ -166,7 +217,7 @@ public sealed class IotRegistrationStore(
         else db.Entry(existing).CurrentValues.SetValues(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
         RecordRegistration(id, nodeId, details);
         await SaveAsync(ct);
-        await transaction.CommitAsync(ct);
+        if (transaction is not null) await transaction.CommitAsync(ct);
     }
 
     internal async Task DeleteSourceAsync(string nodeId, CancellationToken ct)

@@ -46,6 +46,10 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ### IOT-DIAGNOSTICS — đăng ký và chẩn đoán nguồn đo IoT (11/11/2026)
 
+**Mở rộng đăng ký gộp (15/11/2026, SELF-SIGNED theo luồng testbed, chờ maintainer duyệt).** Admin gọi
+`POST /api/v1/iot/nodes/register` với `server_id`, thông tin tủ, feeder và thiết bị MQTT. BE tạo node và lưu nguồn đo trong cùng giao dịch DB; Bridge bổ sung tuyến vào gateway đã cấp secret. Gửi lại cùng cấu hình trả `200` và cùng `node_id`; tạo mới trả `201`; xung đột trả `409`. Với nhiều gateway đủ điều kiện, thiết bị chưa có tuyến cần `gateway_id`. Nếu Bridge đã lưu tuyến mà commit DB thất bại, gửi lại request để hoàn tất cấu hình; tuyến đã cấp được dùng lại. Secret cấp một lần theo gateway và hỗ trợ cấp trước khi thêm node. `POST /iot/servers` cho phép bỏ `base_url` khi có địa chỉ mặc định hợp lệ. MQTT gateway lấy danh sách giới hạn theo Client ID đã xác thực, tối đa 32 node. Các API nguồn và tuyến riêng tiếp tục phục vụ cấu hình hiện có.
+
+
 | Trường | Nội dung |
 |---|---|
 | **Decision** | Ghi nhận sáu route IoT của PR #213 để review trước khi hợp nhất Contract. |
