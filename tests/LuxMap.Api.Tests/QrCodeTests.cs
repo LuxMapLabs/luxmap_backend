@@ -215,6 +215,65 @@ public sealed class QrCodeTests(AssetImportFixture factory)
         Assert.Equal(ErrorCodes.ValidationFailed, await Code(response));
     }
 
+    /// <summary>
+    /// POLE-DELETE-QR: before this, <c>fk_qr_code_pole_pole_id</c> made every pole that had ever been given a code
+    /// undeletable. The codes now go with the pole — the revoked one too — each with its own <c>deleted</c> audit event
+    /// that never holds the code (D-16).
+    /// </summary>
+    [Fact]
+    public async Task Deleting_a_pole_takes_its_codes_with_one_audit_event_each()
+    {
+        var pole = await PlantPoleAsync(factory.CommuneId);
+        var manager = await factory.ManagerClientAsync();
+        var first = await Read(await manager.PostAsJsonAsync(Codes, new { pole_id = pole }));
+        var second = await Read(await manager.PostAsJsonAsync(Codes, new { pole_id = pole }));
+
+        var response = await manager.DeleteAsync($"/api/v1/assets/poles/{pole}");
+
+        Assert.True(response.StatusCode == HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+        Assert.False(await factory.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AnyAsync(p => p.PoleId == pole)));
+        Assert.False(await factory.QueryAsync(db => db.Set<LuxMap.Modules.Citizen.Entities.QrCode>().IgnoreQueryFilters()
+            .AnyAsync(qr => qr.PoleId == pole)));
+        var deleted = await factory.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters().AsNoTracking()
+            .Where(e => e.EntityType == AuditEntityType.QrCode && e.Action == AuditAction.Deleted
+                && (e.EntityId == Id(first) || e.EntityId == Id(second)))
+            .OrderBy(e => e.AuditId).ToListAsync());
+        Assert.Equal([Id(first), Id(second)], deleted.Select(e => e.EntityId));
+        foreach (var code in new[] { first, second }.Select(c => c.GetProperty("code").GetString()!))
+        {
+            Assert.All(deleted, e => Assert.DoesNotContain(code, $"{e.BeforeState}|{e.AfterState}|{e.Note}", StringComparison.Ordinal));
+        }
+    }
+
+    /// <summary>
+    /// The delete takes the pole lock BEFORE it touches the codes — the lock issuing takes — so no code can be issued
+    /// between removing the codes and removing the pole. Without it the code rows would already be deleted (and so
+    /// locked) while the request waits on the pole row; <c>SKIP LOCKED</c> would then not see the code.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_a_pole_waits_for_the_pole_lock_before_touching_its_codes()
+    {
+        var pole = await PlantPoleAsync(factory.CommuneId);
+        var manager = await factory.ManagerClientAsync();
+        await manager.PostAsJsonAsync(Codes, new { pole_id = pole });
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {pole} FOR NO KEY UPDATE");
+
+        var request = manager.DeleteAsync($"/api/v1/assets/poles/{pole}");
+        await Task.WhenAny(request, Task.Delay(TimeSpan.FromMilliseconds(500)));
+        Assert.False(request.IsCompleted, "the delete finished while the pole row was locked");
+        var untouched = await db.Database.SqlQuery<string>(
+            $"SELECT qr_id AS \"Value\" FROM qr_code WHERE pole_id = {pole} FOR NO KEY UPDATE SKIP LOCKED").ToListAsync();
+        Assert.Single(untouched);
+
+        await transaction.RollbackAsync();
+        var response = await request;
+        Assert.True(response.StatusCode == HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+    }
+
     private static string Id(JsonElement item) => item.GetProperty("qr_id").GetString()!;
 
     private static LuxMap.Modules.Citizen.Entities.QrCode Planted(string id, string pole, string commune, string by, DateTime at, bool revoked) => new()

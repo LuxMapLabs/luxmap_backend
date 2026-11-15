@@ -439,6 +439,27 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
         return [.. codes];
     }
 
+    /// <summary>
+    /// POLE-DELETE-QR: deleting a pole takes its codes, but what a citizen SENT through a code is held by
+    /// <c>citizen_submission</c> with RESTRICT — so the delete is refused, and the code removed earlier in the same
+    /// transaction comes back with the rollback.
+    /// </summary>
+    [Fact]
+    public async Task A_pole_a_citizen_reported_through_is_not_deleted_and_keeps_its_code()
+    {
+        var (pole, code) = await PoleWithCodeAsync();
+        Assert.Equal(HttpStatusCode.Accepted, (await Submit(host.CreateClient(), code, "lamp_out")).StatusCode);
+
+        var response = await (await factory.ManagerClientAsync()).DeleteAsync($"/api/v1/assets/poles/{pole}");
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var error = (await Read(response)).GetProperty("error");
+        Assert.Equal(ErrorCodes.AssetInUse, error.GetProperty("code").GetString());
+        Assert.StartsWith("fk_citizen_submission_", error.GetProperty("details").GetProperty("constraint").GetString(), StringComparison.Ordinal);
+        Assert.True(await factory.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AnyAsync(p => p.PoleId == pole)));
+        Assert.True(await factory.QueryAsync(db => db.Set<QrCode>().IgnoreQueryFilters().AnyAsync(qr => qr.PoleId == pole && qr.RevokedAt == null)));
+    }
+
     private async Task<(string Pole, string Code)> PoleWithCodeAsync()
     {
         var pole = await factory.QueryAsync(async db =>
