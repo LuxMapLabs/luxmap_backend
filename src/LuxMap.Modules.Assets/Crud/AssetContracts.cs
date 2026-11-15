@@ -207,6 +207,12 @@ public sealed record CreateFixtureRequest
 
     [Required]
     public DataSource? DataSource { get; init; }
+
+    /// <summary>
+    /// Free text for a special case (FIXTURE-NOTE), e.g. one lamp in the fitting differs. Trimmed, blank = none,
+    /// at most 1000 characters. Fittings are insert-only, so the note is written with the fitting.
+    /// </summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>
@@ -507,6 +513,9 @@ public sealed record ActiveFixture
 
     public DateOnly? WarrantyExpiry { get; init; }
 
+    /// <summary>The fitting's own note (FIXTURE-NOTE); <c>null</c> when none. Not the pole's <c>note</c>.</summary>
+    public string? Note { get; init; }
+
     /// <summary>
     /// From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1). <c>unknown</c> when the expiry is
     /// not on record — never read as "still covered".
@@ -621,7 +630,7 @@ public sealed record PoleListItem
 
 /// <summary>
 /// The one set of rules for a pole note, whichever request carries it: trimmed, blank means none, at most
-/// <see cref="MaxLength"/> characters (POLE-NOTE).
+/// <see cref="MaxLength"/> characters (POLE-NOTE). A fitting's note follows the same rules (FIXTURE-NOTE).
 /// </summary>
 public static class PoleNoteInput
 {

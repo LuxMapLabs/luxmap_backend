@@ -412,6 +412,7 @@ public sealed class AssetCrudService(
             RemovedDate = request.RemovedDate,
             WarrantyExpiry = request.WarrantyExpiry,
             DataSource = request.DataSource!.Value,
+            Note = PoleNoteInput.Normalize(request.Note),
         };
 
         dbContext.Set<Fixture>().Add(fixture);
@@ -1234,6 +1235,7 @@ public sealed class AssetCrudService(
                     InstallDate = lamp.InstallDate,
                     WarrantyExpiry = lamp.WarrantyExpiry,
                     DataSource = lamp.DataSource,
+                    Note = lamp.Note,
                 })
                 .ToList(),
             Note = pole.Note,

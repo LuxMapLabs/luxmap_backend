@@ -2436,3 +2436,20 @@ Quyết định nội bộ BE, Mỹ chốt trong chat 15/11. Không chạm bề 
 | OF-7 | **Lỗ hổng đã biết của OF-6:** nhãn ảnh cột chỉ có `on` / `off` (PHOTO-REVIEW), nên ảnh một bộ sáng một nửa sẽ được gắn `on` và **không** hạ cột xuống `dim`. Báo cáo tại chỗ của kỹ sư (`POST /faults`, `lamp_dim`, `field_report`) tạo sự cố mở nhưng **không** ghi `pole_current_status` (chỉ sweep được duyệt và ảnh được xác nhận ghi). Chưa quyết: thêm nhãn "sáng một phần" cho ảnh, hay để lux kế tay quyết `dim` — cả hai chạm bề mặt API, cần FW |
 
 **Cần báo / cần quyết:** WP5, WP6 (409 ở bộ thứ hai; hình dạng đọc không đổi); OF-7 cần chốt kênh phát hiện bộ sáng một phần.
+
+## FIXTURE-NOTE — ghi chú của bộ đèn cho trường hợp đặc biệt (15/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 15/11/2026**, đi cùng ONE-FIXTURE theo đề xuất của FE: thêm ô ghi chú cho trường hợp đặc biệt của bộ đèn (vd một bóng trong bộ khác loại) thay vì tách bản ghi |
+| **Chạm API** | **Có, chỉ THÊM** — trường tuỳ chọn mới ở một request và hai response; không đổi trường nào. **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Scope** | Assets (entity, `POST /assets/fixtures`, import, kiểm kê), Map (chi tiết cột); migration `AddFixtureNote`; `templates/README.md`; spec sinh lại |
+| **Consumer** | WP5 (form / import bộ đèn, kiểm kê, popup chi tiết cột), WP6 (chi tiết cột). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| FN-1 | Cột `fixture.note text NULL`, CHECK `ck_fixture_note_length` = `char_length(note) <= 1000`. Ghi chú thuộc **lần lắp này**: thay bộ thì bộ mới có ghi chú riêng, ghi chú của bộ cũ ở lại làm lịch sử. Khác `pole.note` (POLE-NOTE — nói về vị trí trụ, ghi đè). Hệ thống không đọc chữ trong ghi chú. `Down()` từ chối khi còn bộ có ghi chú |
+| FN-2 | Ghi: `POST /assets/fixtures` nhận `note?` — cắt khoảng trắng, rỗng = không có, > 1000 ký tự → 400 `VALIDATION_FAILED` (`details.field = note`), cùng luật `PoleNoteInput`. Import bộ đèn: cột **`note` tuỳ chọn**, ô trống = không có, quá dài → lỗi theo dòng. **Không có đường sửa**: bộ đèn chỉ ghi thêm (insert-only), nên ghi chú viết cùng lúc ghi bộ; gõ sai thì hiện chỉ sửa được bằng ngừng dùng + ghi lại bộ — cần endpoint sửa ghi chú thì đặc tả riêng |
+| FN-3 | Đọc: khoá `note` (chuỗi \| null) trong `fixture` và mỗi phần tử `fixtures[]` của `GET /map/poles/{id}`, trong `active_fixture` / `active_fixtures[]` của `GET /assets/poles`. **Không** đưa vào lớp bản đồ bbox, `GET /work-orders/{id}/poles`, gói `/sync/bundle` hay thống kê bảo hành (giữ payload nhẹ như POLE-NOTE N-3); thêm nếu mobile cần |
+
+**Cần báo:** WP5, WP6 (trường mới, chỉ thêm).

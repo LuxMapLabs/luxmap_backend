@@ -84,6 +84,9 @@ public sealed record PoleMapFixture
 
     /// <summary>From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1).</summary>
     public WarrantyStatus WarrantyStatus { get; init; } = WarrantyStatus.Unknown;
+
+    /// <summary>The fitting's own note (FIXTURE-NOTE); <c>null</c> when none. The pole's note is the top-level <c>note</c>.</summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>

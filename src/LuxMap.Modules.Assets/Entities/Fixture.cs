@@ -58,6 +58,14 @@ public class Fixture : ICommuneScoped, IUpdateStamped
     public int LampCount { get; set; } = 1;
 
     /// <summary>
+    /// Free text for the special case the record cannot say (FIXTURE-NOTE) — e.g. one lamp in the fitting is not
+    /// like the others. Set when the fitting is recorded; it belongs to this installation and stays with it as
+    /// history when the fitting is replaced. At most 1000 characters (<c>ck_fixture_note_length</c>), same rules as
+    /// a pole note (<c>PoleNoteInput</c>). The system never reads it.
+    /// </summary>
+    public string? Note { get; set; }
+
+    /// <summary>
     /// Which of the pole's (at most <see cref="FixtureSlots.MaxInService"/>) fitting positions this fitting holds
     /// while in service — always 1 since ONE-FIXTURE (drift OF-1). The unique index on
     /// <c>(pole_id, slot) WHERE removed_date IS NULL</c> plus <c>ck_fixture_active_slot</c> limit a pole to one

@@ -494,6 +494,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("lamp_watt");
 
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
                     b.Property<string>("PoleId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -549,6 +553,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_fixture_fixture_type", "\"fixture_type\" IN ('led_road_lamp')");
 
                             t.HasCheckConstraint("ck_fixture_lamp_count", "lamp_count BETWEEN 1 AND 4");
+
+                            t.HasCheckConstraint("ck_fixture_note_length", "char_length(note) <= 1000");
 
                             t.HasCheckConstraint("ck_fixture_power_source", "\"power_source\" IN ('grid')");
 

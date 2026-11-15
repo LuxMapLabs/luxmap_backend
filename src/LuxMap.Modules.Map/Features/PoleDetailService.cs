@@ -66,7 +66,7 @@ public sealed class PoleDetailService(
             {
                 FixtureId = f.FixtureId, FixtureType = f.FixtureType, PowerSource = f.PowerSource,
                 LampWatt = f.LampWatt, LampCount = f.LampCount,
-                InstallDate = f.InstallDate, WarrantyExpiry = f.WarrantyExpiry,
+                InstallDate = f.InstallDate, WarrantyExpiry = f.WarrantyExpiry, Note = f.Note,
             })
             .ToListAsync(ct);
         var window = warranty.Window();

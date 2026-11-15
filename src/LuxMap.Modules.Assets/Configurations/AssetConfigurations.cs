@@ -315,6 +315,9 @@ public sealed class FixtureConfiguration : IEntityTypeConfiguration<Fixture>
             .HasDatabaseName("ux_fixture_pole_slot_active")
             .HasFilter("removed_date IS NULL");
 
+        // The API trims and checks the same limit and answers 400; this stops every other writer (FIXTURE-NOTE).
+        builder.ToTable(table => table.HasCheckConstraint("ck_fixture_note_length", "char_length(note) <= 1000"));
+
         // A lamp cannot be taken down before it was put up (BE-REVIEW-02, Q-4). The API checks it
         // first to answer 400 with the field named; this is the backstop for every other write path.
         builder.ToTable(table => table.HasCheckConstraint(

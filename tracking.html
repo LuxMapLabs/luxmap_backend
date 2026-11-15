@@ -483,6 +483,16 @@
   </div>
 
   <div class="card">
+    <strong>FIXTURE-NOTE — ghi chú của bộ đèn cho trường hợp đặc biệt, 15/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/ONE-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>AddFixtureNote</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    Cột <code>fixture.note</code> (≤ 1000, <code>ck_fixture_note_length</code>), nhận ở <code>POST /assets/fixtures</code> và cột <code>note</code> tuỳ chọn của import bộ đèn (cùng luật <code>PoleNoteInput</code>);
+    đọc ở <code>fixture</code> / <code>fixtures[]</code> của chi tiết cột và <code>active_fixture(s)</code> của kiểm kê. Không vào lớp bản đồ, cột của phiếu, gói offline. <code>Down()</code> từ chối khi còn ghi chú.
+    6 test mới; phá thử bỏ chuẩn hoá ở API → 3 đỏ, nới CHECK trong migration → 1 đỏ. Toàn bộ suite: 2325 đạt, 7 bỏ qua. Drift FN-1…FN-3, SELF-SIGNED.
+    <strong>Còn mở:</strong> chưa có đường sửa ghi chú (bộ đèn insert-only).</p>
+    <p class="muted">Commit: <code>feat(assets): let a fitting carry a note for its special case</code>.</p>
+  </div>
+
+  <div class="card">
     <strong>ONE-FIXTURE — một trụ một bộ đèn, hỏng bóng nào thay cả bộ, 15/11/2026</strong>
     <p><span class="tag t-next">Nhánh <code>feat/ONE-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>RestrictFixtureToOneInService</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.5.json</code></span>
     Mỹ chốt theo đề xuất của FE: đảo MULTI-FIXTURE, khôi phục D-11 bằng cách khoá còn 1 slot (không revert schema). CHECK mới <code>ck_fixture_active_slot</code>: bộ đang dùng ở slot 1;

@@ -393,12 +393,7 @@ public sealed class AssetImportService(
             // pole never goes back to "no position"); a malformed value is still a row error — never read as "empty".
             var geometry = reader.OptionalGeometry<Point>(CsvImportRow.GeometryColumn);
 
-            // Optional, and never required in the header. Already trimmed, blank = no note.
-            var note = reader.Optional("note");
-            if (note is { Length: > PoleNoteInput.MaxLength })
-            {
-                reader.Fail("note", $"A note is at most {PoleNoteInput.MaxLength} characters; this one has {note.Length}.");
-            }
+            var note = OptionalNote(reader);
 
             // POLE-SEGMENT-NULL D-2: the cell is optional. Blank or a missing column leaves a NEW pole on no segment and KEEPS an
             // existing pole's segment (only PUT null takes a pole off its segment). A reference that matches nothing is still a row
@@ -492,6 +487,21 @@ public sealed class AssetImportService(
     /// history, and a stale inventory file re-imported over an engineer's edit is otherwise lost without a
     /// trace. The import never clears a note — that is a decision for the pole itself, not a gap in a file.
     /// </remarks>
+    /// <summary>
+    /// The optional <c>note</c> column of a poles or fixtures file: never required in the header, already trimmed,
+    /// blank = no note, longer than <see cref="PoleNoteInput.MaxLength"/> fails the row.
+    /// </summary>
+    private static string? OptionalNote(ImportRowReader reader)
+    {
+        var note = reader.Optional("note");
+        if (note is { Length: > PoleNoteInput.MaxLength })
+        {
+            reader.Fail("note", $"A note is at most {PoleNoteInput.MaxLength} characters; this one has {note.Length}.");
+        }
+
+        return note;
+    }
+
     private static void ImportNote(ImportRowReader reader, Pole pole, string? note, List<ImportRowError> warnings)
     {
         if (note is null || note == pole.Note)
@@ -553,6 +563,7 @@ public sealed class AssetImportService(
             var removedDate = reader.Date("removed_date", required: false);
             var warranty = reader.Date("warranty_expiry", required: false);
             var dataSource = reader.RequiredEnum<DataSource>("data_source");
+            var note = OptionalNote(reader);
 
             // One fitting in service per pole (ONE-FIXTURE). A row with removed_date is history and neither takes
             // a slot nor is refused by a fitting already there; only an ACTIVE row can be refused, whether the
@@ -607,6 +618,7 @@ public sealed class AssetImportService(
                 RemovedDate = removedDate,
                 WarrantyExpiry = warranty,
                 DataSource = dataSource,
+                Note = note,
             };
             dbContext.Set<Fixture>().Add(fixture);
             Touch(fixture);

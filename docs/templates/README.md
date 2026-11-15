@@ -325,6 +325,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `removed_date` | Không | date | Để trống nghĩa là bóng **đang lắp**. Thay bóng thì điền vào dòng cũ và thêm một dòng mới |
 | `warranty_expiry` | Không | date | Không phải bóng nào cũng có bảo hành |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_fixture_data_source` |
+| `note` | Không | text ≤ 1000 | Ghi chú trường hợp đặc biệt của **bộ đèn** (vd một bóng khác loại) — FIXTURE-NOTE. Ô trống = không có. Khác cột `note` của file cột (ghi chú vị trí trụ) |
 
 > **Một cột mang MỘT bộ đèn đang dùng** (ONE-FIXTURE) — và nhiều bộ đã ngừng dùng làm lịch sử thay bộ. Import nhận một dòng đang
 > dùng (`removed_date` trống) cho mỗi `pole_external_ref`; dòng thứ hai cho cùng cột, hoặc nạp lại file cho cột đã có bộ, bị từ chối
