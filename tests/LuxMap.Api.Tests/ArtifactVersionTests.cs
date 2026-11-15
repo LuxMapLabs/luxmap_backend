@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Faults.Entities;
-using LuxMap.Modules.Telemetry.Mqtt;
+using LuxMap.Modules.IOT.Mqtt;
 using LuxMap.Persistence.Versions;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;

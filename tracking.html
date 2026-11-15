@@ -41,6 +41,47 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>IOT-CONSOLIDATE-MODULE-DEV — tích hợp dev #258, PR #259 vào dev · 15/11/2026</strong>
+    <p><span class="tag t-done">Claude review đạt · kiểm chứng đạt · Mỹ đã duyệt publish/admin merge sau CI xanh</span>
+    Nền <code>839483e</code>; chỉ conflict bảng completed trong tracking, giữ đủ dòng IOT và POLE-DELETE-QR.
+    QR deletion/DI/locks/audit/tests của #258 giữ nguyên. Claude Opus5.5/high review lại staged merge: không source blocker;
+    P3 evidence/base/authorization đã cập nhật. <b>2320 .NET pass, 0 fail, 5 skip nền +20 Python pass</b>, MQTT thật;
+    build0warning/error, EF không pending model changes, schema/API giữ nguyên, HTTP publish sạch qua cả Assets có port QR.</p>
+    <p>Đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/259">PR #259 → dev</a>; trạng thái CI/merge hiện hành xem tại PR. Mỹ đã cho phép admin merge sau CI xanh đúng head; không deploy/DB dev hoặc B/C.
+    <a href=".ai/results/IOT-CONSOLIDATE-MODULE-DEV-p2.md">Bằng chứng mới</a> ·
+    <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-DEV-by-claude-opus-5-5.md">Review Claude</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>IOT-CONSOLIDATE-MODULE — Claude Opus 5.5 / high review · 15/11/2026</strong>
+    <p><span class="tag t-done">Hai trục review xong · 3 P3 đã sửa và Claude kiểm lại</span>
+    Model <code>claude-opus-5-5</code>, effort <code>high</code>, Claude Code 2.1.325; review source <code>9ec7815</code> so với dev <code>66e1c83</code>.
+    <b>Standards:</b> 0 vi phạm quy chuẩn, 3 P3 chú thích/docs; <b>Spec:</b> 0 finding. Không có P0–P2.
+    Đã khôi phục giải thích bind MQTT options, làm rõ singleton/context scope và sửa code fence;
+    Claude follow-up xác nhận cả 3 đã giải quyết, không có vấn đề mới.</p>
+    <p>Build sau sửa 0 warning/error, mã thực thi giữ nguyên; kết quả regression triển khai 2317 pass/5 skip +20 Python giữ nguyên,
+    reviewer không chạy lại test. <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-by-claude-opus-5-5.md">Biên bản, model/session và follow-up</a>.
+    Commit local; chưa push/deploy; bước B/C còn chờ chốt.</p>
+  </div>
+
+  <div class="card">
+    <strong>IOT-CONSOLIDATE-MODULE — phase 2-A hợp nhất Telemetry vào IOT · 15/11/2026</strong>
+    <p><span class="tag t-done">Kiểm chứng xong · commit local · chưa push/deploy</span>
+    Nền <code>66e1c83</code> (PR #257 đã merge). Chuyển 26 implementation sang IOT, gộp service/job/version registration vào
+    <code>IotModule</code>, gỡ project Telemetry và cập nhật references/catalogs. Giữ port Assets và MQTTnet 5.2.0.1603.</p>
+    <p><b>Schema SQL và raw OpenAPI khớp từng byte với dev; EF không pending model changes.</b>
+    Không có migration/schema/API/protocol mới; relay và hai đường điều khiển còn nguyên.
+    Build 0 warning/error; <b>2317 .NET pass, 0 fail, 5 skip nền + 20 Python pass</b>, MQTT E2E qua EMQX riêng;
+    121 test liên quan trực tiếp pass, review độc lập không finding. Publish sạch không còn DLL/deps Telemetry;
+    HTTP thật trên DB tạm: registry/Bridge/lighting/map 200, Device không credential 401.</p>
+    <p><b>Known issue:</b> lượt tổng đầu đỏ một test ProfileTests/SystemAdmin do so hai snapshot danh sách xã đang đổi;
+    code/test đó giữ nguyên từ dev. Kiểm riêng 35 test hồ sơ/xã và lượt tổng thứ hai xanh; chưa sửa race ngoài scope.
+    <b>Còn:</b> Mỹ đã duyệt push/PR A và admin merge sau CI xanh ngày15/11; bước B/C và VR-10…12/IOT-CONS-1/backup Bridge chưa thực hiện.
+    <a href=".ai/results/IOT-CONSOLIDATE-MODULE-p2.md">Bằng chứng</a> ·
+    <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-by-reviewer.md">Review</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>IOT-CONSOLIDATION — khảo sát phase 2 bỏ relay / hợp nhất Telemetry · 15/11/2026</strong>
     <p><span class="tag t-next">Khảo sát xong sau phase 1 f46364d · D-1…D-8 chờ Mỹ chốt</span>
     Không có bảng relay riêng; <code>feeder_control</code> giữ mapping và state, <code>lighting_command.relay_no</code> là snapshot lịch sử.
@@ -51,12 +92,12 @@
     thiếu firmware trên mẫu (<code>VR-10…12</code>), backup chưa sao lưu <code>bridge_data</code> (runbook VPS đã ghi).
     Chỉ kiểm source/spec/scripts; chưa kiểm DB/VPS, firmware thật hoặc FE/mobile ngoài repo.
     <a href=".ai/results/IOT-CONSOLIDATION-p1.md">Khảo sát, bảng ảnh hưởng, lộ trình/rollback và D-item</a>.
-    Phase 1 giữ nguyên; đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> vào dev theo xác nhận của Mỹ ngày 15/11. Chưa merge/deploy.</p>
+    Phase 1 đã merge vào dev qua <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> ngày 15/11; bước A đã thực hiện ở task IOT-CONSOLIDATE-MODULE phía trên. B/C còn chờ chốt; chưa deploy.</p>
   </div>
 
   <div class="card">
     <strong>CABINET-MULTI-NODE-DEV — phase 1 tích hợp dev sau PR #256 · 15/11/2026</strong>
-    <p><span class="tag t-done">Đã push · PR #257 vào dev · chưa merge/deploy</span>
+    <p><span class="tag t-done">Đã merge dev · PR #257 · chưa deploy</span>
     Nền <code>df35665</code>; một tủ chứa nhiều node, list/detail/map thêm <code>iot_node_ids[]</code> và giữ scalar cũ.
     Giữ ảnh tài sản, <code>feeders[]</code>, <code>power_state</code>, relay, Telemetry, credential/MQTT và lịch sử.
     Mỹ chốt guard tạm: Bridge và relay gán khác node cho cùng feeder → <b>409 IOT_REGISTRATION_CONFLICT</b>;
@@ -66,7 +107,7 @@
     <p><b>2317 .NET pass, 0 fail, 5 skip nền dev + 20 Python pass</b>, MQTT E2E qua broker riêng;
     build 0 warning/error, 3 mutation check đỏ đúng chỗ, HTTP thật trên DB tạm, OpenAPI hợp lệ (10 warning như dev),
     review độc lập không còn finding. Năm skip là ACCT-1/D-6b nhiều xã, không thêm skip mới.
-    <b>PR:</b> <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">#257 → dev</a>, đã push theo xác nhận của Mỹ ngày 15/11; xem CI/review trên PR. Chưa merge, apply dev/VPS, deploy hoặc báo WP5/WP6.
+    <b>PR:</b> <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">#257 → dev</a>, đã merge ngày 15/11 tại <code>66e1c83</code>. Chưa apply dev/VPS, deploy hoặc báo WP5/WP6 trong phiên này.
     Phase 2 bỏ relay / hợp nhất Telemetry chỉ khảo sát sau commit này, chưa hiện thực.
     Bằng chứng: <a href=".ai/results/CABINET-MULTI-NODE-DEV-p2.md">kết quả tích hợp</a>;
     quyết định CAB-MN-1…5; kết quả nhánh cũ 14/11 chỉ là lịch sử.</p>
@@ -1090,6 +1131,30 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE-DEV</code> Đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/259">PR #259 → dev</a> sau Claude review/kiểm chứng. Mỹ duyệt admin merge sau CI xanh đúng head; trạng thái CI/merge xem PR.</td>
+        <td><code>tracking.html</code>, integration evidence publish</td>
+        <td><code>docs(tracking): record IOT consolidation PR 259</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE-DEV</code> Ghép dev #258, giải tracking giữ cả hai bên, review Claude Opus5.5/high lại đạt; 2320 .NET pass/5 skip nền +20 Python pass. Mỹ đã duyệt publish và admin merge sau CI xanh.</td>
+        <td>Changes từ dev#258, tracking, task authorization, evidence/PR body và review tích hợp <code>.ai/</code></td>
+        <td><code>chore(iot): merge dev after pole QR deletion fix</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE</code> Claude Opus 5.5/high: Standards 3 P3 chú thích/docs đã sửa và follow-up xác nhận, Spec 0; không có P0–P2. Build 0 warning/error, không đổi mã thực thi.</td>
+        <td><code>IotModule.cs</code>, <code>IFeederSourceLookup.cs</code>, p2/nháp PR, <code>.ai/reviews/IOT-CONSOLIDATE-MODULE-by-claude-opus-5-5.md</code>, tracking</td>
+        <td><code>docs(iot): address Claude Opus 5.5 review</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE</code> Phase 2-A: gộp Telemetry vào IOT, giữ hành vi/schema/API. 2317 .NET pass/5 skip nền + 20 Python pass; byte-equal schema/spec, HTTP publish sạch, review độc lập. Chưa push/deploy.</td>
+        <td>26 implementation, IotModule/project refs/catalogs, README/development/traps/walkthrough, bằng chứng/review/nháp PR <code>.ai/</code>, tracking</td>
+        <td><code>refactor(iot): consolidate telemetry into IOT module</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
         <td><code>POLE-DELETE-QR</code> Xoá cột xoá luôn mã QR của cột (mỗi mã một audit <code>deleted</code>), dưới khoá hàng <code>pole</code>, cùng transaction; báo cáo công dân vẫn chặn (409). Phát hiện khi 6 cột SEG-004 trên production trả 409 <code>fk_qr_code_pole_pole_id</code>. Chưa merge / deploy; 6 cột chưa xoá.</td>
         <td><code>AssetCrudService.DeletePoleAsync</code>, port <code>IPoleQrCodes</code>, <code>QrCodeService</code>, <code>QrCodeTests</code>, <code>CitizenReportTests</code>, drift <code>POLE-DELETE-QR</code>, <code>traps/citizen.md</code></td>
         <td><code>fix(assets): delete a pole's QR codes with the pole</code></td>
@@ -1478,6 +1543,7 @@
   <h2>Vấn đề đang mở</h2>
   <div class="card">
     <ul>
+      <li><strong>ProfileTests/SystemAdmin có race snapshot xã (15/11, IOT-CONSOLIDATE-MODULE).</strong> PATCH/GET profile so toàn bộ JSON trong lúc CommuneAdminTests tạo/xóa/đổi <code>bbox-test-*</code>; một lượt full đỏ, kiểm riêng 35 test và lượt full sau xanh. Code/test chưa sửa trong bước A; xem <code>docs/agents/traps/testing.md</code>.</li>
       <li><strong>🔴 <code>luxmap.com.vn</code> không phân giải được trên resolver kiểm DNSSEC (22/10/2026 ~10:40).</strong> Google 8.8.8.8, Cloudflare
       1.1.1.1, Quad9, OpenDNS trả <code>SERVFAIL</code>; tắt kiểm (<code>dig +cd</code>) thì ra đúng <code>15.235.242.213</code>. NS của iNET trả lời đúng.
       Nguyên nhân ở phía registry: <code>com.vn</code> có ký DNSSEC, nhưng NS của VNNIC (<code>c.dns-servers.vn</code>) trả lời truy vấn

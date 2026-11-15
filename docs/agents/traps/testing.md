@@ -80,6 +80,12 @@ Sửa: đưa test vào **`SystemAdminCountCollection`** (`DisableParallelization
 Không dùng `RepeatableRead` để né: nó đổi lỗi thành `40001` khi class khác sửa / xoá đúng dòng đang khoá. Phá thử: commit một
 Quản trị từ scope khác **giữa** lệnh khoá và lượt đếm → test đỏ.
 
+**Gặp ở ProfileTests (15/11/2026, IOT-CONSOLIDATE-MODULE):** `Every_role_renames_itself_and_gets_the_me_body_back`
+so toàn bộ JSON của PATCH với GET kế tiếp. Với system_admin, `communes[]` và map bounds phụ thuộc mọi xã;
+`CommuneAdminTests` đồng thời tạo/xóa/đổi `bbox-test-*`, nên hai snapshot có thể khác dù profile đúng.
+Lượt tổng đã đỏ ở tên xã; 35 test hai class chạy riêng xanh. Chưa sửa test trong ticket chuyển module;
+không kết luận hai snapshot dữ liệu động phải bằng nhau chỉ vì cùng hình dạng response.
+
 ## AI-DAYNIGHT — response union và fixture model (03/11/2026)
 
 Test HTTP dùng stub IDayNightClassifier đăng ký trong LuxMapTestHost cho day/unknown/night;

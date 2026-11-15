@@ -40,7 +40,7 @@ Ba thứ chi phối gần như mọi dòng code. Không nắm thì nhiều đo�
 6. LuxMap.Modules.Identity/      ← module domain DUY NHẤT hiện có nội dung
 ```
 
-Sáu module còn lại (`Assets`, `Survey`, `Faults`, `WorkOrders`, `Telemetry`, `Admin`) mỗi cái đúng
+Sáu module còn lại (`Assets`, `Survey`, `Faults`, `WorkOrders`, `IOT`, `Admin`) mỗi cái đúng
 18 dòng khung rỗng. Mở một cái để thấy hình dạng, rồi bỏ qua.
 
 ---
@@ -84,7 +84,7 @@ câu không ai trả lời được.
 ## 3. Bản đồ project — ai phụ thuộc ai
 
 ```
-Modules.{Identity,Assets,Survey,Faults,WorkOrders,Telemetry,Admin}
+Modules.{Identity,Assets,Survey,Faults,WorkOrders,IOT,Admin}
         │
         ▼
    Persistence  ──►  Shared

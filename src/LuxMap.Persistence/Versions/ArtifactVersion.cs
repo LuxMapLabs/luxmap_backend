@@ -9,7 +9,7 @@ namespace LuxMap.Persistence.Versions;
 /// not one table per kind). Immutable: a result cites a row, so the row may never change under it.
 /// </summary>
 /// <remarks>
-/// Lives in Persistence since BE-34 (D-2) so that every module can point at it — Survey for its runs, Telemetry for a device's
+/// Lives in Persistence since BE-34 (D-2) so that every module can point at it — Survey for its runs, IOT for a device's
 /// firmware, Admin for the registry API — without one module referencing another. The table itself did not move.
 /// </remarks>
 public sealed class ArtifactVersion : IImmutableRecord

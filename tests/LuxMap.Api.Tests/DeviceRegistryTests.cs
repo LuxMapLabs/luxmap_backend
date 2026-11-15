@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
-using LuxMap.Modules.Telemetry.Entities;
+using LuxMap.Modules.IOT.Entities;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;

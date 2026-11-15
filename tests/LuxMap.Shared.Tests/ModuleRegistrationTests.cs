@@ -5,7 +5,7 @@ using LuxMap.Modules.Identity;
 using LuxMap.Modules.Identity.Accounts;
 using LuxMap.Modules.Survey;
 using LuxMap.Modules.Notifications;
-using LuxMap.Modules.Telemetry;
+using LuxMap.Modules.IOT;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
@@ -23,7 +23,7 @@ public class ModuleRegistrationTests
         new SurveyModule(),
         new FaultsModule(),
         new WorkOrdersModule(),
-        new TelemetryModule(),
+        new IotModule(),
         new AdminModule(),
         new NotificationsModule(),
     ];
@@ -123,7 +123,7 @@ public class ModuleRegistrationTests
     [Fact]
     public void All_eight_domain_modules_are_present()
     {
-        string[] expected = ["Identity", "Assets", "Survey", "Faults", "WorkOrders", "Telemetry", "Admin", "Notifications"];
+        string[] expected = ["Identity", "Assets", "Survey", "Faults", "WorkOrders", "IOT", "Admin", "Notifications"];
 
         Assert.Equal(expected, AllModules().Select(m => m.Name));
     }

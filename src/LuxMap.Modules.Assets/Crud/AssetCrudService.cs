@@ -1296,7 +1296,7 @@ public sealed class AssetCrudService(
 
     /// <remarks>
     /// <c>iot_node_ids</c> is left empty here and filled by the caller from <see cref="ICabinetDeviceLookup"/>:
-    /// <c>iot_node</c> belongs to Telemetry, which this module does not reference.
+    /// <c>iot_node</c> belongs to IOT, which this module does not reference.
     /// </remarks>
     private System.Linq.Expressions.Expression<Func<ElectricalCabinet, CabinetListItem>> CabinetRow =>
         cabinet => new CabinetListItem

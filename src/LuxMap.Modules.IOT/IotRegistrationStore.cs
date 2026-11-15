@@ -1,8 +1,7 @@
 using System.Net;
 using System.Text.Json;
-using LuxMap.Modules.Telemetry.Entities;
-using LuxMap.Modules.Telemetry;
-using LuxMap.Modules.Telemetry.Lighting;
+using LuxMap.Modules.IOT.Entities;
+using LuxMap.Modules.IOT.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;

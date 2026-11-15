@@ -325,7 +325,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 await AssertBindingConflictAsync(await client.PostAsJsonAsync("/api/v1/lighting/commands",
                     new { feeder_id = rig.Feeder, mode = "off", client_op_id = Guid.NewGuid() }), rig.Feeder);
 
-                await using var scope = services.GetRequiredService<LuxMap.Modules.Telemetry.Mqtt.LightingScopeFactory>()
+                await using var scope = services.GetRequiredService<LuxMap.Modules.IOT.Mqtt.LightingScopeFactory>()
                     .Open(fixture.CommuneId, "binding-guard-test");
                 var error = await Assert.ThrowsAsync<LuxMap.Shared.Http.LuxMapException>(
                     () => scope.Service.PollAsync(rig.Second, CancellationToken.None));

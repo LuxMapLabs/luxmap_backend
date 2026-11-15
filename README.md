@@ -4,6 +4,9 @@ LuxMap là nền tảng GIS + IoT + thị giác máy tính để quản lý tài
 (đồ án FA26SE222). Repo này là backend: một modular monolith ASP.NET Core (.NET 10) trên PostgreSQL + PostGIS, phục vụ
 Web SPA (WP5), app Android (WP6) và engine CV (WP4) qua REST API `/api/v1`.
 
+Thiết bị IoT, firmware, registry, điều khiển HTTP/MQTT, job offline và Bridge diagnostics cùng nằm trong
+`src/LuxMap.Modules.IOT` (phase 2-A). Project `Modules.Telemetry` đã được hợp nhất; dữ liệu đo và lịch sử vẫn được giữ.
+
 - Đặc tả API: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) — nguồn sự thật, thắng mọi tài liệu khác
 - Đọc code từ đâu: [`docs/code-walkthrough.md`](docs/code-walkthrough.md)
 - Sơ đồ trạng thái (sự cố, phiếu, khảo sát, QR, lệnh đèn…), viết bằng tiếng Anh: [`docs/state-machines.md`](docs/state-machines.md)

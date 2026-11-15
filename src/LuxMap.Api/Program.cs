@@ -10,7 +10,6 @@ using LuxMap.Modules.Notifications;
 using LuxMap.Modules.Survey;
 using LuxMap.Modules.Statistics;
 using LuxMap.Modules.Sync;
-using LuxMap.Modules.Telemetry;
 using LuxMap.Modules.WorkOrders;
 using LuxMap.Api.Authorization;
 using LuxMap.Api.Http;
@@ -48,7 +47,6 @@ ILuxMapModule[] modules =
     new SurveyModule(),
     new FaultsModule(),
     new WorkOrdersModule(),
-    new TelemetryModule(),
     new IotModule(),
     new AdminModule(),
     new NotificationsModule(),

@@ -1,13 +1,13 @@
 namespace LuxMap.Modules.Assets;
 
 /// <summary>
-/// What the Telemetry module knows about devices, asked from the Assets side (CABINET).
+/// What the IOT module knows about devices, asked from the Assets side (CABINET).
 /// </summary>
 /// <remarks>
 /// <para>
-/// A port because Assets cannot reference Telemetry — the reference already runs the other way
+/// A port because Assets cannot reference IOT — the reference already runs the other way
 /// (<c>feeder_control</c> points at <c>feeder</c>). Same shape as <c>IActiveWorkOrderLookup</c> between
-/// Faults and WorkOrders. Telemetry implements it.
+/// Faults and WorkOrders. IOT implements it.
 /// </para>
 /// <para>
 /// Both answers go through the commune query filter. That narrows nothing that matters: a device sits in its
