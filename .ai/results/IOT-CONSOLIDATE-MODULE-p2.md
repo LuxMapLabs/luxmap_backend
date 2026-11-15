@@ -1,5 +1,8 @@
 # IOT-CONSOLIDATE-MODULE — kết quả phase 2-A
 
+**Bằng chứng lịch sử trên dev `66e1c83`.** Bản ghép dev #258 (`839483e`) và kết quả publish/CI mới
+được ghi riêng ở `.ai/results/IOT-CONSOLIDATE-MODULE-DEV-p2.md`; không dùng số 2317 dưới đây để thay cho lượt test mới.
+
 ## Phạm vi và duyệt
 
 Mỹ thông báo đã merge #257 và yêu cầu làm tiếp trong chat 15/11/2026.

@@ -24,3 +24,10 @@ Không hiện thực bước B/C: chưa siết một feeder/node, chọn mapping
 xóa relay endpoint/field, chuyển kênh firmware, xóa lịch sử, sửa khoảng trống Bridge last-report/firmware/backup.
 Không thay package version, tạo schema/migration/config/API, apply DB dev/VPS, deploy hoặc gửi tin ngoài repo.
 Không sửa workspace gốc. D-1…D-8 của bước B/C vẫn chờ chốt, không suy ra đã duyệt tất cả từ “làm tiếp”.
+
+
+## Mỹ duyệt publish/merge sau review (15/11/2026)
+
+Mỹ yêu cầu ghép dev sau PR #258, gửi Claude review khả năng push; nếu đạt thì push, mở PR,
+đợi CI xanh và merge bằng admin. Đây là phê duyệt tường minh cho chuỗi publish/merge của bước A,
+thay trạng thái “cần xác nhận riêng” ở trên; không phê duyệt deploy/DB dev hoặc hiện thực B/C.

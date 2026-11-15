@@ -2391,3 +2391,19 @@ của node, cập nhật last-report/firmware qua service có scope, giữ `Node
 replay mẫu cũ không làm node sống giả. Firmware/mẫu đo vẫn cần VR-10, không suy phiên bản cũ từ bản hiện tại.
 
 Chưa đổi API, payload hoặc job trong khảo sát này; chưa báo WP5/WP6/Đạt. Chỉ hiện thực sau khi chốt phương án và tương thích consumer.
+
+### POLE-DELETE-QR — xoá cột xoá luôn mã QR của cột (15/11/2026)
+
+**Phát hiện trên production 15/11:** xoá 6 cột SEG-004 (Phước Thiện) đều trả **409 `ASSET_IN_USE`**, `constraint = fk_qr_code_pole_pole_id`.
+`qr_code → pole` là `Restrict`, và thu hồi mã chỉ ghi `revoked_at` — nên **cột nào từng được cấp mã QR thì không bao giờ xoá được**,
+không có API nào gỡ được chặn.
+
+- `DELETE /api/v1/assets/poles/{id}` giờ xoá **mọi mã QR của cột** (đang dùng lẫn đã thu hồi) trước khi xoá cột, **cùng một transaction**,
+  mỗi mã một audit `deleted` (`entity_type = qr_code`, chỉ `qr_id` / `pole_id` / `active`, không bao giờ `code` — D-16).
+- Thứ tự khoá như cấp / thu hồi mã: đọc cột qua filter (404) → `FOR UPDATE` hàng `pole` → đọc lại → xoá mã → xoá cột.
+- **Vẫn từ chối** khi công dân đã gửi báo cáo qua mã: `citizen_submission → qr_code` là `Restrict` → 409 `ASSET_IN_USE` với constraint
+  `fk_citizen_submission_…`; mã đã xoá trong transaction được rollback. Sự cố, lux reading … vẫn chặn như cũ.
+- **Không đổi bề mặt API:** route, mã trạng thái, body lỗi giữ nguyên; chỉ một trường hợp 409 cũ nay thành 204. Không migration
+  (FK giữ `Restrict`; xoá do service làm, có audit).
+
+Quyết định nội bộ BE, Mỹ chốt trong chat 15/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.

@@ -41,6 +41,18 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>IOT-CONSOLIDATE-MODULE-DEV — tích hợp dev #258, chuẩn bị publish/merge · 15/11/2026</strong>
+    <p><span class="tag t-done">Claude review đạt · kiểm chứng đạt · Mỹ đã duyệt publish/admin merge sau CI xanh</span>
+    Nền <code>839483e</code>; chỉ conflict bảng completed trong tracking, giữ đủ dòng IOT và POLE-DELETE-QR.
+    QR deletion/DI/locks/audit/tests của #258 giữ nguyên. Claude Opus5.5/high review lại staged merge: không source blocker;
+    P3 evidence/base/authorization đã cập nhật. <b>2320 .NET pass, 0 fail, 5 skip nền +20 Python pass</b>, MQTT thật;
+    build0warning/error, EF không pending model changes, schema/API giữ nguyên, HTTP publish sạch qua cả Assets có port QR.</p>
+    <p>Mỹ yêu cầu push → mở PR dev → đợi CI xanh đúng head → merge admin; không deploy/DB dev hoặc B/C.
+    <a href=".ai/results/IOT-CONSOLIDATE-MODULE-DEV-p2.md">Bằng chứng mới</a> ·
+    <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-DEV-by-claude-opus-5-5.md">Review Claude</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>IOT-CONSOLIDATE-MODULE — Claude Opus 5.5 / high review · 15/11/2026</strong>
     <p><span class="tag t-done">Hai trục review xong · 3 P3 đã sửa và Claude kiểm lại</span>
     Model <code>claude-opus-5-5</code>, effort <code>high</code>, Claude Code 2.1.325; review source <code>9ec7815</code> so với dev <code>66e1c83</code>.
@@ -64,7 +76,7 @@
     HTTP thật trên DB tạm: registry/Bridge/lighting/map 200, Device không credential 401.</p>
     <p><b>Known issue:</b> lượt tổng đầu đỏ một test ProfileTests/SystemAdmin do so hai snapshot danh sách xã đang đổi;
     code/test đó giữ nguyên từ dev. Kiểm riêng 35 test hồ sơ/xã và lượt tổng thứ hai xanh; chưa sửa race ngoài scope.
-    <b>Còn:</b> push/PR A cần Mỹ xác nhận; bước B/C và VR-10…12/IOT-CONS-1/backup Bridge chưa thực hiện.
+    <b>Còn:</b> Mỹ đã duyệt push/PR A và admin merge sau CI xanh ngày15/11; bước B/C và VR-10…12/IOT-CONS-1/backup Bridge chưa thực hiện.
     <a href=".ai/results/IOT-CONSOLIDATE-MODULE-p2.md">Bằng chứng</a> ·
     <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-by-reviewer.md">Review</a>.</p>
   </div>
@@ -1119,6 +1131,12 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE-DEV</code> Ghép dev #258, giải tracking giữ cả hai bên, review Claude Opus5.5/high lại đạt; 2320 .NET pass/5 skip nền +20 Python pass. Mỹ đã duyệt publish và admin merge sau CI xanh.</td>
+        <td>Changes từ dev#258, tracking, task authorization, evidence/PR body và review tích hợp <code>.ai/</code></td>
+        <td><code>chore(iot): merge dev after pole QR deletion fix</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
         <td><code>IOT-CONSOLIDATE-MODULE</code> Claude Opus 5.5/high: Standards 3 P3 chú thích/docs đã sửa và follow-up xác nhận, Spec 0; không có P0–P2. Build 0 warning/error, không đổi mã thực thi.</td>
         <td><code>IotModule.cs</code>, <code>IFeederSourceLookup.cs</code>, p2/nháp PR, <code>.ai/reviews/IOT-CONSOLIDATE-MODULE-by-claude-opus-5-5.md</code>, tracking</td>
         <td><code>docs(iot): address Claude Opus 5.5 review</code></td>
@@ -1128,6 +1146,12 @@
         <td><code>IOT-CONSOLIDATE-MODULE</code> Phase 2-A: gộp Telemetry vào IOT, giữ hành vi/schema/API. 2317 .NET pass/5 skip nền + 20 Python pass; byte-equal schema/spec, HTTP publish sạch, review độc lập. Chưa push/deploy.</td>
         <td>26 implementation, IotModule/project refs/catalogs, README/development/traps/walkthrough, bằng chứng/review/nháp PR <code>.ai/</code>, tracking</td>
         <td><code>refactor(iot): consolidate telemetry into IOT module</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>POLE-DELETE-QR</code> Xoá cột xoá luôn mã QR của cột (mỗi mã một audit <code>deleted</code>), dưới khoá hàng <code>pole</code>, cùng transaction; báo cáo công dân vẫn chặn (409). Phát hiện khi 6 cột SEG-004 trên production trả 409 <code>fk_qr_code_pole_pole_id</code>. Chưa merge / deploy; 6 cột chưa xoá.</td>
+        <td><code>AssetCrudService.DeletePoleAsync</code>, port <code>IPoleQrCodes</code>, <code>QrCodeService</code>, <code>QrCodeTests</code>, <code>CitizenReportTests</code>, drift <code>POLE-DELETE-QR</code>, <code>traps/citizen.md</code></td>
+        <td><code>fix(assets): delete a pole's QR codes with the pole</code></td>
       </tr>
       <tr>
         <td>15/11/2026</td>

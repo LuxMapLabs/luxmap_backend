@@ -30,7 +30,7 @@ namespace LuxMap.Modules.Assets.Crud;
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
     WarrantyCalendar warranty, ISurveyCorridor corridor, IFeederControlLookup controls, PoleRelocation relocation, AssetPhotoReader photos,
-    IFeederPowerLookup feederPower)
+    IFeederPowerLookup feederPower, IPoleQrCodes qrCodes)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -667,13 +667,41 @@ public sealed class AssetCrudService(
     /// <c>fk_fault_fixture_fixture_id</c>. PostgreSQL aborts the whole statement, so nothing is left
     /// half-deleted, but the pole itself looks unreferenced. That is why the refusal explains itself.
     /// </para>
+    /// <para>
+    /// <b>Its QR codes go with it</b> (POLE-DELETE-QR, <see cref="IPoleQrCodes"/>): a printed code is not data about the
+    /// road, and before this every pole that had ever been given a code was undeletable. The codes are removed first, each
+    /// with its audit event, under the pole lock issuing takes — read through the filter (404), lock, read again — so no
+    /// code is issued between them. One transaction: a later refusal (a citizen sent a report through a code, a fault)
+    /// rolls the codes back too.
+    /// </para>
     /// </remarks>
-    public Task DeletePoleAsync(string poleId, CancellationToken ct)
-        => DeleteAsync<Pole>(
-            candidate => candidate.PoleId == poleId,
-            "pole",
-            "That pole still has records pointing at it, so it cannot be deleted.",
-            ct);
+    public async Task DeletePoleAsync(string poleId, CancellationToken ct)
+    {
+        const string refusal = "That pole still has records pointing at it, so it cannot be deleted.";
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+        var scoped = await dbContext.Set<Pole>().AsNoTracking()
+            .Where(candidate => candidate.PoleId == poleId).Select(candidate => new { candidate.PoleId, candidate.CommuneId })
+            .FirstOrDefaultAsync(ct);
+        if (scoped is not null)
+        {
+            await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM pole WHERE pole_id = {scoped.PoleId} AND commune_id = {scoped.CommuneId} FOR UPDATE", ct);
+        }
+
+        var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == poleId, "pole", ct);
+        try
+        {
+            await qrCodes.RemoveAllAsync(pole.PoleId, ct);
+            dbContext.Set<Pole>().Remove(pole);
+            await dbContext.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException failure) when (IsForeignKeyViolation(failure))
+        {
+            throw InUse(failure, refusal);
+        }
+
+        await transaction.CommitAsync(ct);
+    }
 
     /// <summary>
     /// Deletes a road segment. The foreign keys decide whether it may go (BE-12).
@@ -741,18 +769,25 @@ public sealed class AssetCrudService(
         }
         catch (DbUpdateException failure) when (IsForeignKeyViolation(failure))
         {
-            // Caught HERE, around SaveChanges, rather than from inside an interceptor. Throwing from
-            // within EF's pipeline would let EF wrap it in a DbUpdateException of its own and the
-            // BE-04 middleware would answer 500 — the trap CommuneWriteGuard documents at its own
-            // throw site.
-            dbContext.ChangeTracker.Clear();
-
-            throw new LuxMapException(
-                ErrorCodes.AssetInUse,
-                HttpStatusCode.Conflict,
-                refusal,
-                DescribeRefusal((PostgresException)failure.InnerException!));
+            throw InUse(failure, refusal);
         }
+    }
+
+    /// <summary>The 409 a delete refused by a foreign key answers, naming the constraint that said no.</summary>
+    /// <remarks>
+    /// Caught around SaveChanges, rather than from inside an interceptor. Throwing from within EF's pipeline would let
+    /// EF wrap it in a DbUpdateException of its own and the BE-04 middleware would answer 500 — the trap
+    /// CommuneWriteGuard documents at its own throw site. Nothing is queried after the failure: inside a transaction the
+    /// statement already aborted it, and disposing it rolls back.
+    /// </remarks>
+    private LuxMapException InUse(DbUpdateException failure, string refusal)
+    {
+        dbContext.ChangeTracker.Clear();
+        return new LuxMapException(
+            ErrorCodes.AssetInUse,
+            HttpStatusCode.Conflict,
+            refusal,
+            DescribeRefusal((PostgresException)failure.InnerException!));
     }
 
     /// <summary>
