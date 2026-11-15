@@ -1090,6 +1090,12 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>15/11/2026</td>
+        <td><code>POLE-DELETE-QR</code> Xoá cột xoá luôn mã QR của cột (mỗi mã một audit <code>deleted</code>), dưới khoá hàng <code>pole</code>, cùng transaction; báo cáo công dân vẫn chặn (409). Phát hiện khi 6 cột SEG-004 trên production trả 409 <code>fk_qr_code_pole_pole_id</code>. Chưa merge / deploy; 6 cột chưa xoá.</td>
+        <td><code>AssetCrudService.DeletePoleAsync</code>, port <code>IPoleQrCodes</code>, <code>QrCodeService</code>, <code>QrCodeTests</code>, <code>CitizenReportTests</code>, drift <code>POLE-DELETE-QR</code>, <code>traps/citizen.md</code></td>
+        <td><code>fix(assets): delete a pole's QR codes with the pole</code></td>
+      </tr>
+      <tr>
+        <td>15/11/2026</td>
         <td><code>CABINET-MULTI-NODE-DEV</code> Publish nhánh và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/257">PR #257</a> vào dev theo Mỹ xác nhận; gồm phase 1 và khảo sát phase 2. Chưa merge/deploy.</td>
         <td><code>tracking.html</code>; bằng chứng publish bổ sung trong <code>CABINET-MULTI-NODE-DEV-p2.md</code></td>
         <td><code>docs(tracking): record cabinet phase 1 PR 257</code></td>
