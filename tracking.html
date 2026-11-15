@@ -41,13 +41,13 @@
 <div class="wrap">
 
   <div class="card">
-    <strong>IOT-CONSOLIDATE-MODULE-DEV — tích hợp dev #258, chuẩn bị publish/merge · 15/11/2026</strong>
+    <strong>IOT-CONSOLIDATE-MODULE-DEV — tích hợp dev #258, PR #259 vào dev · 15/11/2026</strong>
     <p><span class="tag t-done">Claude review đạt · kiểm chứng đạt · Mỹ đã duyệt publish/admin merge sau CI xanh</span>
     Nền <code>839483e</code>; chỉ conflict bảng completed trong tracking, giữ đủ dòng IOT và POLE-DELETE-QR.
     QR deletion/DI/locks/audit/tests của #258 giữ nguyên. Claude Opus5.5/high review lại staged merge: không source blocker;
     P3 evidence/base/authorization đã cập nhật. <b>2320 .NET pass, 0 fail, 5 skip nền +20 Python pass</b>, MQTT thật;
     build0warning/error, EF không pending model changes, schema/API giữ nguyên, HTTP publish sạch qua cả Assets có port QR.</p>
-    <p>Mỹ yêu cầu push → mở PR dev → đợi CI xanh đúng head → merge admin; không deploy/DB dev hoặc B/C.
+    <p>Đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/259">PR #259 → dev</a>; trạng thái CI/merge hiện hành xem tại PR. Mỹ đã cho phép admin merge sau CI xanh đúng head; không deploy/DB dev hoặc B/C.
     <a href=".ai/results/IOT-CONSOLIDATE-MODULE-DEV-p2.md">Bằng chứng mới</a> ·
     <a href=".ai/reviews/IOT-CONSOLIDATE-MODULE-DEV-by-claude-opus-5-5.md">Review Claude</a>.</p>
   </div>
@@ -1129,6 +1129,12 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>IOT-CONSOLIDATE-MODULE-DEV</code> Đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/259">PR #259 → dev</a> sau Claude review/kiểm chứng. Mỹ duyệt admin merge sau CI xanh đúng head; trạng thái CI/merge xem PR.</td>
+        <td><code>tracking.html</code>, integration evidence publish</td>
+        <td><code>docs(tracking): record IOT consolidation PR 259</code></td>
+      </tr>
       <tr>
         <td>15/11/2026</td>
         <td><code>IOT-CONSOLIDATE-MODULE-DEV</code> Ghép dev #258, giải tracking giữ cả hai bên, review Claude Opus5.5/high lại đạt; 2320 .NET pass/5 skip nền +20 Python pass. Mỹ đã duyệt publish và admin merge sau CI xanh.</td>

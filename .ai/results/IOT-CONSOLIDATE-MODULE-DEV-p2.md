@@ -98,4 +98,22 @@ Thêm GET assets/cabinets để kiểm constructor AssetCrudService cùng IPoleQ
 
 ## Publish / CI / merge
 
-Mỹ đã cấp quyền, không cần hỏi lại. Phần thực thi bên GitHub sẽ được ghi sau khi có PR/check/merge thực tế.
+Mỹ đã cấp quyền, không cần hỏi lại.
+
+```text
+$ git commit -m 'chore(iot): merge dev after pole QR deletion fix'
+2b033d8 chore(iot): merge dev after pole QR deletion fix
+$ git push -u origin refactor/IOT-consolidate-module
+[new branch] refactor/IOT-consolidate-module -> refactor/IOT-consolidate-module
+$ gh pr create --base dev --head refactor/IOT-consolidate-module --title 'refactor(iot): consolidate Telemetry into IOT module' --body-file .ai/results/IOT-CONSOLIDATE-MODULE-pr.md
+https://github.com/LuxMapLabs/luxmap_backend/pull/259
+$ gh pr view 259 --json state,baseRefOid,headRefOid,mergeable
+state: OPEN
+baseRefOid: 839483eab3c110e153249b3b4227f36d3f7b7244
+headRefOid: 2b033d82ab04681878eb8471409ec72aa55948e5
+mergeable: MERGEABLE
+```
+
+PR #259 đã được gắn vào chat bằng attach_artifact. CI có hai shard `Merge result / work-orders` và `Merge result / rest`.
+Snapshot trên là thời điểm mở PR; commit docs ghi publish tiếp theo không đổi source. CI/head/merge cuối sẽ được xác minh
+trực tiếp trước lệnh admin merge; không dùng snapshot pending này để kết luận đã xanh.
