@@ -251,6 +251,21 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         });
         Assert.Equal(HttpStatusCode.Created, source.StatusCode);
 
+        var telemetry = $"{nodePath}/electrical/history";
+        var received = await manager.GetFromJsonAsync<JsonElement>(telemetry);
+        Assert.Equal(1, received.GetProperty("page").GetInt32());
+        Assert.Equal(50, received.GetProperty("page_size").GetInt32());
+        Assert.Equal(3, received.GetProperty("total").GetInt32());
+        Assert.Equal(3, received.GetProperty("items")[0].GetProperty("cursor").GetInt64());
+        var measured = await manager.GetFromJsonAsync<JsonElement>($"{telemetry}?page=2&page_size=1&sort_by=measured_at");
+        Assert.Equal(2, measured.GetProperty("page").GetInt32());
+        Assert.Equal(1, Assert.Single(measured.GetProperty("items").EnumerateArray()).GetProperty("cursor").GetInt64());
+        var legacy = await manager.GetFromJsonAsync<JsonElement>($"{telemetry}?after=0&limit=1");
+        Assert.Equal(1, legacy.GetProperty("next_cursor").GetInt64());
+        Assert.True(legacy.GetProperty("has_more").GetBoolean());
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.GetAsync($"{telemetry}?sort_by=unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await manager.GetAsync($"{telemetry}?page=1&after=0")).StatusCode);
+
         // Registration and diagnostics work before the feeder has any poles or a relay assignment.
         var diagnosis = await manager.GetFromJsonAsync<JsonElement>($"{nodePath}/diagnostics");
         Assert.Equal(feeder, diagnosis.GetProperty("feeder_id").GetString());
@@ -581,6 +596,16 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             {
                 "/api/luxmap/gateways/by-device/probe/authorization" or "/api/luxmap/gateways/by-device/probe-2/authorization" => new(HttpStatusCode.NoContent),
                 "/api/luxmap/gateways/by-device/probe/status" => Json(new { status = "online" }),
+                "/api/luxmap/devices/probe/telemetry/history/page" => request.RequestUri.Query switch
+                {
+                    "?page=1&pageSize=50&sortBy=received_at" => Json(new { page = 1, pageSize = 50, total = 3,
+                        items = new[] { Archived(3), Archived(2), Archived(1) } }),
+                    "?page=2&pageSize=1&sortBy=measured_at" => Json(new { page = 2, pageSize = 1, total = 3,
+                        items = new[] { Archived(1) } }),
+                    _ => new(HttpStatusCode.BadRequest),
+                },
+                "/api/luxmap/devices/probe/telemetry/history" when request.RequestUri.Query == "?after=0&limit=1"
+                    => Json(new { items = new[] { Archived(1) }, nextCursor = 1, hasMore = true }),
                 "/api/luxmap/devices/probe/command" when RejectCommand => new(HttpStatusCode.ServiceUnavailable),
                 "/api/luxmap/devices/probe/command" => Json(await SaveCommandAsync(request, ct)),
                 "/api/luxmap/devices/probe" => Json(new
@@ -607,6 +632,11 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 _ => new(HttpStatusCode.NotFound),
             };
         }
+
+        private static object Archived(int cursor) => new
+        {
+            cursor, reading = new { data = new { voltage = 5 }, receivedAt = DateTimeOffset.UtcNow, gatewayId = "TEST-GW" },
+        };
 
         private async Task<JsonElement> SaveCommandAsync(HttpRequestMessage request, CancellationToken ct)
         {

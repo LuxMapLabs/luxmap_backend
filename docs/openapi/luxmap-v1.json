@@ -9112,12 +9112,39 @@
             }
           },
           {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "received_at",
+                "measured_at"
+              ],
+              "type": "string",
+              "description": "Mặc định received_at khi đọc theo trang."
+            }
+          },
+          {
             "name": "after",
             "in": "query",
             "schema": {
               "type": "integer",
-              "format": "int64",
-              "default": 0
+              "format": "int64"
             }
           },
           {
@@ -9125,28 +9152,24 @@
             "in": "query",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "default": 100
+              "format": "int32"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Trang kết quả mặc định. Khi truyền after hoặc limit, trả lịch sử theo cursor.",
             "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/IotTelemetryPage"
-                }
-              },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IotTelemetryPage"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IotTelemetryPage"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/IotArchivedSamplePagedResult"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IotTelemetryPage"
+                    }
+                  ]
                 }
               }
             }
@@ -20943,6 +20966,30 @@
           },
           "reading": {
             "$ref": "#/components/schemas/IotArchivedReading"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotArchivedSamplePagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IotArchivedSample"
+            }
           }
         },
         "additionalProperties": false

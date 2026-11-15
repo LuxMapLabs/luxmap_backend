@@ -144,8 +144,10 @@ Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, 
 | API | Cách dùng |
 |---|---|
 | `GET /api/v1/iot/nodes/{nodeId}/electrical` | Hiện mẫu mới nhất và `power_state`. Kiểm tra `status` và `received_at` để phân biệt mẫu mới với mẫu cũ. |
-| `GET /api/v1/iot/nodes/{nodeId}/electrical/history?after=0&limit=100` | Đọc lịch sử. Dùng `next_cursor` làm `after` cho trang sau hoặc lần lấy mẫu mới. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical/history?page=1&page_size=20&sort_by=received_at` | Đọc lịch sử điện, mới nhất trước. Đổi `sort_by=measured_at` để sắp theo giờ đo trên node. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo ở cấp `feeder_id` từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
+
+Phản hồi lịch sử mặc định có `page`, `page_size`, `total` và `items`. Mặc định trang 1, 50 mục mỗi trang và sắp theo `received_at`; tối đa 200 mục mỗi trang. Mẫu thiếu `timestamp` nằm cuối khi sắp theo `measured_at`. Khi đồng bộ mẫu mới, có thể tiếp tục gọi `?after=0&limit=100` và dùng `next_cursor` cho lần gọi sau.
 
 Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA) và `measurement.power_mw` (mW). Lịch sử dùng `items[].reading.data.{voltage,current,power,lux}` theo thứ tự V, mA, mW, lx. `timestamp` trong dữ liệu lịch sử là giờ đo theo RTC DS3231 của node. `received_at` là giờ UTC khi server nhận mẫu. Dữ liệu gửi bù có thể được nhận muộn hơn lúc đo.
 

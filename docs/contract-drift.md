@@ -73,7 +73,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/nodes` | `ReadNetwork` | Phân trang theo xã, sắp created_at / độ dài ID / ID; trạng thái `online`, `offline`, `unconfigured`, `no_data`, `source_unavailable`. |
 | `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` | `ManageSettings` | Cấp secret gateway một lần qua bridge. |
 | `POST /api/v1/iot/nodes/{nodeId}/source` | `ManageAssets` | Kiểm tra server cùng xã và thiết bị đã có tuyến cùng secret MQTT. Gán node với feeder thuộc cùng tủ và mã thiết bị. trả 201, 400 nếu cấu hình sai, 404 nếu thiếu node hoặc server, 409 nếu trùng, 503 nếu lỗi lưu. |
-| `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện đã lưu của node trong phạm vi xã, phân trang theo `after` và `next_cursor`. |
+| `GET /api/v1/iot/nodes/{nodeId}/electrical/history` | `ReadNetwork` | Đọc lịch sử điện của node trong phạm vi xã. Mặc định trả `page`, `page_size`, `total` và `items`; thứ tự giảm dần theo `sort_by=received_at` (giờ Bridge nhận) hoặc `measured_at` (giờ RTC của node). Mẫu thiếu giờ đo nằm cuối ở chế độ `measured_at`. Truy vấn cũ với `after` hoặc `limit` tiếp tục trả kết quả theo cursor. |
 | `GET /api/v1/iot/nodes/{nodeId}/electrical` | `ReadNetwork` | Mẫu mới nhất, đơn vị V/mA/mW, với `status` là `online`, `offline` hoặc `no_data` và `power_state` theo đầu ra node. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | `ReadNetwork` | Chẩn đoán cấp feeder với `normal`, `anomaly`, `stale`, `no_data`. Có cảnh báo mất áp và tùy chọn hiệu chuẩn 10 bóng. |
 

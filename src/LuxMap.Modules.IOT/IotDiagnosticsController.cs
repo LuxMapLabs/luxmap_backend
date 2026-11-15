@@ -294,16 +294,30 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromQuery(Name = "page")] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null)
         => diagnostics.CommandHistoryAsync(nodeId, PageRequest.Create(page, pageSize), ct);
 
-    /// <summary>Đọc lịch sử điện đã lưu. Dùng next_cursor làm after để lấy mẫu tiếp theo.</summary>
+    /// <summary>Đọc lịch sử điện mới nhất trước theo received_at hoặc measured_at.</summary>
+    /// <remarks>Dùng page và page_size cho lịch sử. Hệ thống đồng bộ theo cursor có thể tiếp tục dùng after và limit.</remarks>
     [HttpGet("nodes/{nodeId}/electrical/history")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<IotTelemetryPage>(StatusCodes.Status200OK)]
+    [ProducesResponseType<PagedResult<IotArchivedSample>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public Task<IotTelemetryPage> TelemetryHistoryAsync(string nodeId, CancellationToken ct,
-        [FromQuery] long after = 0, [FromQuery] int limit = 100)
-        => diagnostics.TelemetryHistoryAsync(nodeId, after, limit, ct);
+    public async Task<IActionResult> TelemetryHistoryAsync(string nodeId, CancellationToken ct,
+        [FromQuery] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null,
+        [FromQuery(Name = "sort_by")] string? sortBy = null,
+        [FromQuery] long? after = null, [FromQuery] int? limit = null)
+    {
+        if (after.HasValue || limit.HasValue)
+        {
+            if (page.HasValue || pageSize.HasValue || sortBy is not null)
+                throw Invalid("Dùng page, page_size và sort_by hoặc after và limit.");
+
+            return Ok(await diagnostics.TelemetryHistoryAsync(nodeId, after ?? 0, limit ?? 100, ct));
+        }
+
+        return Ok(await diagnostics.TelemetryHistoryPageAsync(nodeId, PageRequest.Create(page, pageSize),
+            sortBy ?? "received_at", ct));
+    }
 
     [HttpGet("nodes/{nodeId}/electrical")]
     [ProducesResponseType<IotElectricalResult>(StatusCodes.Status200OK)]

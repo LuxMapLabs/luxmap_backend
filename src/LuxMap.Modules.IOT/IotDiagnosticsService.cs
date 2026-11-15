@@ -469,6 +469,34 @@ public sealed class IotDiagnosticsService(
         }
     }
 
+    public async Task<PagedResult<IotArchivedSample>> TelemetryHistoryPageAsync(
+        string nodeId, PageRequest page, string sortBy, CancellationToken ct)
+    {
+        if (sortBy is not ("received_at" or "measured_at"))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "sort_by phải là received_at hoặc measured_at.");
+
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
+        var path = FormattableString.Invariant(
+            $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history/page?page={page.Page}&pageSize={page.PageSize}&sortBy={sortBy}");
+        try
+        {
+            using var response = await client.GetAsync(new Uri(uri, path), ct);
+            response.EnsureSuccessStatusCode();
+            if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
+            var result = await response.Content.ReadFromJsonAsync<PagedResult<IotArchivedSample>>(cancellationToken: ct);
+            if (result is not { Items: not null, Total: >= 0 } ||
+                result.Page != page.Page || result.PageSize != page.PageSize ||
+                result.Items.Count > page.PageSize || result.Items.Count > result.Total)
+                throw Unavailable("Server IoT trả về trang dữ liệu không hợp lệ.");
+            return result;
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không đọc được lịch sử đo từ server IoT.");
+        }
+    }
+
     private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(string nodeId, CancellationToken ct)
     {
         await RequireNodeAsync(nodeId, ct);

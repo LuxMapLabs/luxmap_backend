@@ -110,6 +110,15 @@ api.MapGet("/{deviceId}/telemetry/history", (string deviceId, long? after, int? 
 }).WithSummary("Đọc dữ liệu đo đã lưu, dùng nextCursor làm after để lấy mẫu tiếp theo")
   .Produces<TelemetryPage>().Produces(400).Produces(404);
 
+api.MapGet("/{deviceId}/telemetry/history/page", (string deviceId, int page, int pageSize, string sortBy, DeviceStore store) =>
+{
+    if (page < 1 || pageSize is < 1 or > 200 || sortBy is not ("measured_at" or "received_at"))
+        return Results.BadRequest(new { error = "Invalid telemetry history pagination or sort order." });
+
+    return Results.Ok(store.ReadTelemetryHistoryPage(deviceId, page, pageSize, sortBy == "measured_at"));
+}).WithSummary("Đọc lịch sử đo theo trang, mẫu mới nhất trước")
+  .Produces<TelemetryHistoryPage>().Produces(400);
+
 app.MapGet("/api/luxmap/mqtt", (MqttBroker mqtt) => Results.Ok(new { running = mqtt.IsRunning, transport = "MQTT TCP" })).WithTags("MQTT").WithSummary("Trạng thái MQTT broker");
 
 app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/status", (string deviceId, MqttBroker mqtt) =>

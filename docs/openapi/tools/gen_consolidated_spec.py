@@ -402,7 +402,7 @@ SUMMARY.update({
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
-    ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện đã lưu của node IoT",
+    ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện của node theo trang hoặc cursor",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
 })
