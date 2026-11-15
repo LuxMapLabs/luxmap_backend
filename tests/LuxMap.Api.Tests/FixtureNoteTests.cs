@@ -13,7 +13,8 @@ namespace LuxMap.Api.Tests;
 /// <summary>
 /// FIXTURE-NOTE (drift FN-1…FN-3) — a fitting carries its own free-text note for the special case its record cannot
 /// say. Written with the fitting (API and import), same rules as a pole note, shown on the pole detail and the
-/// inventory, and kept apart from the pole's own <c>note</c>.
+/// inventory, and kept apart from the pole's own <c>note</c>. FIXTURE-EDIT (drift FN-4…FN-6) — a fitting in service that
+/// was typed in wrong is corrected in place with <c>PUT /assets/fixtures/{id}</c>, note included.
 /// </summary>
 [Collection(nameof(AssetDatabaseCollection))]
 public sealed class FixtureNoteTests(AssetImportFixture fixture)
@@ -121,6 +122,97 @@ public sealed class FixtureNoteTests(AssetImportFixture fixture)
         Assert.Contains("ck_fixture_note_length", failure.InnerException?.Message);
     }
 
+    // ── FIXTURE-EDIT: PUT /assets/fixtures/{id} ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Editing_corrects_the_fitting_in_place_and_keeps_its_id_pole_and_source()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var poleId = await NewPoleAsync();
+        var fixtureId = await CreateAsync(client, poleId, note: "gõ nhầm");
+
+        var response = await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", EditBody(note: "  Thực tế chỉ thay 1 bóng  "));
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var stored = await StoredAsync(fixtureId);
+        Assert.Equal(150, stored.LampWatt);
+        Assert.Equal(2, stored.LampCount);
+        Assert.Equal(new DateOnly(2023, 1, 15), stored.InstallDate);
+        Assert.Equal(new DateOnly(2024, 9, 20), stored.WarrantyExpiry);
+        Assert.Equal("Thực tế chỉ thay 1 bóng", stored.Note);
+        // Not part of the edit: the pole, the provenance, and the fact that it is in service.
+        Assert.Equal(poleId, stored.PoleId);
+        Assert.Equal(DataSource.PublicImagery, stored.DataSource);
+        Assert.Null(stored.RemovedDate);
+
+        var detail = JsonDocument.Parse(await client.GetStringAsync($"/api/v1/map/poles/{poleId}")).RootElement;
+        Assert.Equal(fixtureId, detail.GetProperty("fixture").GetProperty("fixture_id").GetString());
+        Assert.Equal(150, detail.GetProperty("fixture").GetProperty("lamp_watt").GetInt32());
+    }
+
+    [Fact]
+    public async Task An_absent_note_is_kept_and_a_null_note_is_cleared()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var poleId = await NewPoleAsync();
+        var fixtureId = await CreateAsync(client, poleId, note: "giữ lại");
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", EditBody())).StatusCode);
+        Assert.Equal("giữ lại", (await StoredAsync(fixtureId)).Note);
+
+        var clear = new { fixture_type = "led_road_lamp", power_source = "grid", lamp_watt = 150, lamp_count = 2,
+            install_date = "2023-01-15", warranty_expiry = "2024-09-20", note = (string?)null };
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", clear)).StatusCode);
+        Assert.Null((await StoredAsync(fixtureId)).Note);
+    }
+
+    [Fact]
+    public async Task A_retired_fitting_is_not_edited()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var poleId = await NewPoleAsync();
+        var fixtureId = await CreateAsync(client, poleId, note: null);
+        await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}/removal", new { removed_date = "2026-02-01" });
+
+        var response = await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", EditBody());
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("retired", await response.Content.ReadAsStringAsync());
+        Assert.Equal(100, (await StoredAsync(fixtureId)).LampWatt);
+    }
+
+    [Fact]
+    public async Task A_lamp_count_outside_one_to_four_or_a_missing_field_is_400()
+    {
+        var client = await fixture.ManagerClientAsync();
+        var poleId = await NewPoleAsync();
+        var fixtureId = await CreateAsync(client, poleId, note: null);
+
+        var tooMany = new { fixture_type = "led_road_lamp", power_source = "grid", lamp_watt = 150, lamp_count = 5,
+            install_date = "2023-01-15" };
+        var noWatt = new { fixture_type = "led_road_lamp", power_source = "grid", lamp_count = 1, install_date = "2023-01-15" };
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", tooMany)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", noWatt)).StatusCode);
+        Assert.Equal(100, (await StoredAsync(fixtureId)).LampWatt);
+    }
+
+    [Fact]
+    public async Task Another_communes_fitting_is_404_and_a_field_engineer_is_403()
+    {
+        var manager = await fixture.ManagerClientAsync();
+        var poleId = await NewPoleAsync();
+        var fixtureId = await CreateAsync(manager, poleId, note: null);
+
+        var foreign = await fixture.ForeignCommuneClientAsync();
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", EditBody())).StatusCode);
+
+        var crew = await fixture.FieldEngineerClientAsync();
+        Assert.Equal(HttpStatusCode.Forbidden, (await crew.PutAsJsonAsync($"{FixtureRoute}/{fixtureId}", EditBody())).StatusCode);
+
+        Assert.Equal(100, (await StoredAsync(fixtureId)).LampWatt);
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────────────────
 
     private static object LampBody(string poleId, string? note) => new
@@ -133,6 +225,38 @@ public sealed class FixtureNoteTests(AssetImportFixture fixture)
         data_source = "public_imagery",
         note,
     };
+
+    private static object EditBody() => new
+    {
+        fixture_type = "led_road_lamp",
+        power_source = "grid",
+        lamp_watt = 150,
+        lamp_count = 2,
+        install_date = "2023-01-15",
+        warranty_expiry = "2024-09-20",
+    };
+
+    private static object EditBody(string note) => new
+    {
+        fixture_type = "led_road_lamp",
+        power_source = "grid",
+        lamp_watt = 150,
+        lamp_count = 2,
+        install_date = "2023-01-15",
+        warranty_expiry = "2024-09-20",
+        note,
+    };
+
+    private static async Task<string> CreateAsync(HttpClient client, string poleId, string? note)
+    {
+        var created = await client.PostAsJsonAsync(FixtureRoute, LampBody(poleId, note));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        return created.Headers.Location!.ToString().Split('/').Last();
+    }
+
+    private Task<Fixture> StoredAsync(string fixtureId)
+        => fixture.QueryAsync(db => db.Set<Fixture>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(f => f.FixtureId == fixtureId));
 
     private Task<string?> StoredNoteAsync(string poleId)
         => fixture.QueryAsync(db => db.Set<Fixture>().IgnoreQueryFilters()

@@ -316,7 +316,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 
 | Cột | Bắt buộc | Kiểu | Ràng buộc / giá trị hợp lệ |
 |---|---|---|---|
-| `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã đủ 2 bóng đang dùng → lỗi theo dòng** (insert-only) |
+| `pole_external_ref` | **Có** | text | Khớp `external_ref` trong `poles.csv`. **Cột đã có bộ đèn đang dùng → lỗi theo dòng** (insert-only, ONE-FIXTURE) |
 | `fixture_type` | **Có** | enum | `led_road_lamp` — **giá trị duy nhất** từ Contract v1.6 (`ck_fixture_fixture_type`) |
 | `power_source` | **Có** | enum | `grid` — **giá trị duy nhất** từ Contract v1.6 — `ck_fixture_power_source` |
 | `lamp_watt` | **Có** | integer | Công suất **một** bóng |

@@ -483,12 +483,21 @@
   </div>
 
   <div class="card">
+    <strong>FIXTURE-EDIT — sửa bộ đèn đang dùng khi nhập sai, 15/11/2026</strong>
+    <p><span class="tag t-next">PR #261 (nhánh <code>feat/ONE-FIXTURE</code>) · không migration · chưa báo WP5 (FE đang gọi <code>PATCH</code>, phải đổi sang <code>PUT</code>) · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    <code>PUT /assets/fixtures/{fixture_id}</code>, <code>ManageAssets</code>, 204: thay toàn phần loại, nguồn điện, công suất, số bóng, ngày lắp, bảo hành; <code>note</code> vắng = giữ, null = xoá.
+    Không đổi cột, <code>removed_date</code>, <code>data_source</code>; bộ đã ngừng dùng → 400; ngoài xã → 404. Chỉ để chữa nhập sai — thay thật vẫn ngừng dùng + gắn mới (baseline).
+    5 test mới; phá thử bỏ chặn bộ đã ngừng dùng → 1 đỏ, luôn ghi đè ghi chú → 1 đỏ. Toàn bộ suite: 2330 đạt, 7 bỏ qua. Drift FN-4…FN-6; lý do ONE-FIXTURE ghi ở OF-0.</p>
+    <p class="muted">Commit: <code>feat(assets): correct a fitting in service that was entered wrong</code>.</p>
+  </div>
+
+  <div class="card">
     <strong>FIXTURE-NOTE — ghi chú của bộ đèn cho trường hợp đặc biệt, 15/11/2026</strong>
     <p><span class="tag t-next">Nhánh <code>feat/ONE-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>AddFixtureNote</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
     Cột <code>fixture.note</code> (≤ 1000, <code>ck_fixture_note_length</code>), nhận ở <code>POST /assets/fixtures</code> và cột <code>note</code> tuỳ chọn của import bộ đèn (cùng luật <code>PoleNoteInput</code>);
     đọc ở <code>fixture</code> / <code>fixtures[]</code> của chi tiết cột và <code>active_fixture(s)</code> của kiểm kê. Không vào lớp bản đồ, cột của phiếu, gói offline. <code>Down()</code> từ chối khi còn ghi chú.
     6 test mới; phá thử bỏ chuẩn hoá ở API → 3 đỏ, nới CHECK trong migration → 1 đỏ. Toàn bộ suite: 2325 đạt, 7 bỏ qua. Drift FN-1…FN-3, SELF-SIGNED.
-    <strong>Còn mở:</strong> chưa có đường sửa ghi chú (bộ đèn insert-only).</p>
+    Sửa ghi chú: qua <code>PUT /assets/fixtures/{id}</code> (FIXTURE-EDIT).</p>
     <p class="muted">Commit: <code>feat(assets): let a fitting carry a note for its special case</code>.</p>
   </div>
 

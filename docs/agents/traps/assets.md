@@ -15,8 +15,10 @@ PUT           /api/v1/assets/poles/{id}/feeder           PUT  /api/v1/assets/fix
 POST          /api/v1/assets/import/{segments|cabinets|feeders|poles|fixtures}
 ```
 
-**Fixture KHÔNG có DELETE, và cũng không có PUT thay thế** — ngừng dùng thiết bị là việc của
-`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. Bốn loại còn lại xoá
+**Fixture KHÔNG có DELETE** — ngừng dùng thiết bị là việc của
+`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. `PUT /assets/fixtures/{id}`
+(FIXTURE-EDIT, 15/11/2026) chỉ để **chữa nhập sai** bộ đang dùng: giữ ID, cột và neo baseline. Bộ thay thật hay đổi
+số bóng thật thì phải ngừng dùng + ghi bộ mới, nếu không baseline của bộ cũ vẫn áp lên bộ mới (LMC-4, OF-4). Bốn loại còn lại xoá
 được và **khoá ngoại quyết định**, không kiểm trong code: `fault` / `lux_reading` giữ pole,
 `pole` / `fault` / `fault_cluster` giữ segment, `pole.feeder_id` giữ feeder — tất cả `Restrict`, vi
 phạm là 409 `ASSET_IN_USE` kèm tên constraint trong `details` (kể cả khi ràng buộc vấp ở bóng của

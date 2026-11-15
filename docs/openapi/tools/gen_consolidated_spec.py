@@ -240,6 +240,7 @@ SUMMARY = {
     ("get", "/api/v1/assets/feeders/{feederId}/poles"): "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
     ("get", "/api/v1/assets/segments/{segmentId}/poles"): "[TẠM — drift 46] Cột trên một tuyến; có thể gồm cột của xã khác (inter_commune)",
     ("get", "/api/v1/assets/feeders/poles"): "[TẠM — drift 46] Cột CHƯA có mạch; bắt buộc unassigned=true; chỉ listing này trả power_source",
+    ("put", "/api/v1/assets/fixtures/{fixtureId}"): "Sửa bộ đèn đang dùng khi nhập sai (FIXTURE-EDIT); thay thật = ngừng dùng + gắn mới",
     ("put", "/api/v1/assets/fixtures/{fixtureId}/removal"): "Ngừng dùng bóng bằng removed_date; không có DELETE",
     ("get", "/api/v1/auth/me"): "Người đang đăng nhập, đọc từ DB nên role và commune_ids luôn tươi",
     ("post", "/api/v1/auth/login"): "Đăng nhập mobile; trả đúng bốn trường",

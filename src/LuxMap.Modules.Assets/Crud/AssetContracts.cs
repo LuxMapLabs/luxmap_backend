@@ -216,6 +216,37 @@ public sealed record CreateFixtureRequest
 }
 
 /// <summary>
+/// <c>PUT /assets/fixtures/{id}</c> (FIXTURE-EDIT): corrects a fitting in service that was typed in wrong. A FULL
+/// replacement of the fields the record form shows; the pole, <c>removed_date</c> and <c>data_source</c> are not
+/// part of it. A real replacement is still retire + record a new fitting.
+/// </summary>
+public sealed class UpdateFixtureRequest
+{
+    [Required]
+    public FixtureType? FixtureType { get; init; }
+
+    [Required]
+    public PowerSource? PowerSource { get; init; }
+
+    [Required]
+    [Range(1, 10_000)]
+    public int? LampWatt { get; init; }
+
+    [Required]
+    [Range(1, 4)]
+    public int? LampCount { get; init; }
+
+    [Required]
+    public DateOnly? InstallDate { get; init; }
+
+    /// <summary>Absent or <c>null</c> = no warranty on record, as on create.</summary>
+    public DateOnly? WarrantyExpiry { get; init; }
+
+    /// <summary>Absent = keep the note; <c>null</c> or blank = clear it; otherwise the same rules as <see cref="PoleNoteInput"/>.</summary>
+    public JsonElement Note { get; init; }
+}
+
+/// <summary>
 /// Bodies of the three asset update endpoints (BE-12). Each is a FULL REPLACEMENT.
 /// </summary>
 /// <remarks>
