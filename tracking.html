@@ -41,6 +41,15 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>THUMB-ORIENT — thumbnail xoay theo EXIF Orientation, 15/11/2026</strong>
+    <p><span class="tag t-done">Đã sửa · test đỏ khi bỏ <code>AutoOrient</code>, xanh khi có · chưa push</span>
+    Ảnh điện thoại có Orientation 6/8/3 ra thumbnail nằm ngang trong khi ảnh gốc hiển thị đứng: <code>ThumbnailFactory.CreateAsync</code> bỏ EXIF mà chưa xoay pixel.
+    Thêm <code>AutoOrient()</code> trước <code>Resize</code>; cạnh dài 320, tỉ lệ, bỏ metadata giữ nguyên. Ảnh hưởng mọi đường qua <code>ImagePipeline</code>.
+    <code>JpegLuma</code> (đọc thumbnail đã xoay, luma bất biến theo xoay) và <code>OriginalJpegReader</code> (chỉ gọi <code>ThumbnailFactory</code>; <code>Width/Height</code> là pixel thô, ngữ nghĩa khác) không cùng lỗi.
+    Storage.Tests <b>87/87 xanh</b> (3 test mới; bỏ <code>AutoOrient</code> → 3 đỏ, exit 1). Không migration; không sinh lại thumbnail cũ (24 ảnh production đã up lại với pixel đã xoay).</p>
+  </div>
+
+  <div class="card">
     <strong>IOT-CONSOLIDATE-MODULE-DEV — tích hợp dev #258, PR #259 vào dev · 15/11/2026</strong>
     <p><span class="tag t-done">Claude review đạt · kiểm chứng đạt · Mỹ đã duyệt publish/admin merge sau CI xanh</span>
     Nền <code>839483e</code>; chỉ conflict bảng completed trong tracking, giữ đủ dòng IOT và POLE-DELETE-QR.
@@ -1129,6 +1138,12 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>15/11/2026</td>
+        <td><code>THUMB-ORIENT</code> Thumbnail xoay theo EXIF Orientation trước khi bỏ metadata (<code>AutoOrient</code> trong <code>ThumbnailFactory</code>); 3 test mới, Storage.Tests 87/87 xanh, bỏ fix → 3 đỏ.</td>
+        <td><code>ThumbnailFactory.cs</code>, <code>ThumbnailOrientationTests.cs</code>, <code>TestImages.cs</code>, <code>media-storage.md</code>, tracking</td>
+        <td><code>fix(storage): orient thumbnails by EXIF before stripping metadata</code></td>
+      </tr>
       <tr>
         <td>15/11/2026</td>
         <td><code>IOT-CONSOLIDATE-MODULE-DEV</code> Đã push và mở <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/259">PR #259 → dev</a> sau Claude review/kiểm chứng. Mỹ duyệt admin merge sau CI xanh đúng head; trạng thái CI/merge xem PR.</td>

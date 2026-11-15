@@ -50,6 +50,24 @@ public static class TestImages
     }
 
     /// <summary>
+    /// A JPEG whose PIXELS are <paramref name="width"/> x <paramref name="height"/> and whose EXIF
+    /// Orientation tag is <paramref name="orientation"/> — what a phone writes when it is held upright
+    /// but the sensor is landscape. Orientation 6 means "rotate 90° clockwise to display".
+    /// </summary>
+    public static byte[] JpegWithOrientation(ushort orientation, int width = 200, int height = 100)
+    {
+        using var image = new Image<Rgb24>(width, height, new Rgb24(60, 90, 120));
+        var exif = new ExifProfile();
+        exif.SetValue(ExifTag.Orientation, orientation);
+        exif.SetValue(ExifTag.GPSLatitude, Latitude);
+        image.Metadata.ExifProfile = exif;
+
+        var buffer = new MemoryStream();
+        image.Save(buffer, new JpegEncoder { Quality = 92 });
+        return buffer.ToArray();
+    }
+
+    /// <summary>
     /// Headers only. The magic-byte check runs before any decoder, so these never need to be valid
     /// files — and keeping them minimal makes it obvious that the FIRST BYTES are what decides.
     /// </summary>

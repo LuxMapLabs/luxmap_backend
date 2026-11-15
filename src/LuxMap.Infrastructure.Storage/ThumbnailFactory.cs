@@ -62,7 +62,11 @@ public static class ThumbnailFactory
         var options = new DecoderOptions { Configuration = JpegOnly };
         using var image = await Image.LoadAsync(options, source, cancellationToken);
 
-        image.Mutate(context => context.Resize(new ResizeOptions
+        // Orientation FIRST, metadata strip last. A phone held upright stores landscape pixels plus an
+        // EXIF Orientation tag; the original keeps the tag so browsers show it upright, but the
+        // thumbnail drops EXIF below — without rotating the pixels here it would stay sideways for good.
+        // Also before the resize, so "longest edge" is measured on the displayed shape.
+        image.Mutate(context => context.AutoOrient().Resize(new ResizeOptions
         {
             Size = new Size(LongestEdgePixels, LongestEdgePixels),
             Mode = ResizeMode.Max,
