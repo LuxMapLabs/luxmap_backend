@@ -492,6 +492,35 @@
   </div>
 
   <div class="card">
+    <strong>FIXTURE-EDIT — sửa bộ đèn đang dùng khi nhập sai, 15/11/2026</strong>
+    <p><span class="tag t-next">PR #261 (nhánh <code>feat/ONE-FIXTURE</code>) · không migration · chưa báo WP5 (FE đang gọi <code>PATCH</code>, phải đổi sang <code>PUT</code>) · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    <code>PUT /assets/fixtures/{fixture_id}</code>, <code>ManageAssets</code>, 204: thay toàn phần loại, nguồn điện, công suất, số bóng, ngày lắp, bảo hành; <code>note</code> vắng = giữ, null = xoá.
+    Không đổi cột, <code>removed_date</code>, <code>data_source</code>; bộ đã ngừng dùng → 400; ngoài xã → 404. Chỉ để chữa nhập sai — thay thật vẫn ngừng dùng + gắn mới (baseline).
+    5 test mới; phá thử bỏ chặn bộ đã ngừng dùng → 1 đỏ, luôn ghi đè ghi chú → 1 đỏ. Toàn bộ suite: 2330 đạt, 7 bỏ qua. Drift FN-4…FN-6; lý do ONE-FIXTURE ghi ở OF-0.</p>
+    <p class="muted">Commit: <code>feat(assets): correct a fitting in service that was entered wrong</code>.</p>
+  </div>
+
+  <div class="card">
+    <strong>FIXTURE-NOTE — ghi chú của bộ đèn cho trường hợp đặc biệt, 15/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/ONE-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>AddFixtureNote</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.json</code> nên cần CODEOWNERS</span>
+    Cột <code>fixture.note</code> (≤ 1000, <code>ck_fixture_note_length</code>), nhận ở <code>POST /assets/fixtures</code> và cột <code>note</code> tuỳ chọn của import bộ đèn (cùng luật <code>PoleNoteInput</code>);
+    đọc ở <code>fixture</code> / <code>fixtures[]</code> của chi tiết cột và <code>active_fixture(s)</code> của kiểm kê. Không vào lớp bản đồ, cột của phiếu, gói offline. <code>Down()</code> từ chối khi còn ghi chú.
+    6 test mới; phá thử bỏ chuẩn hoá ở API → 3 đỏ, nới CHECK trong migration → 1 đỏ. Toàn bộ suite: 2325 đạt, 7 bỏ qua. Drift FN-1…FN-3, SELF-SIGNED.
+    Sửa ghi chú: qua <code>PUT /assets/fixtures/{id}</code> (FIXTURE-EDIT).</p>
+    <p class="muted">Commit: <code>feat(assets): let a fitting carry a note for its special case</code>.</p>
+  </div>
+
+  <div class="card">
+    <strong>ONE-FIXTURE — một trụ một bộ đèn, hỏng bóng nào thay cả bộ, 15/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/ONE-FIXTURE</code> (chưa push, chưa mở PR) · migration <code>RestrictFixtureToOneInService</code> chưa áp lên <code>luxmap_dev</code> / VPS · chưa báo WP5 / WP6 · sửa <code>luxmap-v1.5.json</code></span>
+    Mỹ chốt theo đề xuất của FE: đảo MULTI-FIXTURE, khôi phục D-11 bằng cách khoá còn 1 slot (không revert schema). CHECK mới <code>ck_fixture_active_slot</code>: bộ đang dùng ở slot 1;
+    slot 2 chỉ còn trên bộ đã ngừng dùng. Bộ thứ hai → 409 <code>POLE_HAS_ACTIVE_FIXTURE</code>, import báo theo dòng. Hình dạng đọc (<code>fixtures[]</code>, <code>fixture_count</code>) giữ, nay tối đa một bộ.
+    Trước migration đã đếm: 0 cột hai bộ trên <code>luxmap_dev</code> và VPS. 76 test (asset, map, chi tiết cột, bảo hành, import) đạt; phá thử CHECK trong migration → đúng test DB đỏ.
+    Drift OF-1…OF-7, SELF-SIGNED; MF-5 đóng. <strong>Còn mở:</strong> OF-7 — ảnh cột chỉ có nhãn on/off nên bộ sáng một phần không hạ được cột xuống <code>dim</code>.</p>
+    <p class="muted">Commit: <code>feat(assets): limit a pole to one fitting in service again</code>.</p>
+  </div>
+
+  <div class="card">
     <strong>MULTI-FIXTURE — một cột mang tối đa hai bóng, mỗi bóng một bản ghi, 11/11/2026</strong>
     <p><span class="tag t-done">Đã merge · #226 (11/11) · migration <code>AddFixtureSlot</code> chưa lên VPS · chưa báo WP5 / WP6</span>
     Mỹ chọn hướng B (đảo D-11 và hướng A của LAMP-COUNT): hai bản ghi <code>fixture</code> riêng mỗi cột. Giới hạn nằm ở DB: <code>fixture.slot</code> (1..2) + UNIQUE

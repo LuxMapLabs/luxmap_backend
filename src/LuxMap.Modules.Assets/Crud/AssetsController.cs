@@ -504,6 +504,27 @@ public sealed class AssetsController(
     }
 
     /// <summary>
+    /// Corrects a fitting in service that was entered wrong (FIXTURE-EDIT, SELF-SIGNED). <b>204</b>, never the object.
+    /// </summary>
+    /// <remarks>
+    /// A FULL replacement of type, power source, wattage, lamp count, install date and warranty; <c>note</c> absent =
+    /// keep, <c>null</c> / blank = clear. The pole and <c>data_source</c> do not change. A retired fitting is 400. A
+    /// fitting that was physically replaced is NOT edited: retire it and record the new one.
+    /// </remarks>
+    [HttpPut("fixtures/{fixtureId}")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateFixtureAsync(
+        string fixtureId, [FromBody] UpdateFixtureRequest request, CancellationToken ct)
+    {
+        await service.UpdateFixtureAsync(fixtureId, request, ct);
+        return NoContent();
+    }
+
+    /// <summary>
     /// Retires a lamp by setting <c>removed_date</c>. There is no DELETE — the equipment history is
     /// the reason the table exists.
     /// </summary>

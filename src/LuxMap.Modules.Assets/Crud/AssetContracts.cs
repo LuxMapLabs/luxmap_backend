@@ -207,6 +207,43 @@ public sealed record CreateFixtureRequest
 
     [Required]
     public DataSource? DataSource { get; init; }
+
+    /// <summary>
+    /// Free text for a special case (FIXTURE-NOTE), e.g. one lamp in the fitting differs. Trimmed, blank = none,
+    /// at most 1000 characters. Fittings are insert-only, so the note is written with the fitting.
+    /// </summary>
+    public string? Note { get; init; }
+}
+
+/// <summary>
+/// <c>PUT /assets/fixtures/{id}</c> (FIXTURE-EDIT): corrects a fitting in service that was typed in wrong. A FULL
+/// replacement of the fields the record form shows; the pole, <c>removed_date</c> and <c>data_source</c> are not
+/// part of it. A real replacement is still retire + record a new fitting.
+/// </summary>
+public sealed class UpdateFixtureRequest
+{
+    [Required]
+    public FixtureType? FixtureType { get; init; }
+
+    [Required]
+    public PowerSource? PowerSource { get; init; }
+
+    [Required]
+    [Range(1, 10_000)]
+    public int? LampWatt { get; init; }
+
+    [Required]
+    [Range(1, 4)]
+    public int? LampCount { get; init; }
+
+    [Required]
+    public DateOnly? InstallDate { get; init; }
+
+    /// <summary>Absent or <c>null</c> = no warranty on record, as on create.</summary>
+    public DateOnly? WarrantyExpiry { get; init; }
+
+    /// <summary>Absent = keep the note; <c>null</c> or blank = clear it; otherwise the same rules as <see cref="PoleNoteInput"/>.</summary>
+    public JsonElement Note { get; init; }
 }
 
 /// <summary>
@@ -476,10 +513,9 @@ public sealed record TopologyPole
 /// </summary>
 /// <remarks>
 /// <para>
-/// A pole carries up to TWO of these (MULTI-FIXTURE, drift MF-1): <c>ux_fixture_pole_slot_active</c>
-/// allows one lamp with no <c>removed_date</c> per slot. <see cref="PoleListItem.ActiveFixtures"/> lists them in slot
-/// order; <see cref="PoleListItem.ActiveFixture"/> is the first of them, kept so a reader written for one lamp
-/// keeps working.
+/// A pole carries ONE of these in service (ONE-FIXTURE, drift OF-1; two were allowed during MULTI-FIXTURE).
+/// <see cref="PoleListItem.ActiveFixtures"/> keeps its published list shape and holds at most that one;
+/// <see cref="PoleListItem.ActiveFixture"/> is the same fitting.
 /// </para>
 /// <para>
 /// <b>Nested here, flat in Contract section 5.1 — and that is deliberate, not drift.</b> The map
@@ -507,6 +543,9 @@ public sealed record ActiveFixture
     public required DateOnly InstallDate { get; init; }
 
     public DateOnly? WarrantyExpiry { get; init; }
+
+    /// <summary>The fitting's own note (FIXTURE-NOTE); <c>null</c> when none. Not the pole's <c>note</c>.</summary>
+    public string? Note { get; init; }
 
     /// <summary>
     /// From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1). <c>unknown</c> when the expiry is
@@ -605,7 +644,7 @@ public sealed record PoleListItem
     /// </summary>
     public ActiveFixture? ActiveFixture { get; init; }
 
-    /// <summary>Every lamp in service, in slot order — at most two (MULTI-FIXTURE). Empty when none; <see cref="ActiveFixture"/> is its first item.</summary>
+    /// <summary>The fitting in service as a list — at most one since ONE-FIXTURE (drift OF-1). Empty when none; <see cref="ActiveFixture"/> is its first item.</summary>
     public IReadOnlyList<ActiveFixture> ActiveFixtures { get; init; } = [];
 
     /// <summary>The free-text note on this spot (POLE-NOTE); <c>null</c> when there is none.</summary>
@@ -622,7 +661,7 @@ public sealed record PoleListItem
 
 /// <summary>
 /// The one set of rules for a pole note, whichever request carries it: trimmed, blank means none, at most
-/// <see cref="MaxLength"/> characters (POLE-NOTE).
+/// <see cref="MaxLength"/> characters (POLE-NOTE). A fitting's note follows the same rules (FIXTURE-NOTE).
 /// </summary>
 public static class PoleNoteInput
 {

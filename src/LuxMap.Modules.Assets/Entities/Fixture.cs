@@ -8,8 +8,8 @@ namespace LuxMap.Modules.Assets.Entities;
 /// <para>
 /// This entity records an INSTALLATION: which device, on which pole, from when to when. Replacing a
 /// lamp sets <see cref="RemovedDate"/> on the old row and inserts a new one, so the pole keeps its
-/// full equipment history. A pole may carry TWO lamps in service at once (MULTI-FIXTURE, drift MF-1) —
-/// each its own row with its own ID, wattage and warranty.
+/// full equipment history. A pole carries ONE fitting in service (ONE-FIXTURE, drift OF-1): its lamps are
+/// identical (<see cref="LampCount"/>) and a failed lamp replaces the whole fitting — new row, new ID, new warranty.
 /// </para>
 /// </summary>
 /// <remarks>
@@ -58,10 +58,18 @@ public class Fixture : ICommuneScoped, IUpdateStamped
     public int LampCount { get; set; } = 1;
 
     /// <summary>
-    /// Which of the pole's (at most <see cref="FixtureSlots.MaxInService"/>) lamp positions this fitting holds
-    /// while in service (MULTI-FIXTURE). The unique index on <c>(pole_id, slot) WHERE removed_date IS NULL</c> is
-    /// what limits a pole to two lamps in service; the API picks the lowest free slot and never exposes it.
-    /// A retired fitting keeps its slot as history and frees it.
+    /// Free text for the special case the record cannot say (FIXTURE-NOTE) — e.g. one lamp in the fitting is not
+    /// like the others. Set when the fitting is recorded; it belongs to this installation and stays with it as
+    /// history when the fitting is replaced. At most 1000 characters (<c>ck_fixture_note_length</c>), same rules as
+    /// a pole note (<c>PoleNoteInput</c>). The system never reads it.
+    /// </summary>
+    public string? Note { get; set; }
+
+    /// <summary>
+    /// Which of the pole's (at most <see cref="FixtureSlots.MaxInService"/>) fitting positions this fitting holds
+    /// while in service — always 1 since ONE-FIXTURE (drift OF-1). The unique index on
+    /// <c>(pole_id, slot) WHERE removed_date IS NULL</c> plus <c>ck_fixture_active_slot</c> limit a pole to one
+    /// fitting in service; the API never exposes the slot. A retired fitting keeps its slot as history and frees it.
     /// </summary>
     public short Slot { get; set; } = FixtureSlots.First;
 

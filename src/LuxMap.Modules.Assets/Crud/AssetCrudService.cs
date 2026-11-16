@@ -380,8 +380,8 @@ public sealed class AssetCrudService(
     {
         var pole = await RequireAsync<Pole>(candidate => candidate.PoleId == request.PoleId, "pole", ct);
 
-        // At most TWO lamps in service per pole, one per slot (MULTI-FIXTURE, drift MF-1). A row that
-        // arrives already retired is history, holds no slot and may coexist with any number of others. The
+        // ONE fitting in service per pole (ONE-FIXTURE, drift OF-1). A row that arrives already retired is
+        // history, holds no slot and may coexist with any number of others. The
         // friendly check is here; the partial unique index ux_fixture_pole_slot_active is the guard that
         // cannot be raced past — see the catch around SaveChanges below.
         short slot = FixtureSlots.First;
@@ -412,6 +412,7 @@ public sealed class AssetCrudService(
             RemovedDate = request.RemovedDate,
             WarrantyExpiry = request.WarrantyExpiry,
             DataSource = request.DataSource!.Value,
+            Note = PoleNoteInput.Normalize(request.Note),
         };
 
         dbContext.Set<Fixture>().Add(fixture);
@@ -996,6 +997,46 @@ public sealed class AssetCrudService(
 
     private const string CabinetSourceField = "cabinet_source";
 
+    /// <summary>
+    /// Corrects a fitting in service that was typed in wrong (FIXTURE-EDIT). Same pole, same ID, same baseline anchor —
+    /// which is exactly why it is for corrections only: a fitting that was physically replaced, or whose lamp count
+    /// really changed, is retired and recorded anew so the old baseline stops applying (LMC-4, OF-4).
+    /// </summary>
+    /// <remarks>
+    /// A retired fitting is history and is not rewritten (400, the same answer as retiring it twice). Out of the
+    /// caller's commune it is a 404 through the query filter. A save that changes nothing leaves <c>updated_by</c> alone.
+    /// </remarks>
+    public async Task UpdateFixtureAsync(string fixtureId, UpdateFixtureRequest request, CancellationToken ct)
+    {
+        // First, so a note that is not text is a 400 before anything is looked up.
+        var (noteSent, note) = PoleNoteInput.Read(request.Note);
+
+        var fixture = await RequireAsync<Fixture>(candidate => candidate.FixtureId == fixtureId, "fixture", ct);
+
+        if (fixture.RemovedDate is { } removed)
+        {
+            throw new LuxMapException(
+                ErrorCodes.ValidationFailed,
+                HttpStatusCode.BadRequest,
+                "That fitting is retired; its record is part of the equipment history and is not edited.",
+                new Dictionary<string, object?> { ["removed_date"] = removed.ToString("yyyy-MM-dd") });
+        }
+
+        fixture.FixtureType = request.FixtureType!.Value;
+        fixture.PowerSource = request.PowerSource!.Value;
+        fixture.LampWatt = request.LampWatt!.Value;
+        fixture.LampCount = request.LampCount!.Value;
+        fixture.InstallDate = request.InstallDate!.Value;
+        fixture.WarrantyExpiry = request.WarrantyExpiry;
+        if (noteSent)
+        {
+            fixture.Note = note;
+        }
+
+        Touch(fixture);
+        await dbContext.SaveChangesAsync(ct);
+    }
+
     /// <summary>Retires a lamp. The row stays: the pole's equipment history is the point of the table.</summary>
     /// <remarks>
     /// Once only, and never before the lamp was installed (BE-REVIEW-02, Q-4). A second retirement
@@ -1234,6 +1275,7 @@ public sealed class AssetCrudService(
                     InstallDate = lamp.InstallDate,
                     WarrantyExpiry = lamp.WarrantyExpiry,
                     DataSource = lamp.DataSource,
+                    Note = lamp.Note,
                 })
                 .ToList(),
             Note = pole.Note,
@@ -1514,7 +1556,7 @@ public sealed class AssetCrudService(
         }
     }
 
-    /// <summary>The lowest free slot on the pole, or 409 when both lamp positions are taken.</summary>
+    /// <summary>The lowest free slot on the pole, or 409 when the pole already has a fitting in service.</summary>
     private async Task<short> FreeSlotOrRejectAsync(string poleId, CancellationToken ct)
     {
         var inUse = await dbContext.Set<Fixture>().AsNoTracking()
@@ -1529,7 +1571,7 @@ public sealed class AssetCrudService(
         => new(
             ErrorCodes.PoleHasActiveFixture,
             HttpStatusCode.Conflict,
-            $"That pole already carries {FixtureSlots.MaxInService} lamps in service. Retire one (PUT /assets/fixtures/{{id}}/removal) before recording another.",
+            "That pole already has a fitting in service. Retire it (PUT /assets/fixtures/{id}/removal) before recording its replacement.",
             new Dictionary<string, object?> { ["pole_id"] = poleId });
 
     /// <summary>PostgreSQL <c>23505</c> on the lamps-in-service index.</summary>
