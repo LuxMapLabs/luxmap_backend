@@ -114,8 +114,7 @@ iot_values = {
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
     ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
     ("IotAnomaly", "code"): [
-        "telemetry_stale", "current_when_off", "voltage_loss", "voltage_deviation",
-        "current_deviation", "power_deviation", "lamp_count_shortfall",
+        "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
     ],
     ("LampCountEstimate", "status"): ["insufficient_samples", "undetermined", "estimated"],
 }
@@ -128,6 +127,9 @@ def iot_property(schema, field):
 
 for (schema, field), values in iot_values.items():
     iot_property(schema, field)["enum"] = values
+
+for schema in ("NodeProfile", "RegisterNodeRequest"):
+    iot_property(schema, "lamp_count_calibration")["enum"] = ["4v", "5v", None]
 
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
     iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]

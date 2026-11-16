@@ -385,6 +385,133 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }
     }
 
+    [Fact]
+    public Task Four_volt_diagnostics_counts_contiguous_samples_and_reports_only_supported_alerts()
+    {
+        var bridge = new ReportedPowerBridge();
+        return WithSharedCabinetAsync(async (client, rig, _services) =>
+        {
+            var nodePath = $"/api/v1/iot/nodes/{rig.First}";
+            object Source(string calibration, double nominalVoltage = 4.08) => new
+            {
+                server_id = rig.Server, device_id = "probe", feeder_id = rig.Feeder,
+                nominal_voltage = nominalVoltage, nominal_current_ma = 100, nominal_power_mw = 500,
+                lamp_count_calibration = calibration,
+            };
+            using var invalid = await client.PostAsJsonAsync($"{nodePath}/source", Source("bad"));
+            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+            using var created = await client.PostAsJsonAsync($"{nodePath}/source", Source("4v"));
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+            var diagnoses = $"{nodePath}/diagnostics";
+            foreach (var (count, currents) in new[]
+            {
+                (10, Window(68.75, 13, 56.25)),
+                (9, Window(63.75, 13, 56.25)),
+                (8, Window(51.25, 12, 46.25)),
+                (7, Window(47.5, 14, 43.75)),
+                (6, Window(42.5, 13, 38.75)),
+            })
+            {
+                bridge.DiagnosticDevice = DiagnosticTelemetry(currents);
+                var payload = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+                var estimate = payload.GetProperty("lamp_count");
+                Assert.Equal("estimated", estimate.GetProperty("status").GetString());
+                Assert.Equal(25, estimate.GetProperty("samples").GetInt32());
+                Assert.Equal(count, estimate.GetProperty("estimated_lit").GetInt32());
+                Assert.Equal(10 - count, estimate.GetProperty("estimated_missing").GetInt32());
+                Assert.Equal(currents.Count(current => current > 65),
+                    estimate.GetProperty("threshold_counts").GetProperty("above_65_ma").GetInt32());
+                var anomalies = payload.GetProperty("anomalies").EnumerateArray();
+                if (count == 10)
+                    Assert.Empty(anomalies);
+                else
+                {
+                    var alert = Assert.Single(anomalies);
+                    Assert.Equal("lamp_count_shortfall", alert.GetProperty("code").GetString());
+                    Assert.Equal(10 - count, alert.GetProperty("observed").GetDouble());
+                }
+            }
+
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(68.75, 1, 63.75));
+            await AssertStatusAsync("undetermined", 25);
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(47.5, 12, 43.75), skipSequence: 12);
+            await AssertStatusAsync("insufficient_samples", 13);
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(47.5, 12, 43.75), oldRtc: true);
+            await AssertStatusAsync("insufficient_samples", 0);
+
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), voltage: 0.04);
+            await AssertSingleAlertAsync("voltage_loss");
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), voltage: 4.6);
+            await AssertSingleAlertAsync("voltage_deviation");
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), staleDelivery: true);
+            await AssertSingleAlertAsync("telemetry_stale");
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), lampCommand: "OFF");
+            var off = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+            Assert.Empty(off.GetProperty("anomalies").EnumerateArray());
+            Assert.Equal(JsonValueKind.Null, off.GetProperty("lamp_count").ValueKind);
+
+            using var updated = await client.PutAsJsonAsync($"{nodePath}/source", new
+            {
+                server_id = rig.Server, device_id = "probe", feeder_id = rig.Feeder,
+                nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500, use_ten_lamp_calibration = true,
+            });
+            Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(100, 25, 100), voltage: 5);
+            var legacy = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+            var legacyCount = legacy.GetProperty("lamp_count");
+            Assert.Equal(10, legacyCount.GetProperty("estimated_lit").GetInt32());
+            Assert.Equal(15, legacyCount.GetProperty("required_votes").GetInt32());
+            Assert.False(legacyCount.TryGetProperty("threshold_counts", out _));
+
+            async Task AssertStatusAsync(string status, int samples)
+            {
+                var payload = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+                var estimate = payload.GetProperty("lamp_count");
+                Assert.Equal(status, estimate.GetProperty("status").GetString());
+                Assert.Equal(samples, estimate.GetProperty("samples").GetInt32());
+                Assert.Equal(JsonValueKind.Null, estimate.GetProperty("estimated_missing").ValueKind);
+                Assert.Empty(payload.GetProperty("anomalies").EnumerateArray());
+            }
+
+            async Task AssertSingleAlertAsync(string code)
+            {
+                var payload = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+                Assert.Equal(code, Assert.Single(payload.GetProperty("anomalies").EnumerateArray())
+                    .GetProperty("code").GetString());
+                Assert.Equal(JsonValueKind.Null, payload.GetProperty("lamp_count").ValueKind);
+            }
+        }, bridge);
+    }
+
+    private static double[] Window(double first, int count, double rest) =>
+        [.. Enumerable.Repeat(first, count), .. Enumerable.Repeat(rest, 25 - count)];
+
+    private static object DiagnosticTelemetry(double[] currents, double voltage = 4.07, string lampCommand = "ON",
+        int? skipSequence = null, bool oldRtc = false, bool staleDelivery = false)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var measured = now.AddSeconds(oldRtc ? -120 : -5);
+        var received = now.AddSeconds(staleDelivery ? -120 : -1);
+        var rows = currents.Select((current, index) =>
+        {
+            var offset = (currents.Length - 1 - index) * 10;
+            return new
+            {
+                receivedAt = index == currents.Length - 1 ? received : received.AddSeconds(-offset),
+                data = new { lampCommand, voltage, current, power = voltage * current, sessionId = "calibration",
+                    sequenceNumber = index + 1, timestamp = measured.AddSeconds(-offset).ToOffset(TimeSpan.FromHours(7))
+                        .ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) },
+            };
+        }).ToArray();
+        return new
+        {
+            deviceId = "probe", latestTelemetry = rows[^1],
+            history = rows.Where(row => row.data.sequenceNumber != skipSequence)
+                .OrderBy(row => row.data.sequenceNumber % 2).ToArray(),
+        };
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -544,7 +671,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }
     }
 
-    private async Task WithSharedCabinetAsync(Func<HttpClient, SharedCabinet, IServiceProvider, Task> check)
+    private async Task WithSharedCabinetAsync(
+        Func<HttpClient, SharedCabinet, IServiceProvider, Task> check, ReportedPowerBridge? bridge = null)
     {
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
@@ -552,7 +680,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
             builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
-                .ConfigurePrimaryHttpMessageHandler(() => new ReportedPowerBridge()));
+                .ConfigurePrimaryHttpMessageHandler(() => bridge ?? new ReportedPowerBridge()));
         });
         using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
         using var managerToken = await fixture.ManagerClientAsync();
@@ -585,6 +713,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     private sealed class ReportedPowerBridge : HttpMessageHandler
     {
         public bool RejectCommand { get; set; }
+        public object? DiagnosticDevice { get; set; }
         private JsonElement? desired;
         private Ack? lastAck;
         private Sample? latestTelemetry;
@@ -639,6 +768,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 "/api/luxmap/devices/command-receipts" => await ReadReceiptsAsync(request, ct),
                 "/api/luxmap/devices/probe/command" when RejectCommand => new(HttpStatusCode.ServiceUnavailable),
                 "/api/luxmap/devices/probe/command" => Json(await SaveCommandAsync(request, ct)),
+                "/api/luxmap/devices/probe" when DiagnosticDevice is { } diagnostic => Json(diagnostic),
                 "/api/luxmap/devices/probe" => Json(new
                 {
                     deviceId = "probe",

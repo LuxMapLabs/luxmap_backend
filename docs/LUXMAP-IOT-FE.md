@@ -163,15 +163,22 @@ Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA
 | | `stale` | Mẫu đã cũ và không dùng để chẩn đoán điện hiện tại. |
 | | `no_data` | Chưa có mẫu để chẩn đoán. |
 | `anomalies[].code` | `telemetry_stale` | Thời gian từ mẫu cuối vượt ngưỡng. |
-| | `current_when_off` | Dòng điện vượt ngưỡng cho phép khi đèn ở trạng thái OFF. |
 | | `voltage_loss` | Điện áp gần 0 khi đèn được yêu cầu bật. |
 | | `voltage_deviation` | Điện áp lệch khỏi giá trị tham chiếu quá ngưỡng. |
-| | `current_deviation` | Dòng điện lệch khỏi giá trị tham chiếu quá ngưỡng. |
-| | `power_deviation` | Công suất lệch khỏi giá trị tham chiếu quá ngưỡng. |
 | | `lamp_count_shortfall` | Số bóng sáng ước lượng thấp hơn số bóng hiệu chuẩn. |
 | `lamp_count.status` | `insufficient_samples` | Chưa đủ 25 mẫu hợp lệ. |
-| | `undetermined` | Đủ 25 mẫu nhưng chưa đủ phiếu để chọn một khung dòng. |
-| | `estimated` | Một khung đủ phiếu để ước lượng số bóng sáng và số bóng thiếu. |
+| | `undetermined` | Đủ 25 mẫu nhưng chưa khớp rõ một nhóm hiệu chuẩn. |
+| | `estimated` | Một nhóm hiệu chuẩn đủ điều kiện để trả số bóng sáng và số bóng thiếu. |
+
+### Hiệu chuẩn bộ thử 10 bóng ở nguồn khoảng 4 V
+
+Thêm `"lamp_count_calibration": "4v"` vào JSON của `POST /api/v1/iot/nodes/register` khi tạo hoặc `PUT /api/v1/iot/nodes/{nodeId}/source` khi sửa nguồn hiện có. Đặt `nominal_voltage` theo điện áp danh định của bộ đang đo để cảnh báo điện áp dùng đúng mốc. Cấu hình `"5v"` và cờ cũ `use_ten_lamp_calibration: true` vẫn chọn hiệu chuẩn 5 V nếu phù hợp.
+
+Hiệu chuẩn 4 V chỉ ước lượng trong phạm vi **6–10 bóng sáng** của bộ thử. Backend xét 25 mẫu ON liên tiếp cùng phiên ở **4,00–4,13 V**, theo thứ tự đo của node. Mẫu cuối phải có giờ RTC còn mới. Nếu có khoảng ngắt, mẫu mất áp, OFF hoặc ra ngoài dải, backend không nối qua điểm đó. Mẫu gửi bù được xếp theo số thứ tự, dãy cũ vừa đến Bridge không đủ để báo thiếu bóng. Firmware lưu một mẫu khoảng mỗi 10 giây nên cần khoảng 4 phút dữ liệu liên tục.
+
+Cả 25 số đo phải nằm trong dải dòng quan sát của một nhóm. Với 10, 8 và 7 bóng, lần lượt cần ít nhất 10 mẫu `>65`, `≥50` và `≥45` mA. Nhóm 9 bóng cần không có mẫu `>65` mA và nhóm 6 bóng cần không có mẫu `≥45` mA. Cửa sổ không khớp rõ trả `undetermined`. Đây là các mốc thử dựa trên dữ liệu của bộ đèn hiện tại.
+
+`lamp_count.median_current_ma` và `lamp_count.threshold_counts` giúp đối chiếu kết quả 4 V. Với 4 V, `votes` là số mẫu nằm trong từng dải quan sát, nên một mẫu có thể được tính ở nhiều dải. `required_votes: 25` là điều kiện cả cửa sổ phải nằm trong dải của nhóm được ước lượng.
 
 | HTTP | `error.code` | Ý nghĩa |
 |---|---|---|

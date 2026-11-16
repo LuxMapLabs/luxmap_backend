@@ -21750,6 +21750,36 @@
           "outside_range_samples": {
             "type": "integer",
             "format": "int32"
+          },
+          "median_current_ma": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "threshold_counts": {
+            "$ref": "#/components/schemas/LampCountThresholdCounts"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LampCountThresholdCounts": {
+        "type": "object",
+        "properties": {
+          "above_65_ma": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "at_or_below_52_5_ma": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "at_or_above_50_ma": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "at_or_above_45_ma": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -22328,6 +22358,10 @@
           },
           "use_ten_lamp_calibration": {
             "type": "boolean"
+          },
+          "lamp_count_calibration": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -23887,6 +23921,10 @@
             "format": "double"
           },
           "gateway_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "lamp_count_calibration": {
             "type": "string",
             "nullable": true
           }

@@ -81,7 +81,8 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 - `unconfigured` là chưa có ánh xạ hợp lệ; `no_data` là đã cấu hình nhưng nguồn chưa có mẫu; `source_unavailable` là nguồn lỗi hoặc hết ngân sách truy vấn của trang. Danh sách node giới hạn tổng thời gian chờ upstream 5 giây. OpenAPI hợp nhất khai enum cho trạng thái server, node, mẫu điện, chẩn đoán, mã bất thường và kết quả đếm bóng. Kênh lệnh bridge giữ wire format `AUTO`/`MANUAL`, `ON`/`OFF` hoặc `null`.
 - Origin phải khớp chính xác scheme/host/port trong `IotDiagnostics:AllowedOrigins` do bên triển khai cấp. Mặc định danh sách rỗng. Chỉ allowlist origin do bên triển khai kiểm soát, bao gồm DNS nếu dùng hostname; client tắt redirect và proxy.
 - Đăng ký mới được ghi vào PostgreSQL cùng người tạo, thời điểm UTC và correlation ID. Ánh xạ khai sẵn trong cấu hình vẫn đọc được nếu origin đã được allowlist. Triển khai dùng cấu hình từ bản thử cũ cần chuyển ánh xạ vào DB hoặc cấp qua cấu hình tĩnh.
-- Registry thiết bị và relay vẫn do Telemetry sở hữu. Module chẩn đoán đọc qua nguồn HTTP của testbed. `use_ten_lamp_calibration` mặc định tắt. Khi bật, bộ ước lượng dùng 25 mẫu và ngưỡng 15 phiếu cho cụm 10 bóng đã hiệu chuẩn. Mẫu mất áp (`voltage_loss`) được xử lý ở chẩn đoán điện áp.
+- Nguồn HTTP của testbed hỗ trợ `lamp_count_calibration: "4v"` hoặc `"5v"` theo node. Cờ cũ `use_ten_lamp_calibration` chọn 5 V khi không truyền cấu hình mới. Hồ sơ 4 V đánh giá 25 mẫu ON cùng phiên trong dải 4,00–4,13 V, dựa trên dải dòng và số mẫu vượt mốc cho 6–10 bóng. Trả thêm trung vị và số mẫu qua mốc. Điện áp gần 0 khi ON báo `voltage_loss`.
+- **Điều chỉnh cảnh báo testbed 16/11/2026.** API chẩn đoán phát `telemetry_stale`, `voltage_loss`, `voltage_deviation`, `lamp_count_shortfall`. Các mã `current_when_off`, `current_deviation`, `power_deviation` được bỏ khỏi phản hồi và OpenAPI. Dữ liệu đo dòng và công suất tiếp tục có ở API điện và lịch sử.
 
 
 

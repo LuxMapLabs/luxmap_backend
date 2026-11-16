@@ -132,6 +132,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [Required] public double NominalCurrentMa { get; init; }
         [Required] public double NominalPowerMw { get; init; }
         public string? GatewayId { get; init; }
+        public string? LampCountCalibration { get; init; }
     }
 
     public sealed record RegisteredNode(string NodeId, string ServerId, string DeviceId, string FeederId, string GatewayId);
@@ -160,6 +161,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             NominalVoltage = request.NominalVoltage,
             NominalCurrentMa = request.NominalCurrentMa,
             NominalPowerMw = request.NominalPowerMw,
+            LampCountCalibration = request.LampCountCalibration,
         };
         if (!profile.IsValid() || request.DataSource is not (DataSource.CalibrationRig or DataSource.Simulated))
             throw Invalid("Thông tin feeder, nguồn dữ liệu hoặc ngưỡng đo không hợp lệ.");

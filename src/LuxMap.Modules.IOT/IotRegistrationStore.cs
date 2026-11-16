@@ -157,6 +157,8 @@ public sealed class IotRegistrationStore(
                 existing.Profile.NominalVoltage != profile.NominalVoltage ||
                 existing.Profile.NominalCurrentMa != profile.NominalCurrentMa ||
                 existing.Profile.NominalPowerMw != profile.NominalPowerMw ||
+                (profile.LampCountCalibration is not null &&
+                 existing.Profile.EffectiveLampCountCalibration != profile.LampCountCalibration) ||
                 node.DataSource != request.DataSource || node.SupportsRemoteControl != request.SupportsRemoteControl)
                 throw Conflict();
             return (existing.NodeId, await ensureGatewayRoute(feeder.CommuneId, ct), false);

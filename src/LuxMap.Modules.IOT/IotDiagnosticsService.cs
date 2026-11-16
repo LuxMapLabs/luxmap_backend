@@ -32,17 +32,22 @@ public sealed record NodeProfile
     public double NominalCurrentMa { get; init; }
     public double NominalPowerMw { get; init; }
     public double VoltageTolerancePercent { get; init; } = 10;
+    // Legacy source fields retained for existing clients and stored profiles.
     public double CurrentTolerancePercent { get; init; } = 25;
     public double PowerTolerancePercent { get; init; } = 25;
     public double OffCurrentLimitMa { get; init; } = 10;
     public int MaxSilenceSeconds { get; init; } = 60;
     public bool UseTenLampCalibration { get; init; }
+    public string? LampCountCalibration { get; init; }
+
+    internal string? EffectiveLampCountCalibration => LampCountCalibration
+        ?? (UseTenLampCalibration ? LampCountEstimator.FiveVolt : null);
 
     internal bool IsValid() =>
         !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrWhiteSpace(FeederId) &&
         Positive(NominalVoltage) && Positive(NominalCurrentMa) && Positive(NominalPowerMw) &&
-        Tolerance(VoltageTolerancePercent) && Tolerance(CurrentTolerancePercent) &&
-        Tolerance(PowerTolerancePercent) && Positive(OffCurrentLimitMa) && MaxSilenceSeconds > 0;
+        Tolerance(VoltageTolerancePercent) && MaxSilenceSeconds > 0 &&
+        LampCountCalibration is null or LampCountEstimator.FourVolt or LampCountEstimator.FiveVolt;
 
     private static bool Positive(double value) => double.IsFinite(value) && value > 0;
     private static bool Tolerance(double value) => Positive(value) && value <= 100;
@@ -119,12 +124,15 @@ public sealed class IotDiagnosticsService(
         var measurement = ReadMeasurement(device);
         if (measurement is null) return result;
 
-        var diagnosis = Evaluate(result, measurement, profile, DateTimeOffset.UtcNow);
-        if (!profile.UseTenLampCalibration || diagnosis.Status == "stale" || measurement.LampCommand != "ON" ||
-            !LampCountEstimator.InCalibrationRange(measurement.Voltage))
+        var now = clock.GetUtcNow();
+        var diagnosis = Evaluate(result, measurement, profile, now);
+        if (profile.EffectiveLampCountCalibration is not { } calibration ||
+            diagnosis.Status == "stale" || measurement.LampCommand != "ON" ||
+            !LampCountEstimator.InCalibrationRange(measurement.Voltage, calibration))
             return diagnosis;
 
-        var estimate = LampCountEstimator.Evaluate(RecentOnCurrents(device!));
+        var estimate = LampCountEstimator.Evaluate(
+            RecentOnCurrents(device!, calibration, now, profile.MaxSilenceSeconds), calibration);
         return estimate.EstimatedMissing is > 0
             ? diagnosis with
             {
@@ -349,11 +357,8 @@ public sealed class IotDiagnosticsService(
         var sample = device?.LatestTelemetry;
         var freshAfter = now.AddSeconds(-maxSilenceSeconds);
         // RTC timestamps are local UTC+07:00. Archived samples can arrive long after they were measured.
-        if (sample?.Data is { } data &&
-            DateTime.TryParseExact(data.Timestamp, "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var local))
+        if (sample?.Data is { } data && MeasuredAt(data.Timestamp) is { } measuredAt)
         {
-            var measuredAt = new DateTimeOffset(local, TimeSpan.FromHours(7));
             var power = DecodePower(data.LampCommand);
             if (measuredAt >= freshAfter && measuredAt <= now &&
                 (ack is null || measuredAt > ack.ReceivedAt) && power != FeederPowerState.Unknown)
@@ -764,9 +769,22 @@ public sealed class IotDiagnosticsService(
             sample.Voltage!.Value, sample.Current!.Value, sample.Power!.Value);
     }
 
-    private static IReadOnlyList<double> RecentOnCurrents(PrototypeDevice device)
+    private static DateTimeOffset? MeasuredAt(string? timestamp) =>
+        DateTime.TryParseExact(timestamp, "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var local) && local.Ticks >= TimeSpan.FromHours(7).Ticks
+            ? new DateTimeOffset(local, TimeSpan.FromHours(7)) : null;
+
+    private static IReadOnlyList<double> RecentOnCurrents(
+        PrototypeDevice device, string calibration, DateTimeOffset now, int maxSilenceSeconds)
     {
         if (device.LatestTelemetry?.Data is not { SessionId: { Length: > 0 } session, SequenceNumber: > 0 } latest)
+            return [];
+
+        var fourVolt = calibration == LampCountEstimator.FourVolt;
+        var maximumGap = TimeSpan.FromSeconds(maxSilenceSeconds);
+        var newestTime = fourVolt ? MeasuredAt(latest.Timestamp) : null;
+        // A newly delivered backlog must not be interpreted as a fresh 4 V reading.
+        if (fourVolt && (newestTime is null || newestTime > now || newestTime < now - maximumGap))
             return [];
 
         // Use sequence order: replayed MQTT samples can arrive out of order.
@@ -780,10 +798,16 @@ public sealed class IotDiagnosticsService(
         {
             var candidates = history[sequence];
             if (candidates.Count() != 1 ||
-                candidates.First() is not { LampCommand: "ON", Voltage: double voltage, Current: double current } ||
-                !LampCountEstimator.InCalibrationRange(voltage) || !double.IsFinite(current))
+                candidates.First() is not { LampCommand: "ON", Voltage: double voltage, Current: double current } sample ||
+                !LampCountEstimator.InCalibrationRange(voltage, calibration) || !double.IsFinite(current))
                 break;
 
+            if (fourVolt)
+            {
+                var older = MeasuredAt(sample.Timestamp);
+                if (older is null || older >= newestTime || newestTime - older > maximumGap) break;
+                newestTime = older;
+            }
             currents.Add(current);
         }
         return currents;
@@ -802,20 +826,12 @@ public sealed class IotDiagnosticsService(
             };
 
         var anomalies = new List<IotAnomaly>();
-        if (reading.LampCommand == "OFF")
+        if (reading.LampCommand == "ON")
         {
-            if (reading.CurrentMa > profile.OffCurrentLimitMa)
-                anomalies.Add(new("current_when_off", reading.CurrentMa, null, null, profile.OffCurrentLimitMa));
-        }
-        else if (Math.Abs(reading.Voltage) <= LampCountEstimator.VoltageLossLimit)
-        {
-            anomalies.Add(new("voltage_loss", reading.Voltage, null, null, LampCountEstimator.VoltageLossLimit));
-        }
-        else
-        {
-            Compare(anomalies, "voltage_deviation", reading.Voltage, profile.NominalVoltage, profile.VoltageTolerancePercent);
-            Compare(anomalies, "current_deviation", reading.CurrentMa, profile.NominalCurrentMa, profile.CurrentTolerancePercent);
-            Compare(anomalies, "power_deviation", reading.PowerMw, profile.NominalPowerMw, profile.PowerTolerancePercent);
+            if (Math.Abs(reading.Voltage) <= LampCountEstimator.VoltageLossLimit)
+                anomalies.Add(new("voltage_loss", reading.Voltage, null, null, LampCountEstimator.VoltageLossLimit));
+            else
+                Compare(anomalies, "voltage_deviation", reading.Voltage, profile.NominalVoltage, profile.VoltageTolerancePercent);
         }
 
         return result with
