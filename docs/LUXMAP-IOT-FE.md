@@ -39,7 +39,7 @@ ESP32 gateway dùng địa chỉ broker TLS, Gateway ID, MQTT username và secre
 
 ### 2.2 Admin tạo node và gán feeder
 
-`POST /api/v1/iot/nodes/register` · quyền `ManageSettings`
+`POST /api/v1/iot/nodes` · quyền `ManageSettings`
 
 ```json
 {
@@ -62,8 +62,8 @@ API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response 
 ### Quản lý tuyến và nguồn đo
 
 - Admin gọi `GET /api/v1/iot/servers/{serverId}/gateways/routes` để đọc `gateway_id`, `device_ids` và `credential_issued`. Nếu nhiều server dùng chung bridge, danh sách phản ánh toàn bộ tuyến của bridge đó.
-- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}/source` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo. Thành công trả `204`. Backend kiểm tra lại xã, feeder, tủ điện và quyền MQTT.
-- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/source` để gỡ liên kết. Thành công trả `204`. Lịch sử trên bridge, tuyến MQTT và secret vẫn được giữ. Nguồn chỉ khai báo trong cấu hình triển khai trả `409` khi sửa hoặc gỡ.
+- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
+- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, còn dữ liệu lịch sử, tuyến MQTT và secret được giữ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
 
 ## 3. Hiển thị trên bản đồ
 
@@ -145,11 +145,11 @@ Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, 
 
 | API | Cách dùng |
 |---|---|
-| `GET /api/v1/iot/nodes/{nodeId}/electrical` | Hiện mẫu mới nhất và `power_state`. Kiểm tra `status` và `received_at` để phân biệt mẫu mới với mẫu cũ. |
-| `GET /api/v1/iot/nodes/{nodeId}/electrical/history?page=1&page_size=20&sort_by=received_at` | Đọc lịch sử điện, mới nhất trước. Đổi `sort_by=measured_at` để sắp theo giờ đo trên node. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical` | Mẫu mới nhất đã ghi cho mạch. Sau khi tháo node, có thể xem mẫu cuối với `status: offline` và `power_state: unknown`. Feeder chưa có mẫu trả `no_data` nếu đã gắn nguồn hoặc `unconfigured` nếu chưa gắn. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical/history?page=1&page_size=20&sort_by=received_at` | Lịch sử điện của mạch qua các lần gắn hoặc thay node. Đổi `sort_by=measured_at` để sắp theo giờ đo. Mỗi dòng có `node_id` và `server_id` của nguồn đã đo. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo ở cấp `feeder_id` từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
 
-Phản hồi lịch sử mặc định có `page`, `page_size`, `total` và `items`. Mặc định trang 1, 50 mục mỗi trang và sắp theo `received_at`; tối đa 200 mục mỗi trang. Mẫu thiếu `timestamp` nằm cuối khi sắp theo `measured_at`. Khi đồng bộ mẫu mới, có thể tiếp tục gọi `?after=0&limit=100` và dùng `next_cursor` cho lần gọi sau.
+Phản hồi lịch sử mặc định có `page`, `page_size`, `total` và `items`. Mặc định trang 1, 50 mục mỗi trang và sắp theo `received_at`; tối đa 200 mục mỗi trang. Mẫu thiếu `timestamp` nằm cuối khi sắp theo `measured_at`. Feeder nhận mẫu theo khoảng thời gian node được gán. Hệ thống ưu tiên giờ đo RTC, dùng giờ nhận cho mẫu không có giờ RTC. Mẫu gửi bù vẫn thuộc mạch lúc đo. Các tích hợp thiết bị có thể tiếp tục dùng endpoint điện theo node, với `after` và `limit` cho đồng bộ cursor.
 
 Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA) và `measurement.power_mw` (mW). Lịch sử dùng `items[].reading.data.{voltage,current,power,lux}` theo thứ tự V, mA, mW, lx. `timestamp` trong dữ liệu lịch sử là giờ đo theo RTC DS3231 của node. `received_at` là giờ UTC khi server nhận mẫu. Dữ liệu gửi bù có thể được nhận muộn hơn lúc đo.
 
@@ -172,7 +172,7 @@ Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA
 
 ### Hiệu chuẩn bộ thử 10 bóng ở nguồn khoảng 4 V
 
-Thêm `"lamp_count_calibration": "4v"` vào JSON của `POST /api/v1/iot/nodes/register` khi tạo hoặc `PUT /api/v1/iot/nodes/{nodeId}/source` khi sửa nguồn hiện có. Đặt `nominal_voltage` theo điện áp danh định của bộ đang đo để cảnh báo điện áp dùng đúng mốc. Cấu hình `"5v"` và cờ cũ `use_ten_lamp_calibration: true` vẫn chọn hiệu chuẩn 5 V nếu phù hợp.
+Thêm `"lamp_count_calibration": "4v"` vào JSON của `POST /api/v1/iot/nodes` khi tạo hoặc `PUT /api/v1/iot/nodes/{nodeId}` khi sửa nguồn hiện có. Đặt `nominal_voltage` theo điện áp danh định của bộ đang đo để cảnh báo điện áp dùng đúng mốc. Cấu hình `"5v"` và cờ cũ `use_ten_lamp_calibration: true` vẫn chọn hiệu chuẩn 5 V nếu phù hợp.
 
 Hiệu chuẩn 4 V chỉ ước lượng trong phạm vi **6–10 bóng sáng** của bộ thử. Backend xét 25 mẫu ON liên tiếp cùng phiên ở **4,00–4,13 V**, theo thứ tự đo của node. Mẫu cuối phải có giờ RTC còn mới. Nếu có khoảng ngắt, mẫu mất áp, OFF hoặc ra ngoài dải, backend không nối qua điểm đó. Mẫu gửi bù được xếp theo số thứ tự, dãy cũ vừa đến Bridge không đủ để báo thiếu bóng. Firmware lưu một mẫu khoảng mỗi 10 giây nên cần khoảng 4 phút dữ liệu liên tục.
 

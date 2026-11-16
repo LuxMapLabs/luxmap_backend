@@ -22,7 +22,7 @@ public sealed class IotNodeConfiguration : IEntityTypeConfiguration<IotNode>
         builder.HasKey(node => node.NodeId);
 
         builder.Property(node => node.NodeId).HasPrefixedId(PrefixedIds.IotNode);
-        builder.Property(node => node.CabinetId).HasColumnType("text").IsRequired();
+        builder.Property(node => node.CabinetId).HasColumnType("text");
         builder.Property(node => node.CredentialHash).HasColumnType("text");
 
         // LC-2: a secret and its issue time come and go together.

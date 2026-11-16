@@ -35,10 +35,9 @@ public class IotNode : ICommuneScoped
     public NodeRole NodeRole { get; set; } = NodeRole.SegmentController;
 
     /// <summary>
-    /// The cabinet the device is mounted in (CAB-3): REQUIRED; a cabinet may carry multiple devices
-    /// (CABINET-MULTI-NODE). Same commune as the cabinet — composite foreign key.
+    /// The mounted cabinet, or null after detaching the node. A mounted cabinet shares the device's commune.
     /// </summary>
-    public required string CabinetId { get; set; }
+    public required string? CabinetId { get; set; }
 
     /// <summary>
     /// <c>true</c> only for the self-built testbed (D-R7): the team never operates a commune's grid,

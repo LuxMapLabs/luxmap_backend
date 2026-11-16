@@ -78,7 +78,7 @@ public sealed class BrokerAuthController(LuxMapDbContext db, MqttOptions mqtt) :
 
         // Unfiltered, only to compare the secret — the same lookup as DeviceAuthenticationHandler.
         var hash = await db.Set<IotNode>().IgnoreQueryFilters().AsNoTracking()
-            .Where(node => node.NodeId == username)
+            .Where(node => node.NodeId == username && node.CabinetId != null)
             .Select(node => node.CredentialHash)
             .FirstOrDefaultAsync(ct);
 

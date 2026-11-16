@@ -53,7 +53,7 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOffli
             // NodeSilence.StatusAt: offline when now − last > threshold, i.e. last < now − threshold; exactly at it is still online.
             var cutoff = now - offlineAfter;
             silent = await scan.Set<IotNode>().IgnoreQueryFilters().AsNoTracking()
-                .Where(n => n.LastReportAt != null && n.LastReportAt < cutoff)
+                .Where(n => n.CabinetId != null && n.LastReportAt != null && n.LastReportAt < cutoff)
                 .OrderBy(n => n.NodeId.Length).ThenBy(n => n.NodeId)
                 .Select(n => new Silent(n.NodeId, n.CommuneId, n.LastReportAt!.Value))
                 .ToListAsync(ct);
@@ -75,7 +75,7 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOffli
     {
         // Re-read in the commune's own context: the device may have reported since the scan.
         var node = await db.Set<IotNode>().AsNoTracking().SingleOrDefaultAsync(n => n.NodeId == candidate.NodeId, ct);
-        if (node?.LastReportAt != candidate.LastReportAt) return false;
+        if (node?.CabinetId is null || node.LastReportAt != candidate.LastReportAt) return false;
 
         var detected = candidate.LastReportAt + offlineAfter;
         if (await db.Set<Fault>().AnyAsync(f => f.OriginNodeId == node.NodeId && f.FaultType == FaultType.NodeOffline

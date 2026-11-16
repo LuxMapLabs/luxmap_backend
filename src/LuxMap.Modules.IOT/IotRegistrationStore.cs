@@ -1,11 +1,14 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.IOT.Entities;
 using LuxMap.Modules.IOT.Registry;
 using LuxMap.Modules.IOT.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
+using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
@@ -24,7 +27,10 @@ internal sealed record IotServerRegistration(string ServerId, string BaseUrl)
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
 }
-internal sealed record IotSourceRegistration(string NodeId, string ServerId, string DeviceId, string Profile);
+internal sealed record IotSourceRegistration(string NodeId, string ServerId, string DeviceId, string Profile)
+{
+    public DateTime? DetachedAt { get; set; }
+}
 
 internal sealed class IotRegistrationAudit : IImmutableRecord
 {
@@ -71,28 +77,38 @@ internal sealed class IotSourceRegistrationConfiguration : IEntityTypeConfigurat
     }
 }
 
+internal sealed record FeederTelemetryBinding(
+    string NodeId, string ServerId, string DeviceId, DateTimeOffset From, DateTimeOffset? Until);
+
 public sealed class IotRegistrationStore(
     LuxMapDbContext db, IOptions<IotOptions> options, ICurrentActorAccessor actor, ICorrelationIdAccessor correlation)
 {
-    internal Task<IotOptions> ReadAsync(IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct)
-        => ReadAsync(db, options.Value, scopedNodeIds, ct);
+    internal Task<IotOptions> ReadAsync(IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct, bool includeDetached = false)
+        => ReadAsync(db, options.Value, scopedNodeIds, ct, includeDetached);
 
     internal static async Task<IotOptions> ReadAsync(
-        LuxMapDbContext db, IotOptions configured, IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct)
+        LuxMapDbContext db, IotOptions configured, IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct,
+        bool includeDetached = false)
     {
         var servers = new Dictionary<string, IotServerProfile>(configured.Servers, StringComparer.OrdinalIgnoreCase);
         foreach (var row in await db.Set<IotServerRegistration>().AsNoTracking().ToListAsync(ct))
             servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude);
 
         var nodes = new Dictionary<string, NodeProfile>(StringComparer.Ordinal);
-        foreach (var id in scopedNodeIds)
-            if (configured.Nodes.TryGetValue(id, out var profile)) nodes.Add(id, profile);
+        var visibleNodes = db.Set<IotNode>().AsNoTracking()
+            .Where(node => scopedNodeIds.Contains(node.NodeId) && (includeDetached || node.CabinetId != null));
+        if (configured.Nodes.Count > 0)
+        {
+            var configuredIds = configured.Nodes.Keys.ToArray();
+            foreach (var id in await visibleNodes.Where(node => configuredIds.Contains(node.NodeId)).Select(node => node.NodeId).ToListAsync(ct))
+                nodes.Add(id, configured.Nodes[id]);
+        }
 
         // Join through the commune-filtered node, even if an unscoped caller passes an ID list.
         var sourceRows = await (
             from row in db.Set<IotSourceRegistration>().AsNoTracking()
-            join node in db.Set<IotNode>() on row.NodeId equals node.NodeId
-            where scopedNodeIds.Contains(node.NodeId)
+            join node in visibleNodes on row.NodeId equals node.NodeId
+            where includeDetached || row.DetachedAt == null
             select row).ToListAsync(ct);
         foreach (var row in sourceRows)
             nodes[row.NodeId] = JsonSerializer.Deserialize<NodeProfile>(row.Profile, LuxMapJsonOptions.Default)!;
@@ -183,21 +199,23 @@ public sealed class IotRegistrationStore(
             throw Conflict();
 
         var nodeId = await nodes.CreateAsync(request, ct);
-        await SaveSourceAsync(nodeId, profile, replace: false, ct);
+        await SaveSourceAsync(nodeId, profile, createOnly: true, ct);
         var gatewayId = await ensureGatewayRoute(feeder.CommuneId, ct);
         await transaction.CommitAsync(ct);
         return (nodeId, gatewayId, true);
     }
 
-    internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool replace, CancellationToken ct)
+    internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool createOnly, CancellationToken ct,
+        Func<string, CancellationToken, Task>? authorize = null)
     {
         await using var transaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(ct) : null;
         var node = await LightingCommandService.LockDeviceAsync(db, nodeId, ct);
         var feeder = await FeederControllerBinding.LockFeederAsync(db, profile.FeederId, ct);
-        if (feeder.CabinetId != node.CabinetId || feeder.CommuneId != node.CommuneId)
+        if (feeder.CabinetId is null || feeder.CommuneId != node.CommuneId ||
+            (node.CabinetId is not null && feeder.CabinetId != node.CabinetId))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                "Feeder phải thuộc cùng tủ điện và xã với node IoT.");
+                "Feeder phải thuộc một tủ điện trong cùng xã và cùng tủ với node nếu node đang được gắn.");
         var controller = await db.Set<FeederControl>().Where(control => control.FeederId == profile.FeederId)
             .Select(control => control.NodeId).SingleOrDefaultAsync(ct);
         FeederControllerBinding.RequireCompatible(profile.FeederId, nodeId, controller);
@@ -209,13 +227,25 @@ public sealed class IotRegistrationStore(
         if (!IotOrigin.TryAllowed(settings, server.BaseUrl, out _))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Địa chỉ IoT server chưa được allowlist.");
         var existing = await db.Set<IotSourceRegistration>().SingleOrDefaultAsync(row => row.NodeId == nodeId, ct);
-        if (replace && existing is null) throw MissingSource(nodeId);
-        if ((!replace && (existing is not null || settings.Nodes.ContainsKey(nodeId))) ||
-            options.Value.Nodes.Values.Any(node => string.Equals(node.ServerId, id, StringComparison.OrdinalIgnoreCase) &&
-                                                    node.DeviceId == profile.DeviceId) ||
-            options.Value.Nodes.Any(pair => pair.Key != nodeId && pair.Value.FeederId == profile.FeederId))
+        if (createOnly && (existing is not null || settings.Nodes.ContainsKey(nodeId))) throw Conflict();
+        if (existing is null && options.Value.Nodes.ContainsKey(nodeId)) throw StaticSource();
+        if (options.Value.Nodes.Any(pair => pair.Key != nodeId &&
+                string.Equals(pair.Value.ServerId, id, StringComparison.OrdinalIgnoreCase) && pair.Value.DeviceId == profile.DeviceId))
             throw Conflict();
 
+        var configuredOwners = options.Value.Nodes.Where(pair => pair.Key != nodeId && pair.Value.FeederId == profile.FeederId)
+            .Select(pair => pair.Key).ToArray();
+        if (configuredOwners.Length > 0 && await db.Set<IotNode>().AnyAsync(candidate =>
+                candidate.CabinetId != null && configuredOwners.Contains(candidate.NodeId), ct))
+            throw Conflict();
+        if (authorize is not null) await authorize(node.CommuneId, ct);
+        if (existing is not null) await AuditLegacyFeederBindingAsync(node, existing, ct);
+
+        if (node.CabinetId is null)
+        {
+            node.CabinetId = feeder.CabinetId;
+            node.UpdatedAt = UtcMicrosecondClock.UtcNow();
+        }
         var details = JsonSerializer.Serialize(profile with { ServerId = id }, LuxMapJsonOptions.Default);
         if (existing is null) db.Add(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
         else db.Entry(existing).CurrentValues.SetValues(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
@@ -224,24 +254,144 @@ public sealed class IotRegistrationStore(
         if (transaction is not null) await transaction.CommitAsync(ct);
     }
 
-    internal async Task DeleteSourceAsync(string nodeId, CancellationToken ct)
+    internal async Task DetachNodeAsync(string nodeId, LightingCommandService lighting, CancellationToken ct)
     {
-        if (!await db.Set<IotNode>().AnyAsync(node => node.NodeId == nodeId, ct))
-            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
-        var row = await db.Set<IotSourceRegistration>().SingleOrDefaultAsync(source => source.NodeId == nodeId, ct)
-            ?? throw MissingSource(nodeId);
-        if (options.Value.Nodes.ContainsKey(nodeId)) throw MissingSource(nodeId);
-        db.Remove(row);
-        RecordRegistration(row.ServerId, nodeId, JsonSerializer.Serialize(new
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var node = await lighting.LockDeviceAsync(nodeId, ct);
+        if (node.CabinetId is null) return;
+
+        var row = await db.Set<IotSourceRegistration>().SingleOrDefaultAsync(source => source.NodeId == nodeId, ct);
+        if (row is null && options.Value.Nodes.TryGetValue(nodeId, out var configured))
         {
-            action = "source_removed", device_id = row.DeviceId,
+            row = new(nodeId, configured.ServerId?.ToLowerInvariant() ?? "default", configured.DeviceId,
+                JsonSerializer.Serialize(configured, LuxMapJsonOptions.Default));
+            db.Add(row);
+        }
+        if (row is not null) await AuditLegacyFeederBindingAsync(node, row, ct);
+        var relays = await db.Set<FeederControl>().Where(control => control.NodeId == nodeId).ToListAsync(ct);
+        var now = UtcMicrosecondClock.UtcNow();
+        await lighting.ExpireStaleAsync([nodeId], now, ct);
+        await lighting.SupersedeRelayAsync(nodeId, null, AuditActorKind.User, now, ct);
+        if (relays.Count > 0)
+        {
+            db.RemoveRange(relays);
+            // The cabinet-aware relay FK is enforced in SQL. Clear the bindings before updating the node.
+            await SaveAsync(ct);
+        }
+
+        if (row is not null) row.DetachedAt = now;
+        RecordRegistration(row?.ServerId ?? "default", nodeId, JsonSerializer.Serialize(new
+        {
+            action = "node_detached", cabinet_id = node.CabinetId, device_id = row?.DeviceId,
         }, LuxMapJsonOptions.Default));
+        node.CabinetId = null;
+        node.UpdatedAt = now;
         await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
-    private LuxMapException MissingSource(string nodeId) => options.Value.Nodes.ContainsKey(nodeId)
-        ? new("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict, "Nguồn đo được khai báo trong cấu hình triển khai.")
-        : new(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Node chưa có nguồn đo đã đăng ký.");
+    private static LuxMapException StaticSource() =>
+        new("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict, "Nguồn đo được khai báo trong cấu hình triển khai.");
+
+    private async Task AuditLegacyFeederBindingAsync(IotNode node, IotSourceRegistration source, CancellationToken ct)
+    {
+        var profile = JsonNode.Parse(source.Profile)!.AsObject();
+        if (profile["feeder_id"]?.GetValue<string>() is not { Length: > 0 } feederId) return;
+        var recorded = await db.Database.SqlQuery<bool>($"""
+            SELECT EXISTS (
+                SELECT 1 FROM iot_registration_audit
+                WHERE node_id = {node.NodeId} AND server_id = {source.ServerId}
+                    AND details ->> 'feeder_id' = {feederId} AND details ->> 'device_id' = {source.DeviceId}
+                    AND details ? 'nominal_voltage'
+            ) AS "Value"
+            """).SingleAsync(ct);
+        if (recorded) return;
+
+        profile["effective_from"] = JsonValue.Create(node.CreatedAt);
+        RecordRegistration(source.ServerId, node.NodeId, profile.ToJsonString(LuxMapJsonOptions.Default));
+    }
+
+    internal async Task<IReadOnlyList<FeederTelemetryBinding>> FeederTelemetryBindingsAsync(
+        string feederId, CancellationToken ct)
+    {
+        // Read audit events and legacy bindings from one snapshot so a concurrent detach cannot leave an open window.
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, ct);
+        // Scope at the feeder. A node can have been detached or replaced since making these measurements.
+        if (!await db.Set<Feeder>().AnyAsync(feeder => feeder.FeederId == feederId, ct))
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy mạch điện.");
+
+        var rows = await db.Database.SqlQuery<FeederTelemetryBindingRow>($"""
+            WITH owners AS (
+                SELECT DISTINCT node_id
+                FROM iot_registration_audit
+                WHERE details ->> 'feeder_id' = {feederId} AND details ? 'nominal_voltage'
+            ),
+            changes AS (
+                SELECT event.id, event.node_id, event.server_id, event.details ->> 'device_id' AS device_id,
+                       event.details ->> 'feeder_id' AS feeder_id,
+                       coalesce((event.details ->> 'effective_from')::timestamptz, event.created_at) AS assigned_at
+                FROM iot_registration_audit event JOIN owners USING (node_id)
+                WHERE (event.details ? 'feeder_id' AND event.details ? 'nominal_voltage')
+                    OR event.details ->> 'action' IN ('node_detached', 'source_removed')
+            ),
+            timeline AS (
+                SELECT *, lead(assigned_at) OVER (PARTITION BY node_id ORDER BY assigned_at, id) AS until
+                FROM changes
+            )
+            SELECT node_id, server_id, device_id, assigned_at, until
+            FROM timeline
+            WHERE feeder_id = {feederId} AND device_id IS NOT NULL
+                AND (until > assigned_at OR (until IS NULL AND EXISTS (
+                    SELECT 1 FROM iot_node mounted WHERE mounted.node_id = timeline.node_id
+                        AND mounted.cabinet_id IS NOT NULL)))
+            """).ToListAsync(ct);
+        var bindings = rows.Select(row => new FeederTelemetryBinding(
+            row.NodeId, row.ServerId, row.DeviceId, row.AssignedAt, row.Until)).ToList();
+
+        // Config-only and imported profiles may predate source audit rows. Use the node's recorded creation and detach dates.
+        var matching = db.Set<IotSourceRegistration>().FromSql($"""
+            SELECT * FROM iot_source_registration WHERE profile ->> 'feeder_id' = {feederId}
+            """).AsNoTracking();
+        var legacy = await (
+            from source in matching
+            join node in db.Set<IotNode>().AsNoTracking() on source.NodeId equals node.NodeId
+            select new { source.NodeId, source.ServerId, source.DeviceId, node.CreatedAt, source.DetachedAt }).ToListAsync(ct);
+        foreach (var row in legacy)
+            AddLegacy(row.NodeId, row.ServerId, row.DeviceId, row.CreatedAt, row.DetachedAt);
+
+        var configuredIds = options.Value.Nodes.Where(pair => pair.Value.FeederId == feederId).Select(pair => pair.Key).ToArray();
+        if (configuredIds.Length > 0)
+        {
+            var configured = await db.Set<IotNode>().AsNoTracking()
+                .Where(node => node.CabinetId != null && configuredIds.Contains(node.NodeId) &&
+                    !db.Set<IotSourceRegistration>().Any(source => source.NodeId == node.NodeId))
+                .Select(node => new { node.NodeId, node.CreatedAt }).ToListAsync(ct);
+            foreach (var node in configured)
+            {
+                var profile = options.Value.Nodes[node.NodeId];
+                AddLegacy(node.NodeId, profile.ServerId ?? "default", profile.DeviceId, node.CreatedAt, null);
+            }
+        }
+
+        await transaction.CommitAsync(ct);
+        return bindings;
+
+        void AddLegacy(string nodeId, string serverId, string deviceId, DateTimeOffset assignedAt, DateTimeOffset? until)
+        {
+            if (!bindings.Any(binding => binding.NodeId == nodeId && binding.ServerId == serverId && binding.DeviceId == deviceId) &&
+                (until is null || until > assignedAt))
+                bindings.Add(new(nodeId, serverId, deviceId, assignedAt, until));
+        }
+    }
+
+    private sealed class FeederTelemetryBindingRow
+    {
+        [Column("node_id")] public required string NodeId { get; init; }
+        [Column("server_id")] public required string ServerId { get; init; }
+        [Column("device_id")] public required string DeviceId { get; init; }
+        [Column("assigned_at")] public DateTimeOffset AssignedAt { get; init; }
+        [Column("until")] public DateTimeOffset? Until { get; init; }
+    }
 
     internal Task AuditCommandAsync(string serverId, string nodeId, object details, CancellationToken ct)
     {

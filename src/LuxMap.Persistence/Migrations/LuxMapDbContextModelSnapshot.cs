@@ -1660,7 +1660,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "node_id_seq");
 
                     b.Property<string>("CabinetId")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("cabinet_id");
 
@@ -1872,6 +1871,10 @@ namespace LuxMap.Persistence.Migrations
                     b.Property<string>("NodeId")
                         .HasColumnType("text")
                         .HasColumnName("node_id");
+
+                    b.Property<DateTime?>("DetachedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("detached_at");
 
                     b.Property<string>("DeviceId")
                         .IsRequired()
@@ -5694,7 +5697,6 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("CabinetId", "CommuneId")
                         .HasPrincipalKey("CabinetId", "CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_iot_node_electrical_cabinet_cabinet_id_commune_id");
                 });
 

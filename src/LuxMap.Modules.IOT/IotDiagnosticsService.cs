@@ -105,7 +105,7 @@ public sealed record IotCommandHistoryItem(
 
 public enum IotCommandHistoryStatus { Success, Pending, Expired }
 
-public sealed class IotDiagnosticsService(
+public sealed partial class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources,
     TimeProvider clock) : IFeederPowerLookup
 {
@@ -318,7 +318,7 @@ public sealed class IotDiagnosticsService(
         (from node in db.Set<IotNode>()
          from feeder in db.Set<Feeder>()
          where node.NodeId == nodeId && feeder.FeederId == feederId &&
-               node.CabinetId == feeder.CabinetId && node.CommuneId == feeder.CommuneId &&
+               node.CabinetId != null && node.CabinetId == feeder.CabinetId && node.CommuneId == feeder.CommuneId &&
                (!remote || node.SupportsRemoteControl)
          select feeder.FeederId).AnyAsync(ct);
 
@@ -522,7 +522,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "after phải từ 0 và limit phải từ 1 đến 1000.");
 
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct, includeDetached: true);
         var path = FormattableString.Invariant(
             $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history?after={after}&limit={limit}");
         try
@@ -548,7 +548,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "sort_by phải là received_at hoặc measured_at.");
 
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct, includeDetached: true);
         var path = FormattableString.Invariant(
             $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history/page?page={page.Page}&pageSize={page.PageSize}&sortBy={sortBy}");
         try
@@ -569,10 +569,11 @@ public sealed class IotDiagnosticsService(
         }
     }
 
-    private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(string nodeId, CancellationToken ct)
+    private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(
+        string nodeId, CancellationToken ct, bool includeDetached = false)
     {
         await RequireNodeAsync(nodeId, ct);
-        var settings = await registry.ReadAsync([nodeId], ct);
+        var settings = await registry.ReadAsync([nodeId], ct, includeDetached);
         if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out _, out var uri))
             throw Unavailable("Chưa cấu hình nguồn điều khiển cho thiết bị IoT.");
         return (uri, profile.DeviceId, profile);
@@ -594,7 +595,7 @@ public sealed class IotDiagnosticsService(
 
     public async Task<PagedResult<IotNodeStatus>> NodesAsync(PageRequest page, CancellationToken ct)
     {
-        var nodes = db.Set<IotNode>().AsNoTracking();
+        var nodes = db.Set<IotNode>().AsNoTracking().Where(node => node.CabinetId != null);
         var total = await nodes.CountAsync(ct);
         if (((long)page.Page - 1) * page.PageSize >= total)
             return PagedResult<IotNodeStatus>.From(page, total, []);
@@ -640,7 +641,7 @@ public sealed class IotDiagnosticsService(
     public async Task<IReadOnlyList<IotServerStatus>> ServersAsync(CancellationToken ct)
     {
         // A server is visible only if it has a registered node in the caller's commune scope.
-        var visibleIds = await db.Set<IotNode>().AsNoTracking()
+        var visibleIds = await db.Set<IotNode>().AsNoTracking().Where(node => node.CabinetId != null)
             .Select(node => node.NodeId).ToListAsync(ct);
         var settings = await registry.ReadAsync(visibleIds, ct);
         var servers = new SortedDictionary<string, (Uri Uri, string DeviceId)>(StringComparer.Ordinal);

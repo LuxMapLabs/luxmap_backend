@@ -112,6 +112,7 @@ iot_values = {
     ("IotServerStatus", "status"): ["online", "offline", "unconfigured", "broker_down", "unreachable"],
     ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
+    ("IotFeederElectricalResult", "status"): ["online", "offline", "no_data", "unconfigured"],
     ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
     ("IotAnomaly", "code"): [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
@@ -390,17 +391,18 @@ SECTION = {
 }
 
 SUMMARY.update({
-    ("post", "/api/v1/iot/nodes/register"): "Đăng ký node, nguồn đo và tuyến MQTT trong một lần",
+    ("get", "/api/v1/iot/feeders/{feederId}/electrical"): "Đọc mẫu điện mới nhất của mạch",
+    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Đọc lịch sử điện theo mạch qua các lần thay node",
+    ("post", "/api/v1/iot/nodes"): "Đăng ký node, nguồn đo và tuyến MQTT trong một lần",
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("put", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route"): "Đăng ký tuyến MQTT cho gateway và node",
     ("post", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Cấp secret MQTT một lần cho gateway",
     ("get", "/api/v1/iot/servers/{serverId}/gateways/routes"): "Liệt kê tuyến và trạng thái cấp secret trên bridge",
-    ("put", "/api/v1/iot/nodes/{nodeId}/source"): "Thay cấu hình nguồn đo IoT",
-    ("delete", "/api/v1/iot/nodes/{nodeId}/source"): "Gỡ nguồn đo IoT",
+    ("put", "/api/v1/iot/nodes/{nodeId}"): "Gắn hoặc cập nhật nguồn đo của node IoT",
+    ("delete", "/api/v1/iot/nodes/{nodeId}"): "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",
     ("post", "/api/v1/iot/servers"): "Đăng ký địa chỉ server IoT",
     ("get", "/api/v1/iot/servers"): "Xem trạng thái các server IoT trong phạm vi truy cập",
-    ("post", "/api/v1/iot/nodes/{nodeId}/source"): "Gán nguồn đo IoT cho node đã đăng ký",
     ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",

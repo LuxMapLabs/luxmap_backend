@@ -53,6 +53,9 @@ sealed class DeviceStore
     public IReadOnlyList<CommandReceipt> ReadCommandReceipts(CommandReceiptKey[] keys) =>
         archive.ReadCommandReceipts(keys);
 
+    public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt) =>
+        archive.ReadFeederHistory(windows, skip, take, measuredAt);
+
     private void Commit(DeviceState state)
     {
         var next = new Dictionary<string, DeviceState>(devices) { [state.DeviceId] = state };

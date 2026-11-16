@@ -9,6 +9,10 @@ record TelemetryHistoryPage(int Page, int PageSize, int Total, IReadOnlyList<Arc
 record CommandReceiptKey(string DeviceId, string CommandId);
 record CommandReceipt(string DeviceId, string CommandId, DateTimeOffset ReceivedAt);
 
+record FeederTelemetryWindow(string NodeId, string ServerId, string DeviceId, DateTimeOffset From, DateTimeOffset? Until);
+record FeederArchivedTelemetry(long Cursor, TelemetryReading Reading, string NodeId, string ServerId, bool Active);
+record FeederTelemetryBatch(int Total, IReadOnlyList<FeederArchivedTelemetry> Items);
+
 sealed class TelemetryArchive
 {
     private readonly string connectionString;
@@ -156,6 +160,80 @@ sealed class TelemetryArchive
         while (reader.Read()) items.Add(new(reader.GetInt64(0), Read(reader.GetString(1))));
         return new(page, pageSize, total, items);
     }
+
+    public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt)
+    {
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction(deferred: true);
+        using var sql = connection.CreateCommand();
+        sql.Transaction = transaction;
+        var bounds = windows.Select(window => new
+        {
+            window.NodeId, window.ServerId, window.DeviceId,
+            fromRtc = RtcBound(window.From), untilRtc = window.Until is { } until ? RtcBound(until) : null,
+            fromReceipt = ReceiptBound(window.From),
+            untilReceipt = window.Until is { } end ? ReceiptBound(end) : null,
+        });
+        sql.Parameters.AddWithValue("$bounds", JsonSerializer.Serialize(bounds, Json));
+        // A sample belongs to the half-open assignment window containing its measurement time.
+        // For records without an RTC timestamp use the UTC Bridge receipt time.
+        const string select = """
+            WITH bounds AS (
+                SELECT json_extract(value, '$.nodeId') AS node_id,
+                       json_extract(value, '$.serverId') AS server_id,
+                       json_extract(value, '$.deviceId') AS device_id,
+                       json_extract(value, '$.fromRtc') AS from_rtc,
+                       json_extract(value, '$.untilRtc') AS until_rtc,
+                       json_extract(value, '$.fromReceipt') AS from_receipt,
+                       json_extract(value, '$.untilReceipt') AS until_receipt
+                FROM json_each($bounds)
+            ),
+            candidates AS (
+                SELECT t.id, t.reading, b.*,
+                       json_extract(t.reading, '$.data.timestamp') AS rtc,
+                       json_extract(t.reading, '$.receivedAt') AS received
+                FROM bounds b JOIN telemetry t ON t.device_id = b.device_id
+            ),
+            normalized AS (
+                SELECT *, substr(received, 1, 19) || '.' ||
+                    substr(CASE WHEN substr(received, 20, 1) = '.'
+                        THEN replace(substr(received, 21), '+00:00', '') ELSE '' END || '0000000', 1, 7) AS receipt
+                FROM candidates
+            ),
+            readings AS (
+                SELECT * FROM normalized
+                WHERE (rtc IS NOT NULL AND rtc >= from_rtc AND (until_rtc IS NULL OR rtc < until_rtc))
+                    OR (rtc IS NULL AND receipt >= from_receipt AND (until_receipt IS NULL OR receipt < until_receipt))
+            )
+            """;
+        sql.CommandText = select + "SELECT count(*) FROM readings;";
+        var total = Convert.ToInt32(sql.ExecuteScalar());
+        if (skip >= total) return new(total, []);
+
+        var order = measuredAt ? "rtc DESC, id DESC" : "receipt DESC, id DESC";
+        sql.CommandText = select + $"SELECT id, reading, node_id, server_id, until_rtc IS NULL FROM readings ORDER BY {order} LIMIT $take OFFSET $skip;";
+        sql.Parameters.AddWithValue("$take", take);
+        sql.Parameters.AddWithValue("$skip", skip);
+        using var reader = sql.ExecuteReader();
+        var items = new List<FeederArchivedTelemetry>();
+        while (reader.Read())
+        {
+            items.Add(new(reader.GetInt64(0), Read(reader.GetString(1)),
+                reader.GetString(2), reader.GetString(3), reader.GetBoolean(4)));
+        }
+        return new(total, items);
+    }
+
+    private static string RtcBound(DateTimeOffset instant)
+    {
+        var local = instant.ToOffset(TimeSpan.FromHours(7));
+        var fraction = local.Ticks % TimeSpan.TicksPerSecond;
+        if (fraction != 0) local = local.AddTicks(TimeSpan.TicksPerSecond - fraction);
+        return local.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string ReceiptBound(DateTimeOffset instant) =>
+        instant.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff", System.Globalization.CultureInfo.InvariantCulture);
 
     public void TrackCommand(string deviceId, LampCommand command)
     {

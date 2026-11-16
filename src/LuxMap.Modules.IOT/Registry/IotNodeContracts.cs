@@ -20,7 +20,7 @@ public sealed record IotNodeItem
 {
     public required string NodeId { get; init; }
 
-    public required string CabinetId { get; init; }
+    public required string? CabinetId { get; init; }
 
     public required string CommuneId { get; init; }
 
