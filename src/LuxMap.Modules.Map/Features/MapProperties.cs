@@ -45,8 +45,7 @@ public record PoleProperties
     /// <summary><c>null</c> if and ONLY if <see cref="FixtureStatus"/> is <c>unknown</c> (section 5.1).</summary>
     public double? StatusConfidence { get; init; }
 
-    // The installation fields come from the FIRST lamp in service (slot order). A pole may carry two
-    // (MULTI-FIXTURE, drift MF-1) — see FixtureCount; the second one is read from GET /map/poles/{id}.
+    // The installation fields come from the fitting in service — one per pole (ONE-FIXTURE, drift OF-1).
     // Null on a pole that carries no lamp at all.
     public PowerSource? PowerSource { get; init; }
 
@@ -57,7 +56,7 @@ public record PoleProperties
     /// <summary>Lamps in the active fitting (LAMP-COUNT); <c>null</c> with no active fixture, like <c>lamp_watt</c>.</summary>
     public int? LampCount { get; init; }
 
-    /// <summary>Lamps in service on the pole, 0 to 2 (MULTI-FIXTURE). The lamp fields above describe the first.</summary>
+    /// <summary>Fittings in service on the pole, 0 or 1 since ONE-FIXTURE (drift OF-1). Lamps in it: <see cref="LampCount"/>.</summary>
     public int FixtureCount { get; init; }
 
     public DateOnly? InstallDate { get; init; }

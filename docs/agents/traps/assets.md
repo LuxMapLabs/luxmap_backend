@@ -15,8 +15,10 @@ PUT           /api/v1/assets/poles/{id}/feeder           PUT  /api/v1/assets/fix
 POST          /api/v1/assets/import/{segments|cabinets|feeders|poles|fixtures}
 ```
 
-**Fixture KHÔNG có DELETE, và cũng không có PUT thay thế** — ngừng dùng thiết bị là việc của
-`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. Bốn loại còn lại xoá
+**Fixture KHÔNG có DELETE** — ngừng dùng thiết bị là việc của
+`fixture.removed_date`, vì đó là sự kiện có thật, còn một dòng gõ nhầm thì không. `PUT /assets/fixtures/{id}`
+(FIXTURE-EDIT, 15/11/2026) chỉ để **chữa nhập sai** bộ đang dùng: giữ ID, cột và neo baseline. Bộ thay thật hay đổi
+số bóng thật thì phải ngừng dùng + ghi bộ mới, nếu không baseline của bộ cũ vẫn áp lên bộ mới (LMC-4, OF-4). Bốn loại còn lại xoá
 được và **khoá ngoại quyết định**, không kiểm trong code: `fault` / `lux_reading` giữ pole,
 `pole` / `fault` / `fault_cluster` giữ segment, `pole.feeder_id` giữ feeder — tất cả `Restrict`, vi
 phạm là 409 `ASSET_IN_USE` kèm tên constraint trong `details` (kể cả khi ràng buộc vấp ở bóng của
@@ -175,16 +177,16 @@ máy chủ (đo được 7 giờ trên máy Asia/Saigon). Chuẩn hoá bằng `U
    rồi giao lại binder cũ nên nghĩa không đổi. Tham số ngày mới **không cần làm gì** — chỉ đừng nhận ngày dưới dạng `string`
    rồi tự `DateTime.Parse`, như vậy là đi vòng qua chốt chặn. Canh bằng `A_bound_that_is_not_iso_8601_is_a_400_never_a_guess`.
 
-**3. Một cột có tối đa HAI bóng đang dùng (MULTI-FIXTURE, drift MF-1 — đảo D-11 ngày 11/11/2026).** Giới hạn là
-**`fixture.slot` (1..2, `ck_fixture_slot`) + UNIQUE partial `ux_fixture_pole_slot_active`** `(pole_id, slot WHERE removed_date IS NULL)`,
-không phải đếm dòng: đếm dòng thì hai request đua nhau vẫn qua được, còn index thì không. Service chỉ **chọn slot trống thấp nhất**
-(`FixtureSlots.FirstFree`) để trả 409 có thông điệp trước khi index phải từ chối; slot **không ra API**. Thay bóng = ngừng dùng bóng cũ
-(giải phóng slot) rồi ghi bóng mới; bóng có `removed_date` là lịch sử, không chiếm slot. CRUD trả 409 `POLE_HAS_ACTIVE_FIXTURE` ở bóng thứ
-ba, import báo theo dòng. 🔴 **Mọi đường ghi `fixture` bằng SQL thô phải kèm `slot`** (cột `NOT NULL`, không default — `seed_mock_set.py`
-đã làm; script mới quên là chết ngay ở lần nạp đầu). Đọc: cột phẳng (`lamp_watt`, …) lấy **bóng đầu theo slot** và đi kèm `fixture_count`;
-đừng `SingleOrDefault` / `FirstOrDefault` không có `OrderBy(Slot)` trên bóng đang dùng — cột hai bóng làm cái trước ném lỗi, cái sau cho
-kết quả không xác định. **Baseline neo vào bóng MỚI NHẤT đang dùng** (`FixtureSlots.NewestFirst`), không phải bóng đầu: thay bóng nào cũng
-làm baseline cũ ngừng khớp. Lỗ hổng đã biết (MF-5): ngừng dùng bóng cũ hơn mà không thay thì baseline vẫn hiệu lực.
+**3. Một cột có MỘT bộ đèn đang dùng (ONE-FIXTURE, drift OF-1, 15/11/2026 — khôi phục D-11 sau MULTI-FIXTURE 11/11).** Giới hạn là
+**UNIQUE partial `ux_fixture_pole_slot_active`** `(pole_id, slot WHERE removed_date IS NULL)` **+ `ck_fixture_active_slot`** (bộ đang dùng
+ở slot 1), không phải đếm dòng: đếm dòng thì hai request đua nhau vẫn qua được, còn index thì không. `ck_fixture_slot` vẫn `1..2` vì slot 2
+còn trên bộ **đã ngừng dùng** từ giai đoạn MULTI-FIXTURE — đừng siết nó về 1. Hằng số ở `FixtureSlots` (`MaxInService`, `MaxRecorded`);
+service chọn slot qua `FixtureSlots.FirstFree` để trả 409 có thông điệp trước khi index phải từ chối; slot **không ra API**. Thay bóng =
+**thay cả bộ**: ngừng dùng bộ cũ rồi ghi bộ mới; bộ có `removed_date` là lịch sử. CRUD trả 409 `POLE_HAS_ACTIVE_FIXTURE` ở bộ thứ hai,
+import báo theo dòng. 🔴 **Mọi đường ghi `fixture` bằng SQL thô phải kèm `slot`** (cột `NOT NULL`, không default — `seed_mock_set.py`
+đã làm). Hình dạng đọc của MULTI-FIXTURE (`fixtures[]`, `active_fixtures[]`, `fixture_count`) **giữ** để không phá FE, nay tối đa một bộ;
+đọc bộ đang dùng vẫn `OrderBy(Slot)` thay vì `SingleOrDefault`, để nới giới hạn về sau không làm ném lỗi. Baseline neo vào bộ mới nhất
+đang dùng (`FixtureSlots.NewestFirst`); MF-5 đóng vì chỉ còn một bộ.
 
 **4. `removed_date >= install_date` và ngừng dùng đúng một lần.** CHECK
 `ck_fixture_removed_after_install` ở DB; API trả 400 `VALIDATION_FAILED` nêu cả hai ngày; PUT lần hai

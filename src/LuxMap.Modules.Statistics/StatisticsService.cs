@@ -301,8 +301,8 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
     }
 
     /// <summary>
-    /// BE-31 — poles and the warranty of their lamps in service: one row per lamp, so a pole with two lamps appears
-    /// twice (MULTI-FIXTURE, drift MF-1) and <c>total</c> counts lamps, not poles. A pole with no lamp in service is
+    /// BE-31 — poles and the warranty of their fitting in service: one row per fitting, which is one per pole since
+    /// ONE-FIXTURE (drift OF-1; MF-6 made it per lamp while two were allowed). A pole with no fitting in service is
     /// listed too, as <c>unknown</c>: "nothing on record" must show up, not drop out of the list.
     /// </summary>
     /// <param name="page"><c>null</c> = every matching row, for the CSV export (capped by <see cref="CsvExport.MaxRows"/>).</param>

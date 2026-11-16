@@ -114,6 +114,13 @@ Tình trạng pull image và test S3 thật theo `tracking.html`; không suy tr�
   `The_thumbnail_carries_no_gps_so_a_widely_served_object_cannot_leak_capture_locations`; test đó
   **không phải chuyện dọn dẹp metadata**, đừng xoá khi refactor.
 
+- 🔴 **Thumbnail phải được XOAY theo EXIF Orientation TRƯỚC khi bỏ metadata (15/11/2026).** Ảnh điện thoại cầm dọc lưu pixel ngang + tag
+  Orientation 6/8/3. Ảnh gốc giữ nguyên byte (có tag) nên trình duyệt hiển thị đứng; thumbnail bỏ EXIF nên nếu không xoay pixel trước thì
+  nằm ngang vĩnh viễn. `ThumbnailFactory.CreateAsync` gọi `AutoOrient()` trước `Resize` (cùng thứ tự "xoay rồi mới bỏ" như `JpegSanitizer`);
+  mọi đường qua `ImagePipeline.PrepareAsync` / `OriginalJpegReader` đều dùng nó. Canh bằng `ThumbnailOrientationTests`. Thumbnail đã sinh
+  trước bản sửa **không** được sinh lại tự động — ảnh hưởng 24 ảnh cột trên production, đã up lại với pixel đã xoay. `ValidatedJpeg.Width/Height`
+  là pixel THÔ của ảnh gốc (từ `Identify`), không phải kích thước hiển thị; đừng dùng chúng để suy hướng ảnh.
+
 - 🔴 **Sáu advisory của ImageSharp 3.1.12 đang được TẮT theo mã (`Directory.Build.props`; năm cái 08/10/2026, cái thứ sáu `GHSA-v76p-62qx-wwq2` —
   decoder TIFF fax — 28/10/2026 khi audit lúc restore bắt đầu báo nó và CI đỏ ở `-warnaserror`)** — mọi bản vá (3.2.0, 4.1.2) đều đòi license
   key lúc build, nên chưa nâng được (gạch dưới). Chấp nhận được **CHỈ VÌ** mọi lần decode đi qua cấu hình chỉ-JPEG

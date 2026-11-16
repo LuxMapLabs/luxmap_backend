@@ -27,7 +27,7 @@ public sealed record PoleMapDetail
     /// <summary>The lamp in use; <c>null</c> when the pole has no active fixture.</summary>
     public PoleMapFixture? Fixture { get; init; }
 
-    /// <summary>Every lamp in service, in slot order — at most two (MULTI-FIXTURE, drift MF-1); <see cref="Fixture"/> is its first item. Empty when none.</summary>
+    /// <summary>The fitting in service as a list — at most one since ONE-FIXTURE (drift OF-1); <see cref="Fixture"/> is its first item. Empty when none.</summary>
     public IReadOnlyList<PoleMapFixture> Fixtures { get; init; } = [];
 
     public required PoleMapStatus CurrentStatus { get; init; }
@@ -84,6 +84,9 @@ public sealed record PoleMapFixture
 
     /// <summary>From <see cref="WarrantyExpiry"/> and today in the communes' zone (BE-31, drift W-1).</summary>
     public WarrantyStatus WarrantyStatus { get; init; } = WarrantyStatus.Unknown;
+
+    /// <summary>The fitting's own note (FIXTURE-NOTE); <c>null</c> when none. The pole's note is the top-level <c>note</c>.</summary>
+    public string? Note { get; init; }
 }
 
 /// <summary>

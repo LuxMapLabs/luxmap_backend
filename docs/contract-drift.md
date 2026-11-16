@@ -2185,6 +2185,9 @@ Lược đồ (PV-a, 17 cột `video_*` trong `work_order_pole_photo`) ghi ở `
 
 ## MULTI-FIXTURE — một cột mang tối đa HAI bóng đang dùng, mỗi bóng một bản ghi `fixture` (11/11/2026)
 
+> ⚠️ **Giới hạn hai bóng đã bị thay bởi ONE-FIXTURE (15/11/2026)** — một cột một bộ đèn đang dùng. Mục này giữ làm lịch sử;
+> MF-3 (hình dạng đọc) và MF-7 (`lamp_count`) còn hiệu lực, MF-1 / MF-2 / MF-5 / MF-6 đọc theo ONE-FIXTURE.
+
 | | |
 |---|---|
 | **Decision maker** | **Mỹ (Dylan), 11/11/2026**: tách thành hai `fixture` riêng (hướng B của LAMP-COUNT), **đảo D-11** (BE-REVIEW-02) và hướng A của 21/10. Ba lựa chọn chốt cùng lúc: trạng thái theo cột, thêm mảng `fixtures[]` giữ field cũ, giữ `lamp_count` |
@@ -2413,3 +2416,63 @@ không có API nào gỡ được chặn.
   (FK giữ `Restrict`; xoá do service làm, có audit).
 
 Quyết định nội bộ BE, Mỹ chốt trong chat 15/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
+
+### POLE-DELETE-PHOTOS — xoá cột xoá luôn ảnh tài sản của cột (16/11/2026)
+
+**Phát hiện trên production 16/11:** cần xoá POLE-0270, POLE-0249 (tuyến SEG-040, cột đợt 03/10 chen giữa các cột đợt 28/09), nhưng
+mỗi cột có một ảnh tài sản và `pole_asset_photo → pole` là `Restrict`; ẩn ảnh chỉ ghi `deleted_at` — nên **cột nào từng có ảnh tài sản
+thì không xoá được**, cùng kiểu chặn POLE-DELETE-QR đã gỡ cho mã QR.
+
+- `DELETE /api/v1/assets/poles/{id}` giờ xoá **mọi dòng ảnh tài sản của cột** (đang hiện lẫn đã ẩn) sau mã QR, trước khi xoá cột,
+  **cùng transaction và dưới cùng khoá hàng `pole`** (khoá mà upload ảnh cũng lấy). Mỗi ảnh một audit `deleted`
+  (`entity_type = pole_asset_photo`, `before` = snapshot ảnh + `object_key` / `thumbnail_key`, `after = null`), cũ trước mới sau.
+- **Bytes ảnh ở lại object store** — `IObjectStore` không có hàm xoá; object không còn dòng là object mồ côi mà đối soát BE-35 báo
+  (cùng nhóm với 22 object mồ côi đang chờ quyết xoá). Không bao giờ ngược lại (dòng còn mà object mất).
+- Cột bị từ chối vì bảng khác (sự cố, lux reading, báo cáo công dân …) → 409 như cũ, ảnh và mã QR được rollback.
+- **Tủ điện chưa đổi:** `cabinet_asset_photo → electrical_cabinet` vẫn `Restrict`, tủ có ảnh vẫn 409 khi xoá.
+- **Không đổi bề mặt API:** route, mã, body lỗi giữ nguyên; chỉ một trường hợp 409 cũ nay thành 204. Không migration.
+
+Quyết định nội bộ BE, Mỹ chốt trong chat 16/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
+
+## ONE-FIXTURE — một cột MỘT bộ đèn đang dùng; hỏng bóng nào thay cả bộ (15/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 15/11/2026**, theo đề xuất của FE (WP5): một trụ một bộ đèn, các bóng trong bộ **giống nhau** (loại, công suất, ngày lắp, bảo hành); hỏng bóng nào thì **thay cả bộ** — tháo bộ cũ, gắn bộ mới, mã mới, bảo hành mới. Lý do: đèn LED đường phố là bộ liền khối; hai bóng khác trạng thái trên một trụ không có cách hiện đúng trên GIS (một trụ một chấm). **Đảo MULTI-FIXTURE (11/11), khôi phục D-11** (BE-REVIEW-02). Cách làm: **khoá còn 1 slot**, không revert schema |
+| **Chạm API** | **Có, chỉ hành vi** — không bỏ / đổi trường nào: bóng thứ hai đang dùng trên một cột nay bị 409 (trước đó được nhận). **SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract |
+| **Scope** | Assets (giới hạn, thông điệp, import), migration `RestrictFixtureToOneInService`; comment ở Map / WorkOrders / Statistics; `CLAUDE.md`, `traps/assets.md`, `erd.md` Q18, `templates/README.md` |
+| **Consumer** | WP5 (form / import bộ đèn: chỉ một bộ mỗi trụ; thay = ngừng dùng bộ cũ rồi thêm bộ mới), WP6 (chi tiết cột). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| OF-0 | **Lý do** (FE nêu, để dẫn khi hội đồng hỏi): (1) trạng thái và sự cố đều tính **theo cột** — cột mang hai bộ khác loại, khác ngày lắp mà bản đồ chỉ hiện một trạng thái thì không trả lời được "bộ nào hỏng"; (2) CV và lux đo trên xe không phân biệt được hai bộ trên cùng một cột; (3) đèn LED đường phố là bộ liền khối, thực tế thay cả bộ; (4) lịch sử vẫn giữ — thay đèn = ngừng dùng bộ cũ + ghi bộ mới. Web đã ẩn nút gắn khi cột có bộ; BE vẫn phải từ chối vì import và mobile cũng gắn được |
+| OF-1 | Một cột có tối đa **một** bản ghi `fixture` đang dùng. Giữ cột `slot` và UNIQUE `ux_fixture_pole_slot_active`; thêm CHECK **`ck_fixture_active_slot`** = `removed_date IS NOT NULL OR slot BETWEEN 1 AND 1` ⇒ bộ đang dùng luôn ở slot 1, nên DB từ chối bộ thứ hai kể cả khi hai request đua nhau. `ck_fixture_slot` vẫn `1..2`: **slot 2 chỉ hợp lệ trên bộ đã ngừng dùng** (lịch sử của giai đoạn MULTI-FIXTURE). Hằng số ở `FixtureSlots` (`MaxInService = 1`, `MaxRecorded = 2`). Kiểm dữ liệu 15/11 trước migration: 0 cột hai bộ đang dùng, 0 dòng slot 2 trên `luxmap_dev` (276 bộ) và VPS (175 bộ) |
+| OF-2 | `POST /assets/fixtures` khi cột đã có bộ đang dùng → **409 `POLE_HAS_ACTIVE_FIXTURE`** (mã giữ nguyên, thông điệp nay "already has a fitting in service"). Import: dòng đang dùng thứ hai cho một cột (trong file hoặc đã có trong DB) lỗi **theo dòng**. Dòng mang `removed_date` vẫn là lịch sử, không bị chặn |
+| OF-3 | **Hình dạng đọc giữ nguyên** để không phá FE / mobile: `fixtures[]`, `active_fixtures[]` còn, nay tối đa 1 phần tử; `fixture_count` nay `0..1`; `fixture` / `active_fixture` / trường phẳng là chính bộ đó. `GET /statistics/warranty` lại một hàng mỗi cột (MF-6 thôi áp). Bỏ hẳn các mảng này nếu muốn là việc của FW khi hợp nhất Contract |
+| OF-4 | **Thay bóng = thay cả bộ:** `PUT /assets/fixtures/{id}/removal` cho bộ cũ rồi `POST` bộ mới (mã `FIX-…` mới, `install_date`, `warranty_expiry` mới). Số bóng trong bộ vẫn là `lamp_count` (LMC-1). Bộ thực tế có bóng khác loại là trường hợp đặc biệt, ghi vào ghi chú của bộ (FIXTURE-NOTE), không tách bản ghi |
+| OF-5 | **MF-5 đóng:** baseline neo vào bộ mới nhất đang dùng, mà nay chỉ có một bộ ⇒ không còn ca "ngừng bóng cũ hơn mà baseline vẫn hiệu lực". Thay bộ ⇒ neo đổi ⇒ baseline cũ ngừng khớp (giữ luật) |
+| OF-6 | **Bộ sáng một phần là `dim`, không phải `out`.** `out` = trụ không có ánh sáng nào; bộ nhiều bóng tắt một phần vẫn sáng nhưng kém hơn baseline của chính trụ ⇒ `dim` (cùng luật LMC-4). Trạng thái vẫn theo cột, không theo bóng |
+| OF-7 | **Lỗ hổng đã biết của OF-6:** nhãn ảnh cột chỉ có `on` / `off` (PHOTO-REVIEW), nên ảnh một bộ sáng một nửa sẽ được gắn `on` và **không** hạ cột xuống `dim`. Báo cáo tại chỗ của kỹ sư (`POST /faults`, `lamp_dim`, `field_report`) tạo sự cố mở nhưng **không** ghi `pole_current_status` (chỉ sweep được duyệt và ảnh được xác nhận ghi). Chưa quyết: thêm nhãn "sáng một phần" cho ảnh, hay để lux kế tay quyết `dim` — cả hai chạm bề mặt API, cần FW |
+
+**Cần báo / cần quyết:** WP5, WP6 (409 ở bộ thứ hai; hình dạng đọc không đổi); OF-7 cần chốt kênh phát hiện bộ sáng một phần.
+
+## FIXTURE-NOTE — ghi chú của bộ đèn cho trường hợp đặc biệt (15/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 15/11/2026**, đi cùng ONE-FIXTURE theo đề xuất của FE: thêm ô ghi chú cho trường hợp đặc biệt của bộ đèn (vd một bóng trong bộ khác loại) thay vì tách bản ghi |
+| **Chạm API** | **Có, chỉ THÊM** — trường tuỳ chọn mới ở một request và hai response; không đổi trường nào. **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Scope** | Assets (entity, `POST /assets/fixtures`, **`PUT /assets/fixtures/{id}`** (FN-4), import, kiểm kê), Map (chi tiết cột); migration `AddFixtureNote`; `templates/README.md`; spec sinh lại |
+| **Consumer** | WP5 (form / import bộ đèn, kiểm kê, popup chi tiết cột), WP6 (chi tiết cột). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| FN-1 | Cột `fixture.note text NULL`, CHECK `ck_fixture_note_length` = `char_length(note) <= 1000`. Ghi chú thuộc **lần lắp này**: thay bộ thì bộ mới có ghi chú riêng, ghi chú của bộ cũ ở lại làm lịch sử. Khác `pole.note` (POLE-NOTE — nói về vị trí trụ, ghi đè). Hệ thống không đọc chữ trong ghi chú. `Down()` từ chối khi còn bộ có ghi chú |
+| FN-2 | Ghi: `POST /assets/fixtures` nhận `note?` — cắt khoảng trắng, rỗng = không có, > 1000 ký tự → 400 `VALIDATION_FAILED` (`details.field = note`), cùng luật `PoleNoteInput`. Import bộ đèn: cột **`note` tuỳ chọn**, ô trống = không có, quá dài → lỗi theo dòng. Sửa ghi chú: qua `PUT /assets/fixtures/{id}` (FN-4) |
+| FN-3 | Đọc: khoá `note` (chuỗi \| null) trong `fixture` và mỗi phần tử `fixtures[]` của `GET /map/poles/{id}`, trong `active_fixture` / `active_fixtures[]` của `GET /assets/poles`. **Không** đưa vào lớp bản đồ bbox, `GET /work-orders/{id}/poles`, gói `/sync/bundle` hay thống kê bảo hành (giữ payload nhẹ như POLE-NOTE N-3); thêm nếu mobile cần |
+
+| FN-4 | **FIXTURE-EDIT — `PUT /assets/fixtures/{fixture_id}`** (FE yêu cầu 15/11, FE đang gọi `PATCH` → **đổi sang `PUT`**, cùng khuôn mọi endpoint sửa tài sản: thay thế toàn phần, **204** không body). Capability `ManageAssets` (Quản lý). Body: `fixture_type`, `power_source`, `lamp_watt` (1..10000), `lamp_count` (1..4) và `install_date` **bắt buộc**; `warranty_expiry` vắng / `null` = không có bảo hành; `note` **vắng = giữ**, `null` / rỗng = xoá, còn lại theo FN-2. **Không đổi** `pole_id`, `removed_date`, `data_source` (không có trong body). Ngoài phạm vi xã → 404; bộ **đã ngừng dùng** → 400 `VALIDATION_FAILED` "That fitting is retired…" (cùng mã như ngừng dùng hai lần); lỗi kiểm tra → 400 có `message` đọc được. Lưu không đổi gì → không đổi `updated_by` |
+| FN-5 | **Chỉ để chữa nhập sai.** Sửa giữ nguyên ID, cột và neo baseline (`FixtureSlots.NewestFirst`). Bộ được thay thật, hoặc số bóng thay đổi thật, thì vẫn **ngừng dùng + ghi bộ mới** (OF-4) — sửa tại chỗ sẽ để baseline của bộ cũ tiếp tục áp lên bộ mới. Hệ thống không phân biệt được hai ý định này; dựa vào quy trình và nhãn form của FE |
+| FN-6 | Không audit riêng (bộ đèn không phải `IAudited`, như mọi sửa tài sản khác); dấu vết là `updated_by` / `updated_at`. Không có khoá hàng: sửa và ngừng dùng đồng thời không đụng chung cột nào |
+
+**Cần báo:** WP5 (đổi `PATCH` → `PUT /assets/fixtures/{fixture_id}`, 204; trường `note` mới), WP6 (trường mới, chỉ thêm).
