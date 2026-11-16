@@ -9,7 +9,6 @@ using LuxMap.Persistence.Versions;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Contracts.Errors;
-using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -18,11 +17,11 @@ using Npgsql;
 namespace LuxMap.Modules.IOT.Lighting;
 
 /// <summary>
-/// The whole life of a lighting command, independent of how it travels (LIGHT-CTRL D-1): a Manager's press, delivery to the
-/// device, the device's acknowledgement, expiry and supersession. The HTTPS poll is the first adapter; an MQTT one would call
-/// these same methods.
+/// The whole life of a lighting command, independent of how it travels (LIGHT-CTRL D-1): creation, delivery to the device,
+/// acknowledgement, expiry and supersession. HTTP device polling and MQTT use these same methods.
 /// </summary>
 /// <remarks>
+/// The creation HTTP routes were removed on 16/11/2026; CreateAsync has no HTTP entry point.
 /// <para>
 /// 🔴 <b>Every write locks the device row first</b> (<c>SELECT 1 … FOR UPDATE</c>, after a scoped read — the order the 2a
 /// review settled) and reads again under the lock. A press on several devices locks them in ordinal <c>node_id</c> order;
@@ -39,24 +38,9 @@ public sealed class LightingCommandService(
 {
     // ── Manager ────────────────────────────────────────────────────────────────────────────────
 
-    public async Task<LightingPreview> PreviewAsync(string? feederId, string? segmentId, CancellationToken ct)
-    {
-        var plan = await PlanAsync(feederId, segmentId, ct);
-        return new LightingPreview
-        {
-            TargetKind = plan.Kind,
-            TargetId = plan.TargetId,
-            Targets = [.. plan.Relays.Select(relay => relay.ToWire())],
-            Excluded = plan.Excluded,
-            AffectedSegmentIds = plan.AffectedSegmentIds,
-            UncontrollablePoleCount = plan.UncontrollablePoleCount,
-            UnassignedSegmentPoleCount = plan.UnassignedSegmentPoleCount,
-        };
-    }
-
     /// <summary>
-    /// Places a press: one command per switchable relay, the rest listed in <c>excluded</c> (D-8). Open commands on the same
-    /// relays are superseded. <c>Replayed</c> is true when the same <c>client_op_id</c> and content were already placed.
+    /// Creates commands internally (no HTTP entry point since 16/11/2026): one per switchable relay, the rest listed in
+    /// <c>excluded</c> (D-8). Open commands on the same relays are superseded. <c>Replayed</c> is true when the same <c>client_op_id</c> and content were already placed.
     /// </summary>
     public async Task<(LightingRequestResult Result, bool Replayed)> CreateAsync(CreateLightingRequest request, CancellationToken ct)
     {
@@ -97,12 +81,12 @@ public sealed class LightingCommandService(
             await LockAsync(nodeId, communeId, ct);
         }
 
-        // D-8: the press is checked again under the locks — the preview, and the plan above, may be stale.
+        // D-8: the press is checked again under the locks — the plan above may be stale.
         var locked = await PlanAsync(request.FeederId, request.SegmentId, ct);
         if (!locked.Relays.SequenceEqual(plan.Relays))
         {
             throw new LuxMapException(ErrorCodes.LightingTargetChanged, HttpStatusCode.Conflict,
-                "The wiring of this target changed while the request was being placed. Preview it again, then send.");
+                "The wiring of this target changed while the request was being placed. Retry with the current wiring.");
         }
 
         plan = locked;
@@ -189,39 +173,6 @@ public sealed class LightingCommandService(
 
         await transaction.CommitAsync(ct);
         return ((await ResultAsync(requestId, ct)) with { UnassignedSegmentPoleCount = plan.UnassignedSegmentPoleCount }, false);
-    }
-
-    /// <summary>Commands in the caller's communes, newest first (by <c>seq</c>, never by the text id).</summary>
-    public async Task<PagedResult<LightingCommandItem>> ListAsync(
-        Guid? requestId, string? feederId, LightingCommandStatus? status, PageRequest page, CancellationToken ct)
-    {
-        var now = Now();
-        var query = db.Set<LightingCommand>().AsNoTracking();
-        if (requestId is { } id)
-        {
-            query = query.Where(command => command.RequestId == id);
-        }
-
-        if (feederId is not null)
-        {
-            query = query.Where(command => command.FeederId == feederId);
-        }
-
-        // The filter matches the status as READ: an open command past its expiry is `expired`, not `pending`.
-        query = status switch
-        {
-            null => query,
-            LightingCommandStatus.Pending or LightingCommandStatus.Delivered
-                => query.Where(command => command.Status == status && command.ExpiresAt > now),
-            LightingCommandStatus.Expired => query.Where(command => command.Status == LightingCommandStatus.Expired
-                || ((command.Status == LightingCommandStatus.Pending || command.Status == LightingCommandStatus.Delivered)
-                    && command.ExpiresAt <= now)),
-            _ => query.Where(command => command.Status == status),
-        };
-
-        var total = await query.CountAsync(ct);
-        var rows = await query.OrderByDescending(command => command.Seq).Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
-        return PagedResult<LightingCommandItem>.From(page, total, [.. rows.Select(row => Item(row, now))]);
     }
 
     // ── Device ─────────────────────────────────────────────────────────────────────────────────
@@ -771,10 +722,7 @@ public sealed class LightingCommandService(
     private static LuxMapException IdempotencyConflict()
         => new("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict, "That key was already used for a different request.");
 
-    private sealed record PlannedRelay(string NodeId, int RelayNo, string FeederId, string CabinetId, string CommuneId, DataSource DataSource)
-    {
-        public LightingTarget ToWire() => new() { NodeId = NodeId, RelayNo = RelayNo, FeederId = FeederId, CabinetId = CabinetId };
-    }
+    private sealed record PlannedRelay(string NodeId, int RelayNo, string FeederId, string CabinetId, string CommuneId, DataSource DataSource);
 
     private sealed record Plan(
         LightingTargetKind Kind,

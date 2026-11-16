@@ -7,9 +7,13 @@ using LuxMap.Modules.IOT.Entities;
 using LuxMap.Modules.IOT.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NetTopologySuite.Geometries;
+using Npgsql;
 
 namespace LuxMap.Api.Tests;
 
@@ -19,7 +23,6 @@ namespace LuxMap.Api.Tests;
 /// </summary>
 public sealed class LightingTestRig(AssetImportFixture fixture)
 {
-    public const string Commands = "/api/v1/lighting/commands";
     public const string Device = "/api/v1/device/commands";
     private const double Lng = 109.5;
     private const double Lat = 13.5;
@@ -78,11 +81,46 @@ public sealed class LightingTestRig(AssetImportFixture fixture)
         return client;
     }
 
-    public async Task<string> PressAsync(HttpClient manager, string feeder, string mode)
+    public async Task<string> PressAsync(string feeder, string mode)
     {
-        var response = await manager.PostAsJsonAsync(LightingTestRig.Commands, new { feeder_id = feeder, mode, client_op_id = Guid.NewGuid() });
-        Assert.True(response.StatusCode == HttpStatusCode.Accepted, await response.Content.ReadAsStringAsync());
-        return Assert.Single((await JsonAsync(response)).GetProperty("commands").EnumerateArray()).GetProperty("command_id").GetString()!;
+        var (result, replayed) = await CreateAsync(new CreateLightingRequest
+        {
+            FeederId = feeder, Mode = Enum.Parse<FeederControlMode>(mode, ignoreCase: true), ClientOpId = Guid.NewGuid(),
+        });
+        Assert.False(replayed);
+        return Assert.Single(result.Commands).CommandId;
+    }
+
+    public async Task<(LightingRequestResult Result, bool Replayed)> CreateAsync(
+        CreateLightingRequest request, IServiceProvider? services = null)
+    {
+        services ??= fixture.Services;
+        await using var scope = services.CreateAsyncScope();
+        var provider = scope.ServiceProvider;
+        var builder = new DbContextOptionsBuilder<LuxMapDbContext>();
+        PersistenceServiceCollectionExtensions.Configure(builder, provider.GetRequiredService<NpgsqlDataSource>());
+        await using var db = new LuxMapDbContext(builder.Options, provider.GetRequiredService<ModuleAssemblyCatalog>(),
+            new FixedScope(CommuneScope.ForCommunes([fixture.CommuneId])));
+        var service = new LightingCommandService(db, new AuditTrail(db, new FixedCorrelation()),
+            new ManagerActor(fixture.ManagerUserId), provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<LightingOptions>(), provider.GetRequiredService<LuxMap.Modules.IOT.IFeederSourceLookup>());
+        return await service.CreateAsync(request, CancellationToken.None);
+    }
+
+    private sealed class FixedScope(CommuneScope scope) : ICommuneScopeAccessor
+    {
+        public CommuneScope Scope { get; } = scope;
+    }
+
+    private sealed class FixedCorrelation : ICorrelationIdAccessor
+    {
+        public string CorrelationId => "lighting-service-test";
+    }
+
+    private sealed class ManagerActor(string userId) : ICurrentActorAccessor
+    {
+        public string UserId => userId;
+        public UserRole? Role => UserRole.Manager;
     }
 
     public async Task<Fetched[]> PollAsync(HttpClient device)
@@ -94,9 +132,6 @@ public sealed class LightingTestRig(AssetImportFixture fixture)
         return [.. body.GetProperty("commands").EnumerateArray().Select(c => new Fetched(
             c.GetProperty("command_id").GetString()!, c.GetProperty("seq").GetInt64(), c.GetProperty("relay_no").GetInt32(), c.GetProperty("mode").GetString()!))];
     }
-
-    public (int, string)[] Targets(JsonElement preview)
-        => [.. preview.GetProperty("targets").EnumerateArray().Select(t => (t.GetProperty("relay_no").GetInt32(), t.GetProperty("feeder_id").GetString()!))];
 
     public string[] Ordered(params string[] ids) => [.. ids.OrderBy(id => id.Length).ThenBy(id => id, StringComparer.Ordinal)];
 

@@ -70,7 +70,7 @@ public sealed class MqttEndToEndTests(AssetImportFixture fixture)
         Assert.Equal(MqttClientSubscribeResultCode.GrantedQoS1, commands);
         Assert.Equal(MqttClientSubscribeResultCode.GrantedQoS1, replies);
 
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var command = await device.NextAsync($"luxmap/v1/nodes/{rig.Node}/relays/1/command", Patience);
         Assert.Equal(commandId, command.GetProperty("command_id").GetString());
         var seq = command.GetProperty("seq").GetInt64();
@@ -107,7 +107,7 @@ public sealed class MqttEndToEndTests(AssetImportFixture fixture)
         await RefusedAsync(mine, device => device.SubscribeAsync($"luxmap/v1/nodes/{theirs.Node}/relays/+/command"));
         await RefusedAsync(mine, device => device.SubscribeAsync("luxmap/v1/nodes/#"));
 
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), theirs.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(theirs.Feeders[0], "off");
         var seq = await fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().Where(c => c.CommandId == commandId).Select(c => c.Seq).SingleAsync());
         await RefusedAsync(mine, device => device.PublishAsync($"luxmap/v1/nodes/{theirs.Node}/ack",
             new { schema_version = 1, command_id = commandId, seq, result = "applied", reported_mode = "off" }, expectDelivery: false));
