@@ -6,6 +6,7 @@ using LuxMap.Modules.IOT;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 
 namespace LuxMap.Api.Tests;
 
@@ -214,13 +215,17 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     public async Task Direct_feeder_control_reports_confirmed_and_automatic_power_for_poles_and_fixtures()
     {
         var bridge = new ReportedPowerBridge();
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
-            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
-                .ConfigurePrimaryHttpMessageHandler(() => bridge));
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<TimeProvider>(clock);
+                services.AddHttpClient<IotDiagnosticsService>().ConfigurePrimaryHttpMessageHandler(() => bridge);
+            });
         });
         using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
         using var managerToken = await fixture.ManagerClientAsync();
@@ -329,13 +334,23 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal("07:00", acceptedAuto.GetProperty("auto_schedule").GetProperty("day_start").GetString());
         Assert.Equal(feeder, acceptedAuto.GetProperty("feeder_id").GetString());
         Assert.Equal(server, acceptedAuto.GetProperty("server_id").GetString());
-        Assert.False(string.IsNullOrEmpty(acceptedAuto.GetProperty("requested_by").GetString()));
+        var managerProfile = await manager.GetFromJsonAsync<JsonElement>("/api/v1/auth/me");
+        Assert.Equal(managerProfile.GetProperty("full_name").GetString(), acceptedAuto.GetProperty("requested_by").GetString());
+        Assert.Equal("pending", newest[0].GetProperty("status").GetString());
+        Assert.Equal("success", acceptedAuto.GetProperty("status").GetString());
+        var rejectedAt = newest[0].GetProperty("requested_at").GetDateTimeOffset();
+        clock.SetUtcNow(rejectedAt.AddSeconds(13));
+        bridge.ReceiptTimes[newest[0].GetProperty("command_id").GetString()!] = rejectedAt.AddSeconds(12.001);
+        var expired = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=1&page_size=1");
+        Assert.Equal("expired", expired.GetProperty("items")[0].GetProperty("status").GetString());
         Assert.True(acceptedAuto.GetProperty("bridge_accepted_at").GetDateTimeOffset() >=
             acceptedAuto.GetProperty("requested_at").GetDateTimeOffset());
 
         var page2 = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=2&page_size=2");
         Assert.Equal(new[] { off, on }, page2.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("command_id").GetString()));
+        Assert.All(page2.GetProperty("items").EnumerateArray(),
+            item => Assert.Equal("success", item.GetProperty("status").GetString()));
         var empty = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=2147483647&page_size=200");
         Assert.Empty(empty.GetProperty("items").EnumerateArray());
         using var foreignToken = await fixture.ForeignCommuneClientAsync();
@@ -579,7 +594,22 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
         private string CommandId => desired!.Value.GetProperty("commandId").GetString()!;
 
-        public void Acknowledge(string lampCommand) => lastAck = new(DateTimeOffset.UtcNow.AddSeconds(-20), CommandId, lampCommand);
+        public Dictionary<string, DateTimeOffset> ReceiptTimes { get; } = [];
+        public void Acknowledge(string lampCommand)
+        {
+            lastAck = new(DateTimeOffset.UtcNow.AddSeconds(-20), CommandId, lampCommand);
+            ReceiptTimes[CommandId] = DateTimeOffset.UtcNow;
+        }
+
+        private async Task<HttpResponseMessage> ReadReceiptsAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var keys = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+            var receipts = keys.EnumerateArray()
+                .Select(key => new { deviceId = key.GetProperty("deviceId").GetString(), commandId = key.GetProperty("commandId").GetString()! })
+                .Where(key => key.deviceId == "probe" && ReceiptTimes.ContainsKey(key.commandId))
+                .Select(key => new { key.deviceId, key.commandId, receivedAt = ReceiptTimes[key.commandId] });
+            return Json(receipts);
+        }
 
         public void ReportTelemetry(string lampCommand, DateTimeOffset measuredAt) =>
             latestTelemetry = new(measuredAt, CommandId, lampCommand);
@@ -606,6 +636,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 },
                 "/api/luxmap/devices/probe/telemetry/history" when request.RequestUri.Query == "?after=0&limit=1"
                     => Json(new { items = new[] { Archived(1) }, nextCursor = 1, hasMore = true }),
+                "/api/luxmap/devices/command-receipts" => await ReadReceiptsAsync(request, ct),
                 "/api/luxmap/devices/probe/command" when RejectCommand => new(HttpStatusCode.ServiceUnavailable),
                 "/api/luxmap/devices/probe/command" => Json(await SaveCommandAsync(request, ct)),
                 "/api/luxmap/devices/probe" => Json(new

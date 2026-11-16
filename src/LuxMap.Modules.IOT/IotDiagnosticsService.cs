@@ -95,10 +95,14 @@ public sealed record IotCommandStatus(
 public sealed record IotCommandHistoryItem(
     string CommandId, string NodeId, string FeederId, string ServerId, string DeviceId,
     string Mode, string? Command, IotAutoSchedule? AutoSchedule,
-    string RequestedBy, DateTime RequestedAt, DateTime? BridgeAcceptedAt);
+    string RequestedBy, DateTime RequestedAt, DateTime? BridgeAcceptedAt,
+    IotCommandHistoryStatus Status = IotCommandHistoryStatus.Pending);
+
+public enum IotCommandHistoryStatus { Success, Pending, Expired }
 
 public sealed class IotDiagnosticsService(
-    LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources) : IFeederPowerLookup
+    LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources,
+    TimeProvider clock) : IFeederPowerLookup
 {
     public async Task<IotDiagnosticResult> GetAsync(string nodeId, CancellationToken ct)
     {
@@ -440,8 +444,71 @@ public sealed class IotDiagnosticsService(
         string nodeId, PageRequest page, CancellationToken ct)
     {
         await RequireNodeAsync(nodeId, ct);
-        return await registry.ReadCommandHistoryAsync(nodeId, page, ct);
+        var history = await registry.ReadCommandHistoryAsync(nodeId, page, ct);
+        if (history.Items.Count == 0) return history;
+
+        var settings = await registry.ReadAsync([], ct);
+        Uri ResolveBridge(IotCommandHistoryItem item)
+        {
+            var address = settings.Servers.TryGetValue(item.ServerId, out var server) ? server.BaseUrl
+                : item.ServerId == "default" ? settings.BaseUrl : null;
+            return IotOrigin.TryAllowed(settings, address, out var uri) ? uri
+                : throw Unavailable("Chưa cấu hình địa chỉ Bridge để kiểm tra ACK của lịch sử.");
+        }
+
+        // Evaluate unanswered requests at the start of the receipt lookup.
+        var now = clock.GetUtcNow();
+        var groups = history.Items.GroupBy(ResolveBridge).ToArray();
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(TimeSpan.FromSeconds(5));
+        var resolved = new System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        try
+        {
+            await Parallel.ForEachAsync(groups, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 12, CancellationToken = budget.Token,
+            }, async (group, token) =>
+            {
+                var keys = group.Select(item => new CommandReceiptKey(item.DeviceId, item.CommandId)).ToHashSet();
+                foreach (var receipt in await ReadCommandReceiptsAsync(group.Key, keys, token))
+                    resolved.TryAdd(receipt.CommandId, receipt.ReceivedAt);
+            });
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không kiểm tra được ACK của lịch sử từ IoT Bridge.");
+        }
+
+        return history with
+        {
+            Items = [.. history.Items.Select(item =>
+            {
+                var deadline = item.RequestedAt.AddSeconds(12);
+                var status = resolved.TryGetValue(item.CommandId, out var ack) &&
+                    ack >= item.RequestedAt && ack <= deadline
+                    ? IotCommandHistoryStatus.Success
+                    : now >= deadline ? IotCommandHistoryStatus.Expired : IotCommandHistoryStatus.Pending;
+                return item with { Status = status };
+            })],
+        };
     }
+
+    private async Task<CommandReceipt[]> ReadCommandReceiptsAsync(
+        Uri origin, HashSet<CommandReceiptKey> keys, CancellationToken ct)
+    {
+        using var response = await client.PostAsJsonAsync(new Uri(origin, "api/luxmap/devices/command-receipts"), keys, ct);
+        response.EnsureSuccessStatusCode();
+        if (!IsJson(response)) throw Unavailable("IoT Bridge không trả về JSON cho ACK của lịch sử.");
+        var receipts = await response.Content.ReadFromJsonAsync<CommandReceipt[]>(cancellationToken: ct);
+        if (receipts is null || receipts.Any(receipt => receipt is null ||
+                !keys.Contains(new(receipt.DeviceId, receipt.CommandId))) ||
+            receipts.Select(receipt => receipt.CommandId).Distinct(StringComparer.Ordinal).Count() != receipts.Length)
+            throw Unavailable("IoT Bridge trả về ACK lịch sử không hợp lệ.");
+        return receipts;
+    }
+
+    private sealed record CommandReceiptKey(string DeviceId, string CommandId);
+    private sealed record CommandReceipt(string DeviceId, string CommandId, DateTimeOffset ReceivedAt);
 
     public async Task<IotTelemetryPage> TelemetryHistoryAsync(
         string nodeId, long after, int limit, CancellationToken ct)

@@ -252,7 +252,7 @@ public sealed class IotRegistrationStore(
     {
         var requests = db.Database.SqlQuery<CommandHistoryRow>($"""
             SELECT requested.id, requested.node_id, requested.server_id, requested.details::text AS details,
-                   requested.created_by, requested.created_at,
+                   coalesce(nullif(sender.full_name, ''), requested.created_by) AS requested_by, requested.created_at,
                    (
                        SELECT min(accepted.created_at)
                        FROM iot_registration_audit accepted
@@ -261,6 +261,7 @@ public sealed class IotRegistrationStore(
                          AND accepted.details ->> 'command_id' = requested.details ->> 'command_id'
                    ) AS bridge_accepted_at
             FROM iot_registration_audit requested
+            LEFT JOIN app_user sender ON sender.user_id = requested.created_by
             WHERE requested.node_id = {nodeId} AND requested.details ->> 'event_type' = 'command_requested'
             """)
             .Where(row => db.Set<IotNode>().Any(node => node.NodeId == row.NodeId));
@@ -276,7 +277,7 @@ public sealed class IotRegistrationStore(
             var details = JsonSerializer.Deserialize<RequestedCommandDetails>(row.Details, LuxMapJsonOptions.Default)!;
             return new IotCommandHistoryItem(details.CommandId, row.NodeId, details.FeederId, row.ServerId,
                 details.DeviceId, details.Mode, details.Command, details.AutoSchedule,
-                row.CreatedBy, row.CreatedAt, row.BridgeAcceptedAt);
+                row.RequestedBy, row.CreatedAt, row.BridgeAcceptedAt);
         }).ToArray();
         return PagedResult<IotCommandHistoryItem>.From(page, total, items);
     }
@@ -287,7 +288,7 @@ public sealed class IotRegistrationStore(
         [Column("node_id")] public required string NodeId { get; init; }
         [Column("server_id")] public required string ServerId { get; init; }
         [Column("details")] public required string Details { get; init; }
-        [Column("created_by")] public required string CreatedBy { get; init; }
+        [Column("requested_by")] public required string RequestedBy { get; init; }
         [Column("created_at")] public DateTime CreatedAt { get; init; }
         [Column("bridge_accepted_at")] public DateTime? BridgeAcceptedAt { get; init; }
     }

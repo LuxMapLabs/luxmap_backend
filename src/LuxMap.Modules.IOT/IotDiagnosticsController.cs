@@ -284,12 +284,13 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
         => diagnostics.CommandAsync(nodeId, ct);
 
-    /// <summary>Đọc lịch sử lệnh ON, OFF và AUTO đã ghi audit, mới nhất trước.</summary>
+    /// <summary>Đọc lịch sử lệnh và trạng thái ACK trong thời hạn 12 giây, mới nhất trước.</summary>
     [HttpGet("nodes/{nodeId}/command/history")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<PagedResult<IotCommandHistoryItem>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
     public Task<PagedResult<IotCommandHistoryItem>> CommandHistoryAsync(string nodeId, CancellationToken ct,
         [FromQuery(Name = "page")] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null)
         => diagnostics.CommandHistoryAsync(nodeId, PageRequest.Create(page, pageSize), ct);

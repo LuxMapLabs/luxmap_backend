@@ -59,6 +59,15 @@ api.MapGet("/", (DeviceStore store) => Results.Ok(store.ReadAll()))
 api.MapGet("/{deviceId}", (string deviceId, DeviceStore store) =>
     store.Read(deviceId) is { } device ? Results.Ok(device) : Results.NotFound())
     .WithSummary("Xem trạng thái và dữ liệu thiết bị").Produces<DeviceState>().Produces(404);
+api.MapPost("/command-receipts", (CommandReceiptKey[] keys, DeviceStore store) =>
+{
+    if (keys.Length is < 1 or > 200 || keys.Any(key => key?.DeviceId is not { } deviceId ||
+            !DeviceRules.ValidId(deviceId) || !Guid.TryParseExact(key.CommandId, "N", out _)))
+        return Results.BadRequest(new { error = "Provide 1 to 200 valid device and command ID pairs." });
+
+    return Results.Ok(store.ReadCommandReceipts(keys.Distinct().ToArray()));
+}).Produces<IReadOnlyList<CommandReceipt>>().Produces(400);
+
 // An unknown device starts in AUTO, matching the firmware's startup mode.
 api.MapGet("/{deviceId}/command", (string deviceId, DeviceStore store) =>
     Results.Ok(store.Read(deviceId)?.DesiredCommand ?? new LampCommand("AUTO", null, "initial-auto", 0)))

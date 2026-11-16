@@ -50,6 +50,9 @@ sealed class DeviceStore
     public TelemetryHistoryPage ReadTelemetryHistoryPage(string id, int page, int pageSize, bool measuredAt) =>
         archive.ReadHistoryPage(id, page, pageSize, measuredAt);
 
+    public IReadOnlyList<CommandReceipt> ReadCommandReceipts(CommandReceiptKey[] keys) =>
+        archive.ReadCommandReceipts(keys);
+
     private void Commit(DeviceState state)
     {
         var next = new Dictionary<string, DeviceState>(devices) { [state.DeviceId] = state };
@@ -72,6 +75,7 @@ sealed class DeviceStore
                 AutoSchedule = command.AutoSchedule ?? state.DesiredCommand.AutoSchedule,
                 Version = Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), checked(state.DesiredCommand.Version + 1))
             };
+            archive.TrackCommand(id, command);
             Commit(state with { DesiredCommand = command, CommandUpdatedAt = DateTimeOffset.UtcNow });
             return command;
         }
@@ -114,13 +118,24 @@ sealed class DeviceStore
     }
     public void AcknowledgeCommand(CommandAcknowledgement ack)
     {
+        var receivedAt = DateTimeOffset.UtcNow;
         lock (gate)
         {
             var state = Get(ack.DeviceId!);
-            if (ack.CommandId != state.DesiredCommand.CommandId || state.CommandAcknowledged ||
-                ack.Mode != state.DesiredCommand.Mode || ack.LampCommand is not ("ON" or "OFF") ||
-                (ack.Mode == "MANUAL" && ack.LampCommand != state.DesiredCommand.Command)) return;
-            Commit(state with { LastCommandAck = new(ack, DateTimeOffset.UtcNow) });
+            var isCurrent = ack.CommandId == state.DesiredCommand.CommandId;
+            if (ack.CommandId == "initial-auto")
+            {
+                if (ack.Mode != "AUTO" || ack.LampCommand is not ("ON" or "OFF")) return;
+            }
+            else
+            {
+                if (isCurrent && state.CommandAcknowledged) return;
+                var receipt = archive.RecordReceipt(ack, receivedAt);
+                if (receipt is null) return;
+                receivedAt = receipt.Value;
+            }
+            if (isCurrent && !state.CommandAcknowledged)
+                Commit(state with { LastCommandAck = new(ack, receivedAt) });
         }
     }
 }
