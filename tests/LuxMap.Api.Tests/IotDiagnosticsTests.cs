@@ -409,7 +409,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
     [Fact]
     public Task Matching_sources_and_relays_keep_two_nodes_in_one_cabinet_independent()
-        => WithSharedCabinetAsync(async (client, rig, _) =>
+        => WithSharedCabinetAsync(async (client, rig, services) =>
         {
             Assert.Equal(HttpStatusCode.Created, (await client.PostAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}/source", SourceBody(rig))).StatusCode);
@@ -419,8 +419,9 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             {
                 Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
                     $"/api/v1/assets/iot-nodes/{node}/relays/1", new { feeder_id = feeder })).StatusCode);
-                Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync(
-                    "/api/v1/lighting/commands", new { feeder_id = feeder, mode = "off", client_op_id = Guid.NewGuid() })).StatusCode);
+                var (result, replayed) = await CreateLightingAsync(feeder, services);
+                Assert.False(replayed);
+                Assert.Equal(node, Assert.Single(result.Commands).NodeId);
             }
             var cabinet = await client.GetFromJsonAsync<JsonElement>($"/api/v1/assets/cabinets/{rig.Cabinet}");
             Assert.Equal(new[] { rig.First, rig.Second }, cabinet.GetProperty("cabinet").GetProperty("iot_node_ids")
@@ -446,8 +447,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             await AssertBindingConflictAsync(await client.GetAsync($"/api/v1/iot/poles/{rig.Pole}/control"), rig.Feeder);
             await AssertBindingConflictAsync(await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/command",
                 new { mode = "MANUAL", command = "OFF" }), rig.Feeder);
-            await AssertBindingConflictAsync(await client.PostAsJsonAsync("/api/v1/lighting/commands",
-                new { feeder_id = rig.Feeder, mode = "off", client_op_id = Guid.NewGuid() }), rig.Feeder);
+            await AssertLightingBindingConflictAsync(rig.Feeder, services);
 
             using var foreignToken = await fixture.ForeignCommuneClientAsync();
             using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/assets/feeders?page_size=200");
@@ -472,8 +472,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 await AssertBindingConflictAsync(await client.GetAsync("/api/v1/assets/feeders?page_size=200"), rig.Feeder);
                 await AssertBindingConflictAsync(await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/command",
                     new { mode = "MANUAL", command = "OFF" }), rig.Feeder);
-                await AssertBindingConflictAsync(await client.PostAsJsonAsync("/api/v1/lighting/commands",
-                    new { feeder_id = rig.Feeder, mode = "off", client_op_id = Guid.NewGuid() }), rig.Feeder);
+                await AssertLightingBindingConflictAsync(rig.Feeder, services);
 
                 await using var scope = services.GetRequiredService<LuxMap.Modules.IOT.Mqtt.LightingScopeFactory>()
                     .Open(fixture.CommuneId, "binding-guard-test");
@@ -542,6 +541,21 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             Assert.Equal("IOT_REGISTRATION_CONFLICT", error.GetProperty("code").GetString());
             Assert.Equal(feeder, error.GetProperty("details").GetProperty("feeder_id").GetString());
         }
+    }
+
+    private Task<(LuxMap.Modules.IOT.Lighting.LightingRequestResult Result, bool Replayed)> CreateLightingAsync(
+        string feeder, IServiceProvider services)
+        => new LightingTestRig(fixture).CreateAsync(new LuxMap.Modules.IOT.Lighting.CreateLightingRequest
+        {
+            FeederId = feeder, Mode = LuxMap.Shared.Contracts.Enums.FeederControlMode.Off, ClientOpId = Guid.NewGuid(),
+        }, services);
+
+    private async Task AssertLightingBindingConflictAsync(string feeder, IServiceProvider services)
+    {
+        var error = await Assert.ThrowsAsync<LuxMap.Shared.Http.LuxMapException>(() => CreateLightingAsync(feeder, services));
+        Assert.Equal(HttpStatusCode.Conflict, error.StatusCode);
+        Assert.Equal("IOT_REGISTRATION_CONFLICT", error.Code);
+        Assert.Equal(feeder, error.Details["feeder_id"]);
     }
 
     private async Task WithSharedCabinetAsync(Func<HttpClient, SharedCabinet, IServiceProvider, Task> check)

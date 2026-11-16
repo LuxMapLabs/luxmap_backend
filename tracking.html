@@ -40,6 +40,17 @@
 <body>
 <div class="wrap">
 
+
+  <div class="card">
+    <strong>IOT-REMOVE-LIGHTING-ROUTES — bỏ ba route <code>/lighting/*</code>, 16/11/2026</strong>
+    <p><span class="tag t-done">Xong · suite xanh trừ 1 flake survey không liên quan · chưa push</span>
+    Xoá <code>GET /lighting/preview</code>, <code>POST /lighting/commands</code>, <code>GET /lighting/commands</code> (drift <b>LC-13</b>,
+    chạm API → ESCALATE ở review, báo WP5 và Đạt). Web <code>origin/dev</code> đã gửi lệnh qua <code>/iot/nodes/{id}/command</code>; mobile
+    và mọi nhánh web đang mở không gọi ba route. Giữ <code>CreateAsync</code>, kênh thiết bị HTTP / MQTT, bảng, migration — kênh cũ không còn
+    đường HTTP sinh lệnh mới; gỡ hẳn là ticket riêng. Test dựng lệnh qua service; thêm test 404 (phá thử: thêm lại route → đỏ).
+    OpenAPI xuất lại: chỉ mất 2 path + 9 schema Lighting. Full suite: 1 lỗi <code>SurveyIngestTests.Concurrent_create…</code> (500 khi tải
+    nặng), chạy riêng 3 lần xanh — flake có sẵn, không thuộc thay đổi này.</p>
+  </div>
   <div class="card">
     <strong>THUMB-ORIENT — thumbnail xoay theo EXIF Orientation, 15/11/2026</strong>
     <p><span class="tag t-done">Đã sửa · test đỏ khi bỏ <code>AutoOrient</code>, xanh khi có · chưa push</span>

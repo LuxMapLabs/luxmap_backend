@@ -26,7 +26,7 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     public async Task Open_commands_are_published_every_round_and_publishing_marks_nothing_delivered()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
 
         var first = await Handler.DispatchAsync([(rig.Node, fixture.CommuneId)], CancellationToken.None);
         var second = await Handler.DispatchAsync([(rig.Node, fixture.CommuneId)], CancellationToken.None);
@@ -47,7 +47,7 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     {
         var rig = await Rigs.RigAsync();
         var other = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var seq = await SeqAsync(commandId);
 
         await Send(other.Node, "receipt", new { schema_version = 1, command_id = commandId, seq });
@@ -67,7 +67,7 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     public async Task An_ack_without_a_receipt_still_lands_and_is_answered()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var seq = await SeqAsync(commandId);
 
         var reply = await Send(rig.Node, "ack", new { schema_version = 1, command_id = commandId, seq, result = "applied", reported_mode = "off" });
@@ -86,14 +86,13 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     public async Task A_refused_ack_is_answered_with_its_code_and_a_closed_one_still_records_the_mode()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
-        var off = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var off = await Rigs.PressAsync(rig.Feeders[0], "off");
         var offSeq = await SeqAsync(off);
 
         var invalid = await Send(rig.Node, "ack", new { schema_version = 1, command_id = off, seq = offSeq, result = "applied" });
         Assert.Equal("VALIDATION_FAILED", Json(invalid!).GetProperty("code").GetString());
 
-        await Rigs.PressAsync(manager, rig.Feeders[0], "auto");
+        await Rigs.PressAsync(rig.Feeders[0], "auto");
         var closed = Json((await Send(rig.Node, "ack", new { schema_version = 1, command_id = off, seq = offSeq, result = "applied", reported_mode = "off" }))!);
 
         Assert.Equal("COMMAND_CLOSED", closed.GetProperty("code").GetString());
@@ -106,7 +105,7 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     public async Task An_ack_marks_the_channel_alive()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         Assert.Null(await LastReportAsync(rig.Node));
 
         await Send(rig.Node, "ack", new { schema_version = 1, command_id = commandId, seq = await SeqAsync(commandId), result = "applied", reported_mode = "off" });
@@ -183,7 +182,7 @@ public sealed class MqttChannelTests(AssetImportFixture fixture)
     public async Task Junk_is_dropped_without_a_reply_or_a_change(string kind, string payload)
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var body = payload.Replace("__ID__", commandId).Replace("__SEQ__", (await SeqAsync(commandId)).ToString());
 
         Assert.Null(await Handler.HandleAsync($"luxmap/v1/nodes/{rig.Node}/{kind}", Bytes(body), CancellationToken.None));

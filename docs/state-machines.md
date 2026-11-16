@@ -303,7 +303,7 @@ relay of a device that has been issued a secret; no controllable relay → 409 `
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : Manager POST /lighting/commands
+    [*] --> pending : LightingCommandService.CreateAsync<br/>(no HTTP route since 16/11 — drift LC-13)
     pending --> delivered : Device fetches the command (HTTP poll)<br/>or sends a receipt / ACK over MQTT
     delivered --> applied : Device ACK applied
     delivered --> failed : Device ACK failed

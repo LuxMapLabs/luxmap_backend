@@ -4,18 +4,6 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.IOT.Lighting;
 
-/// <summary>One relay that a request switches (or would switch, in a preview).</summary>
-public sealed record LightingTarget
-{
-    public required string NodeId { get; init; }
-
-    public required int RelayNo { get; init; }
-
-    public required string FeederId { get; init; }
-
-    public required string CabinetId { get; init; }
-}
-
 /// <summary>A feeder of the target that is left out, and why (D-8).</summary>
 public sealed record LightingExclusion
 {
@@ -28,33 +16,7 @@ public sealed record LightingExclusion
     public required LightingExclusionReason Reason { get; init; }
 }
 
-/// <summary>
-/// <c>GET /lighting/preview</c> — what a press WOULD do, without writing anything. The server checks it all again at the press.
-/// </summary>
-public sealed record LightingPreview
-{
-    public required LightingTargetKind TargetKind { get; init; }
-
-    public required string TargetId { get; init; }
-
-    public required IReadOnlyList<LightingTarget> Targets { get; init; }
-
-    public required IReadOnlyList<LightingExclusion> Excluded { get; init; }
-
-    /// <summary>
-    /// Every segment the switched feeders light — a feeder can run along several, so switching one segment's feeder also
-    /// switches poles of other segments (I-14). The UI must say so before the press.
-    /// </summary>
-    public required IReadOnlyList<string> AffectedSegmentIds { get; init; }
-
-    /// <summary>Poles of the target that no command reaches: no feeder, or a feeder that is excluded.</summary>
-    public required int UncontrollablePoleCount { get; init; }
-
-    /// <summary>Unassigned poles reached by the switched feeders; null when read from a stored request (not recorded).</summary>
-    public required int? UnassignedSegmentPoleCount { get; init; }
-}
-
-/// <summary><c>POST /lighting/commands</c>: exactly one of <c>feeder_id</c> / <c>segment_id</c>.</summary>
+/// <summary>Internal command creation: exactly one of <c>feeder_id</c> / <c>segment_id</c>.</summary>
 public sealed record CreateLightingRequest
 {
     [MaxLength(32)]
@@ -71,7 +33,7 @@ public sealed record CreateLightingRequest
     public Guid? ClientOpId { get; init; }
 }
 
-/// <summary>The press and the commands it created (202, or 200 for a replay of the same <c>client_op_id</c>).</summary>
+/// <summary>The request and its commands, also returned when replaying the same <c>client_op_id</c>.</summary>
 public sealed record LightingRequestResult
 {
     public required Guid RequestId { get; init; }

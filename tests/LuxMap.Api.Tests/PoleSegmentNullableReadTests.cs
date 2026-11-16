@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.IOT.Lighting;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 
@@ -184,41 +186,44 @@ public sealed class PoleSegmentNullableReadTests(AssetImportFixture fixture)
     public async Task Lighting_handles_unassigned_poles_without_null_affected_ids()
     {
         var rig = await Rigs.RigAsync();
-        var client = await fixture.ManagerClientAsync();
         await Pole(null, rig.Feeders[0]);
         await Pole(null, rig.Feeders[0]);
-        var preview = await Get(client, $"/api/v1/lighting/preview?feeder_id={rig.Feeders[0]}");
-        Assert.Equal(new[] { rig.Segment }, preview.GetProperty("affected_segment_ids").EnumerateArray().Select(s => s.GetString()));
-        Assert.Equal(2, preview.GetProperty("unassigned_segment_pole_count").GetInt32());
-        Assert.Equal(0, preview.GetProperty("uncontrollable_pole_count").GetInt32());
-        var input = new { feeder_id = rig.Feeders[0], mode = "on", client_op_id = Guid.NewGuid() };
-        var press = await client.PostAsJsonAsync("/api/v1/lighting/commands", input);
-        Assert.Equal(HttpStatusCode.Accepted, press.StatusCode);
-        var result = await Json(press);
-        Assert.Equal(2, result.GetProperty("unassigned_segment_pole_count").GetInt32());
-        Assert.Equal(0, result.GetProperty("uncontrollable_pole_count").GetInt32());
-        Assert.Equal(new[] { rig.Segment }, result.GetProperty("affected_segment_ids").EnumerateArray().Select(s => s.GetString()));
-        var replay = await client.PostAsJsonAsync("/api/v1/lighting/commands", input);
-        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
-        Null(await Json(replay), "unassigned_segment_pole_count");
+        var input = new CreateLightingRequest
+        {
+            FeederId = rig.Feeders[0], Mode = FeederControlMode.On, ClientOpId = Guid.NewGuid(),
+        };
+        var (result, replayed) = await Rigs.CreateAsync(input);
+        Assert.False(replayed);
+        Assert.Equal(2, result.UnassignedSegmentPoleCount);
+        Assert.Equal(0, result.UncontrollablePoleCount);
+        Assert.Equal(new[] { rig.Segment }, result.AffectedSegmentIds);
+        var replay = await Rigs.CreateAsync(input);
+        Assert.True(replay.Replayed);
+        Assert.Equal(result.RequestId, replay.Result.RequestId);
+        Assert.Null(replay.Result.UnassignedSegmentPoleCount);
         await Rigs.AsSystemAsync(async db =>
         {
             var poles = await db.Set<Pole>().IgnoreQueryFilters().Where(p => p.FeederId == rig.Feeders[0]).ToListAsync();
             foreach (var p in poles) p.SegmentId = null;
             return await db.SaveChangesAsync();
         });
-        preview = await Get(client, $"/api/v1/lighting/preview?feeder_id={rig.Feeders[0]}");
-        Assert.Empty(preview.GetProperty("affected_segment_ids").EnumerateArray());
-        Assert.Equal(3, preview.GetProperty("unassigned_segment_pole_count").GetInt32());
-        Assert.Equal(0, preview.GetProperty("uncontrollable_pole_count").GetInt32());
+        var unassigned = (await Rigs.CreateAsync(input with { ClientOpId = Guid.NewGuid() })).Result;
+        Assert.Empty(unassigned.AffectedSegmentIds);
+        Assert.Equal(3, unassigned.UnassignedSegmentPoleCount);
+        Assert.Equal(0, unassigned.UncontrollablePoleCount);
         var unwired = await Rigs.NewFeederAsync(rig.Cabinet);
         await Pole(null, unwired);
-        preview = await Get(client, $"/api/v1/lighting/preview?feeder_id={unwired}");
-        Assert.Equal(1, preview.GetProperty("uncontrollable_pole_count").GetInt32());
-        Assert.Equal(0, preview.GetProperty("unassigned_segment_pole_count").GetInt32());
-        Assert.Empty(preview.GetProperty("affected_segment_ids").EnumerateArray());
-        var segmentPreview = await Get(client, $"/api/v1/lighting/preview?segment_id={rig.Segment}");
-        Assert.Equal(0, segmentPreview.GetProperty("unassigned_segment_pole_count").GetInt32());
+        var excluded = await Assert.ThrowsAsync<LuxMapException>(() => Rigs.CreateAsync(input with
+        {
+            FeederId = unwired, ClientOpId = Guid.NewGuid(),
+        }));
+        Assert.Equal("NO_CONTROLLABLE_RELAY", excluded.Code);
+        Assert.Equal(1, excluded.Details["uncontrollable_pole_count"]);
+        var segment = (await Rigs.CreateAsync(new CreateLightingRequest
+        {
+            SegmentId = rig.Segment, Mode = FeederControlMode.On, ClientOpId = Guid.NewGuid(),
+        })).Result;
+        Assert.Equal(0, segment.UnassignedSegmentPoleCount);
     }
 
     private Pole NewPole(string? segment, string? feeder, bool foreign = false, DataSource source = DataSource.Simulated) => new()

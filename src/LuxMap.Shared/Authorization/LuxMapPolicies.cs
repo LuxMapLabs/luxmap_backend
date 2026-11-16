@@ -43,7 +43,7 @@ public static class LuxMapPolicies
     public const string RecordLuxReading = "cap:record_lux_reading";
 
     /// <summary>
-    /// Force ON / OFF / AUTO on supported lighting devices (testbed demo). No endpoint yet (D-R7).
+    /// Force ON / OFF / AUTO on supported lighting devices (testbed demo) through IotDiagnosticsController (D-R7).
     /// </summary>
     public const string ControlLighting = "cap:control_lighting";
 

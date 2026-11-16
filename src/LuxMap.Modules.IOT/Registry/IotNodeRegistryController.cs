@@ -14,7 +14,7 @@ namespace LuxMap.Modules.IOT.Registry;
 /// </summary>
 /// <remarks>
 /// Under <c>/assets</c> because a device is equipment mounted in a cabinet (CABINET), managed like every other asset:
-/// <c>ReadNetwork</c> reads, <c>ManageAssets</c> (Manager) writes. Lighting commands are a separate surface (2b).
+/// <c>ReadNetwork</c> reads, <c>ManageAssets</c> (Manager) writes. Lighting control is exposed by IotDiagnosticsController.
 /// </remarks>
 [ApiController]
 [ApiVersion("1.0")]
