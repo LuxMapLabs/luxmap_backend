@@ -9191,6 +9191,26 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-luxmap-capability": "cap:read_network",
@@ -21163,6 +21183,9 @@
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time",
             "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/IotCommandHistoryStatus"
           }
         },
         "additionalProperties": false
@@ -21190,6 +21213,14 @@
           }
         },
         "additionalProperties": false
+      },
+      "IotCommandHistoryStatus": {
+        "enum": [
+          "success",
+          "pending",
+          "expired"
+        ],
+        "type": "string"
       },
       "IotCommandRequest": {
         "type": "object",

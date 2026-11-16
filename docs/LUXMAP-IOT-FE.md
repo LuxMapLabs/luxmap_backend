@@ -137,7 +137,9 @@ Lệnh mới có `expires_at` theo UTC và hết hạn sau 5 phút. Nếu đến
 
 Response có `page`, `page_size`, `total` và `items`. Mới nhất ở đầu. Mặc định 50, tối đa 200 mục mỗi trang. Tăng `page` để lấy trang tiếp theo. Khi node chưa có lệnh đã ghi audit, API trả trang rỗng.
 
-Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, `mode`, `command`, lịch đã gửi trong `auto_schedule`, mã tài khoản `requested_by` và giờ UTC `requested_at`. `bridge_accepted_at` có giá trị khi backend đã lưu xác nhận từ Bridge, và bằng `null` nếu chưa ghi nhận xác nhận. Để xem ACK của node cho lệnh hiện tại, gọi `GET …/command`. Lịch sử đọc từ DB LuxMap và có thể truy cập khi gateway offline.
+Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, `mode`, `command`, lịch đã gửi trong `auto_schedule`, tên hiển thị của người gửi trong `requested_by` và giờ UTC `requested_at`. Nếu tài khoản đã bị xóa, `requested_by` trả mã tài khoản đã ghi audit. `bridge_accepted_at` ghi lúc backend lưu xác nhận chấp nhận lệnh từ Bridge.
+
+`status` có ba giá trị: `success` khi Bridge nhận ACK của node đúng mã lệnh trong vòng 12 giây từ `requested_at`; `pending` khi còn trong thời gian chờ; `expired` khi đã hết 12 giây và thiếu ACK đúng hạn. ACK muộn vẫn hiện `expired`. Mốc này dành cho lịch sử, hạn thực thi lệnh vẫn là 5 phút. Có thể xem khi gateway offline. Khi Bridge không truy cập được để đối chiếu ACK, API trả `503`.
 
 ## 5. Dữ liệu điện và lỗi
 

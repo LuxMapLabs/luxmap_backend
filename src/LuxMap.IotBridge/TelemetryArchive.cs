@@ -6,6 +6,9 @@ record TelemetryPage(IReadOnlyList<ArchivedTelemetry> Items, long NextCursor, bo
 
 record TelemetryHistoryPage(int Page, int PageSize, int Total, IReadOnlyList<ArchivedTelemetry> Items);
 
+record CommandReceiptKey(string DeviceId, string CommandId);
+record CommandReceipt(string DeviceId, string CommandId, DateTimeOffset ReceivedAt);
+
 sealed class TelemetryArchive
 {
     private readonly string connectionString;
@@ -28,6 +31,14 @@ sealed class TelemetryArchive
                 reading TEXT NOT NULL,
                 UNIQUE (device_id, sample_key)
             );
+            CREATE TABLE IF NOT EXISTS command_receipts (
+                device_id TEXT NOT NULL,
+                command_id TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                command TEXT,
+                received_at TEXT,
+                PRIMARY KEY (device_id, command_id)
+            );
             CREATE INDEX IF NOT EXISTS telemetry_device_id ON telemetry (device_id, id);
             CREATE INDEX IF NOT EXISTS telemetry_device_measured_at
                 ON telemetry (device_id, json_extract(reading, '$.data.timestamp') DESC, id DESC);
@@ -41,6 +52,18 @@ sealed class TelemetryArchive
             foreach (var reading in device.History)
                 Insert(connection, transaction, device.DeviceId, reading);
         transaction.Commit();
+
+        foreach (var device in existingDevices)
+        {
+            TrackCommand(device.DeviceId, device.DesiredCommand);
+            // Older Bridge versions retained one already validated ACK per device.
+            if (device.LastCommandAck is { Data: { CommandId: { } id, Mode: "AUTO" or "MANUAL" } ack } previous &&
+                Guid.TryParseExact(id, "N", out _))
+            {
+                TrackCommand(device.DeviceId, new(ack.Mode, ack.Mode == "MANUAL" ? ack.LampCommand : null, id));
+                RecordReceipt(ack, previous.ReceivedAt);
+            }
+        }
     }
 
     private SqliteConnection Open()
@@ -132,6 +155,66 @@ sealed class TelemetryArchive
         var items = new List<ArchivedTelemetry>();
         while (reader.Read()) items.Add(new(reader.GetInt64(0), Read(reader.GetString(1))));
         return new(page, pageSize, total, items);
+    }
+
+    public void TrackCommand(string deviceId, LampCommand command)
+    {
+        if (!Guid.TryParseExact(command.CommandId, "N", out _)) return;
+        using var connection = Open();
+        using var sql = connection.CreateCommand();
+        sql.CommandText = """
+            INSERT INTO command_receipts (device_id, command_id, mode, command)
+            VALUES ($device, $id, $mode, $command)
+            ON CONFLICT (device_id, command_id) DO UPDATE SET mode = excluded.mode
+            WHERE mode = excluded.mode AND command IS excluded.command;
+            """;
+        sql.Parameters.AddWithValue("$device", deviceId);
+        sql.Parameters.AddWithValue("$id", command.CommandId);
+        sql.Parameters.AddWithValue("$mode", command.Mode);
+        sql.Parameters.AddWithValue("$command", (object?)command.Command ?? DBNull.Value);
+        if (sql.ExecuteNonQuery() == 0) throw new ArgumentException("Command ID already belongs to a different command.");
+    }
+
+    public DateTimeOffset? RecordReceipt(CommandAcknowledgement ack, DateTimeOffset receivedAt)
+    {
+        if (!Guid.TryParseExact(ack.CommandId, "N", out _) || ack.Mode is not ("MANUAL" or "AUTO") ||
+            ack.LampCommand is not ("ON" or "OFF")) return null;
+        using var connection = Open();
+        using var sql = connection.CreateCommand();
+        sql.CommandText = """
+            UPDATE command_receipts SET received_at = coalesce(received_at, $received)
+            WHERE device_id = $device AND command_id = $id AND mode = $mode
+                AND (mode = 'AUTO' OR command = $lamp)
+            RETURNING received_at;
+            """;
+        sql.Parameters.AddWithValue("$received", receivedAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        sql.Parameters.AddWithValue("$device", ack.DeviceId!);
+        sql.Parameters.AddWithValue("$id", ack.CommandId!);
+        sql.Parameters.AddWithValue("$mode", ack.Mode);
+        sql.Parameters.AddWithValue("$lamp", ack.LampCommand);
+        return sql.ExecuteScalar() is string timestamp
+            ? DateTimeOffset.Parse(timestamp, System.Globalization.CultureInfo.InvariantCulture) : null;
+    }
+
+    public IReadOnlyList<CommandReceipt> ReadCommandReceipts(CommandReceiptKey[] keys)
+    {
+        using var connection = Open();
+        using var sql = connection.CreateCommand();
+        sql.CommandText = """
+            SELECT receipts.device_id, receipts.command_id, receipts.received_at
+            FROM json_each($keys) AS key
+            JOIN command_receipts AS receipts
+              ON receipts.device_id = json_extract(key.value, '$.deviceId')
+              AND receipts.command_id = json_extract(key.value, '$.commandId')
+            WHERE receipts.received_at IS NOT NULL;
+            """;
+        sql.Parameters.AddWithValue("$keys", JsonSerializer.Serialize(keys, Json));
+        using var reader = sql.ExecuteReader();
+        var receipts = new List<CommandReceipt>();
+        while (reader.Read())
+            receipts.Add(new(reader.GetString(0), reader.GetString(1),
+                DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture)));
+        return receipts;
     }
 
     private static TelemetryReading Read(string? value) =>
