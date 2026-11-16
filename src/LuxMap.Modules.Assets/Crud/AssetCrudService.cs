@@ -30,7 +30,7 @@ namespace LuxMap.Modules.Assets.Crud;
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
     WarrantyCalendar warranty, ISurveyCorridor corridor, IFeederControlLookup controls, PoleRelocation relocation, AssetPhotoReader photos,
-    IFeederPowerLookup feederPower, IPoleQrCodes qrCodes)
+    IFeederPowerLookup feederPower, IPoleQrCodes qrCodes, AssetPhotoService assetPhotos)
 {
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
@@ -675,6 +675,10 @@ public sealed class AssetCrudService(
     /// code is issued between them. One transaction: a later refusal (a citizen sent a report through a code, a fault)
     /// rolls the codes back too.
     /// </para>
+    /// <para>
+    /// <b>So do its asset photos</b> (POLE-DELETE-PHOTOS): the rows go, hidden ones included, each with its audit event,
+    /// in the same transaction; the bytes stay in the object store as orphans for BE-35's reconciliation.
+    /// </para>
     /// </remarks>
     public async Task DeletePoleAsync(string poleId, CancellationToken ct)
     {
@@ -693,6 +697,7 @@ public sealed class AssetCrudService(
         try
         {
             await qrCodes.RemoveAllAsync(pole.PoleId, ct);
+            await assetPhotos.RemoveAllForPoleAsync(pole.PoleId, ct);
             dbContext.Set<Pole>().Remove(pole);
             await dbContext.SaveChangesAsync(ct);
         }

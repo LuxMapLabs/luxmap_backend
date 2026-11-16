@@ -1198,6 +1198,12 @@
         <td><code>refactor(iot): consolidate telemetry into IOT module</code></td>
       </tr>
       <tr>
+        <td>16/11/2026</td>
+        <td><code>POLE-DELETE-PHOTOS</code> Xoá cột xoá luôn các dòng ảnh tài sản của cột (cả ảnh đã ẩn), mỗi ảnh một audit <code>deleted</code> kèm object key, cùng transaction và khoá hàng <code>pole</code>; bytes ở lại MinIO làm object mồ côi cho BE-35. Phát hiện khi POLE-0270 / POLE-0249 (SEG-040) bị chặn bởi <code>pole_asset_photo</code>. Tủ điện có ảnh vẫn 409.</td>
+        <td><code>AssetCrudService.DeletePoleAsync</code>, <code>AssetPhotoService.RemoveAllForPoleAsync</code>, <code>AssetPhotoTests</code>, drift <code>POLE-DELETE-PHOTOS</code></td>
+        <td><code>fix(assets): delete a pole's asset photos with the pole</code></td>
+      </tr>
+      <tr>
         <td>15/11/2026</td>
         <td><code>POLE-DELETE-QR</code> Xoá cột xoá luôn mã QR của cột (mỗi mã một audit <code>deleted</code>), dưới khoá hàng <code>pole</code>, cùng transaction; báo cáo công dân vẫn chặn (409). Phát hiện khi 6 cột SEG-004 trên production trả 409 <code>fk_qr_code_pole_pole_id</code>. Chưa merge / deploy; 6 cột chưa xoá.</td>
         <td><code>AssetCrudService.DeletePoleAsync</code>, port <code>IPoleQrCodes</code>, <code>QrCodeService</code>, <code>QrCodeTests</code>, <code>CitizenReportTests</code>, drift <code>POLE-DELETE-QR</code>, <code>traps/citizen.md</code></td>

@@ -185,6 +185,35 @@ public sealed class AssetPhotoService(LuxMapDbContext db, ICurrentActorAccessor 
         return await store.OpenAsync(StorageBucket.Evidence, thumbnail ? row.ThumbnailKey : row.ObjectKey, ct);
     }
 
+    /// <summary>
+    /// Removes every photo row of a pole that is being deleted, hidden ones included (POLE-DELETE-PHOTOS): a photo of
+    /// a pole that no longer exists is not kept, and its row held the pole with RESTRICT, so no pole that had ever been
+    /// photographed could be deleted.
+    /// </summary>
+    /// <remarks>
+    /// The caller holds the pole lock and owns the transaction, as for QR codes; a later refusal rolls these back too.
+    /// One audit event per row and per <c>SaveChanges</c>, oldest first, carrying the object keys. The bytes stay in the
+    /// object store: <see cref="IObjectStore"/> has no delete, and an object without a row is the orphan BE-35's
+    /// reconciliation reports — never a row without its object.
+    /// </remarks>
+    public async Task RemoveAllForPoleAsync(string poleId, CancellationToken ct)
+    {
+        var rows = await db.Set<PoleAssetPhoto>().Where(p => p.PoleId == poleId)
+            .OrderBy(p => p.CreatedAt).ThenBy(p => p.PhotoId.Length).ThenBy(p => p.PhotoId).ToListAsync(ct);
+        foreach (var row in rows)
+        {
+            var before = new Dictionary<string, object?>(Snapshot(row, poleId))
+            {
+                ["object_key"] = row.ObjectKey,
+                ["thumbnail_key"] = row.ThumbnailKey,
+            };
+            db.Remove(row);
+            audit.Record(new(UtcMicrosecondClock.UtcNow(), AuditActorKind.User, ActorId, actor.Role, row.CommuneId,
+                AuditEntityType.PoleAssetPhoto, row.PhotoId, AuditAction.Deleted, before, null));
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
     public async Task HideAsync<T>(string id, string photoId, CancellationToken ct) where T : class, IAssetPhoto
     {
         RequireWrite(true);
