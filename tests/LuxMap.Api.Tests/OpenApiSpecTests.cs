@@ -179,7 +179,7 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
             if (document.GetProperty("components").GetProperty("schemas").TryGetProperty("SegmentId", out var identity))
                 Assert.False(identity.TryGetProperty("nullable", out var nullableIdentity) && nullableIdentity.GetBoolean());
             foreach (var name in new[] { "LightingPreview", "LightingRequestResult" })
-                Assert.True(Schema(name).GetProperty("properties").GetProperty("unassigned_segment_pole_count").GetProperty("nullable").GetBoolean());
+                Assert.False(document.GetProperty("components").GetProperty("schemas").TryGetProperty(name, out _));
         }
     }
 

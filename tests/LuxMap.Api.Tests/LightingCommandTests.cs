@@ -1,16 +1,14 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.IOT.Entities;
 using LuxMap.Modules.IOT.Lighting;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using NetTopologySuite.Geometries;
 
 namespace LuxMap.Api.Tests;
 
@@ -24,8 +22,6 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
 {
     private LightingTestRig Rigs { get; } = new(fixture);
 
-    private const string Commands = "/api/v1/lighting/commands";
-    private const string Preview = "/api/v1/lighting/preview";
     private const string Device = "/api/v1/device/commands";
     
     // ── The press ──────────────────────────────────────────────────────────────────────────────
@@ -34,23 +30,23 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task A_press_on_a_feeder_is_accepted_as_one_pending_command_and_audited_once()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
+        var (body, replayed) = await Rigs.CreateAsync(new CreateLightingRequest
+        {
+            FeederId = rig.Feeders[0], Mode = FeederControlMode.On, ClientOpId = Guid.NewGuid(),
+        });
 
-        var response = await manager.PostAsJsonAsync(Commands, new { feeder_id = rig.Feeders[0], mode = "on", client_op_id = Guid.NewGuid() });
+        Assert.False(replayed);
+        var command = Assert.Single(body.Commands);
+        Assert.Equal(LightingCommandStatus.Pending, command.Status);
+        Assert.Equal(rig.Node, command.NodeId);
+        Assert.Equal(1, command.RelayNo);
+        Assert.Equal(FeederControlMode.On, command.RequestedMode);
+        Assert.Equal(DataSource.CalibrationRig, command.DataSource);
+        Assert.StartsWith("CMD-", command.CommandId, StringComparison.Ordinal);
+        Assert.Equal(TimeSpan.FromSeconds(60), command.ExpiresAt - command.CreatedAt);
+        Assert.Equal(fixture.ManagerUserId, body.RequestedBy);
 
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-        var body = await Rigs.JsonAsync(response);
-        var command = Assert.Single(body.GetProperty("commands").EnumerateArray());
-        Assert.Equal("pending", command.GetProperty("status").GetString());
-        Assert.Equal(rig.Node, command.GetProperty("node_id").GetString());
-        Assert.Equal(1, command.GetProperty("relay_no").GetInt32());
-        Assert.Equal("on", command.GetProperty("requested_mode").GetString());
-        Assert.Equal("calibration_rig", command.GetProperty("data_source").GetString());
-        Assert.StartsWith("CMD-", command.GetProperty("command_id").GetString(), StringComparison.Ordinal);
-        var created = command.GetProperty("created_at").GetDateTime();
-        Assert.Equal(TimeSpan.FromSeconds(60), command.GetProperty("expires_at").GetDateTime() - created);
-
-        var requestId = body.GetProperty("request_id").GetString()!;
+        var requestId = body.RequestId.ToString();
         Assert.Equal(["requested"], await Rigs.AuditActionsAsync("lighting_request", requestId));
         Assert.Equal("on", await Rigs.ModeAsync(rig.Feeders[0]) ?? "<none>"); // the rig starts ON
     }
@@ -63,45 +59,43 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task A_segment_press_switches_what_it_can_names_the_rest_and_the_other_segments_it_lights()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
         var unwired = await Rigs.NewFeederAsync(rig.Cabinet);
         var other = await Rigs.NewSegmentAsync();
         await Rigs.NewPoleAsync(rig.Segment, unwired);
         await Rigs.NewPoleAsync(rig.Segment, null);
         await Rigs.NewPoleAsync(other, rig.Feeders[0]);
 
-        var preview = await Rigs.JsonAsync(await manager.GetAsync($"{Preview}?segment_id={rig.Segment}"));
-        Assert.Equal("segment", preview.GetProperty("target_kind").GetString());
-        Assert.Equal(rig.Segment, preview.GetProperty("target_id").GetString());
-        Assert.Equal([(1, rig.Feeders[0]), (2, rig.Feeders[1])], Rigs.Targets(preview));
-        var excluded = Assert.Single(preview.GetProperty("excluded").EnumerateArray());
-        Assert.Equal(unwired, excluded.GetProperty("feeder_id").GetString());
-        Assert.Equal("not_wired", excluded.GetProperty("reason").GetString());
-        Assert.Equal(2, preview.GetProperty("uncontrollable_pole_count").GetInt32());
-        Assert.Equal(Rigs.Ordered(rig.Segment, other), preview.GetProperty("affected_segment_ids").EnumerateArray().Select(s => s.GetString()!).ToArray());
-
-        var press = await manager.PostAsJsonAsync(Commands, new { segment_id = rig.Segment, mode = "off", client_op_id = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.Accepted, press.StatusCode);
-        var body = await Rigs.JsonAsync(press);
-        Assert.Equal(2, body.GetProperty("commands").GetArrayLength());
-        Assert.Equal("not_wired", Assert.Single(body.GetProperty("excluded").EnumerateArray()).GetProperty("reason").GetString());
-        Assert.Equal(2, body.GetProperty("uncontrollable_pole_count").GetInt32());
+        var (body, replayed) = await Rigs.CreateAsync(new CreateLightingRequest
+        {
+            SegmentId = rig.Segment, Mode = FeederControlMode.Off, ClientOpId = Guid.NewGuid(),
+        });
+        Assert.False(replayed);
+        Assert.Equal(LightingTargetKind.Segment, body.TargetKind);
+        Assert.Equal(rig.Segment, body.TargetId);
+        Assert.Equal([(1, rig.Feeders[0]), (2, rig.Feeders[1])], body.Commands.Select(c => (c.RelayNo, c.FeederId)).ToArray());
+        var excluded = Assert.Single(body.Excluded);
+        Assert.Equal(unwired, excluded.FeederId);
+        Assert.Equal(LightingExclusionReason.NotWired, excluded.Reason);
+        Assert.Equal(2, body.UncontrollablePoleCount);
+        Assert.Equal(Rigs.Ordered(rig.Segment, other), body.AffectedSegmentIds);
     }
 
     [Fact]
     public async Task Nothing_switchable_is_a_409_that_says_why_and_writes_nothing()
     {
-        var manager = await fixture.ManagerClientAsync();
         var noSecret = await Rigs.RigAsync(issueSecret: false);
         var notRemote = await Rigs.RigAsync(remote: false);
 
         foreach (var (rig, reason) in new[] { (noSecret, "no_credential"), (notRemote, "remote_control_unsupported") })
         {
-            var response = await manager.PostAsJsonAsync(Commands, new { feeder_id = rig.Feeders[0], mode = "on", client_op_id = Guid.NewGuid() });
-            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-            var error = (await Rigs.JsonAsync(response)).GetProperty("error");
-            Assert.Equal("NO_CONTROLLABLE_RELAY", error.GetProperty("code").GetString());
-            Assert.Equal(reason, error.GetProperty("details").GetProperty("excluded")[0].GetProperty("reason").GetString());
+            var error = await Assert.ThrowsAsync<LuxMapException>(() => Rigs.CreateAsync(new CreateLightingRequest
+            {
+                FeederId = rig.Feeders[0], Mode = FeederControlMode.On, ClientOpId = Guid.NewGuid(),
+            }));
+            Assert.Equal(HttpStatusCode.Conflict, error.StatusCode);
+            Assert.Equal("NO_CONTROLLABLE_RELAY", error.Code);
+            var excluded = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<LightingExclusion>>(error.Details["excluded"]));
+            Assert.Equal(reason, WireEnum.Name(excluded.Reason));
             Assert.Equal(0, await fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().CountAsync(c => c.NodeId == rig.Node)));
         }
     }
@@ -110,43 +104,30 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task The_same_key_replays_the_same_request_and_a_different_body_under_it_is_a_409()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
         var key = Guid.NewGuid();
 
-        var first = await manager.PostAsJsonAsync(Commands, new { feeder_id = rig.Feeders[0], mode = "on", client_op_id = key });
-        var again = await manager.PostAsJsonAsync(Commands, new { feeder_id = rig.Feeders[0], mode = "on", client_op_id = key });
-        var other = await manager.PostAsJsonAsync(Commands, new { feeder_id = rig.Feeders[0], mode = "off", client_op_id = key });
+        var input = new CreateLightingRequest { FeederId = rig.Feeders[0], Mode = FeederControlMode.On, ClientOpId = key };
+        var first = await Rigs.CreateAsync(input);
+        var again = await Rigs.CreateAsync(input);
+        var other = await Assert.ThrowsAsync<LuxMapException>(() => Rigs.CreateAsync(input with { Mode = FeederControlMode.Off }));
 
-        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, again.StatusCode);
-        Assert.Equal((await Rigs.JsonAsync(first)).GetProperty("request_id").GetString(), (await Rigs.JsonAsync(again)).GetProperty("request_id").GetString());
+        Assert.False(first.Replayed);
+        Assert.True(again.Replayed);
+        Assert.Equal(first.Result.RequestId, again.Result.RequestId);
         Assert.Equal(HttpStatusCode.Conflict, other.StatusCode);
-        Assert.Equal("IDEMPOTENCY_CONFLICT", (await Rigs.JsonAsync(other)).GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal("IDEMPOTENCY_CONFLICT", other.Code);
         Assert.Equal(1, await fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().CountAsync(c => c.NodeId == rig.Node)));
     }
 
     [Fact]
-    public async Task Only_a_manager_presses_and_every_role_reads_the_history()
+    public async Task Removed_lighting_routes_return_404_for_a_manager()
     {
         var rig = await Rigs.RigAsync();
-        var engineer = await fixture.FieldEngineerClientAsync();
-
-        var press = await engineer.PostAsJsonAsync(Commands, new { feeder_id = rig.Feeders[0], mode = "on", client_op_id = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.Forbidden, press.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await engineer.GetAsync($"{Preview}?feeder_id={rig.Feeders[0]}")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await engineer.GetAsync($"{Commands}?feeder_id={rig.Feeders[0]}")).StatusCode);
-    }
-
-    [Theory]
-    [InlineData("""{ "mode": "on", "client_op_id": "8f0e3b8e-1f2a-4c55-9d3b-2b1f0d6a7c11" }""")]
-    [InlineData("""{ "feeder_id": "FDR-001", "segment_id": "SEG-001", "mode": "on", "client_op_id": "8f0e3b8e-1f2a-4c55-9d3b-2b1f0d6a7c11" }""")]
-    [InlineData("""{ "feeder_id": "FDR-001", "mode": "dim", "client_op_id": "8f0e3b8e-1f2a-4c55-9d3b-2b1f0d6a7c11" }""")]
-    [InlineData("""{ "feeder_id": "FDR-001", "mode": "on" }""")]
-    public async Task A_press_needs_exactly_one_target_a_real_mode_and_a_key(string body)
-    {
         var manager = await fixture.ManagerClientAsync();
-        var response = await manager.PostAsync(Commands, new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync($"/api/v1/lighting/preview?feeder_id={rig.Feeders[0]}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.PostAsJsonAsync("/api/v1/lighting/commands",
+            new { feeder_id = rig.Feeders[0], mode = "off", client_op_id = Guid.NewGuid() })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/lighting/commands")).StatusCode);
     }
 
     // ── The device loop ────────────────────────────────────────────────────────────────────────
@@ -160,8 +141,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task The_device_fetches_executes_and_acknowledges_and_only_its_report_sets_the_mode()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
-        var commandId = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var device = Rigs.DeviceClient(rig);
 
         var first = await Rigs.PollAsync(device);
@@ -187,16 +167,17 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
         Assert.Equal(["delivered", "applied"], await Rigs.AuditActionsAsync("lighting_command", commandId));
         Assert.Empty(await Rigs.PollAsync(device));
 
-        var listed = await Rigs.JsonAsync(await manager.GetAsync($"{Commands}?feeder_id={rig.Feeders[0]}"));
-        Assert.Equal("applied", listed.GetProperty("items")[0].GetProperty("status").GetString());
-        Assert.Equal("off", listed.GetProperty("items")[0].GetProperty("reported_mode").GetString());
+        var stored = await fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().AsNoTracking()
+            .SingleAsync(c => c.CommandId == commandId));
+        Assert.Equal(LightingCommandStatus.Applied, stored.Status);
+        Assert.Equal(FeederControlMode.Off, stored.ReportedMode);
     }
 
     [Fact]
     public async Task A_failed_report_keeps_the_mode_it_reports_and_never_the_requested_one()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var device = Rigs.DeviceClient(rig);
         var fetched = Assert.Single(await Rigs.PollAsync(device));
 
@@ -216,12 +197,11 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task A_newer_press_supersedes_and_a_late_report_never_overwrites_a_newer_mode()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
         var device = Rigs.DeviceClient(rig);
 
-        var off = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var off = await Rigs.PressAsync(rig.Feeders[0], "off");
         var offSeq = Assert.Single(await Rigs.PollAsync(device)).Seq;
-        var auto = await Rigs.PressAsync(manager, rig.Feeders[0], "auto");
+        var auto = await Rigs.PressAsync(rig.Feeders[0], "auto");
         Assert.Equal("superseded", await Rigs.StatusAsync(off));
 
         // The device executed `off` before it heard of `auto`: its report is still the truth about the relay.
@@ -253,21 +233,16 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     }
 
     /// <summary>
-    /// Past <c>expires_at</c> a command reads <c>expired</c> before any write stores it; the next locked write (here the poll)
-    /// stores it as actor <c>system</c>; it is never delivered and never retried.
+    /// The next locked write (here the poll) stores a past-expiry command as actor <c>system</c>; it is never delivered or retried.
     /// </summary>
     [Fact]
-    public async Task An_expired_command_reads_expired_is_stored_by_the_next_poll_and_is_never_delivered()
+    public async Task An_expired_command_is_stored_by_the_next_poll_and_is_never_delivered()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
-        var commandId = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         await Rigs.AgeAsync(commandId);
 
-        var listed = await Rigs.JsonAsync(await manager.GetAsync($"{Commands}?status=expired&feeder_id={rig.Feeders[0]}"));
-        Assert.Equal(commandId, Assert.Single(listed.GetProperty("items").EnumerateArray()).GetProperty("command_id").GetString());
         Assert.Equal("pending", await Rigs.StatusAsync(commandId));
-        Assert.Equal(0, (await Rigs.JsonAsync(await manager.GetAsync($"{Commands}?status=pending&feeder_id={rig.Feeders[0]}"))).GetProperty("total").GetInt32());
 
         var device = Rigs.DeviceClient(rig);
         Assert.Empty(await Rigs.PollAsync(device));
@@ -294,13 +269,16 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
         var credential = await Rigs.JsonAsync(await manager.PostAsync($"/api/v1/assets/iot-nodes/{sibling}/credential", null));
         var siblingRig = rig with { Node = sibling, Secret = credential.GetProperty("secret").GetString()! };
 
-        var response = await manager.PostAsJsonAsync(Commands, new { segment_id = rig.Segment, mode = "off", client_op_id = Guid.NewGuid() });
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-        var commands = (await Rigs.JsonAsync(response)).GetProperty("commands").EnumerateArray().ToArray();
-        Assert.Equal(2, commands.Length);
-        Assert.All(commands, command => Assert.Equal(1, command.GetProperty("relay_no").GetInt32()));
+        var (result, replayed) = await Rigs.CreateAsync(new CreateLightingRequest
+        {
+            SegmentId = rig.Segment, Mode = FeederControlMode.Off, ClientOpId = Guid.NewGuid(),
+        });
+        Assert.False(replayed);
+        var commands = result.Commands;
+        Assert.Equal(2, commands.Count);
+        Assert.All(commands, command => Assert.Equal(1, command.RelayNo));
         Assert.Equal(new[] { rig.Node, sibling }.Order(StringComparer.Ordinal),
-            commands.Select(command => command.GetProperty("node_id").GetString()).Order(StringComparer.Ordinal));
+            commands.Select(command => command.NodeId).Order(StringComparer.Ordinal));
 
         var firstDevice = Rigs.DeviceClient(rig);
         var secondDevice = Rigs.DeviceClient(siblingRig);
@@ -331,7 +309,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     {
         var mine = await Rigs.RigAsync();
         var theirs = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), mine.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(mine.Feeders[0], "off");
         var seq = Assert.Single(await Rigs.PollAsync(Rigs.DeviceClient(mine))).Seq;
 
         var other = Rigs.DeviceClient(theirs);
@@ -362,7 +340,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task A_report_that_does_not_add_up_is_a_400(string result, string? mode, string? error, bool wrongSeq)
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var device = Rigs.DeviceClient(rig);
         var seq = Assert.Single(await Rigs.PollAsync(device)).Seq;
 
@@ -377,7 +355,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task A_report_before_the_command_was_fetched_is_a_409()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var seq = await fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters().Where(c => c.CommandId == commandId).Select(c => c.Seq).SingleAsync());
 
         var response = await Rigs.DeviceClient(rig).PostAsJsonAsync($"{Device}/{commandId}/ack", new { seq, result = "applied", reported_mode = "off" });
@@ -394,7 +372,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     {
         var rig = await Rigs.RigAsync();
         var manager = await fixture.ManagerClientAsync();
-        var commandId = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         Assert.Single(await Rigs.PollAsync(Rigs.DeviceClient(rig)));
 
         var unwire = await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Node}/relays/1", new { feeder_id = (string?)null });
@@ -421,9 +399,9 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
         var rig = await Rigs.RigAsync();
         var manager = await fixture.ManagerClientAsync();
         var device = Rigs.DeviceClient(rig);
-        var off = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var off = await Rigs.PressAsync(rig.Feeders[0], "off");
         var offSeq = Assert.Single(await Rigs.PollAsync(device)).Seq;
-        var auto = await Rigs.PressAsync(manager, rig.Feeders[0], "auto");
+        var auto = await Rigs.PressAsync(rig.Feeders[0], "auto");
         var autoSeq = Assert.Single(await Rigs.PollAsync(device)).Seq;
         await device.PostAsJsonAsync($"{Device}/{auto}/ack", new { seq = autoSeq, result = "applied", reported_mode = "auto" });
 
@@ -448,7 +426,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     {
         var rig = await Rigs.RigAsync();
         var manager = await fixture.ManagerClientAsync();
-        var viaRegistry = await Rigs.PressAsync(manager, rig.Feeders[0], "off");
+        var viaRegistry = await Rigs.PressAsync(rig.Feeders[0], "off");
 
         var update = await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Node}",
             new { data_source = "calibration_rig", supports_remote_control = false });
@@ -459,7 +437,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
 
         // Remote again, press, then the flag flips WITHOUT the registry: the poll itself refuses to deliver.
         await manager.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Node}", new { data_source = "calibration_rig", supports_remote_control = true });
-        var direct = await Rigs.PressAsync(manager, rig.Feeders[1], "off");
+        var direct = await Rigs.PressAsync(rig.Feeders[1], "off");
         await Rigs.AsSystemAsync(db => db.Database.ExecuteSqlAsync($"UPDATE iot_node SET supports_remote_control = false WHERE node_id = {rig.Node}"));
 
         Assert.Empty(await Rigs.PollAsync(Rigs.DeviceClient(rig)));
@@ -472,7 +450,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task The_database_refuses_an_applied_command_without_a_reported_mode()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
 
         var refused = await Assert.ThrowsAsync<Npgsql.PostgresException>(() => Rigs.AsSystemAsync(db => db.Database.ExecuteSqlAsync(
             $"UPDATE lighting_command SET status = 'applied', delivered_at = created_at, completed_at = created_at WHERE command_id = {commandId}")));
@@ -491,16 +469,21 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task A_press_and_a_poll_wait_for_the_device_lock()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
 
-        await HoldingTheDeviceLockAsync(rig.Node, () => manager.PostAsJsonAsync(Commands,
-            new { feeder_id = rig.Feeders[0], mode = "off", client_op_id = Guid.NewGuid() }), HttpStatusCode.Accepted);
+        await HoldingTheDeviceLockAsync(rig.Node, async () =>
+        {
+            await Rigs.PressAsync(rig.Feeders[0], "off");
+        });
 
         // A poll also UPDATEs last_report_at, which would wait on its own; a report time in the future makes it skip that, so
         // only the explicit lock is left to make it wait.
         await Rigs.AsSystemAsync(db => db.Database.ExecuteSqlAsync(
             $"UPDATE iot_node SET last_report_at = now() + interval '1 day' WHERE node_id = {rig.Node}"));
-        await HoldingTheDeviceLockAsync(rig.Node, () => Rigs.DeviceClient(rig).GetAsync(Device), HttpStatusCode.OK);
+        await HoldingTheDeviceLockAsync(rig.Node, async () =>
+        {
+            var response = await Rigs.DeviceClient(rig).GetAsync(Device);
+            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        });
     }
 
     /// <summary>Two presses on one relay at once: the device lock serialises them, so exactly one stays open — the later seq.</summary>
@@ -508,13 +491,11 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task Two_presses_at_once_leave_exactly_one_open_command_the_newest()
     {
         var rig = await Rigs.RigAsync();
-        var manager = await fixture.ManagerClientAsync();
 
-        var responses = await Task.WhenAll(
-            Enumerable.Range(0, 4).Select(_ => manager.PostAsJsonAsync(Commands,
-                new { feeder_id = rig.Feeders[0], mode = "off", client_op_id = Guid.NewGuid() })));
+        var commands = await Task.WhenAll(
+            Enumerable.Range(0, 4).Select(_ => Rigs.PressAsync(rig.Feeders[0], "off")));
 
-        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Accepted, response.StatusCode));
+        Assert.Equal(4, commands.Distinct().Count());
         var rows = await fixture.QueryAsync(db => db.Set<LightingCommand>().IgnoreQueryFilters()
             .Where(c => c.NodeId == rig.Node).OrderBy(c => c.Seq).Select(c => c.Status).ToListAsync());
         Assert.Equal(4, rows.Count);
@@ -526,7 +507,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     public async Task Two_polls_at_once_deliver_the_command_once()
     {
         var rig = await Rigs.RigAsync();
-        var commandId = await Rigs.PressAsync(await fixture.ManagerClientAsync(), rig.Feeders[0], "off");
+        var commandId = await Rigs.PressAsync(rig.Feeders[0], "off");
         var device = Rigs.DeviceClient(rig);
 
         var batches = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Rigs.PollAsync(device)));
@@ -543,7 +524,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
     /// KEY SHARE lock, which <c>FOR UPDATE</c> would block too — the test would then pass with the service's own lock removed
     /// (found by sabotage). <c>FOR NO KEY UPDATE</c> blocks the service's <c>FOR UPDATE</c> and nothing else.
     /// </remarks>
-    private async Task HoldingTheDeviceLockAsync(string node, Func<Task<HttpResponseMessage>> send, HttpStatusCode expected)
+    private async Task HoldingTheDeviceLockAsync(string node, Func<Task> send)
     {
         await using var scope = fixture.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
@@ -555,8 +536,7 @@ public sealed class LightingCommandTests(AssetImportFixture fixture)
         Assert.False(request.IsCompleted, "the request finished while the device row was locked — it never took the lock");
 
         await transaction.RollbackAsync();
-        var response = await request;
-        Assert.True(response.StatusCode == expected, await response.Content.ReadAsStringAsync());
+        await request;
     }
 
     private Task<AuditActorKind> ActorOfAsync(string commandId, AuditAction action)

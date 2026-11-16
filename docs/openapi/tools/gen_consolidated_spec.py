@@ -203,10 +203,7 @@ SUMMARY = {
     ("post", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/decision"): "[TẠM — POLE-PHOTO] Quản lý xác nhận/bác một lần, công bố nhãn review mới nhất sau khóa (không If-Match): off→out, on không bác dim; ảnh cũ không ghi đè; không ghi luminance_history. Ảnh có clip: xác nhận (on lẫn off) chỉ sau khi CHÍNH Quản lý đó đã mở clip — chưa thì 409 POLE_VIDEO_NOT_VIEWED (PV-10); bác không cần xem",
     # AI-1 — model YOLO ON / OFF (PR #118 làm lại sau review), SELF-SIGNED.
     ("post", "/api/v1/ai/detect"): "[TẠM — AI-1] Gate ngày/đêm cho API thử tay: union day/unknown/night có confidence_percent và daynight_model_version; chỉ night kèm YOLO; không ghi DB",
-    # LIGHT-CTRL 2b — lệnh ON / OFF / AUTO + kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW).
-    ("get", "/api/v1/lighting/preview"): "[TẠM — LIGHT-CTRL] Xem trước một lần bấm: rơ-le sẽ đổi, mạch bị loại kèm lý do, tuyến bị ảnh hưởng; không ghi",
-    ("post", "/api/v1/lighting/commands"): "[TẠM — LIGHT-CTRL] Bấm ON / OFF / AUTO cho một mạch hoặc một tuyến — 202; cùng client_op_id → 200; không còn rơ-le nào → 409 NO_CONTROLLABLE_RELAY",
-    ("get", "/api/v1/lighting/commands"): "[TẠM — LIGHT-CTRL] Lịch sử lệnh, mới nhất trước; trạng thái tính lúc đọc (quá hạn = expired)",
+    # LIGHT-CTRL 2b — kênh thiết bị (poll HTTPS), drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW); route /lighting/* bỏ ở LC-13.
     ("get", "/api/v1/device/commands"): "[TẠM — LIGHT-CTRL] [Thiết bị] Lệnh đang mở của chính thiết bị, mới nhất mỗi rơ-le; giao lại tới khi ACK",
     ("post", "/api/v1/device/commands/{commandId}/ack"): "[TẠM — LIGHT-CTRL] [Thiết bị] Báo kết quả SAU khi thực thi; lệnh đã đóng → 409 COMMAND_CLOSED nhưng vẫn lưu",
     # LIGHT-CTRL 2a — đăng ký thiết bị IoT + rơ-le + bí mật, drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW).
@@ -378,7 +375,6 @@ SECTION = {
     "/api/v1/auth/me": "§4.7",
     "/api/v1/assets/cabinets": "drift CAB-1…CAB-8 + CAB-MN-1…CAB-MN-5 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets/iot-nodes": "drift LC-1…LC-10 (SELF-SIGNED, nền tạm tới FW)",
-    "/api/v1/lighting": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/ai": "drift AI-1 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/device": "drift LC-1…LC-11 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/assets": "§5.3",

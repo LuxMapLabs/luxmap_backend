@@ -37,6 +37,8 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
     /// </summary>
     public string AccountPassword { get; } = AuthTestExtensions.SeedPassword("SEED_ADMIN_PASSWORD");
 
+    public string ManagerUserId => userId;
+
     private string userId = null!;
 
     private string foreignCommuneUserId = null!;

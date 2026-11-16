@@ -21,8 +21,8 @@ namespace LuxMap.Api.Tests;
 /// <para>
 /// The write probes send an EMPTY body. An admitted role gets past authorization and is stopped by
 /// validation (400); a refused role never reaches the action (403 <c>ROLE_FORBIDDEN</c>). So the test
-/// tells the two apart without writing a single row. <c>ControlLighting</c> uses
-/// <c>POST /lighting/commands</c> since LIGHT-CTRL 2b; <c>ManageUsers</c> uses
+/// tells the two apart without writing a single row. <c>ControlLighting</c> instead sends a valid command to
+/// <c>POST /iot/nodes/{nodeId}/command</c> for a non-existent node (404 admitted, 403 refused); <c>ManageUsers</c> uses
 /// <c>POST /admin/users</c> since BE-33a.
 /// </para>
 /// </remarks>
@@ -53,7 +53,7 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         ["EditPoleNotes"] = ("PUT", "/api/v1/assets/poles/POLE-0/note", ["manager", "field_engineer"]),
         ["EditPoleLocation"] = ("PUT", "/api/v1/assets/poles/POLE-0/location", ["manager", "field_engineer"]),
         ["RecordLuxReading"] = ("POST", "/api/v1/lux-readings", ["field_engineer"]),
-        ["ControlLighting"] = ("POST", "/api/v1/lighting/commands", ["manager"]),
+        ["ControlLighting"] = ("POST", "/api/v1/iot/nodes/NODE-role-probe-missing/command", ["manager"]),
         ["ManageOwnProfile"] = ("POST", "/api/v1/auth/me/avatar", ["system_admin", "superior", "manager", "field_engineer"]),
         ["ManageUsers"] = ("POST", "/api/v1/admin/users", ["system_admin"]),
         ["ManageCommunes"] = ("POST", "/api/v1/admin/communes", ["system_admin"]),
@@ -100,7 +100,8 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
         using var request = new HttpRequestMessage(new HttpMethod(method), url);
         if (method is "POST" or "PATCH" or "PUT")
         {
-            request.Content = capability is "ManageOwnProfile" or "UploadAssetPhotos" ? new MultipartFormDataContent() : JsonContent.Create(new { });
+            request.Content = capability == "ControlLighting" ? JsonContent.Create(new { mode = "MANUAL", command = "OFF" })
+                : capability is "ManageOwnProfile" or "UploadAssetPhotos" ? new MultipartFormDataContent() : JsonContent.Create(new { });
         }
 
         var response = await client.SendAsync(request);
@@ -111,7 +112,8 @@ public class RoleCapabilityMatrixTests(ScopeTestFixture factory, ITestOutputHelp
 
         if (shouldPass)
         {
-            var expectedStatus = method is "POST" or "PATCH" or "PUT" ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
+            var expectedStatus = capability == "ControlLighting" ? HttpStatusCode.NotFound
+                : method is "POST" or "PATCH" or "PUT" ? HttpStatusCode.BadRequest : HttpStatusCode.OK;
             Assert.Equal(expectedStatus, response.StatusCode);
         }
         else
