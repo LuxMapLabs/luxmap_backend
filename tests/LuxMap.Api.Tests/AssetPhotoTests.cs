@@ -41,6 +41,7 @@ public sealed class AssetPhotoTests(AssetImportFixture factory, ITestOutputHelpe
     private string cabinet = null!;
     private string otherPole = null!;
     private readonly string marker = "asset-photo-" + Guid.NewGuid().ToString("N");
+    private readonly List<string> removedPhotos = [];
     private string PathFor(bool isPole) => $"/api/v1/assets/{(isPole ? "poles/" + pole : "cabinets/" + cabinet)}/photos";
 
     public async Task InitializeAsync()
@@ -78,6 +79,9 @@ public sealed class AssetPhotoTests(AssetImportFixture factory, ITestOutputHelpe
                     (entity_type = 'pole_asset_photo' AND entity_id IN (SELECT photo_id FROM pole_asset_photo WHERE pole_id = {pole} OR pole_id = {otherPole})) OR
                     (entity_type = 'cabinet_asset_photo' AND entity_id IN (SELECT photo_id FROM cabinet_asset_photo WHERE cabinet_id = {cabinet}))
                 """);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"DELETE FROM audit_event WHERE entity_type = 'pole_asset_photo' AND entity_id = ANY({removedPhotos.ToArray()})");
+            await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM lux_reading WHERE pole_id = {pole}");
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole_asset_photo WHERE pole_id = {pole} OR pole_id = {otherPole}");
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM cabinet_asset_photo WHERE cabinet_id = {cabinet}");
             await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole WHERE external_ref LIKE {marker + "%"}");
@@ -150,7 +154,8 @@ public sealed class AssetPhotoTests(AssetImportFixture factory, ITestOutputHelpe
         await Error(await manager.GetAsync(item.GetProperty("original_url").GetString()), 404, "ASSET_PHOTO_NOT_FOUND");
         await Error(await manager.GetAsync(item.GetProperty("thumbnail_url").GetString()), 404, "ASSET_PHOTO_NOT_FOUND");
         await Error(await Upload(isPole, op, field, bytes), 404, "ASSET_PHOTO_NOT_FOUND");
-        await Error(await manager.DeleteAsync(PathFor(isPole)[..^7]), 409, "ASSET_IN_USE");
+        // A cabinet's photos still hold it; a pole's go with the pole (POLE-DELETE-PHOTOS, its own tests below).
+        if (!isPole) await Error(await manager.DeleteAsync(PathFor(isPole)[..^7]), 409, "ASSET_IN_USE");
         Assert.Equal(2, store.Objects.Count);
         var table = isPole ? "pole_asset_photo" : "cabinet_asset_photo";
         var registered = factory.Services.GetServices<StoredObjectColumn>().Where(c => c.Table == table);
@@ -301,6 +306,53 @@ public sealed class AssetPhotoTests(AssetImportFixture factory, ITestOutputHelpe
             Assert.Equal(isPole ? "fk_pole_asset_photo_target" : "fk_cabinet_asset_photo_electrical_cabinet_cabinet_id_commune_id", error.ConstraintName);
             await tx.RollbackAsync(); return 0;
         });
+    }
+
+    /// <summary>
+    /// POLE-DELETE-PHOTOS: before this, <c>pole_asset_photo</c> held its pole with RESTRICT, so a pole that had ever been
+    /// photographed could not be deleted. The rows now go with the pole — the hidden one too — each with its own
+    /// <c>deleted</c> audit event carrying the object keys; the bytes stay in the store for BE-35's reconciliation.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_a_pole_takes_its_photos_with_one_audit_event_each_and_leaves_the_bytes()
+    {
+        var shown = (await Body(await Upload(true), 201)).GetProperty("photo_id").GetString()!;
+        var hidden = (await Body(await Upload(true), 201)).GetProperty("photo_id").GetString()!;
+        removedPhotos.AddRange([shown, hidden]);
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync(PathFor(true) + "/" + hidden)).StatusCode);
+
+        var response = await manager.DeleteAsync($"/api/v1/assets/poles/{pole}");
+
+        Assert.True(response.StatusCode == HttpStatusCode.NoContent, await response.Content.ReadAsStringAsync());
+        Assert.False(await factory.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AnyAsync(p => p.PoleId == pole)));
+        Assert.False(await factory.QueryAsync(db => db.Set<PoleAssetPhoto>().IgnoreQueryFilters().AnyAsync(p => p.PoleId == pole)));
+        var deleted = await factory.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters().AsNoTracking()
+            .Where(e => e.EntityType == AuditEntityType.PoleAssetPhoto && e.Action == AuditAction.Deleted
+                && (e.EntityId == shown || e.EntityId == hidden))
+            .OrderBy(e => e.AuditId).ToListAsync());
+        Assert.Equal([shown, hidden], deleted.Select(e => e.EntityId));
+        Assert.All(deleted, e => Assert.Contains(StorageKeys.KeyFor(ObjectVariant.Original, e.EntityId), e.BeforeState!));
+        Assert.All(deleted, e => Assert.Null(e.AfterState));
+        Assert.Contains(StorageKeys.KeyFor(ObjectVariant.Original, shown), store.Objects.Keys);
+        Assert.Contains(StorageKeys.KeyFor(ObjectVariant.Thumbnail, hidden), store.Objects.Keys);
+    }
+
+    /// <summary>A pole the database still refuses to delete keeps its photos: removing them shares the delete's transaction.</summary>
+    [Fact]
+    public async Task A_refused_pole_delete_keeps_its_photos()
+    {
+        var id = (await Body(await Upload(true), 201)).GetProperty("photo_id").GetString()!;
+        await factory.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO lux_reading (client_op_id, pole_id, commune_id, measured_at, lux_value, data_source, measured_by, created_at)
+            VALUES ({Guid.NewGuid().ToString()}, {pole}, {factory.CommuneId}, now(), 5, 'simulated',
+                    (SELECT user_id FROM app_user WHERE username = {factory.ManagerUsername}), now())
+            """));
+
+        await Error(await manager.DeleteAsync($"/api/v1/assets/poles/{pole}"), 409, "ASSET_IN_USE");
+
+        Assert.True(await factory.QueryAsync(db => db.Set<PoleAssetPhoto>().IgnoreQueryFilters().AnyAsync(p => p.PhotoId == id)));
+        Assert.False(await factory.QueryAsync(db => db.Set<AuditEvent>().IgnoreQueryFilters()
+            .AnyAsync(e => e.EntityType == AuditEntityType.PoleAssetPhoto && e.Action == AuditAction.Deleted && e.EntityId == id)));
     }
 
     private sealed class PhotoScope(string commune) : ICommuneScopeAccessor

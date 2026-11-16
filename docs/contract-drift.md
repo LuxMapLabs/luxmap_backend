@@ -2416,6 +2416,23 @@ không có API nào gỡ được chặn.
 
 Quyết định nội bộ BE, Mỹ chốt trong chat 15/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
 
+### POLE-DELETE-PHOTOS — xoá cột xoá luôn ảnh tài sản của cột (16/11/2026)
+
+**Phát hiện trên production 16/11:** cần xoá POLE-0270, POLE-0249 (tuyến SEG-040, cột đợt 03/10 chen giữa các cột đợt 28/09), nhưng
+mỗi cột có một ảnh tài sản và `pole_asset_photo → pole` là `Restrict`; ẩn ảnh chỉ ghi `deleted_at` — nên **cột nào từng có ảnh tài sản
+thì không xoá được**, cùng kiểu chặn POLE-DELETE-QR đã gỡ cho mã QR.
+
+- `DELETE /api/v1/assets/poles/{id}` giờ xoá **mọi dòng ảnh tài sản của cột** (đang hiện lẫn đã ẩn) sau mã QR, trước khi xoá cột,
+  **cùng transaction và dưới cùng khoá hàng `pole`** (khoá mà upload ảnh cũng lấy). Mỗi ảnh một audit `deleted`
+  (`entity_type = pole_asset_photo`, `before` = snapshot ảnh + `object_key` / `thumbnail_key`, `after = null`), cũ trước mới sau.
+- **Bytes ảnh ở lại object store** — `IObjectStore` không có hàm xoá; object không còn dòng là object mồ côi mà đối soát BE-35 báo
+  (cùng nhóm với 22 object mồ côi đang chờ quyết xoá). Không bao giờ ngược lại (dòng còn mà object mất).
+- Cột bị từ chối vì bảng khác (sự cố, lux reading, báo cáo công dân …) → 409 như cũ, ảnh và mã QR được rollback.
+- **Tủ điện chưa đổi:** `cabinet_asset_photo → electrical_cabinet` vẫn `Restrict`, tủ có ảnh vẫn 409 khi xoá.
+- **Không đổi bề mặt API:** route, mã, body lỗi giữ nguyên; chỉ một trường hợp 409 cũ nay thành 204. Không migration.
+
+Quyết định nội bộ BE, Mỹ chốt trong chat 16/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
+
 ## ONE-FIXTURE — một cột MỘT bộ đèn đang dùng; hỏng bóng nào thay cả bộ (15/11/2026)
 
 | | |
