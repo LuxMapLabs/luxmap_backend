@@ -38,8 +38,8 @@ public sealed class ReviewedPolePhotoPublisher(LuxMapDbContext db, IAuditTrail a
         // An ON reading cannot rebut dim. Preserve the classification and its confidence, but record
         // the newer observation clock so an older OFF photo cannot subsequently overwrite it.
         var before = current is null ? null : new { current.FixtureStatus, current.StatusConfidence, current.LastEvaluatedAt, current.LastSeenAt, current.LastSweepId, current.LastRunId };
-        var preserve = input.EffectiveCvState == "on" && current?.FixtureStatus is FixtureStatus.Normal or FixtureStatus.Dim;
-        var status = preserve ? current!.FixtureStatus : input.EffectiveCvState == "off" ? FixtureStatus.Out : FixtureStatus.Normal;
+        var status = SurveyPublicationRules.PhotoStatus(input.EffectiveCvState, current?.FixtureStatus);
+        var preserve = input.EffectiveCvState == "on" && current?.FixtureStatus == status;
         var confidence = preserve ? current!.StatusConfidence : labelConfidence;
         await PoleStatusPublication.StageAsync(db, pole.PoleId, pole.CommuneId, status, confidence,
             input.CapturedAt, input.Now, null, null, ct);

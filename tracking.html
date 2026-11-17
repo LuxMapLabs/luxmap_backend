@@ -41,6 +41,19 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>WSC-PHOTO — follow-up mang sự cố từ ảnh/clip đã confirm · 17/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR vào dev</span>
+    Lookup gộp sweep đã duyệt và ảnh/clip confirm của chính phiếu/xã neo theo thời gian quan sát;
+    dùng chung luật ON giữ dim/normal với publisher. Bổ sung drift <b>WSC-6</b> (Mỹ chốt, WP5 báo lỗi), không đổi API/schema.</p>
+    <p>Files: <code>SurveyFindingLookup.cs</code>, <code>SurveyPublicationRules.cs</code>, <code>ReviewedPolePhotoPublisher.cs</code>,
+    <code>ISurveyFindingLookup.cs</code>, <code>SurveyFindingTests.cs</code>, API <code>SurveyPublicationTests.cs</code>,
+    <code>docs/contract-drift.md</code>, <code>docs/agents/traps/faults-workorders.md</code>, dashboard và kết quả.
+    Thêm 12 ca unit + 9 ca tích hợp. Claude review: ảnh không đổi trạng thái giữ data_source của quan sát trước. Đã chạy: unit 12/12, API (SurveyPublication + PolePhoto + WorkOrder) 392 pass / 2 skip; phá thử (tắt nguồn ảnh) → 2 test đỏ.
+    <a href=".ai/results/WSC-PHOTO.md">Bằng chứng, phá thử và giới hạn kiểm chứng</a>.</p>
+    <p>Commit: <code>fix(work-orders): carry confirmed pole-photo faults into survey follow-up</code>. Không phát sinh D-item.</p>
+  </div>
+
+  <div class="card">
     <strong>PR #266 — giải quyết conflict iot với dev · 16/11/2026</strong>
     <p><span class="tag t-done">Đã push lên iot · hết conflict · CI đang chạy</span>
     Gộp <code>dev 1e89827</code> vào nền <code>iot 972a927</code> trên <code>fix/PR-266-conflicts</code>.
