@@ -41,6 +41,21 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>POLE-PHOTO-WITHDRAW — kỹ sư hủy mềm ảnh/clip cột chưa quyết · 17/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR vào dev</span>
+    Thêm <code>DELETE /work-orders/{id}/pole-photos/{photo_id}</code>: chỉ người được giao, phiếu đang thực hiện,
+    ảnh chưa quyết; 204 idempotent kể cả retry sau khi phiếu done. Giữ row/bytes/AI/audit, ẩn khỏi các đường đọc/duyệt;
+    replay upload trả 409 <code>POLE_PHOTO_WITHDRAWN</code>. Drift <b>PP-16…PP-19</b> — Mỹ SELF-SIGNED, nền tạm cho WP5/WP6.</p>
+    <p>Files: entity/configuration/controller/service/video view trong <code>LuxMap.Modules.WorkOrders</code>,
+    migration <code>AddPolePhotoWithdrawal</code> + designer/snapshot, hai file test withdrawal/migration,
+    copy-plan + Python test, drift, OpenAPI + generator và biên bản kết quả.
+    Build toàn solution <b>0 warning/error</b>; test Python copy-plan xanh; spec hợp lệ, 10 warning như baseline.
+    Claude review: giữ thứ tự kiểm cũ của ReviewAsync và replay hash khác trên ảnh chưa hủy. Đã chạy: 22 ca withdrawal + migration xanh; WorkOrder/PolePhoto/Capability/Migration/Sync 517 pass / 2 skip; phá thử (bỏ lọc ảnh đã hủy) → 4 đỏ. Down() đọc tay, đối xứng, chưa chạy down/reapply.
+    Commit: <code>feat(work-orders): let the assigned engineer withdraw an undecided pole photo</code>.
+    <a href=".ai/results/POLE-PHOTO-WITHDRAW.md">Bằng chứng và lệnh chạy tiếp</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>PR #266 — giải quyết conflict iot với dev · 16/11/2026</strong>
     <p><span class="tag t-done">Đã push lên iot · hết conflict · CI đang chạy</span>
     Gộp <code>dev 1e89827</code> vào nền <code>iot 972a927</code> trên <code>fix/PR-266-conflicts</code>.

@@ -44,6 +44,8 @@ public sealed class WorkOrderPolePhoto : ICommuneScoped, IAudited
     public string? DecisionNote { get; set; }
     public bool StatusApplied { get; set; }
     public string? StatusReason { get; set; }
+    public DateTime? WithdrawnAt { get; set; }
+    public string? WithdrawnBy { get; set; }
 
     public string? VideoObjectKey { get; set; }
     public string? VideoSha256 { get; set; }

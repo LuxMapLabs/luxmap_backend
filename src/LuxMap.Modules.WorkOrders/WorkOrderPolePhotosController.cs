@@ -16,7 +16,7 @@ namespace LuxMap.Modules.WorkOrders;
 public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService photos, IAuthorizationService authorization,
     ICorrelationIdAccessor correlation) : ControllerBase
 {
-    /// <summary>Upload one pole photo; optional AI, no status change until a Manager confirms.</summary>
+    /// <summary>Upload one pole photo; optional AI, no status change until a Manager confirms. Replay of a withdrawn operation returns 409 POLE_PHOTO_WITHDRAWN (details.photo_id); use a new client_op_id.</summary>
     [HttpPost]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     [Consumes("multipart/form-data")]
@@ -53,6 +53,18 @@ public sealed class WorkOrderPolePhotosController(WorkOrderPolePhotoService phot
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
     public Task<PolePhotoItem> Detail(string id, [FromRoute(Name = "photo_id")] string photoId, CancellationToken ct)
         => photos.DetailAsync(id, photoId, ct);
+
+    /// <summary>Assigned engineer withdraws an undecided photo or clip; retry returns 204 even after the order is done. Bytes are retained.</summary>
+    [HttpDelete("{photo_id}")]
+    [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(typeof(ApiErrorResponse), 404)]
+    [ProducesResponseType(typeof(ApiErrorResponse), 409)]
+    public async Task<IActionResult> Withdraw(string id, [FromRoute(Name = "photo_id")] string photoId, CancellationToken ct)
+    {
+        await photos.WithdrawAsync(id, photoId, ct);
+        return NoContent();
+    }
 
     [HttpGet("{photo_id}/thumbnail")]
     [Authorize(Policy = LuxMapPolicies.ReadWorkOrders)]
