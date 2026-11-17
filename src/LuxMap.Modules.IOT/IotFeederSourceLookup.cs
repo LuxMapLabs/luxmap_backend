@@ -26,7 +26,7 @@ public sealed class IotFeederSourceLookup(IOptions<IotOptions> options) : IFeede
             from node in db.Set<IotNode>().AsNoTracking()
             from control in db.Set<FeederControl>().AsNoTracking()
                 .Where(control => control.FeederId == feeder.FeederId).DefaultIfEmpty()
-            where feederIds.Contains(feeder.FeederId) && feeder.CabinetId == node.CabinetId &&
+            where feederIds.Contains(feeder.FeederId) && node.CabinetId != null && feeder.CabinetId == node.CabinetId &&
                   feeder.CommuneId == node.CommuneId
             select new { feeder.FeederId, node.NodeId, node.CommuneId, node.SupportsRemoteControl,
                 ControllerNodeId = control == null ? null : control.NodeId }).ToListAsync(ct);

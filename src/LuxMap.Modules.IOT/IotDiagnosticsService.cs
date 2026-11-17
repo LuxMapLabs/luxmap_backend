@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using LuxMap.IotWire;
 using LuxMap.Modules.Assets;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Shared.Contracts.Enums;
@@ -32,17 +34,22 @@ public sealed record NodeProfile
     public double NominalCurrentMa { get; init; }
     public double NominalPowerMw { get; init; }
     public double VoltageTolerancePercent { get; init; } = 10;
+    // Legacy source fields retained for existing clients and stored profiles.
     public double CurrentTolerancePercent { get; init; } = 25;
     public double PowerTolerancePercent { get; init; } = 25;
     public double OffCurrentLimitMa { get; init; } = 10;
     public int MaxSilenceSeconds { get; init; } = 60;
     public bool UseTenLampCalibration { get; init; }
+    public string? LampCountCalibration { get; init; }
+
+    internal string? EffectiveLampCountCalibration => LampCountCalibration
+        ?? (UseTenLampCalibration ? LampCountEstimator.FiveVolt : null);
 
     internal bool IsValid() =>
         !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrWhiteSpace(FeederId) &&
         Positive(NominalVoltage) && Positive(NominalCurrentMa) && Positive(NominalPowerMw) &&
-        Tolerance(VoltageTolerancePercent) && Tolerance(CurrentTolerancePercent) &&
-        Tolerance(PowerTolerancePercent) && Positive(OffCurrentLimitMa) && MaxSilenceSeconds > 0;
+        Tolerance(VoltageTolerancePercent) && MaxSilenceSeconds > 0 &&
+        LampCountCalibration is null or LampCountEstimator.FourVolt or LampCountEstimator.FiveVolt;
 
     private static bool Positive(double value) => double.IsFinite(value) && value > 0;
     private static bool Tolerance(double value) => Positive(value) && value <= 100;
@@ -52,13 +59,20 @@ public sealed record IotMeasurement(
     DateTime ReceivedAt, string LampCommand, double Voltage, double CurrentMa, double PowerMw);
 
 public sealed record IotAnomaly(
-    string Code, double? Observed, double? Reference, double? DeviationPercent, double? Limit);
+    string Code,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Observed = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Reference = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? DeviationPercent = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] double? Limit = null);
+
+public sealed record IotSensorHealth(string Status, DateTime? ReceivedAt);
 
 public sealed record IotDiagnosticResult(
     string NodeId, string FeederId, string Status,
     IotMeasurement? Measurement, IReadOnlyList<IotAnomaly> Anomalies)
 {
     public LampCountEstimate? LampCount { get; init; }
+    public IotSensorHealth SensorHealth { get; init; } = new("unknown", null);
 }
 
 public sealed record IotNodeStatus(
@@ -100,7 +114,7 @@ public sealed record IotCommandHistoryItem(
 
 public enum IotCommandHistoryStatus { Success, Pending, Expired }
 
-public sealed class IotDiagnosticsService(
+public sealed partial class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources,
     TimeProvider clock) : IFeederPowerLookup
 {
@@ -114,25 +128,45 @@ public sealed class IotDiagnosticsService(
 
         if (!await CompatibleFeederAsync(nodeId, profile.FeederId, false, ct))
             throw Unavailable("Feeder phải thuộc cùng tủ điện và xã với node IoT.");
-        var result = new IotDiagnosticResult(nodeId, profile.FeederId, "no_data", null, []);
         var device = await ReadDeviceAsync(baseUri, profile.DeviceId, ct);
+        var now = clock.GetUtcNow();
+        var report = device?.SensorHealth;
+        var sensorHealth = report is null || report.ReceivedAt == default || report.Data?.IsValidFor(profile.DeviceId) != true
+            ? new IotSensorHealth("unknown", null)
+            : new IotSensorHealth(
+                report.ReceivedAt <= now && now - report.ReceivedAt <= TimeSpan.FromSeconds(60) ? "fresh" : "stale",
+                report.ReceivedAt.UtcDateTime);
+        var codes = sensorHealth.Status == "fresh" ? report?.Data?.Codes ?? [] : [];
+        var diagnosis = new IotDiagnosticResult(nodeId, profile.FeederId, "no_data", null, [])
+        {
+            SensorHealth = sensorHealth,
+        };
         var measurement = ReadMeasurement(device);
-        if (measurement is null) return result;
-
-        var diagnosis = Evaluate(result, measurement, profile, DateTimeOffset.UtcNow);
-        if (!profile.UseTenLampCalibration || diagnosis.Status == "stale" || measurement.LampCommand != "ON" ||
-            !LampCountEstimator.InCalibrationRange(measurement.Voltage))
-            return diagnosis;
-
-        var estimate = LampCountEstimator.Evaluate(RecentOnCurrents(device!));
-        return estimate.EstimatedMissing is > 0
-            ? diagnosis with
+        if (measurement is not null)
+        {
+            var electricalAvailable = !codes.Any(code => SensorHealthCode.GroupOf(code) == SensorHealthCode.Ina);
+            diagnosis = Evaluate(diagnosis, measurement, profile, now, electricalAvailable);
+            if (electricalAvailable && !codes.Any(code => SensorHealthCode.GroupOf(code) == SensorHealthCode.Rtc) &&
+                profile.EffectiveLampCountCalibration is { } calibration && diagnosis.Status != "stale" &&
+                measurement.LampCommand == "ON" && LampCountEstimator.InCalibrationRange(measurement.Voltage, calibration))
             {
-                Status = "anomaly",
-                LampCount = estimate,
-                Anomalies = [.. diagnosis.Anomalies, new("lamp_count_shortfall", estimate.EstimatedMissing, null, null, null)],
+                var estimate = LampCountEstimator.Evaluate(
+                    RecentOnCurrents(device!, calibration, now, profile.MaxSilenceSeconds), calibration);
+                diagnosis = diagnosis with { LampCount = estimate };
+                if (estimate.EstimatedMissing is > 0)
+                    diagnosis = diagnosis with
+                    {
+                        Status = "anomaly",
+                        Anomalies = [.. diagnosis.Anomalies, new("lamp_count_shortfall", estimate.EstimatedMissing)],
+                    };
             }
-            : diagnosis with { LampCount = estimate };
+        }
+
+        return codes.Length == 0 ? diagnosis : diagnosis with
+        {
+            Status = "anomaly",
+            Anomalies = [.. diagnosis.Anomalies, .. codes.Select(code => new IotAnomaly(code))],
+        };
     }
 
     public async Task RequireMqttAuthorizationAsync(string serverId, string deviceId, string communeId,
@@ -310,7 +344,7 @@ public sealed class IotDiagnosticsService(
         (from node in db.Set<IotNode>()
          from feeder in db.Set<Feeder>()
          where node.NodeId == nodeId && feeder.FeederId == feederId &&
-               node.CabinetId == feeder.CabinetId && node.CommuneId == feeder.CommuneId &&
+               node.CabinetId != null && node.CabinetId == feeder.CabinetId && node.CommuneId == feeder.CommuneId &&
                (!remote || node.SupportsRemoteControl)
          select feeder.FeederId).AnyAsync(ct);
 
@@ -349,11 +383,8 @@ public sealed class IotDiagnosticsService(
         var sample = device?.LatestTelemetry;
         var freshAfter = now.AddSeconds(-maxSilenceSeconds);
         // RTC timestamps are local UTC+07:00. Archived samples can arrive long after they were measured.
-        if (sample?.Data is { } data &&
-            DateTime.TryParseExact(data.Timestamp, "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var local))
+        if (sample?.Data is { } data && MeasuredAt(data.Timestamp) is { } measuredAt)
         {
-            var measuredAt = new DateTimeOffset(local, TimeSpan.FromHours(7));
             var power = DecodePower(data.LampCommand);
             if (measuredAt >= freshAfter && measuredAt <= now &&
                 (ack is null || measuredAt > ack.ReceivedAt) && power != FeederPowerState.Unknown)
@@ -517,7 +548,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "after phải từ 0 và limit phải từ 1 đến 1000.");
 
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct, includeDetached: true);
         var path = FormattableString.Invariant(
             $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history?after={after}&limit={limit}");
         try
@@ -543,7 +574,7 @@ public sealed class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "sort_by phải là received_at hoặc measured_at.");
 
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct);
+        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct, includeDetached: true);
         var path = FormattableString.Invariant(
             $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history/page?page={page.Page}&pageSize={page.PageSize}&sortBy={sortBy}");
         try
@@ -564,10 +595,11 @@ public sealed class IotDiagnosticsService(
         }
     }
 
-    private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(string nodeId, CancellationToken ct)
+    private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(
+        string nodeId, CancellationToken ct, bool includeDetached = false)
     {
         await RequireNodeAsync(nodeId, ct);
-        var settings = await registry.ReadAsync([nodeId], ct);
+        var settings = await registry.ReadAsync([nodeId], ct, includeDetached);
         if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out _, out var uri))
             throw Unavailable("Chưa cấu hình nguồn điều khiển cho thiết bị IoT.");
         return (uri, profile.DeviceId, profile);
@@ -589,7 +621,7 @@ public sealed class IotDiagnosticsService(
 
     public async Task<PagedResult<IotNodeStatus>> NodesAsync(PageRequest page, CancellationToken ct)
     {
-        var nodes = db.Set<IotNode>().AsNoTracking();
+        var nodes = db.Set<IotNode>().AsNoTracking().Where(node => node.CabinetId != null);
         var total = await nodes.CountAsync(ct);
         if (((long)page.Page - 1) * page.PageSize >= total)
             return PagedResult<IotNodeStatus>.From(page, total, []);
@@ -635,7 +667,7 @@ public sealed class IotDiagnosticsService(
     public async Task<IReadOnlyList<IotServerStatus>> ServersAsync(CancellationToken ct)
     {
         // A server is visible only if it has a registered node in the caller's commune scope.
-        var visibleIds = await db.Set<IotNode>().AsNoTracking()
+        var visibleIds = await db.Set<IotNode>().AsNoTracking().Where(node => node.CabinetId != null)
             .Select(node => node.NodeId).ToListAsync(ct);
         var settings = await registry.ReadAsync(visibleIds, ct);
         var servers = new SortedDictionary<string, (Uri Uri, string DeviceId)>(StringComparer.Ordinal);
@@ -764,9 +796,22 @@ public sealed class IotDiagnosticsService(
             sample.Voltage!.Value, sample.Current!.Value, sample.Power!.Value);
     }
 
-    private static IReadOnlyList<double> RecentOnCurrents(PrototypeDevice device)
+    private static DateTimeOffset? MeasuredAt(string? timestamp) =>
+        DateTime.TryParseExact(timestamp, "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var local) && local.Ticks >= TimeSpan.FromHours(7).Ticks
+            ? new DateTimeOffset(local, TimeSpan.FromHours(7)) : null;
+
+    private static IReadOnlyList<double> RecentOnCurrents(
+        PrototypeDevice device, string calibration, DateTimeOffset now, int maxSilenceSeconds)
     {
         if (device.LatestTelemetry?.Data is not { SessionId: { Length: > 0 } session, SequenceNumber: > 0 } latest)
+            return [];
+
+        var fourVolt = calibration == LampCountEstimator.FourVolt;
+        var maximumGap = TimeSpan.FromSeconds(maxSilenceSeconds);
+        var newestTime = fourVolt ? MeasuredAt(latest.Timestamp) : null;
+        // A newly delivered backlog must not be interpreted as a fresh 4 V reading.
+        if (fourVolt && (newestTime is null || newestTime > now || newestTime < now - maximumGap))
             return [];
 
         // Use sequence order: replayed MQTT samples can arrive out of order.
@@ -780,17 +825,24 @@ public sealed class IotDiagnosticsService(
         {
             var candidates = history[sequence];
             if (candidates.Count() != 1 ||
-                candidates.First() is not { LampCommand: "ON", Voltage: double voltage, Current: double current } ||
-                !LampCountEstimator.InCalibrationRange(voltage) || !double.IsFinite(current))
+                candidates.First() is not { LampCommand: "ON", Voltage: double voltage, Current: double current } sample ||
+                !LampCountEstimator.InCalibrationRange(voltage, calibration) || !double.IsFinite(current))
                 break;
 
+            if (fourVolt)
+            {
+                var older = MeasuredAt(sample.Timestamp);
+                if (older is null || older >= newestTime || newestTime - older > maximumGap) break;
+                newestTime = older;
+            }
             currents.Add(current);
         }
         return currents;
     }
 
     internal static IotDiagnosticResult Evaluate(
-        IotDiagnosticResult result, IotMeasurement reading, NodeProfile profile, DateTimeOffset now)
+        IotDiagnosticResult result, IotMeasurement reading, NodeProfile profile, DateTimeOffset now,
+        bool electricalAvailable = true)
     {
         var silence = (now - reading.ReceivedAt).TotalSeconds;
         if (silence > profile.MaxSilenceSeconds)
@@ -802,20 +854,12 @@ public sealed class IotDiagnosticsService(
             };
 
         var anomalies = new List<IotAnomaly>();
-        if (reading.LampCommand == "OFF")
+        if (electricalAvailable && reading.LampCommand == "ON")
         {
-            if (reading.CurrentMa > profile.OffCurrentLimitMa)
-                anomalies.Add(new("current_when_off", reading.CurrentMa, null, null, profile.OffCurrentLimitMa));
-        }
-        else if (Math.Abs(reading.Voltage) <= LampCountEstimator.VoltageLossLimit)
-        {
-            anomalies.Add(new("voltage_loss", reading.Voltage, null, null, LampCountEstimator.VoltageLossLimit));
-        }
-        else
-        {
-            Compare(anomalies, "voltage_deviation", reading.Voltage, profile.NominalVoltage, profile.VoltageTolerancePercent);
-            Compare(anomalies, "current_deviation", reading.CurrentMa, profile.NominalCurrentMa, profile.CurrentTolerancePercent);
-            Compare(anomalies, "power_deviation", reading.PowerMw, profile.NominalPowerMw, profile.PowerTolerancePercent);
+            if (Math.Abs(reading.Voltage) <= LampCountEstimator.VoltageLossLimit)
+                anomalies.Add(new("voltage_loss", reading.Voltage, null, null, LampCountEstimator.VoltageLossLimit));
+            else
+                Compare(anomalies, "voltage_deviation", reading.Voltage, profile.NominalVoltage, profile.VoltageTolerancePercent);
         }
 
         return result with
@@ -850,7 +894,8 @@ public sealed class IotDiagnosticsService(
     private sealed record GatewayHealth(string? Status);
     private sealed record PrototypeDevice(
         string? DeviceId, PrototypeReading? LatestTelemetry, PrototypeReading[]? History,
-        PrototypeCommand? DesiredCommand, bool CommandAcknowledged, PrototypeAck? LastCommandAck);
+        PrototypeCommand? DesiredCommand, bool CommandAcknowledged, PrototypeAck? LastCommandAck,
+        ReceivedSensorHealth? SensorHealth);
     private sealed record PrototypeAck(PrototypeAckData? Data, DateTimeOffset ReceivedAt);
     private sealed record PrototypeAckData(string? LampCommand);
     private static bool TryParseClock(string? value, out TimeOnly time) =>

@@ -40,6 +40,22 @@
 <body>
 <div class="wrap">
 
+  <div class="card">
+    <strong>PR #266 — giải quyết conflict iot với dev · 16/11/2026</strong>
+    <p><span class="tag t-done">Đã push lên iot · hết conflict · CI đang chạy</span>
+    Gộp <code>dev 1e89827</code> vào nền <code>iot 972a927</code> trên <code>fix/PR-266-conflicts</code>.
+    Sinh lại <code>docs/openapi/luxmap-v1.5.json</code>; gộp helper trong <code>tests/LuxMap.Api.Tests/IotDiagnosticsTests.cs</code>,
+    giữ detach/lịch sử điện/4 V và dùng service + kiểm trạng thái DB thay route lighting đã bỏ.
+    Build 0 warning/error; <b>2336 .NET pass, 0 fail, 5 skip có sẵn + 20 Python pass</b>, có MQTT E2E thật.
+    OpenAPI xuất lại khớp, lint hợp lệ (9 warning); không còn file conflict.
+    Files bổ sung: <code>tracking.html</code>, <code>.ai/results/PR-266-conflicts.md</code>.
+    Commit: <code>fix(iot): resolve PR #266 conflicts with dev</code>.
+    <a href=".ai/results/PR-266-conflicts.md">Bằng chứng</a>. Đã push bản sửa <code>1d7bf21</code> ngày 17/11/2026 và đổi tiêu đề
+    <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/266">PR #266</a> thành
+    <code>feat(iot): add 4 V diagnostics and preserve history when detaching nodes</code>.
+    GitHub xác nhận mergeable; CI đang chạy (trạng thái hiện hành xem PR). Chưa merge PR/deploy.</p>
+  </div>
+
 
   <div class="card">
     <strong>IOT-REMOVE-LIGHTING-ROUTES — bỏ ba route <code>/lighting/*</code>, 16/11/2026</strong>

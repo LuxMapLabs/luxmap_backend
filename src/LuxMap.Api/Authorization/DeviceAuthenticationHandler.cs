@@ -56,7 +56,7 @@ public sealed class DeviceAuthenticationHandler(
         var secret = credential[(dot + 1)..];
 
         var device = await db.Set<IotNode>().IgnoreQueryFilters().AsNoTracking()
-            .Where(node => node.NodeId == nodeId)
+            .Where(node => node.NodeId == nodeId && node.CabinetId != null)
             .Select(node => new { node.NodeId, node.CommuneId, node.CredentialHash })
             .FirstOrDefaultAsync(Context.RequestAborted);
 

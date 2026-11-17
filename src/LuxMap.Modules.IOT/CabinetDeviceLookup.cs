@@ -17,12 +17,12 @@ public sealed class CabinetDeviceLookup(LuxMapDbContext db) : ICabinetDeviceLook
         }
 
         var nodes = await db.Set<IotNode>().AsNoTracking()
-            .Where(node => cabinetIds.Contains(node.CabinetId))
+            .Where(node => node.CabinetId != null && cabinetIds.Contains(node.CabinetId))
             .OrderBy(node => node.CreatedAt).ThenBy(node => node.NodeId.Length).ThenBy(node => node.NodeId)
             .Select(node => new { node.CabinetId, node.NodeId })
             .ToListAsync(ct);
 
-        return nodes.GroupBy(node => node.CabinetId).ToDictionary(
+        return nodes.GroupBy(node => node.CabinetId!).ToDictionary(
             group => group.Key, group => (IReadOnlyList<string>)[.. group.Select(node => node.NodeId)], StringComparer.Ordinal);
     }
 

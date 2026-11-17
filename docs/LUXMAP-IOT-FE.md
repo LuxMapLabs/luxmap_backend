@@ -39,7 +39,7 @@ ESP32 gateway dùng địa chỉ broker TLS, Gateway ID, MQTT username và secre
 
 ### 2.2 Admin tạo node và gán feeder
 
-`POST /api/v1/iot/nodes/register` · quyền `ManageSettings`
+`POST /api/v1/iot/nodes` · quyền `ManageSettings`
 
 ```json
 {
@@ -62,8 +62,8 @@ API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response 
 ### Quản lý tuyến và nguồn đo
 
 - Admin gọi `GET /api/v1/iot/servers/{serverId}/gateways/routes` để đọc `gateway_id`, `device_ids` và `credential_issued`. Nếu nhiều server dùng chung bridge, danh sách phản ánh toàn bộ tuyến của bridge đó.
-- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}/source` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo. Thành công trả `204`. Backend kiểm tra lại xã, feeder, tủ điện và quyền MQTT.
-- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/source` để gỡ liên kết. Thành công trả `204`. Lịch sử trên bridge, tuyến MQTT và secret vẫn được giữ. Nguồn chỉ khai báo trong cấu hình triển khai trả `409` khi sửa hoặc gỡ.
+- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
+- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, còn dữ liệu lịch sử, tuyến MQTT và secret được giữ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
 
 ## 3. Hiển thị trên bản đồ
 
@@ -145,11 +145,11 @@ Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, 
 
 | API | Cách dùng |
 |---|---|
-| `GET /api/v1/iot/nodes/{nodeId}/electrical` | Hiện mẫu mới nhất và `power_state`. Kiểm tra `status` và `received_at` để phân biệt mẫu mới với mẫu cũ. |
-| `GET /api/v1/iot/nodes/{nodeId}/electrical/history?page=1&page_size=20&sort_by=received_at` | Đọc lịch sử điện, mới nhất trước. Đổi `sort_by=measured_at` để sắp theo giờ đo trên node. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical` | Mẫu mới nhất đã ghi cho mạch. Sau khi tháo node, có thể xem mẫu cuối với `status: offline` và `power_state: unknown`. Feeder chưa có mẫu trả `no_data` nếu đã gắn nguồn hoặc `unconfigured` nếu chưa gắn. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical/history?page=1&page_size=20&sort_by=received_at` | Lịch sử điện của mạch qua các lần gắn hoặc thay node. Đổi `sort_by=measured_at` để sắp theo giờ đo. Mỗi dòng có `node_id` và `server_id` của nguồn đã đo. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo ở cấp `feeder_id` từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
 
-Phản hồi lịch sử mặc định có `page`, `page_size`, `total` và `items`. Mặc định trang 1, 50 mục mỗi trang và sắp theo `received_at`; tối đa 200 mục mỗi trang. Mẫu thiếu `timestamp` nằm cuối khi sắp theo `measured_at`. Khi đồng bộ mẫu mới, có thể tiếp tục gọi `?after=0&limit=100` và dùng `next_cursor` cho lần gọi sau.
+Phản hồi lịch sử mặc định có `page`, `page_size`, `total` và `items`. Mặc định trang 1, 50 mục mỗi trang và sắp theo `received_at`; tối đa 200 mục mỗi trang. Mẫu thiếu `timestamp` nằm cuối khi sắp theo `measured_at`. Feeder nhận mẫu theo khoảng thời gian node được gán. Hệ thống ưu tiên giờ đo RTC, dùng giờ nhận cho mẫu không có giờ RTC. Mẫu gửi bù vẫn thuộc mạch lúc đo. Các tích hợp thiết bị có thể tiếp tục dùng endpoint điện theo node, với `after` và `limit` cho đồng bộ cursor.
 
 Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA) và `measurement.power_mw` (mW). Lịch sử dùng `items[].reading.data.{voltage,current,power,lux}` theo thứ tự V, mA, mW, lx. `timestamp` trong dữ liệu lịch sử là giờ đo theo RTC DS3231 của node. `received_at` là giờ UTC khi server nhận mẫu. Dữ liệu gửi bù có thể được nhận muộn hơn lúc đo.
 
@@ -163,15 +163,48 @@ Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA
 | | `stale` | Mẫu đã cũ và không dùng để chẩn đoán điện hiện tại. |
 | | `no_data` | Chưa có mẫu để chẩn đoán. |
 | `anomalies[].code` | `telemetry_stale` | Thời gian từ mẫu cuối vượt ngưỡng. |
-| | `current_when_off` | Dòng điện vượt ngưỡng cho phép khi đèn ở trạng thái OFF. |
 | | `voltage_loss` | Điện áp gần 0 khi đèn được yêu cầu bật. |
 | | `voltage_deviation` | Điện áp lệch khỏi giá trị tham chiếu quá ngưỡng. |
-| | `current_deviation` | Dòng điện lệch khỏi giá trị tham chiếu quá ngưỡng. |
-| | `power_deviation` | Công suất lệch khỏi giá trị tham chiếu quá ngưỡng. |
 | | `lamp_count_shortfall` | Số bóng sáng ước lượng thấp hơn số bóng hiệu chuẩn. |
 | `lamp_count.status` | `insufficient_samples` | Chưa đủ 25 mẫu hợp lệ. |
-| | `undetermined` | Đủ 25 mẫu nhưng chưa đủ phiếu để chọn một khung dòng. |
-| | `estimated` | Một khung đủ phiếu để ước lượng số bóng sáng và số bóng thiếu. |
+| | `undetermined` | Đủ 25 mẫu nhưng chưa khớp rõ một nhóm hiệu chuẩn. |
+| | `estimated` | Một nhóm hiệu chuẩn đủ điều kiện để trả số bóng sáng và số bóng thiếu. |
+
+### Lỗi sức khỏe cảm biến
+
+`GET /api/v1/iot/nodes/{nodeId}/diagnostics` trả cùng cấu trúc `anomalies[]` cho lỗi điện và lỗi cảm biến. Mỗi mục có `code`, `observed`, `reference`, `deviation_percent` và `limit`. Bốn trường số của các mã lỗi cảm biến có giá trị `null`.
+
+| Mã lỗi | Nội dung hiển thị |
+|---|---|
+| `ds3231_unavailable` | Không nhận hoặc không khởi tạo được DS3231. |
+| `ds3231_read_failed` | Đọc DS3231 qua I²C thất bại. |
+| `ds3231_time_invalid` | Giờ trên DS3231 không hợp lệ hoặc đồng hồ báo mất nguồn. |
+| `ina226_unavailable` | Không nhận hoặc không khởi tạo được INA226. |
+| `ina226_read_failed` | Đọc thanh ghi INA226 thất bại. |
+| `ina226_shunt_out_of_range` | Số đo shunt chạm giới hạn của INA226. |
+| `bh1750_unavailable` | Không nhận hoặc không khởi tạo được BH1750. |
+| `bh1750_read_failed` | Đọc mẫu ánh sáng BH1750 thất bại. |
+| `microsd_unavailable` | Không khởi tạo được hàng đợi trên microSD. |
+| `microsd_read_failed` | Không đọc được hàng đợi hoặc gặp bản ghi lỗi trên microSD. |
+| `microsd_write_failed` | Không ghi được mẫu lên microSD, kể cả khi file hàng đợi đã đạt giới hạn. |
+| `lora_tx_blocked` | Node có gói chờ phát và AUX ở LOW liên tục ít nhất 10 giây. |
+| `lora_rx_frame_error` | Node liên tiếp nhận nhiều frame LoRa lỗi CRC, quá dài hoặc thiếu dữ liệu. |
+
+`sensor_health.received_at` là giờ UTC Bridge nhận bản tin sức khỏe. `sensor_health.status` là `fresh` trong 60 giây, `stale` khi quá hạn hoặc `unknown` khi chưa có bản tin. Báo cáo mới chứa lỗi cảm biến thì trạng thái chung là `anomaly` kể cả khi `measurement` là `null`. Báo cáo cũ giữ thời điểm nhận để FE biết trạng thái chưa được cập nhật.
+
+Node xác nhận lỗi và phục hồi của DS3231, INA226 và BH1750 sau 3 lần kiểm tra liên tiếp cho cùng kết quả. Lỗi microSD dựa trên kết quả khởi tạo, đọc hoặc ghi thực tế. Lỗi LoRa do node quan sát có thể được gửi khi đường truyền còn hoạt động hoặc khi hoạt động lại. Khi mất hoàn toàn đường truyền, FE dựa vào `telemetry_stale` và `sensor_health.status` để hiển thị dữ liệu đã cũ.
+
+Node gửi snapshot khi trạng thái đổi và định kỳ 30 giây khi đã nhận ACK. Khi cảm biến phục hồi, snapshot mới bỏ mã lỗi đó. Gateway chuyển các bản tin này giữa LoRa và các topic MQTT `luxmap/{deviceId}/sensorHealth` và `luxmap/{deviceId}/sensorHealthAck`. Với lỗi INA226, API bỏ qua cảnh báo dựa trên giá trị điện của mẫu cũ. Với lỗi DS3231, API bỏ qua ước lượng số bóng dựa trên giờ đo.
+
+### Hiệu chuẩn bộ thử 10 bóng ở nguồn khoảng 4 V
+
+Thêm `"lamp_count_calibration": "4v"` vào JSON của `POST /api/v1/iot/nodes` khi tạo hoặc `PUT /api/v1/iot/nodes/{nodeId}` khi sửa nguồn hiện có. Đặt `nominal_voltage` theo điện áp danh định của bộ đang đo để cảnh báo điện áp dùng đúng mốc. Cấu hình `"5v"` và cờ cũ `use_ten_lamp_calibration: true` vẫn chọn hiệu chuẩn 5 V nếu phù hợp.
+
+Hiệu chuẩn 4 V chỉ ước lượng trong phạm vi **6–10 bóng sáng** của bộ thử. Backend xét 25 mẫu ON liên tiếp cùng phiên ở **4,00–4,13 V**, theo thứ tự đo của node. Mẫu cuối phải có giờ RTC còn mới. Nếu có khoảng ngắt, mẫu mất áp, OFF hoặc ra ngoài dải, backend không nối qua điểm đó. Mẫu gửi bù được xếp theo số thứ tự, dãy cũ vừa đến Bridge không đủ để báo thiếu bóng. Firmware lưu một mẫu khoảng mỗi 10 giây nên cần khoảng 4 phút dữ liệu liên tục.
+
+Cả 25 số đo phải nằm trong dải dòng quan sát của một nhóm. Với 10, 8 và 7 bóng, lần lượt cần ít nhất 10 mẫu `>65`, `≥50` và `≥45` mA. Nhóm 9 bóng cần không có mẫu `>65` mA và nhóm 6 bóng cần không có mẫu `≥45` mA. Cửa sổ không khớp rõ trả `undetermined`. Đây là các mốc thử dựa trên dữ liệu của bộ đèn hiện tại.
+
+`lamp_count.median_current_ma` và `lamp_count.threshold_counts` giúp đối chiếu kết quả 4 V. Với 4 V, `votes` là số mẫu nằm trong từng dải quan sát, nên một mẫu có thể được tính ở nhiều dải. `required_votes: 25` là điều kiện cả cửa sổ phải nằm trong dải của nhóm được ước lượng.
 
 | HTTP | `error.code` | Ý nghĩa |
 |---|---|---|

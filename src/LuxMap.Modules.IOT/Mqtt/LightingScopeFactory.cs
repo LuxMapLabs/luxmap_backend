@@ -33,7 +33,7 @@ public sealed class LightingScopeFactory(
     {
         await using var db = Context(CommuneScope.Empty);
         return await db.Set<IotNode>().IgnoreQueryFilters().AsNoTracking()
-            .Where(node => node.NodeId == nodeId).Select(node => node.CommuneId).FirstOrDefaultAsync(ct);
+            .Where(node => node.NodeId == nodeId && node.CabinetId != null).Select(node => node.CommuneId).FirstOrDefaultAsync(ct);
     }
 
     /// <summary>Devices that still have an open command, with their commune — read unfiltered, to know which scopes to open.</summary>

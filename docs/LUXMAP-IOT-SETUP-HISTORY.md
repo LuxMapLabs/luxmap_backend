@@ -57,7 +57,7 @@ Trên trang cấu hình ESP32 gateway, nhập Wi-Fi của nơi lắp đặt, bro
 
 Xem `cabinet_id`, `commune_id` và `feeder_ids` của tủ bằng [GET /api/v1/assets/cabinets/CAB-011](https://luxmap.com.vn/api/v1/assets/cabinets/CAB-011). Chọn feeder thuộc đúng tủ. Sau đó dùng token của Admin cho request sau.
 
-**[POST /api/v1/iot/nodes/register](https://luxmap.com.vn/api/v1/iot/nodes/register)** · quyền `ManageSettings`
+**[POST /api/v1/iot/nodes](https://luxmap.com.vn/api/v1/iot/nodes)** · quyền `ManageSettings`
 
 ```json
 {
@@ -98,6 +98,8 @@ Thành công lần đầu trả `201 Created`. Gửi lại cùng cấu hình tr�
 ```
 
 Sau khi đăng ký, kiểm tra gateway qua [GET /api/v1/iot/servers](https://luxmap.com.vn/api/v1/iot/servers), node qua [GET /api/v1/iot/nodes?page=1&page_size=20](https://luxmap.com.vn/api/v1/iot/nodes?page=1&page_size=20) và mẫu mới nhất qua [GET /api/v1/iot/nodes/NODE-004/electrical](https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/electrical). Gateway online theo heartbeat MQTT. Node online khi có mẫu điện đủ mới. Dùng token có quyền đọc và phạm vi xã/phường của node.
+
+Với node đã có ID, Manager dùng `PUT /api/v1/iot/nodes/{nodeId}` để gắn hoặc đổi nguồn đo. Manager dùng `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và feeder. Backend lưu bản ghi node, liên kết nguồn đã gỡ và dữ liệu lịch sử. Có thể gắn lại cùng `node_id` bằng PUT, chọn feeder có tủ trong cùng xã.
 
 ## 4. API lịch sử lệnh ON, OFF và AUTO
 
@@ -140,9 +142,9 @@ API đọc audit từ database LuxMap, mỗi yêu cầu gửi lệnh qua Bridge 
 
 ## 5. API lịch sử dữ liệu điện
 
-**[GET /api/v1/iot/nodes/NODE-004/electrical/history?page=1&page_size=20&sort_by=measured_at](https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/electrical/history?page=1&page_size=20&sort_by=measured_at)** · quyền `ReadNetwork`
+**[GET /api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&sort_by=measured_at](https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&sort_by=measured_at)** · quyền `ReadNetwork`
 
-API đọc các mẫu đã lưu trong SQLite của Bridge. Dùng `sort_by` để chọn thứ tự mới nhất trước.
+API đọc các mẫu SQLite đã ghi cho feeder qua các lần gắn node. Gọi `GET /api/v1/iot/feeders/FDR-009/electrical` để xem mẫu cuối. Dùng `sort_by` để chọn thứ tự mới nhất trước.
 
 | `sort_by` | Dựa vào | Khi dùng |
 |---|---|---|
@@ -157,6 +159,8 @@ API đọc các mẫu đã lưu trong SQLite của Bridge. Dùng `sort_by` để
   "items": [
     {
       "cursor": 125,
+      "node_id": "NODE-004",
+      "server_id": "iot-server-01",
       "reading": {
         "data": {
           "timestamp": "2026-11-15T15:00:10",
@@ -175,6 +179,8 @@ API đọc các mẫu đã lưu trong SQLite của Bridge. Dùng `sort_by` để
     },
     {
       "cursor": 126,
+      "node_id": "NODE-004",
+      "server_id": "iot-server-01",
       "reading": {
         "data": {
           "timestamp": "2026-11-15T15:00:00",
@@ -197,7 +203,7 @@ API đọc các mẫu đã lưu trong SQLite của Bridge. Dùng `sort_by` để
 
 Mẫu đo lúc **15:00:10** đứng đầu khi dùng `measured_at`. Đổi sang `received_at`, mẫu Bridge nhận lúc **08:00:15 UTC** đứng đầu. Đồng hồ DS3231 trên node lưu giờ địa phương, nên `timestamp` trong API không có hậu tố múi giờ. `voltage` tính bằng V, `current` bằng mA, `power` bằng mW và `lux` bằng lx. `cursor` là ID bản ghi trong kho mẫu Bridge.
 
-Các tích hợp đồng bộ theo cursor có thể dùng `?after=0&limit=100` và đọc `next_cursor`, `has_more`. Dùng riêng bộ tham số đó. Trộn với `page`, `page_size` hoặc `sort_by` trả `400`.
+Các tích hợp đồng bộ theo node có thể dùng `GET /api/v1/iot/nodes/{nodeId}/electrical/history` với `?after=0&limit=100` và đọc `next_cursor`, `has_more`. Dùng riêng bộ tham số đó. Trộn với `page`, `page_size` hoặc `sort_by` trả `400`.
 
 ## 6. Phân trang và đọc lỗi
 

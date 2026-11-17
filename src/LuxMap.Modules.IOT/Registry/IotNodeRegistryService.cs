@@ -151,7 +151,7 @@ public sealed class IotNodeRegistryService(
         {
             var feeder = await FeederControllerBinding.LockFeederAsync(db, feederId, ct);
 
-            if (!string.Equals(feeder.CabinetId, node.CabinetId, StringComparison.Ordinal))
+            if (node.CabinetId is null || !string.Equals(feeder.CabinetId, node.CabinetId, StringComparison.Ordinal))
             {
                 throw new LuxMapException(
                     ErrorCodes.FeederNotInCabinet,
@@ -203,7 +203,7 @@ public sealed class IotNodeRegistryService(
                 FeederId = feederId,
                 NodeId = node.NodeId,
                 CommuneId = node.CommuneId,
-                CabinetId = node.CabinetId,
+                CabinetId = node.CabinetId!,
                 RelayNo = (short)relayNo,
             });
         }
