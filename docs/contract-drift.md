@@ -1911,6 +1911,19 @@ trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và h
 **WP5 cần nhận:** danh sách/media theo phiếu, thao tác duyệt, thông điệp ảnh cũ/inconclusive/unavailable, `last_sweep_id` có thể null khi cột đã được xác nhận bằng ảnh.
 FW cần xác nhận nền tạm; chưa có tuyên bố độ chính xác CV từ ảnh tổng hợp trong test.
 
+### POLE-PHOTO-WITHDRAW (17/11/2026)
+
+**Mỹ chốt 17/11/2026 — SELF-SIGNED, nền tạm, chờ FW xác nhận.** Chạm bề mặt API: endpoint DELETE mới và mã
+`POLE_PHOTO_WITHDRAWN`. Consumer **WP6** (đề xuất gốc của Thịnh) và **WP5** (ảnh đã hủy biến khỏi hàng duyệt);
+chưa gửi thông báo từ lượt thực thi này. Contract văn bản giữ nguyên.
+
+| Mã | Quyết định / bề mặt client |
+|---|---|
+| **PP-16** | `DELETE /api/v1/work-orders/{id}/pole-photos/{photo_id}`, không body, policy `ExecuteWorkOrders` (chỉ `field_engineer`). Chỉ kỹ sư được giao, phiếu `in_progress`, ảnh/clip chưa có decision. Thành công **204**, body rỗng. Xóa **mềm** bằng `withdrawn_at/withdrawn_by`, không xóa row: D-R16 giữ ảnh qua bảo hành và sau đó; D-R13 giữ đích tham chiếu của audit `submitted/analyzed`. Bytes ảnh gốc, thumbnail và clip giữ nguyên, vẫn được kiểm kê BE-35. |
+| **PP-17** | Thứ tự: kiểm phiếu tồn tại/được giao/trong xã → **404 `WORK_ORDER_NOT_FOUND`**; kiểm ảnh thuộc phiếu và trong xã (kể cả ảnh đã hủy) → **404 `POLE_PHOTO_NOT_FOUND`**; đã hủy → **204 ngay**, kể cả phiếu nay `done`, không ghi/audit thêm. Khóa **work_order → pole → photo**, kiểm lại quyền/ảnh dưới khóa; request song song thấy đã hủy cũng 204. Sau đó phiếu không `in_progress` → **409 `WORK_ORDER_NOT_IN_PROGRESS`**, rồi ảnh có decision → **409 `POLE_PHOTO_ALREADY_DECIDED`**. Quản lý/các vai trò khác bị policy chặn **403 `ROLE_FORBIDDEN`** trước lookup; chưa đăng nhập 401. Mỗi lần hủy thật đúng một audit `deleted`, entity `work_order`, xã theo ảnh, snapshot before/after có photo/pole, nhãn AI, nhãn kỹ sư, có/không clip và dấu hủy; cùng một SaveChanges/transaction. |
+| **PP-18** | Ảnh đã hủy biến khỏi list (cả `total`, kể cả lọc `pole_id`); detail/thumbnail/original/video/review/decision coi như không có → **404 `POLE_PHOTO_NOT_FOUND`**. Không ghi lượt xem clip đã hủy. Cột vẫn thuộc phiếu, nhận ảnh/clip mới. Không dùng global query filter: DELETE/replay cần thấy dấu hủy, kiểm kê giữ toàn bộ key. `SurveyFindingLookup` không đổi vì ảnh đã quyết không hủy được. |
+| **PP-19** | Upload ảnh và upload clip dùng lại `client_op_id` của row đã hủy → **409 `POLE_PHOTO_WITHDRAWN`**, `details.photo_id`, sau kiểm quyền phiếu/xã, trước kiểm hash/trạng thái phiếu; cả khi nội dung khác hoặc phiếu đã `done`. Mobile phải dùng **client_op_id mới** cho lần chụp mới. Replay không infer/ghi object/audit, không trả snapshot ảnh đã hủy. Bundle sync hiện không chứa ảnh cột; push không thêm op hủy, dùng DELETE online và retry idempotent. |
+
 ### PHOTO-REVIEW — kỹ sư sửa nhãn trước khi Quản lý công bố (20/10/2026)
 
 **Mỹ SELF-SIGNED 20/10/2026**, theo R-1…R-3 và D-1…D-5 trong `.ai/tasks/PHOTO-REVIEW.md`.

@@ -60,14 +60,22 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict);
     }
 
+    // Keep retention/inventory unchanged: only user-facing reads hide withdrawals. DELETE and upload replay must see them.
+    private IQueryable<WorkOrderPolePhoto> Photos(bool includeWithdrawn = false)
+        => db.Set<WorkOrderPolePhoto>().Where(p => includeWithdrawn || p.WithdrawnAt == null);
+
     /// <summary>The photo (or clip) already stored for this user's operation: the same request again is a replay, a different one is a conflict.</summary>
     private async Task<PolePhotoItem?> ReplayAsync(string id, string actorId, Guid op, string hash, CancellationToken ct)
     {
-        var row = await db.Set<WorkOrderPolePhoto>().AsNoTracking().SingleOrDefaultAsync(p => p.UploadedBy == actorId && p.ClientOpId == op, ct);
+        var row = await Photos(includeWithdrawn: true).AsNoTracking().SingleOrDefaultAsync(p => p.UploadedBy == actorId && p.ClientOpId == op, ct);
         if (row is null) return null;
-        if (row.RequestHash != hash) throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
+        // A live row keeps its original order of checks; a withdrawn one answers WITHDRAWN whatever the content (PP-19).
+        if (row.WithdrawnAt is null && row.RequestHash != hash) throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
         // Scope on the photo is independent of its parent on inter-commune roads.
         await Order(id, true, ct);
+        if (row.WithdrawnAt is not null)
+            throw new LuxMapException("POLE_PHOTO_WITHDRAWN", HttpStatusCode.Conflict, "Use a new client_op_id for a new capture.",
+                new Dictionary<string, object?> { ["photo_id"] = row.PhotoId });
         return Item(row);
     }
 
@@ -185,7 +193,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
     public async Task<PagedResult<PolePhotoItem>> ListAsync(string id, string? poleId, PageRequest page, CancellationToken ct)
     {
         await Order(id, false, ct);
-        var query = db.Set<WorkOrderPolePhoto>().AsNoTracking().Where(p => p.WorkOrderId == id);
+        var query = Photos().AsNoTracking().Where(p => p.WorkOrderId == id);
         if (poleId is not null) query = query.Where(p => p.PoleId == poleId);
         var count = await query.CountAsync(ct);
         var rows = await query.OrderBy(p => p.CapturedAt).ThenBy(p => p.UploadedAt).ThenBy(p => p.PhotoId.Length)
@@ -193,10 +201,10 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         return PagedResult<PolePhotoItem>.From(page, count, rows.Select(Item).ToArray());
     }
 
-    private async Task<WorkOrderPolePhoto> Photo(string id, string photoId, CancellationToken ct)
+    private async Task<WorkOrderPolePhoto> Photo(string id, string photoId, CancellationToken ct, bool includeWithdrawn = false)
     {
         await Order(id, false, ct);
-        return await db.Set<WorkOrderPolePhoto>().AsNoTracking().SingleOrDefaultAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct)
+        return await Photos(includeWithdrawn).AsNoTracking().SingleOrDefaultAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct)
             ?? throw Error("POLE_PHOTO_NOT_FOUND", HttpStatusCode.NotFound);
     }
     public async Task<PolePhotoItem> DetailAsync(string id, string photoId, CancellationToken ct) => Item(await Photo(id, photoId, ct));
@@ -204,6 +212,31 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
     {
         var row = await Photo(id, photoId, ct);
         return await store.OpenAsync(StorageBucket.Evidence, thumbnail ? row.ThumbnailKey : row.ObjectKey, ct);
+    }
+
+    public async Task WithdrawAsync(string id, string photoId, CancellationToken ct)
+    {
+        await Order(id, true, ct);
+        var initial = await Photo(id, photoId, ct, includeWithdrawn: true);
+        if (initial.WithdrawnAt is not null) return;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
+        var order = await Order(id, true, ct);
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {initial.PoleId} AND commune_id = {initial.CommuneId} FOR UPDATE", ct);
+        await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order_pole_photo WHERE photo_id = {photoId} AND commune_id = {initial.CommuneId} FOR UPDATE", ct);
+        var fresh = await Photo(id, photoId, ct, includeWithdrawn: true);
+        if (fresh.WithdrawnAt is not null) return;
+        Writable(order);
+        if (fresh.Decision is not null) throw Error("POLE_PHOTO_ALREADY_DECIDED", HttpStatusCode.Conflict);
+        var row = await Photos(includeWithdrawn: true).SingleAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct);
+        await db.Entry(row).ReloadAsync(ct);
+        var before = new { row.PhotoId, row.PoleId, row.CvState, row.FinalCvState, HasVideo = row.VideoObjectKey is not null, row.WithdrawnAt, row.WithdrawnBy };
+        row.WithdrawnAt = UtcMicrosecondClock.UtcNow(); row.WithdrawnBy = ActorId;
+        audit.Record(new(row.WithdrawnAt.Value, AuditActorKind.User, ActorId, actor.Role, row.CommuneId,
+            AuditEntityType.WorkOrder, id, AuditAction.Deleted, before,
+            new { row.PhotoId, row.PoleId, row.CvState, row.FinalCvState, HasVideo = row.VideoObjectKey is not null, row.WithdrawnAt, row.WithdrawnBy }));
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
 
     public async Task<PolePhotoItem> ReviewAsync(string id, string photoId, PolePhotoReviewRequest request, CancellationToken ct)
@@ -219,7 +252,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {initial.PoleId} AND commune_id = {initial.CommuneId} FOR UPDATE", ct);
         await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order_pole_photo WHERE photo_id = {photoId} AND commune_id = {initial.CommuneId} FOR UPDATE", ct);
         await Photo(id, photoId, ct);
-        var row = await db.Set<WorkOrderPolePhoto>().SingleAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct);
+        var row = await Photos().SingleAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct);
         await db.Entry(row).ReloadAsync(ct);
         if (row.Decision is not null) throw Error("POLE_PHOTO_ALREADY_DECIDED", HttpStatusCode.Conflict);
         if (request.FinalCvState != row.CvState && note is null) throw OptionalJson.Invalid("review_note");
@@ -246,7 +279,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {initial.PoleId} AND commune_id = {initial.CommuneId} FOR UPDATE", ct);
         await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order_pole_photo WHERE photo_id = {photoId} AND commune_id = {initial.CommuneId} FOR UPDATE", ct);
         await Photo(id, photoId, ct);
-        var row = await db.Set<WorkOrderPolePhoto>().SingleAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct);
+        var row = await Photos().SingleAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct);
         await db.Entry(row).ReloadAsync(ct);
         if (row.Decision is not null) throw Error("POLE_PHOTO_ALREADY_DECIDED", HttpStatusCode.Conflict);
         var effective = row.FinalCvState ?? row.CvState;

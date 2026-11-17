@@ -203,6 +203,7 @@ SUMMARY = {
     ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
     ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO] Kết quả AI và quyết định đã lưu; quyền qua phiếu và xã của ảnh",
+    ("delete", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO-WITHDRAW PP-16…PP-19] Người được giao hủy mềm ảnh/clip chưa quyết, phiếu in_progress; 204 idempotent kể cả retry sau done. Giữ bytes/audit; ảnh đã hủy không còn đọc/duyệt được, replay upload trả 409 POLE_PHOTO_WITHDRAWN (details.photo_id), cần client_op_id mới",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail"): "[TẠM — POLE-PHOTO] JPEG thumbnail bỏ metadata, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/original"): "[TẠM — POLE-PHOTO] JPEG gốc nguyên byte, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/video"): "[TẠM — POLE-VIDEO PV-c1] Clip MP4 của ảnh cột, proxy có kiểm quyền, no-store; hỗ trợ Range (206, 416 kèm Content-Range). Quản lý mở clip chưa quyết được ghi nhận một lần (audit viewed)",
