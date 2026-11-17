@@ -1924,6 +1924,17 @@ chưa gửi thông báo từ lượt thực thi này. Contract văn bản giữ 
 | **PP-18** | Ảnh đã hủy biến khỏi list (cả `total`, kể cả lọc `pole_id`); detail/thumbnail/original/video/review/decision coi như không có → **404 `POLE_PHOTO_NOT_FOUND`**. Không ghi lượt xem clip đã hủy. Cột vẫn thuộc phiếu, nhận ảnh/clip mới. Không dùng global query filter: DELETE/replay cần thấy dấu hủy, kiểm kê giữ toàn bộ key. `SurveyFindingLookup` không đổi vì ảnh đã quyết không hủy được. |
 | **PP-19** | Upload ảnh và upload clip dùng lại `client_op_id` của row đã hủy → **409 `POLE_PHOTO_WITHDRAWN`**, `details.photo_id`, sau kiểm quyền phiếu/xã, trước kiểm hash/trạng thái phiếu; cả khi nội dung khác hoặc phiếu đã `done`. Mobile phải dùng **client_op_id mới** cho lần chụp mới. Replay không infer/ghi object/audit, không trả snapshot ảnh đã hủy. Bundle sync hiện không chứa ảnh cột; push không thêm op hủy, dùng DELETE online và retry idempotent. |
 
+### SURVEY-VERIFY-PHOTOS (17/11/2026)
+
+**Mỹ + WP5 (Khang) chốt 17/11/2026 — SELF-SIGNED, nền tạm tới FW kế tiếp.** Chạm bề mặt API: mã lỗi mới
+trên route verify hiện có; Contract văn bản giữ nguyên. WP5 đã cùng chốt; lượt thực thi này không gửi thông báo riêng.
+
+| Mã | Quyết định / bề mặt client |
+|---|---|
+| **SVP-1** | `POST /api/v1/work-orders/{id}/verify` trên phiếu **survey** còn ảnh/clip cột chưa hủy (`withdrawn_at = null`) và chưa quyết (`decision = null`) → **409 `POLE_PHOTOS_UNDECIDED`**, `details.photo_ids` là mảng ID theo `captured_at, uploaded_at, length(photo_id), photo_id` (PP-5). Kiểm sau `RequireAction`, trước mọi thay đổi; phiếu vẫn `done`, không audit `verified`. Ảnh đã reject/confirm/hủy không chặn; không ảnh thì nghiệm thu như cũ. Không tự quyết hay suy nhãn. |
+| **SVP-2** | Chỉ áp phiếu khảo sát; **cố ý giữ nguyên** verify của `inspection`, `repair`, `pole_gps_update`. `allowed_actions` vẫn có `verify` ở trạng thái/quyền hợp lệ; WP5 xử lý 409 và dùng `photo_ids` để đưa Quản lý tới các ảnh/clip cần quyết trước khi thử lại. Follow-up vẫn theo WSC-6. |
+| **SVP-3** | Giữ **409 `POLE_PHOTO_INCONCLUSIVE`**: ảnh không có nhãn on/off không thể công bố. WP5 hướng dẫn Quản lý `return` phiếu, kỹ sư gán nhãn bằng `PATCH …/pole-photos/{photo_id}/review`, nộp lại rồi Quản lý quyết. Giữ **409 `POLE_VIDEO_NOT_VIEWED`**: chính Quản lý phải mở clip trên Web trước khi confirm (cả on/off), vì quyết định có thể công bố trạng thái/tạo sự cố. Ảnh/clip không dùng thì **reject**, không cần ép confirm; reject clip không đòi xem. Không đổi `/decision`, `/review` hay hai cổng này. |
+
 ### PHOTO-REVIEW — kỹ sư sửa nhãn trước khi Quản lý công bố (20/10/2026)
 
 **Mỹ SELF-SIGNED 20/10/2026**, theo R-1…R-3 và D-1…D-5 trong `.ai/tasks/PHOTO-REVIEW.md`.

@@ -60,9 +60,9 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             throw Error("WORK_ORDER_NOT_IN_PROGRESS", HttpStatusCode.Conflict);
     }
 
-    // Keep retention/inventory unchanged: only user-facing reads hide withdrawals. DELETE and upload replay must see them.
+    // Keep retention/inventory unchanged: reads and the survey verify gate hide withdrawals. DELETE and replay must see them.
     private IQueryable<WorkOrderPolePhoto> Photos(bool includeWithdrawn = false)
-        => db.Set<WorkOrderPolePhoto>().Where(p => includeWithdrawn || p.WithdrawnAt == null);
+        => includeWithdrawn ? db.Set<WorkOrderPolePhoto>() : db.Set<WorkOrderPolePhoto>().NotWithdrawn();
 
     /// <summary>The photo (or clip) already stored for this user's operation: the same request again is a replay, a different one is a conflict.</summary>
     private async Task<PolePhotoItem?> ReplayAsync(string id, string actorId, Guid op, string hash, CancellationToken ct)
@@ -196,8 +196,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         var query = Photos().AsNoTracking().Where(p => p.WorkOrderId == id);
         if (poleId is not null) query = query.Where(p => p.PoleId == poleId);
         var count = await query.CountAsync(ct);
-        var rows = await query.OrderBy(p => p.CapturedAt).ThenBy(p => p.UploadedAt).ThenBy(p => p.PhotoId.Length)
-            .ThenBy(p => p.PhotoId).Skip(page.Skip).Take(page.PageSize).ToArrayAsync(ct);
+        var rows = await query.InCaptureOrder().Skip(page.Skip).Take(page.PageSize).ToArrayAsync(ct);
         return PagedResult<PolePhotoItem>.From(page, count, rows.Select(Item).ToArray());
     }
 

@@ -41,6 +41,23 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>SURVEY-VERIFY-PHOTOS — chặn nghiệm thu khảo sát còn ảnh/clip chưa quyết · 17/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR vào dev</span>
+    Verify phiếu survey trả 409 <code>POLE_PHOTOS_UNDECIDED</code> và <code>details.photo_ids</code> theo thứ tự list;
+    bỏ ảnh đã hủy/đã quyết, dùng chung helper lọc và sắp ảnh. Giữ allowed_actions, hai cổng decision và các task kind khác.
+    Drift <b>SVP-1…SVP-3</b> — Mỹ + WP5 chốt, SELF-SIGNED, nền tạm.</p>
+    <p>Files: <code>WorkOrderService.cs</code>, <code>WorkOrderPolePhotoService.cs</code>,
+    <code>WorkOrderPolePhotoQueries.cs</code>, <code>WorkOrdersController.cs</code>,
+    <code>WorkOrderSurveyVerifyPhotoTests.cs</code>, drift, generator + hai spec, dashboard và biên bản kết quả.
+    Thêm 4 phương thức / 5 ca tích hợp: ảnh + clip chưa quyết, reject/hủy, quyết hết, không ảnh, inspection/repair,
+    thứ tự captured_at, quyền/trạng thái trước cổng mới, không audit khi bị chặn.
+    Build <b>0 warning/error</b>; OpenAPI đã xuất/generate/lint hợp lệ, 10 warning hiện có.
+    Claude chạy: 5/5 ca mới; WorkOrder/PolePhoto/Withdraw/Capability/SurveyPublication 541 pass / 2 skip; phá thử (tắt cổng) → 1 đỏ, khôi phục → xanh.
+    Commit: <code>feat(work-orders): block survey verify while pole photos are undecided</code>.
+    <a href=".ai/results/SURVEY-VERIFY-PHOTOS.md">Bằng chứng và lệnh bàn giao Claude</a>.</p>
+  </div>
+
+  <div class="card">
     <strong>POLE-PHOTO-WITHDRAW — kỹ sư hủy mềm ảnh/clip cột chưa quyết · 17/11/2026</strong>
     <p><span class="tag t-done">Xong · PR vào dev</span>
     Thêm <code>DELETE /work-orders/{id}/pole-photos/{photo_id}</code>: chỉ người được giao, phiếu đang thực hiện,
