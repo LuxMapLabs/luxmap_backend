@@ -72,11 +72,13 @@ public sealed record AuthTokenResponse(
 /// <param name="CommuneIds">The communes the account may reach, or <c>["*"]</c> for an administrator. May be empty.</param>
 /// <param name="Communes">
 /// COMMUNE-BBOX: the same communes spelled out — name and map frame — and for an administrator every commune. A frame is
-/// <c>null</c> until an administrator sets one.
+/// <c>null</c> until an administrator sets one. MAP-CENTER: <c>center</c> is the mean of the commune's poles, kept inside its
+/// frame — the frame's midpoint when no pole has a position.
 /// </param>
 /// <param name="MapBounds">
-/// COMMUNE-BBOX: the box around every frame in <paramref name="Communes"/> and its centre — hold the map there
-/// (<c>maxBounds</c>) and open it on the centre. <c>null</c> when none of them has a frame.
+/// COMMUNE-BBOX: the box around every frame in <paramref name="Communes"/> — hold the map there (<c>maxBounds</c>) — and
+/// where to open it. MAP-CENTER: that centre is the mean of the framed communes' poles, kept inside the box; the box's
+/// midpoint when none has a positioned pole. <c>null</c> when no commune has a frame.
 /// </param>
 public sealed record CurrentUserResponse(
     string UserId,
