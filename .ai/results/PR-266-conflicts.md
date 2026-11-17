@@ -50,4 +50,20 @@ Exit code: 0
 Total: **2336 passed, 0 failed, 5 pre-existing skips**. TRX files are in `/tmp/luxmap-pr266-test-results/`.
 
 Remote branches rechecked after resolution: dev `1e8982780b29d14f06cf2961565c5212c9cfbf80`, iot `972a9270bd2eb9906bd357183190a5e85a73997c`.
-No push, PR merge, deployment, or application to a persistent database performed.
+At the end of local verification on 16/11/2026, no push, PR merge, deployment, or application to a persistent database had been performed.
+
+
+## Publication — 17/11/2026
+
+User explicitly approved pushing to `iot` and renaming PR #266.
+
+```text
+$ git push origin HEAD:refs/heads/iot
+To https://github.com/LuxMapLabs/luxmap_backend
+   972a927..1d7bf21  HEAD -> iot
+
+$ gh pr view 266 --json title,mergeable,mergeStateStatus
+{"mergeStateStatus":"BLOCKED","mergeable":"MERGEABLE","title":"feat(iot): add 4 V diagnostics and preserve history when detaching nodes"}
+```
+
+GitHub confirms the conflict is resolved; both CI checks were starting/running after the push. Current checks and review requirements are visible on PR #266. No PR merge or deployment performed.
