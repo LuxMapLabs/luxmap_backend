@@ -2437,6 +2437,25 @@ thì không xoá được**, cùng kiểu chặn POLE-DELETE-QR đã gỡ cho m�
 
 Quyết định nội bộ BE, Mỹ chốt trong chat 16/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
 
+### MAP-CENTER — bản đồ mở ở tâm các cột của xã, không ở tâm khung (17/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 17/11/2026 — sau khi khung bbox của Long Phước / Long Bình được nới bằng hộp bao ranh giới (COMMUNE-BOUNDARY), tâm khung lệch khỏi cụm đèn ~1,3 km / ~2,0 km nên GIS mở ở vùng trống. Mỹ chọn sửa ở backend để web và mobile cùng đúng mà không sửa client. **SELF-SIGNED**, chạm API (đổi **ý nghĩa** một trường, không đổi hình dạng), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (GIS mở ở `map_bounds.center`), WP6 (bản đồ mở ở `map_bounds.center`). Không ai phải sửa code. **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| MC-1 | `GET /auth/me`: `communes[].center` = **trung bình toạ độ các cột có vị trí của xã**, kẹp vào trong `bbox` của xã; xã không có cột có vị trí → trung điểm `bbox` như CB-3; không có `bbox` → `null` như cũ. Thay CB-3 / CB-5 **chỉ cho `/auth/me`** |
+| MC-2 | `map_bounds.center` = trung bình toạ độ cột của các xã **có khung**, mỗi xã nặng theo số cột (xã 3 cột ở xa không kéo bản đồ đi nửa đường), kẹp vào trong `map_bounds.bbox`; không xã nào có cột → trung điểm `bbox`. `map_bounds.bbox` giữ nguyên (CB-5) |
+| MC-3 | Item `/admin/communes` **không đổi**: `center` vẫn là trung điểm khung (mô tả khung Quản trị đang sửa) |
+| MC-4 | Đọc cột theo **`commune_id` lấy từ DB của tài khoản** (cùng nguồn với `communes[]`), không theo claim của token — chỉ trả trung bình và số đếm, không trả cột nào. Identity hỏi qua port `ICommunePoleCenters`, Assets hiện thực. Tâm tính lúc đọc, không lưu |
+
+**Không đổi hình dạng:** trường, kiểu, nullable giữ nguyên; spec OpenAPI không đổi. Không migration.
+
+**Phải báo:** WP5, WP6 — `center` giờ là tâm cụm cột, không còn là trung điểm `bbox`; client nào tự tính trung điểm từ `bbox` thì nên
+dùng `center`. **Chưa báo.**
+
 ## ONE-FIXTURE — một cột MỘT bộ đèn đang dùng; hỏng bóng nào thay cả bộ (15/11/2026)
 
 | | |

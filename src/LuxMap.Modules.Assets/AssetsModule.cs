@@ -3,6 +3,7 @@ using LuxMap.Modules.Assets.Photos;
 using LuxMap.Shared.Storage;
 using LuxMap.Modules.Assets.Import;
 using LuxMap.Modules.Assets.Warranty;
+using LuxMap.Modules.Identity.Auth;
 using LuxMap.Shared.Modularity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,7 @@ public sealed class AssetsModule : ILuxMapModule
         services.AddScoped<AssetCrudService>();
         services.AddScoped<PoleRelocation>();
         services.AddScoped<AssetImportService>();
+        services.AddScoped<ICommunePoleCenters, CommunePoleCenters>();
 
         // BE-31 — the zone comes from the agenda's key so "today" and "tonight" cannot disagree (WarrantyOptions.TimeZoneKey).
         var warranty = WarrantyOptions.From(configuration);
