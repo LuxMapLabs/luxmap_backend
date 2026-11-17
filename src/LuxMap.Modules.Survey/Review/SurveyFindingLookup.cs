@@ -1,30 +1,60 @@
 using LuxMap.Modules.Survey.Entities;
 using LuxMap.Modules.WorkOrders;
+using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
+using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.Survey.Review;
 
-/// <summary>Answers <see cref="ISurveyFindingLookup"/> from the published history of each accepted run.</summary>
+/// <summary>Replays accepted sweep history and confirmed pole photos/clips belonging to the survey order.</summary>
 /// <remarks>
-/// History, not observations: it holds the per-pole verdict the run published, after conflicting passes were
-/// resolved. History, not faults: an out on a pole that already had an open lamp_out created no new fault.
+/// Results, not faults: an out on a pole that already had an open lamp_out created no new fault.
+/// Replay is local to the order, regardless of whether a photo changed the global current status.
 /// </remarks>
 public sealed class SurveyFindingLookup(LuxMapDbContext db) : ISurveyFindingLookup
 {
     public async Task<SurveyFinding[]> FindingsAsync(string workOrderId, string communeId, CancellationToken ct)
     {
-        var rows = await (from sweep in db.Set<SurveySweep>().AsNoTracking()
-                          join history in db.Set<LuminanceHistory>().AsNoTracking() on sweep.SweepId equals history.SweepId
-                          where sweep.WorkOrderId == workOrderId && sweep.Status == SweepStatus.Accepted
-                              && sweep.AcceptedRunId == history.RunId && history.CommuneId == communeId
-                          select new { history.PoleId, history.ClassifiedAs, history.DataSource, history.EvaluatedAt,
-                              history.PublishedAt, history.SweepId }).ToArrayAsync(ct);
-        // Latest first, THEN map: filtering out/dim first would let an older out outlive a newer normal.
-        return rows.GroupBy(r => r.PoleId)
-            .Select(g => g.OrderByDescending(r => r.EvaluatedAt).ThenByDescending(r => r.PublishedAt)
-                .ThenByDescending(r => r.SweepId.Length).ThenByDescending(r => r.SweepId, StringComparer.Ordinal).First())
-            .Select(r => SurveyPublicationRules.FaultFor(r.ClassifiedAs) is { } type ? new SurveyFinding(r.PoleId, type, r.DataSource) : null)
-            .OfType<SurveyFinding>().ToArray();
+        var history = await (from sweep in db.Set<SurveySweep>().AsNoTracking()
+                             join row in db.Set<LuminanceHistory>().AsNoTracking() on sweep.SweepId equals row.SweepId
+                             where sweep.WorkOrderId == workOrderId && sweep.Status == SweepStatus.Accepted
+                                 && sweep.AcceptedRunId == row.RunId && row.CommuneId == communeId
+                             select row).ToArrayAsync(ct);
+        var photos = await db.Set<WorkOrderPolePhoto>().AsNoTracking()
+            .Where(p => p.WorkOrderId == workOrderId && p.CommuneId == communeId && p.Decision == "confirm")
+            .ToArrayAsync(ct);
+        return Merge(history, photos);
     }
+
+    /// <summary>Fold observations oldest first; ON preserves a preceding dim classification (WSC-6).</summary>
+    public static SurveyFinding[] Merge(IEnumerable<LuminanceHistory> history, IEnumerable<WorkOrderPolePhoto> confirmedPhotos)
+    {
+        var observations = history.Select(h => new Observation(h.PoleId, h.DataSource, h.EvaluatedAt,
+                h.PublishedAt, h.SweepId, h.ClassifiedAs, null))
+            .Concat(confirmedPhotos.Select(p => new Observation(p.PoleId, p.DataSource, p.CapturedAt,
+                p.DecidedAt!.Value, p.PhotoId, null, p.FinalCvState ?? p.CvState)));
+        var findings = new List<SurveyFinding>();
+        foreach (var pole in observations.GroupBy(o => o.PoleId))
+        {
+            var status = FixtureStatus.Unknown;
+            var source = default(DataSource);
+            // Sweep last at equal capture time, then the existing sweep tie-break / photo decision tie-break.
+            foreach (var observation in pole.OrderBy(o => o.At).ThenBy(o => o.SweepStatus.HasValue)
+                .ThenBy(o => o.PublishedAt).ThenBy(o => o.Id.Length).ThenBy(o => o.Id, StringComparer.Ordinal))
+            {
+                var next = observation.SweepStatus ?? SurveyPublicationRules.PhotoStatus(observation.CvState!, status);
+                // A photo that leaves the status as it was (ON on dim, OFF on out) raised no fault of its own: the open
+                // fault to carry is the one the earlier observation raised, so keep that observation's data source.
+                if (observation.SweepStatus is not null || next != status) source = observation.DataSource;
+                status = next;
+            }
+            if (SurveyPublicationRules.FaultFor(status) is { } type)
+                findings.Add(new(pole.Key, type, source));
+        }
+        return findings.ToArray();
+    }
+
+    private sealed record Observation(string PoleId, DataSource DataSource, DateTime At, DateTime PublishedAt,
+        string Id, FixtureStatus? SweepStatus, string? CvState);
 }
