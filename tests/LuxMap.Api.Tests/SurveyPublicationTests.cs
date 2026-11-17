@@ -849,6 +849,134 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         Assert.Equal(running, await db.Set<WorkOrderFault>().Where(l => l.FaultId == taken).Select(l => l.WorkOrderId).SingleAsync());
     }
 
+    // WSC-PHOTO: exercise the real publisher and database lookup, with the existing WSC fixture/collection.
+    private async Task<string> FindingPhoto(DateTime at, string state = "off", string? decision = "confirm", string? final = null,
+        string? workOrder = null, int poleIndex = 0)
+    {
+        string photoId;
+        await using (var db = Db())
+        {
+            using var seed = db.EnterUnscopedSystemWriteBackdoor();
+            var photo = new WorkOrderPolePhoto
+            {
+                WorkOrderId = workOrder ?? order, PoleId = poles[poleIndex], CommuneId = poleIndex == 0 ? a : b,
+                DataSource = DataSource.Simulated, UploadedBy = user, UploadedAt = at, CapturedAt = at,
+                Lat = 16, Lng = 108, ClientOpId = Guid.NewGuid(), RequestHash = new('a', 64),
+                ObjectKey = "finding-photo", ThumbnailKey = "finding-thumb", ByteCount = 4, ThumbnailBytes = 4, Width = 1, Height = 1,
+                CvState = state, Confidence = .95, ModelVersion = "finding-model", ArtifactVersion = "finding-artifact", AnalyzedAt = at,
+                FinalCvState = final, ReviewedBy = final is null ? null : user, ReviewedAt = final is null ? null : at,
+                ReviewNote = final is null ? null : "Verified at pole"
+            };
+            db.Add(photo); await db.SaveChangesAsync(); photoId = photo.PhotoId;
+        }
+        if (decision is not null)
+        {
+            await using var db = Db();
+            var audit = new AuditTrail(db, new Correlation());
+            var publisher = new ReviewedPolePhotoPublisher(db, audit, new Actor(user), Options.Create(new SurveyReviewOptions()));
+            var service = new WorkOrderPolePhotoService(db, new Actor(user), objects, null!, null!, audit, null!, publisher, null!, null!, TimeProvider.System);
+            await service.DecideAsync(workOrder ?? order, photoId, new() { Decision = decision }, default);
+        }
+        return photoId;
+    }
+
+    private async Task<WorkOrderDetail> PhotoFollowUpCreated()
+    {
+        await using var db = Db();
+        var controller = new WorkOrdersController(Orders(db), null!, null!, null!, null!, null!);
+        var response = await controller.FollowUp(order, new() { TaskKind = TaskKind.Inspection }, default);
+        var created = Assert.IsType<Microsoft.AspNetCore.Mvc.CreatedResult>(response.Result);
+        Assert.Equal(201, created.StatusCode);
+        return Assert.IsType<WorkOrderDetail>(created.Value);
+    }
+
+    [Theory]
+    [InlineData("off", null, SourceChannel.Cv)]
+    [InlineData("on", "off", SourceChannel.FieldReport)]
+    public async Task Photo_only_survey_carries_the_confirmed_photo_fault(string ai, string? final, SourceChannel channel)
+    {
+        var photo = await FindingPhoto(DateTime.UnixEpoch.AddDays(20001), ai, final: final);
+        await VerifyOrder();
+        var child = await PhotoFollowUpCreated();
+        await using var db = Db();
+        var fault = await db.Set<Fault>().SingleAsync(f => f.OriginPolePhotoId == photo);
+        Assert.Equal((FaultType.LampOut, FaultStatus.Confirmed, channel), (fault.FaultType, fault.FaultStatus, fault.SourceChannel));
+        Assert.Equal([fault.FaultId], child.FaultIds);
+        Assert.False(await db.Set<SurveySweep>().AnyAsync(w => w.WorkOrderId == order));
+    }
+
+    [Theory]
+    [InlineData(null)] [InlineData("reject")]
+    public async Task Undecided_or_rejected_photo_cannot_supply_a_follow_up_finding(string? decision)
+    {
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20001), decision: decision);
+        await PlantFault(FaultType.LampOut, FaultStatus.Confirmed);
+        await VerifyOrder();
+        var error = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp());
+        Assert.Equal((HttpStatusCode.Conflict, "NOTHING_TO_FOLLOW_UP"), (error.StatusCode, error.Code));
+    }
+
+    [Fact]
+    public async Task Confirmed_photo_findings_stay_in_their_order_and_anchor_commune()
+    {
+        var other = await RunningInspection();
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20001), workOrder: other);
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20001), poleIndex: 1);
+        await VerifyOrder();
+        var error = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp());
+        Assert.Equal((HttpStatusCode.Conflict, "NOTHING_TO_FOLLOW_UP"), (error.StatusCode, error.Code));
+    }
+
+    [Fact]
+    public async Task Confirmed_photo_not_applied_globally_still_counts_for_its_own_order()
+    {
+        var fault = await PlantFault(FaultType.LampOut, FaultStatus.Confirmed);
+        var other = await RunningInspection();
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20002), "on", workOrder: other);
+        var photo = await FindingPhoto(DateTime.UnixEpoch.AddDays(20001));
+        await using (var db = Db())
+        {
+            var row = await db.Set<WorkOrderPolePhoto>().SingleAsync(p => p.PhotoId == photo);
+            Assert.False(row.StatusApplied); Assert.Equal("not_newer", row.StatusReason);
+        }
+        await VerifyOrder();
+        Assert.Equal([fault], (await PhotoFollowUpCreated()).FaultIds);
+    }
+
+    [Fact]
+    public async Task Sweep_out_then_newer_photo_on_carries_nothing()
+    {
+        await Accept(await Plant(1, state: "off"));
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20002), "on");
+        await VerifyOrder();
+        var error = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp());
+        Assert.Equal((HttpStatusCode.Conflict, "NOTHING_TO_FOLLOW_UP"), (error.StatusCode, error.Code));
+    }
+
+    [Fact]
+    public async Task Sweep_dim_then_newer_photo_on_still_carries_lamp_dim()
+    {
+        foreach (var day in new[] { 1, 2, 3 }) await Accept(await Plant(day, 100));
+        await Accept(await Plant(4, 50));
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20005), "on");
+        await VerifyOrder();
+        var child = await PhotoFollowUpCreated();
+        await using var db = Db();
+        var fault = await db.Set<Fault>().SingleAsync(f => f.PoleId == poles[0]);
+        Assert.Equal(FaultType.LampDim, fault.FaultType);
+        Assert.Equal([fault.FaultId], child.FaultIds);
+    }
+
+    [Fact]
+    public async Task Older_photo_off_cannot_outlive_a_newer_normal_sweep()
+    {
+        await FindingPhoto(DateTime.UnixEpoch.AddDays(20001));
+        await Accept(await Plant(2));
+        await VerifyOrder();
+        var error = await Assert.ThrowsAsync<LuxMapException>(() => FollowUp());
+        Assert.Equal((HttpStatusCode.Conflict, "NOTHING_TO_FOLLOW_UP"), (error.StatusCode, error.Code));
+    }
+
     /// <summary>Links the fault to another order on a separate connection just before the follow-up takes the fault locks.</summary>
     private sealed class TakeBeforeLock(SurveyPublicationTests test, string fault, string holder) : DbCommandInterceptor
     {
@@ -874,6 +1002,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit_event WHERE commune_id = {a} OR commune_id = {b}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_fault WHERE commune_id = {a} OR commune_id = {b}");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM fault WHERE pole_id = ANY({poles})");
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM work_order_pole_photo WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM pole_current_status WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM luminance_history WHERE pole_id = ANY({poles})");
         await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM baseline_member WHERE baseline_id IN (SELECT baseline_id FROM luminance_baseline WHERE pole_id = ANY({poles}))");

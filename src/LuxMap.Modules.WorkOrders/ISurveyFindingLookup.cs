@@ -2,18 +2,18 @@ using LuxMap.Shared.Contracts.Enums;
 
 namespace LuxMap.Modules.WorkOrders;
 
-/// <summary>The fault type one pole's latest accepted survey result implies (out → lamp_out, dim → lamp_dim).</summary>
+/// <summary>The fault type implied by one pole's accepted sweep and confirmed photo/clip observations (out → lamp_out, dim → lamp_dim).</summary>
 public sealed record SurveyFinding(string PoleId, FaultType FaultType, DataSource DataSource);
 
 /// <summary>
 /// Survey owns its published results and references WorkOrders, so WorkOrders asks through this port
-/// (same shape as <see cref="IPolePhotoPublication"/>). Drift WSC-2.
+/// (same shape as <see cref="IPolePhotoPublication"/>). Drift WSC-2 / WSC-6.
 /// </summary>
 public interface ISurveyFindingLookup
 {
     /// <summary>
-    /// Per pole of <paramref name="communeId"/>, the latest result across the order's accepted sweeps; a pole
-    /// whose latest result is neither out nor dim is absent, so an older out does not come back.
+    /// Per pole of <paramref name="communeId"/>, replay the order's accepted sweeps and confirmed photos/clips
+    /// in observation order. ON preserves dim/normal; a final result other than out/dim is absent.
     /// </summary>
     Task<SurveyFinding[]> FindingsAsync(string workOrderId, string communeId, CancellationToken ct);
 }
