@@ -208,6 +208,8 @@ jobs:
         run: >-
           dotnet test "${{ matrix.target }}" --no-build --no-restore --settings luxmap.runsettings
           --filter "${{ matrix.filter }}" --logger trx --results-directory .github/test-results -m:1
+          --collect "XPlat Code Coverage;Format=cobertura"
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile="**/Migrations/*.cs"
 
       - name: Preserve test failures
         if: ${{ always() }}
@@ -218,7 +220,50 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Preserve coverage
+        # Report 2 QO-02: line coverage of the backend, measured, not estimated. One cobertura file per test project;
+        # the coverage job below merges both shards.
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.shard }}
+          path: .github/test-results/**/coverage.cobertura.xml
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Stop service containers
         if: ${{ always() && steps.services.outcome != 'skipped' }}
         # The hosted VM discards volumes after the job; no shared volume cleanup is needed.
         run: docker compose --profile mqtt down
+
+  coverage:
+    name: Coverage report
+    # Informational: never fails the PR. Merges the cobertura files of both shards (each shard covers different tests,
+    # so either alone under-reports) and writes the per-assembly table to the run summary.
+    needs: verify
+    if: ${{ !cancelled() && needs.verify.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Download shard coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage-in
+
+      - name: Merge and summarise
+        shell: bash
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.4.4
+          reportgenerator -reports:"coverage-in/**/coverage.cobertura.xml" -targetdir:coverage-report \
+            -reporttypes:"Cobertura;MarkdownSummaryGithub;TextSummary;HtmlSummary" \
+            -classfilters:"-*.Migrations.*"
+          cat coverage-report/Summary.txt
+          cat coverage-report/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preserve merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage-report
+          retention-days: 30
