@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using LuxMap.IotWire;
 using System.Collections.Concurrent;
 using MQTTnet;
 using MQTTnet.Protocol;
@@ -125,7 +126,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
             var nodeList = gateways.ContainsKey(e.ClientId) &&
                 e.TopicFilter.Topic == $"luxmap/gateways/{e.ClientId}/nodes";
             if (!nodeList && (!TryRoute(e.ClientId, e.TopicFilter.Topic, out _, out var kind) ||
-                kind is not ("command" or "telemetryAck")))
+                kind is not ("command" or "telemetryAck" or "sensorHealthAck")))
             {
                 e.ProcessSubscription = false;
                 e.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
@@ -151,7 +152,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
                 return;
             }
             if (!TryRoute(e.ClientId, e.ApplicationMessage.Topic, out var id, out var kind) ||
-                kind is not ("telemetry" or "commandAck") || e.ApplicationMessage.Retain ||
+                kind is not ("telemetry" or "sensorHealth" or "commandAck") || e.ApplicationMessage.Retain ||
                 e.ApplicationMessage.PayloadSegment.Count > 4096) return;
             try
             {
@@ -160,6 +161,22 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
                 {
                     var ack = JsonSerializer.Deserialize<CommandAcknowledgement>(payload, json);
                     if (ack is not null && ack.DeviceId == id) store.AcknowledgeCommand(ack);
+                    return;
+                }
+                if (kind == "sensorHealth")
+                {
+                    var report = JsonSerializer.Deserialize<SensorHealthReport>(payload, json);
+                    if (report is null || !report.IsValidFor(id))
+                    {
+                        logger.LogWarning("Rejected {Id}: invalid sensor health report", id);
+                        return;
+                    }
+                    store.AcceptSensorHealth(report);
+                    await PublishAsync(id, "sensorHealthAck", new
+                    {
+                        kind = "sensorHealthAck", deviceId = id, sessionId = report.SessionId,
+                        sequenceNumber = report.SequenceNumber
+                    }, false);
                     return;
                 }
                 var data = JsonSerializer.Deserialize<TelemetryRequest>(payload, json);

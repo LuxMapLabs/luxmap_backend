@@ -116,7 +116,13 @@ iot_values = {
     ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
     ("IotAnomaly", "code"): [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
+        "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",
+        "ina226_unavailable", "ina226_read_failed", "ina226_shunt_out_of_range",
+        "bh1750_unavailable", "bh1750_read_failed",
+        "microsd_unavailable", "microsd_read_failed", "microsd_write_failed",
+        "lora_tx_blocked", "lora_rx_frame_error",
     ],
+    ("IotSensorHealth", "status"): ["fresh", "stale", "unknown"],
     ("LampCountEstimate", "status"): ["insufficient_samples", "undetermined", "estimated"],
 }
 def iot_property(schema, field):
@@ -128,6 +134,8 @@ def iot_property(schema, field):
 
 for (schema, field), values in iot_values.items():
     iot_property(schema, field)["enum"] = values
+
+S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
 for schema in ("NodeProfile", "RegisterNodeRequest"):
     iot_property(schema, "lamp_count_calibration")["enum"] = ["4v", "5v", None]

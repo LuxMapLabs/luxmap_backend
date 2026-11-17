@@ -24355,7 +24355,20 @@
               "telemetry_stale",
               "voltage_loss",
               "voltage_deviation",
-              "lamp_count_shortfall"
+              "lamp_count_shortfall",
+              "ds3231_unavailable",
+              "ds3231_read_failed",
+              "ds3231_time_invalid",
+              "ina226_unavailable",
+              "ina226_read_failed",
+              "ina226_shunt_out_of_range",
+              "bh1750_unavailable",
+              "bh1750_read_failed",
+              "microsd_unavailable",
+              "microsd_read_failed",
+              "microsd_write_failed",
+              "lora_tx_blocked",
+              "lora_rx_frame_error"
             ]
           },
           "observed": {
@@ -24379,7 +24392,14 @@
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "observed",
+          "reference",
+          "deviation_percent",
+          "limit"
+        ]
       },
       "IotArchivedData": {
         "type": "object",
@@ -24684,6 +24704,9 @@
           },
           "lamp_count": {
             "$ref": "#/components/schemas/LampCountEstimate"
+          },
+          "sensor_health": {
+            "$ref": "#/components/schemas/IotSensorHealth"
           }
         },
         "additionalProperties": false
@@ -25185,6 +25208,26 @@
           },
           "control_channel": {
             "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotSensorHealth": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "unknown"
+            ]
+          },
+          "received_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
             "nullable": true
           }
         },

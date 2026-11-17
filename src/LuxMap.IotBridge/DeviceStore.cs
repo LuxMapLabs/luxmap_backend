@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LuxMap.IotWire;
 
 record AutoSchedule(int? DayStartMinute, int? NightStartMinute)
 {
@@ -17,7 +18,8 @@ record CommandAcknowledgement(string? DeviceId, string? CommandId, string? Mode,
 record ReceivedCommandAck(CommandAcknowledgement Data, DateTimeOffset ReceivedAt);
 record DeviceState(string DeviceId, LampCommand DesiredCommand, DateTimeOffset? CommandUpdatedAt,
     TelemetryReading? LatestTelemetry, List<TelemetryReading> History,
-    Dictionary<string, List<SequenceRange>>? AcceptedSequences = null, ReceivedCommandAck? LastCommandAck = null)
+    Dictionary<string, List<SequenceRange>>? AcceptedSequences = null, ReceivedCommandAck? LastCommandAck = null,
+    ReceivedSensorHealth? SensorHealth = null)
 {
     public bool CommandAcknowledged => DesiredCommand.CommandId is not null &&
         LastCommandAck?.Data.CommandId == DesiredCommand.CommandId;
@@ -119,6 +121,17 @@ sealed class DeviceStore
             return true;
         }
     }
+    public void AcceptSensorHealth(SensorHealthReport report)
+    {
+        lock (gate)
+        {
+            var state = Get(report.DeviceId!);
+            if (state.SensorHealth?.Data is { } previous && previous.SessionId == report.SessionId &&
+                previous.SequenceNumber >= report.SequenceNumber) return;
+            Commit(state with { SensorHealth = new(report, DateTimeOffset.UtcNow) });
+        }
+    }
+
     public void AcknowledgeCommand(CommandAcknowledgement ack)
     {
         var receivedAt = DateTimeOffset.UtcNow;

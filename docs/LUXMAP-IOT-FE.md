@@ -170,6 +170,32 @@ Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA
 | | `undetermined` | Đủ 25 mẫu nhưng chưa khớp rõ một nhóm hiệu chuẩn. |
 | | `estimated` | Một nhóm hiệu chuẩn đủ điều kiện để trả số bóng sáng và số bóng thiếu. |
 
+### Lỗi sức khỏe cảm biến
+
+`GET /api/v1/iot/nodes/{nodeId}/diagnostics` trả cùng cấu trúc `anomalies[]` cho lỗi điện và lỗi cảm biến. Mỗi mục có `code`, `observed`, `reference`, `deviation_percent` và `limit`. Bốn trường số của các mã lỗi cảm biến có giá trị `null`.
+
+| Mã lỗi | Nội dung hiển thị |
+|---|---|
+| `ds3231_unavailable` | Không nhận hoặc không khởi tạo được DS3231. |
+| `ds3231_read_failed` | Đọc DS3231 qua I²C thất bại. |
+| `ds3231_time_invalid` | Giờ trên DS3231 không hợp lệ hoặc đồng hồ báo mất nguồn. |
+| `ina226_unavailable` | Không nhận hoặc không khởi tạo được INA226. |
+| `ina226_read_failed` | Đọc thanh ghi INA226 thất bại. |
+| `ina226_shunt_out_of_range` | Số đo shunt chạm giới hạn của INA226. |
+| `bh1750_unavailable` | Không nhận hoặc không khởi tạo được BH1750. |
+| `bh1750_read_failed` | Đọc mẫu ánh sáng BH1750 thất bại. |
+| `microsd_unavailable` | Không khởi tạo được hàng đợi trên microSD. |
+| `microsd_read_failed` | Không đọc được hàng đợi hoặc gặp bản ghi lỗi trên microSD. |
+| `microsd_write_failed` | Không ghi được mẫu lên microSD, kể cả khi file hàng đợi đã đạt giới hạn. |
+| `lora_tx_blocked` | Node có gói chờ phát và AUX ở LOW liên tục ít nhất 10 giây. |
+| `lora_rx_frame_error` | Node liên tiếp nhận nhiều frame LoRa lỗi CRC, quá dài hoặc thiếu dữ liệu. |
+
+`sensor_health.received_at` là giờ UTC Bridge nhận bản tin sức khỏe. `sensor_health.status` là `fresh` trong 60 giây, `stale` khi quá hạn hoặc `unknown` khi chưa có bản tin. Báo cáo mới chứa lỗi cảm biến thì trạng thái chung là `anomaly` kể cả khi `measurement` là `null`. Báo cáo cũ giữ thời điểm nhận để FE biết trạng thái chưa được cập nhật.
+
+Node xác nhận lỗi và phục hồi của DS3231, INA226 và BH1750 sau 3 lần kiểm tra liên tiếp cho cùng kết quả. Lỗi microSD dựa trên kết quả khởi tạo, đọc hoặc ghi thực tế. Lỗi LoRa do node quan sát có thể được gửi khi đường truyền còn hoạt động hoặc khi hoạt động lại. Khi mất hoàn toàn đường truyền, FE dựa vào `telemetry_stale` và `sensor_health.status` để hiển thị dữ liệu đã cũ.
+
+Node gửi snapshot khi trạng thái đổi và định kỳ 30 giây khi đã nhận ACK. Khi cảm biến phục hồi, snapshot mới bỏ mã lỗi đó. Gateway chuyển các bản tin này giữa LoRa và các topic MQTT `luxmap/{deviceId}/sensorHealth` và `luxmap/{deviceId}/sensorHealthAck`. Với lỗi INA226, API bỏ qua cảnh báo dựa trên giá trị điện của mẫu cũ. Với lỗi DS3231, API bỏ qua ước lượng số bóng dựa trên giờ đo.
+
 ### Hiệu chuẩn bộ thử 10 bóng ở nguồn khoảng 4 V
 
 Thêm `"lamp_count_calibration": "4v"` vào JSON của `POST /api/v1/iot/nodes` khi tạo hoặc `PUT /api/v1/iot/nodes/{nodeId}` khi sửa nguồn hiện có. Đặt `nominal_voltage` theo điện áp danh định của bộ đang đo để cảnh báo điện áp dùng đúng mốc. Cấu hình `"5v"` và cờ cũ `use_ten_lamp_calibration: true` vẫn chọn hiệu chuẩn 5 V nếu phù hợp.

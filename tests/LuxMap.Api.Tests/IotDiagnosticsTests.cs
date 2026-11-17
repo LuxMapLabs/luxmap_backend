@@ -493,6 +493,64 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }, bridge);
     }
 
+    [Fact]
+    public Task Sensor_health_uses_the_common_anomaly_shape_with_or_without_electrical_data()
+    {
+        var bridge = new ReportedPowerBridge();
+        return WithSharedCabinetAsync(async (client, rig, _) =>
+        {
+            var nodePath = $"/api/v1/iot/nodes/{rig.First}";
+            using var source = await client.PutAsJsonAsync(nodePath, SourceBody(rig));
+            Assert.Equal(HttpStatusCode.NoContent, source.StatusCode);
+            var diagnoses = $"{nodePath}/diagnostics";
+            var now = DateTimeOffset.UtcNow;
+            object Report(DateTimeOffset received, params string[] codes) => new
+            {
+                receivedAt = received,
+                data = new { deviceId = "probe", sessionId = "health", sequenceNumber = 1,
+                    firmwareVersion = "sensor-health-v1", codes },
+            };
+
+            bridge.DiagnosticDevice = new { deviceId = "probe", sensorHealth = Report(now, "ina226_unavailable") };
+            var failed = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+            Assert.Equal("anomaly", failed.GetProperty("status").GetString());
+            Assert.Equal("fresh", failed.GetProperty("sensor_health").GetProperty("status").GetString());
+            Assert.Equal(JsonValueKind.Null, failed.GetProperty("measurement").ValueKind);
+            var error = Assert.Single(failed.GetProperty("anomalies").EnumerateArray());
+            Assert.Equal("ina226_unavailable", error.GetProperty("code").GetString());
+            foreach (var field in new[] { "observed", "reference", "deviation_percent", "limit" })
+                Assert.Equal(JsonValueKind.Null, error.GetProperty(field).ValueKind);
+
+            bridge.DiagnosticDevice = new
+            {
+                deviceId = "probe",
+                latestTelemetry = new
+                {
+                    receivedAt = now.AddMinutes(-2),
+                    data = new { lampCommand = "ON", voltage = 0.02, current = 0, power = 0 },
+                },
+                sensorHealth = Report(now, "ina226_unavailable", "bh1750_read_failed", "microsd_write_failed", "lora_tx_blocked"),
+            };
+            var combined = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+            Assert.Equal("anomaly", combined.GetProperty("status").GetString());
+            Assert.Equal(new[] { "telemetry_stale", "ina226_unavailable", "bh1750_read_failed", "microsd_write_failed", "lora_tx_blocked" },
+                combined.GetProperty("anomalies")
+                .EnumerateArray().Select(item => item.GetProperty("code").GetString()).ToArray());
+
+            foreach (var (when, expected) in new[] { (now, "fresh"), (now.AddMinutes(-2), "stale") })
+            {
+                bridge.DiagnosticDevice = new
+                {
+                    deviceId = "probe", sensorHealth = expected == "fresh" ? Report(when) : Report(when, "ina226_unavailable"),
+                };
+                var result = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+                Assert.Equal("no_data", result.GetProperty("status").GetString());
+                Assert.Empty(result.GetProperty("anomalies").EnumerateArray());
+                Assert.Equal(expected, result.GetProperty("sensor_health").GetProperty("status").GetString());
+            }
+        }, bridge);
+    }
+
     private static double[] Window(double first, int count, double rest) =>
         [.. Enumerable.Repeat(first, count), .. Enumerable.Repeat(rest, 25 - count)];
 
