@@ -20905,6 +20905,16 @@
               }
             }
           },
+          "409": {
+            "description": "INVALID_STATE_TRANSITION / CONCURRENT_MODIFICATION; survey: POLE_PHOTOS_UNDECIDED, details.photo_ids là mảng ID ảnh/clip chưa hủy và decision=null, theo captured_at, uploaded_at, length(photo_id), photo_id. Không đổi allowed_actions; inspection/repair/pole_gps_update giữ nguyên (kể cả POLE_OFF_SEGMENT của PG-12).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -20931,7 +20941,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)",
+        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)",
         "operationId": "postWorkOrdersIdVerify",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"

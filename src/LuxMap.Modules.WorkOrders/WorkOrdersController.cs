@@ -4,6 +4,7 @@ using Asp.Versioning;
 using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
@@ -204,6 +205,8 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
 
     [HttpPost("{id}/verify")]
     [Authorize(Policy = LuxMapPolicies.ManageWorkOrders)]
+    [ProducesResponseType(typeof(WorkOrderDetail), 200)]
+    [ProducesResponseType(typeof(ApiErrorResponse), 409)]
     public Task<WorkOrderDetail> Verify(string id, ReviewWorkOrderRequest request, CancellationToken ct)
         => service.Act(id, "verify", request.Note, default, ct);
 
