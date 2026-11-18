@@ -41,6 +41,8 @@ internal sealed class WorkbookImportRow(
         return failedReferences.Contains((parent, this["commune_id"], this[column]));
     }
 
+    public bool CarriesGeometry => kind is ImportKind.Cabinets or ImportKind.Poles;
+
     public bool GeometryIsEmpty => kind is ImportKind.Segments or ImportKind.Feeders
         || (source.Cells.GetValueOrDefault(Prefix + "_lat") is null && source.Cells.GetValueOrDefault(Prefix + "_lng") is null);
     private string Prefix => kind == ImportKind.Cabinets ? "cabinet" : "pole";
