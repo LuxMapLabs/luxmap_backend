@@ -1,7 +1,11 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "data", "keyring")))
+    .SetApplicationName("LuxMap.IotBridge.GatewayCredentials");
 builder.Services.AddSingleton<DeviceStore>();
 builder.Services.AddSingleton<GatewayCredentials>();
 builder.Services.AddSingleton<MqttBroker>();
@@ -177,18 +181,51 @@ app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/authorization", (string de
     return authorized ? Results.NoContent() : Results.NotFound();
 }).WithTags("MQTT");
 
-app.MapPost("/api/luxmap/gateways/{gatewayId}/credential", (string gatewayId, HttpContext context,
+app.MapPost("/api/luxmap/gateways/{gatewayId}/credential", async (string gatewayId, HttpContext context,
     MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
 {
     context.Response.Headers.CacheControl = "no-store";
     if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
         context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
     if (!DeviceRules.ValidId(gatewayId)) return Results.BadRequest();
-    mqtt.EnsureGateway(gatewayId);
-    var secret = credentials.Issue(gatewayId);
+    var secret = await mqtt.IssueCredentialAsync(gatewayId);
     if (secret is null) return Results.Conflict(new { error = "Credential already issued." });
     return Results.Ok(new { clientId = gatewayId, username = gatewayId, password = secret, nodeIds = mqtt.Gateways[gatewayId] });
-}).WithTags("MQTT").WithSummary("Cấp secret một lần cho gateway đã đăng ký");
+}).WithTags("MQTT").WithSummary("Cấp secret mới cho gateway");
+
+app.MapGet("/api/luxmap/gateways/{gatewayId}/credential", (string gatewayId, HttpContext context,
+    MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    if (!DeviceRules.ValidId(gatewayId)) return Results.BadRequest();
+    try
+    {
+        var stored = credentials.Retrieve(gatewayId);
+        if (!stored.Issued) return Results.NotFound();
+        var secret = stored.Secret;
+        if (secret is null) return Results.Conflict(new { error = "Legacy hash-only credential cannot be retrieved." });
+        return Results.Ok(new { clientId = gatewayId, username = gatewayId, password = secret,
+            nodeIds = mqtt.Gateways.GetValueOrDefault(gatewayId) ?? [] });
+    }
+    catch (System.Security.Cryptography.CryptographicException)
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+}).WithTags("MQTT").WithSummary("Xem lại secret gateway, chỉ dành cho quản trị");
+
+app.MapDelete("/api/luxmap/gateways/{gatewayId}/credential", async (string gatewayId, HttpContext context,
+    MqttBroker mqtt, IConfiguration configuration) =>
+{
+    context.Response.Headers.CacheControl = "no-store";
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    if (!DeviceRules.ValidId(gatewayId)) return Results.BadRequest();
+    await mqtt.RevokeCredentialAsync(gatewayId);
+    return Results.NoContent();
+}).WithTags("MQTT").WithSummary("Thu hồi secret và ngắt kết nối gateway");
+
 app.Run();
 
 record GatewayRouteRequest(string? DeviceId);

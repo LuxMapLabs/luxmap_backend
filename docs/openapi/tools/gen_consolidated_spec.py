@@ -375,6 +375,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/servers/": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
@@ -406,7 +407,9 @@ SUMMARY.update({
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("put", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route"): "Đăng ký tuyến MQTT cho gateway và node",
-    ("post", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Cấp secret MQTT một lần cho gateway",
+    ("get", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Admin xem lại MQTT secret của gateway",
+    ("delete", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Thu hồi MQTT secret và ngắt gateway",
+    ("post", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Cấp MQTT key mới cho gateway",
     ("get", "/api/v1/iot/servers/{serverId}/gateways/routes"): "Liệt kê tuyến và trạng thái cấp secret trên bridge",
     ("put", "/api/v1/iot/nodes/{nodeId}"): "Gắn hoặc cập nhật nguồn đo của node IoT",
     ("delete", "/api/v1/iot/nodes/{nodeId}"): "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",

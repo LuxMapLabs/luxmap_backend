@@ -2547,3 +2547,12 @@ Phạm vi BE, không sửa FE. Thay đổi mở rộng API và schema, cần con
   Cửa sổ 25 mẫu, tối thiểu 20 phiếu khớp một dải và trung vị cùng dải. Các dải có khoảng bỏ phiếu không xác định.
   Các mức 7–10 có đo thực tế, chưa hiệu chuẩn 1–6. Giữ profile 4v và 5v cũ cho dữ liệu cũ.
 - calibration_rig giữ nguồn riêng; GET /faults?source_channel=iot&data_source=calibration_rig để xem demo.
+
+## IOT-GATEWAY-KEY-2 — xem lại và thu hồi MQTT secret (18/11/2026)
+
+Decision maker: chủ yêu cầu LuxMap IoT trong phiên 18/11/2026, yêu cầu ba thao tác POST tạo mới, GET xem lại, DELETE thu hồi.
+GET/DELETE /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential, ManageSettings, X-Iot-Provisioning-Key
+chỉ nằm phía BE. GET/POST no-store trả IotGatewayCredential. DELETE idempotent 204 và ngắt MQTT gateway.
+GET key hash-only cũ trả 409 IOT_CREDENTIAL_NOT_RETRIEVABLE; không tự thay key thiết bị đang dùng.
+Key cấp mới lưu hash và bản mã Data Protection; keyring bền trong volume data/keyring, cần backup và quyền service.
+Key cũ tiếp tục xác thực được; sau thu hồi key cũ bị từ chối. Tuyến và dữ liệu lịch sử được giữ.

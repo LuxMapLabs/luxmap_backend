@@ -21,6 +21,43 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
     public bool IsRunning => broker?.IsStarted == true;
     public IReadOnlyDictionary<string, string[]> Gateways => gateways;
 
+
+    public async Task<string?> IssueCredentialAsync(string gatewayId)
+    {
+        await commandGate.WaitAsync();
+        try
+        {
+            EnsureGateway(gatewayId);
+            return credentials.Issue(gatewayId);
+        }
+        finally { commandGate.Release(); }
+    }
+
+    public async Task RevokeCredentialAsync(string gatewayId)
+    {
+        await commandGate.WaitAsync();
+        try
+        {
+            credentials.Revoke(gatewayId);
+            lastHeartbeats.TryRemove(gatewayId, out _);
+            if (IsRunning && (await broker!.GetClientsAsync()).Any(client => client.Id == gatewayId))
+            {
+                try
+                {
+                    await broker.DisconnectClientAsync(gatewayId,
+                        new MQTTnet.Server.Disconnecting.MqttServerClientDisconnectOptions
+                        { ReasonCode = MqttDisconnectReasonCode.NotAuthorized });
+                }
+                catch
+                {
+                    // A client can close itself between the snapshot and disconnect.
+                    if ((await broker.GetClientsAsync()).Any(client => client.Id == gatewayId)) throw;
+                }
+            }
+        }
+        finally { commandGate.Release(); }
+    }
+
     public void EnsureGateway(string gatewayId) => SaveGatewayRoute(gatewayId, null);
 
     public async Task<bool> RegisterGatewayAsync(string gatewayId, string nodeId)
@@ -116,6 +153,11 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
             await commandGate.WaitAsync(cancellationToken);
             try
             {
+                if (!credentials.Validate(e.ClientId, e.UserName, e.Password))
+                {
+                    e.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                    return;
+                }
                 foreach (var id in nodes)
                     await PublishCommandAsync(id, store.Read(id)?.DesiredCommand ?? new("AUTO", null, "initial-auto", 0));
             }
@@ -123,6 +165,12 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         };
         broker.InterceptingSubscriptionAsync += e =>
         {
+            if (!credentials.IsIssued(e.ClientId))
+            {
+                e.ProcessSubscription = false;
+                e.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
+                return Task.CompletedTask;
+            }
             var nodeList = gateways.ContainsKey(e.ClientId) &&
                 e.TopicFilter.Topic == $"luxmap/gateways/{e.ClientId}/nodes";
             if (!nodeList && (!TryRoute(e.ClientId, e.TopicFilter.Topic, out _, out var kind) ||
@@ -137,6 +185,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         {
             if (e.ClientId == ServerId) return;
             e.ProcessPublish = false;
+            if (!credentials.IsIssued(e.ClientId)) return;
             if (e.ApplicationMessage.Topic == $"luxmap/gateways/{e.ClientId}/heartbeat")
             {
                 if (gateways.ContainsKey(e.ClientId) && !e.ApplicationMessage.Retain &&

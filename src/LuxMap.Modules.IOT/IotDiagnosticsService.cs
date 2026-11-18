@@ -236,6 +236,56 @@ public sealed partial class IotDiagnosticsService(
         }
     }
 
+
+    public async Task<IotGatewayCredential> GetGatewayCredentialAsync(string serverId, string gatewayId,
+        string? key, CancellationToken ct)
+    {
+        if (!ValidMqttId(gatewayId))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Gateway ID không hợp lệ.");
+        var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
+        using var request = ProvisioningRequest(HttpMethod.Get, uri,
+            $"gateways/{Uri.EscapeDataString(gatewayId)}/credential", key!);
+        try
+        {
+            using var response = await client.SendAsync(request, ct);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Gateway chưa có key hoặc key đã thu hồi.");
+            if (response.StatusCode == HttpStatusCode.Conflict)
+                throw new LuxMapException("IOT_CREDENTIAL_NOT_RETRIEVABLE", HttpStatusCode.Conflict,
+                    "Key cũ chỉ có hash. Cần thu hồi rồi cấp mới để có thể xem lại.");
+            if (response.StatusCode != HttpStatusCode.OK || !IsJson(response))
+                throw Unavailable("Không lấy được key từ IoT Bridge.");
+            var credential = await response.Content.ReadFromJsonAsync<IotGatewayCredential>(cancellationToken: ct);
+            if (credential is null || credential.ClientId != gatewayId || credential.Username != gatewayId ||
+                credential.Password is not { Length: 64 } || credential.NodeIds is null || credential.NodeIds.Any(id => !ValidMqttId(id)))
+                throw Unavailable("IoT Bridge trả thông tin key không hợp lệ.");
+            return credential;
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không lấy được key từ IoT Bridge.");
+        }
+    }
+
+    public async Task RevokeGatewayCredentialAsync(string serverId, string gatewayId, string? key, CancellationToken ct)
+    {
+        if (!ValidMqttId(gatewayId))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Gateway ID không hợp lệ.");
+        var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
+        using var request = ProvisioningRequest(HttpMethod.Delete, uri,
+            $"gateways/{Uri.EscapeDataString(gatewayId)}/credential", key!);
+        try
+        {
+            using var response = await client.SendAsync(request, ct);
+            if (response.StatusCode != HttpStatusCode.NoContent)
+                throw Unavailable("Không thu hồi được key trên IoT Bridge.");
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct))
+        {
+            throw Unavailable("Không thu hồi được key trên IoT Bridge.");
+        }
+    }
+
     private async Task<Uri> ProvisioningOriginAsync(string serverId, string? communeId, string? key, CancellationToken ct)
     {
         var settings = await registry.ReadAsync([], ct);

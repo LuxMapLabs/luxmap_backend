@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="../../src/LuxMap.IotBridge/GatewayCredentials.cs" Link="IotBridge/GatewayCredentials.cs" />
   </ItemGroup>
 
   <ItemGroup>

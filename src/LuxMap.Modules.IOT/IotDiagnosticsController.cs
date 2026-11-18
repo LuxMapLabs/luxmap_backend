@@ -84,6 +84,37 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         return diagnostics.IssueGatewayCredentialAsync(serverId, gatewayId, configuration["Mqtt:ProvisioningKey"], ct);
     }
 
+
+    /// <summary>Xem lại MQTT secret của gateway, dành cho Admin.</summary>
+    [HttpGet("servers/{serverId}/gateways/{gatewayId}/credential")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType<IotGatewayCredential>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IotGatewayCredential> GetGatewayCredentialAsync(string serverId, string gatewayId,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return diagnostics.GetGatewayCredentialAsync(serverId, gatewayId, configuration["Mqtt:ProvisioningKey"], ct);
+    }
+
+    /// <summary>Thu hồi MQTT secret và ngắt gateway đang kết nối.</summary>
+    [HttpDelete("servers/{serverId}/gateways/{gatewayId}/credential")]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> RevokeGatewayCredentialAsync(string serverId, string gatewayId,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+    {
+        Response.Headers.CacheControl = "no-store";
+        await diagnostics.RevokeGatewayCredentialAsync(serverId, gatewayId, configuration["Mqtt:ProvisioningKey"], ct);
+        return NoContent();
+    }
+
     [HttpPut("servers/{serverId}/location")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
