@@ -13,7 +13,7 @@ record FeederTelemetryWindow(string NodeId, string ServerId, string DeviceId, Da
 record FeederArchivedTelemetry(long Cursor, TelemetryReading Reading, string NodeId, string ServerId, bool Active);
 record FeederTelemetryBatch(int Total, IReadOnlyList<FeederArchivedTelemetry> Items);
 
-sealed class TelemetryArchive
+sealed partial class TelemetryArchive
 {
     private readonly string connectionString;
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -177,7 +177,25 @@ sealed class TelemetryArchive
         sql.Parameters.AddWithValue("$bounds", JsonSerializer.Serialize(bounds, Json));
         // A sample belongs to the half-open assignment window containing its measurement time.
         // For records without an RTC timestamp use the UTC Bridge receipt time.
-        const string select = """
+        sql.CommandText = FeederReadingsSql + "SELECT count(*) FROM readings;";
+        var total = Convert.ToInt32(sql.ExecuteScalar());
+        if (skip >= total) return new(total, []);
+
+        var order = measuredAt ? "rtc DESC, id DESC" : "receipt DESC, id DESC";
+        sql.CommandText = FeederReadingsSql + $"SELECT id, reading, node_id, server_id, until_rtc IS NULL FROM readings ORDER BY {order} LIMIT $take OFFSET $skip;";
+        sql.Parameters.AddWithValue("$take", take);
+        sql.Parameters.AddWithValue("$skip", skip);
+        using var reader = sql.ExecuteReader();
+        var items = new List<FeederArchivedTelemetry>();
+        while (reader.Read())
+        {
+            items.Add(new(reader.GetInt64(0), Read(reader.GetString(1)),
+                reader.GetString(2), reader.GetString(3), reader.GetBoolean(4)));
+        }
+        return new(total, items);
+    }
+
+    private const string FeederReadingsSql = """
             WITH bounds AS (
                 SELECT json_extract(value, '$.nodeId') AS node_id,
                        json_extract(value, '$.serverId') AS server_id,
@@ -206,23 +224,6 @@ sealed class TelemetryArchive
                     OR (rtc IS NULL AND receipt >= from_receipt AND (until_receipt IS NULL OR receipt < until_receipt))
             )
             """;
-        sql.CommandText = select + "SELECT count(*) FROM readings;";
-        var total = Convert.ToInt32(sql.ExecuteScalar());
-        if (skip >= total) return new(total, []);
-
-        var order = measuredAt ? "rtc DESC, id DESC" : "receipt DESC, id DESC";
-        sql.CommandText = select + $"SELECT id, reading, node_id, server_id, until_rtc IS NULL FROM readings ORDER BY {order} LIMIT $take OFFSET $skip;";
-        sql.Parameters.AddWithValue("$take", take);
-        sql.Parameters.AddWithValue("$skip", skip);
-        using var reader = sql.ExecuteReader();
-        var items = new List<FeederArchivedTelemetry>();
-        while (reader.Read())
-        {
-            items.Add(new(reader.GetInt64(0), Read(reader.GetString(1)),
-                reader.GetString(2), reader.GetString(3), reader.GetBoolean(4)));
-        }
-        return new(total, items);
-    }
 
     private static string RtcBound(DateTimeOffset instant)
     {

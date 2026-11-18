@@ -11321,178 +11321,6 @@
         "x-luxmap-contract": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)"
       }
     },
-    "/api/v1/iot/nodes/{nodeId}/electrical/history": {
-      "get": {
-        "tags": [
-          "IotDiagnostics"
-        ],
-        "parameters": [
-          {
-            "name": "nodeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "sort_by",
-            "in": "query",
-            "schema": {
-              "enum": [
-                "received_at",
-                "measured_at"
-              ],
-              "type": "string",
-              "description": "Mặc định received_at khi đọc theo trang."
-            }
-          },
-          {
-            "name": "after",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Trang kết quả mặc định. Khi truyền after hoặc limit, trả lịch sử theo cursor.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/IotArchivedSamplePagedResult"
-                    },
-                    {
-                      "$ref": "#/components/schemas/IotTelemetryPage"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:read_network",
-        "x-luxmap-roles": [
-          "superior",
-          "manager",
-          "field_engineer",
-          "system_admin"
-        ],
-        "x-luxmap-client": "shared",
-        "summary": "Đọc lịch sử điện của node theo trang hoặc cursor",
-        "operationId": "getIotNodesNodeidElectricalHistory",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)"
-      }
-    },
     "/api/v1/iot/nodes/{nodeId}/electrical": {
       "get": {
         "tags": [
@@ -11712,7 +11540,7 @@
         "summary": "Đọc mẫu điện mới nhất của mạch",
         "operationId": "getIotFeedersFeederidElectrical",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)"
+        "x-luxmap-contract": "drift IOT-HISTORY-30S (18/11/2026)"
       }
     },
     "/api/v1/iot/feeders/{feederId}/electrical/history": {
@@ -11732,25 +11560,44 @@
           {
             "name": "page",
             "in": "query",
+            "description": "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.",
             "schema": {
+              "minimum": 1,
               "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "default": 1
             }
           },
           {
             "name": "page_size",
             "in": "query",
+            "description": "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.",
             "schema": {
+              "maximum": 200,
+              "minimum": 1,
               "type": "integer",
-              "format": "int32"
+              "format": "int32",
+              "default": 20
             }
           },
           {
-            "name": "sort_by",
+            "name": "from",
             "in": "query",
+            "description": "ISO 8601 UTC, bao gồm thời điểm này; lọc mẫu trước khi tính trung bình.",
             "schema": {
               "type": "string",
-              "default": "received_at"
+              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "ISO 8601 UTC, loại trừ thời điểm này; phải lớn hơn from.",
+            "schema": {
+              "type": "string",
+              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+              "format": "date-time"
             }
           }
         ],
@@ -11760,17 +11607,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/IotFeederArchivedSamplePagedResult"
+                  "$ref": "#/components/schemas/IotFeederHistoryResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IotFeederArchivedSamplePagedResult"
+                  "$ref": "#/components/schemas/IotFeederHistoryResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/IotFeederArchivedSamplePagedResult"
+                  "$ref": "#/components/schemas/IotFeederHistoryResult"
                 }
               }
             }
@@ -11864,10 +11711,184 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Đọc lịch sử điện theo mạch qua các lần thay node",
+        "x-luxmap-contract": "drift IOT-HISTORY-30S (18/11/2026)",
+        "summary": "Trung bình điện 30 giây theo giờ đo DS3231, lọc thời gian và phân trang",
         "operationId": "getIotFeedersFeederidElectricalHistory",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)"
+        "x-luxmap-status": "implemented"
+      }
+    },
+    "/api/v1/iot/feeders/{feederId}/electrical/history/received": {
+      "get": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "feederId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.",
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.",
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "ISO 8601 UTC, bao gồm thời điểm này; lọc mẫu trước khi tính trung bình.",
+            "schema": {
+              "type": "string",
+              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "ISO 8601 UTC, loại trừ thời điểm này; phải lớn hơn from.",
+            "schema": {
+              "type": "string",
+              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotFeederHistoryResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotFeederHistoryResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotFeederHistoryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "x-luxmap-contract": "drift IOT-HISTORY-30S (18/11/2026)",
+        "summary": "Trung bình điện 30 giây theo giờ Bridge nhận, lọc thời gian và phân trang",
+        "operationId": "getIotFeedersFeederidElectricalHistoryReceived",
+        "x-luxmap-status": "implemented"
       }
     },
     "/api/v1/assets/iot-nodes": {
@@ -25010,107 +25031,6 @@
           "limit"
         ]
       },
-      "IotArchivedData": {
-        "type": "object",
-        "properties": {
-          "timestamp": {
-            "type": "string",
-            "nullable": true
-          },
-          "session_id": {
-            "type": "string",
-            "nullable": true
-          },
-          "sequence_number": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "mode": {
-            "type": "string",
-            "nullable": true
-          },
-          "lamp_command": {
-            "type": "string",
-            "nullable": true
-          },
-          "lux": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "voltage": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "current": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "power": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "IotArchivedReading": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/IotArchivedData"
-          },
-          "received_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "gateway_id": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
-      "IotArchivedSample": {
-        "type": "object",
-        "properties": {
-          "cursor": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "reading": {
-            "$ref": "#/components/schemas/IotArchivedReading"
-          }
-        },
-        "additionalProperties": false
-      },
-      "IotArchivedSamplePagedResult": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "page_size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IotArchivedSample"
-            }
-          }
-        },
-        "additionalProperties": false
-      },
       "IotAutoSchedule": {
         "type": "object",
         "properties": {
@@ -25468,45 +25388,37 @@
         },
         "additionalProperties": false
       },
-      "IotFeederArchivedSample": {
+      "IotFeederAverage": {
         "type": "object",
         "properties": {
-          "cursor": {
+          "period_start": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "period_end": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "sample_count": {
             "type": "integer",
             "format": "int64"
           },
-          "reading": {
-            "$ref": "#/components/schemas/IotArchivedReading"
+          "voltage_avg": {
+            "type": "number",
+            "format": "double"
           },
-          "node_id": {
-            "type": "string"
+          "current_ma_avg": {
+            "type": "number",
+            "format": "double"
           },
-          "server_id": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "IotFeederArchivedSamplePagedResult": {
-        "type": "object",
-        "properties": {
-          "page": {
-            "type": "integer",
-            "format": "int32"
+          "power_mw_avg": {
+            "type": "number",
+            "format": "double"
           },
-          "page_size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "total": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IotFeederArchivedSample"
-            }
+          "is_complete": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -25539,6 +25451,44 @@
           },
           "power_state": {
             "$ref": "#/components/schemas/FeederPowerState"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotFeederHistoryResult": {
+        "type": "object",
+        "properties": {
+          "feeder_id": {
+            "type": "string"
+          },
+          "time_basis": {
+            "enum": [
+              "measured_at",
+              "received_at"
+            ],
+            "type": "string"
+          },
+          "interval_seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IotFeederAverage"
+            }
           }
         },
         "additionalProperties": false
@@ -25986,25 +25936,6 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
-          }
-        },
-        "additionalProperties": false
-      },
-      "IotTelemetryPage": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IotArchivedSample"
-            }
-          },
-          "next_cursor": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "has_more": {
-            "type": "boolean"
           }
         },
         "additionalProperties": false

@@ -20,6 +20,7 @@
     <Project Path="src/LuxMap.Shared/LuxMap.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/LuxMap.IotBridge.Tests/LuxMap.IotBridge.Tests.csproj" />
     <Project Path="tests/LuxMap.Api.Tests/LuxMap.Api.Tests.csproj" />
     <Project Path="tests/LuxMap.Infrastructure.Storage.Tests/LuxMap.Infrastructure.Storage.Tests.csproj" />
     <Project Path="tests/LuxMap.Persistence.Tests/LuxMap.Persistence.Tests.csproj" />

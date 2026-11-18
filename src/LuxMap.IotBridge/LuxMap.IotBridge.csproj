@@ -9,4 +9,7 @@
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LuxMap.IotBridge.Tests" />
+  </ItemGroup>
 </Project>

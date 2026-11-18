@@ -146,12 +146,19 @@ Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, 
 | API | Cách dùng |
 |---|---|
 | `GET /api/v1/iot/feeders/{feederId}/electrical` | Mẫu mới nhất đã ghi cho mạch. Sau khi tháo node, có thể xem mẫu cuối với `status: offline` và `power_state: unknown`. Feeder chưa có mẫu trả `no_data` nếu đã gắn nguồn hoặc `unconfigured` nếu chưa gắn. |
-| `GET /api/v1/iot/feeders/{feederId}/electrical/history?page=1&page_size=20&sort_by=received_at` | Lịch sử điện của mạch qua các lần gắn hoặc thay node. Đổi `sort_by=measured_at` để sắp theo giờ đo. Mỗi dòng có `node_id` và `server_id` của nguồn đã đo. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical/history?page=1&page_size=20` | Trung bình mỗi 30 giây theo giờ DS3231. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical/history/received?page=1&page_size=20` | Trung bình mỗi 30 giây theo giờ Bridge nhận. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo ở cấp `feeder_id` từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
 
-Phản hồi lịch sử mặc định có `page`, `page_size`, `total` và `items`. Mặc định trang 1, 50 mục mỗi trang và sắp theo `received_at`; tối đa 200 mục mỗi trang. Mẫu thiếu `timestamp` nằm cuối khi sắp theo `measured_at`. Feeder nhận mẫu theo khoảng thời gian node được gán. Hệ thống ưu tiên giờ đo RTC, dùng giờ nhận cho mẫu không có giờ RTC. Mẫu gửi bù vẫn thuộc mạch lúc đo. Các tích hợp thiết bị có thể tiếp tục dùng endpoint điện theo node, với `after` và `limit` cho đồng bộ cursor.
+Hai API lịch sử trả feeder_id, time_basis, interval_seconds=30, page, page_size, total, items.
+Mặc định 20 khoảng mỗi trang, tối đa 200. Thêm from/to ISO 8601 để lọc mẫu trước khi tính;
+from bao gồm, to loại trừ. Cả hai mới nhất trước. API lịch sử theo node đã bỏ, không dùng sort_by/after/limit.
+Mỗi item có period_start, period_end, sample_count, voltage_avg (V), current_ma_avg (mA),
+power_mw_avg (mW), is_complete. Khoảng trống không tạo dòng. Mẫu OFF vẫn được tính.
+Mẫu gửi bù nằm theo giờ đo ở API thứ nhất, giờ nhận ở API thứ hai; thiếu RTC chỉ có ở API thứ hai.
+Xem [hướng dẫn và JSON đầy đủ](IOT-ELECTRICAL-HISTORY.md).
 
-Mẫu mới nhất dùng `measurement.voltage` (V), `measurement.current_ma` (mA) và `measurement.power_mw` (mW). Lịch sử dùng `items[].reading.data.{voltage,current,power,lux}` theo thứ tự V, mA, mW, lx. `timestamp` trong dữ liệu lịch sử là giờ đo theo RTC DS3231 của node. `received_at` là giờ UTC khi server nhận mẫu. Dữ liệu gửi bù có thể được nhận muộn hơn lúc đo.
+Mẫu điện mới nhất vẫn trả measurement.voltage/current_ma/power_mw, không dùng giá trị trung bình lịch sử.
 
 | Trường | Giá trị | Ý nghĩa |
 |---|---|---|

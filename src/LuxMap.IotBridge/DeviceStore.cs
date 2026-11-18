@@ -58,6 +58,10 @@ sealed class DeviceStore
     public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt) =>
         archive.ReadFeederHistory(windows, skip, take, measuredAt);
 
+    public FeederAverageBatch ReadFeederAverages(FeederTelemetryWindow[] windows, long skip, int take,
+        bool measuredAt, DateTimeOffset? from, DateTimeOffset? to, bool keysOnly) =>
+        archive.ReadFeederAverages(windows, skip, take, measuredAt, from, to, keysOnly);
+
     private void Commit(DeviceState state)
     {
         var next = new Dictionary<string, DeviceState>(devices) { [state.DeviceId] = state };

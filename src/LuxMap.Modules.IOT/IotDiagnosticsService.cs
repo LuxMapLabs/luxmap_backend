@@ -99,8 +99,6 @@ public sealed record IotLocation(
 public sealed record IotServerStatus(string ServerId, string Status, string? CommuneId = null, IotLocation? Location = null);
 public sealed record IotPoleControl(string PoleId, string? FeederId, string? NodeId, bool CanControlFeeder, string? ControlChannel = null);
 
-public sealed record IotTelemetryPage(IReadOnlyList<IotArchivedSample> Items, long NextCursor, bool HasMore);
-public sealed record IotArchivedSample(long Cursor, IotArchivedReading Reading);
 public sealed record IotArchivedReading(IotArchivedData Data, DateTimeOffset ReceivedAt, string? GatewayId);
 public sealed record IotArchivedData(string? Timestamp, string? SessionId, long? SequenceNumber,
     string? Mode, string? LampCommand, double? Lux, double? Voltage, double? Current, double? Power);
@@ -606,60 +604,6 @@ public sealed partial class IotDiagnosticsService(
 
     private sealed record CommandReceiptKey(string DeviceId, string CommandId);
     private sealed record CommandReceipt(string DeviceId, string CommandId, DateTimeOffset ReceivedAt);
-
-    public async Task<IotTelemetryPage> TelemetryHistoryAsync(
-        string nodeId, long after, int limit, CancellationToken ct)
-    {
-        if (after < 0 || limit is < 1 or > 1000)
-            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                "after phải từ 0 và limit phải từ 1 đến 1000.");
-
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct, includeDetached: true);
-        var path = FormattableString.Invariant(
-            $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history?after={after}&limit={limit}");
-        try
-        {
-            using var response = await client.GetAsync(new Uri(uri, path), ct);
-            if (response.StatusCode == HttpStatusCode.NotFound) return new([], after, false);
-            response.EnsureSuccessStatusCode();
-            if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
-            var page = await response.Content.ReadFromJsonAsync<IotTelemetryPage>(cancellationToken: ct);
-            return page is { Items: not null } && page.NextCursor >= after
-                ? page : throw Unavailable("Server IoT trả về trang dữ liệu không hợp lệ.");
-        }
-        catch (Exception ex) when (IsSourceFailure(ex, ct))
-        {
-            throw Unavailable("Không đọc được lịch sử đo từ server IoT.");
-        }
-    }
-
-    public async Task<PagedResult<IotArchivedSample>> TelemetryHistoryPageAsync(
-        string nodeId, PageRequest page, string sortBy, CancellationToken ct)
-    {
-        if (sortBy is not ("received_at" or "measured_at"))
-            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                "sort_by phải là received_at hoặc measured_at.");
-
-        var (uri, deviceId, _) = await DeviceSourceAsync(nodeId, ct, includeDetached: true);
-        var path = FormattableString.Invariant(
-            $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/telemetry/history/page?page={page.Page}&pageSize={page.PageSize}&sortBy={sortBy}");
-        try
-        {
-            using var response = await client.GetAsync(new Uri(uri, path), ct);
-            response.EnsureSuccessStatusCode();
-            if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
-            var result = await response.Content.ReadFromJsonAsync<PagedResult<IotArchivedSample>>(cancellationToken: ct);
-            if (result is not { Items: not null, Total: >= 0 } ||
-                result.Page != page.Page || result.PageSize != page.PageSize ||
-                result.Items.Count > page.PageSize || result.Items.Count > result.Total)
-                throw Unavailable("Server IoT trả về trang dữ liệu không hợp lệ.");
-            return result;
-        }
-        catch (Exception ex) when (IsSourceFailure(ex, ct))
-        {
-            throw Unavailable("Không đọc được lịch sử đo từ server IoT.");
-        }
-    }
 
     private async Task<(Uri Uri, string DeviceId, NodeProfile Profile)> DeviceSourceAsync(
         string nodeId, CancellationToken ct, bool includeDetached = false)

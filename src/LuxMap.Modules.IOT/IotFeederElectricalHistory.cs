@@ -45,7 +45,7 @@ public sealed partial class IotDiagnosticsService
             fresh ? DecodePower(measurement.LampCommand) : FeederPowerState.Unknown);
     }
 
-    public async Task<PagedResult<IotFeederArchivedSample>> FeederTelemetryHistoryAsync(
+    private async Task<PagedResult<IotFeederArchivedSample>> FeederTelemetryHistoryAsync(
         string feederId, PageRequest page, string sortBy, CancellationToken ct)
     {
         if (sortBy is not ("received_at" or "measured_at"))

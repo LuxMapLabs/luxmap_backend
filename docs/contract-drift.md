@@ -2545,3 +2545,30 @@ dùng `center`. **Chưa báo.**
 | WB-6 | Response **200** + `WorkbookImportResult { committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed, total_errors, truncated, rows[], total_warnings, warnings[] }`. `row` là số dòng Excel thật; `column` là **tên cột của sheet**. Khi `committed = false` mọi số đếm là 0 |
 
 **Cần báo:** WP5 (endpoint mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`). **Chưa báo.**
+
+
+## IOT-HISTORY-30S — lịch sử điện theo feeder (18/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| Decision | Hai GET lịch sử chỉ theo feeder, trung bình từng khoảng 30 giây UTC, lọc from/to trước khi phân trang. Bỏ GET lịch sử theo node. |
+| Decision maker | Chủ yêu cầu LuxMap IoT duyệt kế hoạch trong phiên 18/11/2026. SELF-SIGNED, chờ maintainer duyệt PR. |
+| Scope | BE, Bridge, OpenAPI và tài liệu; không sửa FE, không đổi firmware, không xóa dữ liệu thô. |
+
+- GET /api/v1/iot/feeders/{feederId}/electrical/history theo giờ đo DS3231 (UTC+07 chuyển UTC).
+- GET /api/v1/iot/feeders/{feederId}/electrical/history/received theo giờ Bridge nhận UTC.
+- Cả hai dùng ReadNetwork, scope xã của feeder, mới nhất trước, from bao gồm / to loại trừ.
+  Tham số DateTime ISO 8601, thiếu offset được chuẩn hóa UTC theo convention chung.
+  page mặc định 1, page_size mặc định 20, chuẩn hóa 1–200 theo PageRequest.
+- Mỗi item: period_start, period_end, sample_count, voltage_avg (V), current_ma_avg (mA),
+  power_mw_avg (mW), is_complete. Trung bình số học theo mẫu, kể cả mẫu OFF.
+  Lọc mẫu hợp lệ trước khi tính; không tạo khoảng rỗng hoặc điền 0 thay mẫu thiếu.
+  total đếm khoảng 30 giây có mẫu sau lọc. Khoảng đang diễn ra có is_complete=false;
+  is_complete=true chỉ nói khoảng giờ đã kết thúc, mẫu gửi bù vẫn có thể cập nhật giá trị.
+- Các lần thay node/Bridge trong cùng khoảng được gộp theo trọng số sample_count.
+  Mẫu vẫn thuộc feeder theo khoảng gắn nguồn lúc đo; thiếu RTC dùng giờ nhận để gán nguồn.
+  Lịch sử theo giờ đo bỏ mẫu thiếu RTC, lịch sử giờ nhận vẫn giữ chúng.
+- Bỏ sort_by và bộ tham số after/limit của API công khai lịch sử điện.
+  API mẫu điện mới nhất và chẩn đoán vẫn đọc dữ liệu thô.
+  API nội bộ Bridge giữ cursor cho job đồng bộ, được bảo vệ bằng Bridge key.
+- Deploy đồng thời BE và Bridge; không migration PostgreSQL, không mất telemetry.sqlite.
