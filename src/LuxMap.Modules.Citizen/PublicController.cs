@@ -36,7 +36,7 @@ public sealed class PublicController(PublicReportService service) : ControllerBa
     /// <summary>Every photo at its default cap, plus room for the text fields. A raised <c>Citizen:</c> limit cannot pass it.</summary>
     public const long MaxRequestBytes = 3 * 8 * 1024 * 1024 + 1024 * 1024;
 
-    /// <summary>What the scanned code points at: the road and the commune, to show the citizen they are at the right pole.</summary>
+    /// <summary>What the scanned code points at: the road, the commune, the pole's code and note — to show the citizen they are at the right pole.</summary>
     /// <remarks>Malformed, unknown and revoked codes are one and the same 404 <c>PUBLIC_QR_NOT_FOUND</c>.</remarks>
     [HttpPost("qr/lookup")]
     [AllowAnonymous]
