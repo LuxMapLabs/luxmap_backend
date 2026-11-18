@@ -551,3 +551,11 @@ và không để lỗi thành 500. Snapshot audit trước/sau ẩn giữ cả c
 - **Export đọc riêng từng loại qua query filter**, không chỉ đi từ cột; giữ WKT và fitting đã tháo. Giới hạn 5000 mỗi loại kiểm trước
   loại tài sản thiếu mã. Sheet `Không xuất` phải nêu mọi loại thiếu mã và cột có mạch thiếu mã / fitting có cột thiếu mã; không bỏ im lặng.
   `Hướng dẫn` ghi số theo data_source, cảnh báo nhiều xã không nạp lại được và upload chỉ một nguồn.
+
+## ASSET-GEOM-RANGE — toạ độ ngoài EPSG:4326 (18/11/2026)
+
+- **WKTReader và PostGIS đều nhận `POINT(10.97 106.49)`** (vĩ độ 106°): cột `geometry(Point,4326)` không kiểm phạm vi. Chốt chặn
+  duy nhất là `AssetGeometry.OutOfRange`, gọi ở cả `TryReadWkt` lẫn `TryReadGeoJson` — mọi đường ghi hình học tài sản (POST / PUT,
+  CSV, GeoJSON, workbook) đi qua đây. Đường ghi mới nhận `lat` / `lng` dạng số (vd `PUT …/location`) phải tự kiểm như
+  `SetPoleLocationAsync`. Phát hiện khi nạp thử file demo Review 2.
+- Dữ liệu cũ không bị kiểm lại; production 18/11 có 0 tài sản ngoài phạm vi.
