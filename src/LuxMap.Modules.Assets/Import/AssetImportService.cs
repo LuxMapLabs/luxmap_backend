@@ -38,7 +38,7 @@ namespace LuxMap.Modules.Assets.Import;
 /// segment yet — POLE-SEGMENT-NULL D-2).
 /// </para>
 /// </remarks>
-public sealed class AssetImportService(
+public sealed partial class AssetImportService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices)
 {
     public Task<ImportResult> ImportCsvAsync(ImportKind kind, string text, CancellationToken cancellationToken)
@@ -110,32 +110,9 @@ public sealed class AssetImportService(
         var warnings = new List<ImportRowError>();
         var readers = rows.Select(row => new ImportRowReader(row, errors)).ToList();
 
-        // Stable, explicit bigint keys in the "LMI" (LuxMap import) range, independent of enum order or .NET hashes.
-        // Imports are rare: serializing a whole kind, across communes, is enough without per-row lock ordering.
-        var lockKey = kind switch
-        {
-            ImportKind.Segments => 0x4C4D4901L,
-            ImportKind.Cabinets => 0x4C4D4902L,
-            ImportKind.Feeders => 0x4C4D4903L,
-            ImportKind.Poles => 0x4C4D4904L,
-            ImportKind.Fixtures => 0x4C4D4905L,
-            _ => 0x4C4D4900L,
-        };
-
-        // Lock before any planner reads. `await using` rolls back and releases it on every early return or failure,
-        // including a CommuneWriteGuard refusal in SaveChanges. This SELECT does not write or bypass tracked rows.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        await dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
-
-        var plan = kind switch
-        {
-            ImportKind.Segments => await PlanSegmentsAsync(readers, cancellationToken),
-            ImportKind.Cabinets => await PlanCabinetsAsync(readers, cancellationToken),
-            ImportKind.Feeders => await PlanFeedersAsync(readers, cancellationToken),
-            ImportKind.Poles => await PlanPolesAsync(readers, warnings, cancellationToken),
-            ImportKind.Fixtures => await PlanFixturesAsync(readers, cancellationToken),
-            _ => new WritePlan(0, 0, 0),
-        };
+        await LockKindAsync(kind, cancellationToken);
+        var plan = await PlanAsync(kind, readers, warnings, cancellationToken);
 
         var failed = readers.Count(reader => !reader.IsValid);
 
@@ -152,6 +129,33 @@ public sealed class AssetImportService(
 
         return ImportResult.From(plan.Inserted, plan.Updated, plan.Unchanged, failed, errors, warnings);
     }
+
+    private Task<int> LockKindAsync(ImportKind kind, CancellationToken cancellationToken)
+    {
+        // Stable keys shared by CSV, GeoJSON and workbook; LoadOrder is ascending lock order.
+        var lockKey = kind switch
+        {
+            ImportKind.Segments => 0x4C4D4901L,
+            ImportKind.Cabinets => 0x4C4D4902L,
+            ImportKind.Feeders => 0x4C4D4903L,
+            ImportKind.Poles => 0x4C4D4904L,
+            ImportKind.Fixtures => 0x4C4D4905L,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+        return dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", cancellationToken);
+    }
+
+    private Task<WritePlan> PlanAsync(ImportKind kind, List<ImportRowReader> readers,
+        List<ImportRowError> warnings, CancellationToken cancellationToken, bool matchFixtures = false)
+        => kind switch
+        {
+            ImportKind.Segments => PlanSegmentsAsync(readers, cancellationToken),
+            ImportKind.Cabinets => PlanCabinetsAsync(readers, cancellationToken),
+            ImportKind.Feeders => PlanFeedersAsync(readers, cancellationToken),
+            ImportKind.Poles => PlanPolesAsync(readers, warnings, cancellationToken),
+            ImportKind.Fixtures => PlanFixturesAsync(readers, cancellationToken, matchFixtures),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
 
     private sealed record WritePlan(int Inserted, int Updated, int Unchanged);
 
@@ -543,13 +547,18 @@ public sealed class AssetImportService(
     /// doubling the equipment history (ONE-FIXTURE: one fitting in service per pole). Replacing a fitting goes
     /// through CRUD, which can say which row it means.
     /// </remarks>
-    private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
+    private async Task<WritePlan> PlanFixturesAsync(List<ImportRowReader> readers, CancellationToken cancellationToken, bool matchExisting = false)
     {
         var poles = await ReferenceIndexAsync<Pole>(readers, "pole_external_ref", cancellationToken);
 
-        var slotsInUse = await SlotsInUseAsync(
-            poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray(), cancellationToken);
-        var inserted = 0;
+        var poleIds = poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray();
+        var slotsInUse = await SlotsInUseAsync(poleIds, cancellationToken);
+        var active = matchExisting
+            ? await dbContext.Set<Fixture>().AsNoTracking()
+                .Where(f => f.RemovedDate == null && poleIds.Contains(f.PoleId))
+                .ToDictionaryAsync(f => f.PoleId, cancellationToken)
+            : new Dictionary<string, Fixture>();
+        int inserted = 0, unchanged = 0;
 
         foreach (var reader in readers)
         {
@@ -571,6 +580,24 @@ public sealed class AssetImportService(
             if (installDate is not null && removedDate is not null && removedDate < installDate)
             {
                 reader.Fail("removed_date", $"'{removedDate:yyyy-MM-dd}' is before install_date '{installDate:yyyy-MM-dd}'.");
+            }
+
+            if (matchExisting && poleId is not null && active.TryGetValue(poleId, out var current))
+            {
+                void Match(string column, bool equal)
+                {
+                    if (!equal)
+                        reader.Fail(column, $"Pole already has a fitting in service with a different {reader.Row.ColumnName(column)}; replace a fitting through the asset form.");
+                }
+                Match("fixture_type", current.FixtureType == fixtureType);
+                Match("power_source", current.PowerSource == powerSource);
+                Match("lamp_watt", current.LampWatt == watt);
+                Match("lamp_count", current.LampCount == lampCount);
+                Match("install_date", current.InstallDate == installDate);
+                if (reader.Optional("warranty_expiry") is not null) Match("warranty_expiry", current.WarrantyExpiry == warranty);
+                if (note is not null) Match("note", current.Note == note);
+                if (reader.IsValid) unchanged++;
+                continue;
             }
 
             short slot = FixtureSlots.First;
@@ -626,7 +653,7 @@ public sealed class AssetImportService(
             inserted++;
         }
 
-        return new WritePlan(inserted, 0, 0);
+        return new WritePlan(inserted, 0, unchanged);
     }
 
     /// <summary>
@@ -758,7 +785,17 @@ public sealed class AssetImportService(
             return null;
         }
 
-        if (!index.TryGetValue(value, out var matches) || matches.Count == 0)
+        if (reader.Row.ReferenceFailed(column))
+        {
+            reader.Invalidate(); // The defining row already explains why this reference cannot resolve.
+            return null;
+        }
+
+        index.TryGetValue(value, out var matches);
+        // Workbook refs identify a definition in this row's commune; CSV/GeoJSON retain their existing lookup semantics.
+        if (reader.Row.ReferenceCommune is { } commune && matches is not null)
+            matches = matches.Where(match => match.CommuneId == commune).ToList();
+        if (matches is null || matches.Count == 0)
         {
             reader.Fail(column, $"'{value}' matches nothing. Import that file first — see docs/templates/README.md.");
             return null;

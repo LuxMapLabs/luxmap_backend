@@ -2524,26 +2524,23 @@ dùng `center`. **Chưa báo.**
 
 **Cần báo:** WP5 (đổi `PATCH` → `PUT /assets/fixtures/{fixture_id}`, 204; trường `note` mới), WP6 (trường mới, chỉ thêm).
 
-## IOT-FAULTS-1 — chẩn đoán thành Fault và phục hồi (18/11/2026)
+## ASSET-IMPORT-WORKBOOK — nạp kiểm kê từ MỘT sheet Excel (18/11/2026)
 
-Decision maker: chủ yêu cầu LuxMap IoT trong phiên làm việc 18/11/2026. Đã yêu cầu triển khai trên nhánh iot.
-Phạm vi BE, không sửa FE. Thay đổi mở rộng API và schema, cần consumer nhận hai fault_type mới.
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 18/11/2026** — xã bàn giao sổ kiểm kê là một bảng Excel phẳng; tách thành 5 CSV đúng thứ tự khoá ngoại là việc người dùng hay làm sai. Chọn endpoint ở backend (không tách ở web) để gộp trùng, kiểm mâu thuẫn và ghi nguyên tử ở một chỗ |
+| **Chạm API** | **Có, chỉ THÊM** — một endpoint mới, hai schema mới; không đổi 5 endpoint `/assets/import/{kind}`. Ngoài Contract như cả nhóm BE-12a. **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Scope** | Assets (import); dependency mới `DocumentFormat.OpenXml` 3.5.1 (MIT, Microsoft); template `docs/templates/assets-workbook*.xlsx` + script sinh; `templates/README.md`; spec sinh lại. Không migration |
+| **Consumer** | WP5 (modal import tài sản: thêm lựa chọn "một file Excel"). **Chưa báo** |
+| **Ticket** | `.ai/tasks/ASSET-IMPORT-WORKBOOK.md` |
 
-- Thêm fault_type voltage_anomaly, iot_hardware_fault. Giữ 17 anomaly codes, ánh xạ telemetry_stale → node_offline,
-  voltage_loss → segment_outage, lamp_count_shortfall → lamp_out. Phạm vi đếm bóng là feeder, chưa biết pole/fixture.
-- Bổ sung iot_anomaly_code, origin_node_id, feeder_id, cabinet_id, recovered_at trên response Fault.
-  Evidence JSON lưu thuật toán iot-faults-v1, phiên bản hiệu chuẩn và firmware do sensorHealth xác nhận tại lúc đánh giá.
-  Firmware của mẫu lịch sử chưa có metadata được coi là không rõ.
-- Job mỗi 30 giây lưu evidence trong iot_diagnostic_state. Lỗi điện 3 phút, phần cứng 5 phút, thiếu bóng 2 cửa sổ 25 mẫu
-  không chồng nhau. Bản tin lặp không tăng xác nhận. Bản tin phần cứng cũ và dữ liệu đo replay không chứng minh phục hồi.
-- Khi bình thường liên tục 90 giây với bản tin mới: Fault detected chưa có WorkOrder → rejected bằng actor iot,
-  confirmed_by để null, có audit rejected và recovered_at. Các trạng thái khác chỉ ghi nhận phục hồi, không đóng.
-  Quyết định này bổ sung ngoại lệ tự động cho D-6, không thay quyết định của người hay nghiệm thu WorkOrder.
-- Chống trùng node + feeder + anomaly_code khi detected/confirmed/in_progress/resolved.
-  Job offline cũ nhường thiết bị đã cấu hình Bridge cho job chẩn đoán.
-- GET /api/v1/iot/diagnostics/summary dùng ReadNetwork, phạm vi xã, page/page_size, đọc cache DB.
-  diagnostic_status gồm normal, anomaly, stale, no_data, unconfigured, source_unavailable.
-- Thêm profile 5v-quiet-v1 cho R002, trung bình 64 lần, AUX ổn định 1.5 giây, nguồn thử 4.80–5.30 V.
-  Cửa sổ 25 mẫu, tối thiểu 20 phiếu khớp một dải và trung vị cùng dải. Các dải có khoảng bỏ phiếu không xác định.
-  Các mức 7–10 có đo thực tế, chưa hiệu chuẩn 1–6. Giữ profile 4v và 5v cũ cho dữ liệu cũ.
-- calibration_rig giữ nguồn riêng; GET /faults?source_channel=iot&data_source=calibration_rig để xem demo.
+| Mã | Quyết định |
+|---|---|
+| WB-1 | `POST /api/v1/assets/import/workbook`, multipart `file`, `ManageAssets`, ≤ 10 MB. Chỉ `.xlsx` có chữ ký zip; khác → **415**; zip không phải OpenXml → **400**. Đọc **sheet đầu tiên**, header dòng 1, bỏ dòng trống hoàn toàn; ≤ 5 000 dòng, ≤ 200 cột, ô ≤ 2 000 ký tự |
+| WB-2 | Một dòng = một cột đèn (+ bộ đèn tuỳ chọn); tuyến / tủ / mạch lặp lại theo `*_ref` trong cùng `commune_id`. Dòng đầu nhắc tới ref định nghĩa nó; dòng sau ô trống = không nói gì, ô khác giá trị = lỗi dòng. `pole_ref` trùng = lỗi. Danh sách cột và luật bắt-buộc-theo-nhóm ở ticket mục 3 |
+| WB-3 | **All-or-nothing**: kiểm cả sheet, ghi 5 lớp theo thứ tự khoá ngoại trong **một transaction** (khoá advisory của cả 5 lớp, thứ tự tăng); có bất kỳ lỗi nào → không ghi gì, `committed = false`. Khác chủ ý với `{kind}` (ghi phần hợp lệ) — sheet phẳng mà ghi một phần thì lỗi dây chuyền tuyến → cột → bộ đèn khó đọc và để lại dữ liệu nửa vời |
+| WB-4 | Bộ đèn: cột chưa có bộ đang dùng → thêm; đã có → so khớp, giống → `unchanged`, khác → lỗi dòng. Workbook không bao giờ sửa / thay bộ đang dùng (thay bộ đi đường CRUD, OF-4). `/assets/import/fixtures` **giữ** insert-only |
+| WB-5 | Toạ độ là hai cột `*_lat` / `*_lng` (số, Invariant; `10,97` là lỗi, không tự sửa). Sheet không mang hình tuyến / mạch: tuyến mới chưa hình, tuyến đã có giữ hình (ROAD-SEGMENT-GEOM-NULL) |
+| WB-6 | Response **200** + `WorkbookImportResult { committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed, total_errors, truncated, rows[], total_warnings, warnings[] }`. `row` là số dòng Excel thật; `column` là **tên cột của sheet**. Khi `committed = false` mọi số đếm là 0 |
+
+**Cần báo:** WP5 (endpoint mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`). **Chưa báo.**
