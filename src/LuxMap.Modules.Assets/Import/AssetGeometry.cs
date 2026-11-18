@@ -38,6 +38,12 @@ internal static class AssetGeometry
                 return false;
             }
 
+            if (OutOfRange(parsed) is { } rangeError)
+            {
+                error = rangeError;
+                return false;
+            }
+
             parsed.SRID = SpatialConstants.Srid;
             geometry = parsed;
             return true;
@@ -67,6 +73,23 @@ internal static class AssetGeometry
     /// </para>
     /// </remarks>
     public static bool TryReadGeoJson(JsonElement geometry, out Geometry? result, out string? error)
+    {
+        if (!TryParseGeoJson(geometry, out result, out error))
+        {
+            return false;
+        }
+
+        if (OutOfRange(result!) is { } rangeError)
+        {
+            result = null;
+            error = rangeError;
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryParseGeoJson(JsonElement geometry, out Geometry? result, out string? error)
     {
         result = null;
         error = null;
@@ -110,6 +133,38 @@ internal static class AssetGeometry
             error = $"Geometry coordinates are malformed: {exception.Message}";
             return false;
         }
+    }
+
+    /// <summary>
+    /// Every coordinate must be a real EPSG:4326 position: finite, longitude within ±180, latitude within ±90.
+    /// </summary>
+    /// <remarks>
+    /// Neither WKTReader nor PostGIS refuses <c>POINT(10.97 106.49)</c> — a latitude of 106° — so without this a pair typed
+    /// in the spoken order (latitude first) was stored as a point nowhere near the commune and every distance to it was
+    /// nonsense. In Vietnam the swap always pushes the latitude past 90, so naming the likely cause is cheap and right.
+    /// </remarks>
+    private static string? OutOfRange(Geometry geometry)
+    {
+        foreach (var coordinate in geometry.Coordinates)
+        {
+            var (lng, lat) = (coordinate.X, coordinate.Y);
+            if (!double.IsFinite(lng) || !double.IsFinite(lat))
+            {
+                return "Coordinates must be finite numbers.";
+            }
+
+            if (Math.Abs(lng) > 180 || Math.Abs(lat) > 90)
+            {
+                var swapped = Math.Abs(lat) > 90 && Math.Abs(lat) <= 180 && Math.Abs(lng) <= 90
+                    ? " The pair looks swapped: longitude comes first, e.g. POINT(106.49 10.97)."
+                    : string.Empty;
+                return $"Coordinate ({lng.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
+                    + $"{lat.ToString(System.Globalization.CultureInfo.InvariantCulture)}) is outside EPSG:4326: "
+                    + $"longitude must be within ±180 and latitude within ±90.{swapped}";
+            }
+        }
+
+        return null;
     }
 
     private static Coordinate ReadCoordinate(JsonElement position)
