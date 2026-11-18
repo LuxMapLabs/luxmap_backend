@@ -40,6 +40,15 @@
 <body>
 <div class="wrap">
 
+  <div class="card">
+    <strong>ASSET-GEOM-RANGE — từ chối toạ độ ngoài EPSG:4326 · 18/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    <code>AssetGeometry</code> (WKT + GeoJSON) kiểm kinh độ ±180, vĩ độ ±90, số hữu hạn; gợi ý "looks swapped" khi gõ vĩ độ trước.
+    Áp cho form tài sản, import CSV / GeoJSON / workbook. Drift GR-1…GR-3, SELF-SIGNED. Production: 0 tài sản ngoài phạm vi.</p>
+    <p>Phát hiện khi nạp thử file demo Review 2 (<code>POINT(10.97 106.49)</code> được lưu). 10 test mới; phá thử (tắt kiểm) → 7 đỏ.
+    Còn: báo WP5.</p>
+  </div>
+
   <div class="card" id="asset-workbook-multisheet">
     <strong>ASSET-WORKBOOK-MULTISHEET — workbook mỗi loại tài sản một sheet · 18/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>

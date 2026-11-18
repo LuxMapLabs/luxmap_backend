@@ -170,6 +170,9 @@ Không điền các cột server sở hữu; parser bỏ qua cột lạ trong fi
 - `LINESTRING` nhiều điểm ngăn bằng dấu phẩy: `LINESTRING(106.4900 10.9700, 106.4950 10.9705)`.
   Vì bên trong có dấu phẩy nên **ô này phải nằm trong dấu nháy kép**.
 - Số thập phân dùng **dấu chấm**, không dùng dấu phẩy.
+- **Mọi điểm phải nằm trong EPSG:4326**: kinh độ trong ±180, vĩ độ trong ±90, số hữu hạn (ASSET-GEOM-RANGE). Ngoài phạm vi →
+  lỗi dòng ở `geom_wkt` (form: 400). Gõ ngược thứ tự ở Việt Nam luôn cho vĩ độ ~106° nên bị bắt, thông báo gợi ý "looks swapped".
+  Áp cho CSV, GeoJSON, workbook và form tạo / sửa tài sản.
 
 ### Tham chiếu bằng mã, tên chỉ để đọc
 

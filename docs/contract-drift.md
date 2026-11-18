@@ -2628,6 +2628,7 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
 
 **Cần báo:** WP5 (định dạng mới, hai trường form `data_source` / `commune_id`, `sheet` trong lỗi). **Chưa báo.**
 
+
 ## IOT-CONTACT-1 — kết nối node độc lập độ mới mẫu điện (18/11/2026)
 
 | Trường | Nội dung |
@@ -2653,3 +2654,20 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
   liên lạc liên tục, giữ nguyên quy tắc có WorkOrder. Thuật toán iot-faults-v2-contact.
 - API feeder electrical và lịch sử 30 giây giữ nghĩa số đo/nguồn của mạch; API node thể hiện kết nối.
   Deploy đồng thời BE + Bridge để theo dõi liên lạc khi backlog không thay latestTelemetry.
+
+## ASSET-GEOM-RANGE — từ chối toạ độ ngoài EPSG:4326 khi ghi tài sản (18/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 18/11/2026** — phát hiện khi nạp thử file demo: `POINT(10.97 106.49)` (gõ vĩ độ trước) được lưu thành vĩ độ 106° |
+| **Chạm API** | **Có, chỉ SIẾT kiểm tra**: giá trị trước đây được nhận nay bị từ chối; không đổi field, enum hay hình dạng. **SELF-SIGNED** |
+| **Scope** | `AssetGeometry` (WKT + GeoJSON): `POST` / `PUT` tuyến, tủ, mạch, cột; import CSV / GeoJSON `{kind}`; import workbook |
+| **Consumer** | WP5 (form tài sản, import). WP6 không ghi hình học tài sản qua đường này. **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| GR-1 | Mọi toạ độ của hình học tài sản: hữu hạn, kinh độ ∈ [-180, 180], vĩ độ ∈ [-90, 90] (biên được nhận). Sai → form: **400 `VALIDATION_FAILED`**, `details.geom_wkt` = lý do; import: lỗi dòng cột `geom_wkt` |
+| GR-2 | Khi vĩ độ ngoài ±90 mà kinh độ trong ±90, thông báo gợi ý cặp số bị đảo ("looks swapped") |
+| GR-3 | Không kiểm lại dữ liệu đã lưu; production 18/11/2026: 0 tài sản ngoài phạm vi. `PUT /assets/poles/{id}/location` đã kiểm sẵn (không đổi) |
+
+**Cần báo:** WP5 — form và import có thể trả lỗi mới cho toạ độ ngoài phạm vi. **Chưa báo.**
