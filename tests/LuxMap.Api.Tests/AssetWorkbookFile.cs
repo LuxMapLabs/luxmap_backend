@@ -9,45 +9,47 @@ namespace LuxMap.Api.Tests;
 internal static class AssetWorkbookFile
 {
     internal sealed record Cached(string Value, CellValues Type, string? Formula = null);
-    public static readonly string[] Columns = LuxMap.Modules.Assets.Import.WorkbookColumns.All.Select(c => c.Name).ToArray();
+    internal sealed record Sheet(string Name, string[] Columns, List<(uint Number, Dictionary<string, object?> Cells)> Rows);
+    public static byte[] Create(params Sheet[] sheets) => WithSharedStrings(null, sheets);
 
-    public static byte[] Create(IEnumerable<(uint Number, Dictionary<string, object?> Cells)> rows,
-        string[]? columns = null, bool garbageSecondSheet = false, string[]? sharedStrings = null)
+    public static byte[] WithSharedStrings(string[]? strings, params Sheet[] sheets)
     {
-        columns ??= Columns;
         using var stream = new MemoryStream();
         using (var package = SpreadsheetDocument.Create(stream, SpreadsheetDocumentType.Workbook, true))
         {
             var book = package.AddWorkbookPart();
             book.Workbook = new Workbook(new Sheets());
-            if (sharedStrings is not null)
+            if (strings is not null)
             {
                 var shared = book.AddNewPart<SharedStringTablePart>();
-                shared.SharedStringTable = new SharedStringTable(sharedStrings.Select(s => new SharedStringItem(new Text(s))));
+                shared.SharedStringTable = new SharedStringTable(strings.Select(s => new SharedStringItem(new Text(s))));
                 shared.SharedStringTable.Save();
             }
-            var part = book.AddNewPart<WorksheetPart>();
-            using (var writer = OpenXmlWriter.Create(part))
+            foreach (var sheet in sheets)
             {
-                writer.WriteStartElement(new Worksheet());
-                writer.WriteStartElement(new SheetData());
-                WriteRow(writer, 1, columns.Select((c, i) => (i, (object?)c)));
-                foreach (var row in rows)
-                    WriteRow(writer, row.Number, columns.Select((c, i) => (i, row.Cells.GetValueOrDefault(c))).Where(c => c.Item2 is not null));
-                writer.WriteEndElement();
-                writer.WriteEndElement();
-            }
-            book.Workbook.Sheets!.Append(new Sheet { Name = "import", SheetId = 1, Id = book.GetIdOfPart(part) });
-            if (garbageSecondSheet)
-            {
-                var other = book.AddNewPart<WorksheetPart>();
-                other.Worksheet = new Worksheet(new SheetData(new Row(new Cell(new InlineString(new Text("garbage"))) { DataType = CellValues.InlineString }) { RowIndex = 1 }));
-                other.Worksheet.Save();
-                book.Workbook.Sheets.Append(new Sheet { Name = "ignored", SheetId = 2, Id = book.GetIdOfPart(other) });
+                var part = book.AddNewPart<WorksheetPart>();
+                using (var writer = OpenXmlWriter.Create(part))
+                {
+                    writer.WriteStartElement(new Worksheet());
+                    writer.WriteStartElement(new SheetData());
+                    WriteRow(writer, 1, sheet.Columns.Select((c, i) => (i, (object?)c)));
+                    foreach (var row in sheet.Rows)
+                        WriteRow(writer, row.Number, sheet.Columns.Select((c, i) => (i, row.Cells.GetValueOrDefault(c))).Where(c => c.Item2 is not null));
+                    writer.WriteEndElement();
+                    writer.WriteEndElement();
+                }
+                book.Workbook.Sheets!.Append(new DocumentFormat.OpenXml.Spreadsheet.Sheet { Name = sheet.Name,
+                    SheetId = (uint)book.Workbook.Sheets.ChildElements.Count + 1, Id = book.GetIdOfPart(part) });
             }
             book.Workbook.Save();
         }
         return stream.ToArray();
+    }
+
+    public static Sheet Asset(LuxMap.Modules.Assets.Import.ImportKind kind, params Dictionary<string, object?>[] rows)
+    {
+        var layout = LuxMap.Modules.Assets.Import.WorkbookSheets.All.Single(s => s.Kind == kind);
+        return new(layout.Name, layout.Columns, rows.Select((r, i) => ((uint)i + 2, r)).ToList());
     }
 
     private static void WriteRow(OpenXmlWriter writer, uint number, IEnumerable<(int Index, object? Value)> cells)

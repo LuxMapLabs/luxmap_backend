@@ -1,9 +1,9 @@
 ---
 ticket: ASSET-WORKBOOK-MULTISHEET
 title: Đổi workbook kiểm kê từ MỘT sheet phẳng sang MỖI LOẠI TÀI SẢN MỘT SHEET trong một file .xlsx (import + export)
-status: ready
+status: done
 phase: 2
-owner: codex
+owner: claude
 branch: feat/ASSET-WORKBOOK-multisheet
 contract_refs:
   - "drift ASSET-IMPORT-WORKBOOK WB-1…WB-11 (bị thay một phần — mục WB-12…WB-20)"

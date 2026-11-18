@@ -1708,16 +1708,31 @@
           "content": {
             "multipart/form-data": {
               "schema": {
+                "required": [
+                  "data_source"
+                ],
                 "type": "object",
                 "properties": {
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "commune_id": {
+                    "type": "string"
+                  },
+                  "data_source": {
+                    "type": "string"
                   }
                 }
               },
               "encoding": {
                 "file": {
+                  "style": "form"
+                },
+                "commune_id": {
+                  "style": "form"
+                },
+                "data_source": {
                   "style": "form"
                 }
               }
@@ -1821,7 +1836,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Nạp toàn bộ kiểm kê từ sheet đầu của một file .xlsx, all-or-nothing (WB-1…WB-6); 200 kèm committed + lỗi theo dòng Excel",
+        "summary": "Nạp 5 sheet tài sản .xlsx, xã và data_source qua multipart, all-or-nothing (WB-12…WB-20); 200 kèm committed + lỗi theo sheet/dòng Excel",
         "operationId": "postAssetsImportWorkbook",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -2053,7 +2068,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Xuất kiểm kê theo mẫu import Excel, ReadNetwork, tối đa 5000 cột; sheet Không xuất nêu cột thiếu mã (WB-7…WB-11)",
+        "summary": "Xuất mọi loại tài sản theo sheet Excel, ReadNetwork, tối đa 5000 mỗi loại; WKT, bộ đã tháo, Không xuất và thống kê nguồn (WB-19)",
         "operationId": "getAssetsExportWorkbook",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -31351,7 +31366,7 @@
           "rows": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ImportRowError"
+              "$ref": "#/components/schemas/WorkbookRowError"
             }
           },
           "total_warnings": {
@@ -31361,7 +31376,7 @@
           "warnings": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ImportRowError"
+              "$ref": "#/components/schemas/WorkbookRowError"
             }
           }
         },
@@ -31381,6 +31396,27 @@
           "unchanged": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbookRowError": {
+        "type": "object",
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "nullable": true
+          },
+          "row": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "column": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
           }
         },
         "additionalProperties": false

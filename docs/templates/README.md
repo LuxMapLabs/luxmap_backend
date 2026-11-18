@@ -19,54 +19,59 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`, `\d electri
 
 ---
 
-## Một sheet Excel
+## Workbook nhiều sheet (WB-12…WB-20)
 
-`POST /api/v1/assets/import/workbook`, multipart trường `file`, capability `ManageAssets` (Quản lý), tối đa 10 MB.
-Chỉ nhận `.xlsx` có chữ ký zip; `.xls`, CSV hoặc text đổi đuôi trả 415; zip hỏng trả 400.
-Bề mặt WB-1…WB-6 là **SELF-SIGNED**, nền tạm tới FW kế tiếp như nhóm import CSV.
+`POST /api/v1/assets/import/workbook`, multipart: `file` (.xlsx, tối đa 10 MB), **`data_source` bắt buộc**
+(`field`, `public_imagery`, `calibration_rig`, `simulated`), `commune_id` tuỳ chọn. Nguồn testbed không bao giờ chọn `field`.
+Quản lý (`ManageAssets`) chọn xã và nguồn khi upload; vắng xã chỉ được dùng xã duy nhất trong phạm vi, ngoài phạm vi → 403.
+Không đặt `commune_id` / `data_source` trong sheet, kể cả cột trống. Đây là bề mặt drift SELF-SIGNED, nền tạm tới FW kế tiếp.
 
-Xuất kiểm kê: `GET /api/v1/assets/export/workbook?commune_id=…` (tham số lặp được; vắng = mọi xã trong phạm vi),
-capability `ReadNetwork` (cả bốn vai trò). Tải `assets-<yyyy-MM-dd>.xlsx` theo ngày UTC, đúng mẫu `import` để sửa rồi nạp lại.
-Quá 5000 cột trong phạm vi → **413 `EXPORT_TOO_LARGE`**, hãy lọc theo `commune_id`.
-Cột thiếu mã vĩnh viễn hoặc có mạch thiếu mã được liệt kê ở sheet **`Không xuất`** kèm lý do và cách gán mã qua form tài sản;
-chúng không nằm trong sheet đầu. Chỉ xuất bộ đèn đang dùng; nạp lại nguyên file giữ nguyên dấu cập nhật của dữ liệu khớp.
-Giới hạn WB-11: mỗi dòng chỉ mang `data_source` của cột; tuyến/tủ/bộ đèn khác nguồn có thể làm nạp lại báo mâu thuẫn
-hoặc đổi nguồn của tài sản cha. Tuyến/tủ/mạch không có cột không xuất hiện; import không xóa nên chúng vẫn được giữ.
-Sheet không mang hình tuyến / mạch: nạp lại **giữ** hình đã vẽ của cả hai (WB-5).
-Bề mặt WB-7…WB-11 là **SELF-SIGNED**, nền tạm tới FW kế tiếp.
+Nạp **cả file một lần**, không tách sheet ra CSV. Sheet được nhận theo tên (trim + Unicode NFC, phân biệt hoa thường), không theo
+vị trí. Mỗi loại đi qua planner CSV hiện có, theo thứ tự tuyến → tủ → mạch → cột → bộ đèn trong một transaction.
+Sheet vắng bỏ qua; không có sheet tài sản → lỗi. Sheet khác như `Hướng dẫn` bỏ qua; `IoT` có dữ liệu → lỗi vì chưa hỗ trợ.
 
-- [assets-workbook.xlsx](assets-workbook.xlsx): sheet đầu `import` chỉ header để điền; sheet `Hướng dẫn` giải thích từng cột.
-- [assets-workbook.example.xlsx](assets-workbook.example.xlsx): 5 cột mẫu, gồm cột chưa GPS, cột không bộ đèn, bộ chao đôi.
-  Mã xã `COM-070` theo các CSV mẫu hiện tại. Seed sinh ID tự động (khóa `study_site`), nên DB khác phải dùng mã xã thực tế:
-  `python scripts/make_asset_workbook_template.py --commune-id <ma-xa>`.
+| Sheet | Header đúng thứ tự template (`*` bắt buộc có) |
+|---|---|
+| `Tuyến đường` | `external_ref`*, `segment_name`*, `road_class`*, `length_m`, `geom_wkt` |
+| `Tủ điện` | `external_ref`*, `cabinet_name`*, `geom_wkt`* |
+| `Mạch điện` | `external_ref`*, `feeder_name`*, `cabinet_external_ref`, `cabinet_source`, `geom_wkt` |
+| `Cột điện` | `external_ref`*, `segment_external_ref`, `feeder_external_ref`, `feeder_source`, `geom_wkt`, `near_sensitive_poi`, `note` |
+| `Bóng đèn` | `pole_external_ref`*, `fixture_type`*, `power_source`*, `lamp_watt`*, `install_date`*, `lamp_count`, `removed_date`, `warranty_expiry`, `note` |
 
-Chỉ đọc sheet đầu; dòng 1 là header (trim, phân biệt hoa thường), cột lạ bỏ qua, header trùng bị lỗi.
-Dòng trống hoàn toàn bỏ qua. Tối đa 5000 dòng dữ liệu, 200 cột, 2000 ký tự/ô.
+Luật từng cột theo CSV bên dưới, với các khác biệt workbook:
 
-| Nhóm | Cột sheet | Quy tắc |
-|---|---|---|
-| Chung | `commune_id`, `data_source` | Bắt buộc ở header và mỗi dòng; nguồn áp cho tuyến, tủ, cột, bộ đèn |
-| Tuyến | `segment_ref`, `segment_name`, `road_class`, `segment_length_m` | Có ref thì cần tên và loại đường. Không mang hình: giữ hình đã có, tuyến mới chưa hình. Chiều dài trống giữ số đã lưu |
-| Tủ | `cabinet_ref`, `cabinet_name`, `cabinet_lat`, `cabinet_lng` | Có ref thì cần tên và cả hai tọa độ |
-| Mạch | `feeder_ref`, `feeder_name`, `cabinet_source` | Có ref thì cần tên; thuộc tủ cùng dòng, ô tủ trống giữ tủ cũ |
-| Cột | `pole_ref`, `pole_lat`, `pole_lng`, `near_sensitive_poi`, `pole_note`, `feeder_source` | `pole_ref` bắt buộc. Hai tọa độ cùng điền hoặc cùng trống; trống giữ vị trí cũ. Tuyến trống giữ tuyến, mạch trống tháo mạch như import CSV |
-| Bộ đèn | `fixture_type`, `power_source`, `lamp_watt`, `lamp_count`, `install_date`, `warranty_expiry`, `fixture_note` | Cả nhóm tùy chọn; có bất kỳ ô nào thì cần loại, nguồn, công suất, ngày lắp. `lamp_count` trống = 1 |
+- `geom_wkt` dùng WKT EPSG:4326: `POINT(lng lat)` / `LINESTRING(…)`. Tuyến **và mạch** trống hoặc thiếu cột giữ hình đã có;
+  xoá lộ trình qua form. CSV mạch vẫn trống = xoá. Tủ bắt buộc vị trí; cột trống giữ vị trí cũ.
+- Cột **mới** chưa GPS phải có `note` mô tả vị trí. Cột đã có không bị kiểm lại. Không đổi luật CSV / form.
+- `external_ref` là mã kiểm kê của xã (ví dụ `CTA-001`, `TUYEN-A`), không dùng định dạng ID hệ thống `POLE-0001` / `SEG-001`.
+  Trùng mã trong cùng sheet là lỗi ở dòng sau, nêu dòng đầu. Mã cha chọn qua named-range dropdown.
+- Bộ đèn nhận cả đang dùng và đã tháo. Khớp theo **(cột, install_date)**: không có thì thêm, đúng một thì so nội dung và trả
+  `unchanged`, khác thì lỗi “change a fitting through the asset form”, nhiều hơn một thì “ambiguous”. Không sửa bộ đã có.
+  So loại / nguồn điện / công suất / số bóng (trống = 1) / ngày tháo / bảo hành / ghi chú; bảo hành và ghi chú trống không nói gì.
+  ONE-FIXTURE vẫn áp: không thêm bộ đang dùng thứ hai. CSV fixtures vẫn insert-only.
+- Cột lạ có dữ liệu là lỗi header, cột lạ toàn trống bỏ qua. Header trùng / thiếu là lỗi. Dòng hoàn toàn trống bỏ qua.
+- Ngày nhận chuỗi `YYYY-MM-DD` hoặc ngày Excel serial nguyên; không có phần giờ. Số dùng Invariant; mã số `7` đọc thành `"7"`.
+  Template định dạng ref Text để giữ mã `007`. Mỗi sheet tối đa 5000 dòng dữ liệu, 200 cột, 2000 ký tự/ô; tổng giải nén ≤ 100 MB.
 
-Tọa độ hữu hạn, vĩ độ [-90,90], kinh độ [-180,180], dùng dấu chấm thập phân; `10,97` là lỗi.
-Ngày nhận chuỗi `YYYY-MM-DD` hoặc ngày/serial Excel nguyên, không có phần giờ.
-Các dropdown dùng enum hiện hành; `cabinet_source` / `feeder_source` là `verified` hoặc `inferred`.
-Ghi chú tối đa 1000 ký tự; `pole_note` có chữ ghi đè, trống giữ và báo cảnh báo nếu thay ghi chú cũ.
-
-Tuyến/tủ/mạch gộp theo `(commune_id, *_ref)`: dòng đầu định nghĩa, dòng sau trống không nói gì;
-khác giá trị thì lỗi ở dòng sau, nêu dòng đầu. `pole_ref` trùng trong xã là lỗi.
-Một lỗi bất kỳ ⇒ **rollback cả năm lớp**, `committed = false`, mọi số đếm bằng 0, không cảnh báo ghi đè.
+Một lỗi bất kỳ → rollback cả năm lớp, `committed = false`, mọi số đếm 0, không cảnh báo ghi đè.
 Trả 200 với `{committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed,
-total_errors, truncated, rows[], total_warnings, warnings[]}`. Lỗi theo số dòng Excel thật và tên cột sheet,
-sắp theo dòng/cột, tối đa 100 lỗi trong `rows[]`.
+total_errors, truncated, rows[], total_warnings, warnings[]}`. Lỗi / cảnh báo là `{sheet, row, column, message}`;
+`sheet = null` cho lỗi cấp file. `row` là số dòng Excel thật; sắp theo thứ tự loại → dòng → cột; tối đa 100 lỗi được trả.
 
-Bộ đèn đang dùng: nạp lại giống thì `unchanged`, giữ dấu cập nhật; khác thì lỗi, thay bộ qua form tài sản.
-So loại, nguồn, công suất, số bóng, ngày lắp, bảo hành, ghi chú; bảo hành/ghi chú trống không nói gì.
-Không có `removed_date` trong workbook. CSV fixtures vẫn **insert-only**, không đổi hành vi.
+- [assets-workbook.xlsx](assets-workbook.xlsx): `Hướng dẫn` đầu tiên, rồi năm sheet chỉ header; màu xanh đậm bắt buộc / xám tuỳ chọn.
+- [assets-workbook.example.xlsx](assets-workbook.example.xlsx): dữ liệu từ `*.example.csv`, gồm tuyến chưa hình và cột chưa GPS.
+  Xã **chọn qua form**, không phụ thuộc mã xã trong CSV mẫu. Sinh lại cả hai: `python scripts/make_asset_workbook_template.py`.
+
+Xuất: `GET /api/v1/assets/export/workbook?commune_id=…` (`commune_id` lặp được; vắng = toàn phạm vi),
+`ReadNetwork` (cả bốn vai trò), tải `assets-<yyyy-MM-dd>.xlsx` theo UTC. Thứ tự sheet như template; `Không xuất` ở cuối nếu có.
+Xuất mọi tài sản, kể cả tuyến / tủ / mạch không có cột, WKT tuyến / mạch, bộ đèn đã tháo. Mỗi loại > 5000 dòng → 413
+`EXPORT_TOO_LARGE` trước khi loại tài sản không xuất được.
+
+`Không xuất` có `kind`, `id`, `commune_id`, `reason`: tài sản không mã, cột thuộc mạch không mã, bộ đèn của cột không mã.
+Tài sản bị loại không bị sửa / tháo quan hệ. Nạp lại cùng xã và cùng nguồn → mọi lớp `unchanged`, dấu cập nhật không đổi.
+**File nhiều xã không nạp lại được** vì upload chỉ chọn một xã. **Mỗi file nạp lại dùng một `data_source`**: nguồn khác nhau ở
+các tài sản có thể đổi theo lựa chọn upload; bộ đèn đã có không sửa. Sheet `Hướng dẫn` của file xuất ghi số tài sản theo từng nguồn,
+gồm bộ đã tháo, để kiểm trước khi nạp lại.
 
 ---
 
