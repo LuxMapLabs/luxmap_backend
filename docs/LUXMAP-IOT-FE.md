@@ -239,3 +239,47 @@ Fault đã có phiếu giữ trạng thái nghiệp vụ và ghi recovered_at. �
 Xem Fault testbed qua GET /api/v1/faults?source_channel=iot&data_source=calibration_rig&page=1&page_size=20.
 Manager xác nhận sự cố và giao phiếu qua luồng WorkOrder hiện tại.
 Profile mới 5v-quiet-v1 phải được chọn cho nguồn đo R002/64 averages/AUX ổn định 1,5 giây.
+## Quản lý MQTT key gateway — cập nhật 18/11/2026
+
+Cả ba API dùng Bearer token của Admin (`ManageSettings`). `GET` và `POST` trả thông tin bí mật,
+có header `Cache-Control: no-store`. FE chỉ hiển thị cho người dùng được phép, tránh ghi vào log hoặc localStorage.
+
+| Thao tác | Method và URL |
+|---|---|
+| Cấp key mới | `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` |
+| Xem lại key | `GET /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` |
+| Thu hồi key | `DELETE /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` |
+
+Với bộ hiện tại, URL đầy đủ là
+`https://luxmap.com.vn/api/v1/iot/servers/iot-server-01/gateways/LUXMAP-GW001/credential`.
+Cả ba thao tác dùng Body none.
+
+POST và GET thành công trả 200 với cùng dạng JSON:
+
+```json
+{
+  "client_id": "LUXMAP-GW001",
+  "username": "LUXMAP-GW001",
+  "password": "<MQTT secret 64 ký tự>",
+  "node_ids": ["LUXMAP-P001"]
+}
+```
+
+POST trả 409 IOT_REGISTRATION_CONFLICT nếu gateway đang có key.
+GET trả 404 ASSET_NOT_FOUND khi chưa cấp hoặc đã thu hồi key.
+GET với key cũ chỉ được lưu hash trả 409 IOT_CREDENTIAL_NOT_RETRIEVABLE; cần Admin chủ động DELETE rồi POST
+để cấp key mới có thể xem lại. Các key cũ tiếp tục xác thực được trước khi thu hồi.
+
+DELETE thành công trả 204 No Content, gọi lại vẫn 204. Bridge xóa credential, ngắt kết nối MQTT của gateway,
+xóa heartbeat cũ và từ chối key đã thu hồi. Tuyến gateway, node và dữ liệu lịch sử được giữ để cấp lại key bằng POST.
+Sau POST cấp lại, nhập password mới vào cấu hình ESP32 gateway.
+
+Bridge có các route nội bộ GET/POST/DELETE `/api/luxmap/gateways/{gatewayId}/credential`.
+Backend gửi X-Iot-Bridge-Key và X-Iot-Provisioning-Key. FE chỉ gọi API backend bằng Bearer token.
+
+Secret mới được bảo vệ bằng ASP.NET Core Data Protection trước khi lưu cạnh hash trong
+`data/gateway-credentials.json`. Keyring được lưu bền trong `data/keyring/`, application name cố định
+`LuxMap.IotBridge.GatewayCredentials`. Deploy cần giữ volume data qua restart và backup cả credential lẫn keyring.
+Keyring chứa khóa giải mã và cần quyền đọc giới hạn cho service. Việc lưu keyring vào filesystem không tự cấu hình
+mã hóa keyring trên Linux. Nếu mất keyring, GET trả 503; cần khôi phục backup hoặc thu hồi/cấp lại key.
+Không có migration PostgreSQL cho thay đổi credential này. Cần deploy đồng thời BE và IoT Bridge.

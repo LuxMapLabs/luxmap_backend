@@ -145,6 +145,21 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var credential = await admin.PostAsync(credentialPath, null);
         Assert.Equal(HttpStatusCode.OK, credential.StatusCode);
         Assert.True(credential.Headers.CacheControl?.NoStore == true);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.GetAsync(credentialPath)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.DeleteAsync(credentialPath)).StatusCode);
+        using var retrieved = await admin.GetAsync(credentialPath);
+        Assert.Equal(HttpStatusCode.OK, retrieved.StatusCode);
+        Assert.True(retrieved.Headers.CacheControl?.NoStore == true);
+        var storedCredential = await retrieved.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(new string('A', 64), storedCredential.GetProperty("password").GetString());
+        using var legacyKey = await admin.GetAsync($"{root}/servers/{id}/gateways/LEGACY-GW/credential");
+        Assert.Equal(HttpStatusCode.Conflict, legacyKey.StatusCode);
+        var legacyBody = await legacyKey.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("IOT_CREDENTIAL_NOT_RETRIEVABLE", legacyBody.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await admin.GetAsync($"{root}/servers/{id}/gateways/MISSING-GW/credential")).StatusCode);
+        using var revoked = await admin.DeleteAsync(credentialPath);
+        Assert.Equal(HttpStatusCode.NoContent, revoked.StatusCode);
         var setup = new LightingTestRig(fixture);
         var otherFeeder = await setup.NewFeederAsync(await setup.NewCabinetAsync());
         var wrongFeeder = new
@@ -1026,6 +1041,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             if (path.EndsWith("/authorization", StringComparison.Ordinal))
                 return Task.FromResult(new HttpResponseMessage(path.EndsWith("/probe/authorization", StringComparison.Ordinal)
                     ? HttpStatusCode.NoContent : HttpStatusCode.NotFound));
+            if (path.EndsWith("/LEGACY-GW/credential", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict));
+            if (path.EndsWith("/MISSING-GW/credential", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            if (path.EndsWith("/TEST-GW/credential", StringComparison.Ordinal) && request.Method == HttpMethod.Delete)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
             if (path.EndsWith("/TEST-GW/credential", StringComparison.Ordinal))
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
