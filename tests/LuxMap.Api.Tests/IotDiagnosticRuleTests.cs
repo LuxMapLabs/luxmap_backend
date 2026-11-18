@@ -7,6 +7,25 @@ namespace LuxMap.Api.Tests;
 public sealed class IotDiagnosticRuleTests
 {
     [Fact]
+    public void Stale_electricity_with_fresh_contact_is_not_a_node_offline_fault()
+    {
+        var now = DateTime.UtcNow;
+        var result = new IotDiagnosticResult("NODE-test", "FDR-test", "stale",
+            new(now.AddMinutes(-5), "ON", 5, 100, 500), [new("telemetry_stale")])
+        {
+            ConnectionStatus = "online", ElectricalStatus = "stale",
+            LastSeenAt = now, LastCommandAckAt = now, MeasurementKey = "s/1",
+        };
+        Assert.False(IotDiagnosticRules.IsActive(result, "telemetry_stale"));
+        Assert.True(IotDiagnosticRules.TryObservation(result, "telemetry_stale", new(), now, out _));
+        var offline = result with { ConnectionStatus = "offline", LastSeenAt = now.AddMinutes(-5) };
+        Assert.True(IotDiagnosticRules.IsActive(offline, "telemetry_stale"));
+        Assert.True(IotDiagnosticRules.TryObservation(offline, "telemetry_stale", new(), now, out _));
+        Assert.False(IotDiagnosticRules.TryObservation(result with { LastSeenAt = now.AddMinutes(1) },
+            "telemetry_stale", new(), now, out _));
+    }
+
+    [Fact]
     public void Repeated_report_cannot_satisfy_hardware_debounce()
     {
         var state = new DiagnosticCodeEvidence();

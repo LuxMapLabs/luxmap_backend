@@ -24,8 +24,7 @@ public sealed class FeederStateTests(AssetImportFixture fixture)
     {
         var rig = await Plant(fixture, connected ? 2 : 1, mode);
         var client = await fixture.ManagerClientAsync();
-        var list = await Json(client, "/api/v1/assets/feeders?page_size=200");
-        var item = list.GetProperty("items").EnumerateArray().Single(i => i.GetProperty("feeder_id").GetString() == rig.Feeders[0]);
+        var item = await InventoryFeederAsync(client, rig.Feeders[0]);
         var detail = (await Json(client, $"/api/v1/assets/feeders/{rig.Feeders[0]}")).GetProperty("feeder");
         foreach (var row in new[] { item, detail })
         {
@@ -137,6 +136,21 @@ public sealed class FeederStateTests(AssetImportFixture fixture)
 
     internal static JsonElement Cabinet(JsonElement map, string id) => map.GetProperty("features").EnumerateArray()
         .Single(f => f.GetProperty("properties").GetProperty("cabinet_id").GetString() == id).GetProperty("properties");
+
+    private static async Task<JsonElement> InventoryFeederAsync(HttpClient client, string feederId)
+    {
+        for (var page = 1; ; page++)
+        {
+            var result = await Json(client, $"/api/v1/assets/feeders?page={page}&page_size=200");
+            var items = result.GetProperty("items").EnumerateArray().ToArray();
+            var matches = items.Where(item => item.GetProperty("feeder_id").GetString() == feederId).ToArray();
+            if (matches.Length > 0) return Assert.Single(matches);
+            var consumed = (long)result.GetProperty("page").GetInt32() * result.GetProperty("page_size").GetInt32();
+            Assert.True(consumed < result.GetProperty("total").GetInt32(),
+                $"Feeder {feederId} was not found in any inventory page.");
+            Assert.NotEmpty(items);
+        }
+    }
 
     internal static async Task<JsonElement> Json(HttpClient client, string url)
     {

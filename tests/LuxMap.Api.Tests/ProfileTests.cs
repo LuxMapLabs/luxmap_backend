@@ -17,7 +17,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LuxMap.Api.Tests;
 
 /// <summary>ACCT-6: a signed-in user edits their own full_name; nothing else is reachable from this endpoint.</summary>
-public sealed class ProfileTests(AccountTestFactory factory) : IClassFixture<AccountTestFactory>, IAsyncLifetime
+// System-admin /auth/me includes every commune; keep both snapshots isolated from commune-writing tests.
+[Collection(nameof(SystemAdminCountCollection))]
+public sealed class ProfileTests(AccountTestFactory factory) : IAsyncLifetime
 {
     private const string Me = "/api/v1/auth/me";
     private readonly List<string> users = [];

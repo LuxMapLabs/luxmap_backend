@@ -2628,6 +2628,33 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
 
 **Cần báo:** WP5 (định dạng mới, hai trường form `data_source` / `commune_id`, `sheet` trong lỗi). **Chưa báo.**
 
+
+## IOT-CONTACT-1 — kết nối node độc lập độ mới mẫu điện (18/11/2026)
+
+| Trường | Nội dung |
+|---|---|
+| Decision | status ở GET /iot/nodes và GET /iot/nodes/{id}/electrical dựa trên liên lạc node, không chỉ tuổi mẫu điện. Thêm electrical_status, last_seen_at, last_command_ack_at. |
+| Decision maker | Chủ yêu cầu LuxMap IoT duyệt và yêu cầu triển khai 18/11/2026. SELF-SIGNED, chờ maintainer review. |
+| Scope | BE, Bridge, OpenAPI, tài liệu. Không sửa FE/firmware, không đổi schema PostgreSQL. |
+
+- Giữ last_received_at là giờ nhận latestTelemetry, không ghi đè bằng ACK.
+- LastSeenAt theo server khi chấp nhận telemetry, ACK mới hợp lệ hoặc sensorHealth mới hợp lệ.
+  Gateway heartbeat không được dùng thay node heartbeat. ACK lặp giữ receipt cũ.
+  Bridge lưu LastSeenAt và LastCommandAckAt trong devices.json, đọc được snapshot cũ.
+- Dùng max_silence_seconds mặc định 60 cho cả hai phép kiểm độc lập.
+  Node có ACK mới vẫn online khi điện stale/no_data; chưa từng có liên lạc trả no_data.
+  Loại timestamp ở tương lai khỏi bằng chứng kết nối.
+- Điện fresh cần cả giờ nhận và RTC (nếu có) mới; gửi bù vẫn là stale nếu giờ đo cũ.
+  Dữ liệu legacy thiếu RTC dùng giờ nhận. Không dùng ACK để cập nhật mẫu điện.
+- Diagnostics thêm connection_status, electrical_status, last_seen_at, last_command_ack_at.
+  status/anomalies vẫn nói chẩn đoán; telemetry_stale vẫn cảnh báo điện cũ khi node online.
+  Summary thêm các trường này từ snapshot job, giữ evaluated_at và hạn cache 90 giây.
+- Sửa ngoại lệ ánh xạ IOT-FAULTS-1: telemetry_stale chỉ sinh NodeOffline khi node thực sự offline.
+  ACK mới không tạo Fault mất kết nối giả; Fault detected tự phục hồi có audit sau 90 giây
+  liên lạc liên tục, giữ nguyên quy tắc có WorkOrder. Thuật toán iot-faults-v2-contact.
+- API feeder electrical và lịch sử 30 giây giữ nghĩa số đo/nguồn của mạch; API node thể hiện kết nối.
+  Deploy đồng thời BE + Bridge để theo dõi liên lạc khi backlog không thay latestTelemetry.
+
 ## ASSET-GEOM-RANGE — từ chối toạ độ ngoài EPSG:4326 khi ghi tài sản (18/11/2026)
 
 | | |
@@ -2644,4 +2671,3 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
 | GR-3 | Không kiểm lại dữ liệu đã lưu; production 18/11/2026: 0 tài sản ngoài phạm vi. `PUT /assets/poles/{id}/location` đã kiểm sẵn (không đổi) |
 
 **Cần báo:** WP5 — form và import có thể trả lỗi mới cho toạ độ ngoài phạm vi. **Chưa báo.**
-

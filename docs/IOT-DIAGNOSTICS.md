@@ -17,7 +17,11 @@
 |---|---|
 | `node_id` | Mã node LuxMap được chẩn đoán. |
 | `feeder_id` | Mạch điện mà nguồn đo của node đang giám sát. |
-| `status` | Kết quả chẩn đoán chung. Xem bảng trạng thái bên dưới. |
+| `status` | Kết quả chẩn đoán chung, không phải trạng thái kết nối. Xem bảng trạng thái bên dưới. |
+| `connection_status` | Kết nối node: online / offline / no_data, dựa trên liên lạc đã xác thực. |
+| `electrical_status` | Độ mới điện: fresh / stale / no_data. ACK không làm mới điện. |
+| `last_seen_at` | UTC liên lạc node mới nhất (ACK/telemetry/sensorHealth). |
+| `last_command_ack_at` | UTC ACK hợp lệ mới nhất; ACK lặp không đổi thời điểm. |
 | `measurement` | Mẫu điện gần nhất. Có thể là `null` nếu chưa có mẫu. Nếu mẫu đã cũ, API vẫn có thể trả mẫu cuối để tra cứu. |
 | `anomalies` | Danh sách cảnh báo hiện tại. Mỗi lỗi dùng cùng DTO `IotAnomaly`. Nếu chưa phát hiện cảnh báo, mảng là `[]`. |
 | `lamp_count` | Kết quả ước lượng số bóng khi đủ điều kiện chạy kiểm tra. Có thể là `null`. |
@@ -60,7 +64,7 @@ Mỗi cảnh báo luôn có đủ 5 trường. Giá trị số nào không áp d
 
 | Mã | Khi nào xuất hiện | Số liệu đi kèm |
 |---|---|---|
-| `telemetry_stale` | Thời gian từ lần nhận mẫu điện cuối vượt ngưỡng của nguồn đo, mặc định 60 giây. | `observed` là tuổi mẫu tính bằng giây, `limit` là ngưỡng tính bằng giây. |
+| `telemetry_stale` | Giờ nhận hoặc giờ đo RTC đã quá ngưỡng nguồn, mặc định 60 giây. Có thể xuất hiện khi node vẫn online nhờ ACK. | `observed` là tuổi mẫu tính bằng giây, `limit` là ngưỡng tính bằng giây. |
 | `voltage_loss` | Đèn báo `ON`, mẫu còn mới và trị tuyệt đối của điện áp đo được ≤ 0,1 V. | `observed` là điện áp đo được, `limit` là 0,1 V. |
 | `voltage_deviation` | Đèn báo `ON`, mẫu còn mới và điện áp lệch điện áp danh định quá ngưỡng, mặc định 10%. | `observed` và `reference` tính bằng V. `deviation_percent` và `limit` tính bằng %. |
 | `lamp_count_shortfall` | Cửa sổ 25 mẫu ON đủ điều kiện ước lượng cho thấy số bóng sáng thấp hơn số bóng hiệu chuẩn. | `observed` là số bóng thiếu. Chi tiết nằm trong `lamp_count`. |
@@ -245,15 +249,16 @@ Ba mã `current_deviation`, `power_deviation`, `current_when_off` tiếp tục �
 
 | anomaly_code | fault_type | Điều kiện tạo |
 |---|---|---|
-| `telemetry_stale` | `node_offline` | Vượt `max_silence_seconds` của nguồn Bridge. |
+| `telemetry_stale` khi connection_status=offline | `node_offline` | Vượt `max_silence_seconds` của nguồn Bridge. |
 | `voltage_loss` | `segment_outage` | Lỗi giữ liên tục 3 phút trong các mẫu ON mới. |
 | `voltage_deviation` | `voltage_anomaly` | Lỗi giữ liên tục 3 phút trong các mẫu ON mới. |
 | `lamp_count_shortfall` | `lamp_out` | Hai cửa sổ 25 mẫu ON mới, không chồng nhau, xác nhận thiếu bóng. |
 | 13 mã phần cứng | `iot_hardware_fault` | Bản tin phần cứng fresh tiếp tục xác nhận lỗi trong 5 phút. |
 
 Các Fault tạo với `source_channel=iot`, `fault_status=detected` và giữ `data_source` của node.
-`telemetry_stale` mô tả mất dữ liệu điện; điều khiển vẫn có thể trả ACK. Tên FaultType tương thích là `node_offline`,
-còn `iot_anomaly_code` giải thích chính xác dấu hiệu quan sát.
+`telemetry_stale` mô tả mẫu điện cũ; điều khiển vẫn có thể trả ACK.
+Chỉ tạo Fault `node_offline` khi `connection_status=offline` và `last_seen_at` quá ngưỡng.
+Nếu node vẫn online, giữ cảnh báo điện cũ trong diagnostics, không tạo Fault mất kết nối giả.
 Job offline cũ tiếp tục dùng ngưỡng hệ thống cho thiết bị ngoài luồng Bridge.
 
 Bằng chứng theo node, nguồn và mã lỗi được lưu DB qua restart. Cùng một bản tin không tăng xác nhận.
@@ -275,7 +280,7 @@ Sau ít nhất 90 giây có các bản tin mới xác nhận lỗi đã hết:
 - Dữ liệu nguồn không đọc được, bản tin cũ, đếm bóng chưa đủ mẫu hoặc không xác định không được xem là phục hồi.
 
 Fault trả thêm `origin_node_id`, `feeder_id`, `cabinet_id`, `iot_anomaly_code`, `recovered_at`.
-Evidence lưu bằng chứng đo, thuật toán `iot-faults-v1`, phiên bản hiệu chuẩn và firmware được báo trong sensorHealth
+Evidence lưu bằng chứng đo, thuật toán `iot-faults-v2-contact` (bản lịch sử có thể là `iot-faults-v1`), phiên bản hiệu chuẩn và firmware được báo trong sensorHealth
 tại thời điểm đánh giá. Firmware của bản đo lịch sử chưa có metadata vẫn chưa xác định được.
 
 Dòng tổng chỉ ước lượng số bóng thiếu của feeder. `pole_id` và `fixture_id` được giữ null khi chưa xác định bóng nào hỏng.
@@ -340,3 +345,12 @@ PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
 
 Không tự chuyển các nguồn đang dùng profile cũ. Admin tạo nguồn mới cũng có thể chọn `lamp_count_calibration` khi đăng ký.
 API tổng hợp và job cần bản BE mới cùng migration `AddIotDiagnosticFaults`.
+
+
+## Kết nối và dữ liệu điện tách biệt — cập nhật 18/11/2026
+
+ACK mới có thể cho connection_status=online trong khi electrical_status=stale và anomalies vẫn có telemetry_stale.
+Không dùng telemetry_stale một mình để gắn nhãn node mất kết nối hoặc tạo NodeOffline Fault.
+Job chỉ tạo NodeOffline nếu last_seen_at thực sự quá ngưỡng; khi hồi phục vẫn tuân thủ debounce/audit.
+Mẫu gửi bù phải kiểm giờ đo, không chỉ received_at.
+Xem [quy tắc, JSON và tương thích](IOT-NODE-STATUS.md).

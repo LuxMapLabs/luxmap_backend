@@ -11,7 +11,13 @@ namespace LuxMap.Modules.IOT;
 
 public sealed record IotDiagnosticSummaryItem(
     string NodeId, string? FeederId, string DiagnosticStatus, string[] AnomalyCodes,
-    int? EstimatedLit, int? EstimatedMissing, string[] FaultIds, DateTime? EvaluatedAt);
+    int? EstimatedLit, int? EstimatedMissing, string[] FaultIds, DateTime? EvaluatedAt)
+{
+    public string ConnectionStatus { get; init; } = "source_unavailable";
+    public string ElectricalStatus { get; init; } = "source_unavailable";
+    public DateTime? LastSeenAt { get; init; }
+    public DateTime? LastCommandAckAt { get; init; }
+}
 
 public sealed class IotDiagnosticSummary(LuxMapDbContext db, TimeProvider clock)
 {
@@ -39,7 +45,12 @@ public sealed class IotDiagnosticSummary(LuxMapDbContext db, TimeProvider clock)
                 state is null ? "unconfigured" : recent ? state.DiagnosticStatus : "source_unavailable",
                 result?.Anomalies.Select(a => a.Code).Distinct().ToArray() ?? [],
                 result?.LampCount?.EstimatedLit, result?.LampCount?.EstimatedMissing,
-                faults.Where(f => f.OriginNodeId == id).Select(f => f.FaultId).ToArray(), state?.EvaluatedAt);
+                faults.Where(f => f.OriginNodeId == id).Select(f => f.FaultId).ToArray(), state?.EvaluatedAt)
+            {
+                ConnectionStatus = result?.ConnectionStatus ?? (state is null || recent && state.DiagnosticStatus == "unconfigured" ? "unconfigured" : "source_unavailable"),
+                ElectricalStatus = result?.ElectricalStatus ?? (state is null || recent && state.DiagnosticStatus == "unconfigured" ? "unconfigured" : "source_unavailable"),
+                LastSeenAt = result?.LastSeenAt, LastCommandAckAt = result?.LastCommandAckAt,
+            };
         }).ToArray();
         return PagedResult<IotDiagnosticSummaryItem>.From(page, total, items);
     }

@@ -70,7 +70,7 @@ API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response 
 | API | Dữ liệu FE dùng |
 |---|---|
 | `GET /api/v1/iot/servers` | Marker gateway từ `server_id`, `commune_id`, `location.lat/lng` và `status`. `location: null` nghĩa là chưa có tọa độ hiển thị. |
-| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status` và `last_received_at`. |
+| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status`, `last_received_at`, `last_seen_at`, `last_command_ack_at` và `electrical_status`. status phản ánh liên lạc node; last_received_at vẫn là giờ nhận mẫu điện. |
 | `GET /api/v1/iot/poles/{poleId}/control` | Khi bấm trụ, lấy `feeder_id`, `node_id` và `can_control_feeder`. |
 | `GET /api/v1/map/poles` | `features[].properties.power_state` là trạng thái cấp điện của mạch chứa trụ. |
 | `GET /api/v1/map/poles/{poleId}` | `power_state` của trụ và của các bóng trong `fixtures[]`. |
@@ -290,3 +290,18 @@ Secret mới được bảo vệ bằng ASP.NET Core Data Protection trước kh
 Keyring chứa khóa giải mã và cần quyền đọc giới hạn cho service. Việc lưu keyring vào filesystem không tự cấu hình
 mã hóa keyring trên Linux. Nếu mất keyring, GET trả 503; cần khôi phục backup hoặc thu hồi/cấp lại key.
 Không có migration PostgreSQL cho thay đổi credential này. Cần deploy đồng thời BE và IoT Bridge.
+
+
+## Trạng thái liên lạc node và tuổi dữ liệu điện — 18/11/2026
+
+GET /api/v1/iot/nodes: status là liên lạc node. Thêm electrical_status, last_seen_at, last_command_ack_at;
+last_received_at vẫn là thời điểm nhận latestTelemetry.
+GET /api/v1/iot/nodes/{id}/electrical dùng cùng quy tắc và trả measurement cũ để tra cứu.
+Node ACK mới có thể status=online nhưng electrical_status=stale hoặc no_data.
+Gateway online không đồng nghĩa các node online. POST lệnh thành công chưa phải ACK.
+
+Diagnostics trả connection_status riêng, status vẫn là chẩn đoán.
+Summary thêm connection_status/electrical_status và các thời điểm từ snapshot, xem evaluated_at.
+telemetry_stale nói mẫu điện cũ; không dùng nó một mình làm nhãn “Node mất tín hiệu”.
+Các lỗi điện/phần cứng không được xóa chỉ vì node trả ACK.
+[Chi tiết và JSON Postman](IOT-NODE-STATUS.md).

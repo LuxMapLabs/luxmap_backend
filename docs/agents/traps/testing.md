@@ -83,7 +83,7 @@ Quản trị từ scope khác **giữa** lệnh khoá và lượt đếm → tes
 **Gặp ở ProfileTests (15/11/2026, IOT-CONSOLIDATE-MODULE):** `Every_role_renames_itself_and_gets_the_me_body_back`
 so toàn bộ JSON của PATCH với GET kế tiếp. Với system_admin, `communes[]` và map bounds phụ thuộc mọi xã;
 `CommuneAdminTests` đồng thời tạo/xóa/đổi `bbox-test-*`, nên hai snapshot có thể khác dù profile đúng.
-Lượt tổng đã đỏ ở tên xã; 35 test hai class chạy riêng xanh. Chưa sửa test trong ticket chuyển module;
+Lượt tổng đã đỏ ở tên xã; 35 test hai class chạy riêng xanh. Đã sửa 18/11/2026 (PR #280): đưa ProfileTests vào SystemAdminCountCollection không chạy song song, giữ nguyên so sánh toàn bộ PATCH / GET;
 không kết luận hai snapshot dữ liệu động phải bằng nhau chỉ vì cùng hình dạng response.
 
 ## AI-DAYNIGHT — response union và fixture model (03/11/2026)
@@ -97,3 +97,12 @@ Test OpenAPI kiểm oneOf, enum rời nhau, khoảng confidence, consumer web; a
 ## Test migration lùi: tạo tài khoản bằng SQL, không bằng `db.Add(new AppUser …)`
 
 Test dừng DB ở một migration cũ rồi mới ghi dữ liệu (`WorkOrderCancellationMigrationTests`, `AccountsSingleCommuneMigrationTests`) **không được** ghi `AppUser` qua EF: EF ghi mọi cột của model hiện tại, kể cả cột migration sau (như `avatar_*`) mà schema cũ chưa có ⇒ `42703 column … does not exist`. Dùng `OldSchemaUser.InsertAsync` (SQL chỉ nêu cột có ở mọi schema xuất phát). Thêm cột vào `app_user` ở migration mới thì test cũ kiểu này đỏ nếu còn đi đường EF.
+
+
+## Danh sách phân trang trong test không đảm bảo chứa tài sản vừa tạo (18/11/2026)
+
+FeederStateTests từng tìm feeder bằng Single trong trang đầu page_size=200. Khi các test cùng
+AssetDatabaseCollection đã tạo hơn 200 feeder, feeder mới nằm trang sau, gây CI đỏ dù API đúng
+(run 44312524635, PR #280). Khi kiểm tra một tài sản bằng endpoint danh sách, duyệt page cho tới khi
+thấy ID hoặc đã đọc hết total; không coi page_size lớn là lấy tất cả. Giữ kiểm tra trên endpoint
+danh sách nếu đó là hành vi cần kiểm, không thay bằng GET chi tiết để che lỗi phân trang.
