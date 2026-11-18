@@ -93,3 +93,14 @@ public sealed record ImportResult(
             warnings?.Count ?? 0,
             [.. (warnings ?? []).Take(MaxReportedErrors)]);
 }
+
+/// <summary>Counts for one distinct asset kind in an atomic workbook import.</summary>
+public sealed record WorkbookKindCounts(int Inserted, int Updated, int Unchanged);
+
+/// <summary>Atomic workbook outcome. Counts and warnings are zero/empty after rollback.</summary>
+public sealed record WorkbookImportResult(
+    bool Committed,
+    WorkbookKindCounts Segments, WorkbookKindCounts Cabinets, WorkbookKindCounts Feeders,
+    WorkbookKindCounts Poles, WorkbookKindCounts Fixtures,
+    int Failed, int TotalErrors, bool Truncated, IReadOnlyList<ImportRowError> Rows,
+    int TotalWarnings, IReadOnlyList<ImportRowError> Warnings);

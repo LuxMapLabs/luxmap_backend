@@ -2523,3 +2523,24 @@ dùng `center`. **Chưa báo.**
 | FN-6 | Không audit riêng (bộ đèn không phải `IAudited`, như mọi sửa tài sản khác); dấu vết là `updated_by` / `updated_at`. Không có khoá hàng: sửa và ngừng dùng đồng thời không đụng chung cột nào |
 
 **Cần báo:** WP5 (đổi `PATCH` → `PUT /assets/fixtures/{fixture_id}`, 204; trường `note` mới), WP6 (trường mới, chỉ thêm).
+
+## ASSET-IMPORT-WORKBOOK — nạp kiểm kê từ MỘT sheet Excel (18/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 18/11/2026** — xã bàn giao sổ kiểm kê là một bảng Excel phẳng; tách thành 5 CSV đúng thứ tự khoá ngoại là việc người dùng hay làm sai. Chọn endpoint ở backend (không tách ở web) để gộp trùng, kiểm mâu thuẫn và ghi nguyên tử ở một chỗ |
+| **Chạm API** | **Có, chỉ THÊM** — một endpoint mới, hai schema mới; không đổi 5 endpoint `/assets/import/{kind}`. Ngoài Contract như cả nhóm BE-12a. **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Scope** | Assets (import); dependency mới `DocumentFormat.OpenXml` 3.5.1 (MIT, Microsoft); template `docs/templates/assets-workbook*.xlsx` + script sinh; `templates/README.md`; spec sinh lại. Không migration |
+| **Consumer** | WP5 (modal import tài sản: thêm lựa chọn "một file Excel"). **Chưa báo** |
+| **Ticket** | `.ai/tasks/ASSET-IMPORT-WORKBOOK.md` |
+
+| Mã | Quyết định |
+|---|---|
+| WB-1 | `POST /api/v1/assets/import/workbook`, multipart `file`, `ManageAssets`, ≤ 10 MB. Chỉ `.xlsx` có chữ ký zip; khác → **415**; zip không phải OpenXml → **400**. Đọc **sheet đầu tiên**, header dòng 1, bỏ dòng trống hoàn toàn; ≤ 5 000 dòng, ≤ 200 cột, ô ≤ 2 000 ký tự |
+| WB-2 | Một dòng = một cột đèn (+ bộ đèn tuỳ chọn); tuyến / tủ / mạch lặp lại theo `*_ref` trong cùng `commune_id`. Dòng đầu nhắc tới ref định nghĩa nó; dòng sau ô trống = không nói gì, ô khác giá trị = lỗi dòng. `pole_ref` trùng = lỗi. Danh sách cột và luật bắt-buộc-theo-nhóm ở ticket mục 3 |
+| WB-3 | **All-or-nothing**: kiểm cả sheet, ghi 5 lớp theo thứ tự khoá ngoại trong **một transaction** (khoá advisory của cả 5 lớp, thứ tự tăng); có bất kỳ lỗi nào → không ghi gì, `committed = false`. Khác chủ ý với `{kind}` (ghi phần hợp lệ) — sheet phẳng mà ghi một phần thì lỗi dây chuyền tuyến → cột → bộ đèn khó đọc và để lại dữ liệu nửa vời |
+| WB-4 | Bộ đèn: cột chưa có bộ đang dùng → thêm; đã có → so khớp, giống → `unchanged`, khác → lỗi dòng. Workbook không bao giờ sửa / thay bộ đang dùng (thay bộ đi đường CRUD, OF-4). `/assets/import/fixtures` **giữ** insert-only |
+| WB-5 | Toạ độ là hai cột `*_lat` / `*_lng` (số, Invariant; `10,97` là lỗi, không tự sửa). Sheet không mang hình tuyến / mạch: tuyến mới chưa hình, tuyến đã có giữ hình (ROAD-SEGMENT-GEOM-NULL) |
+| WB-6 | Response **200** + `WorkbookImportResult { committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed, total_errors, truncated, rows[], total_warnings, warnings[] }`. `row` là số dòng Excel thật; `column` là **tên cột của sheet**. Khi `committed = false` mọi số đếm là 0 |
+
+**Cần báo:** WP5 (endpoint mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`). **Chưa báo.**

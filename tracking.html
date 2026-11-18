@@ -41,6 +41,20 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>ASSET-IMPORT-WORKBOOK — kiểm kê một sheet Excel · 18/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR #271 vào dev</span>
+    Thêm <code>POST /api/v1/assets/import/workbook</code>, tái dùng planner năm lớp trong một transaction;
+    gộp trùng, giới hạn SAX, so khớp bộ đang dùng, lỗi theo cột sheet. WB-1…WB-6 SELF-SIGNED, nền tạm tới FW kế tiếp.</p>
+    <p>Files: <code>Import/AssetImportWorkbook.cs</code>, <code>WorkbookDocument.cs</code>, <code>WorkbookImportRow.cs</code>,
+    controller/service/contracts/row reader, <code>AssetImportWorkbookTests.cs</code>, helper OpenXml,
+    script và hai workbook template, README/fixtures CSV.</p>
+    <p>Dependency mới: <code>DocumentFormat.OpenXml</code> 3.5.1. Sửa bug ánh xạ <code>geom_wkt</code> của mạch sang
+    <code>pole_lat</code>; thêm chốt dung lượng giải nén 100 MB và test nạp chính file template. <code>dotnet test</code> xanh,
+    phá thử rollback / so khớp bộ đèn / chốt dung lượng / template đều đỏ đúng; OpenAPI +1 path, +2 schema, lint sạch.
+    Còn: mở template bằng Excel (máy không có); báo WP5 (modal import thêm "một file Excel").</p>
+  </div>
+
+  <div class="card">
     <strong>SURVEY-VERIFY-PHOTOS — chặn nghiệm thu khảo sát còn ảnh/clip chưa quyết · 17/11/2026</strong>
     <p><span class="tag t-done">Xong · PR vào dev</span>
     Verify phiếu survey trả 409 <code>POLE_PHOTOS_UNDECIDED</code> và <code>details.photo_ids</code> theo thứ tự list;

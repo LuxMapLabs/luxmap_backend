@@ -1,6 +1,6 @@
 # Mẫu import kiểm kê tài sản (BE-12)
 
-Năm file CSV để nạp hồ sơ tài sản chiếu sáng. Cột lấy **trực tiếp từ schema thật** trong
+Một workbook Excel hoặc năm file CSV để nạp hồ sơ tài sản chiếu sáng. Cột lấy **trực tiếp từ schema thật** trong
 PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`, `\d electrical_cabinet`), không suy từ entity class.
 
 > **Endpoint import đã có (BE-12a).** Mỗi lần nạp MỘT loại file:
@@ -10,12 +10,53 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`, `\d electri
 > multipart/form-data, field `file`, tối đa 10 MB
 > ```
 >
-> Chỉ **Quản lý** được nạp (capability `ManageAssets`, Contract v1.7 §2 — tới v1.6 là Quản trị). Trả **200** kèm kết quả `{inserted, updated, failed, total_errors,
-> truncated, rows[]}` — 200 kể cả khi có dòng hỏng, vì những dòng hợp lệ đã ghi thật.
+> Chỉ **Quản lý** được nạp (capability `ManageAssets`, Contract v1.7 §2 — tới v1.6 là Quản trị). Trả **200** kèm kết quả `{inserted, updated, unchanged, failed, total_errors,
+> truncated, rows[], total_warnings, warnings[]}` — 200 kể cả khi có dòng hỏng, vì những dòng hợp lệ đã ghi thật.
 >
 > ⚠️ **Contract v1.1 vẫn không đặc tả endpoint này.** Cả đường dẫn lẫn hình dạng kết quả đều là
 > drift đã đăng ký, cần chốt ở FW-00. Hình dạng response khi ĐỌC một tài sản thuộc **BE-12b**,
-> đang chờ duyệt — hiện `GET` chỉ trả danh sách ID.
+> đã hiện thực, trả dữ liệu kiểm kê và thông tin cập nhật gần nhất.
+
+---
+
+## Một sheet Excel
+
+`POST /api/v1/assets/import/workbook`, multipart trường `file`, capability `ManageAssets` (Quản lý), tối đa 10 MB.
+Chỉ nhận `.xlsx` có chữ ký zip; `.xls`, CSV hoặc text đổi đuôi trả 415; zip hỏng trả 400.
+Bề mặt WB-1…WB-6 là **SELF-SIGNED**, nền tạm tới FW kế tiếp như nhóm import CSV.
+
+- [assets-workbook.xlsx](assets-workbook.xlsx): sheet đầu `import` chỉ header để điền; sheet `Hướng dẫn` giải thích từng cột.
+- [assets-workbook.example.xlsx](assets-workbook.example.xlsx): 5 cột mẫu, gồm cột chưa GPS, cột không bộ đèn, bộ chao đôi.
+  Mã xã `COM-070` theo các CSV mẫu hiện tại. Seed sinh ID tự động (khóa `study_site`), nên DB khác phải dùng mã xã thực tế:
+  `python scripts/make_asset_workbook_template.py --commune-id <ma-xa>`.
+
+Chỉ đọc sheet đầu; dòng 1 là header (trim, phân biệt hoa thường), cột lạ bỏ qua, header trùng bị lỗi.
+Dòng trống hoàn toàn bỏ qua. Tối đa 5000 dòng dữ liệu, 200 cột, 2000 ký tự/ô.
+
+| Nhóm | Cột sheet | Quy tắc |
+|---|---|---|
+| Chung | `commune_id`, `data_source` | Bắt buộc ở header và mỗi dòng; nguồn áp cho tuyến, tủ, cột, bộ đèn |
+| Tuyến | `segment_ref`, `segment_name`, `road_class`, `segment_length_m` | Có ref thì cần tên và loại đường. Không mang hình: giữ hình đã có, tuyến mới chưa hình. Chiều dài trống giữ số đã lưu |
+| Tủ | `cabinet_ref`, `cabinet_name`, `cabinet_lat`, `cabinet_lng` | Có ref thì cần tên và cả hai tọa độ |
+| Mạch | `feeder_ref`, `feeder_name`, `cabinet_source` | Có ref thì cần tên; thuộc tủ cùng dòng, ô tủ trống giữ tủ cũ |
+| Cột | `pole_ref`, `pole_lat`, `pole_lng`, `near_sensitive_poi`, `pole_note`, `feeder_source` | `pole_ref` bắt buộc. Hai tọa độ cùng điền hoặc cùng trống; trống giữ vị trí cũ. Tuyến trống giữ tuyến, mạch trống tháo mạch như import CSV |
+| Bộ đèn | `fixture_type`, `power_source`, `lamp_watt`, `lamp_count`, `install_date`, `warranty_expiry`, `fixture_note` | Cả nhóm tùy chọn; có bất kỳ ô nào thì cần loại, nguồn, công suất, ngày lắp. `lamp_count` trống = 1 |
+
+Tọa độ hữu hạn, vĩ độ [-90,90], kinh độ [-180,180], dùng dấu chấm thập phân; `10,97` là lỗi.
+Ngày nhận chuỗi `YYYY-MM-DD` hoặc ngày/serial Excel nguyên, không có phần giờ.
+Các dropdown dùng enum hiện hành; `cabinet_source` / `feeder_source` là `verified` hoặc `inferred`.
+Ghi chú tối đa 1000 ký tự; `pole_note` có chữ ghi đè, trống giữ và báo cảnh báo nếu thay ghi chú cũ.
+
+Tuyến/tủ/mạch gộp theo `(commune_id, *_ref)`: dòng đầu định nghĩa, dòng sau trống không nói gì;
+khác giá trị thì lỗi ở dòng sau, nêu dòng đầu. `pole_ref` trùng trong xã là lỗi.
+Một lỗi bất kỳ ⇒ **rollback cả năm lớp**, `committed = false`, mọi số đếm bằng 0, không cảnh báo ghi đè.
+Trả 200 với `{committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed,
+total_errors, truncated, rows[], total_warnings, warnings[]}`. Lỗi theo số dòng Excel thật và tên cột sheet,
+sắp theo dòng/cột, tối đa 100 lỗi trong `rows[]`.
+
+Bộ đèn đang dùng: nạp lại giống thì `unchanged`, giữ dấu cập nhật; khác thì lỗi, thay bộ qua form tài sản.
+So loại, nguồn, công suất, số bóng, ngày lắp, bảo hành, ghi chú; bảo hành/ghi chú trống không nói gì.
+Không có `removed_date` trong workbook. CSV fixtures vẫn **insert-only**, không đổi hành vi.
 
 ---
 
@@ -26,7 +67,7 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`, `\d electri
 | `segments.csv` · `cabinets.csv` · `feeders.csv` · `poles.csv` · `fixtures.csv` | **Chỉ dòng header** | Phát cho đơn vị điền dữ liệu thật |
 | `segments.example.csv` · … · `fixtures.example.csv` | Header **+ một dòng chạy được** | Chạy thử pipeline trước khi có dữ liệu thật |
 
-**Quy tắc, áp cho cả bốn loại:**
+**Quy tắc, áp cho cả năm loại:**
 
 > File template **không được chứa bất kỳ mã nào bắt buộc phải tồn tại trong database**.
 > Chỉ `*.example.csv` mới được.
@@ -97,7 +138,7 @@ Cả năm bảng đều tham chiếu `administrative_unit`, nên **xã phải t�
 
 ### Cột server sở hữu — KHÔNG có trong template
 
-Không điền, không thêm cột. Gửi lên sẽ bị từ chối chứ không bị bỏ qua im lặng.
+Không điền các cột server sở hữu; parser bỏ qua cột lạ trong file.
 
 | Cột | Vì sao |
 |---|---|
@@ -217,8 +258,7 @@ Ba lý do lưu cột này vào DB, không phải một:
 **partial index** (`WHERE external_ref IS NOT NULL`), nhiều cột không mã vẫn cùng tồn tại trong một
 xã. Nhưng **trong file import thì bắt buộc**: không có nó thì không upsert được.
 
-**Không emit ra API.** Contract không có trường này; thêm vào response là đổi hình dạng đã publish.
-Lưu và tra được, giống `data_source` ở tầng tài sản. Đã đăng ký drift.
+**Có trong API kiểm kê**, không emit ra `properties` bản đồ; giống `data_source` ở tầng tài sản.
 
 > ⚠️ **`fixture` KHÔNG có `external_ref`, và nạp bóng là INSERT-ONLY.**
 > Một cột mang nhiều bóng qua thời gian, nên không mã nào trong file chỉ đúng **một lần lắp đặt**.
@@ -251,7 +291,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 | `external_ref` | **Có** | text | Mã tuyến của đơn vị quản lý. `poles.csv` trỏ về bằng `segment_external_ref`. Trùng trong cùng xã → **UPDATE** |
 | `segment_name` | **Có** | text | |
 | `road_class` | **Có** | enum | `inter_commune` · `inter_village` — `ck_road_segment_road_class` |
-| `length_m` | Có **nếu có `geom_wkt`** | integer ≥ 1 | Mét. **Giá trị KHAI BÁO**, không tính lại từ `geom_wkt`. Để trống / bỏ cột khi tuyến chưa có hình |
+| `length_m` | Không trong header | integer ≥ 1 | Mét khai báo, không tính lại từ hình. Ô trống giữ chiều dài đã lưu; tuyến có hình phải có chiều dài từ file hoặc DB |
 | `geom_wkt` | Không | LineString | `geometry(LineString,4326)`, **nullable** (ROAD-SEGMENT-GEOM-NULL): để trống hoặc bỏ hẳn cột ⇒ tuyến chưa có hình — xem mục *Tuyến chưa có hình* bên dưới |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_road_segment_data_source` |
@@ -260,7 +300,7 @@ theo locale — **định dạng cột thành Text trước khi gõ**.
 
 Xã có tuyến mới chỉ có trong sổ sách: nhập tuyến + cột trước, tạo lịch công tác theo tuyến, ra thực địa lấy GPS sau.
 
-- `geom_wkt` để trống hoặc bỏ hẳn cột ⇒ tuyến mới được tạo **chưa có hình** (`has_geometry: false`, `geom_wkt: null` ở API). Tuyến đó **không lên bản đồ** (`/map/segments`), nhưng vẫn gán được `pole_ids`, vẫn có lịch tuần và phiếu khảo sát. `length_m` để trống được **khi không có `geom_wkt`** (ASSET-SEGMENT-LENGTH-NULL: chưa có hình thì chưa có gì để đo); dòng có `geom_wkt` thì `length_m` **bắt buộc**, số nguyên ≥ 1.
+- `geom_wkt` để trống hoặc bỏ hẳn cột ⇒ tuyến mới được tạo **chưa có hình** (`has_geometry: false`, `geom_wkt: null` ở API). Tuyến đó **không lên bản đồ** (`/map/segments`), nhưng vẫn gán được `pole_ids`, vẫn có lịch tuần và phiếu khảo sát. `length_m` để trống được **khi không có `geom_wkt`** (ASSET-SEGMENT-LENGTH-NULL: chưa có hình thì chưa có gì để đo); tuyến có hình phải có chiều dài trong file hoặc đã lưu ở DB, số nguyên ≥ 1.
 - Nạp lại file với ô `length_m` trống **giữ** số đang lưu của tuyến đã có.
 - Nạp lại file với ô trống **không** xoá hình của tuyến đã có — một tuyến đã có hình không quay về "chưa có". Muốn đổi hình: điền WKT mới, hoặc `PUT /assets/segments/{id}`.
 - Vẽ hình lần đầu: điền WKT rồi nạp lại file (trùng `external_ref` ⇒ cập nhật), hoặc `PUT` kèm `geom_wkt`. ⚠️ Import **không** đo hành lang cột (khác `PUT`, vốn trả 409 `POLE_OFF_SEGMENT` khi hình mới bỏ sót cột đã có GPS).
@@ -322,7 +362,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `lamp_watt` | **Có** | integer | Công suất **một** bóng |
 | `lamp_count` | Không | integer `1..4` | Số bóng **giống nhau** trong MỘT bộ đèn (chao đôi = `2`). Để trống / không có cột = `1` (LAMP-COUNT). Một cột chỉ có **một** bộ đang dùng (ONE-FIXTURE) |
 | `install_date` | **Có** | date | `YYYY-MM-DD` |
-| `removed_date` | Không | date | Để trống nghĩa là bóng **đang lắp**. Thay bóng thì điền vào dòng cũ và thêm một dòng mới |
+| `removed_date` | Không | date | Trống = bộ đang dùng. Ngày có giá trị = thêm bản ghi lịch sử; không sửa bộ cũ. Thay bộ qua form tài sản |
 | `warranty_expiry` | Không | date | Không phải bóng nào cũng có bảo hành |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_fixture_data_source` |
 | `note` | Không | text ≤ 1000 | Ghi chú trường hợp đặc biệt của **bộ đèn** (vd một bóng khác loại) — FIXTURE-NOTE. Ô trống = không có. Khác cột `note` của file cột (ghi chú vị trí trụ) |
