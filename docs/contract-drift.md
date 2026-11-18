@@ -197,6 +197,26 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
   Giữ policy hiện hành (system_admin →403), không mở rộng quyền các endpoint Create/Patch/Assign khác.
   Planner vẫn tách xã đúng; chưa có đường HTTP caller `*` được phép theo ma trận hiện hành.
 
+### WO-AUTODISPATCH-2 — sự cố IoT vào phân lịch tự động, trường IoT trên phiếu (18/11/2026)
+
+**Mỹ chốt 18/11/2026 · SELF-SIGNED**, chạm bề mặt API (chỉ thêm trường / nới null), nền tạm tới FW kế tiếp; chưa hợp nhất Contract.
+
+- Sự cố **không tuyến nhưng có `cabinet_id`** (sự cố IoT: thiết bị ở tủ, không cột, không tuyến — I-18) **không còn vào
+  `NO_SEGMENT`**: gom theo `(commune_id, cabinet_id)`. Sự cố có tuyến vẫn gom theo tuyến dù có `cabinet_id`.
+  `NO_SEGMENT` chỉ còn cho sự cố thiếu cả hai. Không có nhánh gom theo xã: thiết bị luôn gắn một tủ.
+- Ca theo tủ: mỗi sự cố là một đơn vị (không cột), tách tối đa `MaxPolesPerOrder` theo length/id;
+  tiêu đề `Kiểm tra tủ {cabinet_name} - {n} sự cố IoT` (+ ` (ca {i}/{k})`), tên tủ đọc qua query filter, không đọc được thì dùng mã tủ.
+  Cùng severity / điểm / thời điểm: ca theo tuyến xếp trước ca theo tủ.
+- Proposal: **`segment_id`, `segment_name` nay nullable** (null ở ca theo tủ), **thêm `cabinet_id`** (null ở ca theo tuyến);
+  `pole_ids` rỗng, `pole_count` = số sự cố. Tạo phiếu vẫn qua `POST /work-orders/batch` với `fault_ids` (đã nhận phiếu kiểm tra không tuyến).
+- `node_offline` nay **ghi `cabinet_id`** = tủ của thiết bị lúc phát hiện (trước chỉ sự cố chẩn đoán có). Sự cố `node_offline`
+  cũ còn mở không có `cabinet_id` — không backfill — vẫn vào `NO_SEGMENT`, Quản lý tạo phiếu tay.
+- Thiết bị IoT chỉ ở testbed (`calibration_rig` / `simulated`): phiếu theo tủ là phiếu kiểm tra **tủ testbed**, giao kỹ sư của xã đó.
+- `GET /work-orders/{id}` (và `work_orders[]` của `/sync/bundle`): mỗi `faults[]` thêm `origin_node_id`, `feeder_id`, `cabinet_id`,
+  `iot_anomaly_code`, `recovered_at` — cùng tên với item `GET /faults`; null ở sự cố CV / hiện trường.
+- **FE / mobile cần làm:** hiển thị ca theo tủ (không có tuyến) trong popup preview; hiện thông tin thiết bị trên sự cố của phiếu.
+  Chưa báo WP5 / WP6.
+
 ### ASSET-SEG-1 — tạo / sửa tuyến kèm tập cột (09/11/2026)
 
 | Trường | Nội dung |

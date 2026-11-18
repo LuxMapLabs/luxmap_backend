@@ -94,7 +94,8 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOffli
         var silentFor = (int)Math.Round(offlineAfter.TotalMinutes);
         var fault = new Fault
         {
-            FaultId = faultId, CommuneId = node.CommuneId, OriginNodeId = node.NodeId, Lat = cabinet.Y, Lng = cabinet.X,
+            FaultId = faultId, CommuneId = node.CommuneId, OriginNodeId = node.NodeId, CabinetId = node.CabinetId,
+            Lat = cabinet.Y, Lng = cabinet.X,
             FaultType = FaultType.NodeOffline, FaultStatus = FaultStatus.Detected, Severity = Severity.Medium,
             SourceChannel = SourceChannel.Iot, DataSource = node.DataSource, DetectedAt = detected,
             Note = string.Create(CultureInfo.InvariantCulture,

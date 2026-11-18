@@ -98,6 +98,61 @@ public partial class WorkOrderTests
         });
     }
 
+    // An IoT fault as the diagnostic job writes it: no pole, no road, the device's cabinet and feeder.
+    private async Task<string> IotFault(string cabinet, DateTime? recovered = null)
+    {
+        var id = await Fault();
+        await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var f = await db.Set<Fault>().IgnoreQueryFilters().SingleAsync(f => f.FaultId == id);
+            (f.SegmentId, f.SourceChannel, f.FaultType) = (null, SourceChannel.Iot, FaultType.NodeOffline);
+            (f.CabinetId, f.FeederId, f.IotAnomalyCode, f.RecoveredAt) = (cabinet, "FDR-WO-TEST", "telemetry_stale", recovered);
+            await db.SaveChangesAsync();
+            return 0;
+        });
+        return id;
+    }
+
+    [Fact]
+    public async Task Auto_dispatch_groups_iot_faults_with_no_road_by_their_cabinet()
+    {
+        var cabinet = $"CAB-{home}";
+        var iot = new[] { await IotFault(cabinet), await IotFault(cabinet) };
+        await WithDispatchClient(async client =>
+        {
+            var json = await Preview(client);
+            Assert.Empty(json.GetProperty("skipped").EnumerateArray());
+            var p = Assert.Single(json.GetProperty("proposals").EnumerateArray());
+            // No cabinet row in this commune: the title falls back to the id, as a road name falls back to its id.
+            Assert.Equal($"Kiểm tra tủ {cabinet} - 2 sự cố IoT", p.GetProperty("title").GetString());
+            Assert.Equal(cabinet, p.GetProperty("cabinet_id").GetString());
+            Assert.Equal(JsonValueKind.Null, p.GetProperty("segment_id").ValueKind);
+            Assert.Equal(JsonValueKind.Null, p.GetProperty("segment_name").ValueKind);
+            Assert.Equal(iot, p.GetProperty("fault_ids").EnumerateArray().Select(x => x.GetString()));
+            Assert.Equal("inspection", p.GetProperty("task_kind").GetString());
+        });
+    }
+
+    [Fact]
+    public async Task Work_order_detail_carries_the_iot_fields_of_its_faults()
+    {
+        var recovered = new DateTime(2026, 11, 10, 1, 2, 3, DateTimeKind.Utc);
+        var iot = await IotFault($"CAB-{home}", recovered);
+        var cv = await Fault();
+        var id = await Create(faults: [iot, cv]);
+        var faults = (await Send("manager", "GET", "/" + id, null, 200)).GetProperty("faults").EnumerateArray()
+            .ToDictionary(f => f.GetProperty("fault_id").GetString()!);
+        var device = faults[iot];
+        Assert.Equal($"CAB-{home}", device.GetProperty("cabinet_id").GetString());
+        Assert.Equal("FDR-WO-TEST", device.GetProperty("feeder_id").GetString());
+        Assert.Equal("telemetry_stale", device.GetProperty("iot_anomaly_code").GetString());
+        Assert.Equal("2026-11-10T01:02:03Z", device.GetProperty("recovered_at").GetString());
+        Assert.Equal(JsonValueKind.Null, device.GetProperty("origin_node_id").ValueKind);
+        foreach (var field in new[] { "origin_node_id", "feeder_id", "cabinet_id", "iot_anomaly_code", "recovered_at" })
+            Assert.Equal(JsonValueKind.Null, faults[cv].GetProperty(field).ValueKind);
+    }
+
     [Fact]
     public async Task Auto_dispatch_filters_status_active_links_and_engineer_eligibility()
     {

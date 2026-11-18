@@ -20561,10 +20561,12 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "assigned_to_name": {
             "type": "string",
@@ -20584,6 +20586,10 @@
             "$ref": "#/components/schemas/Severity"
           },
           "unassigned_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
             "type": "string",
             "nullable": true
           }
@@ -27034,6 +27040,28 @@
           },
           "inspection_outcome": {
             "$ref": "#/components/schemas/InspectionOutcome"
+          },
+          "origin_node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "iot_anomaly_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "recovered_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false

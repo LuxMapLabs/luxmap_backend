@@ -85,7 +85,7 @@ public sealed class AutoDispatchQueries(LuxMapDbContext db, TimeProvider clock, 
         var faults = await query.OrderByDescending(f => f.Severity == Severity.Critical ? 4 : f.Severity == Severity.High ? 3
                 : f.Severity == Severity.Medium ? 2 : 1)
             .ThenBy(f => f.DetectedAt).ThenBy(f => f.FaultId.Length).ThenBy(f => f.FaultId)
-            .Select(f => new { f.FaultId, f.CommuneId, f.SegmentId, f.PoleId, f.Severity, f.PriorityScore, f.DetectedAt }).ToListAsync(ct);
+            .Select(f => new { f.FaultId, f.CommuneId, f.SegmentId, f.PoleId, f.Severity, f.PriorityScore, f.DetectedAt, f.CabinetId }).ToListAsync(ct);
         var selected = faults.Take(AutoDispatchPlanner.CandidateLimit).ToArray();
         var roadIds = selected.Select(f => f.SegmentId).OfType<string>().Distinct().ToArray();
         // As in WorkOrderPoleService: unfiltered geometry ONLY, for scoped poles on inter-commune roads.
@@ -96,6 +96,10 @@ public sealed class AutoDispatchQueries(LuxMapDbContext db, TimeProvider clock, 
         // Names remain scoped; another commune's road name must never leak.
         var names = await db.Set<RoadSegment>().AsNoTracking().Where(s => roadIds.Contains(s.SegmentId))
             .ToDictionaryAsync(s => s.SegmentId, s => s.SegmentName, ct);
+        // IoT faults group by cabinet; a device's cabinet shares its commune (iot_node FK on (cabinet_id, commune_id)), so names stay scoped.
+        var cabinetIds = selected.Select(f => f.CabinetId).OfType<string>().Distinct().ToArray();
+        var cabinets = await db.Set<ElectricalCabinet>().AsNoTracking().Where(c => cabinetIds.Contains(c.CabinetId))
+            .ToDictionaryAsync(c => c.CabinetId, c => c.CabinetName, ct);
         var poleIds = selected.Select(f => f.PoleId).OfType<string>().Distinct().ToArray();
         var poles = await db.Set<Pole>().AsNoTracking().Where(p => poleIds.Contains(p.PoleId))
             .Select(p => new { p.PoleId, p.SegmentId, p.Geom }).ToListAsync(ct);
@@ -110,7 +114,8 @@ public sealed class AutoDispatchQueries(LuxMapDbContext db, TimeProvider clock, 
         var loads = await WorkOrderLoads.Read(db, engineerIds, from, to, ct);
         var candidates = selected.Select(f => new DispatchFault(f.FaultId, f.CommuneId, f.SegmentId,
             f.SegmentId is null ? "" : names.GetValueOrDefault(f.SegmentId, f.SegmentId), f.PoleId,
-            positions.GetValueOrDefault(f.PoleId ?? ""), f.Severity, f.PriorityScore, f.DetectedAt)).ToArray();
+            positions.GetValueOrDefault(f.PoleId ?? ""), f.Severity, f.PriorityScore, f.DetectedAt,
+            f.CabinetId, f.CabinetId is null ? null : cabinets.GetValueOrDefault(f.CabinetId))).ToArray();
         var preview = AutoDispatchPlanner.Plan(start, candidates, engineers, loads, options);
         return preview with { Skipped = [.. preview.Skipped, .. faults.Skip(AutoDispatchPlanner.CandidateLimit)
             .Select(f => new DispatchSkipped(f.FaultId, "LIMIT_EXCEEDED"))] };
