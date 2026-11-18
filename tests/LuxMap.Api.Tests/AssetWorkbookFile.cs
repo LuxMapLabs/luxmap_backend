@@ -9,10 +9,7 @@ namespace LuxMap.Api.Tests;
 internal static class AssetWorkbookFile
 {
     internal sealed record Cached(string Value, CellValues Type, string? Formula = null);
-    public static readonly string[] Columns = ["commune_id", "data_source", "segment_ref", "segment_name", "road_class",
-        "segment_length_m", "cabinet_ref", "cabinet_name", "cabinet_lat", "cabinet_lng", "feeder_ref", "feeder_name",
-        "cabinet_source", "pole_ref", "pole_lat", "pole_lng", "near_sensitive_poi", "pole_note", "feeder_source",
-        "fixture_type", "power_source", "lamp_watt", "lamp_count", "install_date", "warranty_expiry", "fixture_note"];
+    public static readonly string[] Columns = LuxMap.Modules.Assets.Import.WorkbookColumns.All.Select(c => c.Name).ToArray();
 
     public static byte[] Create(IEnumerable<(uint Number, Dictionary<string, object?> Cells)> rows,
         string[]? columns = null, bool garbageSecondSheet = false, string[]? sharedStrings = null)
