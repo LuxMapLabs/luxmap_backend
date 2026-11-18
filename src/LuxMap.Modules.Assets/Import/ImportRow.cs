@@ -24,6 +24,13 @@ internal interface IImportRow
     string? ReferenceCommune => null;
     bool HasErrors => false;
 
+    /// <summary>
+    /// The source format has a geometry for this kind at all. CSV / GeoJSON do, so a blank cell there is a statement
+    /// (a feeder's blank <c>geom_wkt</c> clears its route). A workbook carries no segment or feeder route, so blank there
+    /// says nothing and an existing route must be kept (WB-5).
+    /// </summary>
+    bool CarriesGeometry => true;
+
     string? this[string column] { get; }
 
     /// <summary>
