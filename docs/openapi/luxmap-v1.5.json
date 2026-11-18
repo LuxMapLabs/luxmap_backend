@@ -14887,7 +14887,7 @@
         "tags": [
           "Public"
         ],
-        "summary": "[Web] [TẠM — CITIZEN-QR] (ẩn danh) Mã QR trỏ tới đâu: tên tuyến + tên xã; mã sai / không tồn tại / đã thu hồi cùng một 404",
+        "summary": "[Web] [TẠM — CITIZEN-QR] (ẩn danh) Mã QR trỏ tới đâu: tên tuyến + tên xã + external_ref + note của cột (công khai); mã sai / không tồn tại / đã thu hồi cùng một 404",
         "requestBody": {
           "content": {
             "application/json": {
@@ -27752,6 +27752,8 @@
         "required": [
           "can_report",
           "commune_name",
+          "external_ref",
+          "note",
           "reason",
           "segment_name"
         ],
@@ -27763,6 +27765,14 @@
           },
           "commune_name": {
             "type": "string"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
           },
           "can_report": {
             "type": "boolean"

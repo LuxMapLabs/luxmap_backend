@@ -23875,6 +23875,8 @@
         "required": [
           "can_report",
           "commune_name",
+          "external_ref",
+          "note",
           "reason",
           "segment_name"
         ],
@@ -23886,6 +23888,14 @@
           },
           "commune_name": {
             "type": "string"
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
           },
           "can_report": {
             "type": "boolean"

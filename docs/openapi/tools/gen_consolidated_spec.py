@@ -359,7 +359,7 @@ SUMMARY[("post", "/api/v1/qr-codes")] = (
 SUMMARY[("post", "/api/v1/qr-codes/{qrId}/revoke")] = "[TẠM — CITIZEN-QR] Thu hồi mã QR; mã đã thu hồi không dùng lại được (409)"
 SUMMARY[("get", "/api/v1/qr-codes")] = "[TẠM — CITIZEN-QR] Danh sách mã QR trong xã của người gọi; lọc pole_id, active, commune_id"
 SUMMARY[("post", "/api/v1/public/qr/lookup")] = (
-    "[TẠM — CITIZEN-QR] (ẩn danh) Mã QR trỏ tới đâu: tên tuyến + tên xã; mã sai / không tồn tại / đã thu hồi cùng một 404")
+    "[TẠM — CITIZEN-QR] (ẩn danh) Mã QR trỏ tới đâu: tên tuyến + tên xã + external_ref + note của cột (công khai); mã sai / không tồn tại / đã thu hồi cùng một 404")
 SUMMARY[("post", "/api/v1/public/reports")] = (
     "[TẠM — CITIZEN-QR] (ẩn danh) Gửi báo cáo về cột của mã: loại, mô tả, vị trí tuỳ chọn, 0–3 ảnh JPEG; vào hàng chờ Quản lý duyệt")
 SUMMARY[("get", "/api/v1/citizen-reports")] = (

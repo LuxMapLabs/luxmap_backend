@@ -41,6 +41,16 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>CITIZEN-QR-LOOKUP — tra mã QR trả thêm <code>external_ref</code>, <code>note</code> · 18/11/2026</strong>
+    <p><span class="tag t-next">Chờ PR vào dev</span>
+    <code>POST /api/v1/public/qr/lookup</code>: <code>PublicQrInfo</code> thêm <code>external_ref</code> và <code>note</code> của cột
+    (nullable, luôn có mặt). Drift <b>PB-9</b> — Mỹ chốt, SELF-SIGNED, đảo một phần PB-1 / D-4: ghi chú cột nay công khai với ai cầm mã.</p>
+    <p>Files: <code>PublicReportService.cs</code>, <code>PublicController.cs</code>, <code>CitizenReportTests.cs</code>,
+    generator + hai spec, drift. Citizen / Anonymous / OpenApiSpec 55/55 xanh; phá thử (bỏ projection <code>note</code>) → đỏ, khôi phục → xanh.
+    OpenAPI chỉ đổi schema <code>PublicQrInfo</code>, lint hợp lệ (10 warning sẵn có). Còn: báo WP5.</p>
+  </div>
+
+  <div class="card">
     <strong>ASSET-IMPORT-WORKBOOK — kiểm kê một sheet Excel · 18/11/2026</strong>
     <p><span class="tag t-done">Xong · PR #271 vào dev</span>
     Thêm <code>POST /api/v1/assets/import/workbook</code>, tái dùng planner năm lớp trong một transaction;

@@ -118,17 +118,33 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
     }
 
     [Fact]
-    public async Task The_lookup_names_the_road_and_the_commune_and_no_internal_id()
+    public async Task The_lookup_names_the_road_the_commune_the_pole_code_and_note_and_no_internal_id()
     {
-        var (pole, code) = await PoleWithCodeAsync();
+        var externalRef = $"CIT-{Guid.NewGuid():N}";
+        var (pole, code) = await PoleWithCodeAsync(externalRef, note: "Gần cổng trường");
 
         var body = await Read(await host.CreateClient().PostAsJsonAsync(Lookup, new { code }));
 
-        // can_report / reason: POLE-GEOM-NULL GN-7. Still no id of any kind.
-        Assert.Equal(["can_report", "commune_name", "reason", "segment_name"], body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+        // can_report / reason: POLE-GEOM-NULL GN-7. external_ref / note: PB-9. Still no pole_id, coordinates or status.
+        Assert.Equal(
+            ["can_report", "commune_name", "external_ref", "note", "reason", "segment_name"],
+            body.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.True(body.GetProperty("can_report").GetBoolean());
         Assert.Equal("Citizen road", body.GetProperty("segment_name").GetString());
+        Assert.Equal(externalRef, body.GetProperty("external_ref").GetString());
+        Assert.Equal("Gần cổng trường", body.GetProperty("note").GetString());
         Assert.DoesNotContain(pole, body.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_pole_without_code_or_note_looks_up_with_both_null()
+    {
+        var (_, code) = await PoleWithCodeAsync();
+
+        var body = await Read(await host.CreateClient().PostAsJsonAsync(Lookup, new { code }));
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("external_ref").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("note").ValueKind);
     }
 
     [Fact]
@@ -460,7 +476,7 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
         Assert.True(await factory.QueryAsync(db => db.Set<QrCode>().IgnoreQueryFilters().AnyAsync(qr => qr.PoleId == pole && qr.RevokedAt == null)));
     }
 
-    private async Task<(string Pole, string Code)> PoleWithCodeAsync()
+    private async Task<(string Pole, string Code)> PoleWithCodeAsync(string? externalRef = null, string? note = null)
     {
         var pole = await factory.QueryAsync(async db =>
         {
@@ -472,7 +488,11 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
             };
             db.Add(road);
             await db.SaveChangesAsync();
-            var planted = new Pole { CommuneId = factory.CommuneId, SegmentId = road.SegmentId, DataSource = DataSource.Field, Geom = new Point(107.505, 11.405) { SRID = 4326 } };
+            var planted = new Pole
+            {
+                CommuneId = factory.CommuneId, SegmentId = road.SegmentId, DataSource = DataSource.Field, ExternalRef = externalRef, Note = note,
+                Geom = new Point(107.505, 11.405) { SRID = 4326 },
+            };
             db.Add(planted);
             await db.SaveChangesAsync();
             return planted.PoleId;
