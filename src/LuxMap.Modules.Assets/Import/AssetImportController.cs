@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text;
 using Asp.Versioning;
@@ -36,14 +37,15 @@ public sealed class AssetImportController(AssetImportService service) : Controll
     /// </remarks>
     public const int MaxUploadBytes = 10 * 1024 * 1024;
 
-    /// <summary>Imports the first worksheet of a .xlsx inventory atomically (WB-1…WB-6).</summary>
+    /// <summary>Imports named asset worksheets atomically (WB-12…WB-20).</summary>
     [HttpPost("workbook")]
     [RequestSizeLimit(MaxUploadBytes)]
     [ProducesResponseType<WorkbookImportResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status415UnsupportedMediaType)]
-    public async Task<ActionResult<WorkbookImportResult>> ImportWorkbookAsync(IFormFile file, CancellationToken cancellationToken)
+    public async Task<ActionResult<WorkbookImportResult>> ImportWorkbookAsync(IFormFile file, [FromForm(Name = "commune_id")] string? communeId,
+        [FromForm(Name = "data_source"), Required] string? dataSource, CancellationToken cancellationToken)
     {
         using var stream = new MemoryStream();
         if (file is not null) await file.CopyToAsync(stream, cancellationToken);
@@ -51,7 +53,7 @@ public sealed class AssetImportController(AssetImportService service) : Controll
             || stream.Length < 4 || !stream.GetBuffer().AsSpan(0, 4).SequenceEqual(new byte[] { 0x50, 0x4b, 0x03, 0x04 }))
             throw new LuxMapException(ErrorCodes.UnsupportedMediaType, HttpStatusCode.UnsupportedMediaType, "Upload a .xlsx workbook.");
         stream.Position = 0;
-        return Ok(await service.ImportWorkbookAsync(stream, cancellationToken));
+        return Ok(await service.ImportWorkbookAsync(stream, communeId, dataSource, cancellationToken));
     }
 
     /// <summary>

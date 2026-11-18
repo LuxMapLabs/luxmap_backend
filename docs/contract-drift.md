@@ -197,6 +197,26 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
   Giữ policy hiện hành (system_admin →403), không mở rộng quyền các endpoint Create/Patch/Assign khác.
   Planner vẫn tách xã đúng; chưa có đường HTTP caller `*` được phép theo ma trận hiện hành.
 
+### WO-AUTODISPATCH-2 — sự cố IoT vào phân lịch tự động, trường IoT trên phiếu (18/11/2026)
+
+**Mỹ chốt 18/11/2026 · SELF-SIGNED**, chạm bề mặt API (chỉ thêm trường / nới null), nền tạm tới FW kế tiếp; chưa hợp nhất Contract.
+
+- Sự cố **không tuyến nhưng có `cabinet_id`** (sự cố IoT: thiết bị ở tủ, không cột, không tuyến — I-18) **không còn vào
+  `NO_SEGMENT`**: gom theo `(commune_id, cabinet_id)`. Sự cố có tuyến vẫn gom theo tuyến dù có `cabinet_id`.
+  `NO_SEGMENT` chỉ còn cho sự cố thiếu cả hai. Không có nhánh gom theo xã: thiết bị luôn gắn một tủ.
+- Ca theo tủ: mỗi sự cố là một đơn vị (không cột), tách tối đa `MaxPolesPerOrder` theo length/id;
+  tiêu đề `Kiểm tra tủ {cabinet_name} - {n} sự cố IoT` (+ ` (ca {i}/{k})`), tên tủ đọc qua query filter, không đọc được thì dùng mã tủ.
+  Cùng severity / điểm / thời điểm: ca theo tuyến xếp trước ca theo tủ.
+- Proposal: **`segment_id`, `segment_name` nay nullable** (null ở ca theo tủ), **thêm `cabinet_id`** (null ở ca theo tuyến);
+  `pole_ids` rỗng, `pole_count` = số sự cố. Tạo phiếu vẫn qua `POST /work-orders/batch` với `fault_ids` (đã nhận phiếu kiểm tra không tuyến).
+- `node_offline` nay **ghi `cabinet_id`** = tủ của thiết bị lúc phát hiện (trước chỉ sự cố chẩn đoán có). Sự cố `node_offline`
+  cũ còn mở không có `cabinet_id` — không backfill — vẫn vào `NO_SEGMENT`, Quản lý tạo phiếu tay.
+- Thiết bị IoT chỉ ở testbed (`calibration_rig` / `simulated`): phiếu theo tủ là phiếu kiểm tra **tủ testbed**, giao kỹ sư của xã đó.
+- `GET /work-orders/{id}` (và `work_orders[]` của `/sync/bundle`): mỗi `faults[]` thêm `origin_node_id`, `feeder_id`, `cabinet_id`,
+  `iot_anomaly_code`, `recovered_at` — cùng tên với item `GET /faults`; null ở sự cố CV / hiện trường.
+- **FE / mobile cần làm:** hiển thị ca theo tủ (không có tuyến) trong popup preview; hiện thông tin thiết bị trên sự cố của phiếu.
+  Chưa báo WP5 / WP6.
+
 ### ASSET-SEG-1 — tạo / sửa tuyến kèm tập cột (09/11/2026)
 
 | Trường | Nội dung |
@@ -2543,8 +2563,20 @@ dùng `center`. **Chưa báo.**
 | WB-4 | Bộ đèn: cột chưa có bộ đang dùng → thêm; đã có → so khớp, giống → `unchanged`, khác → lỗi dòng. Workbook không bao giờ sửa / thay bộ đang dùng (thay bộ đi đường CRUD, OF-4). `/assets/import/fixtures` **giữ** insert-only |
 | WB-5 | Toạ độ là hai cột `*_lat` / `*_lng` (số, Invariant; `10,97` là lỗi, không tự sửa). Sheet không mang hình tuyến / mạch: tuyến mới chưa hình, tuyến đã có giữ hình (ROAD-SEGMENT-GEOM-NULL) |
 | WB-6 | Response **200** + `WorkbookImportResult { committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed, total_errors, truncated, rows[], total_warnings, warnings[] }`. `row` là số dòng Excel thật; `column` là **tên cột của sheet**. Khi `committed = false` mọi số đếm là 0 |
+| WB-7 | **Export** (ASSET-EXPORT-WORKBOOK, Mỹ chốt 18/11/2026): `GET /api/v1/assets/export/workbook?commune_id=…` (lặp được, qua `CommuneFilter.Narrow`; vắng = mọi xã trong phạm vi). Capability **`ReadNetwork`** (cả 4 vai trò, như đọc danh sách kiểm kê). 200 file `.xlsx` `assets-<yyyy-MM-dd>.xlsx`, cùng 26 cột và thứ tự với template import |
+| WB-8 | Quá **5 000** cột trong phạm vi (giới hạn của import) → **413 `EXPORT_TOO_LARGE`** (mã có sẵn, W-6) — file xuất ra luôn nạp lại được; lọc theo `commune_id` |
+| WB-9 | Một dòng một cột đèn kèm tuyến / tủ / mạch / bộ đèn **đang dùng**; bộ đã tháo không xuất. Mục tiêu: xuất → nạp lại nguyên file = mọi dòng `unchanged` |
+| WB-10 | Cột **không có `external_ref`**, hoặc có mạch **không có `external_ref`**, không vào sheet 1 (nạp lại sẽ lỗi hoặc tháo mạch) mà liệt kê ở sheet 2 **`Không xuất`** (`pole_id`, `commune_id`, `reason`). Không bỏ im lặng |
+| WB-11 | Giới hạn: một dòng một `data_source` (của cột). Tuyến / tủ / bộ đèn khác `data_source` với cột → nạp lại báo mâu thuẫn hoặc đổi nguồn của tài sản cha. Tuyến / tủ / mạch không có cột nào không xuất hiện (import không xoá nên không mất) |
 
-**Cần báo:** WP5 (endpoint mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`). **Chưa báo.**
+> ⚠️ **WB-2, WB-4, WB-5, WB-9, WB-10, WB-11 bị thay** bởi ASSET-WORKBOOK-MULTISHEET (WB-12…WB-20, cuối file). WB-1, WB-3, WB-6, WB-7, WB-8 vẫn hiệu lực, WB-6 thêm trường `sheet`.
+
+**Cần báo:** WP5 (endpoint import mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`; endpoint export và nút tải). **Chưa báo.**
+
+**Phát hiện khi hiện thực ASSET-EXPORT-WORKBOOK (18/11/2026) — sửa ở PR export, sau khi #271 đã merge với lỗi này:** `PlanFeedersAsync` gán
+`feeder.Geom = geometry` mà workbook không có hình mạch, nên xuất → nạp lại xoá lộ trình mạch đã vẽ dù file không sửa.
+Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5); CSV / GeoJSON giữ luật cũ (ô `geom_wkt` trống = xoá).
+
 
 
 ## IOT-HISTORY-30S — lịch sử điện theo feeder (18/11/2026)
@@ -2573,6 +2605,28 @@ dùng `center`. **Chưa báo.**
   API nội bộ Bridge giữ cursor cho job đồng bộ, được bảo vệ bằng Bridge key.
 - Deploy đồng thời BE và Bridge; không migration PostgreSQL, không mất telemetry.sqlite.
 
+## ASSET-WORKBOOK-MULTISHEET — workbook kiểm kê: mỗi loại tài sản một sheet (18/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 18/11/2026** — theo mẫu `Assets_Template.xlsx` của nhóm. Sheet phẳng (#271/#276) không chứa được tài sản chưa có cột, hình tuyến / lộ trình mạch, lịch sử bộ đèn, và phải gộp trùng giữa dòng |
+| **Chạm API** | **Có, đổi định dạng** của `POST /assets/import/workbook` và `GET /assets/export/workbook` (đường dẫn giữ). Chưa consumer nào gọi (WP5 chưa có nút) nên không vỡ ai. **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Ticket** | `.ai/tasks/ASSET-WORKBOOK-MULTISHEET.md` |
+| **Consumer** | WP5 (modal import / nút xuất). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| WB-12 | Một `.xlsx`, sheet nhận theo **tên** (trim + NFC): `Tuyến đường`, `Tủ điện`, `Mạch điện`, `Cột điện`, `Bóng đèn`; cột = cột file CSV cùng loại trừ `commune_id` / `data_source`. Sheet vắng = không nạp loại đó; không sheet tài sản nào → lỗi. Sheet khác bỏ qua, **trừ** `IoT` có dữ liệu → lỗi "chưa hỗ trợ" |
+| WB-13 | `commune_id` và `data_source` đặt **khi upload** (multipart). `data_source` bắt buộc, không mặc định. `commune_id` vắng = xã duy nhất của người gọi; phạm vi ≠ một xã mà vắng → 400; ngoài phạm vi → 403. Hai cột này xuất hiện trong sheet → lỗi |
+| WB-14 | Cột không nhận mà **có dữ liệu** → lỗi header của sheet (không âm thầm bỏ); cột lạ toàn trống bỏ qua |
+| WB-15 | Toạ độ `geom_wkt` (WKT) mọi sheet — thay WB-5. Tuyến và mạch: ô trống / thiếu cột = **giữ** hình (mạch khác CSV, nơi ô trống xoá) |
+| WB-16 | Cột **mới** không `geom_wkt` thì bắt buộc `note` (chỉ workbook; CSV / form không đổi) |
+| WB-17 | Bộ đèn — thay WB-4: khoá khớp `(cột, install_date)`; nhận bộ đã tháo (`removed_date`). Chưa có → thêm (ONE-FIXTURE giữ); một bộ khớp → giống = `unchanged`, khác = lỗi; nhiều bộ khớp → lỗi. CSV fixtures giữ insert-only |
+| WB-18 | Vẫn all-or-nothing một transaction (WB-3). Lỗi / cảnh báo thêm **`sheet`**: `{sheet, row, column, message}` (`WorkbookRowError`); `ImportRowError` của CSV không đổi |
+| WB-19 | Export — thay WB-9 / WB-10: sheet `Hướng dẫn` + 5 sheet + `Không xuất`; **mọi** tài sản trong phạm vi (cả tuyến / tủ / mạch không có cột, hình tuyến / mạch, bộ đã tháo). `Không xuất` liệt kê tài sản thiếu `external_ref`, cột trên mạch thiếu mã, bộ đèn của cột thiếu mã |
+| WB-20 | Giới hạn — thay WB-11: mỗi file nạp lại một xã, một `data_source`. Export nhiều xã không nạp lại được; tài sản khác nguồn trong một xã bị đổi theo nguồn chọn khi upload — `Hướng dẫn` của file xuất ghi số tài sản theo từng nguồn |
+
+**Cần báo:** WP5 (định dạng mới, hai trường form `data_source` / `commune_id`, `sheet` trong lỗi). **Chưa báo.**
 
 ## IOT-CONTACT-1 — kết nối node độc lập độ mới mẫu điện (18/11/2026)
 

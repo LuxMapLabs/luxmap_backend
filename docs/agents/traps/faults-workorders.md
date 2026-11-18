@@ -333,6 +333,14 @@ Nhóm cột phân biệt trước khi chunk để hai fault của một cột kh
 Preview không SaveChanges/audit/notification/khoá; không bỏ filter xã để lấy tên tuyến ngoài quyền.
 Quyền vẫn theo ManageWorkOrders hiện hành; mâu thuẫn system_admin của ticket ghi ở drift WO-AUTODISPATCH-1.
 
+## WO-AUTODISPATCH-2 — sự cố IoT gom theo tủ (18/11/2026)
+
+Khoá gom là `(commune_id, segment_id ?? cabinet_id)`, tuyến thắng tủ. Tủ đọc từ **`fault.cabinet_id`**, không suy từ
+`iot_node`: WorkOrders không tham chiếu IOT (ranh giới module), và tủ lúc phát hiện mới đúng khi thiết bị dời tủ.
+Vì vậy **mọi writer sinh sự cố IoT phải ghi `CabinetId`** (`IotDiagnosticJob`, `NodeOfflineJob`) — quên thì sự cố lặng lẽ
+rơi vào `NO_SEGMENT` (`A_silent_device_raises_one_node_offline_fault…` canh `NodeOfflineJob`).
+`WorkOrderFaultDetail` mang năm trường IoT cùng tên `FaultItem`; thêm trường IoT mới thì thêm ở cả hai.
+
 ## SURVEY-RECURRING — lịch địa phương và biên ghi chung (09/11/2026)
 
 Mốc Thứ Năm 17:00, tuần T2–CN và cửa sổ sinh phiếu chỉ qua `SurveyScheduleCalendar`, với giờ địa phương

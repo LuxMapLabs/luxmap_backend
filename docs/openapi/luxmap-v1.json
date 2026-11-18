@@ -1289,16 +1289,31 @@
           "content": {
             "multipart/form-data": {
               "schema": {
+                "required": [
+                  "data_source"
+                ],
                 "type": "object",
                 "properties": {
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "commune_id": {
+                    "type": "string"
+                  },
+                  "data_source": {
+                    "type": "string"
                   }
                 }
               },
               "encoding": {
                 "file": {
+                  "style": "form"
+                },
+                "commune_id": {
+                  "style": "form"
+                },
+                "data_source": {
                   "style": "form"
                 }
               }
@@ -1514,6 +1529,86 @@
         "x-luxmap-capability": "cap:manage_assets",
         "x-luxmap-roles": [
           "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/assets/export/workbook": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
         ],
         "x-luxmap-client": "shared"
       }
@@ -20481,10 +20576,12 @@
             "type": "string"
           },
           "segment_id": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "segment_name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "assigned_to_name": {
             "type": "string",
@@ -20504,6 +20601,10 @@
             "$ref": "#/components/schemas/Severity"
           },
           "unassigned_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
             "type": "string",
             "nullable": true
           }
@@ -27076,6 +27177,28 @@
           },
           "inspection_outcome": {
             "$ref": "#/components/schemas/InspectionOutcome"
+          },
+          "origin_node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "iot_anomaly_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "recovered_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -27479,7 +27602,7 @@
           "rows": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ImportRowError"
+              "$ref": "#/components/schemas/WorkbookRowError"
             }
           },
           "total_warnings": {
@@ -27489,7 +27612,7 @@
           "warnings": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ImportRowError"
+              "$ref": "#/components/schemas/WorkbookRowError"
             }
           }
         },
@@ -27509,6 +27632,27 @@
           "unchanged": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbookRowError": {
+        "type": "object",
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "nullable": true
+          },
+          "row": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "column": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
           }
         },
         "additionalProperties": false

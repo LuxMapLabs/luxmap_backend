@@ -10,7 +10,7 @@ using LuxMap.Shared.Http;
 
 namespace LuxMap.Modules.Assets.Import;
 
-/// <summary>Bounded SAX reader. Only cells from the first sheet and referenced shared strings are retained.</summary>
+/// <summary>Bounded SAX reader. Asset sheets are identified by name; only bounded rows and referenced shared strings are retained.</summary>
 internal sealed class WorkbookDocument
 {
     public const int MaxRows = 5000;
@@ -26,8 +26,10 @@ internal sealed class WorkbookDocument
 
     internal sealed record Value(string Text, string? Type);
     internal sealed record SheetRow(int Number, Dictionary<string, string?> Cells);
-    public List<SheetRow> Rows { get; } = [];
-    public List<ImportRowError> Errors { get; } = [];
+    public Dictionary<ImportKind, List<SheetRow>> Sheets { get; } = [];
+    private List<SheetRow> Rows = [];
+    private string? sheetName;
+    public List<WorkbookRowError> Errors { get; } = [];
 
     public static WorkbookDocument Read(Stream stream)
     {
@@ -45,13 +47,27 @@ internal sealed class WorkbookDocument
             stream.Position = 0;
             using var package = SpreadsheetDocument.Open(stream, false);
             var book = package.WorkbookPart ?? throw new InvalidDataException("Missing workbook.");
-            var sheet = book.Workbook?.Sheets?.Elements<Sheet>().FirstOrDefault()
-                ?? throw new InvalidDataException("Missing first worksheet.");
-            var sheetId = sheet.Id?.Value ?? throw new InvalidDataException("Missing sheet relationship.");
-            var part = book.GetPartById(sheetId) as WorksheetPart
-                ?? throw new InvalidDataException("First sheet is not a worksheet.");
             var document = new WorkbookDocument();
-            document.ReadSheet(part, book.SharedStringTablePart);
+            foreach (var sheet in book.Workbook?.Sheets?.Elements<Sheet>() ?? [])
+            {
+                var name = (sheet.Name?.Value ?? "").Trim().Normalize(NormalizationForm.FormC);
+                var layout = WorkbookSheets.All.SingleOrDefault(s => s.Name == name);
+                if (layout is null && name != "IoT") continue;
+                var sheetId = sheet.Id?.Value ?? throw new InvalidDataException("Missing sheet relationship.");
+                var part = book.GetPartById(sheetId) as WorksheetPart
+                    ?? throw new InvalidDataException("Not a worksheet.");
+                document.sheetName = name;
+                document.Rows = [];
+                if (layout is not null && document.Sheets.ContainsKey(layout.Kind))
+                {
+                    document.Errors.Add(new(name, 1, null, "Duplicate asset sheet."));
+                    continue;
+                }
+                document.ReadSheet(part, book.SharedStringTablePart, layout);
+                if (layout is not null) document.Sheets[layout.Kind] = document.Rows;
+            }
+            if (document.Sheets.Count == 0)
+                document.Errors.Add(new(null, 1, null, "No asset sheet found"));
             return document;
         }
         catch (Exception ex) when (ex is OpenXmlPackageException or InvalidDataException or System.Xml.XmlException
@@ -61,8 +77,9 @@ internal sealed class WorkbookDocument
         }
     }
 
-    private void ReadSheet(WorksheetPart part, SharedStringTablePart? strings)
+    private void ReadSheet(WorksheetPart part, SharedStringTablePart? strings, WorkbookSheets.Layout? layout)
     {
+        var errorStart = Errors.Count;
         var raw = new List<(int Number, Dictionary<int, Value> Cells)>();
         var needed = new HashSet<int>();
         using (var reader = OpenXmlReader.Create(part))
@@ -87,7 +104,7 @@ internal sealed class WorkbookDocument
                     nextColumn = column + 1;
                     if (column >= MaxColumns || nextColumn > MaxColumns)
                     {
-                        Errors.Add(new(1, null, "A worksheet may have at most 200 columns."));
+                        Errors.Add(new(sheetName, 1, null, "A worksheet may have at most 200 columns."));
                         return;
                     }
                     type = Attribute(reader, "t");
@@ -102,7 +119,7 @@ internal sealed class WorkbookDocument
                         var headerStrings = ReadStrings(strings, needed, raw);
                         var name = headers is not null && headers.TryGetValue(column, out var headerCell)
                             ? Resolve(headerCell, headerStrings) : null;
-                        Errors.Add(new(row, name, "A cell may have at most 2000 characters."));
+                        Errors.Add(new(sheetName, row, name, "A cell may have at most 2000 characters."));
                         return;
                     }
                 }
@@ -119,7 +136,7 @@ internal sealed class WorkbookDocument
                     if (row == 1 || cells!.Count > 0) raw.Add((row, cells!));
                     if (raw.Count > MaxRows + 1 && needed.Count == 0)
                     {
-                        Errors.Add(new(1, null, "A worksheet may have at most 5000 data rows."));
+                        Errors.Add(new(sheetName, 1, null, "A worksheet may have at most 5000 data rows."));
                         return;
                     }
                     // Bound retained raw rows even for a sheet made entirely of shared whitespace.
@@ -127,14 +144,14 @@ internal sealed class WorkbookDocument
                     if (raw.Count > MaxRows + 1)
                     {
                         var resolved = ReadStrings(strings, needed, raw);
-                        if (Errors.Count > 0) return;
+                        if (Errors.Count > errorStart) return;
                         raw.RemoveAll(r => r.Number != 1 && r.Cells.Values.All(v => Resolve(v, resolved).Length == 0));
                         needed.Clear();
                         foreach (var cell in raw.SelectMany(r => r.Cells.Values).Where(v => v.Type == "s"))
                             needed.Add(int.Parse(cell.Text, CultureInfo.InvariantCulture));
                         if (raw.Count > MaxRows + 1)
                         {
-                            Errors.Add(new(1, null, "A worksheet may have at most 5000 data rows."));
+                            Errors.Add(new(sheetName, 1, null, "A worksheet may have at most 5000 data rows."));
                             return;
                         }
                     }
@@ -142,25 +159,42 @@ internal sealed class WorkbookDocument
             }
         }
         var shared = ReadStrings(strings, needed, raw);
-        if (Errors.Count > 0) return;
+        if (Errors.Count > errorStart) return;
+        if (layout is null)
+        {
+            var dataRow = raw.FirstOrDefault(r => r.Number != 1 && r.Cells.Values.Any(v => Resolve(v, shared).Length > 0));
+            if (dataRow.Number != 0)
+                Errors.Add(new(sheetName, dataRow.Number, null, "IoT import is not supported yet"));
+            return;
+        }
         var header = raw.FirstOrDefault(r => r.Number == 1).Cells;
         if (header is null)
         {
-            Errors.Add(new(1, "pole_ref", "Column missing from the header row."));
+            Errors.Add(new(sheetName, 1, null, "Column missing from the header row."));
             return;
         }
         var columns = header.ToDictionary(p => p.Key, p => Resolve(p.Value, shared));
         foreach (var duplicate in columns.Values.Where(v => v.Length > 0).GroupBy(v => v, StringComparer.Ordinal).Where(g => g.Count() > 1))
-            Errors.Add(new(1, duplicate.Key, "Duplicate column in the header row."));
-        var missing = new[] { "commune_id", "data_source", "pole_ref" }.Except(columns.Values, StringComparer.Ordinal).ToArray();
-        if (missing.Length > 0) Errors.Add(new(1, string.Join(", ", missing), "Column missing from the header row."));
-        if (Errors.Count > 0) return;
+            Errors.Add(new(sheetName, 1, duplicate.Key, "Duplicate column in the header row."));
+        foreach (var (index, name) in columns)
+        {
+            if (name is "commune_id" or "data_source"
+                || (!layout.Columns.Contains(name, StringComparer.Ordinal)
+                    && raw.Any(r => r.Number != 1 && r.Cells.TryGetValue(index, out var v) && Resolve(v, shared).Length > 0)))
+                Errors.Add(new(sheetName, 1, name, $"Column '{name}' is not supported in this sheet."));
+        }
+        // A nonempty cell without a header must not silently disappear either.
+        if (raw.Any(r => r.Number != 1 && r.Cells.Any(c => !columns.ContainsKey(c.Key) && Resolve(c.Value, shared).Length > 0)))
+            Errors.Add(new(sheetName, 1, null, "A nonempty column has no header."));
+        var missing = layout.Required.Except(columns.Values, StringComparer.Ordinal).ToArray();
+        if (missing.Length > 0) Errors.Add(new(sheetName, 1, string.Join(", ", missing), "Column missing from the header row."));
+        if (Errors.Count > errorStart) return;
         foreach (var (number, cells) in raw.Where(r => r.Number != 1))
         {
             if (cells.Values.All(v => Resolve(v, shared).Length == 0)) continue;
             if (Rows.Count == MaxRows)
             {
-                Errors.Add(new(1, null, "A worksheet may have at most 5000 data rows."));
+                Errors.Add(new(sheetName, 1, null, "A worksheet may have at most 5000 data rows."));
                 return;
             }
             var values = new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -168,19 +202,19 @@ internal sealed class WorkbookDocument
             {
                 if (!cells.TryGetValue(index, out var cell)) continue;
                 var value = Resolve(cell, shared);
-                if (cell.Type == "e") Errors.Add(new(number, name, $"Excel cell error: {value}."));
+                if (cell.Type == "e") Errors.Add(new(sheetName, number, name, $"Excel cell error: {value}."));
                 if (cell.Type == "b") value = value == "1" ? "true" : value == "0" ? "false" : value;
                 if (cell.Type is null or "n")
                 {
                     if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var numeric) && double.IsFinite(numeric))
                     {
-                        if (name is "install_date" or "warranty_expiry")
+                        if (name is "install_date" or "removed_date" or "warranty_expiry")
                         {
-                            if (numeric != Math.Truncate(numeric)) Errors.Add(new(number, name, "A date serial must not contain a time."));
+                            if (numeric != Math.Truncate(numeric)) Errors.Add(new(sheetName, number, name, "A date serial must not contain a time."));
                             else
                             {
                                 try { value = DateTime.FromOADate(numeric).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture); }
-                                catch (ArgumentException) { Errors.Add(new(number, name, "Invalid date serial.")); }
+                                catch (ArgumentException) { Errors.Add(new(sheetName, number, name, "Invalid date serial.")); }
                             }
                         }
                         else value = numeric.ToString("G17", CultureInfo.InvariantCulture);
@@ -205,6 +239,7 @@ internal sealed class WorkbookDocument
             if (reader.IsStartElement && reader.ElementType == typeof(SharedStringItem)) { index++; text.Clear(); }
             else if (reader.IsStartElement && reader.ElementType == typeof(Text))
             {
+                if (!needed.Contains(index)) continue;
                 text.Append(reader.GetText());
                 if (text.Length > MaxCellLength)
                 {
@@ -217,7 +252,7 @@ internal sealed class WorkbookDocument
                         if (cell.Type != "s") name = cell.Text;
                         else if (int.TryParse(cell.Text, out var headerIndex)) values.TryGetValue(headerIndex, out name);
                     }
-                    Errors.Add(new(location.Number == 0 ? 1 : location.Number, name, "A shared string may have at most 2000 characters."));
+                    Errors.Add(new(sheetName, location.Number == 0 ? 1 : location.Number, name, "A shared string may have at most 2000 characters."));
                     return values;
                 }
             }

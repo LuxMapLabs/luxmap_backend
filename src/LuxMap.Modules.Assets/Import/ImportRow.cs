@@ -24,6 +24,10 @@ internal interface IImportRow
     string? ReferenceCommune => null;
     bool HasErrors => false;
 
+    /// <summary>Workbook blanks keep feeder routes; CSV/GeoJSON blanks clear them.</summary>
+    bool KeepEmptyGeometry => false;
+    bool RequireLocationNote => false;
+
     string? this[string column] { get; }
 
     /// <summary>
@@ -122,7 +126,19 @@ internal sealed class ImportRowReader(IImportRow row, List<ImportRowError> error
     /// <summary>True while this row has produced no error — i.e. it is still eligible to be written.</summary>
     public bool IsValid { get; private set; } = !row.HasErrors;
 
+    /// <summary>
+    /// A reference on this row points at a parent that failed in an earlier sheet. The parent's error explains the row, so
+    /// checks that only fail BECAUSE the parent is missing (a topology label without its relation) must stay quiet too.
+    /// </summary>
+    public bool ReferenceSuppressed { get; private set; }
+
     public void Invalidate() => IsValid = false;
+
+    public void SuppressReference()
+    {
+        IsValid = false;
+        ReferenceSuppressed = true;
+    }
 
     public void Fail(string? column, string message)
     {

@@ -33,6 +33,23 @@ public sealed class AssetsController(
     AssetCrudService service,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
+    /// <summary>Complete inventory in named asset worksheets, including retired fittings (WB-19, SELF-SIGNED).</summary>
+    [HttpGet("export/workbook")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK, Export.AssetExportWorkbook.ContentType)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status413PayloadTooLarge)]
+    public async Task<IActionResult> ExportWorkbookAsync(
+        [FromServices] Export.AssetExportWorkbook workbook,
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        CancellationToken ct)
+    {
+        var communes = CommuneFilter.Narrow(scopeAccessor.Scope, communeId);
+        var bytes = await workbook.WriteAsync(communes, ct);
+        var day = DateTime.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        return File(bytes, Export.AssetExportWorkbook.ContentType, $"assets-{day}.xlsx");
+    }
+
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
     // These returned PagedResult<string> — ids only — from BE-12a until 22/09/2026, a placeholder

@@ -1,353 +1,344 @@
 using System.IO.Compression;
 using System.Net;
 using System.Text;
-using System.Text.Json;
 using DocumentFormat.OpenXml.Spreadsheet;
 using LuxMap.Modules.Assets.Entities;
+using LuxMap.Modules.Assets.Import;
 using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Api.Tests;
 
 [Collection(nameof(AssetDatabaseCollection))]
-public sealed class AssetImportWorkbookTests(AssetImportFixture fixture)
+public sealed class AssetImportWorkbookTests(AssetImportFixture fixture) : AssetWorkbookTestContext(fixture)
 {
-    private Dictionary<string, object?> Pole(string tag, int index = 1) => new()
+    [Fact]
+    public async Task All_sheets_link_assets_and_replay_without_writes_including_retired_fittings()
     {
-        ["commune_id"] = fixture.CommuneId, ["data_source"] = "public_imagery", ["pole_ref"] = $"{tag}-P{index}",
-    };
-
-    private List<(uint Number, Dictionary<string, object?> Cells)> Full(string tag)
-    {
-        var rows = new List<(uint, Dictionary<string, object?>)>();
-        for (var i = 1; i <= 4; i++)
+        var sheets = Full();
+        var result = await Import(sheets.Reverse().ToArray()); // Recognition and FK order do not depend on tab position.
+        Committed(result);
+        foreach (var kind in new[] { "segments", "cabinets", "feeders", "poles" })
+            Assert.Equal(1, result.GetProperty(kind).GetProperty("inserted").GetInt32());
+        Assert.Equal(2, result.GetProperty("fixtures").GetProperty("inserted").GetInt32());
+        await Fixture.QueryAsync(async db =>
         {
-            var row = Pole(tag, i);
-            row["segment_ref"] = tag + "-S"; row["segment_name"] = "Route"; row["road_class"] = "inter_village";
-            row["cabinet_ref"] = tag + "-C"; row["cabinet_name"] = "Cabinet";
-            row["cabinet_lat"] = 10.97; row["cabinet_lng"] = 106.49;
-            row["feeder_ref"] = tag + "-F"; row["feeder_name"] = "Feeder";
-            if (i != 3) { row["pole_lat"] = 10.97; row["pole_lng"] = 106.49; }
-            if (i != 4)
-            {
-                row["fixture_type"] = "led_road_lamp"; row["power_source"] = "grid";
-                row["lamp_watt"] = 100; row["lamp_count"] = i == 2 ? 2 : 1;
-                row["install_date"] = "2022-03-24";
-            }
-            rows.Add(((uint)i + 1, row));
+            var p = await db.Set<Pole>().IgnoreQueryFilters().SingleAsync(p => p.CommuneId == Commune);
+            var s = await db.Set<RoadSegment>().IgnoreQueryFilters().SingleAsync(p => p.CommuneId == Commune);
+            var f = await db.Set<Feeder>().IgnoreQueryFilters().SingleAsync(p => p.CommuneId == Commune);
+            var c = await db.Set<ElectricalCabinet>().IgnoreQueryFilters().SingleAsync(p => p.CommuneId == Commune);
+            Assert.Equal(s.SegmentId, p.SegmentId); Assert.Equal(f.FeederId, p.FeederId); Assert.Equal(c.CabinetId, f.CabinetId);
+            Assert.All(await db.Set<Fixture>().IgnoreQueryFilters().Where(x => x.CommuneId == Commune).ToListAsync(), x => Assert.Equal(p.PoleId, x.PoleId));
+            return 0;
+        });
+        var before = await Snapshot();
+        result = await Import(sheets);
+        Committed(result);
+        foreach (var kind in new[] { "segments", "cabinets", "feeders", "poles", "fixtures" })
+        {
+            Assert.Equal(0, result.GetProperty(kind).GetProperty("inserted").GetInt32());
+            Assert.Equal(0, result.GetProperty(kind).GetProperty("updated").GetInt32());
+            Assert.Equal(kind == "fixtures" ? 2 : 1, result.GetProperty(kind).GetProperty("unchanged").GetInt32());
         }
-        return rows;
+        Assert.Equal(before, await Snapshot());
     }
 
-    /// <summary>
-    /// The committed templates must stay readable by the endpoint they are handed out for. The empty template is a header row
-    /// the parser accepts; the example names COM-070 (outside this run's fixture commune), so its ONLY errors may be commune
-    /// scope — any other error means a header, enum, date or coordinate in the example drifted from the code.
-    /// </summary>
     [Fact]
-    public async Task Committed_templates_parse_and_the_example_fails_only_on_commune_scope()
+    public async Task Last_sheet_failure_rolls_back_inserts_and_updates_and_zeroes_counts()
+    {
+        Committed(await Import(Full()));
+        var before = await Snapshot();
+        var sheets = Full();
+        sheets[0].Rows[0].Cells["segment_name"] = "Must roll back";
+        sheets[3].Rows.Add((9, Row(("external_ref", "NEW"), ("note", "Near bridge"))));
+        sheets[4].Rows[1].Cells["lamp_watt"] = "invalid";
+        var result = await Import(sheets);
+        Rejected(result); Error(result, "Bóng đèn", 3, "lamp_watt", "whole number");
+        Assert.Equal(before, await Snapshot());
+    }
+
+    [Fact]
+    public async Task Committed_templates_load_with_the_commune_chosen_in_the_form()
     {
         var directory = Path.Combine(AssetImportMockSetTests.RepositoryRoot(), "docs", "templates");
-
-        var empty = await Import(await File.ReadAllBytesAsync(Path.Combine(directory, "assets-workbook.xlsx")));
-        Assert.True(empty.GetProperty("committed").GetBoolean(), empty.ToString());
-        Assert.Equal(0, empty.GetProperty("total_errors").GetInt32());
-
-        var before = await Counts();
-        var example = await Import(await File.ReadAllBytesAsync(Path.Combine(directory, "assets-workbook.example.xlsx")));
-        Rejected(example);
-        var errors = example.GetProperty("rows").EnumerateArray().ToList();
-        Assert.NotEmpty(errors);
-        Assert.All(errors, e => Assert.Equal("commune_id", e.GetProperty("column").GetString()));
-        Assert.Equal(before, await Counts());
-    }
-
-    [Fact]
-    public async Task Full_sheet_creates_five_kinds_and_links_them_and_keeps_unknown_GPS()
-    {
-        var tag = Tag();
-        var result = await Import(AssetWorkbookFile.Create(Full(tag)));
-        Assert.True(result.GetProperty("committed").GetBoolean());
-        foreach (var (kind, count) in new[] { ("segments", 1), ("cabinets", 1), ("feeders", 1), ("poles", 4), ("fixtures", 3) })
-            Assert.Equal(count, result.GetProperty(kind).GetProperty("inserted").GetInt32());
-        var poles = await fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters()
-            .Where(p => p.ExternalRef!.StartsWith(tag)).Include(p => p.Fixtures).ToListAsync());
-        Assert.Equal(4, poles.Count);
-        var segmentId = Assert.Single(poles.Select(p => p.SegmentId).Distinct());
-        var feederId = Assert.Single(poles.Select(p => p.FeederId).Distinct());
-        Assert.NotNull(segmentId); Assert.NotNull(feederId);
-        Assert.Null(poles.Single(p => p.ExternalRef == tag + "-P3").Geom);
-        Assert.Empty(poles.Single(p => p.ExternalRef == tag + "-P4").Fixtures);
-        Assert.Equal(2, Assert.Single(poles.Single(p => p.ExternalRef == tag + "-P2").Fixtures).LampCount);
-        var cabinetId = await fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
-            .Where(f => f.FeederId == feederId).Select(f => f.CabinetId).SingleAsync());
-        Assert.Equal(tag + "-C", await fixture.QueryAsync(db => db.Set<ElectricalCabinet>().IgnoreQueryFilters()
-            .Where(c => c.CabinetId == cabinetId).Select(c => c.ExternalRef).SingleAsync()));
-    }
-
-    [Fact]
-    public async Task Last_row_failure_rolls_back_all_five_tables_and_zeroes_counts()
-    {
-        var tag = Tag();
-        var before = await Counts();
-        var rows = Full(tag);
-        rows[^1].Cells["fixture_type"] = "wrong"; // A fixture-only error after four kinds have saved.
-        var result = await Import(AssetWorkbookFile.Create(rows));
-        Rejected(result);
-        Assert.Equal(before, await Counts());
-        foreach (var kind in new[] { "segments", "cabinets", "feeders", "poles", "fixtures" })
-            foreach (var count in result.GetProperty(kind).EnumerateObject()) Assert.Equal(0, count.Value.GetInt32());
-    }
-
-    [Fact]
-    public async Task Identical_reimport_is_unchanged_and_preserves_stamps()
-    {
-        var tag = Tag(); var bytes = AssetWorkbookFile.Create(Full(tag));
-        Assert.True((await Import(bytes)).GetProperty("committed").GetBoolean());
-        var before = await Stamps(tag);
-        var second = await Import(bytes);
-        Assert.True(second.GetProperty("committed").GetBoolean());
-        foreach (var kind in new[] { "segments", "cabinets", "feeders", "poles", "fixtures" })
-        {
-            Assert.Equal(0, second.GetProperty(kind).GetProperty("inserted").GetInt32());
-            Assert.Equal(0, second.GetProperty(kind).GetProperty("updated").GetInt32());
-        }
-        Assert.Equal(3, second.GetProperty("fixtures").GetProperty("unchanged").GetInt32());
-        Assert.Equal(before, await Stamps(tag));
-    }
-
-    [Fact]
-    public async Task Different_active_fixture_is_refused_without_mutating_it()
-    {
-        var tag = Tag(); var rows = Full(tag);
-        await Import(AssetWorkbookFile.Create(rows));
-        var before = await Stamps(tag); var counts = await Counts();
-        rows[0].Cells["lamp_watt"] = 150;
-        var result = await Import(AssetWorkbookFile.Create(rows));
-        Rejected(result); Error(result, 2, "lamp_watt", "replace a fitting through the asset form");
-        Assert.Equal(before, await Stamps(tag)); Assert.Equal(counts, await Counts());
-    }
-
-    [Fact]
-    public async Task Duplicate_parent_conflicts_name_the_defining_row_and_blank_repetitions_are_allowed()
-    {
-        var tag = Tag(); var rows = Full(tag);
-        rows[1].Cells["segment_name"] = "Different";
-        var result = await Import(AssetWorkbookFile.Create(rows));
-        Rejected(result); Error(result, 3, "segment_name", "row 2");
-        rows[1].Cells["segment_name"] = " ";
-        Assert.True((await Import(AssetWorkbookFile.Create(rows))).GetProperty("committed").GetBoolean());
-    }
-
-    [Fact]
-    public async Task Duplicate_poles_fail_on_every_later_occurrence()
-    {
-        var row = Pole(Tag());
-        var result = await Import(AssetWorkbookFile.Create([(2, row), (4, row), (7, row)]));
-        Rejected(result); Error(result, 4, "pole_ref", "Duplicate"); Error(result, 7, "pole_ref", "Duplicate");
-    }
-
-    [Fact]
-    public async Task Sparse_cells_and_blank_rows_preserve_real_Excel_row_numbers()
-    {
-        var row = Pole(Tag()); row["fixture_note"] = "requires the other fixture fields";
-        var result = await Import(AssetWorkbookFile.Create([(2, new()), (7, row)]));
-        Rejected(result); Error(result, 7, "install_date", "Required");
-        Assert.All(result.GetProperty("rows").EnumerateArray(), e => Assert.Equal(7, e.GetProperty("row").GetInt32()));
-    }
-
-    [Fact]
-    public async Task Serial_and_ISO_dates_are_accepted_but_times_and_local_dates_fail()
-    {
-        var tag = Tag(); var rows = Full(tag);
-        rows[0].Cells["install_date"] = new DateTime(2022, 3, 24).ToOADate();
-        rows[1].Cells["warranty_expiry"] = new DateTime(2024, 3, 24).ToOADate();
-        var result = await Import(AssetWorkbookFile.Create(rows));
-        Assert.True(result.GetProperty("committed").GetBoolean());
-        var dates = await fixture.QueryAsync(db => db.Set<Fixture>().IgnoreQueryFilters()
-            .Where(f => f.Pole.ExternalRef == tag + "-P1").Select(f => f.InstallDate).ToListAsync());
-        Assert.Equal(new DateOnly(2022, 3, 24), Assert.Single(dates));
-        rows[0].Cells["install_date"] = new DateTime(2022, 3, 24, 12, 0, 0).ToOADate();
-        rows[1].Cells["install_date"] = "24/03/2022";
-        result = await Import(AssetWorkbookFile.Create(rows));
-        Rejected(result); Error(result, 2, "install_date", "time"); Error(result, 3, "install_date", "YYYY-MM-DD");
+        var empty = await ImportBytes(await File.ReadAllBytesAsync(Path.Combine(directory, "assets-workbook.xlsx")));
+        Committed(empty); Assert.Empty(await Snapshot());
+        var example = await ImportBytes(await File.ReadAllBytesAsync(Path.Combine(directory, "assets-workbook.example.xlsx")));
+        Committed(example); Assert.Equal(3, example.GetProperty("poles").GetProperty("inserted").GetInt32());
+        Assert.True(await Fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().Where(x => x.CommuneId == Commune).AllAsync(x => x.ExternalRef!.StartsWith("CTA-"))));
     }
 
     [Theory]
-    [InlineData("10.97", null)]
-    [InlineData("10,97", "106.49")]
-    [InlineData("NaN", "106.49")]
-    public async Task Invalid_coordinate_pairs_are_sheet_cell_errors(string lat, string? lng)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Missing_sheets_are_skipped_and_empty_or_missing_route_cells_keep_geometry(bool missingColumn)
     {
-        var row = Pole(Tag()); row["pole_lat"] = lat; row["pole_lng"] = lng;
-        var result = await Import(AssetWorkbookFile.Create([(2, row)]));
-        Rejected(result); Error(result, 2, "pole_lat", "latitude");
+        Committed(await Import(Full())); var before = await Snapshot();
+        var sheets = Full().Take(3).Where(s => s.Name != "Tủ điện").Select(s =>
+        {
+            s.Rows[0].Cells.Remove("geom_wkt");
+            return missingColumn ? s with { Columns = s.Columns.Where(c => c != "geom_wkt").ToArray() } : s;
+        }).ToArray();
+        var result = await Import(sheets); Committed(result);
+        Assert.Equal(1, result.GetProperty("segments").GetProperty("unchanged").GetInt32());
+        Assert.Equal(1, result.GetProperty("feeders").GetProperty("unchanged").GetInt32());
+        Assert.Equal(0, result.GetProperty("poles").GetProperty("unchanged").GetInt32());
+        Assert.Equal(before, await Snapshot());
     }
 
     [Fact]
-    public async Task Only_the_first_sheet_is_read()
+    public async Task No_asset_sheet_is_a_file_error_and_IoT_data_is_not_silently_discarded()
     {
-        var result = await Import(AssetWorkbookFile.Create([(2, Pole(Tag()))], garbageSecondSheet: true));
-        Assert.True(result.GetProperty("committed").GetBoolean());
-    }
-
-    [Fact]
-    public async Task Missing_and_duplicate_headers_are_reported_once_at_row_one()
-    {
-        var missing = await Import(AssetWorkbookFile.Create([], columns: ["commune_id", "data_source"]));
-        Rejected(missing); Assert.Single(missing.GetProperty("rows").EnumerateArray()); Error(missing, 1, "pole_ref", "Column missing");
-        var duplicate = await Import(AssetWorkbookFile.Create([], columns: ["commune_id", "data_source", "pole_ref", "pole_ref"]));
-        Rejected(duplicate); Error(duplicate, 1, "pole_ref", "Duplicate column");
-    }
-
-    [Fact]
-    public async Task A_foreign_commune_is_a_row_error_and_does_not_write()
-    {
-        var row = Pole(Tag()); row["commune_id"] = fixture.ForeignCommuneId;
-        var before = await Counts();
-        var result = await Import(AssetWorkbookFile.Create([(2, row)]));
-        Rejected(result); Error(result, 2, "commune_id", "outside your permitted commune scope");
-        Assert.Equal(before, await Counts());
+        var guide = new AssetWorkbookFile.Sheet("Hướng dẫn", ["Help"], []);
+        var result = await Import(guide); Rejected(result); Error(result, null, 1, null, "No asset sheet found");
+        var asset = AssetWorkbookFile.Asset(ImportKind.Poles);
+        var iot = new AssetWorkbookFile.Sheet("IoT", ["cabinet_external_ref"], []);
+        Committed(await Import(guide, asset, iot));
+        iot.Rows.Add((7, Row(("cabinet_external_ref", "TU-A"))));
+        result = await Import(asset, iot); Rejected(result);
+        Error(result, "IoT", 7, null, "IoT import is not supported yet");
+        Assert.Empty(await Snapshot());
     }
 
     [Theory]
-    [InlineData("x.xls")]
-    [InlineData("x.csv")]
-    [InlineData("x.xlsx")]
-    public async Task Unsupported_extensions_and_disguised_text_are_415(string name)
+    [InlineData("commune_id")]
+    [InlineData("data_source")]
+    public async Task Form_columns_are_forbidden_even_when_blank(string column)
     {
-        var response = await Upload(Encoding.UTF8.GetBytes("not zip"), name);
-        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
-        Assert.Contains("Upload a .xlsx workbook.", await response.Content.ReadAsStringAsync());
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Poles);
+        var result = await Import(sheet with { Columns = [.. sheet.Columns, column] });
+        Rejected(result); Error(result, "Cột điện", 1, column, "not supported");
     }
 
-    [Fact]
-    public async Task Invalid_zip_and_non_OpenXml_zip_are_400()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Unknown_columns_are_allowed_only_if_every_cell_is_blank(bool populated)
     {
-        using var stream = new MemoryStream();
-        using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, true))
-        using (var writer = new StreamWriter(zip.CreateEntry("hello.txt").Open())) await writer.WriteAsync("hello");
-        foreach (var bytes in new[] { stream.ToArray(), new byte[] { 0x50, 0x4b, 3, 4, 0, 0 } })
-        {
-            var response = await Upload(bytes);
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            Assert.Contains("VALIDATION_FAILED", await response.Content.ReadAsStringAsync());
-        }
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "CTA-001"), ("note", "Near school"), ("inventory_number", populated ? "7" : null)));
+        var result = await Import(sheet with { Columns = [.. sheet.Columns, "inventory_number"] });
+        if (populated) { Rejected(result); Error(result, "Cột điện", 1, "inventory_number", "not supported"); Assert.Empty(await Snapshot()); }
+        else Committed(result);
     }
 
-    [Fact]
-    public async Task A_workbook_that_inflates_past_the_cap_is_400_before_parsing()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("2")]
+    [InlineData("calibration-rig")]
+    public async Task Data_source_is_required_and_must_be_an_exact_wire_enum(string? source)
     {
-        // A valid workbook plus one highly compressible entry: a few hundred KB on the wire, > 100 MB unzipped.
-        using var stream = new MemoryStream();
-        stream.Write(AssetWorkbookFile.Create([(2u, Pole(Tag()))]));
-        using (var zip = new ZipArchive(stream, ZipArchiveMode.Update, true))
-        using (var entry = zip.CreateEntry("xl/media/padding.bin", CompressionLevel.SmallestSize).Open())
-        {
-            var block = new byte[1024 * 1024];
-            for (var i = 0; i < 101; i++) await entry.WriteAsync(block);
-        }
-
-        var response = await Upload(stream.ToArray());
+        using var response = await Upload(AssetWorkbookFile.Create(AssetWorkbookFile.Asset(ImportKind.Poles)), source);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("expands to more than 100 MB", await response.Content.ReadAsStringAsync());
+        Assert.Contains("data_source", await response.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task More_than_5000_data_rows_are_rejected_before_writing()
+    public async Task Upload_defaults_only_a_single_commune_and_rejects_foreign_communes()
     {
-        var tag = Tag(); var before = await Counts();
-        var result = await Import(AssetWorkbookFile.Create(Enumerable.Range(1, 5001).Select(i => ((uint)i + 1, Pole(tag, i)))));
-        Rejected(result); Assert.Contains("5000", result.GetProperty("rows")[0].GetProperty("message").GetString());
-        Assert.Equal(before, await Counts());
+        var bytes = AssetWorkbookFile.Create(AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "CTA-001"), ("note", "School"))));
+        using var single = await Upload(bytes); Assert.Equal(HttpStatusCode.OK, single.StatusCode);
+        Assert.Single(await Snapshot());
+        using var missing = await Upload(bytes, scope: [Commune, OtherCommune]);
+        Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode); Assert.Contains("commune_id", await missing.Content.ReadAsStringAsync());
+        using var foreign = await Upload(bytes, commune: OtherCommune); Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
+        Assert.Contains("COMMUNE_FORBIDDEN", await foreign.Content.ReadAsStringAsync());
     }
 
     [Fact]
-    public async Task Literal_workbook_route_returns_workbook_shape_instead_of_unknown_kind()
+    public async Task Form_source_reaches_all_existing_planners()
     {
-        var result = await Import(AssetWorkbookFile.Create([]));
-        Assert.True(result.GetProperty("committed").GetBoolean());
-        Assert.Equal(0, result.GetProperty("poles").GetProperty("inserted").GetInt32());
+        using var response = await Upload(AssetWorkbookFile.Create(Full()), "calibration_rig", Commune);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var snapshot = await Snapshot(); Assert.Equal(6, snapshot.Length);
+        Assert.All(snapshot.Where(s => !s.StartsWith("F/", StringComparison.Ordinal)), s => Assert.EndsWith("CalibrationRig", s));
     }
 
     [Fact]
-    public async Task Parent_errors_use_sheet_names_and_suppress_cascading_reference_errors()
+    public async Task Only_new_poles_without_geometry_need_a_note()
     {
-        var row = Pole(Tag()); row["segment_ref"] = "missing-definition";
-        var result = await Import(AssetWorkbookFile.Create([(2, row)]));
-        Rejected(result); Error(result, 2, "segment_name", "Required");
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "CTA-001")));
+        var result = await Import(sheet); Rejected(result); Error(result, "Cột điện", 2, "note", "without geom_wkt needs a note");
+        sheet.Rows[0].Cells["geom_wkt"] = "POINT(106.49 10.97)";
+        Committed(await Import(sheet));
+        sheet.Rows[0].Cells.Remove("geom_wkt"); Committed(await Import(sheet));
+        await Fixture.QueryAsync(async db =>
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO pole (commune_id, external_ref, data_source) VALUES ({Commune}, 'OLD-NO-GPS', 'public_imagery')");
+            return 0;
+        });
+        Committed(await Import(AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "OLD-NO-GPS")))));
+    }
+
+    [Theory]
+    [InlineData("fixture_type", "wrong")]
+    [InlineData("power_source", "wrong")]
+    [InlineData("lamp_watt", "150")]
+    [InlineData("lamp_count", "2")]
+    [InlineData("removed_date", "2024-01-01")]
+    [InlineData("warranty_expiry", "2029-01-01")]
+    [InlineData("note", "Changed")]
+    public async Task Existing_fitting_changes_are_errors_without_writes(string column, string value)
+    {
+        Committed(await Import(Full())); var before = await Snapshot();
+        var fitting = Fitting("2022-03-24"); fitting[column] = value;
+        var result = await Import(AssetWorkbookFile.Asset(ImportKind.Fixtures, fitting));
+        Rejected(result); Error(result, "Bóng đèn", 2, column,
+            column is "fixture_type" or "power_source" ? "not one of" : "change a fitting through the asset form");
+        Assert.Equal(before, await Snapshot());
+    }
+
+    [Fact]
+    public async Task Blank_optional_fitting_cells_say_nothing_and_blank_count_means_one()
+    {
+        Committed(await Import(Full())); var before = await Snapshot();
+        var fitting = Fitting("2022-03-24"); fitting.Remove("warranty_expiry"); fitting.Remove("note"); fitting.Remove("lamp_count");
+        var result = await Import(AssetWorkbookFile.Asset(ImportKind.Fixtures, fitting)); Committed(result);
+        Assert.Equal(1, result.GetProperty("fixtures").GetProperty("unchanged").GetInt32()); Assert.Equal(before, await Snapshot());
+    }
+
+    [Fact]
+    public async Task Different_install_date_cannot_replace_an_active_fitting_and_ambiguous_history_is_rejected()
+    {
+        Committed(await Import(Full())); var before = await Snapshot();
+        var result = await Import(AssetWorkbookFile.Asset(ImportKind.Fixtures, Fitting("2025-01-01")));
+        Rejected(result); Error(result, "Bóng đèn", 2, "pole_external_ref", "already has a fitting"); Assert.Equal(before, await Snapshot());
+        await Fixture.QueryAsync(async db =>
+        {
+            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO fixture (pole_id, commune_id, fixture_type, power_source, lamp_watt, lamp_count, slot, install_date, removed_date, data_source) SELECT pole_id, commune_id, 'led_road_lamp', 'grid', 100, 1, 1, DATE '2020-01-01', DATE '2021-01-01', 'public_imagery' FROM pole WHERE commune_id = {Commune}");
+            return 0;
+        });
+        before = await Snapshot();
+        result = await Import(AssetWorkbookFile.Asset(ImportKind.Fixtures, Fitting("2020-01-01", "2021-01-01")));
+        Rejected(result); Error(result, "Bóng đèn", 2, "install_date", "ambiguous"); Assert.Equal(before, await Snapshot());
+    }
+
+    [Fact]
+    public async Task Duplicate_refs_report_first_row_and_parent_failures_suppress_child_noise_in_load_order()
+    {
+        var sheets = Full();
+        sheets[0].Rows.Add((9, sheets[0].Rows[0].Cells));
+        sheets[1].Rows[0].Cells["geom_wkt"] = "invalid";
+        sheets[3].Rows.Add((7, Row(("external_ref", "OTHER"), ("geom_wkt", "bad"))));
+        var result = await Import(sheets.Reverse().ToArray()); Rejected(result);
+        Error(result, "Tuyến đường", 9, "external_ref", "row 2");
+        Error(result, "Tủ điện", 2, "geom_wkt", "WKT");
+        Error(result, "Cột điện", 7, "geom_wkt", "WKT");
         Assert.DoesNotContain(result.GetProperty("rows").EnumerateArray(), e => e.GetProperty("message").GetString()!.Contains("matches nothing"));
-        Assert.DoesNotContain(result.GetProperty("rows").EnumerateArray(), e => e.GetProperty("column").GetString() == "external_ref");
-        row["segment_ref"] = null; row["pole_ref"] = null;
-        result = await Import(AssetWorkbookFile.Create([(2, row)]));
-        Error(result, 2, "pole_ref", "Required");
+        var names = result.GetProperty("rows").EnumerateArray().Select(e => e.GetProperty("sheet").GetString()).ToArray();
+        Assert.True(new[] { "Tuyến đường", "Tủ điện", "Cột điện" }.SequenceEqual(names.Distinct()), result.GetProperty("rows").ToString());
+        Assert.Empty(await Snapshot());
     }
 
     [Fact]
-    public async Task Shared_strings_booleans_and_cached_formulas_are_read_as_values()
+    public async Task Trimmed_NFC_sheet_names_and_sparse_Excel_rows_are_preserved()
     {
-        var row = Pole(Tag());
-        row["data_source"] = new AssetWorkbookFile.Cached("0", CellValues.SharedString);
-        row["near_sensitive_poi"] = true;
-        row["fixture_type"] = "led_road_lamp"; row["power_source"] = "grid";
-        row["lamp_watt"] = new AssetWorkbookFile.Cached("100.0", CellValues.Number, "50+50");
-        row["install_date"] = "2022-03-24";
-        Assert.True((await Import(AssetWorkbookFile.Create([(2, row)], sharedStrings: ["public_imagery"]))).GetProperty("committed").GetBoolean());
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Poles);
+        sheet = sheet with { Name = ("  " + sheet.Name + "  ").Normalize(NormalizationForm.FormD) };
+        sheet.Rows.Add((3, new())); sheet.Rows.Add((19, Row(("external_ref", "CTA-001"))));
+        var result = await Import(sheet); Rejected(result); Error(result, "Cột điện", 19, "note", "needs a note");
+        result = await Import(sheet with { Name = "cột điện" }); Rejected(result); Error(result, null, 1, null, "No asset sheet");
+    }
+
+    [Theory]
+    [InlineData("2022-03-24", true)]
+    [InlineData("03/24/2022", false)]
+    [InlineData(44644, true)]
+    [InlineData(44644.5, false)]
+    public async Task Dates_accept_ISO_or_integer_Excel_serials_only(object value, bool valid)
+    {
+        var sheets = Full(); sheets[4].Rows[1].Cells["install_date"] = value;
+        var result = await Import(sheets);
+        if (valid) Committed(result); else { Rejected(result); Assert.Empty(await Snapshot()); }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task Bounded_reader_rejects_row_column_cell_and_Excel_errors(int problem)
+    {
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "CTA-001"), ("note", "School")));
+        switch (problem)
+        {
+            case 0: sheet.Rows.Clear(); sheet.Rows.AddRange(Enumerable.Range(0, 5001).Select(i => ((uint)i + 2, Row(("external_ref", "P" + i), ("note", "School"))))); break;
+            case 1: sheet = sheet with { Columns = Enumerable.Range(0, 201).Select(i => "col" + i).ToArray() }; break;
+            case 2: sheet.Rows[0].Cells["note"] = new string('x', 2001); break;
+            case 3: sheet.Rows[0].Cells["note"] = new AssetWorkbookFile.Cached("#N/A", CellValues.Error); break;
+        }
+        Rejected(await Import(sheet)); Assert.Empty(await Snapshot());
     }
 
     [Fact]
-    public async Task Excel_error_cells_overlong_cells_and_too_many_columns_are_rejected()
+    public async Task Note_overwrite_warnings_identify_the_sheet_and_physical_row()
     {
-        var row = Pole(Tag()); row["pole_note"] = new AssetWorkbookFile.Cached("#N/A", CellValues.Error);
-        var result = await Import(AssetWorkbookFile.Create([(2, row)]));
-        Rejected(result); Error(result, 2, "pole_note", "Excel cell error");
-        row["pole_note"] = new string('x', 2001);
-        result = await Import(AssetWorkbookFile.Create([(2, row)]));
-        Rejected(result); Error(result, 2, "pole_note", "2000");
-        row["pole_note"] = new AssetWorkbookFile.Cached("0", CellValues.SharedString);
-        result = await Import(AssetWorkbookFile.Create([(2, row)], sharedStrings: [new string('x', 2001)]));
-        Rejected(result); Error(result, 2, "pole_note", "2000");
-        Rejected(await Import(AssetWorkbookFile.Create([], columns: Enumerable.Range(0, 201).Select(i => "col" + i).ToArray())));
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "CTA-001"), ("note", "Old location")));
+        Committed(await Import(sheet));
+        sheet.Rows.Clear(); sheet.Rows.Add((11, Row(("external_ref", "CTA-001"), ("note", "New location"))));
+        var result = await Import(sheet); Committed(result);
+        var warning = Assert.Single(result.GetProperty("warnings").EnumerateArray());
+        Assert.Equal("Cột điện", warning.GetProperty("sheet").GetString());
+        Assert.Equal(11, warning.GetProperty("row").GetInt32()); Assert.Equal("note", warning.GetProperty("column").GetString());
+        Assert.Contains("Old location", warning.GetProperty("message").GetString());
     }
 
-    private async Task<int[]> Counts() => await fixture.QueryAsync(async db => new[]
+    [Fact]
+    public async Task Required_and_duplicate_headers_are_rejected_and_errors_use_sheet_columns()
     {
-        await db.Set<RoadSegment>().IgnoreQueryFilters().CountAsync(s => s.CommuneId == fixture.CommuneId),
-        await db.Set<ElectricalCabinet>().IgnoreQueryFilters().CountAsync(s => s.CommuneId == fixture.CommuneId),
-        await db.Set<Feeder>().IgnoreQueryFilters().CountAsync(s => s.CommuneId == fixture.CommuneId),
-        await db.Set<Pole>().IgnoreQueryFilters().CountAsync(s => s.CommuneId == fixture.CommuneId),
-        await db.Set<Fixture>().IgnoreQueryFilters().CountAsync(s => s.CommuneId == fixture.CommuneId),
-    });
-
-    private async Task<string[]> Stamps(string tag) => await fixture.QueryAsync(async db =>
-    {
-        var poles = await db.Set<Pole>().IgnoreQueryFilters().Where(p => p.ExternalRef!.StartsWith(tag)).Include(p => p.Fixtures).ToListAsync();
-        var segments = await db.Set<RoadSegment>().IgnoreQueryFilters().Where(s => s.ExternalRef!.StartsWith(tag)).ToListAsync();
-        var cabinets = await db.Set<ElectricalCabinet>().IgnoreQueryFilters().Where(c => c.ExternalRef!.StartsWith(tag)).ToListAsync();
-        var feeders = await db.Set<Feeder>().IgnoreQueryFilters().Where(f => f.ExternalRef!.StartsWith(tag)).ToListAsync();
-        return poles.OrderBy(p => p.ExternalRef).SelectMany(p => new[] { $"{p.PoleId}/{p.UpdatedBy}/{p.UpdatedAt:O}" }
-            .Concat(p.Fixtures.OrderBy(f => f.FixtureId).Select(f => $"{f.FixtureId}/{f.UpdatedBy}/{f.UpdatedAt:O}/{f.LampWatt}")))
-            .Concat(segments.OrderBy(s => s.ExternalRef).Select(s => $"{s.SegmentId}/{s.UpdatedBy}/{s.UpdatedAt:O}"))
-            .Concat(cabinets.OrderBy(c => c.ExternalRef).Select(c => $"{c.CabinetId}/{c.UpdatedBy}/{c.UpdatedAt:O}"))
-            .Concat(feeders.OrderBy(f => f.ExternalRef).Select(f => $"{f.FeederId}/{f.UpdatedBy}/{f.UpdatedAt:O}")).ToArray();
-    });
-
-    private async Task<JsonElement> Import(byte[] bytes)
-    {
-        using var response = await Upload(bytes);
-        var text = await response.Content.ReadAsStringAsync();
-        Assert.True(response.StatusCode == HttpStatusCode.OK, $"{response.StatusCode}: {text}");
-        return JsonDocument.Parse(text).RootElement;
+        var sheet = AssetWorkbookFile.Asset(ImportKind.Cabinets);
+        var result = await Import(sheet with { Columns = ["external_ref", "geom_wkt"] });
+        Rejected(result); Error(result, "Tủ điện", 1, "cabinet_name", "missing");
+        result = await Import(sheet with { Columns = [.. sheet.Columns, "external_ref"] });
+        Rejected(result); Error(result, "Tủ điện", 1, "external_ref", "Duplicate");
     }
-    private async Task<HttpResponseMessage> Upload(byte[] bytes, string name = "inventory.xlsx")
+
+    [Fact]
+    public async Task Shared_strings_numeric_refs_cached_formulas_and_serial_removal_dates_are_values()
     {
-        var client = await fixture.ManagerClientAsync();
-        using var content = new MultipartFormDataContent();
-        content.Add(new ByteArrayContent(bytes), "file", name);
-        return await client.PostAsync("/api/v1/assets/import/workbook", content);
+        var sheets = Full();
+        sheets[3].Rows[0].Cells["external_ref"] = 7;
+        foreach (var row in sheets[4].Rows) row.Cells["pole_external_ref"] = 7;
+        sheets[3].Rows[0].Cells["note"] = new AssetWorkbookFile.Cached("0", CellValues.SharedString);
+        sheets[4].Rows[0].Cells["removed_date"] = new DateTime(2021, 1, 1).ToOADate();
+        sheets[4].Rows[1].Cells["lamp_watt"] = new AssetWorkbookFile.Cached("100.0", CellValues.Number, "50+50");
+        // An unused long shared string from an ignored guide is outside the recognized sheet's cell limits.
+        Committed(await ImportBytes(AssetWorkbookFile.WithSharedStrings(["Near bridge", new string('x', 2001)], sheets)));
+        Assert.True(await Fixture.QueryAsync(db => db.Set<Pole>().IgnoreQueryFilters().AnyAsync(p => p.CommuneId == Commune && p.ExternalRef == "7" && p.Note == "Near bridge")));
+        sheets[3].Rows[0].Cells["note"] = new AssetWorkbookFile.Cached("1", CellValues.SharedString);
+        var before = await Snapshot();
+        var result = await ImportBytes(AssetWorkbookFile.WithSharedStrings(["Near bridge", new string('x', 2001)], sheets));
+        Rejected(result); Error(result, "Cột điện", 2, "note", "2000 characters"); Assert.Equal(before, await Snapshot());
     }
-    private static void Rejected(JsonElement result) => Assert.False(result.GetProperty("committed").GetBoolean());
-    private static void Error(JsonElement result, int row, string column, string message)
-        => Assert.Contains(result.GetProperty("rows").EnumerateArray(), e => e.GetProperty("row").GetInt32() == row
-            && e.GetProperty("column").GetString() == column && e.GetProperty("message").GetString()!.Contains(message, StringComparison.Ordinal));
-    private static string Tag() => "WB" + Guid.NewGuid().ToString("N")[..10];
+
+    [Fact]
+    public async Task Invalid_zip_with_the_xlsx_signature_returns_400()
+    {
+        using var response = await Upload([0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0]);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Zip_expansion_cap_is_checked_before_OpenXml_parsing()
+    {
+        using var stream = new MemoryStream();
+        stream.Write(AssetWorkbookFile.Create(AssetWorkbookFile.Asset(ImportKind.Poles)));
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Update, true))
+        {
+            using var target = zip.CreateEntry("large.txt", CompressionLevel.SmallestSize).Open();
+            var block = new byte[1024 * 1024];
+            for (var i = 0; i < 101; i++) target.Write(block);
+        }
+        using var response = await Upload(stream.ToArray()); Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("100 MB", await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("inventory.xls")]
+    [InlineData("inventory.csv")]
+    [InlineData("inventory.xlsx")]
+    public async Task Unsupported_files_are_415(string name)
+    {
+        using var response = await Upload(Encoding.UTF8.GetBytes("not a workbook"), name: name);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+    }
 }

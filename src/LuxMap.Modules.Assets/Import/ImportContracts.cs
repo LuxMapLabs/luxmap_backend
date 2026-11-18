@@ -97,10 +97,13 @@ public sealed record ImportResult(
 /// <summary>Counts for one distinct asset kind in an atomic workbook import.</summary>
 public sealed record WorkbookKindCounts(int Inserted, int Updated, int Unchanged);
 
+/// <summary>A workbook error identifies both the sheet and its physical Excel row.</summary>
+public sealed record WorkbookRowError(string? Sheet, int Row, string? Column, string Message);
+
 /// <summary>Atomic workbook outcome. Counts and warnings are zero/empty after rollback.</summary>
 public sealed record WorkbookImportResult(
     bool Committed,
     WorkbookKindCounts Segments, WorkbookKindCounts Cabinets, WorkbookKindCounts Feeders,
     WorkbookKindCounts Poles, WorkbookKindCounts Fixtures,
-    int Failed, int TotalErrors, bool Truncated, IReadOnlyList<ImportRowError> Rows,
-    int TotalWarnings, IReadOnlyList<ImportRowError> Warnings);
+    int Failed, int TotalErrors, bool Truncated, IReadOnlyList<WorkbookRowError> Rows,
+    int TotalWarnings, IReadOnlyList<WorkbookRowError> Warnings);
