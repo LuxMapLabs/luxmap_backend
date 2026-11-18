@@ -44,6 +44,7 @@ public static class SwaggerSetup
             options.OperationFilter<ClientSurfaceOperationFilter>();
             options.OperationFilter<AiDetectOperationFilter>();
             options.OperationFilter<IotTelemetryHistoryOperationFilter>();
+            options.SchemaFilter<IotConnectivitySchemaFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than
             // trusting Swashbuckle to infer correctly: getting this wrong makes FM-04 generate

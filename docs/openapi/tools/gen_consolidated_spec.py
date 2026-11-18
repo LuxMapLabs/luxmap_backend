@@ -109,6 +109,12 @@ S = d["components"]["schemas"]
 
 # The bridge DTOs use strings on the wire. Publish their accepted values for client generation.
 iot_values = {
+    ("IotNodeStatus", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
+    ("IotElectricalResult", "electrical_status"): ["fresh", "stale", "no_data"],
+    ("IotDiagnosticResult", "electrical_status"): ["fresh", "stale", "no_data"],
+    ("IotDiagnosticResult", "connection_status"): ["online", "offline", "no_data"],
+    ("IotDiagnosticSummaryItem", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
+    ("IotDiagnosticSummaryItem", "connection_status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotFeederHistoryResult", "time_basis"): ["measured_at", "received_at"],
     ("IotServerStatus", "status"): ["online", "offline", "unconfigured", "broker_down", "unreachable"],
     ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
@@ -377,9 +383,10 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S (18/11/2026)",
     "/api/v1/iot/servers/": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)",
-    "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 (18/11/2026)",
+    "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics/citizen-feedback": "drift ST-13 (SELF-SIGNED, nền tạm tới FW)",

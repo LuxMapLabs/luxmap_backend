@@ -72,6 +72,10 @@ public sealed record IotDiagnosticResult(
     string NodeId, string FeederId, string Status,
     IotMeasurement? Measurement, IReadOnlyList<IotAnomaly> Anomalies)
 {
+    public string ConnectionStatus { get; init; } = "no_data";
+    public string ElectricalStatus { get; init; } = "no_data";
+    public DateTime? LastSeenAt { get; init; }
+    public DateTime? LastCommandAckAt { get; init; }
     public LampCountEstimate? LampCount { get; init; }
     public DateTime? MeasuredAt { get; init; }
     public string? MeasurementKey { get; init; }
@@ -85,13 +89,21 @@ public sealed record IotDiagnosticResult(
 public sealed record IotNodeStatus(
     string NodeId, string? ServerId, string Status, DateTime? LastReceivedAt)
 {
+    public string ElectricalStatus { get; init; } = "no_data";
+    public DateTime? LastSeenAt { get; init; }
+    public DateTime? LastCommandAckAt { get; init; }
     public string? CabinetId { get; init; }
     public string? CommuneId { get; init; }
     public IotLocation? Location { get; init; }
 }
 
 public sealed record IotElectricalResult(
-    string NodeId, string ServerId, string Status, IotMeasurement? Measurement, FeederPowerState PowerState = FeederPowerState.Unknown);
+    string NodeId, string ServerId, string Status, IotMeasurement? Measurement, FeederPowerState PowerState = FeederPowerState.Unknown)
+{
+    public string ElectricalStatus { get; init; } = "no_data";
+    public DateTime? LastSeenAt { get; init; }
+    public DateTime? LastCommandAckAt { get; init; }
+}
 
 public sealed record IotLocation(
     [property: System.Text.Json.Serialization.JsonRequired] double Lat,
@@ -176,6 +188,19 @@ public sealed partial class IotDiagnosticsService(
             }
         }
 
+        var contact = ContactOf(device, measurement, profile, now);
+        if (measurement is not null && contact.ElectricalStatus == "stale" && diagnosis.Status != "stale")
+            diagnosis = diagnosis with
+            {
+                Status = "stale", LampCount = null,
+                Anomalies = [new("telemetry_stale", Math.Max(0, (now - measurement.ReceivedAt).TotalSeconds),
+                    null, null, profile.MaxSilenceSeconds)],
+            };
+        diagnosis = diagnosis with
+        {
+            ConnectionStatus = contact.Status, ElectricalStatus = contact.ElectricalStatus,
+            LastSeenAt = contact.LastSeenAt, LastCommandAckAt = contact.LastCommandAckAt,
+        };
         return codes.Length == 0 ? diagnosis : diagnosis with
         {
             Status = "anomaly",
@@ -624,9 +649,14 @@ public sealed partial class IotDiagnosticsService(
 
         var device = await ReadDeviceAsync(uri, profile.DeviceId, ct);
         var measurement = ReadMeasurement(device);
-        var now = DateTimeOffset.UtcNow;
-        return new(nodeId, id, StatusOf(measurement, profile, now), measurement,
-            PowerStateOf(device, profile.MaxSilenceSeconds, now));
+        var now = clock.GetUtcNow();
+        var contact = ContactOf(device, measurement, profile, now);
+        return new(nodeId, id, contact.Status, measurement,
+            PowerStateOf(device, profile.MaxSilenceSeconds, now))
+        {
+            ElectricalStatus = contact.ElectricalStatus, LastSeenAt = contact.LastSeenAt,
+            LastCommandAckAt = contact.LastCommandAckAt,
+        };
     }
 
     public async Task<PagedResult<IotNodeStatus>> NodesAsync(PageRequest page, CancellationToken ct)
@@ -641,8 +671,8 @@ public sealed partial class IotDiagnosticsService(
         var settings = await registry.ReadAsync(ids, ct);
         var result = ids.Select(id => settings.Nodes.TryGetValue(id, out var profile) &&
             TryServer(settings, profile, out var serverId, out _)
-            ? new IotNodeStatus(id, serverId, "source_unavailable", null)
-            : new IotNodeStatus(id, profile?.ServerId, "unconfigured", null)).ToArray();
+            ? new IotNodeStatus(id, serverId, "source_unavailable", null) { ElectricalStatus = "source_unavailable" }
+            : new IotNodeStatus(id, profile?.ServerId, "unconfigured", null) { ElectricalStatus = "unconfigured" }).ToArray();
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(TimeSpan.FromSeconds(5));
@@ -728,16 +758,22 @@ public sealed partial class IotDiagnosticsService(
     private async Task<IotNodeStatus> NodeStatusAsync(IotOptions settings, string nodeId, CancellationToken ct)
     {
         if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out var id, out var uri))
-            return new(nodeId, profile?.ServerId, "unconfigured", null);
+            return new(nodeId, profile?.ServerId, "unconfigured", null) { ElectricalStatus = "unconfigured" };
 
         try
         {
-            var measurement = await ReadMeasurementAsync(uri, profile.DeviceId, ct);
-            return new(nodeId, id, StatusOf(measurement, profile, DateTimeOffset.UtcNow), measurement?.ReceivedAt);
+            var device = await ReadDeviceAsync(uri, profile.DeviceId, ct);
+            var measurement = ReadMeasurement(device);
+            var contact = ContactOf(device, measurement, profile, clock.GetUtcNow());
+            return new(nodeId, id, contact.Status, measurement?.ReceivedAt)
+            {
+                ElectricalStatus = contact.ElectricalStatus, LastSeenAt = contact.LastSeenAt,
+                LastCommandAckAt = contact.LastCommandAckAt,
+            };
         }
         catch (LuxMapException ex) when (ex.Code == "IOT_SOURCE_UNAVAILABLE")
         {
-            return new(nodeId, id, "source_unavailable", null);
+            return new(nodeId, id, "source_unavailable", null) { ElectricalStatus = "source_unavailable" };
         }
     }
 
@@ -760,13 +796,6 @@ public sealed partial class IotDiagnosticsService(
         return !string.IsNullOrWhiteSpace(profile.DeviceId) && profile.DeviceId is not ("." or "..") &&
             profile.MaxSilenceSeconds > 0 && IotOrigin.TryAllowed(settings, url, out uri);
     }
-
-    private static string StatusOf(IotMeasurement? measurement, NodeProfile profile, DateTimeOffset now)
-        => measurement is null ? "no_data"
-            : now - measurement.ReceivedAt > TimeSpan.FromSeconds(profile.MaxSilenceSeconds) ? "offline" : "online";
-
-    private async Task<IotMeasurement?> ReadMeasurementAsync(Uri baseUri, string deviceId, CancellationToken ct)
-        => ReadMeasurement(await ReadDeviceAsync(baseUri, deviceId, ct));
 
     private async Task<PrototypeDevice?> ReadDeviceAsync(Uri baseUri, string deviceId, CancellationToken ct)
     {
@@ -854,8 +883,11 @@ public sealed partial class IotDiagnosticsService(
         IotDiagnosticResult result, IotMeasurement reading, NodeProfile profile, DateTimeOffset now,
         bool electricalAvailable = true)
     {
-        var silence = (now - reading.ReceivedAt).TotalSeconds;
-        if (silence > profile.MaxSilenceSeconds)
+        var silence = Math.Max(0, (now - reading.ReceivedAt).TotalSeconds);
+        if (result.MeasuredAt is { } measured)
+            silence = Math.Max(silence, (now - measured).TotalSeconds);
+        if (reading.ReceivedAt > now || result.MeasuredAt > now ||
+            silence > profile.MaxSilenceSeconds)
             return result with
             {
                 Status = "stale",
@@ -905,7 +937,7 @@ public sealed partial class IotDiagnosticsService(
     private sealed record PrototypeDevice(
         string? DeviceId, PrototypeReading? LatestTelemetry, PrototypeReading[]? History,
         PrototypeCommand? DesiredCommand, bool CommandAcknowledged, PrototypeAck? LastCommandAck,
-        ReceivedSensorHealth? SensorHealth);
+        ReceivedSensorHealth? SensorHealth, DateTimeOffset? LastSeenAt = null, DateTimeOffset? LastCommandAckAt = null);
     private sealed record PrototypeAck(PrototypeAckData? Data, DateTimeOffset ReceivedAt);
     private sealed record PrototypeAckData(string? LampCommand);
     private static bool TryParseClock(string? value, out TimeOnly time) =>

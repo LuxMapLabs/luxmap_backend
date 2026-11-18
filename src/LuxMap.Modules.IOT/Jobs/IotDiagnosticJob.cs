@@ -112,7 +112,7 @@ public sealed class IotDiagnosticJob(
             foreach (var code in IotDiagnosticRules.Codes)
             {
                 if (!IotDiagnosticRules.TryObservation(result, code, profile, now, out var key)) continue;
-                var active = result.Anomalies.Any(a => a.Code == code);
+                var active = IotDiagnosticRules.IsActive(result, code);
                 if (!evidence.Codes.TryGetValue(code, out var tracked))
                     evidence.Codes[code] = tracked = new();
                 if (!tracked.Observe(key, active, result.MeasurementSequence, now, code, result.LampCount?.EstimatedLit)) continue;
@@ -251,7 +251,7 @@ public sealed class DiagnosticCodeEvidence
 
 public static class IotDiagnosticRules
 {
-    public const string Version = "iot-faults-v1";
+    public const string Version = "iot-faults-v2-contact";
     public static readonly string[] Codes = [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",
@@ -260,6 +260,10 @@ public static class IotDiagnosticRules
         "microsd_unavailable", "microsd_read_failed", "microsd_write_failed",
         "lora_tx_blocked", "lora_rx_frame_error",
     ];
+
+    public static bool IsActive(IotDiagnosticResult result, string code) =>
+        code == "telemetry_stale" ? result.ConnectionStatus == "offline"
+            : result.Anomalies.Any(anomaly => anomaly.Code == code);
 
     public static FaultType TypeOf(string code) => code switch
     {
@@ -276,13 +280,14 @@ public static class IotDiagnosticRules
         key = "";
         if (code == "telemetry_stale")
         {
-            if (result.Measurement is not { } sample) return false;
-            // Keep one key per job pass for silence while recovery needs a fresh report.
-            key = result.Status == "stale" || result.Anomalies.Any(a => a.Code == code)
-                ? $"{result.MeasurementKey}/{now.Ticks}" :
-                result.MeasuredAt is { } recentMeasured && recentMeasured <= now &&
-                now - recentMeasured <= TimeSpan.FromSeconds(profile.MaxSilenceSeconds) ? result.MeasurementKey ?? "" : "";
-            return key.Length > 0;
+            // Missing telemetry alone is not proof that the node is disconnected.
+            // A fresh validated ACK/health report can prove connectivity independently.
+            if (result.LastSeenAt is not { } seen || seen > now ||
+                result.ConnectionStatus is not ("online" or "offline")) return false;
+            var silent = now - seen > TimeSpan.FromSeconds(profile.MaxSilenceSeconds);
+            if (silent != (result.ConnectionStatus == "offline")) return false;
+            key = silent ? $"contact/{seen.Ticks}/{now.Ticks}" : $"contact/{seen.Ticks}";
+            return true;
         }
         if (code.Contains('_') && !code.StartsWith("voltage_") && code != "lamp_count_shortfall")
         {

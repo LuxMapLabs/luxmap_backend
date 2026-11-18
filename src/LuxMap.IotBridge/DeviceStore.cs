@@ -21,6 +21,8 @@ record DeviceState(string DeviceId, LampCommand DesiredCommand, DateTimeOffset? 
     Dictionary<string, List<SequenceRange>>? AcceptedSequences = null, ReceivedCommandAck? LastCommandAck = null,
     ReceivedSensorHealth? SensorHealth = null)
 {
+    public DateTimeOffset? LastSeenAt { get; init; }
+    public DateTimeOffset? LastCommandAckAt { get; init; }
     public bool CommandAcknowledged => DesiredCommand.CommandId is not null &&
         LastCommandAck?.Data.CommandId == DesiredCommand.CommandId;
 }
@@ -28,12 +30,14 @@ record DeviceState(string DeviceId, LampCommand DesiredCommand, DateTimeOffset? 
 sealed class DeviceStore
 {
     private readonly object gate = new();
+    private readonly TimeProvider clock;
     private readonly string path;
     private readonly TelemetryArchive archive;
     private readonly JsonSerializerOptions json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private Dictionary<string, DeviceState> devices;
-    public DeviceStore(IHostEnvironment environment)
+    public DeviceStore(IHostEnvironment environment, TimeProvider? clock = null)
     {
+        this.clock = clock ?? TimeProvider.System;
         var directory = Path.Combine(environment.ContentRootPath, "data");
         Directory.CreateDirectory(directory);
         path = Path.Combine(directory, "devices.json");
@@ -110,7 +114,8 @@ sealed class DeviceStore
                 else merged.Add(range);
             }
             ledger[data.SessionId!] = merged;
-            var reading = archive.Save(data.DeviceId!, new TelemetryReading(data, DateTimeOffset.UtcNow, gatewayId));
+            var now = clock.GetUtcNow();
+            var reading = archive.Save(data.DeviceId!, new TelemetryReading(data, now, gatewayId));
             var latest = state.LatestTelemetry;
             var newer = latest is null || (latest.Data.SessionId == data.SessionId
                 ? sequence > (latest.Data.SequenceNumber ?? 0)
@@ -118,6 +123,7 @@ sealed class DeviceStore
                     string.CompareOrdinal(data.Timestamp, latest.Data.Timestamp) >= 0);
             Commit(state with
             {
+                LastSeenAt = now,
                 LatestTelemetry = newer ? reading : latest,
                 History = state.History.Append(reading).TakeLast(1000).ToList(),
                 AcceptedSequences = ledger
@@ -132,13 +138,18 @@ sealed class DeviceStore
             var state = Get(report.DeviceId!);
             if (state.SensorHealth?.Data is { } previous && previous.SessionId == report.SessionId &&
                 previous.SequenceNumber >= report.SequenceNumber) return;
-            Commit(state with { SensorHealth = new(report, DateTimeOffset.UtcNow) });
+            var now = clock.GetUtcNow();
+            Commit(state with { SensorHealth = new(report, now), LastSeenAt = now });
         }
     }
 
+    private static DateTimeOffset Later(DateTimeOffset? previous, DateTimeOffset current) =>
+        previous is { } last && last > current ? last : current;
+
     public void AcknowledgeCommand(CommandAcknowledgement ack)
     {
-        var receivedAt = DateTimeOffset.UtcNow;
+        var receivedAt = clock.GetUtcNow();
+        var observedAt = receivedAt;
         lock (gate)
         {
             var state = Get(ack.DeviceId!);
@@ -155,7 +166,19 @@ sealed class DeviceStore
                 receivedAt = receipt.Value;
             }
             if (isCurrent && !state.CommandAcknowledged)
-                Commit(state with { LastCommandAck = new(ack, receivedAt) });
+                Commit(state with
+                {
+                    LastCommandAck = new(ack, receivedAt),
+                    LastSeenAt = Later(state.LastSeenAt, receivedAt),
+                    LastCommandAckAt = Later(state.LastCommandAckAt, receivedAt),
+                });
+            else if (!isCurrent && ack.CommandId != "initial-auto" && receivedAt == observedAt)
+                Commit(state with
+                {
+                    LastSeenAt = observedAt, LastCommandAckAt = observedAt,
+                });
+            // A repeated ACK keeps its first receipt time. Gateway retries must not
+            // make a powered-off node look online forever.
         }
     }
 }

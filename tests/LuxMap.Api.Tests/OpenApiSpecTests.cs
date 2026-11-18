@@ -32,6 +32,22 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Iot_contact_and_electrical_statuses_have_separate_schemas_and_timestamps()
+    {
+        foreach (var name in new[] { "IotNodeStatus", "IotElectricalResult", "IotDiagnosticResult", "IotDiagnosticSummaryItem" })
+        {
+            var fields = Schema(name).GetProperty("properties");
+            foreach (var field in new[] { "electrical_status", "last_seen_at", "last_command_ack_at" })
+                Assert.True(fields.TryGetProperty(field, out _));
+            Assert.Contains("fresh", fields.GetProperty("electrical_status").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+            Assert.Contains("stale", fields.GetProperty("electrical_status").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+            var contact = name is "IotNodeStatus" or "IotElectricalResult" ? "status" : "connection_status";
+            Assert.Contains("online", fields.GetProperty(contact).GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+            Assert.Contains("offline", fields.GetProperty(contact).GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
+        }
+    }
+
+    [Fact]
     public void Feeder_history_has_two_averaged_time_bases_and_no_public_node_history()
     {
         var paths = Spec.GetProperty("paths");

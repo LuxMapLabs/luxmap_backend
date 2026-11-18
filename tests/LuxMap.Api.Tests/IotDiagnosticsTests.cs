@@ -449,7 +449,11 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             bridge.DiagnosticDevice = DiagnosticTelemetry(Window(47.5, 12, 43.75), skipSequence: 12);
             await AssertStatusAsync("insufficient_samples", 13);
             bridge.DiagnosticDevice = DiagnosticTelemetry(Window(47.5, 12, 43.75), oldRtc: true);
-            await AssertStatusAsync("insufficient_samples", 0);
+            var replayed = await client.GetFromJsonAsync<JsonElement>(diagnoses);
+            Assert.Equal("stale", replayed.GetProperty("electrical_status").GetString());
+            Assert.Equal("online", replayed.GetProperty("connection_status").GetString());
+            Assert.Equal(JsonValueKind.Null, replayed.GetProperty("lamp_count").ValueKind);
+            await AssertSingleAlertAsync("telemetry_stale");
 
             bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), voltage: 0.04);
             await AssertSingleAlertAsync("voltage_loss");
@@ -964,6 +968,102 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }, bridge);
     }
 
+    [Fact]
+    public Task Node_contact_and_electrical_freshness_are_independent_and_ack_expires()
+    {
+        var bridge = new ReportedPowerBridge();
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        return WithSharedCabinetAsync(async (client, rig, _) =>
+        {
+            Assert.Equal(HttpStatusCode.NoContent,
+                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+            var now = time.GetUtcNow();
+            var old = now.AddMinutes(-5);
+            object Reading(DateTimeOffset received, DateTimeOffset measured) => new
+            {
+                receivedAt = received,
+                data = new
+                {
+                    timestamp = measured.ToOffset(TimeSpan.FromHours(7)).ToString("yyyy-MM-ddTHH:mm:ss"),
+                    voltage = 5, current = 100, power = 500, lampCommand = "ON",
+                    sessionId = "session", sequenceNumber = 1,
+                },
+            };
+            object Ack(DateTimeOffset at) => new
+            {
+                receivedAt = at, data = new { lampCommand = "OFF", commandId = Guid.NewGuid().ToString("N") },
+            };
+            async Task<JsonElement> Node()
+            {
+                for (var page = 1; ; page++)
+                {
+                    var result = await client.GetFromJsonAsync<JsonElement>($"/api/v1/iot/nodes?page={page}&page_size=200");
+                    foreach (var item in result.GetProperty("items").EnumerateArray())
+                        if (item.GetProperty("node_id").GetString() == rig.First) return item;
+                    Assert.True(page * 200 < result.GetProperty("total").GetInt32(), "Registered node missing from its commune.");
+                }
+            }
+            var url = $"/api/v1/iot/nodes/{rig.First}";
+            // Legacy Bridge has no lastSeenAt field: a fresh ACK still proves contact.
+            bridge.DiagnosticDevice = new { deviceId = "probe", latestTelemetry = Reading(old, old), lastCommandAck = Ack(now) };
+            var node = await Node();
+            Assert.Equal("online", node.GetProperty("status").GetString());
+            Assert.Equal("stale", node.GetProperty("electrical_status").GetString());
+            Assert.Equal(now.UtcDateTime, node.GetProperty("last_seen_at").GetDateTime());
+            Assert.Equal(now.UtcDateTime, node.GetProperty("last_command_ack_at").GetDateTime());
+            Assert.Equal(old.UtcDateTime, node.GetProperty("last_received_at").GetDateTime());
+            var electrical = await client.GetFromJsonAsync<JsonElement>($"{url}/electrical");
+            Assert.Equal("online", electrical.GetProperty("status").GetString());
+            Assert.Equal("stale", electrical.GetProperty("electrical_status").GetString());
+            Assert.Equal("off", electrical.GetProperty("power_state").GetString());
+            var diagnosis = await client.GetFromJsonAsync<JsonElement>($"{url}/diagnostics");
+            Assert.Equal("online", diagnosis.GetProperty("connection_status").GetString());
+            Assert.Equal("stale", diagnosis.GetProperty("electrical_status").GetString());
+            Assert.Contains(diagnosis.GetProperty("anomalies").EnumerateArray(), item => item.GetProperty("code").GetString() == "telemetry_stale");
+
+            time.Advance(TimeSpan.FromSeconds(60));
+            Assert.Equal("online", (await Node()).GetProperty("status").GetString());
+            time.Advance(TimeSpan.FromSeconds(1));
+            Assert.Equal("offline", (await Node()).GetProperty("status").GetString());
+
+            now = time.GetUtcNow();
+            bridge.DiagnosticDevice = new { deviceId = "probe", lastCommandAck = Ack(now) };
+            Assert.Equal("online", (await Node()).GetProperty("status").GetString());
+            Assert.Equal("no_data", (await Node()).GetProperty("electrical_status").GetString());
+            electrical = await client.GetFromJsonAsync<JsonElement>($"{url}/electrical");
+            Assert.Equal(JsonValueKind.Null, electrical.GetProperty("measurement").ValueKind);
+
+            // A fresh packet carrying an old RTC sample proves contact, not fresh electricity.
+            bridge.DiagnosticDevice = new { deviceId = "probe", latestTelemetry = Reading(now, old) };
+            Assert.Equal("online", (await Node()).GetProperty("status").GetString());
+            Assert.Equal("stale", (await Node()).GetProperty("electrical_status").GetString());
+            bridge.DiagnosticDevice = new { deviceId = "probe", latestTelemetry = Reading(now, now) };
+            Assert.Equal("fresh", (await Node()).GetProperty("electrical_status").GetString());
+
+            // New Bridge records contact while replay leaves latestTelemetry untouched.
+            bridge.DiagnosticDevice = new { deviceId = "probe", latestTelemetry = Reading(old, old), lastSeenAt = now };
+            Assert.Equal("online", (await Node()).GetProperty("status").GetString());
+            Assert.Equal("stale", (await Node()).GetProperty("electrical_status").GetString());
+
+            bridge.DiagnosticDevice = new
+            {
+                deviceId = "probe", sensorHealth = new
+                {
+                    receivedAt = now,
+                    data = new { deviceId = "probe", sessionId = "session", sequenceNumber = 1,
+                        firmwareVersion = "firmware-v1", codes = new[] { "ina226_unavailable" } },
+                },
+            };
+            Assert.Equal("online", (await Node()).GetProperty("status").GetString());
+            Assert.Equal("no_data", (await Node()).GetProperty("electrical_status").GetString());
+
+            bridge.DiagnosticDevice = new { deviceId = "probe", lastSeenAt = now.AddHours(1), lastCommandAck = Ack(now.AddHours(1)) };
+            Assert.Equal("no_data", (await Node()).GetProperty("status").GetString());
+            bridge.DiagnosticDevice = new { deviceId = "probe" };
+            Assert.Equal("no_data", (await Node()).GetProperty("status").GetString());
+        }, bridge, time);
+    }
+
     private sealed record SharedCabinet(string Cabinet, string Feeder, string OtherFeeder, string Pole, string First, string Second, string Server);
 
     private static object SourceBody(SharedCabinet rig, string? feeder = null, string device = "probe") => new
@@ -999,7 +1099,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     private async Task WithSharedCabinetAsync(
-        Func<HttpClient, SharedCabinet, IServiceProvider, Task> check, ReportedPowerBridge? bridge = null)
+        Func<HttpClient, SharedCabinet, IServiceProvider, Task> check, ReportedPowerBridge? bridge = null, TimeProvider? clock = null)
     {
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
@@ -1007,8 +1107,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
             builder.UseSetting("IotDiagnostics:AllowedOrigins:1", "https://alternate.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
-            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
-                .ConfigurePrimaryHttpMessageHandler(() => bridge ?? new ReportedPowerBridge()));
+            builder.ConfigureServices(services =>
+            {
+                if (clock is not null) services.AddSingleton<TimeProvider>(clock);
+                services.AddHttpClient<IotDiagnosticsService>()
+                    .ConfigurePrimaryHttpMessageHandler(() => bridge ?? new ReportedPowerBridge());
+            });
         });
         using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
         using var managerToken = await fixture.ManagerClientAsync();

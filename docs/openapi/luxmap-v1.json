@@ -21444,6 +21444,36 @@
               "$ref": "#/components/schemas/IotAnomaly"
             }
           },
+          "connection_status": {
+            "enum": [
+              "online",
+              "offline",
+              "no_data"
+            ],
+            "type": "string",
+            "description": "Trạng thái liên lạc node, độc lập diagnostic status và electrical_status."
+          },
+          "electrical_status": {
+            "enum": [
+              "fresh",
+              "stale",
+              "no_data"
+            ],
+            "type": "string",
+            "description": "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "UTC lần liên lạc node đã xác thực gần nhất: mẫu đo, ACK mới hoặc báo cáo phần cứng.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_command_ack_at": {
+            "type": "string",
+            "description": "UTC ACK lệnh hợp lệ gần nhất. ACK lặp giữ thời điểm nhận lần đầu.",
+            "format": "date-time",
+            "nullable": true
+          },
           "lamp_count": {
             "$ref": "#/components/schemas/LampCountEstimate"
           },
@@ -21520,6 +21550,40 @@
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time",
             "nullable": true
+          },
+          "connection_status": {
+            "enum": [
+              "online",
+              "offline",
+              "no_data",
+              "unconfigured",
+              "source_unavailable"
+            ],
+            "type": "string",
+            "description": "Trạng thái liên lạc node, độc lập diagnostic status và electrical_status."
+          },
+          "electrical_status": {
+            "enum": [
+              "fresh",
+              "stale",
+              "no_data",
+              "unconfigured",
+              "source_unavailable"
+            ],
+            "type": "string",
+            "description": "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "UTC lần liên lạc node đã xác thực gần nhất: mẫu đo, ACK mới hoặc báo cáo phần cứng.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_command_ack_at": {
+            "type": "string",
+            "description": "UTC ACK lệnh hợp lệ gần nhất. ACK lặp giữ thời điểm nhận lần đầu.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -21558,13 +21622,40 @@
             "type": "string"
           },
           "status": {
-            "type": "string"
+            "enum": [
+              "online",
+              "offline",
+              "no_data"
+            ],
+            "type": "string",
+            "description": "Trạng thái liên lạc node. online không đảm bảo mẫu điện còn mới."
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
           },
           "power_state": {
             "$ref": "#/components/schemas/FeederPowerState"
+          },
+          "electrical_status": {
+            "enum": [
+              "fresh",
+              "stale",
+              "no_data"
+            ],
+            "type": "string",
+            "description": "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "UTC lần liên lạc node đã xác thực gần nhất: mẫu đo, ACK mới hoặc báo cáo phần cứng.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_command_ack_at": {
+            "type": "string",
+            "description": "UTC ACK lệnh hợp lệ gần nhất. ACK lặp giữ thời điểm nhận lần đầu.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -21992,11 +22083,42 @@
             "nullable": true
           },
           "status": {
-            "type": "string"
+            "enum": [
+              "online",
+              "offline",
+              "no_data",
+              "unconfigured",
+              "source_unavailable"
+            ],
+            "type": "string",
+            "description": "Trạng thái liên lạc node. online không đảm bảo mẫu điện còn mới."
           },
           "last_received_at": {
             "type": "string",
-            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "description": "UTC nhận mẫu điện latestTelemetry, giữ nghĩa cũ; không phải thời điểm ACK.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "electrical_status": {
+            "enum": [
+              "fresh",
+              "stale",
+              "no_data",
+              "unconfigured",
+              "source_unavailable"
+            ],
+            "type": "string",
+            "description": "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo."
+          },
+          "last_seen_at": {
+            "type": "string",
+            "description": "UTC lần liên lạc node đã xác thực gần nhất: mẫu đo, ACK mới hoặc báo cáo phần cứng.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "last_command_ack_at": {
+            "type": "string",
+            "description": "UTC ACK lệnh hợp lệ gần nhất. ACK lặp giữ thời điểm nhận lần đầu.",
             "format": "date-time",
             "nullable": true
           },
