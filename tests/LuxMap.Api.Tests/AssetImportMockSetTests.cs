@@ -193,7 +193,7 @@ public sealed class AssetImportMockSetTests(AssetImportFixture fixture, ITestOut
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
     }
 
-    private static string RepositoryRoot()
+    internal static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "mocks")))

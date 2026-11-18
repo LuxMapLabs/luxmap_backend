@@ -1,1 +1,1 @@
-pole_external_ref,fixture_type,power_source,lamp_watt,install_date,removed_date,warranty_expiry,data_source
+pole_external_ref,fixture_type,power_source,lamp_watt,lamp_count,install_date,removed_date,warranty_expiry,data_source,note

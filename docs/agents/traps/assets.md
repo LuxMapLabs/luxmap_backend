@@ -529,3 +529,16 @@ không kéo summary vào PoleProperties/bundle. Cha còn ảnh ẩn vẫn 409 AS
 Khoá `(uploaded_by, client_op_id)` là toàn bảng của từng loại ảnh. Sau lỗi unique operation phải rollback
 trước lookup có scope; row cũ nay ngoài scope vẫn là 409 IDEMPOTENCY_CONFLICT, không truy vấn bỏ scope
 và không để lỗi thành 500. Snapshot audit trước/sau ẩn giữ cả cha, xã và nguồn ảnh, không chỉ cặp deleted.
+
+## ASSET-IMPORT-WORKBOOK — một sheet Excel đi qua planner của năm lớp (18/11/2026, drift WB-1…WB-6)
+
+- **Workbook không có validator riêng**: `WorkbookImportRow` dịch tên cột nội bộ của planner (`external_ref`, `geom_wkt`,
+  `note`…) sang tên cột sheet qua `ColumnName`. Planner đọc thêm một cột mới → **phải** khai ánh xạ ở đó. Cột không có
+  bản tương ứng trong sheet phải ánh xạ ra `null` (đọc là trống), **không** sang cột hàng xóm: từng ánh xạ `geom_wkt` của
+  mạch sang `pole_lat` làm mọi dòng có GPS cột + `feeder_ref` lỗi "Expected a LineString" (bắt được ở test PostGIS, không ở build).
+- **All-or-nothing có `SaveChanges` giữa các lớp** (để lớp sau resolve ID vừa sinh), nên "chưa ghi" chỉ đúng vì rollback ở
+  cuối. Bỏ rollback thì build và nhiều test vẫn xanh trên đường đúng — test `Last_row_failure_rolls_back…` là chốt.
+- **Chốt dung lượng giải nén** (`WorkbookDocument.MaxUncompressedBytes`, tổng kích thước khai báo của entry zip) đứng **trước**
+  OpenXml: `OpenXmlReader.GetText` nạp nguyên text node trước khi kiểm được độ dài ô.
+- Template `docs/templates/assets-workbook*.xlsx` sinh bằng `scripts/make_asset_workbook_template.py`; test
+  `Committed_templates_parse…` nạp chính file đã commit — đổi cột / enum thì sinh lại template cùng PR.
