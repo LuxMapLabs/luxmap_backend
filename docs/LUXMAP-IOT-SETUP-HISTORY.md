@@ -140,76 +140,30 @@ API đọc audit từ database LuxMap, mỗi yêu cầu gửi lệnh qua Bridge 
 
 `status` là `success` nếu Bridge nhận ACK hợp lệ trong 12 giây tính từ `requested_at`, `pending` khi còn chờ ACK hoặc `expired` khi hết thời gian chờ. ACK muộn vẫn có trạng thái `expired`.
 
-## 5. API lịch sử dữ liệu điện
+## 5. API lịch sử dữ liệu điện theo feeder
 
-**[GET /api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&sort_by=measured_at](https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&sort_by=measured_at)** · quyền `ReadNetwork`
+Theo giờ đo:
 
-API đọc các mẫu SQLite đã ghi cho feeder qua các lần gắn node. Gọi `GET /api/v1/iot/feeders/FDR-009/electrical` để xem mẫu cuối. Dùng `sort_by` để chọn thứ tự mới nhất trước.
-
-| `sort_by` | Dựa vào | Khi dùng |
-|---|---|---|
-| `measured_at` | `items[].reading.data.timestamp`, giờ đo trên node | Vẽ biểu đồ theo lúc đo, kể cả mẫu gửi bù. Mẫu thiếu giờ đo nằm cuối. |
-| `received_at` | `items[].reading.received_at`, giờ UTC Bridge nhận mẫu | Xem mẫu vừa tới Bridge. Đây là mặc định khi bỏ `sort_by`. |
-
-```json
-{
-  "page": 1,
-  "page_size": 20,
-  "total": 2,
-  "items": [
-    {
-      "cursor": 125,
-      "node_id": "NODE-004",
-      "server_id": "iot-server-01",
-      "reading": {
-        "data": {
-          "timestamp": "2026-11-15T15:00:10",
-          "session_id": "a1b2c3d4",
-          "sequence_number": 42,
-          "mode": "MANUAL",
-          "lamp_command": "ON",
-          "lux": 27.5,
-          "voltage": 5,
-          "current": 102.5,
-          "power": 512.5
-        },
-        "received_at": "2026-11-15T08:00:12Z",
-        "gateway_id": "LUXMAP-GW001"
-      }
-    },
-    {
-      "cursor": 126,
-      "node_id": "NODE-004",
-      "server_id": "iot-server-01",
-      "reading": {
-        "data": {
-          "timestamp": "2026-11-15T15:00:00",
-          "session_id": "a1b2c3d4",
-          "sequence_number": 41,
-          "mode": "MANUAL",
-          "lamp_command": "ON",
-          "lux": 27.5,
-          "voltage": 5,
-          "current": 100,
-          "power": 500
-        },
-        "received_at": "2026-11-15T08:00:15Z",
-        "gateway_id": "LUXMAP-GW001"
-      }
-    }
-  ]
-}
+```http
+GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&from=2026-11-18T07:00:00Z&to=2026-11-18T08:00:00Z
 ```
 
-Mẫu đo lúc **15:00:10** đứng đầu khi dùng `measured_at`. Đổi sang `received_at`, mẫu Bridge nhận lúc **08:00:15 UTC** đứng đầu. Đồng hồ DS3231 trên node lưu giờ địa phương, nên `timestamp` trong API không có hậu tố múi giờ. `voltage` tính bằng V, `current` bằng mA, `power` bằng mW và `lux` bằng lx. `cursor` là ID bản ghi trong kho mẫu Bridge.
+Theo giờ Bridge nhận:
 
-Các tích hợp đồng bộ theo node có thể dùng `GET /api/v1/iot/nodes/{nodeId}/electrical/history` với `?after=0&limit=100` và đọc `next_cursor`, `has_more`. Dùng riêng bộ tham số đó. Trộn với `page`, `page_size` hoặc `sort_by` trả `400`.
+```http
+GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history/received?page=1&page_size=20&from=2026-11-18T07:00:00Z&to=2026-11-18T08:00:00Z
+```
 
-## 6. Phân trang và đọc lỗi
+Cả hai ReadNetwork, scope xã của feeder, mới nhất trước. Mỗi dòng trung bình 30 giây;
+total đếm khoảng có mẫu sau lọc; page_size mặc định 20, tối đa 200.
+API lịch sử theo node đã bỏ. sort_by/after/limit không dùng ở lịch sử công khai nữa.
+Lịch sử lệnh ở mục 4 vẫn theo node, không đổi.
 
-- Cả hai API lịch sử mặc định `page=1`, `page_size=50`, tối đa 200 mục mỗi trang. `total` là tổng bản ghi của node. `items` là dữ liệu của trang hiện tại.
-- Giữ nguyên `page_size` và `sort_by` khi chuyển trang. Tăng `page` nếu `page × page_size < total`. Khi đổi kiểu sắp xếp, quay về trang 1.
-- `200` với `items: []` là trang rỗng. `401` cần kiểm tra token. `403` cần kiểm tra quyền. `404` có thể do ID sai hoặc node nằm ngoài phạm vi xã/phường.
-- Lịch sử điện trả `503` nếu nguồn đo chưa được gán hoặc backend không đọc được Bridge. Deploy cả backend và IoT Bridge có API phân trang để dùng `page` và `sort_by` trên VPS.
+Xem [JSON, quy tắc trung bình, múi giờ, gửi bù và phân trang](IOT-ELECTRICAL-HISTORY.md).
 
-Xem thêm [tài liệu tích hợp FE](LUXMAP-IOT-FE.md) và [cấu hình IoT Bridge trên VPS](deploy/vps.md#10-iot-bridge--mqtt-tls-cho-testbed-iot-bridge-vps-14112026).
+## 6. Đọc lỗi và triển khai
+
+400 khi from/to không hợp lệ, 401 khi thiếu token, 403 khi thiếu quyền,
+404 khi feeder không thấy trong phạm vi xã, 503 khi Bridge không đọc được.
+Feeder chưa có nguồn trả total=0, items=[].
+Deploy đồng thời BE và Bridge; giữ volume data/telemetry.sqlite.

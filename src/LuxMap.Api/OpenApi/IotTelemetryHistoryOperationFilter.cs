@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 using LuxMap.Modules.IOT;
-using LuxMap.Shared.Contracts.Paging;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -11,34 +10,31 @@ public sealed class IotTelemetryHistoryOperationFilter : IOperationFilter
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
         if (context.MethodInfo.DeclaringType != typeof(IotDiagnosticsController) ||
-            context.MethodInfo.Name != nameof(IotDiagnosticsController.TelemetryHistoryAsync)) return;
+            context.MethodInfo.Name is not (nameof(IotDiagnosticsController.FeederMeasuredHistoryAsync)
+                or nameof(IotDiagnosticsController.FeederReceivedHistoryAsync))) return;
 
-        if (operation.Parameters?.SingleOrDefault(parameter => parameter.Name == "sort_by") is OpenApiParameter sortBy)
+        operation.Extensions ??= new Dictionary<string, IOpenApiExtension>();
+        operation.Extensions["x-luxmap-contract"] = new JsonNodeExtension(JsonValue.Create("drift IOT-HISTORY-30S (18/11/2026)"));
+        if (context.SchemaRepository.Schemas.TryGetValue(nameof(IotFeederHistoryResult), out var result) &&
+            result.Properties is { } fields && fields.TryGetValue("time_basis", out var field) && field is OpenApiSchema basis)
+            basis.Enum = [JsonValue.Create("measured_at")!, JsonValue.Create("received_at")!];
+
+        foreach (var parameter in operation.Parameters?.OfType<OpenApiParameter>() ?? [])
         {
-            sortBy.Schema = new OpenApiSchema
+            if (parameter.Name is "page" or "page_size")
             {
-                Type = JsonSchemaType.String,
-                Enum = [JsonValue.Create("received_at")!, JsonValue.Create("measured_at")!],
-                Description = "Mặc định received_at khi đọc theo trang.",
-            };
-        }
-        operation.Responses!["200"] = new OpenApiResponse
-        {
-            Description = "Trang kết quả mặc định. Khi truyền after hoặc limit, trả lịch sử theo cursor.",
-            Content = new Dictionary<string, OpenApiMediaType>
-            {
-                ["application/json"] = new()
+                parameter.Schema = new OpenApiSchema
                 {
-                    Schema = new OpenApiSchema
-                    {
-                        OneOf =
-                        [
-                            context.SchemaGenerator.GenerateSchema(typeof(PagedResult<IotArchivedSample>), context.SchemaRepository),
-                            context.SchemaGenerator.GenerateSchema(typeof(IotTelemetryPage), context.SchemaRepository),
-                        ],
-                    },
-                },
-            },
-        };
+                    Type = JsonSchemaType.Integer, Format = "int32", Minimum = "1",
+                    Maximum = parameter.Name == "page_size" ? "200" : null,
+                    Default = JsonValue.Create(parameter.Name == "page_size" ? 20 : 1),
+                };
+                parameter.Description = "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.";
+            }
+            if (parameter.Name is "from" or "to")
+                parameter.Description = parameter.Name == "from"
+                    ? "ISO 8601 UTC, bao gồm thời điểm này; lọc mẫu trước khi tính trung bình."
+                    : "ISO 8601 UTC, loại trừ thời điểm này; phải lớn hơn from.";
+        }
     }
 }

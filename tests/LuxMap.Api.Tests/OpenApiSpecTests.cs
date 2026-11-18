@@ -32,6 +32,34 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Feeder_history_has_two_averaged_time_bases_and_no_public_node_history()
+    {
+        var paths = Spec.GetProperty("paths");
+        Assert.False(paths.TryGetProperty("/api/v1/iot/nodes/{nodeId}/electrical/history", out _));
+        foreach (var suffix in new[] { "", "/received" })
+        {
+            var get = paths.GetProperty("/api/v1/iot/feeders/{feederId}/electrical/history" + suffix).GetProperty("get");
+            var names = get.GetProperty("parameters").EnumerateArray().Select(parameter => parameter.GetProperty("name").GetString()).ToArray();
+            Assert.Contains("from", names); Assert.Contains("to", names);
+            Assert.Contains("page", names); Assert.Contains("page_size", names);
+            Assert.DoesNotContain("sort_by", names); Assert.DoesNotContain("after", names);
+            var pageSize = Assert.Single(get.GetProperty("parameters").EnumerateArray(),
+                parameter => parameter.GetProperty("name").GetString() == "page_size").GetProperty("schema");
+            Assert.Equal(20, pageSize.GetProperty("default").GetInt32());
+            Assert.Equal(200, pageSize.GetProperty("maximum").GetInt32());
+            Assert.True(get.TryGetProperty("x-luxmap-contract", out _));
+            foreach (var code in new[] { "200", "400", "404", "503" })
+                Assert.True(get.GetProperty("responses").TryGetProperty(code, out _));
+        }
+        var fields = Schema("IotFeederAverage").GetProperty("properties");
+        foreach (var name in new[] { "period_start", "period_end", "sample_count", "voltage_avg", "current_ma_avg", "power_mw_avg", "is_complete" })
+            Assert.True(fields.TryGetProperty(name, out _));
+        Assert.Equal(new[] { "measured_at", "received_at" },
+            Schema("IotFeederHistoryResult").GetProperty("properties").GetProperty("time_basis").GetProperty("enum")
+                .EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
     public void Evidence_has_an_optional_nullable_pole_and_a_query_filter_but_fault_upload_does_not()
     {
         var path = Spec.GetProperty("paths").GetProperty("/api/v1/work-orders/{id}/evidence");

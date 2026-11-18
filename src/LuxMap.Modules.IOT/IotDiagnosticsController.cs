@@ -297,31 +297,6 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromQuery(Name = "page")] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null)
         => diagnostics.CommandHistoryAsync(nodeId, PageRequest.Create(page, pageSize), ct);
 
-    /// <summary>Đọc lịch sử điện mới nhất trước theo received_at hoặc measured_at.</summary>
-    /// <remarks>Dùng page và page_size cho lịch sử. Hệ thống đồng bộ theo cursor có thể tiếp tục dùng after và limit.</remarks>
-    [HttpGet("nodes/{nodeId}/electrical/history")]
-    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<PagedResult<IotArchivedSample>>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> TelemetryHistoryAsync(string nodeId, CancellationToken ct,
-        [FromQuery] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null,
-        [FromQuery(Name = "sort_by")] string? sortBy = null,
-        [FromQuery] long? after = null, [FromQuery] int? limit = null)
-    {
-        if (after.HasValue || limit.HasValue)
-        {
-            if (page.HasValue || pageSize.HasValue || sortBy is not null)
-                throw Invalid("Dùng page, page_size và sort_by hoặc after và limit.");
-
-            return Ok(await diagnostics.TelemetryHistoryAsync(nodeId, after ?? 0, limit ?? 100, ct));
-        }
-
-        return Ok(await diagnostics.TelemetryHistoryPageAsync(nodeId, PageRequest.Create(page, pageSize),
-            sortBy ?? "received_at", ct));
-    }
-
     [HttpGet("nodes/{nodeId}/electrical")]
     [ProducesResponseType<IotElectricalResult>(StatusCodes.Status200OK)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
@@ -340,17 +315,31 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotFeederElectricalResult> FeederElectricalAsync(string feederId, CancellationToken ct)
         => diagnostics.FeederElectricalAsync(feederId, ct);
 
-    /// <summary>Lịch sử điện của feeder qua các lần gắn và thay node.</summary>
+    /// <summary>Lịch sử điện trung bình 30 giây theo giờ đo DS3231, mới nhất trước.</summary>
     [HttpGet("feeders/{feederId}/electrical/history")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<PagedResult<IotFeederArchivedSample>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<IotFeederHistoryResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public Task<PagedResult<IotFeederArchivedSample>> FeederTelemetryHistoryAsync(string feederId, CancellationToken ct,
+    public Task<IotFeederHistoryResult> FeederMeasuredHistoryAsync(string feederId, CancellationToken ct,
         [FromQuery] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null,
-        [FromQuery(Name = "sort_by")] string sortBy = "received_at")
-        => diagnostics.FeederTelemetryHistoryAsync(feederId, PageRequest.Create(page, pageSize), sortBy, ct);
+        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
+        => diagnostics.FeederAveragedHistoryAsync(feederId, PageRequest.Create(page, pageSize ?? 20),
+            "measured_at", from, to, ct);
+
+    /// <summary>Lịch sử điện trung bình 30 giây theo giờ server nhận, mới nhất trước.</summary>
+    [HttpGet("feeders/{feederId}/electrical/history/received")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<IotFeederHistoryResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IotFeederHistoryResult> FeederReceivedHistoryAsync(string feederId, CancellationToken ct,
+        [FromQuery] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null,
+        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
+        => diagnostics.FeederAveragedHistoryAsync(feederId, PageRequest.Create(page, pageSize ?? 20),
+            "received_at", from, to, ct);
 
     [HttpGet("nodes")]
     [ProducesResponseType<PagedResult<IotNodeStatus>>(StatusCodes.Status200OK)]

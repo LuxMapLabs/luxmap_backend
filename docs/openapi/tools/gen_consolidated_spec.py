@@ -109,6 +109,7 @@ S = d["components"]["schemas"]
 
 # The bridge DTOs use strings on the wire. Publish their accepted values for client generation.
 iot_values = {
+    ("IotFeederHistoryResult", "time_basis"): ["measured_at", "received_at"],
     ("IotServerStatus", "status"): ["online", "offline", "unconfigured", "broker_down", "unreachable"],
     ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
@@ -376,6 +377,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S (18/11/2026)",
     "/api/v1/iot/servers/": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
@@ -403,7 +405,8 @@ SECTION = {
 
 SUMMARY.update({
     ("get", "/api/v1/iot/feeders/{feederId}/electrical"): "Đọc mẫu điện mới nhất của mạch",
-    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Đọc lịch sử điện theo mạch qua các lần thay node",
+    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Trung bình điện 30 giây theo giờ đo DS3231, lọc thời gian và phân trang",
+    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history/received"): "Trung bình điện 30 giây theo giờ Bridge nhận, lọc thời gian và phân trang",
     ("post", "/api/v1/iot/nodes"): "Đăng ký node, nguồn đo và tuyến MQTT trong một lần",
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
@@ -420,7 +423,6 @@ SUMMARY.update({
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",
     ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
-    ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện của node theo trang hoặc cursor",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/diagnostics/summary"): "Chẩn đoán tổng hợp theo trang, job lưu DB và phạm vi xã",
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
