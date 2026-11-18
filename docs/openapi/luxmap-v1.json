@@ -1280,6 +1280,120 @@
         "x-luxmap-client": "web"
       }
     },
+    "/api/v1/assets/import/workbook": {
+      "post": {
+        "tags": [
+          "AssetImport"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbookImportResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbookImportResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkbookImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/assets/import/{kind}": {
       "post": {
         "tags": [
@@ -26834,6 +26948,75 @@
             "items": {
               "$ref": "#/components/schemas/WorkOrderStatusRow"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbookImportResult": {
+        "type": "object",
+        "properties": {
+          "committed": {
+            "type": "boolean"
+          },
+          "segments": {
+            "$ref": "#/components/schemas/WorkbookKindCounts"
+          },
+          "cabinets": {
+            "$ref": "#/components/schemas/WorkbookKindCounts"
+          },
+          "feeders": {
+            "$ref": "#/components/schemas/WorkbookKindCounts"
+          },
+          "poles": {
+            "$ref": "#/components/schemas/WorkbookKindCounts"
+          },
+          "fixtures": {
+            "$ref": "#/components/schemas/WorkbookKindCounts"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total_errors": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowError"
+            }
+          },
+          "total_warnings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportRowError"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbookKindCounts": {
+        "type": "object",
+        "properties": {
+          "inserted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false

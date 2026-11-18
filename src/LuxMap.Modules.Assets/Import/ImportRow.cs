@@ -19,6 +19,11 @@ internal interface IImportRow
     /// <summary>Line number for CSV, 1-based feature index for GeoJSON. Both point a person at the file.</summary>
     int Row { get; }
 
+    string? ColumnName(string? column) => column;
+    bool ReferenceFailed(string column) => false;
+    string? ReferenceCommune => null;
+    bool HasErrors => false;
+
     string? this[string column] { get; }
 
     /// <summary>
@@ -115,12 +120,14 @@ internal sealed class ImportRowReader(IImportRow row, List<ImportRowError> error
     public IImportRow Row => row;
 
     /// <summary>True while this row has produced no error — i.e. it is still eligible to be written.</summary>
-    public bool IsValid { get; private set; } = true;
+    public bool IsValid { get; private set; } = !row.HasErrors;
+
+    public void Invalidate() => IsValid = false;
 
     public void Fail(string? column, string message)
     {
         IsValid = false;
-        errors.Add(new ImportRowError(row.Row, column, message));
+        errors.Add(new ImportRowError(row.Row, row.ColumnName(column), message));
     }
 
     public string? Optional(string column) => row[column];
