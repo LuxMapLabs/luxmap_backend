@@ -41,6 +41,16 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>ASSET-EXPORT-WORKBOOK — xuất kiểm kê Excel · 18/11/2026</strong>
+    <p><span class="tag t-next">Chờ PR vào dev (sau #271)</span>
+    <code>GET /api/v1/assets/export/workbook</code> (ReadNetwork, lọc xã, quá 5000 cột → 413), đúng 26 cột của template import,
+    một danh sách cột dùng chung; cột / mạch thiếu mã ra sheet <code>Không xuất</code>. WB-7…WB-11 SELF-SIGNED.</p>
+    <p>Kèm sửa lỗi của #271 (đã ở dev): nạp lại workbook xoá lộ trình mạch đã vẽ — nay giữ (WB-5). Xuất → nạp lại nguyên file = mọi lớp
+    <code>unchanged</code>, dấu cập nhật không đổi. Phá thử làm tròn toạ độ / bỏ sheet <code>Không xuất</code> / xoá lộ trình mạch
+    đều đỏ đúng. Còn: báo WP5 (nút tải); giới hạn WB-11 (một <code>data_source</code> mỗi dòng).</p>
+  </div>
+
+  <div class="card">
     <strong>CITIZEN-QR-LOOKUP — tra mã QR trả thêm <code>external_ref</code>, <code>note</code> · 18/11/2026</strong>
     <p><span class="tag t-next">Chờ PR vào dev</span>
     <code>POST /api/v1/public/qr/lookup</code>: <code>PublicQrInfo</code> thêm <code>external_ref</code> và <code>note</code> của cột
