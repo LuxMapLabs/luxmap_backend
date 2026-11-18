@@ -1747,6 +1747,7 @@ Người quyết: **Mỹ** chọn hướng (giữ endpoint có đăng nhập, mo
 | PB-6 | Hạn mức ảnh: 20 / mã / đêm và 512 MiB / đêm toàn hệ thống — **quá thì vẫn nhận chữ, bỏ ảnh** (`photos_kept` nhỏ hơn số gửi) |
 | PB-7 | Giới hạn tần suất theo địa chỉ client: tra mã 30 / 10 phút, gửi 10 / giờ → 429 `RATE_LIMITED`. `X-Forwarded-For` **chỉ** được tin từ proxy khai ở `ForwardedHeaders:*`; không khai gì thì **không** đọc header đó (middleware tắt) |
 | PB-8 | Audit actor **`public`** (không user, không role); audit **không bao giờ** chứa mã hay mô tả. Vị trí người gửi cách cột > 200 m → cờ `far_from_pole`, không từ chối |
+| PB-9 | **18/11/2026, Mỹ (Dylan) — SELF-SIGNED, chạm API, đảo một phần PB-1 / D-4.** `PublicQrInfo` thêm `external_ref` và `note` của cột (cả hai nullable, luôn có mặt). Vẫn **không** `pole_id`, toạ độ, trạng thái. ⚠️ `note` vốn là ghi chú nội bộ của Quản lý (POLE-NOTE) — nay **ai cầm mã QR cũng đọc được**, không lọc; người viết ghi chú phải coi nó là công khai. WP5 **chưa báo** |
 
 ### CITIZEN-QR P2c — hàng chờ duyệt của Quản lý (13/10/2026)
 

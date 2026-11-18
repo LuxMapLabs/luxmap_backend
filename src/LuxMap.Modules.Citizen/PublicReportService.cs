@@ -27,11 +27,23 @@ public sealed record PhotoUpload(long Length, Func<Stream> Open);
 public sealed record PublicReportInput(
     string? Code, string? Kind, string? Description, double? Lat, double? Lng, Guid? ClientOpId, IReadOnlyList<PhotoUpload> Photos);
 
-/// <summary>What the public page learns about a code: enough to show the citizen they scanned the right pole, nothing more (D-4).</summary>
+/// <summary>
+/// What the public page learns about a code: enough to show the citizen they scanned the right pole (D-4). No <c>pole_id</c>,
+/// coordinates or status.
+/// </summary>
 public sealed record PublicQrInfo
 {
     public required string? SegmentName { get; init; }
     public required string CommuneName { get; init; }
+
+    /// <summary>The pole's permanent team code (<c>external_ref</c>) — <c>null</c> when it has none (PB-9).</summary>
+    public required string? ExternalRef { get; init; }
+
+    /// <summary>
+    /// The pole's note, verbatim and public (PB-9): ANYONE holding the code reads it. Whoever writes a note writes it for
+    /// citizens too — nothing here filters it.
+    /// </summary>
+    public required string? Note { get; init; }
 
     /// <summary>
     /// <c>false</c> when a send would be refused, so the page can say so before the citizen fills the form (POLE-GEOM-NULL
@@ -83,6 +95,8 @@ public sealed partial class PublicReportService(
                     .Where(s => s.SegmentId == p.SegmentId).Select(s => s.SegmentName).FirstOrDefault(),
                 CommuneName = db.Set<AdministrativeUnit>()
                     .Where(u => u.CommuneId == p.CommuneId).Select(u => u.Name).First(),
+                ExternalRef = p.ExternalRef,
+                Note = p.Note,
                 CanReport = p.Geom != null,
                 Reason = p.Geom != null ? null : LocationRequiredReason,
             })
