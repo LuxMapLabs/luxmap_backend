@@ -83,6 +83,8 @@ internal sealed record FeederTelemetryBinding(
 public sealed class IotRegistrationStore(
     LuxMapDbContext db, IOptions<IotOptions> options, ICurrentActorAccessor actor, ICorrelationIdAccessor correlation)
 {
+    internal IotRegistrationStore ForContext(LuxMapDbContext context) => new(context, options, actor, correlation);
+
     internal Task<IotOptions> ReadAsync(IReadOnlyCollection<string> scopedNodeIds, CancellationToken ct, bool includeDetached = false)
         => ReadAsync(db, options.Value, scopedNodeIds, ct, includeDetached);
 

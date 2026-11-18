@@ -157,3 +157,186 @@ Nếu node báo lỗi phần cứng trước khi Bridge có mẫu điện đầu
 Để nhận các mã lỗi phần cứng trên VPS, cần firmware node và gateway có hỗ trợ `sensorHealth`, cùng bản IoT Bridge và LuxMap API tương ứng. Có thể kiểm tra theo thứ tự **node gửi → gateway chuyển MQTT → Bridge trả `sensorHealthAck` → API hiện mã trong `anomalies[]`**.
 
 Xem [OpenAPI của backend](openapi/luxmap-v1.5.json) và [hướng dẫn tích hợp IoT cho FE](LUXMAP-IOT-FE.md).
+
+
+## Luồng chẩn đoán và Fault tự động — cập nhật 18/11/2026
+
+Backend chạy job `iot_diagnostics` mỗi 30 giây. Job đọc Bridge, lưu snapshot và bằng chứng trong PostgreSQL.
+FE gọi API đọc snapshot để hiển thị. Việc mở Dashboard không phải điều kiện để phát hiện sự cố.
+Chu kỳ thực tế có thể dài hơn khi nhiều nguồn Bridge phản hồi chậm.
+
+### API tổng hợp có phân trang
+
+```http
+GET https://luxmap.com.vn/api/v1/iot/diagnostics/summary?page=1&page_size=20
+```
+
+Dùng Bearer token và quyền `ReadNetwork`, giới hạn theo xã của tài khoản.
+`page_size` tối đa 200. API lấy một trang từ DB, không gọi Bridge lần lượt cho từng node trong request.
+
+```json
+{
+  "page": 1,
+  "page_size": 20,
+  "total": 1,
+  "items": [
+    {
+      "node_id": "NODE-004",
+      "feeder_id": "FDR-009",
+      "diagnostic_status": "anomaly",
+      "anomaly_codes": ["lamp_count_shortfall"],
+      "estimated_lit": 8,
+      "estimated_missing": 2,
+      "fault_ids": ["FAULT-0001"],
+      "evaluated_at": "2026-11-18T04:00:00Z"
+    }
+  ]
+}
+```
+
+Ví dụ minh họa. ID Fault thực tế được DB cấp. `fault_ids` chứa sự cố đang xử lý hoặc chờ nghiệm thu của node.
+`estimated_lit` và `estimated_missing` có thể null. `evaluated_at` là thời điểm job đánh giá gần nhất theo UTC.
+
+### diagnostic_status gồm những giá trị nào?
+
+| diagnostic_status | Ý nghĩa |
+|---|---|
+| `normal` | Dữ liệu đủ để đánh giá và chưa phát hiện cảnh báo theo dữ liệu đang có. |
+| `anomaly` | Có ít nhất một cảnh báo điện, số bóng hoặc phần cứng còn mới. |
+| `stale` | Mẫu điện quá hạn, có `telemetry_stale`. Lỗi phần cứng mới có thể làm trạng thái tổng thành `anomaly`. |
+| `no_data` | Chưa có mẫu điện hợp lệ và chưa có lỗi phần cứng mới xác nhận. |
+| `unconfigured` | Node chưa có nguồn Bridge để job đánh giá. |
+| `source_unavailable` | Có nguồn nhưng đọc Bridge thất bại, cấu hình không dùng được, hoặc snapshot quá 90 giây. |
+
+API chi tiết `GET /iot/nodes/{nodeId}/diagnostics` tiếp tục dùng trường `status` với bốn giá trị
+`normal | anomaly | stale | no_data`. Lỗi nguồn của API chi tiết trả HTTP 503.
+API tổng hợp trả `diagnostic_status` cho từng hàng để một nguồn lỗi không làm hỏng cả trang.
+Snapshot chưa có ở node mới được xem là chưa được job cấu hình/đánh giá. Dùng `evaluated_at` để phân biệt.
+`normal` vẫn có thể đi cùng `lamp_count.status=insufficient_samples` hoặc `undetermined`; FE cần đọc kết quả đếm riêng.
+
+### anomaly_codes gồm những mã nào?
+
+`anomaly_codes` là mảng các chuỗi bên dưới. Mảng `[]` nghĩa là snapshot hiện tại không có mã cảnh báo.
+Khi nguồn chưa sẵn sàng, mảng rỗng chưa chứng minh thiết bị hoạt động bình thường; đọc `diagnostic_status` trước.
+
+| anomaly_code | Nội dung |
+|---|---|
+| `telemetry_stale` | Mẫu điện quá hạn. Có thể do nguồn đo hoặc đường truyền gián đoạn. |
+| `voltage_loss` | Điện áp ≤ 0,1 V trong mẫu ON còn mới. |
+| `voltage_deviation` | Điện áp lệch quá ngưỡng so với danh định khi ON. |
+| `lamp_count_shortfall` | Ước lượng số bóng sáng thấp hơn số bóng chuẩn của feeder. |
+| `ds3231_unavailable` | Không nhận hoặc khởi tạo được DS3231. |
+| `ds3231_read_failed` | Đọc DS3231 thất bại. |
+| `ds3231_time_invalid` | Giờ DS3231 không hợp lệ. |
+| `ina226_unavailable` | Không nhận hoặc khởi tạo được INA226. |
+| `ina226_read_failed` | Đọc INA226 thất bại. |
+| `ina226_shunt_out_of_range` | Điện áp shunt chạm giới hạn đo. |
+| `bh1750_unavailable` | Không nhận hoặc khởi tạo được BH1750. |
+| `bh1750_read_failed` | Đọc BH1750 thất bại. |
+| `microsd_unavailable` | Không khởi tạo được hàng đợi microSD. |
+| `microsd_read_failed` | Đọc hàng đợi microSD thất bại. |
+| `microsd_write_failed` | Ghi hàng đợi microSD thất bại. |
+| `lora_tx_blocked` | Có gói cần gửi nhưng AUX giữ LOW quá ngưỡng. |
+| `lora_rx_frame_error` | Nhận lặp lại khung LoRa lỗi CRC, thiếu hoặc quá dài. |
+
+Ba mã `current_deviation`, `power_deviation`, `current_when_off` tiếp tục được loại khỏi chẩn đoán.
+
+### Từ cảnh báo sang Fault
+
+| anomaly_code | fault_type | Điều kiện tạo |
+|---|---|---|
+| `telemetry_stale` | `node_offline` | Vượt `max_silence_seconds` của nguồn Bridge. |
+| `voltage_loss` | `segment_outage` | Lỗi giữ liên tục 3 phút trong các mẫu ON mới. |
+| `voltage_deviation` | `voltage_anomaly` | Lỗi giữ liên tục 3 phút trong các mẫu ON mới. |
+| `lamp_count_shortfall` | `lamp_out` | Hai cửa sổ 25 mẫu ON mới, không chồng nhau, xác nhận thiếu bóng. |
+| 13 mã phần cứng | `iot_hardware_fault` | Bản tin phần cứng fresh tiếp tục xác nhận lỗi trong 5 phút. |
+
+Các Fault tạo với `source_channel=iot`, `fault_status=detected` và giữ `data_source` của node.
+`telemetry_stale` mô tả mất dữ liệu điện; điều khiển vẫn có thể trả ACK. Tên FaultType tương thích là `node_offline`,
+còn `iot_anomaly_code` giải thích chính xác dấu hiệu quan sát.
+Job offline cũ tiếp tục dùng ngưỡng hệ thống cho thiết bị ngoài luồng Bridge.
+
+Bằng chứng theo node, nguồn và mã lỗi được lưu DB qua restart. Cùng một bản tin không tăng xác nhận.
+Khoảng gián đoạn bằng chứng mới quá 90 giây làm bắt đầu lại thời gian xác nhận.
+Mẫu đo cũ gửi bù chỉ phục vụ lịch sử, không dùng làm bằng chứng điện mới hoặc phục hồi.
+Phần cứng cần `sensor_health.status=fresh`.
+
+Chống trùng bằng khóa node + feeder + mã lỗi khi Fault đang `detected | confirmed | in_progress | resolved`.
+Khóa hàng và unique index bảo vệ trường hợp nhiều backend cùng chạy.
+Một lần lỗi đã phát hiện không tạo lại chỉ vì job chạy lại hoặc Manager đã đóng nó trong cùng đợt lỗi.
+
+### Tự phục hồi và audit
+
+Sau ít nhất 90 giây có các bản tin mới xác nhận lỗi đã hết:
+
+- Fault `detected` chưa có WorkOrder chuyển `rejected`, ghi `recovered_at`, ghi chú hệ thống và audit actor `iot`.
+- Fault đã gắn WorkOrder hoặc đã tiến sang trạng thái khác giữ trạng thái nghiệp vụ, thêm dấu hiệu phục hồi và audit.
+- Không gán một tài khoản giả vào `confirmed_by`. Quyết định tự động có actor và correlation ID trong audit.
+- Dữ liệu nguồn không đọc được, bản tin cũ, đếm bóng chưa đủ mẫu hoặc không xác định không được xem là phục hồi.
+
+Fault trả thêm `origin_node_id`, `feeder_id`, `cabinet_id`, `iot_anomaly_code`, `recovered_at`.
+Evidence lưu bằng chứng đo, thuật toán `iot-faults-v1`, phiên bản hiệu chuẩn và firmware được báo trong sensorHealth
+tại thời điểm đánh giá. Firmware của bản đo lịch sử chưa có metadata vẫn chưa xác định được.
+
+Dòng tổng chỉ ước lượng số bóng thiếu của feeder. `pole_id` và `fixture_id` được giữ null khi chưa xác định bóng nào hỏng.
+Manager dùng `fault_ids` để tạo phiếu qua API WorkOrder hiện tại. Phiếu sửa chữa cần Fault được xác nhận theo luồng hiện có.
+
+### Xem sự cố testbed trên Dashboard
+
+```http
+GET https://luxmap.com.vn/api/v1/faults?source_channel=iot&data_source=calibration_rig&page=1&page_size=20
+```
+
+Dùng quyền `ReadFaults` và phạm vi xã. Danh sách Fault mặc định tiếp tục lọc dữ liệu calibration_rig ra.
+FE truyền bộ lọc trên khi đang xem bộ thử.
+
+### Chọn hiệu chuẩn mới 5v-quiet-v1
+
+Profile dùng cho R002, trung bình 64 lần và node đo khi LoRa nghỉ, AUX HIGH ổn định 1,5 giây.
+Điện áp được nhận cho đếm bóng là 4,80–5,30 V. Hai profile `4v` và `5v` giữ hành vi cũ.
+
+32 mẫu thực nghiệm cho mỗi cấu hình:
+
+| Bóng | Khoảng đo thực nghiệm mA | Trung bình mA |
+|---|---|---|
+| 7 | 58,75–71,25 | 66,72 |
+| 8 | 75–85 | 80,31 |
+| 9 | 81,25–91,25 | 86,60 |
+| 10 | 91,25–101,25 | 96,37 |
+
+Khoảng bỏ phiếu có biên từ chối để tách phần chồng lấn:
+
+| Số bóng | Khoảng bỏ phiếu mA |
+|---|---|
+| 7 | 58,75–72,25 |
+| 8 | 74,75–82,20 |
+| 9 | 84,75–90,20 |
+| 10 | 92,75–102,50 |
+
+Cửa sổ cần 25 mẫu liên tiếp cùng session, đúng thứ tự sequence, ON, đủ mới theo DS3231 và trong khoảng điện áp.
+Tối thiểu 20/25 mẫu phải thuộc cùng một dải và trung vị phải thuộc chính dải đó.
+Khoảng trống giữa các dải và các mức 1–6 chưa hiệu chuẩn cho kết quả `undetermined`.
+Số bóng thiếu = max(0, installed_lamp_count − estimated_lit).
+Các ngưỡng này là hiệu chuẩn bộ thử, cần đo lại khi đổi nguồn, điện trở LED, shunt hay cách đấu.
+
+Manager sửa nguồn hiện có bằng request đầy đủ:
+
+```http
+PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
+```
+
+```json
+{
+  "server_id": "iot-server-01",
+  "device_id": "LUXMAP-P001",
+  "feeder_id": "FDR-009",
+  "nominal_voltage": 5,
+  "nominal_current_ma": 100,
+  "nominal_power_mw": 500,
+  "lamp_count_calibration": "5v-quiet-v1",
+  "installed_lamp_count": 10
+}
+```
+
+Không tự chuyển các nguồn đang dùng profile cũ. Admin tạo nguồn mới cũng có thể chọn `lamp_count_calibration` khi đăng ký.
+API tổng hợp và job cần bản BE mới cùng migration `AddIotDiagnosticFaults`.

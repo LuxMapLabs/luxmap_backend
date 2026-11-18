@@ -44,6 +44,8 @@ public class DomainEnumSerializationTests
     [InlineData(FaultType.SegmentOutage, "segment_outage")]
     [InlineData(FaultType.NodeOffline, "node_offline")]
     [InlineData(FaultType.RuntimeDecline, "runtime_decline")]
+    [InlineData(FaultType.VoltageAnomaly, "voltage_anomaly")]
+    [InlineData(FaultType.IotHardwareFault, "iot_hardware_fault")]
     public void FaultType_matches_contract(FaultType value, string expected)
         => Assert.Equal(expected, Wire(value));
 
@@ -142,7 +144,7 @@ public class DomainEnumSerializationTests
             // changing an enum cannot happen without someone coming to this line and saying so.
             // NodeRole dropped sampled_fixture on 28/09/2026 — no device on individual poles (I-1).
             (typeof(FixtureStatus), 4), (typeof(PowerSource), 1), (typeof(FixtureType), 1),
-            (typeof(FaultType), 5), (typeof(FaultStatus), 6), (typeof(Severity), 4),
+            (typeof(FaultType), 7), (typeof(FaultStatus), 6), (typeof(Severity), 4),
             (typeof(SourceChannel), 3), (typeof(DataSource), 4), (typeof(WorkOrderStatus), 6),
             (typeof(NodeRole), 1), (typeof(NodeStatus), 3), (typeof(RoadClass), 2),
             // TOPO-INFER TI-1, 07/10/2026 — SELF-SIGNED, not yet in Contract section 1.

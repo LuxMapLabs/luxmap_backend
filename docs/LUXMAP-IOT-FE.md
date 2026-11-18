@@ -226,3 +226,16 @@ Nối relay hoặc gán source trái quy tắc trả **409 `IOT_REGISTRATION_CON
 Nguồn tĩnh + nguồn DB trùng feeder cũng trả 409 khi đọc power/map/control hoặc gửi lệnh; FE hiển thị thông báo cấu hình
 và yêu cầu người quản lý sửa liên kết, không diễn giải là mất điện hoặc tự đổi nguồn.
 Phase 2 hợp nhất đường điều khiển sẽ được đặc tả riêng; phase 1 giữ relay và các endpoint hiện hành.
+
+## Dashboard chẩn đoán và Fault IoT (18/11/2026)
+
+Đọc GET /api/v1/iot/diagnostics/summary?page=1&page_size=20 bằng quyền ReadNetwork.
+Mỗi item có node_id, feeder_id, diagnostic_status, anomaly_codes[], estimated_lit, estimated_missing, fault_ids và evaluated_at.
+diagnostic_status nhận normal, anomaly, stale, no_data, unconfigured hoặc source_unavailable.
+Danh sách đầy đủ 17 anomaly_codes và cách xử lý null, stale, nguồn lỗi nằm trong [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
+
+Job đánh giá độc lập với FE, tạo Fault detected sau debounce. Detected tự phục hồi và chưa có WorkOrder chuyển rejected có audit.
+Fault đã có phiếu giữ trạng thái nghiệp vụ và ghi recovered_at. Đếm bóng thiếu chỉ xác định feeder.
+Xem Fault testbed qua GET /api/v1/faults?source_channel=iot&data_source=calibration_rig&page=1&page_size=20.
+Manager xác nhận sự cố và giao phiếu qua luồng WorkOrder hiện tại.
+Profile mới 5v-quiet-v1 phải được chọn cho nguồn đo R002/64 averages/AUX ổn định 1,5 giây.

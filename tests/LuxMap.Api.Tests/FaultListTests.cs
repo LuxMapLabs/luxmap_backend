@@ -111,7 +111,7 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
     }
 
     [Fact]
-    public async Task Each_item_carries_the_eighteen_contract_keys_in_order_then_the_two_review_keys()
+    public async Task Each_item_keeps_contract_order_and_appends_review_and_iot_context()
     {
         var pole = await PlantPoleAsync(home, 108.004, 16.003);
         await PlantAsync(new Plan { Pole = pole, Lat = null, Lng = null, Priority = 12.5 });
@@ -124,7 +124,8 @@ public class FaultListTests(AssetImportFixture factory, ITestOutputHelper output
             ["fault_id", "pole_id", "fixture_id", "segment_id", "location", "fault_type", "fault_status",
              "severity", "source_channel", "data_source", "priority_score", "status_confidence", "cluster_id",
              "detected_at", "updated_at", "work_order_id", "note", "reported_by",
-             "review_note", "allowed_actions"],
+             "review_note", "allowed_actions", "origin_node_id", "feeder_id", "cabinet_id",
+             "iot_anomaly_code", "recovered_at"],
             keys);
         Assert.Equal(pole, item.GetProperty("pole_id").GetString());
         Assert.Equal(JsonValueKind.Null, item.GetProperty("work_order_id").ValueKind);

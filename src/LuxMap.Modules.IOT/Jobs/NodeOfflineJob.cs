@@ -14,6 +14,7 @@ using LuxMap.Shared.Contracts.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Microsoft.Extensions.Options;
 
 namespace LuxMap.Modules.IOT.Jobs;
 
@@ -36,7 +37,7 @@ namespace LuxMap.Modules.IOT.Jobs;
 /// back (D-6): resolving is a person's decision, and there is no system account to sign it.
 /// </para>
 /// </remarks>
-public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOfflineJob> log) : IScheduledJob
+public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOfflineJob> log, IOptions<IotOptions>? bridgeOptions = null) : IScheduledJob
 {
     public string Name => "node_offline";
 
@@ -52,8 +53,11 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOffli
             offlineAfter = (await SystemSettingValues.ReadAsync(scan, ct)).IotOfflineAfter;
             // NodeSilence.StatusAt: offline when now − last > threshold, i.e. last < now − threshold; exactly at it is still online.
             var cutoff = now - offlineAfter;
+            var bridgeNodes = await scan.Set<IotSourceRegistration>().AsNoTracking()
+                .Where(s => s.DetachedAt == null).Select(s => s.NodeId).ToListAsync(ct);
+            bridgeNodes.AddRange(bridgeOptions?.Value.Nodes.Keys.ToArray() ?? []);
             silent = await scan.Set<IotNode>().IgnoreQueryFilters().AsNoTracking()
-                .Where(n => n.CabinetId != null && n.LastReportAt != null && n.LastReportAt < cutoff)
+                .Where(n => n.CabinetId != null && n.LastReportAt != null && n.LastReportAt < cutoff && !bridgeNodes.Contains(n.NodeId))
                 .OrderBy(n => n.NodeId.Length).ThenBy(n => n.NodeId)
                 .Select(n => new Silent(n.NodeId, n.CommuneId, n.LastReportAt!.Value))
                 .ToListAsync(ct);

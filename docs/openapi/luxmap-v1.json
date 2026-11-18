@@ -8811,6 +8811,61 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/iot/diagnostics/summary": {
+      "get": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticSummaryItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticSummaryItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticSummaryItemPagedResult"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/iot/nodes/{nodeId}/diagnostics": {
       "get": {
         "tags": [
@@ -20396,6 +20451,28 @@
             "items": {
               "type": "string"
             }
+          },
+          "origin_node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "iot_anomaly_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "recovered_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -20467,7 +20544,9 @@
           "lamp_dim",
           "segment_outage",
           "node_offline",
-          "runtime_decline"
+          "runtime_decline",
+          "voltage_anomaly",
+          "iot_hardware_fault"
         ],
         "type": "string"
       },
@@ -21223,8 +21302,103 @@
           "lamp_count": {
             "$ref": "#/components/schemas/LampCountEstimate"
           },
+          "measured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "measurement_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "sensor_health_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "firmware_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "calibration_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "measurement_sequence": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
           "sensor_health": {
             "$ref": "#/components/schemas/IotSensorHealth"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotDiagnosticSummaryItem": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "diagnostic_status": {
+            "type": "string"
+          },
+          "anomaly_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "estimated_lit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "estimated_missing": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "fault_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evaluated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotDiagnosticSummaryItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IotDiagnosticSummaryItem"
+            }
           }
         },
         "additionalProperties": false
@@ -22195,6 +22369,10 @@
           },
           "use_ten_lamp_calibration": {
             "type": "boolean"
+          },
+          "installed_lamp_count": {
+            "type": "integer",
+            "format": "int32"
           },
           "lamp_count_calibration": {
             "type": "string",
@@ -23768,6 +23946,10 @@
           "lamp_count_calibration": {
             "type": "string",
             "nullable": true
+          },
+          "installed_lamp_count": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -24094,6 +24276,28 @@
             "items": {
               "type": "string"
             }
+          },
+          "origin_node_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "cabinet_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "iot_anomaly_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "recovered_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           },
           "client_op_id": {
             "type": "string"

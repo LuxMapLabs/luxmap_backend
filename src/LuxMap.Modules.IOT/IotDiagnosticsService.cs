@@ -40,6 +40,7 @@ public sealed record NodeProfile
     public double OffCurrentLimitMa { get; init; } = 10;
     public int MaxSilenceSeconds { get; init; } = 60;
     public bool UseTenLampCalibration { get; init; }
+    public int InstalledLampCount { get; init; } = 10;
     public string? LampCountCalibration { get; init; }
 
     internal string? EffectiveLampCountCalibration => LampCountCalibration
@@ -48,8 +49,8 @@ public sealed record NodeProfile
     internal bool IsValid() =>
         !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrWhiteSpace(FeederId) &&
         Positive(NominalVoltage) && Positive(NominalCurrentMa) && Positive(NominalPowerMw) &&
-        Tolerance(VoltageTolerancePercent) && MaxSilenceSeconds > 0 &&
-        LampCountCalibration is null or LampCountEstimator.FourVolt or LampCountEstimator.FiveVolt;
+        Tolerance(VoltageTolerancePercent) && MaxSilenceSeconds > 0 && InstalledLampCount is > 0 and <= 1000 &&
+        LampCountCalibration is null or LampCountEstimator.FourVolt or LampCountEstimator.FiveVolt or LampCountEstimator.QuietFiveVolt;
 
     private static bool Positive(double value) => double.IsFinite(value) && value > 0;
     private static bool Tolerance(double value) => Positive(value) && value <= 100;
@@ -72,6 +73,12 @@ public sealed record IotDiagnosticResult(
     IotMeasurement? Measurement, IReadOnlyList<IotAnomaly> Anomalies)
 {
     public LampCountEstimate? LampCount { get; init; }
+    public DateTime? MeasuredAt { get; init; }
+    public string? MeasurementKey { get; init; }
+    public string? SensorHealthKey { get; init; }
+    public string? FirmwareVersion { get; init; }
+    public string? CalibrationVersion { get; init; }
+    public long? MeasurementSequence { get; init; }
     public IotSensorHealth SensorHealth { get; init; } = new("unknown", null);
 }
 
@@ -118,6 +125,9 @@ public sealed partial class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources,
     TimeProvider clock) : IFeederPowerLookup
 {
+    internal IotDiagnosticsService ForContext(LuxMapDbContext context) =>
+        new(context, client, registry.ForContext(context), sources, clock);
+
     public async Task<IotDiagnosticResult> GetAsync(string nodeId, CancellationToken ct)
     {
         await RequireNodeAsync(nodeId, ct);
@@ -140,6 +150,12 @@ public sealed partial class IotDiagnosticsService(
         var diagnosis = new IotDiagnosticResult(nodeId, profile.FeederId, "no_data", null, [])
         {
             SensorHealth = sensorHealth,
+            MeasuredAt = MeasuredAt(device?.LatestTelemetry?.Data?.Timestamp)?.UtcDateTime,
+            MeasurementKey = device?.LatestTelemetry?.Data is { } telemetry ? $"{telemetry.SessionId}/{telemetry.SequenceNumber}" : null,
+            MeasurementSequence = device?.LatestTelemetry?.Data?.SequenceNumber,
+            SensorHealthKey = report?.Data is { } health ? $"{health.SessionId}/{health.SequenceNumber}" : null,
+            FirmwareVersion = report?.Data?.FirmwareVersion,
+            CalibrationVersion = profile.EffectiveLampCountCalibration,
         };
         var measurement = ReadMeasurement(device);
         if (measurement is not null)
@@ -151,7 +167,7 @@ public sealed partial class IotDiagnosticsService(
                 measurement.LampCommand == "ON" && LampCountEstimator.InCalibrationRange(measurement.Voltage, calibration))
             {
                 var estimate = LampCountEstimator.Evaluate(
-                    RecentOnCurrents(device!, calibration, now, profile.MaxSilenceSeconds), calibration);
+                    RecentOnCurrents(device!, calibration, now, profile.MaxSilenceSeconds), calibration, profile.InstalledLampCount);
                 diagnosis = diagnosis with { LampCount = estimate };
                 if (estimate.EstimatedMissing is > 0)
                     diagnosis = diagnosis with
@@ -807,7 +823,7 @@ public sealed partial class IotDiagnosticsService(
         if (device.LatestTelemetry?.Data is not { SessionId: { Length: > 0 } session, SequenceNumber: > 0 } latest)
             return [];
 
-        var fourVolt = calibration == LampCountEstimator.FourVolt;
+        var fourVolt = calibration != LampCountEstimator.FiveVolt;
         var maximumGap = TimeSpan.FromSeconds(maxSilenceSeconds);
         var newestTime = fourVolt ? MeasuredAt(latest.Timestamp) : null;
         // A newly delivered backlog must not be interpreted as a fresh 4 V reading.
