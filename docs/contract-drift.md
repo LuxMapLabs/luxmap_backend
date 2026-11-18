@@ -1911,6 +1911,30 @@ trước khi gửi; 409 `POLE_OFF_SEGMENT` thì trả cột về chỗ cũ và h
 **WP5 cần nhận:** danh sách/media theo phiếu, thao tác duyệt, thông điệp ảnh cũ/inconclusive/unavailable, `last_sweep_id` có thể null khi cột đã được xác nhận bằng ảnh.
 FW cần xác nhận nền tạm; chưa có tuyên bố độ chính xác CV từ ảnh tổng hợp trong test.
 
+### POLE-PHOTO-WITHDRAW (17/11/2026)
+
+**Mỹ chốt 17/11/2026 — SELF-SIGNED, nền tạm, chờ FW xác nhận.** Chạm bề mặt API: endpoint DELETE mới và mã
+`POLE_PHOTO_WITHDRAWN`. Consumer **WP6** (đề xuất gốc của Thịnh) và **WP5** (ảnh đã hủy biến khỏi hàng duyệt);
+chưa gửi thông báo từ lượt thực thi này. Contract văn bản giữ nguyên.
+
+| Mã | Quyết định / bề mặt client |
+|---|---|
+| **PP-16** | `DELETE /api/v1/work-orders/{id}/pole-photos/{photo_id}`, không body, policy `ExecuteWorkOrders` (chỉ `field_engineer`). Chỉ kỹ sư được giao, phiếu `in_progress`, ảnh/clip chưa có decision. Thành công **204**, body rỗng. Xóa **mềm** bằng `withdrawn_at/withdrawn_by`, không xóa row: D-R16 giữ ảnh qua bảo hành và sau đó; D-R13 giữ đích tham chiếu của audit `submitted/analyzed`. Bytes ảnh gốc, thumbnail và clip giữ nguyên, vẫn được kiểm kê BE-35. |
+| **PP-17** | Thứ tự: kiểm phiếu tồn tại/được giao/trong xã → **404 `WORK_ORDER_NOT_FOUND`**; kiểm ảnh thuộc phiếu và trong xã (kể cả ảnh đã hủy) → **404 `POLE_PHOTO_NOT_FOUND`**; đã hủy → **204 ngay**, kể cả phiếu nay `done`, không ghi/audit thêm. Khóa **work_order → pole → photo**, kiểm lại quyền/ảnh dưới khóa; request song song thấy đã hủy cũng 204. Sau đó phiếu không `in_progress` → **409 `WORK_ORDER_NOT_IN_PROGRESS`**, rồi ảnh có decision → **409 `POLE_PHOTO_ALREADY_DECIDED`**. Quản lý/các vai trò khác bị policy chặn **403 `ROLE_FORBIDDEN`** trước lookup; chưa đăng nhập 401. Mỗi lần hủy thật đúng một audit `deleted`, entity `work_order`, xã theo ảnh, snapshot before/after có photo/pole, nhãn AI, nhãn kỹ sư, có/không clip và dấu hủy; cùng một SaveChanges/transaction. |
+| **PP-18** | Ảnh đã hủy biến khỏi list (cả `total`, kể cả lọc `pole_id`); detail/thumbnail/original/video/review/decision coi như không có → **404 `POLE_PHOTO_NOT_FOUND`**. Không ghi lượt xem clip đã hủy. Cột vẫn thuộc phiếu, nhận ảnh/clip mới. Không dùng global query filter: DELETE/replay cần thấy dấu hủy, kiểm kê giữ toàn bộ key. `SurveyFindingLookup` không đổi vì ảnh đã quyết không hủy được. |
+| **PP-19** | Upload ảnh và upload clip dùng lại `client_op_id` của row đã hủy → **409 `POLE_PHOTO_WITHDRAWN`**, `details.photo_id`, sau kiểm quyền phiếu/xã, trước kiểm hash/trạng thái phiếu; cả khi nội dung khác hoặc phiếu đã `done`. Mobile phải dùng **client_op_id mới** cho lần chụp mới. Replay không infer/ghi object/audit, không trả snapshot ảnh đã hủy. Bundle sync hiện không chứa ảnh cột; push không thêm op hủy, dùng DELETE online và retry idempotent. |
+
+### SURVEY-VERIFY-PHOTOS (17/11/2026)
+
+**Mỹ + WP5 (Khang) chốt 17/11/2026 — SELF-SIGNED, nền tạm tới FW kế tiếp.** Chạm bề mặt API: mã lỗi mới
+trên route verify hiện có; Contract văn bản giữ nguyên. WP5 đã cùng chốt; lượt thực thi này không gửi thông báo riêng.
+
+| Mã | Quyết định / bề mặt client |
+|---|---|
+| **SVP-1** | `POST /api/v1/work-orders/{id}/verify` trên phiếu **survey** còn ảnh/clip cột chưa hủy (`withdrawn_at = null`) và chưa quyết (`decision = null`) → **409 `POLE_PHOTOS_UNDECIDED`**, `details.photo_ids` là mảng ID theo `captured_at, uploaded_at, length(photo_id), photo_id` (PP-5). Kiểm sau `RequireAction`, trước mọi thay đổi; phiếu vẫn `done`, không audit `verified`. Ảnh đã reject/confirm/hủy không chặn; không ảnh thì nghiệm thu như cũ. Không tự quyết hay suy nhãn. |
+| **SVP-2** | Chỉ áp phiếu khảo sát; **cố ý giữ nguyên** verify của `inspection`, `repair`, `pole_gps_update`. `allowed_actions` vẫn có `verify` ở trạng thái/quyền hợp lệ; WP5 xử lý 409 và dùng `photo_ids` để đưa Quản lý tới các ảnh/clip cần quyết trước khi thử lại. Follow-up vẫn theo WSC-6. |
+| **SVP-3** | Giữ **409 `POLE_PHOTO_INCONCLUSIVE`**: ảnh không có nhãn on/off không thể công bố. WP5 hướng dẫn Quản lý `return` phiếu, kỹ sư gán nhãn bằng `PATCH …/pole-photos/{photo_id}/review`, nộp lại rồi Quản lý quyết. Giữ **409 `POLE_VIDEO_NOT_VIEWED`**: chính Quản lý phải mở clip trên Web trước khi confirm (cả on/off), vì quyết định có thể công bố trạng thái/tạo sự cố. Ảnh/clip không dùng thì **reject**, không cần ép confirm; reject clip không đòi xem. Không đổi `/decision`, `/review` hay hai cổng này. |
+
 ### PHOTO-REVIEW — kỹ sư sửa nhãn trước khi Quản lý công bố (20/10/2026)
 
 **Mỹ SELF-SIGNED 20/10/2026**, theo R-1…R-3 và D-1…D-5 trong `.ai/tasks/PHOTO-REVIEW.md`.
@@ -1954,6 +1978,7 @@ Migration `AddPolePhotoReviews`; thay đổi thêm trường/endpoint, giữ `/d
 | WSC-3 | Bỏ qua sự cố đang nằm trong phiếu **đang chạy** khác (`released_at IS NULL`), kể cả khi bị lấy **trong lúc** chờ khoá: lọc lại sau khi khoá sự cố, không trả 409 cả request. Không còn gì → 409 `NOTHING_TO_FOLLOW_UP`. Khác nhánh kiểm tra → sửa chữa, nơi sự cố bận vẫn là 409 `FAULT_ALREADY_IN_WORK_ORDER` |
 | WSC-4 | Khảo sát liên xã: chỉ mang sự cố thuộc **xã neo** của phiếu khảo sát (`work_order.commune_id`). Xã khác cần phiếu riêng |
 | WSC-5 | Phiếu khảo sát **không** có liên kết `work_order_fault` và luồng này **không** tạo sự cố. `fault_ids` vẫn là tập con của tập mang sang; sai → 400 kèm `carried_fault_ids`, nay sắp theo độ dài rồi mã (luật ID độ rộng tối thiểu) ở cả hai nhánh |
+| WSC-6 | **17/11/2026, Mỹ chốt — sửa lỗi WP5 đã báo, không chạm bề mặt API.** Tập mang sang xét thêm ảnh/clip cột **của chính phiếu**, đúng xã neo, `decision=confirm`, nhãn `final_cv_state ?? cv_state`, bất kể `status_applied`; bỏ ảnh chưa quyết/reject. Gộp từng cột theo thời gian quan sát tăng dần (`evaluated_at` của history / `captured_at` của ảnh): sweep đặt `classified_as`; ảnh off → out; ảnh on giữ dim/normal nếu đang có, còn lại → normal (luật publisher PP-9/PP-14). `data_source` lấy từ quan sát cuối cùng **đổi** trạng thái (ảnh on giữ dim, ảnh off trên out không tạo sự cố riêng nên giữ nguồn của quan sát trước); chỉ trạng thái cuối mới ánh xạ qua `FaultFor` (out → lamp_out, dim → lamp_dim). Hoà giờ sweep–ảnh: sweep thắng; hai ảnh: `decided_at`, rồi độ dài `photo_id`, rồi ordinal (tăng dần); sweep giữ tiebreak WSC-2. Không sinh fault, không đổi port / request / response / mã lỗi / schema. |
 
 ### CLAUDE-MD-CLEANUP — chỗ lệch tìm ra khi rà CLAUDE.md (20/10/2026)
 
@@ -2436,6 +2461,25 @@ thì không xoá được**, cùng kiểu chặn POLE-DELETE-QR đã gỡ cho m�
 - **Không đổi bề mặt API:** route, mã, body lỗi giữ nguyên; chỉ một trường hợp 409 cũ nay thành 204. Không migration.
 
 Quyết định nội bộ BE, Mỹ chốt trong chat 16/11. Không chạm bề mặt API → im lặng 3 ngày làm việc là approve.
+
+### MAP-CENTER — bản đồ mở ở tâm các cột của xã, không ở tâm khung (17/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | Mỹ (Dylan), 17/11/2026 — sau khi khung bbox của Long Phước / Long Bình được nới bằng hộp bao ranh giới (COMMUNE-BOUNDARY), tâm khung lệch khỏi cụm đèn ~1,3 km / ~2,0 km nên GIS mở ở vùng trống. Mỹ chọn sửa ở backend để web và mobile cùng đúng mà không sửa client. **SELF-SIGNED**, chạm API (đổi **ý nghĩa** một trường, không đổi hình dạng), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (GIS mở ở `map_bounds.center`), WP6 (bản đồ mở ở `map_bounds.center`). Không ai phải sửa code. **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| MC-1 | `GET /auth/me`: `communes[].center` = **trung bình toạ độ các cột có vị trí của xã**, kẹp vào trong `bbox` của xã; xã không có cột có vị trí → trung điểm `bbox` như CB-3; không có `bbox` → `null` như cũ. Thay CB-3 / CB-5 **chỉ cho `/auth/me`** |
+| MC-2 | `map_bounds.center` = trung bình toạ độ cột của các xã **có khung**, mỗi xã nặng theo số cột (xã 3 cột ở xa không kéo bản đồ đi nửa đường), kẹp vào trong `map_bounds.bbox`; không xã nào có cột → trung điểm `bbox`. `map_bounds.bbox` giữ nguyên (CB-5) |
+| MC-3 | Item `/admin/communes` **không đổi**: `center` vẫn là trung điểm khung (mô tả khung Quản trị đang sửa) |
+| MC-4 | Đọc cột theo **`commune_id` lấy từ DB của tài khoản** (cùng nguồn với `communes[]`), không theo claim của token — chỉ trả trung bình và số đếm, không trả cột nào. Identity hỏi qua port `ICommunePoleCenters`, Assets hiện thực. Tâm tính lúc đọc, không lưu |
+
+**Không đổi hình dạng:** trường, kiểu, nullable giữ nguyên; spec OpenAPI không đổi. Không migration.
+
+**Phải báo:** WP5, WP6 — `center` giờ là tâm cụm cột, không còn là trung điểm `bbox`; client nào tự tính trung điểm từ `bbox` thì nên
+dùng `center`. **Chưa báo.**
 
 ## ONE-FIXTURE — một cột MỘT bộ đèn đang dùng; hỏng bóng nào thay cả bộ (15/11/2026)
 

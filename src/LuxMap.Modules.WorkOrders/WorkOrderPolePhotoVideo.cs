@@ -57,7 +57,8 @@ public sealed partial class WorkOrderPolePhotoService
         if (seen.Decision is not null || seen.VideoViewedBy == actorId) return;
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order_pole_photo WHERE photo_id = {seen.PhotoId} AND commune_id = {seen.CommuneId} FOR UPDATE", ct);
-        var row = await db.Set<WorkOrderPolePhoto>().SingleAsync(p => p.WorkOrderId == id && p.PhotoId == seen.PhotoId, ct);
+        await Photo(id, seen.PhotoId, ct);
+        var row = await Photos().SingleAsync(p => p.WorkOrderId == id && p.PhotoId == seen.PhotoId, ct);
         await db.Entry(row).ReloadAsync(ct);
         if (row.Decision is not null || row.VideoViewedBy == actorId) return;
         var now = UtcMicrosecondClock.UtcNow();

@@ -80,6 +80,14 @@ public static class SurveyPublicationRules
     }
 
     public static bool IsNewer(DateTime evaluatedAt, DateTime? previous) => previous is null || evaluatedAt > previous;
+    /// <summary>ON cannot rebut dim; keep known ON classifications, otherwise map ON/OFF directly.</summary>
+    public static FixtureStatus PhotoStatus(string cvState, FixtureStatus? previous) => cvState switch
+    {
+        "on" => previous is FixtureStatus.Normal or FixtureStatus.Dim ? previous.Value : FixtureStatus.Normal,
+        "off" => FixtureStatus.Out,
+        _ => throw new ArgumentOutOfRangeException(nameof(cvState))
+    };
+
     public static FaultType? FaultFor(FixtureStatus status) => status switch
     { FixtureStatus.Out => FaultType.LampOut, FixtureStatus.Dim => FaultType.LampDim, _ => null };
     public static Severity SeverityFor(FaultType type, bool sensitive, SurveyReviewOptions options)

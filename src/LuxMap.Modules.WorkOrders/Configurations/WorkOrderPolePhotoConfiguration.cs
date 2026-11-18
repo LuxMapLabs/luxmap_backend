@@ -16,6 +16,7 @@ public sealed class WorkOrderPolePhotoConfiguration : IEntityTypeConfiguration<W
     {
         b.ToTable("work_order_pole_photo", t =>
         {
+            t.HasCheckConstraint("ck_pole_photo_withdrawal", "(withdrawn_at IS NULL AND withdrawn_by IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND decision IS NULL)");
             t.HasCheckConstraint("ck_pole_photo_lat", "lat BETWEEN -90 AND 90 AND lat <> 'NaN'::float8");
             t.HasCheckConstraint("ck_pole_photo_lng", "lng BETWEEN -180 AND 180 AND lng <> 'NaN'::float8");
             t.HasCheckConstraint("ck_pole_photo_sizes", "byte_count BETWEEN 1 AND 16777216 AND thumbnail_bytes > 0 AND width > 0 AND height > 0 AND width::bigint * height <= 40000000");
@@ -46,6 +47,9 @@ public sealed class WorkOrderPolePhotoConfiguration : IEntityTypeConfiguration<W
         b.HasOne<AppUser>().WithMany().HasForeignKey(x => x.ReviewedBy).OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pole_photo_reviewed_by");
         b.HasIndex(x => x.ReviewedBy).HasDatabaseName("ix_pole_photo_reviewed_by");
+        b.HasOne<AppUser>().WithMany().HasForeignKey(x => x.WithdrawnBy).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_pole_photo_withdrawn_by");
+        b.HasIndex(x => x.WithdrawnBy).HasDatabaseName("ix_pole_photo_withdrawn_by");
         b.HasOne<ArtifactVersion>().WithMany().HasForeignKey(x => x.VideoExtractorVersionId).OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_pole_photo_video_extractor_version");
         b.HasIndex(x => x.VideoExtractorVersionId).HasDatabaseName("ix_pole_photo_video_extractor_version");

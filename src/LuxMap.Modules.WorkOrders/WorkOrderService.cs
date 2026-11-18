@@ -575,6 +575,14 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var claimed = Performed(performedAt);
         var wo = await Find(id, ct);
         RequireAction(wo, action);
+        if (action == "verify" && wo.TaskKind == TaskKind.Survey)
+        {
+            var undecided = await db.Set<WorkOrderPolePhoto>().NotWithdrawn().AsNoTracking()
+                .Where(p => p.WorkOrderId == id && p.Decision == null).InCaptureOrder()
+                .Select(p => p.PhotoId).ToArrayAsync(ct);
+            if (undecided.Length > 0)
+                throw Error("POLE_PHOTOS_UNDECIDED", HttpStatusCode.Conflict, ("photo_ids", undecided));
+        }
         // BE-43 D-6: the engineer's own clock may not put the step before the step it follows.
         var previous = action switch { "start" => wo.AssignedAt, "complete" => wo.StartedAt, _ => null };
         if (claimed is { } at && at < previous) throw OptionalJson.Invalid("performed_at");

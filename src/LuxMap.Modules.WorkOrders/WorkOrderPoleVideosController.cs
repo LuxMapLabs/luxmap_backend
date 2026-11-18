@@ -23,7 +23,8 @@ public sealed class WorkOrderPoleVideosController(WorkOrderPolePhotoService phot
 
     /// <summary>
     /// Upload one clip; the operation id in the path makes a retry the same request. 201 when stored, 200 when this operation was already stored
-    /// (nothing is read, judged or written again); 409 <c>IDEMPOTENCY_CONFLICT</c> when the id was used for different content.
+    /// (nothing is read, judged or written again); 409 <c>POLE_PHOTO_WITHDRAWN</c> (details.photo_id) for a withdrawn operation,
+    /// requiring a new client_op_id; otherwise 409 <c>IDEMPOTENCY_CONFLICT</c> when the id was used for different content.
     /// </summary>
     [HttpPut("{client_op_id}")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]

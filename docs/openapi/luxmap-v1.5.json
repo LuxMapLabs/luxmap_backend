@@ -18097,6 +18097,103 @@
         "operationId": "getWorkOrdersIdPolePhotosPhotoId",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
+      },
+      "delete": {
+        "tags": [
+          "WorkOrderPolePhotos"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "photo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:execute_work_orders",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "[TẠM — POLE-PHOTO-WITHDRAW PP-16…PP-19] Người được giao hủy mềm ảnh/clip chưa quyết, phiếu in_progress; 204 idempotent kể cả retry sau done. Giữ bytes/audit; ảnh đã hủy không còn đọc/duyệt được, replay upload trả 409 POLE_PHOTO_WITHDRAWN (details.photo_id), cần client_op_id mới",
+        "operationId": "deleteWorkOrdersIdPolePhotosPhotoId",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
       }
     },
     "/api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail": {
@@ -20887,6 +20984,16 @@
               }
             }
           },
+          "409": {
+            "description": "INVALID_STATE_TRANSITION / CONCURRENT_MODIFICATION; survey: POLE_PHOTOS_UNDECIDED, details.photo_ids là mảng ID ảnh/clip chưa hủy và decision=null, theo captured_at, uploaded_at, length(photo_id), photo_id. Không đổi allowed_actions; inspection/repair/pole_gps_update giữ nguyên (kể cả POLE_OFF_SEGMENT của PG-12).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
             "content": {
@@ -20913,7 +21020,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)",
+        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)",
         "operationId": "postWorkOrdersIdVerify",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"

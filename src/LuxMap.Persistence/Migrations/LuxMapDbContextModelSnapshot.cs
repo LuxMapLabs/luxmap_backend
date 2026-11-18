@@ -4745,6 +4745,14 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("width");
 
+                    b.Property<DateTime?>("WithdrawnAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("withdrawn_at");
+
+                    b.Property<string>("WithdrawnBy")
+                        .HasColumnType("text")
+                        .HasColumnName("withdrawn_by");
+
                     b.Property<string>("WorkOrderId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -4770,6 +4778,9 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasIndex("VideoViewedBy")
                         .HasDatabaseName("ix_pole_photo_video_viewed_by");
+
+                    b.HasIndex("WithdrawnBy")
+                        .HasDatabaseName("ix_pole_photo_withdrawn_by");
 
                     b.HasIndex("PoleId", "CapturedAt")
                         .HasDatabaseName("ix_work_order_pole_photo_pole_id_captured_at");
@@ -4810,6 +4821,8 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_pole_photo_video_values", "video_object_key IS NULL OR (btrim(video_object_key) <> '' AND video_sha256 ~ '^[0-9a-f]{64}$' AND video_bytes > 0 AND video_duration_ms > 0 AND video_sampled_frames > 0 AND video_on_frames >= 0 AND video_off_frames >= 0 AND video_daylight_frames >= 0 AND video_on_frames + video_off_frames + video_daylight_frames <= video_sampled_frames AND video_median_luma BETWEEN 0 AND 1 AND video_median_luma <> 'NaN'::float8)");
 
                             t.HasCheckConstraint("ck_pole_photo_video_viewed", "(video_viewed_by IS NULL AND video_viewed_at IS NULL) OR (video_viewed_by IS NOT NULL AND video_viewed_at IS NOT NULL AND video_object_key IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_pole_photo_withdrawal", "(withdrawn_at IS NULL AND withdrawn_by IS NULL) OR (withdrawn_at IS NOT NULL AND withdrawn_by IS NOT NULL AND decision IS NULL)");
 
                             t.HasCheckConstraint("ck_work_order_pole_photo_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
                         });
@@ -6598,6 +6611,12 @@ namespace LuxMap.Persistence.Migrations
                         .HasForeignKey("VideoViewedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_pole_photo_video_viewed_by");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("WithdrawnBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_pole_photo_withdrawn_by");
 
                     b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
                         .WithMany()

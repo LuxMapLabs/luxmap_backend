@@ -41,6 +41,51 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>SURVEY-VERIFY-PHOTOS — chặn nghiệm thu khảo sát còn ảnh/clip chưa quyết · 17/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR vào dev</span>
+    Verify phiếu survey trả 409 <code>POLE_PHOTOS_UNDECIDED</code> và <code>details.photo_ids</code> theo thứ tự list;
+    bỏ ảnh đã hủy/đã quyết, dùng chung helper lọc và sắp ảnh. Giữ allowed_actions, hai cổng decision và các task kind khác.
+    Drift <b>SVP-1…SVP-3</b> — Mỹ + WP5 chốt, SELF-SIGNED, nền tạm.</p>
+    <p>Files: <code>WorkOrderService.cs</code>, <code>WorkOrderPolePhotoService.cs</code>,
+    <code>WorkOrderPolePhotoQueries.cs</code>, <code>WorkOrdersController.cs</code>,
+    <code>WorkOrderSurveyVerifyPhotoTests.cs</code>, drift, generator + hai spec, dashboard và biên bản kết quả.
+    Thêm 4 phương thức / 5 ca tích hợp: ảnh + clip chưa quyết, reject/hủy, quyết hết, không ảnh, inspection/repair,
+    thứ tự captured_at, quyền/trạng thái trước cổng mới, không audit khi bị chặn.
+    Build <b>0 warning/error</b>; OpenAPI đã xuất/generate/lint hợp lệ, 10 warning hiện có.
+    Claude chạy: 5/5 ca mới; WorkOrder/PolePhoto/Withdraw/Capability/SurveyPublication 541 pass / 2 skip; phá thử (tắt cổng) → 1 đỏ, khôi phục → xanh.
+    Commit: <code>feat(work-orders): block survey verify while pole photos are undecided</code>.
+    <a href=".ai/results/SURVEY-VERIFY-PHOTOS.md">Bằng chứng và lệnh bàn giao Claude</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>POLE-PHOTO-WITHDRAW — kỹ sư hủy mềm ảnh/clip cột chưa quyết · 17/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR vào dev</span>
+    Thêm <code>DELETE /work-orders/{id}/pole-photos/{photo_id}</code>: chỉ người được giao, phiếu đang thực hiện,
+    ảnh chưa quyết; 204 idempotent kể cả retry sau khi phiếu done. Giữ row/bytes/AI/audit, ẩn khỏi các đường đọc/duyệt;
+    replay upload trả 409 <code>POLE_PHOTO_WITHDRAWN</code>. Drift <b>PP-16…PP-19</b> — Mỹ SELF-SIGNED, nền tạm cho WP5/WP6.</p>
+    <p>Files: entity/configuration/controller/service/video view trong <code>LuxMap.Modules.WorkOrders</code>,
+    migration <code>AddPolePhotoWithdrawal</code> + designer/snapshot, hai file test withdrawal/migration,
+    copy-plan + Python test, drift, OpenAPI + generator và biên bản kết quả.
+    Build toàn solution <b>0 warning/error</b>; test Python copy-plan xanh; spec hợp lệ, 10 warning như baseline.
+    Claude review: giữ thứ tự kiểm cũ của ReviewAsync và replay hash khác trên ảnh chưa hủy. Đã chạy: 22 ca withdrawal + migration xanh; WorkOrder/PolePhoto/Capability/Migration/Sync 517 pass / 2 skip; phá thử (bỏ lọc ảnh đã hủy) → 4 đỏ. Down() đọc tay, đối xứng, chưa chạy down/reapply.
+    Commit: <code>feat(work-orders): let the assigned engineer withdraw an undecided pole photo</code>.
+    <a href=".ai/results/POLE-PHOTO-WITHDRAW.md">Bằng chứng và lệnh chạy tiếp</a>.</p>
+  </div>
+
+  <div class="card">
+    <strong>WSC-PHOTO — follow-up mang sự cố từ ảnh/clip đã confirm · 17/11/2026</strong>
+    <p><span class="tag t-done">Xong · PR vào dev</span>
+    Lookup gộp sweep đã duyệt và ảnh/clip confirm của chính phiếu/xã neo theo thời gian quan sát;
+    dùng chung luật ON giữ dim/normal với publisher. Bổ sung drift <b>WSC-6</b> (Mỹ chốt, WP5 báo lỗi), không đổi API/schema.</p>
+    <p>Files: <code>SurveyFindingLookup.cs</code>, <code>SurveyPublicationRules.cs</code>, <code>ReviewedPolePhotoPublisher.cs</code>,
+    <code>ISurveyFindingLookup.cs</code>, <code>SurveyFindingTests.cs</code>, API <code>SurveyPublicationTests.cs</code>,
+    <code>docs/contract-drift.md</code>, <code>docs/agents/traps/faults-workorders.md</code>, dashboard và kết quả.
+    Thêm 12 ca unit + 9 ca tích hợp. Claude review: ảnh không đổi trạng thái giữ data_source của quan sát trước. Đã chạy: unit 12/12, API (SurveyPublication + PolePhoto + WorkOrder) 392 pass / 2 skip; phá thử (tắt nguồn ảnh) → 2 test đỏ.
+    <a href=".ai/results/WSC-PHOTO.md">Bằng chứng, phá thử và giới hạn kiểm chứng</a>.</p>
+    <p>Commit: <code>fix(work-orders): carry confirmed pole-photo faults into survey follow-up</code>. Không phát sinh D-item.</p>
+  </div>
+
+  <div class="card">
     <strong>PR #266 — giải quyết conflict iot với dev · 16/11/2026</strong>
     <p><span class="tag t-done">Đã push lên iot · hết conflict · CI đang chạy</span>
     Gộp <code>dev 1e89827</code> vào nền <code>iot 972a927</code> trên <code>fix/PR-266-conflicts</code>.
@@ -1518,6 +1563,8 @@
 
   <h2>COMMUNE-BOUNDARY — ranh giới xã để khoanh vùng trên bản đồ, 13/11/2026</h2>
   <div class="card"><p><span class="tag t-next">Nhánh <code>feat/COMMUNE-BOUNDARY</code>, chưa PR</span> FE đang khoanh vùng bằng hình chữ nhật <code>bbox</code>; nay xã có <strong>ranh giới polygon</strong> (hiện thực Q17 của ERD, phần vẽ). Drift <strong>COMMUNE-BOUNDARY CBD-1…CBD-6</strong> (SELF-SIGNED 13/11, chạm API, chỉ thêm). Cột <code>administrative_unit.boundary geometry(MultiPolygon,4326)</code> + CHECK <code>ST_IsValid</code>; <code>PUT /admin/communes/{id}/boundary</code> (<code>ManageCommunes</code>, GeoJSON Polygon / MultiPolygon, <code>null</code> xoá, kiểm vòng khép, tự cắt, đảo lat/lng, ≤ 10 000 đỉnh); <code>has_boundary</code> trên item xã; <code>GET /map/communes</code> (<code>ReadNetwork</code>) chỉ trả xã trong phạm vi người gọi — tự áp scope vì bảng xã không có query filter. Ranh giới <strong>chỉ để vẽ</strong>: phân quyền vẫn theo <code>commune_id</code> (staff đã chỉ thấy tài sản xã mình từ trước). Dữ liệu OSM Long Phước / Long Bình ở <code>scripts/data/commune-boundaries.geojson</code>, nạp bằng <code>scripts/load_commune_boundaries.py --apply</code> (qua API). Migration <code>CommuneBoundary</code>, chưa áp <code>luxmap_dev</code> / VPS. Test: 26 ca (<code>CommuneBoundaryTests.cs</code>), phá thử chốt scope → đỏ đúng test; hai test migration cũ chuyển sang <code>OldSchemaCommune</code> (chèn xã bằng SQL); toàn bộ 1698 + 424 + 45 + 83 xanh (7 skip có sẵn), mã thoát 0; OpenAPI xuất lại (186 operation), lint 10 cảnh báo như cũ. <strong>Codex review (gpt-6.1-sol high, 13/11):</strong> 0 P1 · 3 P2 · 2 P3, đã sửa hết — chặn <code>null</code> / giá trị thứ tư trong vị trí (độ cao số vẫn nhận), thêm 14 ca test (scope rỗng bằng token không claim xã, 9 ca polygon sai, <code>updated_at</code>), DTO sang <code>sealed class</code>; phá thử 4 chốt đều đỏ đúng test (<code>.ai/reviews/COMMUNE-BOUNDARY-by-codex.md</code>). <strong>Còn:</strong> áp migration + nạp ranh giới trên <code>luxmap_dev</code> / VPS; báo WP5 (lớp <code>/map/communes</code>, ghi nguồn © OpenStreetMap); suy xã từ toạ độ là quyết định riêng.</p></div>
+  <h2>MAP-CENTER — bản đồ mở ở tâm các cột của xã, 17/11/2026</h2>
+  <div class="card"><p><span class="tag t-next">Nhánh <code>feat/MAP-CENTER-poles</code>, chưa PR</span> Ranh giới Long Phước / Long Bình đã nạp lên VPS (16/11) và khung bbox được Quản trị lưu lại bằng hộp bao ranh giới (17/11) — tâm khung lệch khỏi cụm đèn ~1,3 km / ~2,0 km, GIS mở ở vùng trống. Drift <strong>MAP-CENTER MC-1…MC-4</strong> (SELF-SIGNED 17/11, đổi ý nghĩa trường, không đổi hình dạng): <code>/auth/me</code> <code>communes[].center</code> và <code>map_bounds.center</code> = trung bình toạ độ cột (xã có khung, nặng theo số cột), kẹp vào trong bbox; không có cột thì trung điểm bbox như cũ. Item <code>/admin/communes</code> không đổi. Port <code>ICommunePoleCenters</code> (Identity) do Assets hiện thực, đọc theo xã của tài khoản trong DB; logic thuần ở <code>MapFocus</code> (Shared). Test: 5 ca <code>MapFocusTests</code> + 3 ca <code>MapCenterTests</code> (PostGIS); phá thử → 2 ca đỏ đúng; spec OpenAPI không đổi, không migration. <strong>Còn:</strong> PR vào <code>dev</code>, deploy VPS, báo WP5 / WP6.</p></div>
 
   <h2>CI — advisory ImageSharp 3.1.12, 08/10/2026</h2>
   <div class="card"><p><span class="tag t-next">Đã merge (PR #120) — tạm, chờ license key để lên 4.1.2</span> 07/10 GitHub công bố 5 advisory (3 high) cho ImageSharp ≤ 4.1.1; <code>dotnet restore -warnaserror</code> làm đỏ MỌI PR. Bản vá chỉ ở 4.1.2, mà 4.x cần <code>SixLaborsLicenseKey</code>. Mỹ chọn tắt đúng 5 mã (<code>Directory.Build.props</code>) — hợp lệ vì mọi decode đi qua cấu hình chỉ-JPEG; <code>JpegOnlyDecodeTests</code> canh tiền đề đó. <strong>Còn:</strong> xin license key Six Labors → lên 4.1.2 → gỡ suppress.</p></div>

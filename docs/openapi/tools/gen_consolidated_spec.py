@@ -206,6 +206,7 @@ SUMMARY = {
     ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
     ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO] Kết quả AI và quyết định đã lưu; quyền qua phiếu và xã của ảnh",
+    ("delete", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO-WITHDRAW PP-16…PP-19] Người được giao hủy mềm ảnh/clip chưa quyết, phiếu in_progress; 204 idempotent kể cả retry sau done. Giữ bytes/audit; ảnh đã hủy không còn đọc/duyệt được, replay upload trả 409 POLE_PHOTO_WITHDRAWN (details.photo_id), cần client_op_id mới",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail"): "[TẠM — POLE-PHOTO] JPEG thumbnail bỏ metadata, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/original"): "[TẠM — POLE-PHOTO] JPEG gốc nguyên byte, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/video"): "[TẠM — POLE-VIDEO PV-c1] Clip MP4 của ảnh cột, proxy có kiểm quyền, no-store; hỗ trợ Range (206, 416 kèm Content-Range). Quản lý mở clip chưa quyết được ghi nhận một lần (audit viewed)",
@@ -309,7 +310,7 @@ for method, suffix, summary in [
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
     ("post", "/{id}/start", "Người được giao bắt đầu việc"),
     ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10), chưa vào GIS"),
-    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault; pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)"),
+    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)"),
     ("post", "/{id}/return", "Quản lý trả việc để làm tiếp"),
     ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),
     ("post", "/{id}/follow-up", "[FR-2, WSC] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu, chung case_id: kiểm tra → sửa chữa mang sự cố fault_present; khảo sát → kiểm tra mang sự cố mở trên cột mà lần khảo sát đã duyệt thấy out/dim (xã neo)"),
@@ -619,6 +620,14 @@ for parameter in d["paths"]["/api/v1/work-orders"]["get"].get("parameters", []):
     if parameter["name"] == "cancellation_request_status":
         parameter["schema"] = {"$ref": "#/components/schemas/CancellationRequestStatus"}
         parameter["description"] = "Một trạng thái phụ none/pending/rejected; AND với filter khác. Badge dùng total pending."
+
+# SURVEY-VERIFY-PHOTOS: Mỹ + WP5 chốt 17/11/2026, SELF-SIGNED, nền tạm.
+verify = d["paths"]["/api/v1/work-orders/{id}/verify"]["post"]
+verify["responses"]["409"] = err(
+    "INVALID_STATE_TRANSITION / CONCURRENT_MODIFICATION; survey: POLE_PHOTOS_UNDECIDED, "
+    "details.photo_ids là mảng ID ảnh/clip chưa hủy và decision=null, theo captured_at, uploaded_at, length(photo_id), photo_id. "
+    "Không đổi allowed_actions; inspection/repair/pole_gps_update giữ nguyên (kể cả POLE_OFF_SEGMENT của PG-12)."
+)
 
 # ACCT-1: arrays remain on the wire; cardinality depends on the resulting role.
 for name in ("CreateUserRequest", "UpdateUserRequest"):

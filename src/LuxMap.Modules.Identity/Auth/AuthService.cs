@@ -16,6 +16,7 @@ public sealed class AuthService(
     WebAuthOptions webOptions,
     GoogleLoginOptions googleOptions,
     IGoogleIdTokenVerifier googleVerifier,
+    ICommunePoleCenters poleCenters,
     TimeProvider timeProvider,
     ILogger<AuthService> logger)
 {
@@ -169,7 +170,7 @@ public sealed class AuthService(
         }
 
         var communeIds = await CommuneIdsForAsync(user, ct);
-        var communes = await CommunesForAsync(user, communeIds, ct);
+        var (communes, mapBounds) = await CommunesForAsync(user, communeIds, ct);
         return new CurrentUserResponse(
             user.UserId,
             user.Username,
@@ -178,15 +179,16 @@ public sealed class AuthService(
             ContractEnum.ToDbValue(user.Role),
             communeIds,
             communes,
-            MapBounds.Of(CommuneBbox.Union(communes.Where(commune => commune.Bbox is not null).Select(commune => commune.Bbox!))),
+            mapBounds,
             AvatarUrls.For(user));
     }
 
     /// <summary>
     /// COMMUNE-BBOX: the caller's communes with their names and map frames — every commune for system-wide scope. The anchor
     /// table is never filtered (see <see cref="AdministrativeUnit"/>), so the ids decide, read from the same rows as the claim.
+    /// MAP-CENTER: each centre, and the centre of the box around them, sit on the poles (<see cref="MapFocus"/>).
     /// </summary>
-    private async Task<IReadOnlyList<CommuneSummary>> CommunesForAsync(
+    private async Task<(IReadOnlyList<CommuneSummary> Communes, MapBounds? MapBounds)> CommunesForAsync(
         AppUser user, IReadOnlyList<string> communeIds, CancellationToken ct)
     {
         var query = dbContext.Set<AdministrativeUnit>().AsNoTracking();
@@ -199,11 +201,19 @@ public sealed class AuthService(
         var units = await query
             .OrderBy(unit => unit.CreatedAt).ThenBy(unit => unit.CommuneId.Length).ThenBy(unit => unit.CommuneId)
             .ToListAsync(ct);
-        return units.Select(unit =>
-        {
-            var bbox = unit.GetBbox();
-            return new CommuneSummary(unit.CommuneId, unit.Name, bbox, bbox?.Center());
-        }).ToList();
+        var frames = units.Select(unit => (unit.CommuneId, unit.Name, Bbox: unit.GetBbox())).ToList();
+
+        // Only a framed commune can open the map, so only those are asked for their poles.
+        var poles = await poleCenters.CentersAsync(
+            frames.Where(unit => unit.Bbox is not null).Select(unit => unit.CommuneId).ToList(), ct);
+        var placed = frames
+            .Select(unit => (unit.CommuneId, unit.Name, unit.Bbox, Poles: poles.GetValueOrDefault(unit.CommuneId)))
+            .ToList();
+
+        var communes = placed
+            .Select(unit => new CommuneSummary(unit.CommuneId, unit.Name, unit.Bbox, MapFocus.Center(unit.Bbox, unit.Poles)))
+            .ToList();
+        return (communes, MapFocus.Bounds(placed.Select(unit => (unit.Bbox, unit.Poles))));
     }
 
     /// <param name="group">The endpoint group the token arrived at. A token issued by the other group
