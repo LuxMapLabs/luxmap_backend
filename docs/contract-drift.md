@@ -2549,6 +2549,8 @@ dùng `center`. **Chưa báo.**
 | WB-10 | Cột **không có `external_ref`**, hoặc có mạch **không có `external_ref`**, không vào sheet 1 (nạp lại sẽ lỗi hoặc tháo mạch) mà liệt kê ở sheet 2 **`Không xuất`** (`pole_id`, `commune_id`, `reason`). Không bỏ im lặng |
 | WB-11 | Giới hạn: một dòng một `data_source` (của cột). Tuyến / tủ / bộ đèn khác `data_source` với cột → nạp lại báo mâu thuẫn hoặc đổi nguồn của tài sản cha. Tuyến / tủ / mạch không có cột nào không xuất hiện (import không xoá nên không mất) |
 
+> ⚠️ **WB-2, WB-4, WB-5, WB-9, WB-10, WB-11 bị thay** bởi ASSET-WORKBOOK-MULTISHEET (WB-12…WB-20, cuối file). WB-1, WB-3, WB-6, WB-7, WB-8 vẫn hiệu lực, WB-6 thêm trường `sheet`.
+
 **Cần báo:** WP5 (endpoint import mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`; endpoint export và nút tải). **Chưa báo.**
 
 **Phát hiện khi hiện thực ASSET-EXPORT-WORKBOOK (18/11/2026) — sửa ở PR export, sau khi #271 đã merge với lỗi này:** `PlanFeedersAsync` gán
@@ -2582,3 +2584,27 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
   API mẫu điện mới nhất và chẩn đoán vẫn đọc dữ liệu thô.
   API nội bộ Bridge giữ cursor cho job đồng bộ, được bảo vệ bằng Bridge key.
 - Deploy đồng thời BE và Bridge; không migration PostgreSQL, không mất telemetry.sqlite.
+
+## ASSET-WORKBOOK-MULTISHEET — workbook kiểm kê: mỗi loại tài sản một sheet (18/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 18/11/2026** — theo mẫu `Assets_Template.xlsx` của nhóm. Sheet phẳng (#271/#276) không chứa được tài sản chưa có cột, hình tuyến / lộ trình mạch, lịch sử bộ đèn, và phải gộp trùng giữa dòng |
+| **Chạm API** | **Có, đổi định dạng** của `POST /assets/import/workbook` và `GET /assets/export/workbook` (đường dẫn giữ). Chưa consumer nào gọi (WP5 chưa có nút) nên không vỡ ai. **SELF-SIGNED**, nền tạm tới FW kế tiếp |
+| **Ticket** | `.ai/tasks/ASSET-WORKBOOK-MULTISHEET.md` |
+| **Consumer** | WP5 (modal import / nút xuất). **Chưa báo** |
+
+| Mã | Quyết định |
+|---|---|
+| WB-12 | Một `.xlsx`, sheet nhận theo **tên** (trim + NFC): `Tuyến đường`, `Tủ điện`, `Mạch điện`, `Cột điện`, `Bóng đèn`; cột = cột file CSV cùng loại trừ `commune_id` / `data_source`. Sheet vắng = không nạp loại đó; không sheet tài sản nào → lỗi. Sheet khác bỏ qua, **trừ** `IoT` có dữ liệu → lỗi "chưa hỗ trợ" |
+| WB-13 | `commune_id` và `data_source` đặt **khi upload** (multipart). `data_source` bắt buộc, không mặc định. `commune_id` vắng = xã duy nhất của người gọi; phạm vi ≠ một xã mà vắng → 400; ngoài phạm vi → 403. Hai cột này xuất hiện trong sheet → lỗi |
+| WB-14 | Cột không nhận mà **có dữ liệu** → lỗi header của sheet (không âm thầm bỏ); cột lạ toàn trống bỏ qua |
+| WB-15 | Toạ độ `geom_wkt` (WKT) mọi sheet — thay WB-5. Tuyến và mạch: ô trống / thiếu cột = **giữ** hình (mạch khác CSV, nơi ô trống xoá) |
+| WB-16 | Cột **mới** không `geom_wkt` thì bắt buộc `note` (chỉ workbook; CSV / form không đổi) |
+| WB-17 | Bộ đèn — thay WB-4: khoá khớp `(cột, install_date)`; nhận bộ đã tháo (`removed_date`). Chưa có → thêm (ONE-FIXTURE giữ); một bộ khớp → giống = `unchanged`, khác = lỗi; nhiều bộ khớp → lỗi. CSV fixtures giữ insert-only |
+| WB-18 | Vẫn all-or-nothing một transaction (WB-3). Lỗi / cảnh báo thêm **`sheet`**: `{sheet, row, column, message}` (`WorkbookRowError`); `ImportRowError` của CSV không đổi |
+| WB-19 | Export — thay WB-9 / WB-10: sheet `Hướng dẫn` + 5 sheet + `Không xuất`; **mọi** tài sản trong phạm vi (cả tuyến / tủ / mạch không có cột, hình tuyến / mạch, bộ đã tháo). `Không xuất` liệt kê tài sản thiếu `external_ref`, cột trên mạch thiếu mã, bộ đèn của cột thiếu mã |
+| WB-20 | Giới hạn — thay WB-11: mỗi file nạp lại một xã, một `data_source`. Export nhiều xã không nạp lại được; tài sản khác nguồn trong một xã bị đổi theo nguồn chọn khi upload — `Hướng dẫn` của file xuất ghi số tài sản theo từng nguồn |
+
+**Cần báo:** WP5 (định dạng mới, hai trường form `data_source` / `commune_id`, `sheet` trong lỗi). **Chưa báo.**
+
