@@ -347,6 +347,7 @@ public class ScheduledJobTests(AssetImportFixture factory) : IAsyncLifetime
         Assert.Equal(DataSource.Simulated, fault.DataSource);
         Assert.Equal(Severity.Medium, fault.Severity);
         Assert.Equal(node, fault.OriginNodeId);
+        Assert.Equal(cabinet, fault.CabinetId); // auto-dispatch groups IoT faults by cabinet
         Assert.Equal(last.AddHours(1), fault.DetectedAt); // the iot_offline_after_minutes setting, not when the job ran
         Assert.Equal((16.05, 108.25), (fault.Lat, fault.Lng)); // the cabinet's point
         Assert.Null(fault.PoleId);

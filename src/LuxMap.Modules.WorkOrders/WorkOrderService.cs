@@ -136,7 +136,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             AssigneeEligible = wo.AssignedTo is null ? null : await EligibleUsers(wo.CommuneId).AnyAsync(x => x.UserId == wo.AssignedTo, ct),
             AllowedActions = WorkOrderRules.AllowedActions(wo.WoStatus, actor.Role, wo.AssignedTo == actor.UserId, wo.TaskKind, wo.CancellationRequestStatus),
             Faults = members.Select(x => new WorkOrderFaultDetail(x.Fault.FaultId, x.Fault.PoleId, x.Fault.SegmentId,
-                new(x.Lat, x.Lng), x.Fault.FaultType, x.Fault.FaultStatus, x.Fault.Severity, x.InspectionOutcome)).ToArray(),
+                new(x.Lat, x.Lng), x.Fault.FaultType, x.Fault.FaultStatus, x.Fault.Severity, x.InspectionOutcome,
+                x.Fault.OriginNodeId, x.Fault.FeederId, x.Fault.CabinetId, x.Fault.IotAnomalyCode, x.Fault.RecoveredAt)).ToArray(),
         };
     }
 

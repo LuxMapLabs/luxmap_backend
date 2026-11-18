@@ -96,6 +96,44 @@ public class AutoDispatchPlannerTests
         Assert.Equal(Start, other.ScheduledDate);
     }
 
+    private static DispatchFault Iot(int i, string? cabinet, string? name = null)
+        => Fault(i, pole: null) with { SegmentId = null, SegmentName = "", PoleId = null, CabinetId = cabinet, CabinetName = name };
+
+    [Fact]
+    public void Iot_faults_with_no_road_group_by_cabinet_and_only_faults_with_neither_are_skipped()
+    {
+        var p = Plan([Iot(1, "CAB-001", "Tủ chợ"), Iot(2, "CAB-001", "Tủ chợ"), Iot(3, "CAB-002"), Iot(4, null), Fault(5)]);
+        Assert.Equal(new DispatchSkipped("F-0004", "NO_SEGMENT"), Assert.Single(p.Skipped));
+        Assert.Equal(3, p.OrderCount);
+        // Same severity and detection: road before cabinet, then cabinet id.
+        Assert.Equal(["Kiểm tra 1 cột sự cố - S", "Kiểm tra tủ Tủ chợ - 2 sự cố IoT", "Kiểm tra tủ CAB-002 - 1 sự cố IoT"],
+            p.Proposals.Select(x => x.Title));
+        var market = p.Proposals[1];
+        Assert.Equal(["F-0001", "F-0002"], market.FaultIds);
+        Assert.Equal(("CAB-001", (string?)null, (string?)null), (market.CabinetId, market.SegmentId, market.SegmentName));
+        Assert.Empty(market.PoleIds);
+        Assert.Equal(2, market.PoleCount);
+        Assert.Equal((null, "S"), (p.Proposals[0].CabinetId, p.Proposals[0].SegmentId));
+    }
+
+    [Fact]
+    public void A_fault_on_a_road_groups_by_road_even_when_it_names_a_cabinet()
+    {
+        var p = Plan([Fault(1) with { CabinetId = "CAB-001" }, Fault(2)]);
+        var only = Assert.Single(p.Proposals);
+        Assert.Equal(("S", (string?)null), (only.SegmentId, only.CabinetId));
+        Assert.Equal(["F-0001", "F-0002"], only.FaultIds);
+    }
+
+    [Fact]
+    public void A_cabinet_splits_into_shifts_and_stays_apart_per_commune()
+    {
+        var p = Plan(Enumerable.Range(1, 9).Select(i => Iot(i, "CAB-001")).Append(Iot(10, "CAB-001") with { CommuneId = "D" }));
+        Assert.Equal(["Kiểm tra tủ CAB-001 - 8 sự cố IoT (ca 1/2)", "Kiểm tra tủ CAB-001 - 1 sự cố IoT (ca 2/2)"],
+            p.Proposals.Where(x => x.CommuneId == "C").Select(x => x.Title));
+        Assert.Equal("F-0010", Assert.Single(p.Proposals, x => x.CommuneId == "D").FaultIds.Single());
+    }
+
     [Fact]
     public void Segment_faults_are_individual_units_after_poles_in_numeric_fault_order()
     {

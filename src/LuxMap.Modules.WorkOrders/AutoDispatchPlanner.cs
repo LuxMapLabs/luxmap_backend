@@ -18,14 +18,17 @@ public sealed class AutoDispatchOptions
 
 public sealed record DispatchEngineer(string UserId, string FullName, string CommuneId);
 public sealed record EngineerLoad(string UserId, DateOnly Date);
+/// <param name="CabinetId">IoT faults have no road: they group by the cabinet the device sits in instead.</param>
 public sealed record DispatchFault(string FaultId, string CommuneId, string? SegmentId, string SegmentName,
-    string? PoleId, double Along, Severity Severity, double? PriorityScore, DateTime DetectedAt);
+    string? PoleId, double Along, Severity Severity, double? PriorityScore, DateTime DetectedAt,
+    string? CabinetId = null, string? CabinetName = null);
 public sealed record DispatchSkipped(string FaultId, string Reason);
 public sealed record AutoDispatchPreview(DateOnly StartDate, int FaultCount, int OrderCount,
     DispatchProposal[] Proposals, DispatchSkipped[] Skipped);
 public sealed record DispatchProposal(TaskKind TaskKind, string Title, DateOnly ScheduledDate, DateOnly DueDate,
-    string? AssignedTo, string[] FaultIds, string Note, string CommuneId, string SegmentId, string SegmentName,
-    string? AssignedToName, string[] PoleIds, int PoleCount, Severity MaxSeverity, string? UnassignedReason);
+    string? AssignedTo, string[] FaultIds, string Note, string CommuneId, string? SegmentId, string? SegmentName,
+    string? AssignedToName, string[] PoleIds, int PoleCount, Severity MaxSeverity, string? UnassignedReason,
+    string? CabinetId);
 
 /// <summary>Reusable per-run load board; selecting reserves the slot for later selections in this run.</summary>
 public sealed class EngineerLoadBoard(IEnumerable<EngineerLoad> existing, int quotaPerDay)
@@ -87,9 +90,12 @@ public static class AutoDispatchPlanner
             .ThenBy(f => f.FaultId.Length).ThenBy(f => f.FaultId, StringComparer.Ordinal).ToArray();
         var skipped = sorted.Skip(CandidateLimit).Select(f => new DispatchSkipped(f.FaultId, "LIMIT_EXCEEDED")).ToList();
         var selected = sorted.Take(CandidateLimit).ToArray();
-        skipped.AddRange(selected.Where(f => f.SegmentId is null).Select(f => new DispatchSkipped(f.FaultId, "NO_SEGMENT")));
-        var batches = new List<(DispatchFault[] Faults, int Units, int Index, int Count, DateTime Detected)>();
-        foreach (var group in selected.Where(f => f.SegmentId is not null).GroupBy(f => (f.CommuneId, f.SegmentId)))
+        // A road groups first; a fault with no road but a cabinet (IoT) groups by its cabinet; only a fault with neither is skipped.
+        skipped.AddRange(selected.Where(f => f.SegmentId is null && f.CabinetId is null)
+            .Select(f => new DispatchSkipped(f.FaultId, "NO_SEGMENT")));
+        var batches = new List<(DispatchFault[] Faults, int Units, int Index, int Count, DateTime Detected, bool ByCabinet, string Key)>();
+        foreach (var group in selected.Where(f => f.SegmentId is not null || f.CabinetId is not null)
+                     .GroupBy(f => (f.CommuneId, ByCabinet: f.SegmentId is null, Key: (f.SegmentId ?? f.CabinetId)!)))
         {
             var units = group.GroupBy(f => (IsPole: f.PoleId is not null, Id: f.PoleId ?? f.FaultId))
                 .OrderBy(g => !g.Key.IsPole).ThenBy(g => g.Key.IsPole ? g.Min(f => f.Along) : 0d)
@@ -98,24 +104,27 @@ public static class AutoDispatchPlanner
             var chunks = units.Chunk(options.MaxPolesPerOrder).ToArray();
             for (var i = 0; i < chunks.Length; i++)
                 // Detection time is the SEGMENT's earliest, so chunks of one road with equal severity / score keep road order (ca 1 before ca 2).
-                batches.Add((chunks[i].SelectMany(x => x).ToArray(), chunks[i].Length, i + 1, chunks.Length, group.Min(f => f.DetectedAt)));
+                batches.Add((chunks[i].SelectMany(x => x).ToArray(), chunks[i].Length, i + 1, chunks.Length, group.Min(f => f.DetectedAt),
+                    group.Key.ByCabinet, group.Key.Key));
         }
         var board = new EngineerLoadBoard(loads, options.QuotaPerDay);
         var people = engineers.ToArray();
         var proposals = batches.OrderByDescending(b => b.Faults.Max(f => SeverityRank(f.Severity)))
             .ThenByDescending(b => b.Faults.Max(f => f.PriorityScore)).ThenBy(b => b.Detected)
-            .ThenBy(b => b.Faults[0].SegmentId!.Length).ThenBy(b => b.Faults[0].SegmentId, StringComparer.Ordinal)
+            .ThenBy(b => b.ByCabinet).ThenBy(b => b.Key.Length).ThenBy(b => b.Key, StringComparer.Ordinal)
             .ThenBy(b => b.Index).ThenBy(b => b.Faults[0].CommuneId.Length).ThenBy(b => b.Faults[0].CommuneId, StringComparer.Ordinal)
             .Select(b =>
             {
                 var first = b.Faults[0];
                 var slot = board.Select(people.Where(e => e.CommuneId == first.CommuneId), start);
+                var title = b.ByCabinet ? $"Kiểm tra tủ {first.CabinetName ?? first.CabinetId} - {b.Units} sự cố IoT"
+                    : $"Kiểm tra {b.Units} cột sự cố - {first.SegmentName}";
                 return new DispatchProposal(TaskKind.Inspection,
-                    $"Kiểm tra {b.Units} cột sự cố - {first.SegmentName}" + (b.Count > 1 ? $" (ca {b.Index}/{b.Count})" : ""),
+                    title + (b.Count > 1 ? $" (ca {b.Index}/{b.Count})" : ""),
                     slot.Date, slot.Date, slot.Engineer?.UserId, b.Faults.Select(f => f.FaultId).ToArray(), "Phân lịch tự động",
-                    first.CommuneId, first.SegmentId!, first.SegmentName, slot.Engineer?.FullName,
+                    first.CommuneId, b.ByCabinet ? null : first.SegmentId, b.ByCabinet ? null : first.SegmentName, slot.Engineer?.FullName,
                     b.Faults.Select(f => f.PoleId).OfType<string>().Distinct().ToArray(), b.Units,
-                    b.Faults.MaxBy(f => SeverityRank(f.Severity))!.Severity, slot.Reason);
+                    b.Faults.MaxBy(f => SeverityRank(f.Severity))!.Severity, slot.Reason, b.ByCabinet ? b.Key : null);
             }).OrderBy(p => p.ScheduledDate).ToArray();
         return new(start, proposals.Sum(p => p.FaultIds.Length), proposals.Length, proposals, skipped.ToArray());
     }

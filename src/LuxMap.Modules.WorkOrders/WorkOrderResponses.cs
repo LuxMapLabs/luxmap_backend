@@ -69,7 +69,10 @@ public sealed record WorkOrderPoleLocation(string PoleId, double Lat, double Lng
 public sealed record WorkOrderAttachmentItem(string AttachmentId, string FileName, long ByteCount, DateTime UploadedAt, string DownloadUrl);
 
 public sealed record WorkOrderLocation(double Lat, double Lng);
+/// <param name="OriginNodeId">IoT only, like <c>FaultItem</c>: the device, its feeder and cabinet, the anomaly code,
+/// and when the device recovered by itself. Null on every CV / field fault.</param>
 public sealed record WorkOrderFaultDetail(string FaultId, string? PoleId, string? SegmentId,
     WorkOrderLocation Location, FaultType FaultType, FaultStatus FaultStatus, Severity Severity,
-    InspectionOutcome? InspectionOutcome);
+    InspectionOutcome? InspectionOutcome, string? OriginNodeId, string? FeederId, string? CabinetId,
+    string? IotAnomalyCode, DateTime? RecoveredAt);
 public sealed record WorkOrderAssignee(string UserId, string FullName);
