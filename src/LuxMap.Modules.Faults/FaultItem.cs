@@ -15,11 +15,6 @@ public record FaultItem
     public required string FaultId { get; init; }
     public string? PoleId { get; init; }
     public string? FixtureId { get; init; }
-    public string? OriginNodeId { get; init; }
-    public string? FeederId { get; init; }
-    public string? CabinetId { get; init; }
-    public string? IotAnomalyCode { get; init; }
-    public DateTime? RecoveredAt { get; init; }
     public string? SegmentId { get; init; }
     public required FaultLocation Location { get; init; }
     public FaultType FaultType { get; init; }
@@ -44,6 +39,12 @@ public record FaultItem
     /// <c>edit_note</c>. Empty for every role but the Manager. Advisory: a race can still answer 409.
     /// </summary>
     public required string[] AllowedActions { get; init; }
+
+    public string? OriginNodeId { get; init; }
+    public string? FeederId { get; init; }
+    public string? CabinetId { get; init; }
+    public string? IotAnomalyCode { get; init; }
+    public DateTime? RecoveredAt { get; init; }
 }
 
 /// <summary><c>location{lat,lng}</c> — EPSG:4326 degrees.</summary>
