@@ -542,3 +542,9 @@ và không để lỗi thành 500. Snapshot audit trước/sau ẩn giữ cả c
   OpenXml: `OpenXmlReader.GetText` nạp nguyên text node trước khi kiểm được độ dài ô.
 - Template `docs/templates/assets-workbook*.xlsx` sinh bằng `scripts/make_asset_workbook_template.py`; test
   `Committed_templates_parse…` nạp chính file đã commit — đổi cột / enum thì sinh lại template cùng PR.
+
+- **ASSET-EXPORT-WORKBOOK:** CSV / GeoJSON mạch: ô hình trống = **xoá** lộ trình; workbook không có cột hình mạch nên
+  `PlanFeedersAsync` chỉ gán `Geom` khi `IImportRow.CarriesGeometry` (workbook: chỉ tủ và cột). Bỏ điều kiện đó thì mọi
+  lần xuất → nạp lại âm thầm xoá lộ trình mạch đã vẽ (test `Reimport_keeps_a_drawn_feeder_route…`). Test thứ tự ưu tiên cặp `POLE-9999`/`POLE-10000`, nếu fixture overflow đang giữ thì chọn ranh giới
+  số chữ số kế tiếp còn trống; không giành ID hoặc di chuyển sequence dùng chung. Test giới hạn xuất chèn ID ở dải
+  cao đã kiểm trống để không tiêu sequence qua ranh giới mà test overflow đang giữ.

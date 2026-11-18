@@ -2543,8 +2543,18 @@ dùng `center`. **Chưa báo.**
 | WB-4 | Bộ đèn: cột chưa có bộ đang dùng → thêm; đã có → so khớp, giống → `unchanged`, khác → lỗi dòng. Workbook không bao giờ sửa / thay bộ đang dùng (thay bộ đi đường CRUD, OF-4). `/assets/import/fixtures` **giữ** insert-only |
 | WB-5 | Toạ độ là hai cột `*_lat` / `*_lng` (số, Invariant; `10,97` là lỗi, không tự sửa). Sheet không mang hình tuyến / mạch: tuyến mới chưa hình, tuyến đã có giữ hình (ROAD-SEGMENT-GEOM-NULL) |
 | WB-6 | Response **200** + `WorkbookImportResult { committed, segments/cabinets/feeders/poles/fixtures: {inserted, updated, unchanged}, failed, total_errors, truncated, rows[], total_warnings, warnings[] }`. `row` là số dòng Excel thật; `column` là **tên cột của sheet**. Khi `committed = false` mọi số đếm là 0 |
+| WB-7 | **Export** (ASSET-EXPORT-WORKBOOK, Mỹ chốt 18/11/2026): `GET /api/v1/assets/export/workbook?commune_id=…` (lặp được, qua `CommuneFilter.Narrow`; vắng = mọi xã trong phạm vi). Capability **`ReadNetwork`** (cả 4 vai trò, như đọc danh sách kiểm kê). 200 file `.xlsx` `assets-<yyyy-MM-dd>.xlsx`, cùng 26 cột và thứ tự với template import |
+| WB-8 | Quá **5 000** cột trong phạm vi (giới hạn của import) → **413 `EXPORT_TOO_LARGE`** (mã có sẵn, W-6) — file xuất ra luôn nạp lại được; lọc theo `commune_id` |
+| WB-9 | Một dòng một cột đèn kèm tuyến / tủ / mạch / bộ đèn **đang dùng**; bộ đã tháo không xuất. Mục tiêu: xuất → nạp lại nguyên file = mọi dòng `unchanged` |
+| WB-10 | Cột **không có `external_ref`**, hoặc có mạch **không có `external_ref`**, không vào sheet 1 (nạp lại sẽ lỗi hoặc tháo mạch) mà liệt kê ở sheet 2 **`Không xuất`** (`pole_id`, `commune_id`, `reason`). Không bỏ im lặng |
+| WB-11 | Giới hạn: một dòng một `data_source` (của cột). Tuyến / tủ / bộ đèn khác `data_source` với cột → nạp lại báo mâu thuẫn hoặc đổi nguồn của tài sản cha. Tuyến / tủ / mạch không có cột nào không xuất hiện (import không xoá nên không mất) |
 
-**Cần báo:** WP5 (endpoint mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`). **Chưa báo.**
+**Cần báo:** WP5 (endpoint import mới, hình dạng kết quả khác `ImportResult`, template `.xlsx`; endpoint export và nút tải). **Chưa báo.**
+
+**Phát hiện khi hiện thực ASSET-EXPORT-WORKBOOK (18/11/2026) — sửa ở PR export, sau khi #271 đã merge với lỗi này:** `PlanFeedersAsync` gán
+`feeder.Geom = geometry` mà workbook không có hình mạch, nên xuất → nạp lại xoá lộ trình mạch đã vẽ dù file không sửa.
+Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5); CSV / GeoJSON giữ luật cũ (ô `geom_wkt` trống = xoá).
+
 
 
 ## IOT-HISTORY-30S — lịch sử điện theo feeder (18/11/2026)

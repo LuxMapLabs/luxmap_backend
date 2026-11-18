@@ -152,7 +152,7 @@ internal sealed class WorkbookDocument
         var columns = header.ToDictionary(p => p.Key, p => Resolve(p.Value, shared));
         foreach (var duplicate in columns.Values.Where(v => v.Length > 0).GroupBy(v => v, StringComparer.Ordinal).Where(g => g.Count() > 1))
             Errors.Add(new(1, duplicate.Key, "Duplicate column in the header row."));
-        var missing = new[] { "commune_id", "data_source", "pole_ref" }.Except(columns.Values, StringComparer.Ordinal).ToArray();
+        var missing = WorkbookColumns.All.Where(c => c.Required).Select(c => c.Name).Except(columns.Values, StringComparer.Ordinal).ToArray();
         if (missing.Length > 0) Errors.Add(new(1, string.Join(", ", missing), "Column missing from the header row."));
         if (Errors.Count > 0) return;
         foreach (var (number, cells) in raw.Where(r => r.Number != 1))

@@ -33,6 +33,7 @@ public sealed class AssetsModule : ILuxMapModule
         services.AddScoped<AssetCrudService>();
         services.AddScoped<PoleRelocation>();
         services.AddScoped<AssetImportService>();
+        services.AddScoped<Export.AssetExportWorkbook>();
         services.AddScoped<ICommunePoleCenters, CommunePoleCenters>();
 
         // BE-31 — the zone comes from the agenda's key so "today" and "tonight" cannot disagree (WarrantyOptions.TimeZoneKey).
