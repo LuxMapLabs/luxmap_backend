@@ -352,7 +352,11 @@ public sealed partial class AssetImportService(
             if (feeder is not null)
             {
                 feeder.FeederName = name!;
-                feeder.Geom = geometry;
+                if (reader.Row.CarriesGeometry)
+                {
+                    feeder.Geom = geometry;
+                }
+
                 TopologyLink.ApplyFeederCabinet(dbContext, feeder, newCabinetId, cabinetSource);
                 Count(feeder, ref updated, ref unchanged);
                 continue;

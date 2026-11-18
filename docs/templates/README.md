@@ -25,6 +25,16 @@ PostgreSQL (`\d pole`, `\d fixture`, `\d road_segment`, `\d feeder`, `\d electri
 Chỉ nhận `.xlsx` có chữ ký zip; `.xls`, CSV hoặc text đổi đuôi trả 415; zip hỏng trả 400.
 Bề mặt WB-1…WB-6 là **SELF-SIGNED**, nền tạm tới FW kế tiếp như nhóm import CSV.
 
+Xuất kiểm kê: `GET /api/v1/assets/export/workbook?commune_id=…` (tham số lặp được; vắng = mọi xã trong phạm vi),
+capability `ReadNetwork` (cả bốn vai trò). Tải `assets-<yyyy-MM-dd>.xlsx` theo ngày UTC, đúng mẫu `import` để sửa rồi nạp lại.
+Quá 5000 cột trong phạm vi → **413 `EXPORT_TOO_LARGE`**, hãy lọc theo `commune_id`.
+Cột thiếu mã vĩnh viễn hoặc có mạch thiếu mã được liệt kê ở sheet **`Không xuất`** kèm lý do và cách gán mã qua form tài sản;
+chúng không nằm trong sheet đầu. Chỉ xuất bộ đèn đang dùng; nạp lại nguyên file giữ nguyên dấu cập nhật của dữ liệu khớp.
+Giới hạn WB-11: mỗi dòng chỉ mang `data_source` của cột; tuyến/tủ/bộ đèn khác nguồn có thể làm nạp lại báo mâu thuẫn
+hoặc đổi nguồn của tài sản cha. Tuyến/tủ/mạch không có cột không xuất hiện; import không xóa nên chúng vẫn được giữ.
+Sheet không mang hình tuyến / mạch: nạp lại **giữ** hình đã vẽ của cả hai (WB-5).
+Bề mặt WB-7…WB-11 là **SELF-SIGNED**, nền tạm tới FW kế tiếp.
+
 - [assets-workbook.xlsx](assets-workbook.xlsx): sheet đầu `import` chỉ header để điền; sheet `Hướng dẫn` giải thích từng cột.
 - [assets-workbook.example.xlsx](assets-workbook.example.xlsx): 5 cột mẫu, gồm cột chưa GPS, cột không bộ đèn, bộ chao đôi.
   Mã xã `COM-070` theo các CSV mẫu hiện tại. Seed sinh ID tự động (khóa `study_site`), nên DB khác phải dùng mã xã thực tế:

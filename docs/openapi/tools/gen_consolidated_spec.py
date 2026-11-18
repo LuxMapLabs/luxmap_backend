@@ -169,6 +169,7 @@ def opid(method, path):
 
 # Summaries for the implemented operations (from the controllers' XML docs / behaviour)
 SUMMARY = {
+    ("get", "/api/v1/assets/export/workbook"): "Xuất kiểm kê theo mẫu import Excel, ReadNetwork, tối đa 5000 cột; sheet Không xuất nêu cột thiếu mã (WB-7…WB-11)",
     ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|cabinets|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
     ("post", "/api/v1/assets/import/workbook"): "Nạp toàn bộ kiểm kê từ sheet đầu của một file .xlsx, all-or-nothing (WB-1…WB-6); 200 kèm committed + lỗi theo dòng Excel",
     ("get", "/api/v1/assets/segments"): "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",

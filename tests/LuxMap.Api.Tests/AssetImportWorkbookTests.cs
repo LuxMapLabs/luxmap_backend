@@ -115,6 +115,28 @@ public sealed class AssetImportWorkbookTests(AssetImportFixture fixture)
         Assert.Equal(before, await Stamps(tag));
     }
 
+    /// <summary>
+    /// The sheet has no feeder route column (WB-5): re-importing must keep a route drawn elsewhere, not read the absent
+    /// column as "no route". CSV keeps its own rule (a blank geom_wkt clears) — that is CarriesGeometry's job.
+    /// </summary>
+    [Fact]
+    public async Task Reimport_keeps_a_drawn_feeder_route()
+    {
+        var tag = Tag(); var bytes = AssetWorkbookFile.Create(Full(tag));
+        Assert.True((await Import(bytes)).GetProperty("committed").GetBoolean());
+        var feederRef = tag + "-F";
+        await fixture.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE feeder SET geom = ST_GeomFromText('LINESTRING(106.49 10.97, 106.50 10.98)', 4326) WHERE external_ref = {feederRef}"));
+        var before = await Stamps(tag);
+
+        var second = await Import(bytes);
+        Assert.True(second.GetProperty("committed").GetBoolean());
+        Assert.Equal(1, second.GetProperty("feeders").GetProperty("unchanged").GetInt32());
+        Assert.Equal(before, await Stamps(tag));
+        Assert.True(await fixture.QueryAsync(db => db.Set<Feeder>().IgnoreQueryFilters()
+            .AnyAsync(f => f.ExternalRef == feederRef && f.Geom != null)));
+    }
+
     [Fact]
     public async Task Different_active_fixture_is_refused_without_mutating_it()
     {
