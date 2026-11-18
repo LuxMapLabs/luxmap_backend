@@ -18,6 +18,8 @@ public sealed class IotModule : ILuxMapModule
         services.AddSingleton(new VersionedResultColumn("iot_node_firmware_change", "iot_node_firmware", "firmware_version_id", VersionReference.Id));
         // BE-26: a silent device raises node_offline under the existing scheduled job runner.
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.NodeOfflineJob>();
+        services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.IotDiagnosticJob>();
+        services.AddScoped<IotDiagnosticSummary>();
 
         var lighting = configuration.GetSection(Lighting.LightingOptions.SectionName).Get<Lighting.LightingOptions>()
             ?? new Lighting.LightingOptions();

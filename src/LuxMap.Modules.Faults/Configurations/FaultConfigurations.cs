@@ -82,6 +82,10 @@ public sealed class FaultConfiguration : IEntityTypeConfiguration<Fault>
         builder.HasContractEnum(fault => fault.FaultType);
         builder.HasContractEnum(fault => fault.OverrideFaultType);
         builder.Ignore(fault => fault.EffectiveType);
+        builder.Property(fault => fault.IotEvidence).HasColumnType("jsonb");
+        builder.Property(fault => fault.IotAnomalyCode).HasColumnType("text");
+        builder.Property(fault => fault.FeederId).HasColumnType("text");
+        builder.Property(fault => fault.CabinetId).HasColumnType("text");
         builder.Property(fault => fault.ReviewNote).HasColumnType("text");
         builder.HasContractEnum(fault => fault.FaultStatus);
         builder.HasContractEnum(fault => fault.Severity);

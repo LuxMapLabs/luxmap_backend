@@ -2479,3 +2479,27 @@ Quyết định nội bộ BE, Mỹ chốt trong chat 16/11. Không chạm bề 
 | FN-6 | Không audit riêng (bộ đèn không phải `IAudited`, như mọi sửa tài sản khác); dấu vết là `updated_by` / `updated_at`. Không có khoá hàng: sửa và ngừng dùng đồng thời không đụng chung cột nào |
 
 **Cần báo:** WP5 (đổi `PATCH` → `PUT /assets/fixtures/{fixture_id}`, 204; trường `note` mới), WP6 (trường mới, chỉ thêm).
+
+## IOT-FAULTS-1 — chẩn đoán thành Fault và phục hồi (18/11/2026)
+
+Decision maker: chủ yêu cầu LuxMap IoT trong phiên làm việc 18/11/2026. Đã yêu cầu triển khai trên nhánh iot.
+Phạm vi BE, không sửa FE. Thay đổi mở rộng API và schema, cần consumer nhận hai fault_type mới.
+
+- Thêm fault_type voltage_anomaly, iot_hardware_fault. Giữ 17 anomaly codes, ánh xạ telemetry_stale → node_offline,
+  voltage_loss → segment_outage, lamp_count_shortfall → lamp_out. Phạm vi đếm bóng là feeder, chưa biết pole/fixture.
+- Bổ sung iot_anomaly_code, origin_node_id, feeder_id, cabinet_id, recovered_at trên response Fault.
+  Evidence JSON lưu thuật toán iot-faults-v1, phiên bản hiệu chuẩn và firmware do sensorHealth xác nhận tại lúc đánh giá.
+  Firmware của mẫu lịch sử chưa có metadata được coi là không rõ.
+- Job mỗi 30 giây lưu evidence trong iot_diagnostic_state. Lỗi điện 3 phút, phần cứng 5 phút, thiếu bóng 2 cửa sổ 25 mẫu
+  không chồng nhau. Bản tin lặp không tăng xác nhận. Bản tin phần cứng cũ và dữ liệu đo replay không chứng minh phục hồi.
+- Khi bình thường liên tục 90 giây với bản tin mới: Fault detected chưa có WorkOrder → rejected bằng actor iot,
+  confirmed_by để null, có audit rejected và recovered_at. Các trạng thái khác chỉ ghi nhận phục hồi, không đóng.
+  Quyết định này bổ sung ngoại lệ tự động cho D-6, không thay quyết định của người hay nghiệm thu WorkOrder.
+- Chống trùng node + feeder + anomaly_code khi detected/confirmed/in_progress/resolved.
+  Job offline cũ nhường thiết bị đã cấu hình Bridge cho job chẩn đoán.
+- GET /api/v1/iot/diagnostics/summary dùng ReadNetwork, phạm vi xã, page/page_size, đọc cache DB.
+  diagnostic_status gồm normal, anomaly, stale, no_data, unconfigured, source_unavailable.
+- Thêm profile 5v-quiet-v1 cho R002, trung bình 64 lần, AUX ổn định 1.5 giây, nguồn thử 4.80–5.30 V.
+  Cửa sổ 25 mẫu, tối thiểu 20 phiếu khớp một dải và trung vị cùng dải. Các dải có khoảng bỏ phiếu không xác định.
+  Các mức 7–10 có đo thực tế, chưa hiệu chuẩn 1–6. Giữ profile 4v và 5v cũ cho dữ liệu cũ.
+- calibration_rig giữ nguồn riêng; GET /faults?source_channel=iot&data_source=calibration_rig để xem demo.

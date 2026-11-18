@@ -22,6 +22,7 @@ namespace LuxMap.Modules.Faults;
 /// </remarks>
 public interface IActiveWorkOrderLookup
 {
+    IActiveWorkOrderLookup InContext(LuxMap.Persistence.LuxMapDbContext context) => this;
     /// <summary>fault_id → work_order_id for those of <paramref name="faultIds"/> held by a work order.</summary>
     Task<IReadOnlyDictionary<string, string>> ActiveWorkOrdersAsync(
         IReadOnlyCollection<string> faultIds, CancellationToken ct);

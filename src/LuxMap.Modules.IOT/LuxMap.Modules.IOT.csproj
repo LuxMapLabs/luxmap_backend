@@ -12,6 +12,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="LuxMap.Api.Tests" />
     <Compile Include="..\LuxMap.IotBridge\SensorHealthReport.cs" Link="Wire\SensorHealthReport.cs" />
     <!-- LC-12 M-13: the MQTT client of the device channel (MIT). -->
     <PackageReference Include="MQTTnet" Version="5.2.0.1603" />

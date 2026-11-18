@@ -114,6 +114,7 @@ iot_values = {
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
     ("IotFeederElectricalResult", "status"): ["online", "offline", "no_data", "unconfigured"],
     ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
+    ("IotDiagnosticSummaryItem", "diagnostic_status"): ["normal", "anomaly", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotAnomaly", "code"): [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",
@@ -135,10 +136,12 @@ def iot_property(schema, field):
 for (schema, field), values in iot_values.items():
     iot_property(schema, field)["enum"] = values
 
+iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot_values[("IotAnomaly", "code")]
+
 S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
 for schema in ("NodeProfile", "RegisterNodeRequest"):
-    iot_property(schema, "lamp_count_calibration")["enum"] = ["4v", "5v", None]
+    iot_property(schema, "lamp_count_calibration")["enum"] = ["4v", "5v", "5v-quiet-v1", None]
 
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
     iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
@@ -371,6 +374,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
     "/api/v1/statistics/citizen-feedback": "drift ST-13 (SELF-SIGNED, nền tạm tới FW)",
@@ -413,6 +417,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical/history"): "Đọc lịch sử điện của node theo trang hoặc cursor",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
+    ("get", "/api/v1/iot/diagnostics/summary"): "Chẩn đoán tổng hợp theo trang, job lưu DB và phạm vi xã",
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
 })
 

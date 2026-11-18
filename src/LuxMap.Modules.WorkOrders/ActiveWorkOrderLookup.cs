@@ -12,6 +12,8 @@ namespace LuxMap.Modules.WorkOrders;
 /// </remarks>
 public sealed class ActiveWorkOrderLookup(LuxMapDbContext db) : IActiveWorkOrderLookup
 {
+    public IActiveWorkOrderLookup InContext(LuxMapDbContext context) => new ActiveWorkOrderLookup(context);
+
     public async Task<IReadOnlyDictionary<string, string>> ActiveWorkOrdersAsync(
         IReadOnlyCollection<string> faultIds, CancellationToken ct)
     {

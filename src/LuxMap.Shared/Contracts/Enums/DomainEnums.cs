@@ -49,6 +49,8 @@ public enum FaultType
     SegmentOutage,
     NodeOffline,
     RuntimeDecline,
+    VoltageAnomaly,
+    IotHardwareFault,
 }
 
 /// <summary>fault_status : detected | confirmed | rejected | in_progress | resolved | verified</summary>

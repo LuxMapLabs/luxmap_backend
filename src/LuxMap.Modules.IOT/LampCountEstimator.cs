@@ -26,6 +26,12 @@ internal static class LampCountEstimator
     internal const double VoltageLossLimit = 0.1;
     public const string FourVolt = "4v";
     public const string FiveVolt = "5v";
+    public const string QuietFiveVolt = "5v-quiet-v1";
+
+    private static readonly (int Count, double Min, double Max)[] QuietBands =
+    [
+        (7, 58.75, 72.25), (8, 74.75, 82.20), (9, 84.75, 90.20), (10, 92.75, 102.5),
+    ];
     private const int FiveVoltRequiredVotes = 15;
     private const int MinimumThresholdSamples = 10;
     private const int InstalledLamps = 10;
@@ -43,15 +49,17 @@ internal static class LampCountEstimator
         (7, 42.5, 48.75), (6, 38.75, 43.75),
     ];
 
-    internal static bool InCalibrationRange(double voltage, string calibration) => calibration == FourVolt
+    internal static bool InCalibrationRange(double voltage, string calibration) => calibration == QuietFiveVolt
+        ? voltage is >= 4.80 and <= 5.30
+        : calibration == FourVolt
         ? voltage is >= 4.00 and <= 4.13
         : voltage is >= 4.75 and <= 5.25;
 
-    internal static LampCountEstimate Evaluate(IReadOnlyList<double> samples, string calibration)
+    internal static LampCountEstimate Evaluate(IReadOnlyList<double> samples, string calibration, int installedLamps = InstalledLamps)
     {
         var fourVolt = calibration == FourVolt;
-        var bands = fourVolt ? FourVoltBands : FiveVoltBands;
-        var requiredVotes = fourVolt ? WindowSize : FiveVoltRequiredVotes;
+        var bands = calibration == QuietFiveVolt ? QuietBands : fourVolt ? FourVoltBands : FiveVoltBands;
+        var requiredVotes = calibration == QuietFiveVolt ? 20 : fourVolt ? WindowSize : FiveVoltRequiredVotes;
         var votes = bands.ToDictionary(band => band.Count, _ => 0);
         var ambiguous = 0;
         var outside = 0;
@@ -75,11 +83,17 @@ internal static class LampCountEstimator
                 samples.Count(current => current >= 50), samples.Count(current => current >= 45));
         }
 
+        if (calibration == QuietFiveVolt && samples.Count > 0)
+        {
+            var ordered = samples.Order().ToArray();
+            median = (ordered[(ordered.Length - 1) / 2] + ordered[ordered.Length / 2]) / 2;
+        }
         var candidates = votes.Where(vote => vote.Value >= requiredVotes &&
+            (calibration != QuietFiveVolt || bands.Any(b => b.Count == vote.Key && median >= b.Min && median <= b.Max)) &&
             (counts is null || SupportsFourVoltEstimate(vote.Key, counts))).Select(vote => vote.Key).ToArray();
         int? lit = samples.Count == WindowSize && candidates.Length == 1 ? candidates[0] : null;
         var status = samples.Count < WindowSize ? "insufficient_samples" : lit is null ? "undetermined" : "estimated";
-        return new(status, samples.Count, WindowSize, requiredVotes, lit, InstalledLamps - lit, votes, ambiguous, outside)
+        return new(status, samples.Count, WindowSize, requiredVotes, lit, lit is null ? null : Math.Max(0, installedLamps - lit.Value), votes, ambiguous, outside)
         {
             MedianCurrentMa = median, ThresholdCounts = counts,
         };

@@ -32,6 +32,11 @@ public class Fault : ICommuneScoped, IAudited
     /// would be satisfied by that anyway in PostgreSQL, but the filter says the intent out loud.
     /// </remarks>
     public string? ClientOpId { get; set; }
+    public string? IotAnomalyCode { get; set; }
+    public string? FeederId { get; set; }
+    public string? CabinetId { get; set; }
+    public string? IotEvidence { get; set; }
+    public DateTime? RecoveredAt { get; set; }
 
     /// <summary>
     /// The pole, when it is known. NULL when a crew reports a fault at a pole not yet in the asset

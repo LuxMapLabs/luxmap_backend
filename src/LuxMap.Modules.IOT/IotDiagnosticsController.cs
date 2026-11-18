@@ -128,6 +128,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [Required] public double NominalPowerMw { get; init; }
         public string? GatewayId { get; init; }
         public string? LampCountCalibration { get; init; }
+        public int InstalledLampCount { get; init; } = 10;
     }
 
     public sealed record RegisteredNode(string NodeId, string ServerId, string DeviceId, string FeederId, string GatewayId);
@@ -157,6 +158,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             NominalCurrentMa = request.NominalCurrentMa,
             NominalPowerMw = request.NominalPowerMw,
             LampCountCalibration = request.LampCountCalibration,
+            InstalledLampCount = request.InstalledLampCount,
         };
         if (!profile.IsValid() || request.DataSource is not (DataSource.CalibrationRig or DataSource.Simulated))
             throw Invalid("Thông tin feeder, nguồn dữ liệu hoặc ngưỡng đo không hợp lệ.");
@@ -215,6 +217,14 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
     private static LuxMapException Invalid(string message)
         => new(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, message);
+
+    /// <summary>Chẩn đoán tổng hợp từ job nền, có phân trang và phạm vi xã.</summary>
+    [HttpGet("diagnostics/summary")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<PagedResult<IotDiagnosticSummaryItem>>(StatusCodes.Status200OK)]
+    public Task<PagedResult<IotDiagnosticSummaryItem>> SummaryAsync(
+        [FromQuery] PageQuery page, [FromServices] IotDiagnosticSummary summary, CancellationToken ct)
+        => summary.ListAsync(page.ToPageRequest(), ct);
 
     [HttpGet("nodes/{nodeId}/diagnostics")]
     [ProducesResponseType<IotDiagnosticResult>(StatusCodes.Status200OK)]
