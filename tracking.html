@@ -40,8 +40,22 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="asset-workbook-multisheet">
+    <strong>ASSET-WORKBOOK-MULTISHEET — workbook mỗi loại tài sản một sheet · 18/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Thay workbook một sheet bằng <code>Hướng dẫn</code> + Tuyến đường / Tủ điện / Mạch điện / Cột điện / Bóng đèn; xã và
+    <code>data_source</code> chọn khi upload; lỗi có <code>sheet</code>; planner CSV dùng lại, rollback toàn file giữ nguyên.
+    Export đủ mọi tài sản (cả tuyến/tủ/mạch không cột, hình WKT, bộ đã tháo). Drift WB-12…WB-20, SELF-SIGNED.</p>
+    <div class="bar"><i style="width:100%"></i></div>
+    <p><code>dotnet test</code> xanh (Api 1884 / 7 skip). Sửa thêm: lỗi dây chuyền nhãn <code>cabinet_source</code>/<code>feeder_source</code>
+    khi tài sản cha lỗi; 5 test sai (thiếu <code>lamp_count</code>/<code>slot</code>, tên <code>_xlnm</code>, giả định thứ tự dòng).
+    Phá thử rollback / xoá lộ trình mạch / khớp bộ đèn / cột lạ / nhãn dây chuyền đều đỏ đúng. Còn: báo WP5; ghi chú tủ điện và
+    import IoT là ticket riêng.</p>
+  </div>
+
   <div class="card">
-    <strong>ASSET-EXPORT-WORKBOOK — xuất kiểm kê Excel · 18/11/2026</strong>
+    <strong>ASSET-EXPORT-WORKBOOK — lịch sử định dạng một sheet · 18/11/2026</strong>
+    <p>Định dạng bên dưới đã được thay bởi <a href="#asset-workbook-multisheet">ASSET-WORKBOOK-MULTISHEET</a> (WB-12…WB-20).</p>
     <p><span class="tag t-next">Chờ PR vào dev (sau #271)</span>
     <code>GET /api/v1/assets/export/workbook</code> (ReadNetwork, lọc xã, quá 5000 cột → 413), đúng 26 cột của template import,
     một danh sách cột dùng chung; cột / mạch thiếu mã ra sheet <code>Không xuất</code>. WB-7…WB-11 SELF-SIGNED.</p>
@@ -61,7 +75,8 @@
   </div>
 
   <div class="card">
-    <strong>ASSET-IMPORT-WORKBOOK — kiểm kê một sheet Excel · 18/11/2026</strong>
+    <strong>ASSET-IMPORT-WORKBOOK — lịch sử định dạng một sheet · 18/11/2026</strong>
+    <p>Định dạng bên dưới đã được thay bởi <a href="#asset-workbook-multisheet">ASSET-WORKBOOK-MULTISHEET</a> (WB-12…WB-20).</p>
     <p><span class="tag t-done">Xong · PR #271 vào dev</span>
     Thêm <code>POST /api/v1/assets/import/workbook</code>, tái dùng planner năm lớp trong một transaction;
     gộp trùng, giới hạn SAX, so khớp bộ đang dùng, lỗi theo cột sheet. WB-1…WB-6 SELF-SIGNED, nền tạm tới FW kế tiếp.</p>

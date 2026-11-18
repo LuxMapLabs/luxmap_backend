@@ -339,7 +339,7 @@ public sealed partial class AssetImportService(
             var newCabinetId = cabinet?.Id ?? feeder?.CabinetId;
             var (cabinetSource, labelError) = TopologyLink.Resolve(
                 feeder?.CabinetId, feeder?.CabinetSource, newCabinetId, reader.Label("cabinet_source"), "cabinet_source", "cabinet_id");
-            if (labelError is not null)
+            if (labelError is not null && !reader.ReferenceSuppressed)
             {
                 reader.Fail("cabinet_source", labelError);
             }
@@ -352,7 +352,7 @@ public sealed partial class AssetImportService(
             if (feeder is not null)
             {
                 feeder.FeederName = name!;
-                if (reader.Row.CarriesGeometry)
+                if (!reader.Row.KeepEmptyGeometry || !reader.Row.GeometryIsEmpty)
                 {
                     feeder.Geom = geometry;
                 }
@@ -431,11 +431,14 @@ public sealed partial class AssetImportService(
                 existing.TryGetValue((communeId, externalRef), out pole);
             }
 
+            if (pole is null && reader.Row.RequireLocationNote && reader.Row.GeometryIsEmpty && note is null)
+                reader.Fail("note", "A pole without geom_wkt needs a note describing where it is");
+
             // TOPO-INFER TI-2: the label follows TopologyLink's rule. An empty feeder cell still clears the circuit here
             // (full replacement, as before), and with it the label.
             var (feederSource, labelError) = TopologyLink.Resolve(
                 pole?.FeederId, pole?.FeederSource, feeder?.Id, reader.Label("feeder_source"), "feeder_source", "feeder_id");
-            if (labelError is not null)
+            if (labelError is not null && !reader.ReferenceSuppressed)
             {
                 reader.Fail("feeder_source", labelError);
             }
@@ -541,13 +544,11 @@ public sealed partial class AssetImportService(
     private bool Touch(IUpdateStamped asset) => AssetStamp.Touch(dbContext, asset, actor);
 
     /// <summary>
-    /// Fixtures are INSERT-ONLY — see <see cref="Fixture"/> and the note on
-    /// <c>ix_fixture_pole_id_active</c>.
+    /// CSV / GeoJSON fixtures are insert-only; workbook replay matches immutable installations by (pole, install_date).
     /// </summary>
     /// <remarks>
-    /// There is no natural key to upsert on. A pole carries several lamps over its life and the
-    /// history is the point, so nothing in the file identifies a particular installation. Re-running
-    /// a fixtures file therefore reports one error per ACTIVE row beyond a pole's one fitting rather than silently
+    /// A pole carries several lamps over its life and the history is the point. Re-running
+    /// a CSV / GeoJSON fixtures file reports one error per ACTIVE row beyond a pole's one fitting rather than silently
     /// doubling the equipment history (ONE-FIXTURE: one fitting in service per pole). Replacing a fitting goes
     /// through CRUD, which can say which row it means.
     /// </remarks>
@@ -557,11 +558,10 @@ public sealed partial class AssetImportService(
 
         var poleIds = poles.Values.SelectMany(assets => assets.Select(asset => asset.Id)).ToArray();
         var slotsInUse = await SlotsInUseAsync(poleIds, cancellationToken);
-        var active = matchExisting
-            ? await dbContext.Set<Fixture>().AsNoTracking()
-                .Where(f => f.RemovedDate == null && poleIds.Contains(f.PoleId))
-                .ToDictionaryAsync(f => f.PoleId, cancellationToken)
-            : new Dictionary<string, Fixture>();
+        var fittings = matchExisting
+            ? (await dbContext.Set<Fixture>().AsNoTracking().Where(f => poleIds.Contains(f.PoleId)).ToListAsync(cancellationToken))
+                .GroupBy(f => (f.PoleId, f.InstallDate)).ToDictionary(g => g.Key, g => g.ToList())
+            : new Dictionary<(string, DateOnly), List<Fixture>>();
         int inserted = 0, unchanged = 0;
 
         foreach (var reader in readers)
@@ -586,18 +586,25 @@ public sealed partial class AssetImportService(
                 reader.Fail("removed_date", $"'{removedDate:yyyy-MM-dd}' is before install_date '{installDate:yyyy-MM-dd}'.");
             }
 
-            if (matchExisting && poleId is not null && active.TryGetValue(poleId, out var current))
+            if (matchExisting && poleId is not null && installDate is not null
+                && fittings.TryGetValue((poleId, installDate.Value), out var matches))
             {
+                if (matches.Count > 1)
+                {
+                    reader.Fail("install_date", "The fitting match (pole, install_date) is ambiguous.");
+                    continue;
+                }
+                var current = matches[0];
                 void Match(string column, bool equal)
                 {
                     if (!equal)
-                        reader.Fail(column, $"Pole already has a fitting in service with a different {reader.Row.ColumnName(column)}; replace a fitting through the asset form.");
+                        reader.Fail(column, $"Different {column}; change a fitting through the asset form");
                 }
                 Match("fixture_type", current.FixtureType == fixtureType);
                 Match("power_source", current.PowerSource == powerSource);
                 Match("lamp_watt", current.LampWatt == watt);
                 Match("lamp_count", current.LampCount == lampCount);
-                Match("install_date", current.InstallDate == installDate);
+                Match("removed_date", current.RemovedDate == removedDate);
                 if (reader.Optional("warranty_expiry") is not null) Match("warranty_expiry", current.WarrantyExpiry == warranty);
                 if (note is not null) Match("note", current.Note == note);
                 if (reader.IsValid) unchanged++;
@@ -654,6 +661,7 @@ public sealed partial class AssetImportService(
             dbContext.Set<Fixture>().Add(fixture);
             Touch(fixture);
 
+            if (matchExisting) fittings[(poleId!, installDate.Value)] = [fixture];
             inserted++;
         }
 
@@ -791,7 +799,7 @@ public sealed partial class AssetImportService(
 
         if (reader.Row.ReferenceFailed(column))
         {
-            reader.Invalidate(); // The defining row already explains why this reference cannot resolve.
+            reader.SuppressReference(); // The defining row already explains why this reference cannot resolve.
             return null;
         }
 

@@ -33,7 +33,7 @@ public sealed class AssetsController(
     AssetCrudService service,
     ICommuneScopeAccessor scopeAccessor) : ControllerBase
 {
-    /// <summary>Current inventory in the import workbook format (WB-7…WB-11, SELF-SIGNED).</summary>
+    /// <summary>Complete inventory in named asset worksheets, including retired fittings (WB-19, SELF-SIGNED).</summary>
     [HttpGet("export/workbook")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<FileContentResult>(StatusCodes.Status200OK, Export.AssetExportWorkbook.ContentType)]

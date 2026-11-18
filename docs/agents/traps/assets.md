@@ -530,21 +530,24 @@ Khoá `(uploaded_by, client_op_id)` là toàn bảng của từng loại ảnh. 
 trước lookup có scope; row cũ nay ngoài scope vẫn là 409 IDEMPOTENCY_CONFLICT, không truy vấn bỏ scope
 và không để lỗi thành 500. Snapshot audit trước/sau ẩn giữ cả cha, xã và nguồn ảnh, không chỉ cặp deleted.
 
-## ASSET-IMPORT-WORKBOOK — một sheet Excel đi qua planner của năm lớp (18/11/2026, drift WB-1…WB-6)
+## ASSET-IMPORT-WORKBOOK — mỗi loại một sheet, chung planner (18/11/2026, drift WB-12…WB-20)
 
-- **Workbook không có validator riêng**: `WorkbookImportRow` dịch tên cột nội bộ của planner (`external_ref`, `geom_wkt`,
-  `note`…) sang tên cột sheet qua `ColumnName`. Planner đọc thêm một cột mới → **phải** khai ánh xạ ở đó. Cột không có
-  bản tương ứng trong sheet phải ánh xạ ra `null` (đọc là trống), **không** sang cột hàng xóm: từng ánh xạ `geom_wkt` của
-  mạch sang `pole_lat` làm mọi dòng có GPS cột + `feeder_ref` lỗi "Expected a LineString" (bắt được ở test PostGIS, không ở build).
-- **All-or-nothing có `SaveChanges` giữa các lớp** (để lớp sau resolve ID vừa sinh), nên "chưa ghi" chỉ đúng vì rollback ở
-  cuối. Bỏ rollback thì build và nhiều test vẫn xanh trên đường đúng — test `Last_row_failure_rolls_back…` là chốt.
-- **Chốt dung lượng giải nén** (`WorkbookDocument.MaxUncompressedBytes`, tổng kích thước khai báo của entry zip) đứng **trước**
-  OpenXml: `OpenXmlReader.GetText` nạp nguyên text node trước khi kiểm được độ dài ô.
-- Template `docs/templates/assets-workbook*.xlsx` sinh bằng `scripts/make_asset_workbook_template.py`; test
-  `Committed_templates_parse…` nạp chính file đã commit — đổi cột / enum thì sinh lại template cùng PR.
-
-- **ASSET-EXPORT-WORKBOOK:** CSV / GeoJSON mạch: ô hình trống = **xoá** lộ trình; workbook không có cột hình mạch nên
-  `PlanFeedersAsync` chỉ gán `Geom` khi `IImportRow.CarriesGeometry` (workbook: chỉ tủ và cột). Bỏ điều kiện đó thì mọi
-  lần xuất → nạp lại âm thầm xoá lộ trình mạch đã vẽ (test `Reimport_keeps_a_drawn_feeder_route…`). Test thứ tự ưu tiên cặp `POLE-9999`/`POLE-10000`, nếu fixture overflow đang giữ thì chọn ranh giới
-  số chữ số kế tiếp còn trống; không giành ID hoặc di chuyển sequence dùng chung. Test giới hạn xuất chèn ID ở dải
-  cao đã kiểm trống để không tiêu sequence qua ranh giới mà test overflow đang giữ.
+- **Không có validator nghiệp vụ thứ hai.** `WorkbookSheets` giữ tên sheet / header CSV; `WorkbookSheetRow` giữ nguyên tên cột,
+  chỉ đưa `commune_id` / `data_source` từ multipart vào indexer và commune dùng resolve mã cha. Mỗi sheet vào planner theo LoadOrder;
+  không chiếu dòng phẳng, gộp cha hay ánh xạ tên cột. Lỗi CSV giữ `ImportRowError`; workbook bọc thành `WorkbookRowError` có `sheet`.
+- **All-or-nothing có SaveChanges giữa các lớp** để resolve ID vừa sinh. Bỏ rollback vẫn build xanh nhưng để dữ liệu dở trong DB;
+  test `Last_sheet_failure_rolls_back_inserts_and_updates_and_zeroes_counts` kiểm cả tạo và sửa. Năm advisory lock cùng khoá CSV,
+  lấy tăng dần trước planner. Cha lỗi được giữ theo `(kind, commune, ref)` để con không sinh lỗi “matches nothing” dư thừa.
+- **Geometry trống phụ thuộc định dạng.** `IImportRow.KeepEmptyGeometry` true ở workbook: tuyến / mạch trống hoặc thiếu cột giữ hình;
+  CSV / GeoJSON mạch vẫn trống = xoá. `RequireLocationNote` chỉ bật ở workbook: kiểm note khi cột mới chưa GPS, không áp CSV / form.
+- **Workbook fixtures khớp (pole, install_date), cả đã tháo.** Đọc tất cả fitting theo các pole có scope, nhóm theo cặp; nhiều bản ghi
+  là lỗi ambiguous. Đúng một thì so nội dung, không ghi / không Touch; chưa có thì thêm, vẫn ONE-FIXTURE. CSV fixtures insert-only.
+- **Chặn dữ liệu bị nuốt:** cột commune_id / data_source luôn lỗi header, cột lạ chỉ được trống; IoT có dữ liệu là lỗi. Sheet nhận theo
+  tên trim + NFC phân biệt hoa thường, mỗi sheet giữ số dòng Excel thật. Lỗi sắp LoadOrder → dòng → cột, không trộn dòng cùng số giữa sheet.
+- **Chốt giải nén đứng trước OpenXml:** `WorkbookDocument.MaxUncompressedBytes` kiểm tổng entry zip ≤ 100 MB;
+  OpenXmlReader.GetText có thể materialize text trước khi chốt độ dài ô kiểm được. Giữ SAX và giới hạn mỗi sheet.
+- Template sinh bằng `scripts/make_asset_workbook_template.py`, header / thứ tự và dropdown phải khớp export. Test tải chính hai file
+  đã commit, example chọn xã qua multipart. Mã kiểm kê của xã không dùng định dạng ID hệ thống.
+- **Export đọc riêng từng loại qua query filter**, không chỉ đi từ cột; giữ WKT và fitting đã tháo. Giới hạn 5000 mỗi loại kiểm trước
+  loại tài sản thiếu mã. Sheet `Không xuất` phải nêu mọi loại thiếu mã và cột có mạch thiếu mã / fitting có cột thiếu mã; không bỏ im lặng.
+  `Hướng dẫn` ghi số theo data_source, cảnh báo nhiều xã không nạp lại được và upload chỉ một nguồn.

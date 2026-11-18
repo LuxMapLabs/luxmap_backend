@@ -1289,16 +1289,31 @@
           "content": {
             "multipart/form-data": {
               "schema": {
+                "required": [
+                  "data_source"
+                ],
                 "type": "object",
                 "properties": {
                   "file": {
                     "type": "string",
                     "format": "binary"
+                  },
+                  "commune_id": {
+                    "type": "string"
+                  },
+                  "data_source": {
+                    "type": "string"
                   }
                 }
               },
               "encoding": {
                 "file": {
+                  "style": "form"
+                },
+                "commune_id": {
+                  "style": "form"
+                },
+                "data_source": {
                   "style": "form"
                 }
               }
@@ -27437,7 +27452,7 @@
           "rows": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ImportRowError"
+              "$ref": "#/components/schemas/WorkbookRowError"
             }
           },
           "total_warnings": {
@@ -27447,7 +27462,7 @@
           "warnings": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ImportRowError"
+              "$ref": "#/components/schemas/WorkbookRowError"
             }
           }
         },
@@ -27467,6 +27482,27 @@
           "unchanged": {
             "type": "integer",
             "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WorkbookRowError": {
+        "type": "object",
+        "properties": {
+          "sheet": {
+            "type": "string",
+            "nullable": true
+          },
+          "row": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "column": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
           }
         },
         "additionalProperties": false
