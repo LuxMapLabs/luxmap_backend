@@ -293,6 +293,8 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 
 ### ACCT-5 — avatar tài khoản (09/11/2026)
 
+- **19/11/2026 — Mỹ quyết (AVATAR-PNG):** avatar nhận JPEG hoặc PNG theo magic bytes, lưu thành JPEG; PNG trong suốt ghép nền trắng. Các luồng ảnh khác giữ JPEG-only.
+
 **Mỹ chốt 09/11/2026 · SELF-SIGNED**, nền tạm tới FW kế tiếp; chưa hợp nhất Contract.
 
 - `POST /api/v1/auth/me/avatar`: multipart field **`file`**, 200 `{avatar_url}`; thiếu file → 400 `VALIDATION_FAILED`, `details.field=file`.

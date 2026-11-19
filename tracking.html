@@ -1838,6 +1838,19 @@
     </ul>
   </div>
 
+  <div class="card" id="avatar-png">
+    <strong>AVATAR-PNG — avatar nhận PNG, lưu JPEG · 19/11/2026</strong>
+    <p><span class="tag t-done">Đã hiện thực · test xanh · chờ PR</span>
+    Caller chọn <code>AllowedImageFormats</code> (mặc định JPEG-only); chỉ avatar mở JPEG+PNG theo magic bytes,
+    alpha ghép nền trắng, bỏ metadata rồi lưu JPEG. Giữ nguyên giới hạn, key và thumbnail. Drift ACCT-5, Mỹ quyết.</p>
+    <p>Files: Shared/Storage, Infrastructure.Storage (sanitizer, magic bytes, ThumbnailFactory), AvatarService,
+    PublicReportService; AvatarTests, CitizenReportTests, AvatarPngTests, JpegOnlyDecodeTests; CLAUDE.md, Directory.Build.props,
+    media-storage.md, contract-drift.md. Build <code>--disable-build-servers -m:1</code>: 0 warning / 0 error;
+    decoder guard 2/2, storage 90/90 xanh. Phá thử <code>Configuration.Default</code> → guard đỏ (exit 1), khôi phục → 2/2 xanh.
+    Lượt MSBuild đa tiến trình ban đầu bị sandbox chặn pipe; chạy một tiến trình thành công. VSTest đôi lúc bị chặn socket; chạy lại 90/90 xanh.
+    Kiểm chứng ngoài sandbox (Claude): thêm chốt <code>Only_the_avatar_service_opts_into_png</code>; phá thử (luồng công dân bật PNG → đỏ, bỏ ghép nền trắng → pixel đen, đỏ), khôi phục xanh. Api.Tests 1907/1915 (7 skip), 1 đỏ chập chờn <code>SurveyProcessingTests.Expired_lease_is_reclaimed_with_a_new_attempt</code> (ngoài vùng ảnh) — chạy riêng xanh cùng AvatarTests + test PNG công dân (25/25). Commit <code>feat(avatar): accept PNG uploads and store them as JPEG</code>. Còn: web mở PNG ở <code>ProfileModal</code>; chưa kiểm chứng app mobile.</p>
+  </div>
+
 </div>
 </body>
 </html>

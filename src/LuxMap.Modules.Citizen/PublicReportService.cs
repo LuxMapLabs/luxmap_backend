@@ -139,7 +139,7 @@ public sealed partial class PublicReportService(
             foreach (var photo in input.Photos)
             {
                 await using var stream = photo.Open();
-                cleaned.Add(await sanitizer.SanitizeJpegAsync(stream, limits, ct));
+                cleaned.Add(await sanitizer.SanitizeJpegAsync(stream, limits, ct, AllowedImageFormats.JpegOnly));
             }
         }
 

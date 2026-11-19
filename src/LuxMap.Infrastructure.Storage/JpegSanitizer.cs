@@ -10,7 +10,7 @@ using SixLabors.ImageSharp.Processing;
 namespace LuxMap.Infrastructure.Storage;
 
 /// <summary>
-/// <see cref="IImageSanitizer"/> on ImageSharp (CITIZEN-QR P2b). Decodes ONLY through <see cref="ThumbnailFactory.JpegOnly"/> —
+/// <see cref="IImageSanitizer"/> on ImageSharp (CITIZEN-QR P2b). Decodes only through <see cref="ThumbnailFactory.JpegOnly"/> or, for avatars, <see cref="ThumbnailFactory.JpegOrPng"/> —
 /// the premise under which the ImageSharp advisories are suppressed (<c>JpegOnlyDecodeTests</c>).
 /// </summary>
 /// <param name="maxConcurrency">Photos cleaned at once. The slot is taken BEFORE the photo is read into memory, so memory is
@@ -24,7 +24,8 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
     private readonly SemaphoreSlim gate = new(maxConcurrency, maxConcurrency);
     private int waiting;
 
-    public async Task<byte[]> SanitizeJpegAsync(Stream content, ImageLimits limits, CancellationToken cancellationToken = default)
+    public async Task<byte[]> SanitizeJpegAsync(Stream content, ImageLimits limits, CancellationToken cancellationToken = default,
+        AllowedImageFormats allowedFormats = AllowedImageFormats.JpegOnly)
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(limits);
@@ -49,9 +50,9 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
         try
         {
             using var buffered = await ReadBoundedAsync(content, limits.MaxBytes, cancellationToken);
-            await JpegMagicBytes.EnsureJpegAsync(buffered, cancellationToken);
+            await JpegMagicBytes.EnsureAllowedAsync(buffered, allowedFormats, cancellationToken);
             buffered.Position = 0;
-            return await CleanAsync(buffered, limits, cancellationToken);
+            return await CleanAsync(buffered, limits, allowedFormats, cancellationToken);
         }
         finally
         {
@@ -62,9 +63,9 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
 
     public void Dispose() => gate.Dispose();
 
-    private static async Task<byte[]> CleanAsync(MemoryStream buffered, ImageLimits limits, CancellationToken ct)
+    private static async Task<byte[]> CleanAsync(MemoryStream buffered, ImageLimits limits, AllowedImageFormats allowedFormats, CancellationToken ct)
     {
-        var decoder = new DecoderOptions { Configuration = ThumbnailFactory.JpegOnly };
+        var decoder = new DecoderOptions { Configuration = allowedFormats == AllowedImageFormats.JpegOrPng ? ThumbnailFactory.JpegOrPng : ThumbnailFactory.JpegOnly };
         ImageInfo info;
         try
         {
@@ -72,7 +73,7 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
         }
         catch (Exception error) when (error is ImageFormatException or UnknownImageFormatException)
         {
-            throw Unsupported(error);
+            throw Unsupported(error, allowedFormats);
         }
 
         if ((long)info.Width * info.Height > limits.MaxPixels)
@@ -90,7 +91,7 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
         }
         catch (Exception error) when (error is ImageFormatException or UnknownImageFormatException)
         {
-            throw Unsupported(error);
+            throw Unsupported(error, allowedFormats);
         }
 
         using (image)
@@ -104,6 +105,9 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
                     Mode = ResizeMode.Max, Size = new Size(limits.MaxLongEdge, limits.MaxLongEdge),
                 }));
             }
+
+            // JPEG has no alpha; composite transparent PNG pixels on white before encoding.
+            image.Mutate(context => context.BackgroundColor(Color.White));
 
             image.Metadata.ExifProfile = null;
             image.Metadata.XmpProfile = null;
@@ -139,8 +143,10 @@ public sealed class JpegSanitizer(int maxConcurrency, int maxWaiting) : IImageSa
         return buffered;
     }
 
-    private static LuxMapException Unsupported(Exception error)
+    private static LuxMapException Unsupported(Exception error, AllowedImageFormats allowedFormats)
         => new(ErrorCodes.UnsupportedImageFormat, HttpStatusCode.UnsupportedMediaType,
-            "The photo starts like a JPEG but cannot be decoded as one: " + error.Message,
+            (allowedFormats == AllowedImageFormats.JpegOrPng
+                ? "The photo cannot be decoded as JPEG or PNG: "
+                : "The photo cannot be decoded as JPEG: ") + error.Message,
             new Dictionary<string, object?> { ["field"] = "photos" });
 }
