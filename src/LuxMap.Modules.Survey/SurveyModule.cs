@@ -41,6 +41,7 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddSingleton<LuxMap.Shared.Media.IClipFrameSampler, FfmpegClipFrameSampler>();
         services.AddScoped<Review.SurveyReviewService>();
         services.AddScoped<LuxMap.Modules.WorkOrders.IPolePhotoPublication, Review.ReviewedPolePhotoPublisher>();
+        services.AddScoped<LuxMap.Modules.WorkOrders.IRepairStatusPublication, Review.RepairStatusPublisher>();
         services.AddScoped<LuxMap.Modules.WorkOrders.ISurveyFindingLookup, Review.SurveyFindingLookup>();
         services.AddScoped<Review.SurveyMediaAccess>();
         services.AddOptions<Review.SurveyReviewOptions>().Bind(configuration.GetSection("SurveyReview"))

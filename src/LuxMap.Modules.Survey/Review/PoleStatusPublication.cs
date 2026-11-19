@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.Survey.Review;
 
-/// <summary>One current-status writer for accepted sweeps and confirmed operational photos.</summary>
+/// <summary>One current-status writer for accepted sweeps, confirmed operational photos and verified repairs.</summary>
 internal static class PoleStatusPublication
 {
     public static async Task<bool> StageAsync(LuxMapDbContext db, string poleId, string communeId,

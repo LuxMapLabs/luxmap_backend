@@ -371,6 +371,15 @@ Lịch có audit nội bộ `SurveyRecurringSchedule`, action `Created` / `Detai
 - `GET /work-orders/agenda` (RG-9): nhóm giữ `segment_name`; `location` và `distance_m` null; xếp sau nhóm đo được (`OrderBy(DistanceM is null)` sẵn có). `roadDistance` lọc `Geom != null` **trước** `DistanceMeters`
   (NULL vào `double` ném), và `roadDistance[segmentId]` đổi thành `TryGetValue` — tuyến không hình vắng trong từ điển. `Location` của **từng phiếu** vẫn ưu tiên toạ độ sự cố nếu có.
 
+## REPAIR-STATUS — công bố trạng thái khi nghiệm thu sửa chữa (19/11/2026, RS-1…RS-6 SELF-SIGNED)
+
+- `IRepairStatusPublication` chỉ stage; Survey hiện thực qua `PoleStatusPublication`. Phiếu, fault, trạng thái cột và đúng một audit
+  `verified` (kèm `pole_status`) save chung trong transaction. `PoleCurrentStatus` không implement `IAudited`.
+- Khoá phiếu trước, rồi các cột theo `StringComparer.Ordinal`, trước khi đọc current status. Thời điểm quan sát là `CompletedAt`.
+  Chỉ loại khỏi truy vấn fault mở các ID vừa chuyển verified; fault cùng phiếu bị skipped vẫn chặn công bố.
+- FK `fault.pole_id` không buộc cùng xã: writer API bình thường suy xã từ cột, nhưng dữ liệu legacy có thể lệch. Lọc cột bằng query
+  filter trước khi khoá / công bố; cột ngoài scope không được ghi và không có outcome. Không dùng backdoor hay xã phiếu để ghi trạng thái cột.
+
 ## WO-POLE-GPS — lệnh "Cập nhật vị trí cột" (13/11/2026, drift PG-1…PG-13)
 
 - **Mục tiêu nằm ở `work_order_pole_target`, không ở `segment_id`.** Lệnh `pole_gps_update` vẫn lưu `segment_id` (lọc, agenda, gói sync cần), nên

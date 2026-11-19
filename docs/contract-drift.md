@@ -2754,3 +2754,23 @@ Chỉ gỡ nguồn đo và binding MQTT/relay, giữ cabinet_id, node và mọi 
 để đóng khoảng đo theo feeder và kết thúc đợt lỗi; không thực hiện ON/OFF vật lý khi gỡ.
 Nguồn cấu hình tĩnh bị nguồn DB đã gỡ ghi đè để không tự sống lại. PUT cùng node_id để gắn lại feeder.
 DELETE /nodes/{nodeId} vẫn gỡ cả tủ và feeder như trước. Không migration DB, không FE.
+
+## REPAIR-STATUS — nghiệm thu phiếu sửa chữa công bố cột `normal` (19/11/2026)
+
+| | |
+|---|---|
+| **Nguồn** | Đề xuất phía Web: sửa xong, Quản lý nghiệm thu thì cột phải chuyển bình thường ngay, không chờ đợt khảo sát theo lịch |
+| **Decision maker / Date** | **Mỹ SELF-SIGNED 19/11/2026** (xác nhận trong chat). Đổi **ngữ nghĩa** `fixture_status`, không đổi hình dạng API ⇒ nền tạm, chờ FW xác nhận |
+| **Consumer** | WP5: cột đổi màu ngay sau `verify`, không cần sửa code. WP6: không đổi. **Chưa báo** |
+| **Scope** | `POST /work-orders/{id}/verify` của phiếu `repair`; không migration, không trường / enum mới |
+
+| Mã | Quyết định |
+|---|---|
+| **RS-1** | "Trạng thái hiện tại của cột" = lần quan sát đã công bố gần nhất (sweep được duyệt, ảnh cột được xác nhận) **hoặc nghiệm thu phiếu sửa chữa**. Lý do: kỹ sư đã bật đèn và chụp ảnh `after`, Quản lý duyệt dựa trên ảnh đó — là quan sát của người, cùng loại với ảnh cột người sửa nhãn (PP-14) |
+| **RS-2** | Khi `verify` phiếu **repair**, xét các cột mang sự cố có loại hiệu lực (`override_fault_type ?? fault_type`) là `lamp_out` / `lamp_dim` **vừa chuyển `verified` trong chính lần verify này**. Không xét cột chỉ nằm trên tuyến, sự cố bị bỏ qua (`skipped`), hay `segment_outage` / `node_offline` / `runtime_decline` — sự cố IoT không đổi màu cột, `node_status` vẫn theo telemetry |
+| **RS-3** | Cột còn sự cố `lamp_out` / `lamp_dim` khác thuộc `FaultStatusSets.Open` ⇒ không công bố (`other_open_fault`). Thời điểm quan sát là **`completed_at`** của phiếu (lúc kỹ sư báo xong), không phải lúc Quản lý bấm; chỉ công bố khi mới hơn `last_evaluated_at ?? last_seen_at` như PP-10, nếu không ⇒ `not_newer` (một sweep sau lúc sửa thắng) |
+| **RS-4** | Ghi qua writer chung `PoleStatusPublication`: `normal`, `status_confidence = null`, `last_sweep_id = last_run_id = null`; không ghi `luminance_history` / baseline. Ghi đè cả `dim` (sửa / thay bóng là lý do dim hết) — đây là chỗ khác ảnh `on`, vốn không bác bỏ được `dim` (PP-9) |
+| **RS-5** | Verify repair mở transaction, khoá **`work_order` → các `pole` theo thứ tự `pole_id` ordinal**, như duyệt sweep và ảnh cột. Kết quả từng cột (`applied` / `not_newer` / `other_open_fault`) nằm trong audit `verified` của phiếu, cùng một `SaveChanges` |
+| **RS-6** | Nghiên cứu: trạng thái từ nghiệm thu **không phải kết quả CV**. Đánh giá độ chính xác làm trên phiếu kiểm tra (SF-18); ai đếm theo `pole_current_status` để chấm CV phải loại các cột có `last_sweep_id = null` hoặc tra audit. Sweep sau mới hơn sẽ ghi đè nếu sửa chưa đạt |
+
+Đường ảnh cột trên phiếu sửa chữa (PP-3, PP-9) vẫn giữ.

@@ -21,7 +21,8 @@ using Npgsql;
 namespace LuxMap.Modules.WorkOrders;
 
 public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor actor,
-    IAuditTrail audit, FaultTransitions transitions, ISurveyFindingLookup surveys, PoleRelocation relocation)
+    IAuditTrail audit, FaultTransitions transitions, ISurveyFindingLookup surveys, PoleRelocation relocation,
+    IRepairStatusPublication repairStatus)
 {
     private string ActorId => actor.UserId ?? throw new LuxMapException("UNAUTHENTICATED", HttpStatusCode.Unauthorized, "Authentication required.");
 
@@ -596,10 +597,13 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var ids = links.Select(x => x.FaultId).ToArray();
         var targets = await db.Set<WorkOrderPoleTarget>().Where(x => x.WorkOrderId == id).OrderBy(x => x.Position).ToListAsync(ct);
         var before = Snapshot(wo, ids, links: links);
-        // PG-12: the poles move and the order closes together, or neither happens.
-        await using var poleMove = wo.TaskKind == TaskKind.PoleGpsUpdate && action == "verify"
+        // PG-12 / RS-5: pole changes and verification commit together, or neither happens.
+        var repairVerify = wo.TaskKind == TaskKind.Repair && action == "verify";
+        await using var verification = action == "verify" && wo.TaskKind is TaskKind.PoleGpsUpdate or TaskKind.Repair
             ? await db.Database.BeginTransactionAsync(ct) : null;
-        if (poleMove is not null) await MovePolesAsync(wo, targets, ct);
+        if (repairVerify)
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
+        if (verification is not null && wo.TaskKind == TaskKind.PoleGpsUpdate) await MovePolesAsync(wo, targets, ct);
         if (action == "complete")
         {
             if (wo.TaskKind == TaskKind.Inspection && links.Count > 0)
@@ -619,6 +623,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var now = UtcMicrosecondClock.UtcNow();
         var changes = new List<FaultChange>();
         var skipped = new List<string>();
+        IReadOnlyList<RepairStatusOutcome> statusOutcomes = [];
         if (wo.TaskKind == TaskKind.Repair && action is "start" or "verify")
         {
             var faults = await db.Set<Fault>().Where(x => ids.Contains(x.FaultId)).ToListAsync(ct);
@@ -634,6 +639,19 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                 }
                 else { skipped.Add(fault.FaultId); continue; }
                 changes.Add(new(fault.FaultId, from, fault.FaultStatus));
+            }
+            if (repairVerify)
+            {
+                var verified = changes.Where(x => x.To == FaultStatus.Verified).Select(x => x.FaultId).ToArray();
+                var candidates = faults.Where(x => verified.Contains(x.FaultId) && x.PoleId is not null
+                    && (x.OverrideFaultType ?? x.FaultType) is FaultType.LampOut or FaultType.LampDim)
+                    .Select(x => x.PoleId!).Distinct(StringComparer.Ordinal).ToArray();
+                // Legacy/cross-commune fault references must not grant write access to their poles.
+                var poles = await db.Set<Pole>().Where(x => candidates.Contains(x.PoleId)).Select(x => x.PoleId).ToListAsync(ct);
+                poles.Sort(StringComparer.Ordinal);
+                foreach (var poleId in poles)
+                    await db.Database.ExecuteSqlAsync($"SELECT 1 FROM pole WHERE pole_id = {poleId} FOR UPDATE", ct);
+                statusOutcomes = await repairStatus.StageAsync(poles, verified, wo.CompletedAt!.Value, now, ct);
             }
         }
         // Drift FR-2a (C): verifying an inspection IS the Manager confirming what the engineer saw.
@@ -673,6 +691,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var after = Snapshot(wo, ids, changes.ToArray(), skipped.ToArray(), links);
         if (wo.TaskKind == TaskKind.PoleGpsUpdate && action == "complete")
             Record(wo, auditAction, before, new { work_order = after, pole_locations = Reported(targets) }, now, note);
+        else if (repairVerify)
+            Record(wo, auditAction, before, new { work_order = after, pole_status = statusOutcomes }, now, note);
         else Record(wo, auditAction, before, after, now, note);
         switch (action)
         {
@@ -682,7 +702,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             case "cancel": Notify(WorkOrderNotices.Cancelled(wo, note), [wo.AssignedTo], now); break;
         }
         await Save(id, [], ct);
-        if (poleMove is not null) await poleMove.CommitAsync(ct);
+        if (verification is not null) await verification.CommitAsync(ct);
         return await Detail(id, ct);
     }
 
