@@ -43,7 +43,7 @@ public sealed class AvatarService(
     {
         var user = await db.Set<AppUser>().AsNoTracking().SingleOrDefaultAsync(u => u.UserId == OwnUserId, ct)
             ?? throw Missing();
-        var clean = await sanitizer.SanitizeJpegAsync(content, AvatarLimits.Image, ct);
+        var clean = await sanitizer.SanitizeJpegAsync(content, AvatarLimits.Image, ct, AllowedImageFormats.JpegOrPng);
         using var image = new MemoryStream(clean, writable: false);
         // Sanitizing (the slow, model-free CPU work) stays outside the lock. The keys are fixed per user, so the object
         // write is last-writer-wins independent of the row: two overlapping uploads could leave the row of one pointing

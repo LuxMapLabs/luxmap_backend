@@ -255,7 +255,8 @@ Vi phạm thì build và test vẫn xanh; chi tiết ở file vùng được tr�
 - **Khoảng cách** chỉ qua `SpatialFunctions.DistanceMeters`; lọc thô `ST_Intersects` trên cột 4326 trần **trước**, tinh chỉnh khoảng cách
   3405 sau; không `Geometry` đã transform nào rời SQL. → `spatial-map.md`
 - **Ảnh:** mọi byte qua API (không presigned URL); ghi object **trước**, commit row **sau**; nhận JPEG theo **magic bytes**, decode chỉ qua
-  `ThumbnailFactory.JpegOnly` (tiền đề tắt advisory ImageSharp); thumbnail bỏ metadata **tường minh**. → `media-storage.md`
+  `ThumbnailFactory.JpegOnly` hoặc `JpegOrPng` chỉ cho avatar (tiền đề tắt advisory ImageSharp); avatar nhận thêm PNG rồi lưu JPEG,
+  ghép alpha trên nền trắng; thumbnail bỏ metadata **tường minh**. → `media-storage.md`
 - **Audit (D-R13):** entity `IAudited` → **đúng một** `AuditEvent` mỗi `SaveChanges`, stage bằng `IAuditTrail.Record` trên cùng DbContext,
   không save riêng. Bảng audit append-only. → `faults-workorders.md`
 - **Khoá hàng:** đọc qua query filter **trước** (ngoài phạm vi → 404, không chờ khoá), rồi `ExecuteSql("SELECT 1 … FOR UPDATE")`, rồi đọc lại

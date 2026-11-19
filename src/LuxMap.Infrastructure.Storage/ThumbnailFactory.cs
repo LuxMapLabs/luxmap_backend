@@ -1,6 +1,7 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
 
 namespace LuxMap.Infrastructure.Storage;
@@ -39,6 +40,10 @@ public static class ThumbnailFactory
     /// </para>
     /// </remarks>
     public static Configuration JpegOnly { get; } = new(new JpegConfigurationModule());
+
+    /// <summary>JPEG and PNG only, selected explicitly for avatars before re-encoding as JPEG.</summary>
+    /// <remarks>No other codecs or ICC profile conversion are enabled; never use Configuration.Default for uploads.</remarks>
+    public static Configuration JpegOrPng { get; } = new(new JpegConfigurationModule(), new PngConfigurationModule());
 
     /// <summary>
     /// Decodes <paramref name="source"/>, scales its longest edge to

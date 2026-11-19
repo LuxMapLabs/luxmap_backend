@@ -102,23 +102,72 @@ public sealed class AvatarTests(AvatarTestFactory factory) : IClassFixture<Avata
     }
 
     [Theory]
-    [InlineData("png", "image/jpeg")]
-    [InlineData("png", "image/png")]
+    [InlineData("broken-png", "image/jpeg")]
+    [InlineData("broken-png", "image/png")]
+    [InlineData("gif", "image/gif")]
     [InlineData("webp", "image/webp")]
     [InlineData("garbage", "image/jpeg")]
     [InlineData("broken-jpeg", "image/jpeg")]
-    public async Task Non_jpeg_and_undecodable_files_are_415_even_with_a_jpg_name(string kind, string type)
+    public async Task Unsupported_and_undecodable_files_are_415_even_with_a_jpg_name(string kind, string type)
     {
         var (client, id) = await Account(UserRole.Manager);
         byte[] bytes = kind switch
         {
-            "png" => [0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10],
+            "gif" => "GIF89a"u8.ToArray(),
+            "broken-png" => [0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10],
             "webp" => "RIFF0000WEBP"u8.ToArray(),
             "broken-jpeg" => [0xff, 0xd8, 0xff, 0],
             _ => "not an image"u8.ToArray(),
         };
         await Error(await Upload(client, bytes, type), HttpStatusCode.UnsupportedMediaType, ErrorCodes.UnsupportedImageFormat);
         Assert.Null((await Row(id)).AvatarUpdatedAt);
+        Assert.Empty(Objects(id));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Png_is_stored_as_jpeg_and_transparent_pixels_become_white(bool transparent)
+    {
+        var (client, id) = await Account(UserRole.Manager);
+        using var image = new Image<Rgba32>(32, 32, transparent ? new Rgba32(0, 0, 0, 0) : new Rgba32(255, 255, 255, 255));
+        using var png = new MemoryStream();
+        image.SaveAsPng(png);
+        Assert.Equal(HttpStatusCode.OK, (await Upload(client, png.ToArray(), "application/octet-stream")).StatusCode);
+        var row = await Row(id);
+        AssertStored(row);
+        foreach (var key in new[] { row.AvatarObjectKey!, row.AvatarThumbnailKey! })
+        {
+            var bytes = factory.Photos.Objects[(StorageBucket.Avatar, key)];
+            Assert.Equal(new byte[] { 0xff, 0xd8, 0xff }, bytes[..3]);
+            using var stored = Decode(bytes);
+            using var pixels = stored.CloneAs<Rgb24>();
+            Assert.Equal(new Rgb24(255, 255, 255), pixels[16, 16]);
+        }
+        Assert.Equal("image/jpeg", (await client.GetAsync(Own)).Content.Headers.ContentType!.MediaType);
+    }
+
+    [Fact]
+    public async Task Png_over_pixel_cap_is_refused_from_header_before_decode()
+    {
+        var (client, id) = await Account(UserRole.Manager);
+        using var image = new Image<Rgba32>(1, 1);
+        using var output = new MemoryStream();
+        image.SaveAsPng(output);
+        var png = output.ToArray();
+        // IHDR dimensions and CRC are the only bytes changed; the compressed data still holds one pixel.
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(png.AsSpan(16), 40000);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(png.AsSpan(20), 40000);
+        uint crc = 0xffffffff;
+        foreach (var value in png.AsSpan(12, 17))
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++) crc = (crc >> 1) ^ ((crc & 1) != 0 ? 0xedb88320u : 0);
+        }
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(png.AsSpan(29), ~crc);
+        var response = await Upload(client, png);
+        await Error(response, HttpStatusCode.BadRequest, ErrorCodes.ValidationFailed);
+        Assert.Equal(16_000_000, (await Json(response)).GetProperty("error").GetProperty("details").GetProperty("max_pixels").GetInt64());
         Assert.Empty(Objects(id));
     }
 

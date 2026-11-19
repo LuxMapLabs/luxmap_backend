@@ -205,13 +205,18 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
     }
 
     [Fact]
-    public async Task A_file_that_is_not_a_jpeg_is_415()
+    public async Task A_valid_png_is_still_415_for_citizen_photos()
     {
         var (_, code) = await PoleWithCodeAsync();
 
-        var response = await Submit(host.CreateClient(), code, "lamp_out", photos: [[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]]);
+        using var image = new Image<Rgba32>(16, 16);
+        using var png = new MemoryStream();
+        image.SaveAsPng(png);
+        var response = await Submit(host.CreateClient(), code, "lamp_out", photos: [png.ToArray()]);
 
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.Equal(ErrorCodes.UnsupportedImageFormat, (await Read(response)).GetProperty("error").GetProperty("code").GetString());
+        Assert.Empty(photos.Objects);
     }
 
     /// <summary>Whoever holds a code cannot use up its allowance to silence everyone else: past it, the text still goes in (review P1 #5).</summary>
@@ -416,11 +421,12 @@ public sealed class CitizenReportTests(AssetImportFixture factory) : IAsyncLifet
 
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async Task<byte[]> SanitizeJpegAsync(Stream content, ImageLimits limits, CancellationToken cancellationToken = default)
+        public async Task<byte[]> SanitizeJpegAsync(Stream content, ImageLimits limits, CancellationToken cancellationToken = default,
+            AllowedImageFormats allowedFormats = AllowedImageFormats.JpegOnly)
         {
             Entered.TrySetResult();
             await Release.Task;
-            return await inner.SanitizeJpegAsync(content, limits, cancellationToken);
+            return await inner.SanitizeJpegAsync(content, limits, cancellationToken, allowedFormats);
         }
     }
 

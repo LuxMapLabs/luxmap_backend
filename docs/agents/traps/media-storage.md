@@ -67,12 +67,17 @@ Không re-encode, strip EXIF hay xoay original. **Ảnh công dân và avatar l�
 (`docs/agents/traps/citizen.md`, mục P2b). Capture config và chất lượng GPS track kiểm ở cấp phiên, không đòi metadata
 ISO/shutter/aperture/GPS/heading trên từng JPEG (D-R24; `SurveyRawParser`). Thumbnail bỏ metadata tường minh — xem cuối file.
 
-**5. Chỉ nhận JPEG, quyết bằng MAGIC BYTES.**
+**5. Chỉ nhận JPEG, ngoại lệ PNG cho avatar (19/11/2026), quyết bằng MAGIC BYTES.**
 
-`FF D8 FF`. Không tin `Content-Type`, không tin đuôi file — PNG đổi tên `.jpg` bị chặn, JPEG khai sai
+Với các luồng JPEG-only: `FF D8 FF`. Không tin `Content-Type`, không tin đuôi file — PNG đổi tên `.jpg` bị chặn, JPEG khai sai
 header vẫn qua. Lớp phòng thủ thứ hai: ImageSharp chạy trên một `Configuration` **chỉ đăng ký
 JpegConfigurationModule**, không phải `Configuration.Default` — PNG dựng sẵn để tấn công không chỉ bị
 từ chối bởi chính sách, mà **không có code path nào phân tích được nó**.
+
+**Chỉ avatar** cho phép thêm PNG (`89 50 4E 47 0D 0A 1A 0A`): caller chọn `AllowedImageFormats.JpegOrPng`,
+decode qua `ThumbnailFactory.JpegOrPng` chỉ đăng ký JPEG + PNG. Mặc định sanitizer và ảnh công dân vẫn JPEG-only;
+khảo sát/evidence/ảnh cột/AI không đổi. PNG có alpha ghép nền trắng, bỏ metadata rồi mã hoá JPEG, key và thumbnail giữ `.jpg`.
+Không bật `ColorProfileHandling.Convert`, không dùng `Configuration.Default`.
 
 **Video/raw input là luồng riêng**: D-R28 chốt proxy streaming qua API (BE-15), MP4 H.264/H.265, clip tối đa 300 MiB;
 quy tắc JPEG chỉ áp lên luồng ảnh. Không presigned; xem `docs/agents/traps/survey.md`, mục BE-15 P2a.
@@ -123,8 +128,9 @@ Tình trạng pull image và test S3 thật theo `tracking.html`; không suy tr�
 
 - 🔴 **Sáu advisory của ImageSharp 3.1.12 đang được TẮT theo mã (`Directory.Build.props`; năm cái 08/10/2026, cái thứ sáu `GHSA-v76p-62qx-wwq2` —
   decoder TIFF fax — 28/10/2026 khi audit lúc restore bắt đầu báo nó và CI đỏ ở `-warnaserror`)** — mọi bản vá (3.2.0, 4.1.2) đều đòi license
-  key lúc build, nên chưa nâng được (gạch dưới). Chấp nhận được **CHỈ VÌ** mọi lần decode đi qua cấu hình chỉ-JPEG
-  (`ThumbnailFactory.JpegOnly`, sau kiểm `FF D8 FF`): TIFF / histogram / ICC không có đường tới. `Image.Load(stream)` không kèm
+  key lúc build, nên chưa nâng được (gạch dưới). Chấp nhận được **CHỈ VÌ** mọi lần decode đi qua `ThumbnailFactory.JpegOnly`
+  hoặc `JpegOrPng` (chỉ avatar), sau kiểm magic bytes. Cả sáu advisory đều ngoài decoder PNG;
+  TIFF / histogram / đọc `IccProfile.Entries` không có đường tới, không bật ICC conversion. `Image.Load(stream)` không kèm
   `DecoderOptions` dùng `Configuration.Default` (mọi codec) và **phá đúng tiền đề đó** — `JpegOnlyDecodeTests` đỏ. Có license thì nâng
   bản đã vá và gỡ khối suppress; advisory mới sau đó thì nâng bản, không tắt thêm.
 - **Ghim ImageSharp ở 3.1.12.** Từ 3.2.0 (đã thử 28/10/2026) và 4.x, task validate lúc build đòi `SixLaborsLicenseKey`, và
@@ -150,7 +156,8 @@ Tiến độ test S3 thật theo `tracking.html` (BE-36 D-7); một lần kiểm
 
 ## ACCT-AVATAR — nền tạm ACCT-5 (09/11/2026)
 
-Avatar dùng `IImageSanitizer` như ảnh công dân: JPEG-only, xoay orientation, bỏ EXIF/GPS/XMP/IPTC/ICC, cạnh dài ≤512,
+Avatar dùng `IImageSanitizer`: JPEG hoặc PNG theo magic bytes (Mỹ quyết 19/11/2026), lưu JPEG; PNG alpha ghép nền trắng.
+Xoay orientation, bỏ EXIF/GPS/XMP/IPTC/ICC, cạnh dài ≤512,
 đọc tối đa 1 MiB và 16 triệu pixel. Khác survey/evidence: original avatar cũng đã sanitize. Bucket thứ năm `luxmap-avatar`,
 hai key cố định theo user, upload lại ghi đè. DELETE chỉ gỡ năm cột liên kết; byte vẫn còn tới upload kế tiếp, chưa có xoá thật.
 Phục vụ thumbnail qua API có Bearer, không URL S3. `StoredObjectColumn` khai tên cột avatar tường minh trong IdentityModule.
