@@ -706,7 +706,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
     // on the poles its latest accepted result found out / dim, in its anchor commune only.
     private WorkOrderService Orders(LuxMapDbContext db) => new(db, new Actor(user), new AuditTrail(db, new Correlation()),
         new FaultTransitions(), new SurveyFindingLookup(db), new LuxMap.Modules.Assets.Crud.PoleRelocation(db, new Actor(user),
-            new LuxMap.Modules.Survey.Processing.SurveyCorridor(Options.Create(new LuxMap.Modules.Survey.Processing.SurveyProcessingOptions())), new AuditTrail(db, new Correlation())));
+            new LuxMap.Modules.Survey.Processing.SurveyCorridor(Options.Create(new LuxMap.Modules.Survey.Processing.SurveyProcessingOptions())), new AuditTrail(db, new Correlation())),
+        new RepairStatusPublisher(db));
 
     private async Task VerifyOrder()
     {
