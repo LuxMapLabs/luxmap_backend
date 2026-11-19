@@ -41,6 +41,16 @@
 <div class="wrap">
 
   <div class="card">
+    <strong>WB-21 — bỏ <code>geom_wkt</code> khỏi sheet Mạch điện · 19/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Bản đồ không vẽ <code>feeder.geom</code> (sơ đồ tủ dựng từ tủ + cột theo tuyến), nên workbook không nhận / không xuất lộ trình mạch nữa:
+    cột có dữ liệu → lỗi header, cột trống của file cũ bỏ qua, lộ trình đã lưu giữ nguyên. API, CSV, DB không đổi; mô tả OpenAPI của
+    4 trường ghi "chỉ lưu" (FEEDER-GEOM-1). Template sinh lại.</p>
+    <p><code>dotnet test</code> xanh (Api 1904 / 7 skip). 1 test mới (cột có dữ liệu bị từ chối, cột trống giữ lộ trình); round-trip export
+    nay trồng lộ trình qua SQL và kiểm nó còn. Phá thử (trả <code>geom_wkt</code> vào layout) → 3 đỏ. Còn: báo WP5 cùng đợt WB-12…WB-20.</p>
+  </div>
+
+  <div class="card">
     <strong>ASSET-GEOM-RANGE — từ chối toạ độ ngoài EPSG:4326 · 18/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>
     <code>AssetGeometry</code> (WKT + GeoJSON) kiểm kinh độ ±180, vĩ độ ±90, số hữu hạn; gợi ý "looks swapped" khi gõ vĩ độ trước.

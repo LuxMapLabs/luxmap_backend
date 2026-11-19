@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SHEETS = [
     ('Tuyến đường', 'segments', ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt'], 3),
     ('Tủ điện', 'cabinets', ['external_ref', 'cabinet_name', 'geom_wkt'], 3),
-    ('Mạch điện', 'feeders', ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source', 'geom_wkt'], 2),
+    ('Mạch điện', 'feeders', ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source'], 2),
     ('Cột điện', 'poles', ['external_ref', 'segment_external_ref', 'feeder_external_ref', 'feeder_source', 'geom_wkt', 'near_sensitive_poi', 'note'], 1),
     ('Bóng đèn', 'fixtures', ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'lamp_count', 'removed_date', 'warranty_expiry', 'note'], 5),
 ]
@@ -31,7 +31,7 @@ GUIDE = [
     'external_ref là mã kiểm kê của xã (CTA-001, TUYEN-A), không dùng mã hệ thống POLE-0001 / SEG-001.',
     'Cột mới không GPS phải có note mô tả vị trí. Bộ đèn khớp theo cột và ngày lắp; sửa qua form.',
     'Mỗi sheet tối đa 5000 dòng, 200 cột, 2000 ký tự/ô; file 10 MB, giải nén 100 MB.',
-    'geom_wkt: POINT(lng lat) / LINESTRING(lng lat, …). Tuyến/mạch trống: giữ hình; xoá qua form.',
+    'geom_wkt: POINT(lng lat) / LINESTRING(lng lat, …). Tuyến trống: giữ hình; xoá qua form. Mạch điện không có geom_wkt.',
     'File nhiều xã không nạp lại được; upload chỉ nhận một xã.',
     'Nạp lại dùng một data_source; tài sản khác nguồn sẽ theo nguồn chọn khi upload (bộ đèn có sẵn không sửa).',
     'Nguồn: field / public_imagery / calibration_rig / simulated. Testbed không bao giờ chọn field.',

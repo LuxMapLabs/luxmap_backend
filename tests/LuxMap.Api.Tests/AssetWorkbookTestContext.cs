@@ -81,11 +81,14 @@ public abstract class AssetWorkbookTestContext(AssetImportFixture fixture) : IAs
             ("length_m", 100), ("geom_wkt", "LINESTRING(106.49 10.97, 106.50 10.98)"))),
         AssetWorkbookFile.Asset(ImportKind.Cabinets, Row(("external_ref", "TU-A"), ("cabinet_name", "Cabinet"), ("geom_wkt", "POINT(106.49 10.97)"))),
         AssetWorkbookFile.Asset(ImportKind.Feeders, Row(("external_ref", "MACH-A"), ("feeder_name", "Feeder"), ("cabinet_external_ref", "TU-A"),
-            ("cabinet_source", "verified"), ("geom_wkt", "LINESTRING(106.49 10.97, 106.50 10.98)"))),
+            ("cabinet_source", "verified"))),
         AssetWorkbookFile.Asset(ImportKind.Poles, Row(("external_ref", "007"), ("segment_external_ref", "TUYEN-A"),
             ("feeder_external_ref", "MACH-A"), ("feeder_source", "verified"), ("geom_wkt", "POINT(106.4900123456789 10.9700123456789)"), ("near_sensitive_poi", true))),
         AssetWorkbookFile.Asset(ImportKind.Fixtures, Fitting("2020-01-01", "2021-01-01"), Fitting("2022-03-24")),
     ];
+    /// <summary>A feeder route as the form or CSV would store it — the workbook cannot (WB-21).</summary>
+    protected Task SetFeederRoute(string externalRef, string wkt) => fixture.QueryAsync(db => db.Database.ExecuteSqlRawAsync(
+        "UPDATE feeder SET geom = ST_GeomFromText({0}, 4326) WHERE commune_id = {1} AND external_ref = {2}", wkt, Commune, externalRef));
     protected static Dictionary<string, object?> Fitting(string install, string? removed = null)
         => Row(("pole_external_ref", "007"), ("fixture_type", "led_road_lamp"), ("power_source", "grid"), ("lamp_watt", 100),
             ("lamp_count", 1), ("install_date", install), ("removed_date", removed), ("warranty_expiry", "2028-03-24"), ("note", "Lamp"));

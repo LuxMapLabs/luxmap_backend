@@ -77,7 +77,10 @@ public sealed record CreateFeederRequest
     [MaxLength(32)]
     public string? CommuneId { get; init; }
 
-    /// <summary>Optional WKT <c>LINESTRING</c>. Branch C surveyed no cable routes; blank beats invented.</summary>
+    /// <summary>
+    /// Optional WKT <c>LINESTRING</c>. Branch C surveyed no cable routes; blank beats invented. Stored only: no map layer or cabinet
+    /// diagram draws it (FEEDER-GEOM-1), and the asset workbook does not carry it (WB-21).
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     /// <summary>The cabinet this circuit leaves from (CAB-2), in the feeder's own commune. Optional.</summary>
@@ -331,7 +334,10 @@ public sealed record UpdateFeederRequest
     [MaxLength(256)]
     public string? FeederName { get; init; }
 
-    /// <summary>Optional WKT <c>LINESTRING</c>. Branch C surveyed no cable routes; blank beats invented.</summary>
+    /// <summary>
+    /// Optional WKT <c>LINESTRING</c>. Branch C surveyed no cable routes; blank beats invented. Stored only: no map layer or cabinet
+    /// diagram draws it (FEEDER-GEOM-1), and the asset workbook does not carry it (WB-21).
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     /// <summary>
@@ -827,7 +833,8 @@ public sealed record FeederListItem
     public required string CommuneName { get; init; }
 
     /// <summary>
-    /// Whether a cable route was recorded, rather than the route itself.
+    /// Whether a cable route was recorded, rather than the route itself. The route is stored only: no map layer or cabinet diagram
+    /// draws it (FEEDER-GEOM-1).
     /// </summary>
     /// <remarks>
     /// Branch C surveyed no cable routes, so this is <c>false</c> for almost every feeder. Shipping a
@@ -859,7 +866,10 @@ public sealed record FeederDetail
 {
     public required FeederListItem Feeder { get; init; }
 
-    /// <summary>WKT <c>LINESTRING</c>, or <c>null</c> — most feeders have no surveyed route.</summary>
+    /// <summary>
+    /// WKT <c>LINESTRING</c>, or <c>null</c> — most feeders have no surveyed route. Stored only: no map layer or cabinet diagram
+    /// draws it (FEEDER-GEOM-1).
+    /// </summary>
     public string? GeomWkt { get; init; }
 
     public required DateTime CreatedAt { get; init; }

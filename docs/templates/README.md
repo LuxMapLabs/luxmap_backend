@@ -34,14 +34,17 @@ Sheet vắng bỏ qua; không có sheet tài sản → lỗi. Sheet khác như `
 |---|---|
 | `Tuyến đường` | `external_ref`*, `segment_name`*, `road_class`*, `length_m`, `geom_wkt` |
 | `Tủ điện` | `external_ref`*, `cabinet_name`*, `geom_wkt`* |
-| `Mạch điện` | `external_ref`*, `feeder_name`*, `cabinet_external_ref`, `cabinet_source`, `geom_wkt` |
+| `Mạch điện` | `external_ref`*, `feeder_name`*, `cabinet_external_ref`, `cabinet_source` — **không** `geom_wkt` (WB-21) |
 | `Cột điện` | `external_ref`*, `segment_external_ref`, `feeder_external_ref`, `feeder_source`, `geom_wkt`, `near_sensitive_poi`, `note` |
 | `Bóng đèn` | `pole_external_ref`*, `fixture_type`*, `power_source`*, `lamp_watt`*, `install_date`*, `lamp_count`, `removed_date`, `warranty_expiry`, `note` |
 
 Luật từng cột theo CSV bên dưới, với các khác biệt workbook:
 
-- `geom_wkt` dùng WKT EPSG:4326: `POINT(lng lat)` / `LINESTRING(…)`. Tuyến **và mạch** trống hoặc thiếu cột giữ hình đã có;
-  xoá lộ trình qua form. CSV mạch vẫn trống = xoá. Tủ bắt buộc vị trí; cột trống giữ vị trí cũ.
+- `geom_wkt` dùng WKT EPSG:4326: `POINT(lng lat)` / `LINESTRING(…)`. Tuyến trống hoặc thiếu cột giữ hình đã có; xoá lộ trình
+  qua form. Tủ bắt buộc vị trí; cột trống giữ vị trí cũ.
+- Sheet `Mạch điện` **không nhận `geom_wkt`** (WB-21): bản đồ không vẽ lộ trình mạch — sơ đồ tủ dựng từ tủ và cột theo tuyến.
+  Cột `geom_wkt` có dữ liệu → lỗi header; cột trống (file xuất cũ) bỏ qua; lộ trình đã lưu giữ nguyên. CSV / form mạch vẫn nhận
+  `geom_wkt` (CSV trống = xoá), nhưng đó là dữ liệu chỉ lưu, không hiện trên bản đồ.
 - Cột **mới** chưa GPS phải có `note` mô tả vị trí. Cột đã có không bị kiểm lại. Không đổi luật CSV / form.
 - `external_ref` là mã kiểm kê của xã (ví dụ `CTA-001`, `TUYEN-A`), không dùng định dạng ID hệ thống `POLE-0001` / `SEG-001`.
   Trùng mã trong cùng sheet là lỗi ở dòng sau, nêu dòng đầu. Mã cha chọn qua named-range dropdown.
@@ -350,7 +353,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `external_ref` | **Có** | text | Mã mạch điện của đơn vị quản lý. `poles.csv` trỏ về bằng `feeder_external_ref` |
 | `feeder_name` | **Có** | text | |
 | `commune_id` | **Có** | mã | FK `administrative_unit` |
-| `geom_wkt` | Không | LineString | **Nullable** — nhóm không khảo sát tuyến cáp, để trống thay vì bịa lộ trình |
+| `geom_wkt` | Không | LineString | **Nullable** — nhóm không khảo sát tuyến cáp, để trống thay vì bịa lộ trình. **Chỉ lưu**, bản đồ không vẽ (FEEDER-GEOM-1); workbook không có cột này (WB-21) |
 | `cabinet_source` | Không | `verified` / `inferred` | Nguồn gốc của quan hệ mạch → trụ (TOPO-INFER). Xem mục "Nhãn nguồn gốc" bên dưới |
 | `cabinet_external_ref` | Không | text | Khớp `external_ref` trong `cabinets.csv`, **cùng xã** với mạch. ⚠️ **Ô trống hay thiếu cột = GIỮ trụ đang có** — import không bao giờ tháo mạch khỏi trụ (CAB-6). Mạch đang được thiết bị điều khiển (có rơ-le) **không đổi trụ được** — lỗi theo dòng (CAB-4) |
 

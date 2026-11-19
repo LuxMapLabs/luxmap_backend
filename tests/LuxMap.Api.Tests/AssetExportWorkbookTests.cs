@@ -40,16 +40,16 @@ public sealed class AssetExportWorkbookTests(AssetImportFixture fixture) : Asset
         sheets[0].Rows.Add((3, Row(("external_ref", "EMPTY-ROUTE"), ("segment_name", "No poles"), ("road_class", "inter_village"))));
         sheets[1].Rows.Add((3, Row(("external_ref", "EMPTY-CAB"), ("cabinet_name", "No circuits"), ("geom_wkt", "POINT(106.50 10.98)"))));
         sheets[2].Rows.Add((3, Row(("external_ref", "EMPTY-FEEDER"), ("feeder_name", "No poles"))));
-        Committed(await Import(sheets)); var before = await Snapshot();
+        Committed(await Import(sheets)); await SetFeederRoute("MACH-A", "LINESTRING(106.49 10.97, 106.50 10.98)");
+        var before = await Snapshot();
         var bytes = await Export();
         using (var stream = new MemoryStream(bytes))
         using (var book = SpreadsheetDocument.Open(stream, false))
         {
             foreach (var name in new[] { "Tuyến đường", "Tủ điện", "Mạch điện", "Bóng đèn" }) Assert.Equal(2, Rows(Sheet(book, name)).Count);
             Assert.Contains(Rows(Sheet(book, "Bóng đèn")), r => r.ContainsKey("removed_date"));
-            // Rows of one import share created_at and EF does not hand out IDs in sheet order: find the routed feeder by its ref.
-            var routed = Rows(Sheet(book, "Mạch điện")).Single(r => r["external_ref"].InnerText == "MACH-A");
-            Assert.Equal("LINESTRING (106.49 10.97, 106.5 10.98)", routed["geom_wkt"].InnerText);
+            // WB-21: the feeder sheet carries no route; the re-import below keeps the stored one (the snapshot includes feeder.geom).
+            Assert.DoesNotContain("geom_wkt", Headers(Sheet(book, "Mạch điện")));
         }
         var result = await ImportBytes(bytes); Committed(result);
         foreach (var kind in new[] { "segments", "cabinets", "feeders", "poles", "fixtures" })
