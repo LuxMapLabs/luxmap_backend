@@ -2714,3 +2714,17 @@ Nếu thiếu/không hợp lệ/không allowlist địa chỉ mặc định: 503
 JSON dư base_url không thể đổi đích Bridge (được bỏ qua như các unknown field JSON hiện tại).
 Giữ địa chỉ nội bộ trong DB/audit, không xóa/sửa server đã đăng ký. Không hardcode docker hostname vào C#.
 Admin ManageSettings tạo server, Manager không có quyền. Không đổi schema DB, MQTT broker hoặc FE.
+
+
+## IOT-SERVER-IDENTITY-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+Mỗi server_id lowercase là đúng một MQTT Client ID/username/gateway; Bridge dùng chung không phải thiết bị.
+POST nodes bỏ gateway_id, RegisteredNode bỏ gateway_id. Key dùng /iot/servers/{serverId}/credential (POST/GET/DELETE).
+GET servers chỉ đọc heartbeat/key của đúng server_id. GET servers/{serverId}/nodes phân trang ReadNetwork/scope xã.
+Route/credential URL cũ chỉ chấp nhận canonical ID hoặc alias legacy đã được Admin xác nhận sau migration; không chọn tùy ý gateway khác.
+Admin POST servers/{serverId}/gateway-migration nhận legacy_gateway_id, sau khi key mới đã cấp và gateway mới heartbeat online.
+Bridge chuyển danh sách thiết bị có đối chiếu sở hữu, lưu snapshot atomic, ngắt client cũ, cập nhật danh sách mới và thu hồi key cũ; không chấp nhận tuyến chứa thiết bị ngoài nguồn đã đăng ký.
+BE lưu alias legacy trong DB/audit để giữ URL cũ; migration idempotent, không sửa lịch sử lệnh/điện/lỗi hoặc đổi device_id.
+PUT nguồn chuyển server trong cùng xã dùng compare-and-swap route tại Bridge và rollback bù nếu DB lỗi; lỗi không được âm thầm thành công.
+DELETE nguồn gỡ quyền MQTT của đúng server; lịch sử feeder giữ nguyên. Firmware chỉ một Server ID; Client ID/username tự suy ra,
+NVS cũ được đọc để chuyển đổi có kiểm soát (không tự đổi danh tính/key đang hoạt động).

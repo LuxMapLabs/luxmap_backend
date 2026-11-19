@@ -115,6 +115,8 @@ S = d["components"]["schemas"]
 
 # The bridge DTOs use strings on the wire. Publish their accepted values for client generation.
 iot_values = {
+    ("IotServerNode", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
+    ("IotServerNode", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotNodeStatus", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "electrical_status"): ["fresh", "stale", "no_data"],
     ("IotDiagnosticResult", "electrical_status"): ["fresh", "stale", "no_data"],
@@ -399,9 +401,9 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
-    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 (18/11/2026)",
+    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",
-    "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)",
+    "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
@@ -427,6 +429,11 @@ SECTION = {
 }
 
 SUMMARY.update({
+    ("post", "/api/v1/iot/servers/{serverId}/credential"): "Admin cấp MQTT key; Client ID và username bằng server_id",
+    ("get", "/api/v1/iot/servers/{serverId}/credential"): "Admin xem lại key của đúng server_id; no-store",
+    ("delete", "/api/v1/iot/servers/{serverId}/credential"): "Admin thu hồi key và ngắt kết nối server",
+    ("get", "/api/v1/iot/servers/{serverId}/nodes"): "Danh sách node thuộc đúng server trong phạm vi xã, phân trang",
+    ("post", "/api/v1/iot/servers/{serverId}/gateway-migration"): "Admin chuyển gateway cũ sang server_id sau khi mã mới có heartbeat",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical"): "Đọc mẫu điện mới nhất của mạch",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Trung bình điện 30 giây theo giờ đo DS3231, lọc thời gian và phân trang",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical/history/received"): "Trung bình điện 30 giây theo giờ Bridge nhận, lọc thời gian và phân trang",

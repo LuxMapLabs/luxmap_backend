@@ -17,6 +17,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
     private volatile Dictionary<string, string[]> gateways = new(StringComparer.Ordinal);
     private readonly object registrationGate = new();
     private readonly string registrationPath = Path.Combine(environment.ContentRootPath, "data", "gateway-routes.json");
+    private readonly ConcurrentDictionary<string, string> authenticatedSessions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> lastHeartbeats = new(StringComparer.Ordinal);
     public bool IsRunning => broker?.IsStarted == true;
     public IReadOnlyDictionary<string, string[]> Gateways => gateways;
@@ -39,6 +40,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         try
         {
             credentials.Revoke(gatewayId);
+            authenticatedSessions.TryRemove(gatewayId, out _);
             lastHeartbeats.TryRemove(gatewayId, out _);
             if (IsRunning && (await broker!.GetClientsAsync()).Any(client => client.Id == gatewayId))
             {
@@ -62,45 +64,136 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
 
     public async Task<bool> RegisterGatewayAsync(string gatewayId, string nodeId)
     {
-        if (!SaveGatewayRoute(gatewayId, nodeId)) return false;
         await commandGate.WaitAsync();
         try
         {
-            if (IsRunning)
+            if (!credentials.IsIssued(gatewayId) || !SaveGatewayRoute(gatewayId, nodeId)) return false;
+            if (IsRunning) {
+                await PublishNodeListAsync(gatewayId);
                 await PublishCommandAsync(nodeId, store.Read(nodeId)?.DesiredCommand ?? new("AUTO", null, "initial-auto", 0));
+            }
+            return true;
         }
         finally { commandGate.Release(); }
-        return true;
     }
 
     private bool SaveGatewayRoute(string gatewayId, string? nodeId)
     {
         lock (registrationGate)
         {
-            var exists = gateways.TryGetValue(gatewayId, out var assigned);
-            assigned ??= [];
-            if (nodeId is null && exists || nodeId is not null && assigned.Contains(nodeId)) return true;
-            if (nodeId is not null &&
-                (assigned.Length >= MaxNodesPerGateway || gateways.Values.Any(nodes => nodes.Contains(nodeId))))
-                return false;
-            var saved = ReadRegistrations();
-            saved[gatewayId] = nodeId is null ? [] : [.. saved.GetValueOrDefault(gatewayId) ?? [], nodeId];
-            Directory.CreateDirectory(Path.GetDirectoryName(registrationPath)!);
-            using (var file = File.Create(registrationPath + ".tmp"))
-            {
-                JsonSerializer.Serialize(file, saved);
-                file.Flush(flushToDisk: true);
-            }
-            File.Move(registrationPath + ".tmp", registrationPath, overwrite: true);
-            gateways = new(gateways, StringComparer.Ordinal) { [gatewayId] = nodeId is null ? [] : [.. assigned, nodeId] };
+            var assigned = gateways.GetValueOrDefault(gatewayId) ?? [];
+            if (nodeId is null && gateways.ContainsKey(gatewayId) || nodeId is not null && assigned.Contains(nodeId)) return true;
+            if (nodeId is not null && (assigned.Length >= MaxNodesPerGateway ||
+                gateways.Values.Any(nodes => nodes.Contains(nodeId)))) return false;
+            var next = new Dictionary<string, string[]>(gateways, StringComparer.Ordinal) {
+                [gatewayId] = nodeId is null ? [] : [.. assigned, nodeId],
+            };
+            SaveRoutes(next);
             return true;
         }
     }
 
-    private Dictionary<string, string[]> ReadRegistrations() => File.Exists(registrationPath)
-        ? JsonSerializer.Deserialize<Dictionary<string, string[]>>(File.ReadAllText(registrationPath))
-            ?? throw new InvalidDataException("Invalid gateway routes.")
-        : new(StringComparer.Ordinal);
+    // Versioned full snapshots preserve removals even when startup appsettings had legacy routes.
+    private void SaveRoutes(Dictionary<string, string[]> next)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(registrationPath)!);
+        using (var file = File.Create(registrationPath + ".tmp")) {
+            JsonSerializer.Serialize(file, new { version = 2, gateways = next });
+            file.Flush(flushToDisk: true);
+        }
+        File.Move(registrationPath + ".tmp", registrationPath, overwrite: true);
+        gateways = next;
+    }
+
+    private Dictionary<string, string[]> LoadRoutes(Dictionary<string, string[]> configured)
+    {
+        if (!File.Exists(registrationPath)) return configured;
+        using var file = JsonDocument.Parse(File.ReadAllText(registrationPath));
+        if (file.RootElement.TryGetProperty("version", out var version)) {
+            if (version.GetInt32() != 2) throw new InvalidDataException("Unsupported gateway routes version.");
+            return file.RootElement.GetProperty("gateways").Deserialize<Dictionary<string, string[]>>()
+                ?? throw new InvalidDataException("Invalid gateway routes snapshot.");
+        }
+        var legacy = file.RootElement.Deserialize<Dictionary<string, string[]>>()
+            ?? throw new InvalidDataException("Invalid legacy gateway routes.");
+        foreach (var (id, devices) in legacy)
+            configured[id] = (configured.GetValueOrDefault(id) ?? []).Union(devices, StringComparer.Ordinal).ToArray();
+        return configured;
+    }
+
+    public string GatewayIdentityStatus(string gatewayId)
+    {
+        if (!gateways.ContainsKey(gatewayId)) return "unconfigured";
+        if (!IsRunning) return "broker_down";
+        return credentials.IsIssued(gatewayId) && lastHeartbeats.TryGetValue(gatewayId, out var received) &&
+            TimeProvider.System.GetElapsedTime(received) < TimeSpan.FromSeconds(30) ? "online" : "offline";
+    }
+
+    private Task PublishNodeListAsync(string id) => PublishTopicAsync($"luxmap/gateways/{id}/nodes",
+        new { serverId = id, deviceIds = gateways.GetValueOrDefault(id) ?? [] }, false);
+
+    private async Task DisconnectAsync(string id)
+    {
+        if (IsRunning && (await broker!.GetClientsAsync()).Any(c => c.Id == id)) {
+            try { await broker.DisconnectClientAsync(id, new MQTTnet.Server.Disconnecting.MqttServerClientDisconnectOptions
+                { ReasonCode = MqttDisconnectReasonCode.NotAuthorized }); }
+            catch { if ((await broker.GetClientsAsync()).Any(c => c.Id == id)) throw; }
+        }
+    }
+
+    // Compare-and-swap prevents a delayed retry from stealing a device from another server.
+    public async Task<bool> ChangeBindingAsync(string serverId, string deviceId, string? expectedOwner, bool detach)
+    {
+        await commandGate.WaitAsync();
+        try
+        {
+            var owner = gateways.SingleOrDefault(p => p.Value.Contains(deviceId)).Key;
+            if (detach && owner is null) return true;
+            if (!detach && owner == serverId) return credentials.IsIssued(serverId);
+            if (owner != expectedOwner || (detach && owner != serverId) ||
+                (!detach && !credentials.IsIssued(serverId))) return false;
+            var target = gateways.GetValueOrDefault(serverId) ?? [];
+            if (!detach && target.Length >= MaxNodesPerGateway) return false;
+            var next = new Dictionary<string, string[]>(gateways, StringComparer.Ordinal);
+            if (owner is not null) next[owner] = next[owner].Where(id => id != deviceId).ToArray();
+            if (!detach) next[serverId] = [.. target, deviceId];
+            lock (registrationGate) SaveRoutes(next);
+            // Existing MQTT subscriptions must not keep receiving commands for removed devices.
+            if (owner is not null && owner != serverId || detach) await DisconnectAsync(owner!);
+            if (IsRunning) {
+                if (owner is not null) await PublishNodeListAsync(owner);
+                if (!detach) await PublishNodeListAsync(serverId);
+            }
+            return true;
+        }
+        finally { commandGate.Release(); }
+    }
+
+    public async Task<bool> MigrateGatewayAsync(string legacyId, string serverId, string[] expectedDevices)
+    {
+        await commandGate.WaitAsync();
+        try
+        {
+            if (legacyId == serverId || GatewayIdentityStatus(serverId) != "online") return false;
+            var old = gateways.GetValueOrDefault(legacyId) ?? [];
+            var current = gateways.GetValueOrDefault(serverId) ?? [];
+            var expected = expectedDevices.ToHashSet(StringComparer.Ordinal);
+            if (expected.Count != expectedDevices.Length || expected.Count > MaxNodesPerGateway ||
+                old.Any(id => !expected.Contains(id)) || current.Any(id => !expected.Contains(id)) ||
+                expected.Any(id => !old.Contains(id) && !current.Contains(id))) return false;
+            var next = new Dictionary<string, string[]>(gateways, StringComparer.Ordinal) {
+                [legacyId] = [], [serverId] = expectedDevices,
+            };
+            lock (registrationGate) SaveRoutes(next);
+            credentials.Revoke(legacyId);
+            authenticatedSessions.TryRemove(legacyId, out _);
+            lastHeartbeats.TryRemove(legacyId, out _);
+            await DisconnectAsync(legacyId);
+            await PublishNodeListAsync(serverId);
+            return true;
+        }
+        finally { commandGate.Release(); }
+    }
 
     public string GatewayStatus(string deviceId)
     {
@@ -113,11 +206,8 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        gateways = configuration.GetSection("Mqtt:Gateways").Get<Dictionary<string, string[]>>()
-            ?? new() { ["LUXMAP-GW001"] = ["LUXMAP-P001"] };
-        foreach (var (gateway, nodes) in ReadRegistrations())
-            gateways[gateway] = (gateways.GetValueOrDefault(gateway) ?? [])
-                .Union(nodes, StringComparer.Ordinal).ToArray();
+        gateways = LoadRoutes(configuration.GetSection("Mqtt:Gateways").Get<Dictionary<string, string[]>>()
+            ?? new(StringComparer.Ordinal));
         if (gateways.Any(pair => !DeviceRules.ValidId(pair.Key) || pair.Value.Length > MaxNodesPerGateway ||
             pair.Value.Any(id => !DeviceRules.ValidId(id))) ||
             gateways.Values.SelectMany(nodes => nodes).GroupBy(id => id).Any(group => group.Count() > 1))
@@ -158,14 +248,15 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
                     e.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                     return;
                 }
-                foreach (var id in nodes)
+                authenticatedSessions[e.ClientId] = credentials.Fingerprint(e.ClientId)!;
+                foreach (var id in gateways.GetValueOrDefault(e.ClientId) ?? [])
                     await PublishCommandAsync(id, store.Read(id)?.DesiredCommand ?? new("AUTO", null, "initial-auto", 0));
             }
             finally { commandGate.Release(); }
         };
         broker.InterceptingSubscriptionAsync += e =>
         {
-            if (!credentials.IsIssued(e.ClientId))
+            if (!SessionAuthorized(e.ClientId))
             {
                 e.ProcessSubscription = false;
                 e.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
@@ -185,7 +276,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         {
             if (e.ClientId == ServerId) return;
             e.ProcessPublish = false;
-            if (!credentials.IsIssued(e.ClientId)) return;
+            if (!SessionAuthorized(e.ClientId)) return;
             if (e.ApplicationMessage.Topic == $"luxmap/gateways/{e.ClientId}/heartbeat")
             {
                 if (gateways.ContainsKey(e.ClientId) && !e.ApplicationMessage.Retain &&
@@ -197,7 +288,7 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
             {
                 if (gateways.TryGetValue(e.ClientId, out var nodes) && !e.ApplicationMessage.Retain &&
                     e.ApplicationMessage.PayloadSegment.AsSpan().SequenceEqual("1"u8))
-                    await PublishTopicAsync($"luxmap/gateways/{e.ClientId}/nodes", new { deviceIds = nodes }, false);
+                    await PublishNodeListAsync(e.ClientId);
                 return;
             }
             if (!TryRoute(e.ClientId, e.ApplicationMessage.Topic, out var id, out var kind) ||
@@ -247,6 +338,9 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         logger.LogInformation("MQTT broker listening on TCP {Port}{Tls}; gateways: {Count}", port,
             certificates is null ? "" : $" and TLS {tlsPort}", gateways.Count);
     }
+
+    private bool SessionAuthorized(string id) =>
+        authenticatedSessions.TryGetValue(id, out var fingerprint) && fingerprint == credentials.Fingerprint(id);
 
     private bool TryRoute(string gatewayId, string topic, out string nodeId, out string kind)
     {

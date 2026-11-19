@@ -43,6 +43,11 @@ sealed class GatewayCredentials(IHostEnvironment environment, IDataProtectionPro
         }
     }
 
+    internal string? Fingerprint(string gatewayId)
+    {
+        lock (gate) return Read().GetValueOrDefault(gatewayId)?.Hash;
+    }
+
     public bool IsIssued(string gatewayId)
     {
         lock (gate) return Read().ContainsKey(gatewayId);

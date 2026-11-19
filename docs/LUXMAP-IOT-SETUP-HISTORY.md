@@ -1,3 +1,10 @@
+# Cập nhật Server ID — 19/11/2026
+
+Luồng thêm thiết bị dùng server_id làm MQTT Client ID và username, bỏ gateway_id riêng.
+Dùng POST/GET/DELETE /api/v1/iot/servers/{serverId}/credential. POST /iot/nodes chỉ chọn server_id.
+Các ví dụ mã gateway riêng bên dưới là luồng cũ; xem hướng dẫn hiện hành và chuyển đổi tại
+[IOT-SERVER-IDENTITY-API-CHANGES.md](IOT-SERVER-IDENTITY-API-CHANGES.md).
+
 # Đăng ký IoT server, IoT node và xem lịch sử trên LuxMap
 
 Hướng dẫn này dùng `iot-server-01`, gateway `LUXMAP-GW001` và node vật lý `LUXMAP-P001` làm ví dụ. Tủ là `CAB-011`, mạch điện là `FDR-009` và xã/phường là `COM-070`. Sau khi tạo, API cấp mã tài sản dạng `NODE-004`. Hãy dùng các ID thực tế của môi trường đang thao tác.

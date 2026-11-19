@@ -164,6 +164,45 @@ app.MapGet("/api/luxmap/mqtt", (MqttBroker mqtt) => Results.Ok(new { running = m
 app.MapGet("/api/luxmap/gateways/by-device/{deviceId}/status", (string deviceId, MqttBroker mqtt) =>
     Results.Ok(new { status = mqtt.GatewayStatus(deviceId) })).WithTags("MQTT");
 
+app.MapGet("/api/luxmap/gateways/{gatewayId}/status", (string gatewayId, MqttBroker mqtt, GatewayCredentials credentials) =>
+    Results.Ok(new { status = mqtt.GatewayIdentityStatus(gatewayId), credentialIssued = credentials.IsIssued(gatewayId) }))
+    .WithTags("MQTT").WithSummary("Heartbeat và key của đúng một server/gateway");
+
+app.MapPost("/api/luxmap/gateways/{gatewayId}/devices/{deviceId}/binding",
+    async (string gatewayId, string deviceId, GatewayBindingRequest request, HttpContext context,
+        MqttBroker mqtt, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    if (!DeviceRules.ValidId(gatewayId) || !DeviceRules.ValidId(deviceId) ||
+        request.ExpectedGatewayId is { } expected && !DeviceRules.ValidId(expected)) return Results.BadRequest();
+    return await mqtt.ChangeBindingAsync(gatewayId, deviceId, request.ExpectedGatewayId, request.Detach)
+        ? Results.NoContent() : Results.Conflict();
+}).WithTags("MQTT");
+
+app.MapPost("/api/luxmap/gateways/{gatewayId}/migration",
+    async (string gatewayId, GatewayMigrationRequest request, HttpContext context,
+        MqttBroker mqtt, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    if (!DeviceRules.ValidId(gatewayId) || !DeviceRules.ValidId(request.LegacyGatewayId) ||
+        request.DeviceIds is null || request.DeviceIds.Length > 32 ||
+        request.DeviceIds.Any(id => !DeviceRules.ValidId(id))) return Results.BadRequest();
+    return await mqtt.MigrateGatewayAsync(request.LegacyGatewayId, gatewayId, request.DeviceIds)
+        ? Results.NoContent() : Results.Conflict();
+}).WithTags("MQTT");
+
+app.MapGet("/api/luxmap/gateways/{gatewayId}/devices/{deviceId}/authorization",
+    (string gatewayId, string deviceId, HttpContext context, MqttBroker mqtt,
+        GatewayCredentials credentials, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    return credentials.IsIssued(gatewayId) && (mqtt.Gateways.GetValueOrDefault(gatewayId) ?? []).Contains(deviceId)
+        ? Results.NoContent() : Results.NotFound();
+}).WithTags("MQTT");
+
 app.MapGet("/api/luxmap/gateways", (MqttBroker mqtt) => Results.Ok(mqtt.Gateways))
     .WithTags("MQTT").WithSummary("Danh sách gateway và node được phép chuyển tiếp");
 app.MapGet("/api/luxmap/gateways/routes", (HttpContext context, MqttBroker mqtt,
@@ -174,6 +213,16 @@ app.MapGet("/api/luxmap/gateways/routes", (HttpContext context, MqttBroker mqtt,
     return Results.Ok(mqtt.Gateways.OrderBy(route => route.Key, StringComparer.Ordinal)
         .Select(route => new { gatewayId = route.Key, deviceIds = route.Value, credentialIssued = credentials.IsIssued(route.Key) })
         .ToArray());
+}).WithTags("MQTT");
+
+app.MapGet("/api/luxmap/gateways/{gatewayId}/route", (string gatewayId, HttpContext context,
+    MqttBroker mqtt, GatewayCredentials credentials, IConfiguration configuration) =>
+{
+    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
+        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
+    return mqtt.Gateways.TryGetValue(gatewayId, out var devices)
+        ? Results.Ok(new { gatewayId, deviceIds = devices, credentialIssued = credentials.IsIssued(gatewayId) })
+        : Results.NotFound();
 }).WithTags("MQTT");
 
 app.MapPut("/api/luxmap/gateways/{gatewayId}/route", async (string gatewayId, GatewayRouteRequest request,
@@ -242,3 +291,6 @@ app.MapDelete("/api/luxmap/gateways/{gatewayId}/credential", async (string gatew
 app.Run();
 
 record GatewayRouteRequest(string? DeviceId);
+
+record GatewayBindingRequest(string? ExpectedGatewayId, bool Detach = false);
+record GatewayMigrationRequest(string LegacyGatewayId, string[] DeviceIds);

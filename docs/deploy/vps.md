@@ -315,3 +315,17 @@ Ba lỗi bắt được nhờ diễn tập, đã sửa trong file:
    container vẫn giữ inode cũ, reload báo lỗi và **cấu hình cũ chạy tiếp**. Nay gắn cả thư mục `deploy/caddy/`.
 3. **`respond @matcher` đứng sau mọi `handle`** trong thứ tự của Caddy, nên chặn `/api/v1/internal/*` bằng `respond` không
    bao giờ chạy. Nay là một `handle` có đường dẫn dài hơn.
+
+
+### Server ID thống nhất cho ESP32 gateway (19/11/2026)
+
+BE và IoT Bridge phải deploy cùng phiên bản. Áp dụng migration AddIotServerGatewayIdentity
+(thêm alias gateway cũ, không xóa dữ liệu). Dùng server_id, ví dụ iot-server-01, làm MQTT
+Client ID và username trên firmware espserver mới. Key được Admin quản lý qua
+POST/GET/DELETE /api/v1/iot/servers/{serverId}/credential.
+Không gửi gateway_id khi POST /iot/nodes; gateway tự nhận danh sách node theo server_id.
+Các khóa môi trường, mạng Docker, TLS 8883 và volume dữ liệu giữ nguyên.
+
+Thiết bị đang dùng LUXMAP-GW001 phải được cấp key cho mã mới, đổi cấu hình firmware,
+chờ heartbeat rồi gọi gateway-migration; không chỉ đổi tên key trong file dữ liệu.
+Xem [toàn bộ API, JSON và quy trình migration](../IOT-SERVER-IDENTITY-API-CHANGES.md).

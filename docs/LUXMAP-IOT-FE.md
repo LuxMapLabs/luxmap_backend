@@ -1,5 +1,7 @@
 # Tích hợp IoT LuxMap cho Frontend
 
+Cập nhật gộp Server ID 19/11/2026: xem [bảng API và quy trình migration](IOT-SERVER-IDENTITY-API-CHANGES.md). Mã FE chưa được sửa; các URL gateway cũ đã deprecated.
+
 FE gọi [Backend LuxMap cổng 5141](http://localhost:5141/swagger/index.html) bằng header `Authorization: Bearer <access_token>`. Khi deploy, thay localhost bằng địa chỉ backend của môi trường tương ứng.
 
 ```text
@@ -10,8 +12,7 @@ FE ↔ HTTP API LuxMap ↔ HTTP nội bộ IoT Bridge ↔ MQTT ↔ ESP32 gateway
 
 | Trường | Ví dụ | Nơi sử dụng |
 |---|---|---|
-| `server_id` | `iot-server-01` | Mã server trong LuxMap, dùng để đăng ký vị trí và liên kết node. |
-| `gatewayId` | `LUXMAP-GW001` | Client ID MQTT của ESP32 gateway. |
+| `server_id` | `iot-server-01` | Mã ESP32 gateway trong LuxMap, đồng thời là MQTT Client ID và username. |
 | `device_id` | `LUXMAP-P001` | ID phần cứng trong firmware node, dùng cho tuyến MQTT. |
 | `node_id` | `NODE-001` | ID tài sản do backend sinh, dùng trong API điều khiển và đọc dữ liệu. |
 
@@ -35,7 +36,7 @@ Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán n
 
 Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. JSON tạo server không có trường `base_url`; FE chỉ gửi server_id, commune_id và location. Địa chỉ Bridge do người triển khai cấu hình; nếu thiếu/sai hoặc chưa allowlist thì API trả 503 IOT_SOURCE_UNAVAILABLE. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường và GPS.
 
-ESP32 gateway dùng địa chỉ broker TLS, Gateway ID, MQTT username và secret đã cấp. Firmware tự yêu cầu danh sách node trên MQTT sau khi kết nối và làm mới mỗi 10 giây. Với gateway vật lý mới, Admin gọi `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` một lần và nhập `password` từ phản hồi trên trang cấu hình ESP32. Gateway có thể kết nối khi danh sách node còn rỗng. Tránh lưu secret vào log hoặc bộ nhớ của FE.
+ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Client ID và username tự bằng server_id. Firmware tự yêu cầu danh sách node trên MQTT sau khi kết nối và làm mới mỗi 10 giây. Với gateway vật lý mới, Admin gọi `POST /api/v1/iot/servers/{serverId}/credential` một lần và nhập `password` từ phản hồi trên trang cấu hình ESP32. Gateway có thể kết nối khi danh sách node còn rỗng. Tránh lưu secret vào log hoặc bộ nhớ của FE.
 
 ### 2.2 Admin tạo node và gán feeder
 
@@ -55,15 +56,15 @@ ESP32 gateway dùng địa chỉ broker TLS, Gateway ID, MQTT username và secre
 }
 ```
 
-Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Nếu thiết bị đã thuộc một gateway có secret, backend dùng lại tuyến đó. Nếu bridge có nhiều gateway đã cấp secret và thiết bị chưa có tuyến, gửi thêm `gateway_id`, ví dụ `LUXMAP-GW001`. Mỗi gateway hỗ trợ tối đa 32 node được phép.
+Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
 
-API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response có `node_id`, `server_id`, `device_id`, `feeder_id` và `gateway_id`. Dùng `node_id` cho API điều khiển và đọc dữ liệu. Thêm node bằng API này tự thêm tuyến, dùng lại secret và liên kết trực tiếp với feeder. Các trụ và bóng được xác định theo feeder.
+API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response có `node_id`, `server_id`, `device_id`, `feeder_id`. Dùng `node_id` cho API điều khiển và đọc dữ liệu. Thêm node bằng API này tự thêm tuyến, dùng lại secret và liên kết trực tiếp với feeder. Các trụ và bóng được xác định theo feeder.
 
 ### Quản lý tuyến và nguồn đo
 
-- Admin gọi `GET /api/v1/iot/servers/{serverId}/gateways/routes` để đọc `gateway_id`, `device_ids` và `credential_issued`. Nếu nhiều server dùng chung bridge, danh sách phản ánh toàn bộ tuyến của bridge đó.
+- Đọc `GET /api/v1/iot/servers` để lấy credential_issued và heartbeat của từng server. `GET /api/v1/iot/servers/{serverId}/nodes?page=1&page_size=20` trả node thuộc đúng server, có lọc xã. API routes cũ deprecated, chỉ trả tuyến của server đang chọn.
 - Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
-- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, còn dữ liệu lịch sử, tuyến MQTT và secret được giữ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
+- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, dữ liệu lịch sử và secret gateway được giữ; quyền MQTT của device_id bị gỡ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
 
 ## 3. Hiển thị trên bản đồ
 
@@ -253,20 +254,21 @@ có header `Cache-Control: no-store`. FE chỉ hiển thị cho người dùng �
 
 | Thao tác | Method và URL |
 |---|---|
-| Cấp key mới | `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` |
-| Xem lại key | `GET /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` |
-| Thu hồi key | `DELETE /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` |
+| Cấp key mới | `POST /api/v1/iot/servers/{serverId}/credential` |
+| Xem lại key | `GET /api/v1/iot/servers/{serverId}/credential` |
+| Thu hồi key | `DELETE /api/v1/iot/servers/{serverId}/credential` |
 
 Với bộ hiện tại, URL đầy đủ là
-`https://luxmap.com.vn/api/v1/iot/servers/iot-server-01/gateways/LUXMAP-GW001/credential`.
+`https://luxmap.com.vn/api/v1/iot/servers/iot-server-01/credential`.
 Cả ba thao tác dùng Body none.
 
 POST và GET thành công trả 200 với cùng dạng JSON:
 
 ```json
 {
-  "client_id": "LUXMAP-GW001",
-  "username": "LUXMAP-GW001",
+  "server_id": "iot-server-01",
+  "client_id": "iot-server-01",
+  "username": "iot-server-01",
   "password": "<MQTT secret 64 ký tự>",
   "node_ids": ["LUXMAP-P001"]
 }
