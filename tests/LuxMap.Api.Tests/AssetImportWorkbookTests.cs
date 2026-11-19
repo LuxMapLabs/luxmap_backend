@@ -283,6 +283,28 @@ public sealed class AssetImportWorkbookTests(AssetImportFixture fixture) : Asset
     }
 
     [Fact]
+    public async Task Feeder_routes_are_refused_in_the_workbook_and_a_blank_old_column_keeps_the_stored_route()
+    {
+        // WB-21: nothing draws feeder.geom, so a route typed into the sheet would be stored and never seen.
+        var feeders = Full()[2];
+        var withRoute = feeders with { Columns = [.. feeders.Columns, "geom_wkt"] };
+        withRoute.Rows[0].Cells["geom_wkt"] = "LINESTRING(106.49 10.97, 106.50 10.98)";
+        var result = await Import(Full()[1], withRoute);
+        Rejected(result); Error(result, "Mạch điện", 1, "geom_wkt", "not supported");
+        Assert.Empty(await Snapshot());
+
+        // A file exported before WB-21 still has the column; left blank it is ignored and the route set through the form stays.
+        Committed(await Import(Full()));
+        await SetFeederRoute("MACH-A", "LINESTRING(106.49 10.97, 106.50 10.98)");
+        var before = await Snapshot();
+        withRoute.Rows[0].Cells.Remove("geom_wkt");
+        result = await Import(Full()[1], withRoute); Committed(result);
+        Assert.Equal(1, result.GetProperty("feeders").GetProperty("unchanged").GetInt32());
+        Assert.Equal(before, await Snapshot());
+        Assert.Contains(before, line => line.StartsWith("F/", StringComparison.Ordinal) && line.Contains("LINESTRING", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Required_and_duplicate_headers_are_rejected_and_errors_use_sheet_columns()
     {
         var sheet = AssetWorkbookFile.Asset(ImportKind.Cabinets);

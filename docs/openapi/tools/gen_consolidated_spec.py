@@ -74,6 +74,12 @@ d["components"]["schemas"]["ApiError"]["properties"]["details"]["additionalPrope
 d["components"]["schemas"]["ApiError"]["properties"]["details"]["description"] = (
     "Túi ngữ cảnh tự do. Luôn có mặt và luôn chứa correlation_id (Contract §1.4)."
 )
+# FEEDER-GEOM-1: the feeder route is stored only. Nothing draws it, and the asset workbook does not carry it (WB-21).
+for schema, field in [("CreateFeederRequest", "geom_wkt"), ("UpdateFeederRequest", "geom_wkt"),
+                      ("FeederDetail", "geom_wkt"), ("FeederListItem", "has_geometry")]:
+    d["components"]["schemas"][schema]["properties"][field]["description"] = (
+        "Lộ trình cáp (WKT LINESTRING) CHỈ LƯU: không lớp bản đồ hay sơ đồ tủ nào vẽ nó; workbook không mang (FEEDER-GEOM-1, WB-21)."
+    )
 # Same lint fix for BE-43's two free-form fields: an untyped `object?` in C# exports `nullable` without `type`.
 d["components"]["schemas"]["SyncConflict"]["properties"]["server_state"] = {
     "type": "object", "additionalProperties": True, "nullable": True,
@@ -181,8 +187,8 @@ SUMMARY = {
     ("get", "/api/v1/assets/segments"): "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
     ("get", "/api/v1/assets/segments/{segmentId}"): "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
     ("post", "/api/v1/assets/segments"): "Tạo tuyến đường; 201 + Location, không body",
-    ("get", "/api/v1/assets/feeders"): "Danh sách mạch điện — has_geometry + pole_count + cabinet{cabinet_id, cabinet_name, location} | null (CAB-6); KHÔNG có data_source (§1.6)",
-    ("get", "/api/v1/assets/feeders/{feederId}"): "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
+    ("get", "/api/v1/assets/feeders"): "Danh sách mạch điện — has_geometry (lộ trình chỉ lưu, FEEDER-GEOM-1) + pole_count + cabinet{cabinet_id, cabinet_name, location} | null (CAB-6); KHÔNG có data_source (§1.6)",
+    ("get", "/api/v1/assets/feeders/{feederId}"): "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp, và chỉ lưu — bản đồ không vẽ (FEEDER-GEOM-1)",
     ("post", "/api/v1/assets/feeders"): "Tạo mạch điện; 201 + Location, không body",
     ("get", "/api/v1/assets/poles"): "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1); unassigned_segment=true chỉ lấy cột CHƯA TUYẾN, lọc trước tổng và phân trang [POLE-SEGMENT-NULL]",
     ("get", "/api/v1/assets/poles/{poleId}"): "Một cột + geom_wkt + segment_name + created_at; ngoài phạm vi xã → 404",

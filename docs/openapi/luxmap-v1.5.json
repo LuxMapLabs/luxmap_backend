@@ -2731,7 +2731,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Danh sách mạch điện — has_geometry + pole_count + cabinet{cabinet_id, cabinet_name, location} | null (CAB-6); KHÔNG có data_source (§1.6)",
+        "summary": "Danh sách mạch điện — has_geometry (lộ trình chỉ lưu, FEEDER-GEOM-1) + pole_count + cabinet{cabinet_id, cabinet_name, location} | null (CAB-6); KHÔNG có data_source (§1.6)",
         "operationId": "getAssetsFeeders",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -2970,7 +2970,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp",
+        "summary": "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp, và chỉ lưu — bản đồ không vẽ (FEEDER-GEOM-1)",
         "operationId": "getAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -23666,7 +23666,8 @@
           },
           "geom_wkt": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Lộ trình cáp (WKT LINESTRING) CHỈ LƯU: không lớp bản đồ hay sơ đồ tủ nào vẽ nó; workbook không mang (FEEDER-GEOM-1, WB-21)."
           },
           "cabinet_id": {
             "maxLength": 32,
@@ -24704,7 +24705,8 @@
           },
           "geom_wkt": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Lộ trình cáp (WKT LINESTRING) CHỈ LƯU: không lớp bản đồ hay sơ đồ tủ nào vẽ nó; workbook không mang (FEEDER-GEOM-1, WB-21)."
           },
           "created_at": {
             "type": "string",
@@ -24749,7 +24751,8 @@
             "type": "string"
           },
           "has_geometry": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Lộ trình cáp (WKT LINESTRING) CHỈ LƯU: không lớp bản đồ hay sơ đồ tủ nào vẽ nó; workbook không mang (FEEDER-GEOM-1, WB-21)."
           },
           "pole_count": {
             "type": "integer",
@@ -30273,7 +30276,8 @@
           },
           "geom_wkt": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Lộ trình cáp (WKT LINESTRING) CHỈ LƯU: không lớp bản đồ hay sơ đồ tủ nào vẽ nó; workbook không mang (FEEDER-GEOM-1, WB-21)."
           },
           "cabinet_id": {
             "type": "string",

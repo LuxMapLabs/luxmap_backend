@@ -2619,14 +2619,24 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
 | WB-12 | Một `.xlsx`, sheet nhận theo **tên** (trim + NFC): `Tuyến đường`, `Tủ điện`, `Mạch điện`, `Cột điện`, `Bóng đèn`; cột = cột file CSV cùng loại trừ `commune_id` / `data_source`. Sheet vắng = không nạp loại đó; không sheet tài sản nào → lỗi. Sheet khác bỏ qua, **trừ** `IoT` có dữ liệu → lỗi "chưa hỗ trợ" |
 | WB-13 | `commune_id` và `data_source` đặt **khi upload** (multipart). `data_source` bắt buộc, không mặc định. `commune_id` vắng = xã duy nhất của người gọi; phạm vi ≠ một xã mà vắng → 400; ngoài phạm vi → 403. Hai cột này xuất hiện trong sheet → lỗi |
 | WB-14 | Cột không nhận mà **có dữ liệu** → lỗi header của sheet (không âm thầm bỏ); cột lạ toàn trống bỏ qua |
-| WB-15 | Toạ độ `geom_wkt` (WKT) mọi sheet — thay WB-5. Tuyến và mạch: ô trống / thiếu cột = **giữ** hình (mạch khác CSV, nơi ô trống xoá) |
+| WB-15 | Toạ độ `geom_wkt` (WKT) mọi sheet — thay WB-5. Tuyến và mạch: ô trống / thiếu cột = **giữ** hình (mạch khác CSV, nơi ô trống xoá). **Phần mạch thay bởi WB-21** (19/11) |
 | WB-16 | Cột **mới** không `geom_wkt` thì bắt buộc `note` (chỉ workbook; CSV / form không đổi) |
 | WB-17 | Bộ đèn — thay WB-4: khoá khớp `(cột, install_date)`; nhận bộ đã tháo (`removed_date`). Chưa có → thêm (ONE-FIXTURE giữ); một bộ khớp → giống = `unchanged`, khác = lỗi; nhiều bộ khớp → lỗi. CSV fixtures giữ insert-only |
 | WB-18 | Vẫn all-or-nothing một transaction (WB-3). Lỗi / cảnh báo thêm **`sheet`**: `{sheet, row, column, message}` (`WorkbookRowError`); `ImportRowError` của CSV không đổi |
-| WB-19 | Export — thay WB-9 / WB-10: sheet `Hướng dẫn` + 5 sheet + `Không xuất`; **mọi** tài sản trong phạm vi (cả tuyến / tủ / mạch không có cột, hình tuyến / mạch, bộ đã tháo). `Không xuất` liệt kê tài sản thiếu `external_ref`, cột trên mạch thiếu mã, bộ đèn của cột thiếu mã |
+| WB-19 | Export — thay WB-9 / WB-10: sheet `Hướng dẫn` + 5 sheet + `Không xuất`; **mọi** tài sản trong phạm vi (cả tuyến / tủ / mạch không có cột, hình tuyến / ~~mạch~~ (WB-21), bộ đã tháo). `Không xuất` liệt kê tài sản thiếu `external_ref`, cột trên mạch thiếu mã, bộ đèn của cột thiếu mã |
 | WB-20 | Giới hạn — thay WB-11: mỗi file nạp lại một xã, một `data_source`. Export nhiều xã không nạp lại được; tài sản khác nguồn trong một xã bị đổi theo nguồn chọn khi upload — `Hướng dẫn` của file xuất ghi số tài sản theo từng nguồn |
+| WB-21 | **19/11/2026, thay phần mạch của WB-15 và WB-19** (FEEDER-GEOM-1 bên dưới). Sheet `Mạch điện` **không có `geom_wkt`**, ở template lẫn file xuất. Cột `geom_wkt` có dữ liệu trong sheet này → lỗi header WB-14 (*"Column 'geom_wkt' is not supported in this sheet."*); cột trống (file xuất trước WB-21) bỏ qua. Lộ trình mạch đã lưu **giữ nguyên** khi nạp lại. Ngoại lệ của WB-12 "cột = cột CSV": CSV `feeders` **vẫn** nhận `geom_wkt` như cũ |
 
-**Cần báo:** WP5 (định dạng mới, hai trường form `data_source` / `commune_id`, `sheet` trong lỗi). **Chưa báo.**
+**Cần báo:** WP5 (định dạng mới, hai trường form `data_source` / `commune_id`, `sheet` trong lỗi; WB-21 bỏ `geom_wkt` khỏi sheet mạch). **Chưa báo.**
+
+### FEEDER-GEOM-1 — lộ trình mạch là dữ liệu lưu, không vẽ (19/11/2026)
+
+| | |
+|---|---|
+| **Decision** | `feeder.geom` **giữ** (CAB-2 không đổi: cột DB, `geom_wkt` của `POST` / `PUT /assets/feeders`, `has_geometry` ở danh sách, `geom_wkt` ở chi tiết, CSV `feeders`). Nó là trường **chỉ lưu**: không lớp bản đồ nào vẽ, sơ đồ tủ (`CabinetTopologyService`) dựng đường mạch từ toạ độ tủ và cột chiếu lên tuyến. Mô tả OpenAPI của bốn trường ghi rõ điều này. Workbook bỏ cột (WB-21) vì đó là chỗ người dùng nhập tay hàng loạt rồi không thấy kết quả trên bản đồ |
+| **Decision maker** | **Mỹ (Dylan), 19/11/2026**, trên đề xuất của thành viên nhóm. Phương án bỏ hẳn hai trường ở API bị **loại**: `has_geometry` đã ở Contract (§5.3.1 `:824`, `:867`), bỏ là thay đổi phá vỡ với WP5 cho một trường vô hại |
+| **Chạm API** | Field / hình dạng **không đổi**; chỉ định dạng workbook đổi (WB-21, SELF-SIGNED như WB-12…WB-20). Không migration |
+| **Kéo theo** | Muốn vẽ lộ trình mạch sau này → mở lại WB-21 và thêm lớp bản đồ; dữ liệu đã lưu không mất |
 
 
 ## IOT-CONTACT-1 — kết nối node độc lập độ mới mẫu điện (18/11/2026)

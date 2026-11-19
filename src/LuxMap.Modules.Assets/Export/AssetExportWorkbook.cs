@@ -68,7 +68,7 @@ public sealed class AssetExportWorkbook(LuxMapDbContext db)
             [ImportKind.Feeders] = feeders.Where(x => Include("feeders", x.FeederId, x.CommuneId, x.ExternalRef))
                 .Select(x => new object?[] { x.ExternalRef, x.FeederName,
                     x.CabinetId is null ? null : cabinetRefs.GetValueOrDefault(x.CabinetId),
-                    x.CabinetSource is { } cs ? WireEnum.Name(cs) : null, x.Geom?.AsText() }).ToList(),
+                    x.CabinetSource is { } cs ? WireEnum.Name(cs) : null }).ToList(),
             [ImportKind.Poles] = poles.Where(x => Include("poles", x.PoleId, x.CommuneId, x.ExternalRef,
                     x.FeederId is not null && feederRefs.GetValueOrDefault(x.FeederId) is null ? "Mạch của cột thiếu mã kiểm kê hoặc ngoài phạm vi." : null))
                 .Select(x => new object?[] { x.ExternalRef,
@@ -144,7 +144,7 @@ public sealed class AssetExportWorkbook(LuxMapDbContext db)
                 ["external_ref là mã kiểm kê của xã (CTA-001, TUYEN-A), không dùng mã hệ thống POLE-0001 / SEG-001."],
                 ["Cột mới không GPS phải có note mô tả vị trí. Bộ đèn khớp theo cột và ngày lắp; sửa qua form."],
                 ["Mỗi sheet tối đa 5000 dòng, 200 cột, 2000 ký tự/ô; file 10 MB, giải nén 100 MB."],
-                ["geom_wkt: POINT(lng lat) / LINESTRING(lng lat, …). Tuyến/mạch trống: giữ hình; xoá qua form."],
+                ["geom_wkt: POINT(lng lat) / LINESTRING(lng lat, …). Tuyến trống: giữ hình; xoá qua form. Mạch điện không có geom_wkt."],
                 ["File nhiều xã không nạp lại được; upload chỉ nhận một xã."],
                 ["Nạp lại dùng một data_source; tài sản khác nguồn sẽ theo nguồn chọn khi upload (bộ đèn có sẵn không sửa)."],
                 ["Nguồn: field / public_imagery / calibration_rig / simulated. Testbed không bao giờ chọn field."],
