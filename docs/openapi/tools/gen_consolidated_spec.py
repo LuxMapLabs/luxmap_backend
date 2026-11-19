@@ -160,13 +160,6 @@ iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [2]
 
 S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
-for schema in ("NodeProfile", "RegisterNodeRequest"):
-    for legacy_field in ("lamp_count_calibration", "installed_lamp_count", "use_ten_lamp_calibration"):
-        if legacy_field in S[schema].get("properties", {}):
-            iot_property(schema, legacy_field)["deprecated"] = True
-            iot_property(schema, legacy_field)["description"] = "Legacy input only; no lamp counting is performed."
-    iot_property(schema, "lamp_count_calibration")["enum"] = ["4v", "5v", "5v-quiet-v1", None]
-
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
     iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
     iot_property(schema, "command")["enum"] = ["ON", "OFF", None]
@@ -401,7 +394,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
-    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)",
+    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",
     "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 + IOT-CONTACT-1 (18/11/2026)",
@@ -437,7 +430,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/feeders/{feederId}/electrical"): "Đọc mẫu điện mới nhất của mạch",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Trung bình điện 30 giây theo giờ đo DS3231, lọc thời gian và phân trang",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical/history/received"): "Trung bình điện 30 giây theo giờ Bridge nhận, lọc thời gian và phân trang",
-    ("post", "/api/v1/iot/nodes"): "Đăng ký node, nguồn đo và tuyến MQTT trong một lần",
+    ("post", "/api/v1/iot/nodes"): "Admin đăng ký node với 7 trường; tự đặt calibration_rig và cho phép điều khiển",
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("put", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route"): "Đăng ký tuyến MQTT cho gateway và node",
@@ -445,7 +438,8 @@ SUMMARY.update({
     ("delete", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Thu hồi MQTT secret và ngắt gateway",
     ("post", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Cấp MQTT key mới cho gateway",
     ("get", "/api/v1/iot/servers/{serverId}/gateways/routes"): "Liệt kê tuyến và trạng thái cấp secret trên bridge",
-    ("put", "/api/v1/iot/nodes/{nodeId}"): "Gắn hoặc cập nhật nguồn đo của node IoT",
+    ("put", "/api/v1/iot/nodes/{nodeId}"): "Manager cập nhật nguồn đo với 6 trường, kiểm phạm vi xã",
+    ("delete", "/api/v1/iot/nodes/{nodeId}/feeder"): "Gỡ node khỏi feeder, giữ node trong tủ và giữ lịch sử",
     ("delete", "/api/v1/iot/nodes/{nodeId}"): "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",
     ("post", "/api/v1/iot/servers"): "Admin đăng ký IoT server và vị trí, tự dùng Bridge cấu hình sẵn (không nhận base_url)",
     ("get", "/api/v1/iot/servers"): "Xem trạng thái các server IoT trong phạm vi truy cập",

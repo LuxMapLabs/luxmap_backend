@@ -2730,3 +2730,27 @@ BE lưu alias legacy trong DB/audit để giữ URL cũ; migration idempotent, k
 PUT nguồn chuyển server trong cùng xã dùng compare-and-swap route tại Bridge và rollback bù nếu DB lỗi; lỗi không được âm thầm thành công.
 DELETE nguồn gỡ quyền MQTT của đúng server; lịch sử feeder giữ nguyên. Firmware chỉ một Server ID; Client ID/username tự suy ra,
 NVS cũ được đọc để chuyển đổi có kiểm soát (không tự đổi danh tính/key đang hoạt động).
+
+
+## IOT-NODE-REGISTER-COMPACT-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+POST /api/v1/iot/nodes chỉ nhận server_id, cabinet_id, feeder_id, device_id và nominal_voltage/current_ma/power_mw.
+Bỏ data_source, supports_remote_control, lamp_count_calibration, installed_lamp_count khỏi DTO và schema tạo node.
+gateway_id đã được bỏ theo IOT-SERVER-IDENTITY-1; server_id là mã gateway duy nhất.
+BE tự đặt DataSource.CalibrationRig và SupportsRemoteControl=true cho endpoint thêm bộ IoT testbed này.
+Quyền ManageSettings, kiểm xã/tủ/feeder, tuyến MQTT và 201/200 replay giữ nguyên.
+Các thuộc tính JSON cũ dư bị bỏ qua theo quy tắc serializer hiện hành, không thay đổi giá trị mặc định do BE chọn.
+Không sửa profile/node đã lưu, API registry /assets/iot-nodes hoặc JSON PUT NodeProfile tương thích cũ; không migration DB, không FE.
+
+
+## IOT-NODE-FEEDER-DETACH-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+PUT /api/v1/iot/nodes/{nodeId} dùng UpdateNodeRequest chỉ 6 trường: server_id, device_id, feeder_id,
+nominal_voltage, nominal_current_ma, nominal_power_mw. Không còn xuất DTO nội bộ NodeProfile qua API.
+Các ngưỡng bổ sung do BE chọn mặc định; bỏ các cờ hiệu chuẩn/số bóng cũ khỏi public JSON.
+DELETE /api/v1/iot/nodes/{nodeId}/feeder mới: ManageAssets/Manager đúng xã; 204 khi gỡ hoặc gọi lại,
+404 ngoài xã/không tồn tại, 409 liên kết xung đột, 503 khi Bridge chưa xác nhận/hoàn tác thất bại.
+Chỉ gỡ nguồn đo và binding MQTT/relay, giữ cabinet_id, node và mọi lịch sử. Ghi action source_removed
+để đóng khoảng đo theo feeder và kết thúc đợt lỗi; không thực hiện ON/OFF vật lý khi gỡ.
+Nguồn cấu hình tĩnh bị nguồn DB đã gỡ ghi đè để không tự sống lại. PUT cùng node_id để gắn lại feeder.
+DELETE /nodes/{nodeId} vẫn gỡ cả tủ và feeder như trước. Không migration DB, không FE.

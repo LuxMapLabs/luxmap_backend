@@ -112,10 +112,12 @@ public sealed class IotRegistrationStore(
         var sourceRows = await (
             from row in db.Set<IotSourceRegistration>().AsNoTracking()
             join node in visibleNodes on row.NodeId equals node.NodeId
-            where includeDetached || row.DetachedAt == null
             select row).ToListAsync(ct);
-        foreach (var row in sourceRows)
-            nodes[row.NodeId] = JsonSerializer.Deserialize<NodeProfile>(row.Profile, LuxMapJsonOptions.Default)!;
+        foreach (var row in sourceRows) {
+            // A persisted removal also overrides a source originally declared in appsettings.
+            if (!includeDetached && row.DetachedAt is not null) nodes.Remove(row.NodeId);
+            else nodes[row.NodeId] = JsonSerializer.Deserialize<NodeProfile>(row.Profile, LuxMapJsonOptions.Default)!;
+        }
         return new() { BaseUrl = configured.BaseUrl, Servers = servers, Nodes = nodes, AllowedOrigins = configured.AllowedOrigins };
     }
 
@@ -270,7 +272,8 @@ public sealed class IotRegistrationStore(
         var configuredOwners = options.Value.Nodes.Where(pair => pair.Key != nodeId && pair.Value.FeederId == profile.FeederId)
             .Select(pair => pair.Key).ToArray();
         if (configuredOwners.Length > 0 && await db.Set<IotNode>().AnyAsync(candidate =>
-                candidate.CabinetId != null && configuredOwners.Contains(candidate.NodeId), ct))
+                candidate.CabinetId != null && configuredOwners.Contains(candidate.NodeId) &&
+                !db.Set<IotSourceRegistration>().Any(source => source.NodeId == candidate.NodeId && source.DetachedAt != null), ct))
             throw Conflict();
         if (authorize is not null) await authorize(node.CommuneId,
             existing is null ? settings.Nodes.GetValueOrDefault(nodeId)
@@ -291,7 +294,7 @@ public sealed class IotRegistrationStore(
     }
 
     internal async Task DetachNodeAsync(string nodeId, LightingCommandService lighting, CancellationToken ct,
-        Func<string, NodeProfile, CancellationToken, Task>? detachRoute = null)
+        Func<string, NodeProfile, CancellationToken, Task>? detachRoute = null, bool detachCabinet = true)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var node = await lighting.LockDeviceAsync(nodeId, ct);
@@ -306,6 +309,7 @@ public sealed class IotRegistrationStore(
         }
         if (row is not null) await AuditLegacyFeederBindingAsync(node, row, ct);
         var relays = await db.Set<FeederControl>().Where(control => control.NodeId == nodeId).ToListAsync(ct);
+        if (!detachCabinet && (row is null || row.DetachedAt is not null) && relays.Count == 0) return;
         var now = UtcMicrosecondClock.UtcNow();
         await lighting.ExpireStaleAsync([nodeId], now, ct);
         await lighting.SupersedeRelayAsync(nodeId, null, AuditActorKind.User, now, ct);
@@ -322,9 +326,9 @@ public sealed class IotRegistrationStore(
         await IotDiagnosticHistory.InterruptNodeAsync(db, nodeId, now, ct);
         RecordRegistration(row?.ServerId ?? "default", nodeId, JsonSerializer.Serialize(new
         {
-            action = "node_detached", cabinet_id = node.CabinetId, device_id = row?.DeviceId,
+            action = detachCabinet ? "node_detached" : "source_removed", cabinet_id = node.CabinetId, device_id = row?.DeviceId,
         }, LuxMapJsonOptions.Default));
-        node.CabinetId = null;
+        if (detachCabinet) node.CabinetId = null;
         node.UpdatedAt = now;
         await SaveAsync(ct);
         await transaction.CommitAsync(ct);

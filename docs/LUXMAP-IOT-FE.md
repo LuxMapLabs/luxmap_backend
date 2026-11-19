@@ -48,21 +48,20 @@ ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Cl
   "cabinet_id": "CAB-011",
   "feeder_id": "FDR-009",
   "device_id": "LUXMAP-P001",
-  "data_source": "calibration_rig",
-  "supports_remote_control": true,
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
   "nominal_power_mw": 500
 }
 ```
 
-Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
+Request tạo node chỉ có 7 trường như trên. BE tự đặt data_source=calibration_rig và supports_remote_control=true; không nhập hiệu chuẩn hay số bóng. Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
 
 API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response có `node_id`, `server_id`, `device_id`, `feeder_id`. Dùng `node_id` cho API điều khiển và đọc dữ liệu. Thêm node bằng API này tự thêm tuyến, dùng lại secret và liên kết trực tiếp với feeder. Các trụ và bóng được xác định theo feeder.
 
 ### Quản lý tuyến và nguồn đo
 
 - Đọc `GET /api/v1/iot/servers` để lấy credential_issued và heartbeat của từng server. `GET /api/v1/iot/servers/{serverId}/nodes?page=1&page_size=20` trả node thuộc đúng server, có lọc xã. API routes cũ deprecated, chỉ trả tuyến của server đang chọn.
+- Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/feeder` (Body none) để chỉ gỡ khỏi feeder: 204 idempotent; giữ node trong tủ, giữ lịch sử, gỡ binding MQTT và relay. Không tự gửi ON/OFF. Sau đó dùng PUT để gắn lại.
 - Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
 - Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, dữ liệu lịch sử và secret gateway được giữ; quyền MQTT của device_id bị gỡ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
 
@@ -204,15 +203,12 @@ Node xác nhận lỗi và phục hồi của DS3231, INA226 và BH1750 sau 3 l�
 
 Node gửi snapshot khi trạng thái đổi và định kỳ 30 giây khi đã nhận ACK. Khi cảm biến phục hồi, snapshot mới bỏ mã lỗi đó. Gateway chuyển các bản tin này giữa LoRa và các topic MQTT `luxmap/{deviceId}/sensorHealth` và `luxmap/{deviceId}/sensorHealthAck`. Với lỗi INA226, API bỏ qua cảnh báo dựa trên giá trị điện của mẫu cũ. Với lỗi DS3231, API bỏ qua ước lượng số bóng dựa trên giờ đo.
 
-### Hiệu chuẩn bộ thử 10 bóng ở nguồn khoảng 4 V
+### Ngưỡng điện hiện hành
 
-Thêm `"lamp_count_calibration": "4v"` vào JSON của `POST /api/v1/iot/nodes` khi tạo hoặc `PUT /api/v1/iot/nodes/{nodeId}` khi sửa nguồn hiện có. Đặt `nominal_voltage` theo điện áp danh định của bộ đang đo để cảnh báo điện áp dùng đúng mốc. Cấu hình `"5v"` và cờ cũ `use_ten_lamp_calibration: true` vẫn chọn hiệu chuẩn 5 V nếu phù hợp.
-
-Hiệu chuẩn 4 V chỉ ước lượng trong phạm vi **6–10 bóng sáng** của bộ thử. Backend xét 25 mẫu ON liên tiếp cùng phiên ở **4,00–4,13 V**, theo thứ tự đo của node. Mẫu cuối phải có giờ RTC còn mới. Nếu có khoảng ngắt, mẫu mất áp, OFF hoặc ra ngoài dải, backend không nối qua điểm đó. Mẫu gửi bù được xếp theo số thứ tự, dãy cũ vừa đến Bridge không đủ để báo thiếu bóng. Firmware lưu một mẫu khoảng mỗi 10 giây nên cần khoảng 4 phút dữ liệu liên tục.
-
-Cả 25 số đo phải nằm trong dải dòng quan sát của một nhóm. Với 10, 8 và 7 bóng, lần lượt cần ít nhất 10 mẫu `>65`, `≥50` và `≥45` mA. Nhóm 9 bóng cần không có mẫu `>65` mA và nhóm 6 bóng cần không có mẫu `≥45` mA. Cửa sổ không khớp rõ trả `undetermined`. Đây là các mốc thử dựa trên dữ liệu của bộ đèn hiện tại.
-
-`lamp_count.median_current_ma` và `lamp_count.threshold_counts` giúp đối chiếu kết quả 4 V. Với 4 V, `votes` là số mẫu nằm trong từng dải quan sát, nên một mẫu có thể được tính ở nhiều dải. `required_votes: 25` là điều kiện cả cửa sổ phải nằm trong dải của nhóm được ước lượng.
+API dùng trung bình 2 mẫu điện hợp lệ, cảnh báo current_drop khi dòng giảm quá 5% so với nominal_current_ma.
+Không đếm bóng hư; không gửi lamp_count_calibration hoặc installed_lamp_count khi tạo node.
+Đặt nominal_voltage, nominal_current_ma và nominal_power_mw theo nguồn đo thực tế của cả feeder.
+PUT dùng UpdateNodeRequest chỉ 6 trường: server_id, device_id, feeder_id và 3 nominal_*. Không xuất các thuộc tính NodeProfile nội bộ ra Swagger; cấu hình/profile cũ vẫn đọc được.
 
 | HTTP | `error.code` | Ý nghĩa |
 |---|---|---|
