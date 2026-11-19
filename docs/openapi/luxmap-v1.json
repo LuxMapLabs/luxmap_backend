@@ -24574,10 +24574,6 @@
           "server_id": {
             "type": "string"
           },
-          "base_url": {
-            "type": "string",
-            "nullable": true
-          },
           "commune_id": {
             "type": "string",
             "nullable": true

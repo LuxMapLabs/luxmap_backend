@@ -75,6 +75,29 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             .CountAsync(node => node.CabinetId == cabinet)));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("http://127.0.0.1:5000")]
+    [InlineData("https://telemetry.example.test/private")]
+    public async Task Server_registration_rejects_invalid_default_bridge_configuration(string defaultOrigin)
+    {
+        using var factory = new LuxMapApiFactory();
+        using var host = factory.WithWebHostBuilder(builder => {
+            builder.UseSetting("IotDiagnostics:BaseUrl", defaultOrigin);
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:1", "https://alternate.example.test");
+        });
+        using var token = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
+        using var admin = AuthorizedClient(host.CreateClient(), token);
+        using var response = await admin.PostAsJsonAsync("/api/v1/iot/servers", new {
+            server_id = "iot-" + Guid.NewGuid().ToString("N"),
+            commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
+        });
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error");
+        Assert.Equal("IOT_SOURCE_UNAVAILABLE", error.GetProperty("code").GetString());
+    }
+
     private sealed class RegistrationBridge : HttpMessageHandler
     {
         public List<string> Devices { get; } = [];
@@ -104,6 +127,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseSetting("IotDiagnostics:BaseUrl", "https://telemetry.example.test");
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
             builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
@@ -119,7 +143,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
         const string root = "/api/v1/iot";
         var id = "iot-" + Guid.NewGuid().ToString("N");
-        var server = new { server_id = id, base_url = "https://telemetry.example.test", commune_id = fixture.CommuneId, location = new { lat = 10.78, lng = 106.7 } };
+        var server = new { server_id = id, commune_id = fixture.CommuneId, location = new { lat = 10.78, lng = 106.7 } };
         var nodePath = $"{root}/nodes/{rig.Node}";
         var profile = new
         {
@@ -129,13 +153,22 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsJsonAsync($"{root}/servers", server)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await admin.PutAsJsonAsync(nodePath, profile)).StatusCode);
-        foreach (var invalid in new[] { "http://127.0.0.1:5000", "http://10.0.0.8", "https://telemetry.example.test/private" })
+        foreach (var invalid in new[] { "", "bad/server", "iot server" })
         {
             Assert.Equal(HttpStatusCode.BadRequest,
-                (await admin.PostAsJsonAsync($"{root}/servers", new { server_id = id, base_url = invalid })).StatusCode);
+                (await admin.PostAsJsonAsync($"{root}/servers", new { server_id = invalid })).StatusCode);
         }
         Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync($"{root}/servers", server)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync($"{root}/servers", server)).StatusCode);
+        var ignoredId = "iot-" + Guid.NewGuid().ToString("N");
+        using var ignored = await admin.PostAsJsonAsync($"{root}/servers", new {
+            server_id = ignoredId, base_url = "http://127.0.0.1:9999/private",
+            commune_id = fixture.CommuneId, location = new { lat = 10.78, lng = 106.7 },
+        });
+        Assert.Equal(HttpStatusCode.Created, ignored.StatusCode);
+        var stored = await fixture.QueryAsync(db => db.Set<IotServerRegistration>()
+            .SingleAsync(row => row.ServerId == ignoredId));
+        Assert.Equal("https://telemetry.example.test", stored.BaseUrl);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync(nodePath, profile)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync(nodePath,
             new { profile.server_id, device_id = "unauthorized", profile.feeder_id,
@@ -237,6 +270,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseSetting("IotDiagnostics:BaseUrl", "https://telemetry.example.test");
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
             builder.ConfigureServices(services =>
@@ -257,7 +291,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var segment = await setup.NewSegmentAsync();
         var server = "iot-" + Guid.NewGuid().ToString("N");
         using var registration = await admin.PostAsJsonAsync("/api/v1/iot/servers",
-            new { server_id = server, base_url = "https://telemetry.example.test", commune_id = fixture.CommuneId,
+            new { server_id = server, commune_id = fixture.CommuneId,
                 location = new { lat = 13.5, lng = 109.5 } });
         Assert.Equal(HttpStatusCode.Created, registration.StatusCode);
 
@@ -857,7 +891,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     public Task Feeder_average_history_merges_overlapping_bridge_buckets_by_sample_count()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, services) =>
         {
             using var admin = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
             var alternate = "iot-" + Guid.NewGuid().ToString("N");
@@ -865,12 +899,16 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             {
                 Content = JsonContent.Create(new
                 {
-                    server_id = alternate, base_url = "https://alternate.example.test",
+                    server_id = alternate,
                     commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
                 }),
             };
             register.Headers.Authorization = admin.DefaultRequestHeaders.Authorization;
-            Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(register)).StatusCode);
+            var bridgeDefaults = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IotOptions>>().Value;
+            var originalOrigin = bridgeDefaults.BaseUrl;
+            bridgeDefaults.BaseUrl = "https://alternate.example.test";
+            try { Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(register)).StatusCode); }
+            finally { bridgeDefaults.BaseUrl = originalOrigin; }
             Assert.Equal(HttpStatusCode.NoContent,
                 (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             Assert.Equal(HttpStatusCode.NoContent,
@@ -1069,6 +1107,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseSetting("IotDiagnostics:BaseUrl", "https://telemetry.example.test");
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
             builder.UseSetting("IotDiagnostics:AllowedOrigins:1", "https://alternate.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
@@ -1101,7 +1140,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var server = "iot-" + Guid.NewGuid().ToString("N");
         Assert.Equal(HttpStatusCode.Created, (await admin.PostAsJsonAsync("/api/v1/iot/servers", new
         {
-            server_id = server, base_url = "https://telemetry.example.test", commune_id = fixture.CommuneId,
+            server_id = server, commune_id = fixture.CommuneId,
             location = new { lat = 13.5, lng = 109.5 },
         })).StatusCode);
         await check(client, new(cabinet, feeder, other, pole, nodes[0], nodes[1], server), host.Services);

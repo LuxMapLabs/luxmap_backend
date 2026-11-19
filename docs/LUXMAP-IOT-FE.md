@@ -33,7 +33,7 @@ Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán n
 }
 ```
 
-Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. Gửi `base_url` rõ ràng khi cần chọn một origin khác trong allowlist. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường và GPS.
+Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. JSON tạo server không có trường `base_url`; FE chỉ gửi server_id, commune_id và location. Địa chỉ Bridge do người triển khai cấu hình; nếu thiếu/sai hoặc chưa allowlist thì API trả 503 IOT_SOURCE_UNAVAILABLE. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường và GPS.
 
 ESP32 gateway dùng địa chỉ broker TLS, Gateway ID, MQTT username và secret đã cấp. Firmware tự yêu cầu danh sách node trên MQTT sau khi kết nối và làm mới mỗi 10 giây. Với gateway vật lý mới, Admin gọi `POST /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential` một lần và nhập `password` từ phản hồi trên trang cấu hình ESP32. Gateway có thể kết nối khi danh sách node còn rỗng. Tránh lưu secret vào log hoặc bộ nhớ của FE.
 

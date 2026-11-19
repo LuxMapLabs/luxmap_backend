@@ -401,7 +401,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
 SECTION = {
     "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",
-    "/api/v1/iot/servers/": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)",
+    "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
@@ -440,7 +440,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/servers/{serverId}/gateways/routes"): "Liệt kê tuyến và trạng thái cấp secret trên bridge",
     ("put", "/api/v1/iot/nodes/{nodeId}"): "Gắn hoặc cập nhật nguồn đo của node IoT",
     ("delete", "/api/v1/iot/nodes/{nodeId}"): "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",
-    ("post", "/api/v1/iot/servers"): "Đăng ký địa chỉ server IoT",
+    ("post", "/api/v1/iot/servers"): "Admin đăng ký IoT server và vị trí, tự dùng Bridge cấu hình sẵn (không nhận base_url)",
     ("get", "/api/v1/iot/servers"): "Xem trạng thái các server IoT trong phạm vi truy cập",
     ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
