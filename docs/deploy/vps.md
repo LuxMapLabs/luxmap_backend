@@ -241,11 +241,13 @@ mà backend gọi để đọc / điều khiển node. `deploy.sh` build và kh�
 ```
 Mqtt__BridgeKey=<≥ 32 ký tự, openssl rand -hex 32>
 Mqtt__ProvisioningKey=<≥ 32 ký tự, khác BridgeKey>
+IotDiagnostics__BaseUrl=http://iot-bridge:5000
 IotDiagnostics__AllowedOrigins__0=http://iot-bridge:5000
 ```
 
-Sửa xong: `docker compose up -d --force-recreate api iot-bridge`. Rồi Quản lý đăng ký server với `base_url` đúng
-`http://iot-bridge:5000` (`POST /api/v1/iot/servers`).
+Sửa xong: `docker compose up -d --force-recreate api iot-bridge`. Rồi Admin đăng ký server bằng POST /api/v1/iot/servers chỉ với server_id, commune_id và location.
+Không gửi base_url trong JSON; backend dùng địa chỉ Bridge nội bộ từ cấu hình phía trên.
+Nếu còn .env cũ chỉ có một origin allowlist thì vẫn tương thích. Cấu hình thiếu/sai/không allowlist trả 503 IOT_SOURCE_UNAVAILABLE.
 
 **Chứng chỉ.** Bridge đọc thẳng cặp `.crt` / `.key` Let's Encrypt của Caddy trong volume `caddy_data` (mount chỉ đọc) và đọc
 lại khi file đổi, nên Caddy gia hạn là kết nối kế tiếp nhận chứng chỉ mới, không cần restart. Bridge gửi kèm chứng chỉ

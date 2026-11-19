@@ -9267,10 +9267,10 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Đăng ký địa chỉ server IoT",
+        "summary": "Admin đăng ký IoT server và vị trí, tự dùng Bridge cấu hình sẵn (không nhận base_url)",
         "operationId": "postIotServers",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       },
       "get": {
         "tags": [
@@ -9338,7 +9338,7 @@
         "summary": "Xem trạng thái các server IoT trong phạm vi truy cập",
         "operationId": "getIotServers",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/gateways/routes": {
@@ -9455,7 +9455,7 @@
         "summary": "Liệt kê tuyến và trạng thái cấp secret trên bridge",
         "operationId": "getIotServersServeridGatewaysRoutes",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route": {
@@ -9613,7 +9613,7 @@
         "summary": "Đăng ký tuyến MQTT cho gateway và node",
         "operationId": "putIotServersServeridGatewaysGatewayidRoute",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential": {
@@ -9769,7 +9769,7 @@
         "summary": "Cấp MQTT key mới cho gateway",
         "operationId": "postIotServersServeridGatewaysGatewayidCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       },
       "get": {
         "tags": [
@@ -9923,7 +9923,7 @@
         "summary": "Admin xem lại MQTT secret của gateway",
         "operationId": "getIotServersServeridGatewaysGatewayidCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       },
       "delete": {
         "tags": [
@@ -10040,7 +10040,7 @@
         "summary": "Thu hồi MQTT secret và ngắt gateway",
         "operationId": "deleteIotServersServeridGatewaysGatewayidCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/location": {
@@ -10190,7 +10190,7 @@
         "summary": "Cập nhật xã/phường và tọa độ gateway",
         "operationId": "putIotServersServeridLocation",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 (19/11/2026)"
       }
     },
     "/api/v1/iot/poles/{poleId}/control": {
@@ -28545,10 +28545,6 @@
         "properties": {
           "server_id": {
             "type": "string"
-          },
-          "base_url": {
-            "type": "string",
-            "nullable": true
           },
           "commune_id": {
             "type": "string",

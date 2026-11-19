@@ -19,7 +19,7 @@ namespace LuxMap.Modules.IOT;
 [Route("api/v{version:apiVersion}/iot")]
 public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
 {
-    public sealed record RegisterServerRequest(string ServerId, string? BaseUrl = null, string? CommuneId = null, IotLocation? Location = null);
+    public sealed record RegisterServerRequest(string ServerId, string? CommuneId = null, IotLocation? Location = null);
     public sealed record RegisteredServer(string ServerId);
 
     [HttpPost("servers")]
@@ -32,10 +32,14 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromServices] IotRegistrationStore registry, [FromServices] IOptions<IotOptions> options, CancellationToken ct)
     {
         var settings = options.Value;
-        var baseUrl = request.BaseUrl ?? settings.BaseUrl;
+        if (!ValidServerId(request.ServerId))
+            throw Invalid("Server ID không hợp lệ.");
+        var baseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? null : settings.BaseUrl;
+        // Backwards compatible with deployments configured with a single allowlisted Bridge.
         if (baseUrl is null && settings.AllowedOrigins.Length == 1) baseUrl = settings.AllowedOrigins[0];
-        if (!ValidServerId(request.ServerId) || !IotOrigin.TryAllowed(settings, baseUrl, out var uri))
-            throw Invalid("Server ID không hợp lệ hoặc địa chỉ IoT server chưa được allowlist.");
+        if (!IotOrigin.TryAllowed(settings, baseUrl, out var uri))
+            throw new LuxMapException("IOT_SOURCE_UNAVAILABLE", HttpStatusCode.ServiceUnavailable,
+                "Địa chỉ Bridge mặc định chưa được cấu hình hợp lệ hoặc chưa được allowlist.");
 
         var id = request.ServerId.ToLowerInvariant();
         if (request.CommuneId is not null || request.Location is not null)

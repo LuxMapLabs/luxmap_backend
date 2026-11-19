@@ -32,6 +32,15 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Iot_server_registration_does_not_expose_internal_bridge_url()
+    {
+        var properties = Schema("RegisterServerRequest").GetProperty("properties");
+        Assert.False(properties.TryGetProperty("base_url", out _));
+        foreach (var field in new[] { "server_id", "commune_id", "location" })
+            Assert.True(properties.TryGetProperty(field, out _));
+    }
+
+    [Fact]
     public void Iot_contact_and_electrical_statuses_have_separate_schemas_and_timestamps()
     {
         foreach (var name in new[] { "IotNodeStatus", "IotElectricalResult", "IotDiagnosticResult", "IotDiagnosticSummaryItem" })

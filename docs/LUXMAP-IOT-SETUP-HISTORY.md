@@ -35,7 +35,7 @@ Postman / FE → API LuxMap → IoT Bridge → MQTT TLS → ESP32 gateway → Lo
 - `server_id` là mã duy nhất, do Admin chọn.
 - `commune_id` là mã xã/phường chứa bộ thiết bị. Khi gán node, server, tủ và feeder phải cùng xã/phường.
 - `location` là GPS của gateway. `lat` là vĩ độ, `lng` là kinh độ. Vị trí node trên bản đồ lấy từ tủ điện.
-- Có thể bỏ `base_url` nếu backend đã đặt địa chỉ mặc định hoặc allowlist có một origin duy nhất. Nếu cần chọn cụ thể, thêm `"base_url": "http://iot-bridge:5000"` khi đó là địa chỉ đã được allowlist trên VPS.
+- Không gửi base_url trong JSON. Backend dùng IotDiagnostics__BaseUrl=http://iot-bridge:5000 trên VPS; giữ fallback khi allowlist chỉ có một origin. Không có địa chỉ hợp lệ: 503 IOT_SOURCE_UNAVAILABLE.
 
 Khi thành công, API trả `201 Created` và JSON sau.
 

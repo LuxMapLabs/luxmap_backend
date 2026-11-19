@@ -2704,3 +2704,13 @@ from inclusive/to exclusive lọc đợt lỗi giao khoảng, page/page_size<=20
 Thêm bảng iot_diagnostic_episode và history_sampled_at; giữ lịch sử khi gỡ/thay node.
 Dòng chuẩn bộ 10 bóng 5V đo 93.5546875 mA (R002, AVG16, LoRa nghỉ 1500ms), nhập nominal_current_ma theo feeder.
 Không hardcode dòng chuẩn cho mọi thiết bị, không tự học lại từ mẫu đang lỗi.
+
+
+## IOT-SERVER-DEFAULT-BRIDGE-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+POST /api/v1/iot/servers bỏ base_url khỏi RegisterServerRequest/OpenAPI; chỉ còn server_id, commune_id, location.
+Backend chọn IotDiagnostics:BaseUrl, giữ kiểm allowlist; tương thích triển khai cũ bằng origin duy nhất nếu BaseUrl trống.
+Nếu thiếu/không hợp lệ/không allowlist địa chỉ mặc định: 503 IOT_SOURCE_UNAVAILABLE; server_id sai vẫn 400 VALIDATION_FAILED.
+JSON dư base_url không thể đổi đích Bridge (được bỏ qua như các unknown field JSON hiện tại).
+Giữ địa chỉ nội bộ trong DB/audit, không xóa/sửa server đã đăng ký. Không hardcode docker hostname vào C#.
+Admin ManageSettings tạo server, Manager không có quyền. Không đổi schema DB, MQTT broker hoặc FE.

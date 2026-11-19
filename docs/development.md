@@ -10,7 +10,7 @@ và luồng khảo sát. Muốn chạy nhanh lần đầu thì đọc [`README.m
 
 ## Chạy IoT Bridge local
 
-1. Tạo `.env` từ `.env.example` khi thiết lập máy mới. Với file đã có, bổ sung `Mqtt__BridgeKey` và `Mqtt__ProvisioningKey`, mỗi khóa ít nhất 32 ký tự, cùng `IotDiagnostics__AllowedOrigins__0=http://127.0.0.1:5000`. Dùng cùng hai khóa cho API và bridge. Giá trị mẫu dành cho local.
+1. Tạo `.env` từ `.env.example` khi thiết lập máy mới. Với file đã có, bổ sung `Mqtt__BridgeKey` và `Mqtt__ProvisioningKey`, mỗi khóa ít nhất 32 ký tự, cùng `IotDiagnostics__BaseUrl=http://127.0.0.1:5000` và `IotDiagnostics__AllowedOrigins__0=http://127.0.0.1:5000`. Dùng cùng hai khóa cho API và bridge. Giá trị mẫu dành cho local.
 2. Chạy API LuxMap như phần môi trường dev. Trong terminal riêng, đặt hai biến môi trường của bridge bằng các giá trị trong `.env`, vì tiến trình bridge đọc chúng từ môi trường. Ví dụ PowerShell:
 
    ```powershell
@@ -20,7 +20,7 @@ và luồng khảo sát. Muốn chạy nhanh lần đầu thì đọc [`README.m
    ```
 
    Bridge mặc định dùng HTTP `5000` và MQTT TCP `1883`. Nếu chạy EMQX qua `docker compose --profile mqtt`, đặt `Mqtt__Port=1884` trong terminal bridge trước khi chạy, rồi đổi cổng broker của gateway sang `1884`.
-3. Trên Swagger backend cổng `5141`, đăng nhập Admin và gọi `POST /api/v1/iot/servers` với `base_url: "http://127.0.0.1:5000"` và `server_id` mới. Thành công trả `201 Created`. Xem [luồng đăng ký IoT](LUXMAP-IOT-FE.md#2-đăng-ký-một-bộ-iot-mới) để lấy các trường còn lại.
+3. Trên Swagger backend cổng `5141`, đăng nhập Admin và gọi `POST /api/v1/iot/servers` với `server_id` mới, commune_id và location; không gửi base_url vì backend tự dùng địa chỉ Bridge cấu hình ở bước 1. Thành công trả `201 Created`. Xem [luồng đăng ký IoT](LUXMAP-IOT-FE.md#2-đăng-ký-một-bộ-iot-mới) để lấy các trường còn lại.
 
 ## Build và test
 
