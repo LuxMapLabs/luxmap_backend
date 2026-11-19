@@ -21,6 +21,7 @@ public sealed class WorkOrdersModule : ILuxMapModule
         dispatch.Validate();
         services.AddSingleton(dispatch);
         services.AddScoped<AutoDispatchQueries>();
+        services.AddScoped<SchedulingSuggestionService>();
         services.AddScoped<WorkOrderService>();
         services.AddScoped<SurveyRecurringService>();
         services.AddScoped<WorkOrderPoleService>();

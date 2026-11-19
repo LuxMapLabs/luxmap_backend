@@ -32,6 +32,25 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Scheduling_suggestions_publish_manager_policy_wire_kinds_and_real_pagination()
+    {
+        foreach (var path in new[] { "/api/v1/work-orders/suggestions", "/api/v1/work-orders/suggestions/items" })
+        {
+            var get = Spec.GetProperty("paths").GetProperty(path).GetProperty("get");
+            Assert.Equal("cap:manage_work_orders", get.GetProperty("x-luxmap-capability").GetString());
+            Assert.Equal(new[] { "manager" }, get.GetProperty("x-luxmap-roles").EnumerateArray().Select(x => x.GetString()!));
+        }
+        var parameters = Spec.GetProperty("paths").GetProperty("/api/v1/work-orders/suggestions/items").GetProperty("get")
+            .GetProperty("parameters").EnumerateArray().ToDictionary(x => x.GetProperty("name").GetString()!);
+        Assert.True(parameters["kind"].GetProperty("required").GetBoolean());
+        Assert.Equal(new[] { "fault_inspection", "fault_repair", "missing_gps", "survey_needed", "overdue" },
+            parameters["kind"].GetProperty("schema").GetProperty("enum").EnumerateArray().Select(x => x.GetString()!));
+        Assert.Equal(50, parameters["page_size"].GetProperty("schema").GetProperty("default").GetInt32());
+        Assert.Equal(200, parameters["page_size"].GetProperty("schema").GetProperty("maximum").GetInt32());
+        Assert.Equal("field", parameters["data_source"].GetProperty("schema").GetProperty("default").GetString());
+    }
+
+    [Fact]
     public void Iot_gateway_identity_is_derived_from_server_id_in_new_contract()
     {
         Assert.False(Schema("RegisterNodeRequest").GetProperty("properties").TryGetProperty("gateway_id", out _));
