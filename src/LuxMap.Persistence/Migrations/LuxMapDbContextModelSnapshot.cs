@@ -2010,6 +2010,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("latitude");
 
+                    b.Property<string>("LegacyGatewayId")
+                        .HasColumnType("text")
+                        .HasColumnName("legacy_gateway_id");
+
                     b.Property<double?>("Longitude")
                         .HasColumnType("double precision")
                         .HasColumnName("longitude");
@@ -2019,6 +2023,11 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_iot_server_registration_commune_id");
+
+                    b.HasIndex("LegacyGatewayId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_iot_server_registration_legacy_gateway_id")
+                        .HasFilter("legacy_gateway_id IS NOT NULL");
 
                     b.ToTable("iot_server_registration", (string)null);
                 });

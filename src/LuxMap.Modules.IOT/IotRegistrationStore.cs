@@ -24,6 +24,7 @@ namespace LuxMap.Modules.IOT;
 internal sealed record IotServerRegistration(string ServerId, string BaseUrl)
 {
     public string? CommuneId { get; set; }
+    public string? LegacyGatewayId { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
 }
@@ -59,6 +60,7 @@ internal sealed class IotServerRegistrationConfiguration : IEntityTypeConfigurat
     {
         builder.ToTable("iot_server_registration");
         builder.HasKey(row => row.ServerId);
+        builder.HasIndex(row => row.LegacyGatewayId).IsUnique().HasFilter("legacy_gateway_id IS NOT NULL");
         builder.HasOne<AdministrativeUnit>().WithMany().HasForeignKey(row => row.CommuneId)
             .OnDelete(DeleteBehavior.Restrict);
     }
@@ -94,7 +96,7 @@ public sealed class IotRegistrationStore(
     {
         var servers = new Dictionary<string, IotServerProfile>(configured.Servers, StringComparer.OrdinalIgnoreCase);
         foreach (var row in await db.Set<IotServerRegistration>().AsNoTracking().ToListAsync(ct))
-            servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude);
+            servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude, row.LegacyGatewayId);
 
         var nodes = new Dictionary<string, NodeProfile>(StringComparer.Ordinal);
         var visibleNodes = db.Set<IotNode>().AsNoTracking()
@@ -148,6 +150,26 @@ public sealed class IotRegistrationStore(
         row.Longitude = location.Lng;
         RecordRegistration(id, null, JsonSerializer.Serialize(new { commune_id = communeId, location }, LuxMapJsonOptions.Default));
         await SaveAsync(ct);
+    }
+
+    internal async Task MigrateIdentityAsync(string serverId, string legacyId,
+        Func<CancellationToken, Task> migrateBridge, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM iot_server_registration WHERE server_id = {serverId} FOR UPDATE", ct);
+        var row = await db.Set<IotServerRegistration>().SingleOrDefaultAsync(s => s.ServerId == serverId, ct);
+        if (row is null) throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Server chưa được đăng ký trong DB.");
+        if (row.LegacyGatewayId is not null && row.LegacyGatewayId != legacyId ||
+            await db.Set<IotServerRegistration>().AnyAsync(s => s.ServerId != serverId &&
+                (s.LegacyGatewayId == legacyId || s.ServerId == legacyId.ToLowerInvariant()), ct))
+            throw Conflict();
+        await migrateBridge(ct); // idempotent; if DB commit fails, the Admin can retry safely
+        row.LegacyGatewayId = legacyId;
+        RecordRegistration(serverId, null, JsonSerializer.Serialize(
+            new { action = "gateway_identity_migrated", legacy_gateway_id = legacyId, gateway_id = serverId }, LuxMapJsonOptions.Default));
+        await SaveAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     private async Task RequireCommuneAsync(string communeId, CancellationToken ct)
@@ -208,7 +230,7 @@ public sealed class IotRegistrationStore(
     }
 
     internal async Task SaveSourceAsync(string nodeId, NodeProfile profile, bool createOnly, CancellationToken ct,
-        Func<string, CancellationToken, Task>? authorize = null)
+        Func<string, NodeProfile?, CancellationToken, Task>? authorize = null)
     {
         await using var transaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(ct) : null;
@@ -228,6 +250,16 @@ public sealed class IotRegistrationStore(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "IoT server chưa được đăng ký.");
         if (!IotOrigin.TryAllowed(settings, server.BaseUrl, out _))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Địa chỉ IoT server chưa được allowlist.");
+        if (server.CommuneId != node.CommuneId)
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy server trong xã của node.");
+        var originIds = settings.Servers.Where(p => IotOrigin.TryAllowed(settings, p.Value.BaseUrl, out var address) &&
+            IotOrigin.TryAllowed(settings, server.BaseUrl, out var targetAddress) && address == targetAddress)
+            .Select(p => p.Key).ToArray();
+        if (await db.Set<IotSourceRegistration>().AnyAsync(row => row.NodeId != nodeId &&
+                row.DeviceId == profile.DeviceId && originIds.Contains(row.ServerId), ct) ||
+            options.Value.Nodes.Any(p => p.Key != nodeId && p.Value.DeviceId == profile.DeviceId &&
+                originIds.Contains(p.Value.ServerId, StringComparer.OrdinalIgnoreCase)))
+            throw Conflict();
         var existing = await db.Set<IotSourceRegistration>().SingleOrDefaultAsync(row => row.NodeId == nodeId, ct);
         if (createOnly && (existing is not null || settings.Nodes.ContainsKey(nodeId))) throw Conflict();
         if (existing is null && options.Value.Nodes.ContainsKey(nodeId)) throw StaticSource();
@@ -240,7 +272,9 @@ public sealed class IotRegistrationStore(
         if (configuredOwners.Length > 0 && await db.Set<IotNode>().AnyAsync(candidate =>
                 candidate.CabinetId != null && configuredOwners.Contains(candidate.NodeId), ct))
             throw Conflict();
-        if (authorize is not null) await authorize(node.CommuneId, ct);
+        if (authorize is not null) await authorize(node.CommuneId,
+            existing is null ? settings.Nodes.GetValueOrDefault(nodeId)
+                : JsonSerializer.Deserialize<NodeProfile>(existing.Profile, LuxMapJsonOptions.Default), ct);
         if (existing is not null) await AuditLegacyFeederBindingAsync(node, existing, ct);
 
         if (node.CabinetId is null)
@@ -256,7 +290,8 @@ public sealed class IotRegistrationStore(
         if (transaction is not null) await transaction.CommitAsync(ct);
     }
 
-    internal async Task DetachNodeAsync(string nodeId, LightingCommandService lighting, CancellationToken ct)
+    internal async Task DetachNodeAsync(string nodeId, LightingCommandService lighting, CancellationToken ct,
+        Func<string, NodeProfile, CancellationToken, Task>? detachRoute = null)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var node = await lighting.LockDeviceAsync(nodeId, ct);
@@ -281,6 +316,8 @@ public sealed class IotRegistrationStore(
             await SaveAsync(ct);
         }
 
+        if (row is not null && detachRoute is not null)
+            await detachRoute(node.CommuneId, JsonSerializer.Deserialize<NodeProfile>(row.Profile, LuxMapJsonOptions.Default)!, ct);
         if (row is not null) row.DetachedAt = now;
         await IotDiagnosticHistory.InterruptNodeAsync(db, nodeId, now, ct);
         RecordRegistration(row?.ServerId ?? "default", nodeId, JsonSerializer.Serialize(new

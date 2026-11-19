@@ -32,6 +32,17 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Iot_gateway_identity_is_derived_from_server_id_in_new_contract()
+    {
+        Assert.False(Schema("RegisterNodeRequest").GetProperty("properties").TryGetProperty("gateway_id", out _));
+        Assert.False(Schema("RegisteredNode").GetProperty("properties").TryGetProperty("gateway_id", out _));
+        Assert.True(Schema("IotGatewayCredential").GetProperty("properties").TryGetProperty("server_id", out _));
+        Assert.True(Schema("IotServerStatus").GetProperty("properties").TryGetProperty("credential_issued", out _));
+        foreach (var method in new[] { "get", "post", "delete" })
+            Assert.True(Spec.GetProperty("paths").GetProperty("/api/v1/iot/servers/{serverId}/credential").TryGetProperty(method, out _));
+    }
+
+    [Fact]
     public void Iot_server_registration_does_not_expose_internal_bridge_url()
     {
         var properties = Schema("RegisterServerRequest").GetProperty("properties");

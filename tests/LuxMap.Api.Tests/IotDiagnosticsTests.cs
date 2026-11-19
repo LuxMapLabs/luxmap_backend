@@ -34,6 +34,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var feeder = await setup.NewFeederAsync(cabinet);
         var otherFeeder = await setup.NewFeederAsync(cabinet);
         var server = "iot-" + Guid.NewGuid().ToString("N");
+        bridge.ServerId = server;
         const string register = "/api/v1/iot/nodes";
         using var serverResponse = await admin.PostAsJsonAsync("/api/v1/iot/servers", new
         {
@@ -60,7 +61,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var first = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
         Assert.True(first.StatusCode == HttpStatusCode.Created, await first.Content.ReadAsStringAsync());
         var firstBody = await first.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("GW-TEST", firstBody.GetProperty("gateway_id").GetString());
+        Assert.Equal(server, firstBody.GetProperty("server_id").GetString());
+        Assert.False(firstBody.TryGetProperty("gateway_id", out _));
         using var repeat = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
         Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
         var repeatBody = await repeat.Content.ReadFromJsonAsync<JsonElement>();
@@ -73,6 +75,115 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal(new[] { "P001", "P002" }, bridge.Devices);
         Assert.Equal(2, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters()
             .CountAsync(node => node.CabinetId == cabinet)));
+    }
+
+    [Fact]
+    public async Task Server_identity_scopes_status_keys_nodes_and_explicit_legacy_migration()
+    {
+        var bridge = new IdentityBridge();
+        using var factory = new LuxMapApiFactory();
+        using var host = factory.WithWebHostBuilder(builder => {
+            builder.UseSetting("IotDiagnostics:BaseUrl", "https://identity.example.test");
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://identity.example.test");
+            builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
+            builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
+                .ConfigurePrimaryHttpMessageHandler(() => bridge));
+        });
+        using var adminToken = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
+        using var managerToken = await fixture.ManagerClientAsync();
+        using var foreignToken = await fixture.ForeignCommuneClientAsync();
+        using var admin = AuthorizedClient(host.CreateClient(), adminToken);
+        using var manager = AuthorizedClient(host.CreateClient(), managerToken);
+        using var foreign = AuthorizedClient(host.CreateClient(), foreignToken);
+        var first = "identity-" + Guid.NewGuid().ToString("N");
+        var second = "identity-" + Guid.NewGuid().ToString("N");
+        foreach (var server in new[] { first, second }) {
+            using var created = await admin.PostAsJsonAsync("/api/v1/iot/servers", new {
+                server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
+            });
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+            using var key = await admin.PostAsync($"/api/v1/iot/servers/{server}/credential", null);
+            Assert.Equal(HttpStatusCode.OK, key.StatusCode);
+            var body = await key.Content.ReadFromJsonAsync<JsonElement>();
+            foreach (var field in new[] { "server_id", "client_id", "username" })
+                Assert.Equal(server, body.GetProperty(field).GetString());
+        }
+        bridge.Online.Add(first);
+        var servers = await manager.GetFromJsonAsync<JsonElement>("/api/v1/iot/servers");
+        Assert.Equal("online", servers.EnumerateArray().Single(x => x.GetProperty("server_id").GetString() == first).GetProperty("status").GetString());
+        Assert.Equal("offline", servers.EnumerateArray().Single(x => x.GetProperty("server_id").GetString() == second).GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/v1/iot/servers/{first}/nodes")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsync($"/api/v1/iot/servers/{first}/credential", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.GetAsync($"/api/v1/iot/servers/{first}/gateways/{second}/credential")).StatusCode);
+
+        var setup = new LightingTestRig(fixture);
+        var cabinet = await setup.NewCabinetAsync();
+        var feeder = await setup.NewFeederAsync(cabinet);
+        object Payload(string server) => new {
+            server_id = server, cabinet_id = cabinet, feeder_id = feeder, device_id = "identity-probe",
+            data_source = "calibration_rig", supports_remote_control = true,
+            nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
+        };
+        using var registration = await admin.PostAsJsonAsync("/api/v1/iot/nodes", Payload(first));
+        Assert.True(registration.StatusCode == HttpStatusCode.Created, await registration.Content.ReadAsStringAsync());
+        var node = (await registration.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("node_id").GetString();
+        var list = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/servers/{first}/nodes?page=1&page_size=1");
+        Assert.Equal(1, list.GetProperty("total").GetInt32());
+        Assert.Equal(node, list.GetProperty("items")[0].GetProperty("node_id").GetString());
+        var empty = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/servers/{first}/nodes?page=2147483647&page_size=200");
+        Assert.Empty(empty.GetProperty("items").EnumerateArray());
+        using var moved = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(second));
+        Assert.True(moved.StatusCode == HttpStatusCode.NoContent, await moved.Content.ReadAsStringAsync());
+        Assert.Empty(bridge.Devices[first]);
+        Assert.Contains("identity-probe", bridge.Devices[second]);
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
+        Assert.Empty(bridge.Devices[second]);
+        Assert.Equal(1, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters().CountAsync(n => n.NodeId == node)));
+
+        const string legacy = "LEGACY-IDENTITY-TEST";
+        using var notReady = await admin.PostAsJsonAsync($"/api/v1/iot/servers/{second}/gateway-migration", new { legacy_gateway_id = legacy });
+        Assert.Equal(HttpStatusCode.Conflict, notReady.StatusCode);
+        bridge.Online.Add(second);
+        using var migration = await admin.PostAsJsonAsync($"/api/v1/iot/servers/{second}/gateway-migration", new { legacy_gateway_id = legacy });
+        Assert.Equal(HttpStatusCode.NoContent, migration.StatusCode);
+        using var alias = await admin.GetAsync($"/api/v1/iot/servers/{second}/gateways/{legacy}/credential");
+        Assert.Equal(HttpStatusCode.OK, alias.StatusCode);
+        Assert.Equal(second, (await alias.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("client_id").GetString());
+        var row = await fixture.QueryAsync(db => db.Set<IotServerRegistration>().SingleAsync(s => s.ServerId == second));
+        Assert.Equal(legacy, row.LegacyGatewayId);
+    }
+
+    private sealed class IdentityBridge : HttpMessageHandler
+    {
+        public Dictionary<string, List<string>> Devices { get; } = [];
+        public HashSet<string> Online { get; } = [];
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var parts = request.RequestUri!.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 5 || parts[2] != "gateways") return new(HttpStatusCode.NotFound);
+            var id = parts[3]; var kind = parts[4];
+            Devices.TryAdd(id, []);
+            HttpResponseMessage Json(object value) => new(HttpStatusCode.OK) { Content = JsonContent.Create(value) };
+            if (kind == "credential") return Json(new { clientId = id, username = id, password = new string('A', 64), nodeIds = Devices[id] });
+            if (kind == "status") return Json(new { status = Online.Contains(id) ? "online" : "offline", credentialIssued = true });
+            if (kind == "route") {
+                if (request.Method == HttpMethod.Put) {
+                    var body = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
+                    Devices[id].Add(body.GetProperty("deviceId").GetString()!);
+                    return new(HttpStatusCode.NoContent);
+                }
+                return Json(new { gatewayId = id, deviceIds = Devices[id], credentialIssued = true });
+            }
+            if (kind == "migration") return new(Online.Contains(id) ? HttpStatusCode.NoContent : HttpStatusCode.Conflict);
+            if (kind == "devices" && parts.Length == 7 && parts[6] == "binding") {
+                var body = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
+                var device = parts[5];
+                foreach (var devices in Devices.Values) devices.Remove(device);
+                if (!body.GetProperty("detach").GetBoolean()) Devices[id].Add(device);
+                return new(HttpStatusCode.NoContent);
+            }
+            return new(HttpStatusCode.NotFound);
+        }
     }
 
     [Theory]
@@ -100,6 +211,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
     private sealed class RegistrationBridge : HttpMessageHandler
     {
+        public string ServerId { get; set; } = "";
         public List<string> Devices { get; } = [];
         public bool RejectAppend { get; set; }
 
@@ -107,13 +219,13 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         {
             Assert.Equal("registration.example.test", request.RequestUri!.Host);
             Assert.True(request.Headers.Contains("X-Iot-Provisioning-Key"));
-            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == "/api/luxmap/gateways/routes")
+            if (request.Method == HttpMethod.Get && request.RequestUri.AbsolutePath == $"/api/luxmap/gateways/{ServerId}/route")
                 return new(HttpStatusCode.OK)
                 {
-                    Content = JsonContent.Create(new[] { new { gatewayId = "GW-TEST", deviceIds = Devices, credentialIssued = true } }),
+                    Content = JsonContent.Create(new { gatewayId = ServerId, deviceIds = Devices, credentialIssued = true }),
                 };
             Assert.Equal(HttpMethod.Put, request.Method);
-            Assert.Equal("/api/luxmap/gateways/GW-TEST/route", request.RequestUri.AbsolutePath);
+            Assert.Equal($"/api/luxmap/gateways/{ServerId}/route", request.RequestUri.AbsolutePath);
             if (RejectAppend) return new(HttpStatusCode.ServiceUnavailable);
             var route = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
             Devices.Add(route.GetProperty("deviceId").GetString()!);
@@ -124,11 +236,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     [Fact]
     public async Task Registration_requires_admin_and_allowlisted_origin_and_reads_are_commune_scoped()
     {
+        var origin = "https://registration-" + Guid.NewGuid().ToString("N") + ".example.test";
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("IotDiagnostics:BaseUrl", "https://telemetry.example.test");
-            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
+            builder.UseSetting("IotDiagnostics:BaseUrl", origin);
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", origin);
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
             builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
                 .ConfigurePrimaryHttpMessageHandler(() => new InvalidUpstream()));
@@ -168,12 +281,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal(HttpStatusCode.Created, ignored.StatusCode);
         var stored = await fixture.QueryAsync(db => db.Set<IotServerRegistration>()
             .SingleAsync(row => row.ServerId == ignoredId));
-        Assert.Equal("https://telemetry.example.test", stored.BaseUrl);
+        Assert.Equal(origin, stored.BaseUrl);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync(nodePath, profile)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync(nodePath,
             new { profile.server_id, device_id = "unauthorized", profile.feeder_id,
                 profile.nominal_voltage, profile.nominal_current_ma, profile.nominal_power_mw })).StatusCode);
-        var credentialPath = $"{root}/servers/{id}/gateways/TEST-GW/credential";
+        var credentialPath = $"{root}/servers/{id}/credential";
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsync(credentialPath, null)).StatusCode);
         using var credential = await admin.PostAsync(credentialPath, null);
         Assert.Equal(HttpStatusCode.OK, credential.StatusCode);
@@ -188,8 +301,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var legacyKey = await admin.GetAsync($"{root}/servers/{id}/gateways/LEGACY-GW/credential");
         Assert.Equal(HttpStatusCode.Conflict, legacyKey.StatusCode);
         var legacyBody = await legacyKey.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("IOT_CREDENTIAL_NOT_RETRIEVABLE", legacyBody.GetProperty("error").GetProperty("code").GetString());
-        Assert.Equal(HttpStatusCode.NotFound,
+        Assert.Equal("IOT_REGISTRATION_CONFLICT", legacyBody.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Conflict,
             (await admin.GetAsync($"{root}/servers/{id}/gateways/MISSING-GW/credential")).StatusCode);
         using var revoked = await admin.DeleteAsync(credentialPath);
         Assert.Equal(HttpStatusCode.NoContent, revoked.StatusCode);
@@ -1104,11 +1217,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     private async Task WithSharedCabinetAsync(
         Func<HttpClient, SharedCabinet, IServiceProvider, Task> check, ReportedPowerBridge? bridge = null, TimeProvider? clock = null)
     {
+        var origin = "https://isolated-" + Guid.NewGuid().ToString("N") + ".example.test";
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
-            builder.UseSetting("IotDiagnostics:BaseUrl", "https://telemetry.example.test");
-            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://telemetry.example.test");
+            builder.UseSetting("IotDiagnostics:BaseUrl", origin);
+            builder.UseSetting("IotDiagnostics:AllowedOrigins:0", origin);
             builder.UseSetting("IotDiagnostics:AllowedOrigins:1", "https://alternate.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
             builder.ConfigureServices(services =>
@@ -1188,6 +1302,16 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            var pieces = request.RequestUri!.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (pieces.Length >= 5 && pieces[2] == "gateways") {
+                var serverId = pieces[3];
+                if (pieces[^1] == "route" && request.Method == HttpMethod.Get)
+                    return Json(new { gatewayId = serverId, deviceIds = new[] { "probe", "probe-2" }, credentialIssued = true });
+                if (pieces[^1] == "route" || pieces[^1] == "binding") return new(HttpStatusCode.NoContent);
+                if (pieces[^1] == "status") return Json(new { status = "online", credentialIssued = true });
+                if (pieces[^1] == "authorization")
+                    return new(pieces[^2] is "probe" or "probe-2" ? HttpStatusCode.NoContent : HttpStatusCode.NotFound);
+            }
             return request.RequestUri!.AbsolutePath switch
             {
                 "/api/luxmap/gateways/by-device/probe/authorization" or "/api/luxmap/gateways/by-device/probe-2/authorization" => new(HttpStatusCode.NoContent),
@@ -1259,27 +1383,23 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
-            if (path.EndsWith("/gateways/routes", StringComparison.Ordinal))
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = JsonContent.Create(new[] { new { gatewayId = "TEST-GW", deviceIds = new[] { "probe" },
-                        credentialIssued = true } }),
-                });
-            if (path.EndsWith("/authorization", StringComparison.Ordinal))
-                return Task.FromResult(new HttpResponseMessage(path.EndsWith("/probe/authorization", StringComparison.Ordinal)
-                    ? HttpStatusCode.NoContent : HttpStatusCode.NotFound));
-            if (path.EndsWith("/LEGACY-GW/credential", StringComparison.Ordinal))
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Conflict));
-            if (path.EndsWith("/MISSING-GW/credential", StringComparison.Ordinal))
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
-            if (path.EndsWith("/TEST-GW/credential", StringComparison.Ordinal) && request.Method == HttpMethod.Delete)
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
-            if (path.EndsWith("/TEST-GW/credential", StringComparison.Ordinal))
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = JsonContent.Create(new { clientId = "TEST-GW", username = "TEST-GW",
-                        password = new string('A', 64), nodeIds = new[] { "probe" } }),
-                });
+            var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 5 && parts[2] == "gateways") {
+                var id = parts[3];
+                if (parts[^1] == "route" && request.Method == HttpMethod.Get)
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+                        Content = JsonContent.Create(new { gatewayId = id, deviceIds = new[] { "probe" }, credentialIssued = true }),
+                    });
+                if (parts[^1] is "binding" or "route")
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+                if (parts[^1] == "authorization")
+                    return Task.FromResult(new HttpResponseMessage(parts[^2] == "probe" ? HttpStatusCode.NoContent : HttpStatusCode.NotFound));
+                if (parts[^1] == "credential")
+                    return Task.FromResult(request.Method == HttpMethod.Delete ? new HttpResponseMessage(HttpStatusCode.NoContent)
+                        : new HttpResponseMessage(HttpStatusCode.OK) {
+                            Content = JsonContent.Create(new { clientId = id, username = id, password = new string('A', 64), nodeIds = new[] { "probe" } }),
+                        });
+            }
             if (path.EndsWith("/devices/legacy-probe", StringComparison.Ordinal))
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             var content = new StringContent("unexpected upstream response", Encoding.UTF8, "text/plain");
