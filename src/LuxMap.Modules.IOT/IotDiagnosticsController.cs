@@ -227,13 +227,9 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [Required, MaxLength(32)] public string CabinetId { get; init; } = "";
         [Required, MaxLength(32)] public string FeederId { get; init; } = "";
         [Required] public string DeviceId { get; init; } = "";
-        [Required] public DataSource? DataSource { get; init; }
-        public bool SupportsRemoteControl { get; init; }
         [Required] public double NominalVoltage { get; init; }
         [Required] public double NominalCurrentMa { get; init; }
         [Required] public double NominalPowerMw { get; init; }
-        public string? LampCountCalibration { get; init; }
-        public int InstalledLampCount { get; init; } = 10;
     }
 
     public sealed record RegisteredNode(string NodeId, string ServerId, string DeviceId, string FeederId);
@@ -261,21 +257,29 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             NominalVoltage = request.NominalVoltage,
             NominalCurrentMa = request.NominalCurrentMa,
             NominalPowerMw = request.NominalPowerMw,
-            LampCountCalibration = request.LampCountCalibration,
-            InstalledLampCount = request.InstalledLampCount,
         };
-        if (!profile.IsValid() || request.DataSource is not (DataSource.CalibrationRig or DataSource.Simulated))
-            throw Invalid("Thông tin feeder, nguồn dữ liệu hoặc ngưỡng đo không hợp lệ.");
+        if (!profile.IsValid())
+            throw Invalid("Thông tin feeder hoặc ngưỡng đo không hợp lệ.");
 
         var (nodeId, _, created) = await registry.RegisterNodeAsync(new CreateIotNodeRequest
         {
-            CabinetId = request.CabinetId, DataSource = request.DataSource,
-            SupportsRemoteControl = request.SupportsRemoteControl,
+            CabinetId = request.CabinetId, DataSource = DataSource.CalibrationRig,
+            SupportsRemoteControl = true,
         }, profile, nodes, sources, (communeId, token) =>
             diagnostics.EnsureGatewayRouteAsync(profile.ServerId, request.DeviceId, communeId,
                 configuration["Mqtt:ProvisioningKey"], token), ct);
         var result = new RegisteredNode(nodeId, profile.ServerId, profile.DeviceId, profile.FeederId);
         return created ? Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical", result) : Ok(result);
+    }
+
+    public sealed record UpdateNodeRequest
+    {
+        [Required] public string ServerId { get; init; } = "";
+        [Required] public string DeviceId { get; init; } = "";
+        [Required, MaxLength(32)] public string FeederId { get; init; } = "";
+        [Required] public double NominalVoltage { get; init; }
+        [Required] public double NominalCurrentMa { get; init; }
+        [Required] public double NominalPowerMw { get; init; }
     }
 
     [HttpPut("nodes/{nodeId}")]
@@ -285,13 +289,17 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> UpdateNodeSourceAsync(string nodeId, NodeProfile profile,
+    public async Task<IActionResult> UpdateNodeSourceAsync(string nodeId, UpdateNodeRequest request,
         [FromServices] IotRegistrationStore registry,
         [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
     {
+        var profile = new NodeProfile {
+            ServerId = request.ServerId.ToLowerInvariant(), DeviceId = request.DeviceId, FeederId = request.FeederId,
+            NominalVoltage = request.NominalVoltage, NominalCurrentMa = request.NominalCurrentMa,
+            NominalPowerMw = request.NominalPowerMw,
+        };
         if (!profile.IsValid() || !ValidServerId(profile.ServerId) ||
-            profile.DeviceId.Length > 128 || profile.DeviceId is "." or ".." ||
-            profile.DeviceId.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_' && c != '.'))
+            !IotDiagnosticsService.ValidMqttId(profile.DeviceId))
             throw Invalid("Thiếu server ID, thông tin thiết bị, tài sản hoặc ngưỡng đo hợp lệ.");
 
         NodeProfile? previous = null;
@@ -322,10 +330,28 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> DetachNodeAsync(string nodeId,
+    public Task<IActionResult> DetachNodeAsync(string nodeId,
         [FromServices] IotRegistrationStore registry,
         [FromServices] LuxMap.Modules.IOT.Lighting.LightingCommandService lighting,
         [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+        => DetachAsync(nodeId, registry, lighting, configuration, ct, detachCabinet: true);
+
+    /// <summary>Gỡ nguồn và quyền MQTT của node khỏi feeder, giữ node trong tủ và giữ lịch sử.</summary>
+    [HttpDelete("nodes/{nodeId}/feeder")]
+    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IActionResult> DetachNodeFeederAsync(string nodeId,
+        [FromServices] IotRegistrationStore registry,
+        [FromServices] LuxMap.Modules.IOT.Lighting.LightingCommandService lighting,
+        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+        => DetachAsync(nodeId, registry, lighting, configuration, ct, detachCabinet: false);
+
+    private async Task<IActionResult> DetachAsync(string nodeId, IotRegistrationStore registry,
+        LuxMap.Modules.IOT.Lighting.LightingCommandService lighting,
+        Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct, bool detachCabinet)
     {
         NodeProfile? previous = null;
         string? commune = null;
@@ -335,7 +361,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
                 previous = old; commune = communeId;
                 await diagnostics.DetachBindingAsync(old, communeId, configuration["Mqtt:ProvisioningKey"], token);
                 routeChanged = true;
-            });
+            }, detachCabinet: detachCabinet);
         }
         catch {
             if (routeChanged && previous is not null && commune is not null) {

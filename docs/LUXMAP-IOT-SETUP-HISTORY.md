@@ -72,8 +72,6 @@ Xem `cabinet_id`, `commune_id` và `feeder_ids` của tủ bằng [GET /api/v1/a
   "cabinet_id": "CAB-011",
   "feeder_id": "FDR-009",
   "device_id": "LUXMAP-P001",
-  "data_source": "calibration_rig",
-  "supports_remote_control": true,
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
   "nominal_power_mw": 500
@@ -85,10 +83,7 @@ Xem `cabinet_id`, `commune_id` và `feeder_ids` của tủ bằng [GET /api/v1/a
 | `server_id` | Dùng mã đã đăng ký ở bước 1. |
 | `cabinet_id`, `feeder_id` | Tủ điện và mạch điện đã import. Feeder xác định các trụ và bóng chịu tác động của node. |
 | `device_id` | Sao chép đúng `DEVICE_ID` của ESP32 node, kể cả chữ hoa/thường. |
-| `data_source` | Dùng `calibration_rig` cho bộ thử vật lý hoặc `simulated` cho dữ liệu mô phỏng. |
-| `supports_remote_control` | Đặt `true` để cho phép điều khiển node này. |
 | `nominal_voltage`, `nominal_current_ma`, `nominal_power_mw` | Mức điện áp, dòng và công suất danh định của cả feeder, lần lượt tính bằng V, mA và mW. |
-| `gateway_id` | Có thể bỏ nếu thiết bị đã có tuyến hợp lệ hoặc Bridge chỉ có một gateway đã cấp secret. Nếu thiết bị chưa có tuyến và có nhiều gateway được cấp secret trên cùng Bridge, gửi thêm `"gateway_id": "LUXMAP-GW001"`. |
 
 Một request tạo node, gán nguồn đo theo feeder và bổ sung tuyến MQTT cho gateway. Gateway dùng lại secret đã có. Bản ghi node liên kết trực tiếp với feeder nên JSON chỉ cần `feeder_id` cho phần liên kết mạch.
 
@@ -99,14 +94,15 @@ Thành công lần đầu trả `201 Created`. Gửi lại cùng cấu hình tr�
   "node_id": "NODE-004",
   "server_id": "iot-server-01",
   "device_id": "LUXMAP-P001",
-  "feeder_id": "FDR-009",
-  "gateway_id": "LUXMAP-GW001"
+  "feeder_id": "FDR-009"
 }
 ```
 
 Sau khi đăng ký, kiểm tra gateway qua [GET /api/v1/iot/servers](https://luxmap.com.vn/api/v1/iot/servers), node qua [GET /api/v1/iot/nodes?page=1&page_size=20](https://luxmap.com.vn/api/v1/iot/nodes?page=1&page_size=20) và mẫu mới nhất qua [GET /api/v1/iot/nodes/NODE-004/electrical](https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/electrical). Gateway online theo heartbeat MQTT. Node online khi có mẫu điện đủ mới. Dùng token có quyền đọc và phạm vi xã/phường của node.
 
-Với node đã có ID, Manager dùng `PUT /api/v1/iot/nodes/{nodeId}` để gắn hoặc đổi nguồn đo. Manager dùng `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và feeder. Backend lưu bản ghi node, liên kết nguồn đã gỡ và dữ liệu lịch sử. Có thể gắn lại cùng `node_id` bằng PUT, chọn feeder có tủ trong cùng xã.
+Với node đã có ID, Manager dùng `PUT /api/v1/iot/nodes/{nodeId}` để gắn hoặc đổi nguồn đo. PUT chỉ gửi server_id, device_id, feeder_id và 3 nominal_*. Manager dùng `DELETE /api/v1/iot/nodes/{nodeId}/feeder` để chỉ gỡ feeder, giữ tủ. `DELETE /api/v1/iot/nodes/{nodeId}` gỡ cả khỏi tủ và feeder. Backend lưu bản ghi node, liên kết nguồn đã gỡ và dữ liệu lịch sử. Có thể gắn lại cùng `node_id` bằng PUT, chọn feeder có tủ trong cùng xã.
+
+BE tự đặt data_source=calibration_rig và supports_remote_control=true khi thêm node. JSON tạo node chỉ có server_id, cabinet_id, feeder_id, device_id và 3 giá trị nominal_*.
 
 ## 4. API lịch sử lệnh ON, OFF và AUTO
 

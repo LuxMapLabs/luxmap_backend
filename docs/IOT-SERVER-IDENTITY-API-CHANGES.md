@@ -29,6 +29,7 @@ key và tuyến của chính nó. Một gateway hỗ trợ tối đa 32 device_i
 | POST /api/v1/iot/servers/{serverId}/gateway-migration | Mới, chuyển có kiểm tra từ mã gateway cũ sang server_id | ManageSettings |
 | POST /api/v1/iot/nodes | Bỏ gateway_id trong request/response; tự gán ACL theo server_id | ManageSettings |
 | PUT /api/v1/iot/nodes/{nodeId} | Chuyển nguồn giữa server cùng Bridge và cùng xã: kiểm tra chủ hiện tại rồi chuyển ACL | ManageAssets (Manager), lọc xã |
+| DELETE /api/v1/iot/nodes/{nodeId}/feeder | Mới: gỡ khỏi feeder, giữ node trong tủ và giữ lịch sử | ManageAssets, lọc xã |
 | DELETE /api/v1/iot/nodes/{nodeId} | Gỡ quyền gửi MQTT của thiết bị khỏi gateway; giữ node và lịch sử | ManageAssets, lọc xã |
 
 Các API command, command/history, electrical, lịch sử điện theo feeder và diagnostics không đổi URL/JSON.
@@ -102,8 +103,6 @@ POST https://luxmap.com.vn/api/v1/iot/nodes
   "cabinet_id": "CAB-011",
   "feeder_id": "FDR-009",
   "device_id": "LUXMAP-P001",
-  "data_source": "calibration_rig",
-  "supports_remote_control": true,
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
   "nominal_power_mw": 500
@@ -117,7 +116,7 @@ POST https://luxmap.com.vn/api/v1/iot/nodes
 ~~~
 
 BE thêm device_id vào quyền MQTT của đúng server_id, gateway tự nhận danh sách mới.
-Không có pole_id, relay_no, gateway_id hoặc base_url trong request này.
+Request chỉ có 7 trường ở trên. Không gửi gateway_id, lamp_count_calibration, installed_lamp_count, data_source hoặc supports_remote_control. BE tự đặt data_source=calibration_rig và supports_remote_control=true cho bộ IoT testbed. Không thay đổi node đã có hoặc API /assets/iot-nodes.
 Một device_id không được đồng thời thuộc hai nguồn trên cùng Bridge.
 
 ### Bước 4 — đọc trạng thái và danh sách node
@@ -197,7 +196,29 @@ Không gọi DELETE key qua alias cũ sau migration để dọn: alias trỏ key
 
 ## 5. PUT/DELETE nguồn và giới hạn vận hành
 
-PUT /api/v1/iot/nodes/NODE-004 giữ JSON nguồn như trước: server_id, device_id, feeder_id và ngưỡng.
+PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004 dùng đúng 6 trường:
+
+~~~json
+{
+  "server_id": "iot-server-01",
+  "device_id": "LUXMAP-P001",
+  "feeder_id": "FDR-009",
+  "nominal_voltage": 5,
+  "nominal_current_ma": 100,
+  "nominal_power_mw": 500
+}
+~~~
+
+Thành công 204 No Content. Không gửi cabinet_id, gateway_id, data_source, supports_remote_control,
+relay_no, pole_id, cờ hiệu chuẩn/số bóng hoặc các ngưỡng nội bộ; BE dùng ngưỡng mặc định.
+Tủ hiện tại giữ nguyên; feeder phải thuộc tủ đó. Nếu node đã rời tủ, BE lấy tủ từ feeder mới cùng xã.
+
+DELETE https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/feeder dùng Body none.
+Manager cùng xã gọi; 204 kể cả gọi lại. Chỉ gỡ nguồn đo, binding relay/MQTT và chặn điều khiển qua nguồn đã gỡ;
+node vẫn trong tủ, lịch sử lệnh/điện/lỗi không mất. Dùng PUT trên để gắn lại.
+Thao tác gỡ không gửi ON/OFF vật lý; muốn đèn OFF thì gửi lệnh và kiểm ACK trước khi gỡ.
+Node chưa gán feeder có trạng thái nguồn unconfigured. DELETE /nodes/NODE-004 vẫn gỡ cả khỏi tủ như trước.
+
 Chỉ Manager trong cùng xã. Thiết bị mới chưa có nguồn phải được Admin cấp tuyến trước;
 thiết bị đang gắn có thể chuyển sang server khác cùng Bridge với key đã cấp, cùng xã.
 Bridge kiểm tra chủ hiện tại trước khi chuyển. Đổi device_id cần target đã được cấp quyền ở server đích.

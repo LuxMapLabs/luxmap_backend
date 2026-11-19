@@ -43,6 +43,28 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     }
 
     [Fact]
+    public void Iot_node_registration_only_exposes_seven_fields()
+    {
+        var fields = Schema("RegisterNodeRequest").GetProperty("properties").EnumerateObject()
+            .Select(p => p.Name).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(new[] { "cabinet_id", "device_id", "feeder_id", "nominal_current_ma",
+            "nominal_power_mw", "nominal_voltage", "server_id" }, fields);
+    }
+
+    [Fact]
+    public void Iot_node_update_has_six_fields_and_feeder_unlink_has_no_body()
+    {
+        var fields = Schema("UpdateNodeRequest").GetProperty("properties").EnumerateObject()
+            .Select(p => p.Name).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(new[] { "device_id", "feeder_id", "nominal_current_ma", "nominal_power_mw",
+            "nominal_voltage", "server_id" }, fields);
+        var unlink = Spec.GetProperty("paths").GetProperty("/api/v1/iot/nodes/{nodeId}/feeder").GetProperty("delete");
+        Assert.False(unlink.TryGetProperty("requestBody", out _));
+        Assert.Equal(LuxMapPolicies.ManageAssets, unlink.GetProperty("x-luxmap-capability").GetString());
+        Assert.Equal(new[] { "manager" }, unlink.GetProperty("x-luxmap-roles").EnumerateArray().Select(v => v.GetString()));
+    }
+
+    [Fact]
     public void Iot_server_registration_does_not_expose_internal_bridge_url()
     {
         var properties = Schema("RegisterServerRequest").GetProperty("properties");
@@ -271,7 +293,7 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
             if (Spec.GetProperty("components").GetProperty("schemas").TryGetProperty(name, out var schema))
                 Assert.DoesNotContain("control_mode", schema.GetRawText());
 
-        var source = Schema("NodeProfile").GetProperty("properties");
+        var source = Schema("UpdateNodeRequest").GetProperty("properties");
         Assert.True(source.TryGetProperty("feeder_id", out _));
         Assert.False(source.TryGetProperty("relay_no", out _));
         Assert.False(source.TryGetProperty("pole_id", out _));

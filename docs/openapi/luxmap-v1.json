@@ -9462,17 +9462,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NodeProfile"
+                "$ref": "#/components/schemas/UpdateNodeRequest"
               }
             },
             "text/json": {
               "schema": {
-                "$ref": "#/components/schemas/NodeProfile"
+                "$ref": "#/components/schemas/UpdateNodeRequest"
               }
             },
             "application/*+json": {
               "schema": {
-                "$ref": "#/components/schemas/NodeProfile"
+                "$ref": "#/components/schemas/UpdateNodeRequest"
               }
             }
           }
@@ -9568,6 +9568,93 @@
         ],
         "x-luxmap-client": "shared"
       },
+      "delete": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/iot/nodes/{nodeId}/feeder": {
       "delete": {
         "tags": [
           "IotDiagnostics"
@@ -23521,65 +23608,6 @@
         },
         "additionalProperties": false
       },
-      "NodeProfile": {
-        "type": "object",
-        "properties": {
-          "server_id": {
-            "type": "string",
-            "nullable": true
-          },
-          "device_id": {
-            "type": "string"
-          },
-          "feeder_id": {
-            "type": "string"
-          },
-          "nominal_voltage": {
-            "type": "number",
-            "format": "double"
-          },
-          "nominal_current_ma": {
-            "type": "number",
-            "format": "double"
-          },
-          "nominal_power_mw": {
-            "type": "number",
-            "format": "double"
-          },
-          "voltage_tolerance_percent": {
-            "type": "number",
-            "format": "double"
-          },
-          "current_tolerance_percent": {
-            "type": "number",
-            "format": "double"
-          },
-          "power_tolerance_percent": {
-            "type": "number",
-            "format": "double"
-          },
-          "off_current_limit_ma": {
-            "type": "number",
-            "format": "double"
-          },
-          "max_silence_seconds": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "use_ten_lamp_calibration": {
-            "type": "boolean"
-          },
-          "installed_lamp_count": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "lamp_count_calibration": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "additionalProperties": false
-      },
       "NodeRole": {
         "enum": [
           "segment_controller"
@@ -25102,7 +25130,6 @@
       "RegisterNodeRequest": {
         "required": [
           "cabinet_id",
-          "data_source",
           "device_id",
           "feeder_id",
           "nominal_current_ma",
@@ -25130,12 +25157,6 @@
             "minLength": 1,
             "type": "string"
           },
-          "data_source": {
-            "$ref": "#/components/schemas/DataSource"
-          },
-          "supports_remote_control": {
-            "type": "boolean"
-          },
           "nominal_voltage": {
             "type": "number",
             "format": "double"
@@ -25147,14 +25168,6 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
-          },
-          "lamp_count_calibration": {
-            "type": "string",
-            "nullable": true
-          },
-          "installed_lamp_count": {
-            "type": "integer",
-            "format": "int32"
           }
         },
         "additionalProperties": false
@@ -27252,6 +27265,45 @@
           },
           "supports_remote_control": {
             "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateNodeRequest": {
+        "required": [
+          "device_id",
+          "feeder_id",
+          "nominal_current_ma",
+          "nominal_power_mw",
+          "nominal_voltage",
+          "server_id"
+        ],
+        "type": "object",
+        "properties": {
+          "server_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "device_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "feeder_id": {
+            "maxLength": 32,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nominal_voltage": {
+            "type": "number",
+            "format": "double"
+          },
+          "nominal_current_ma": {
+            "type": "number",
+            "format": "double"
+          },
+          "nominal_power_mw": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
