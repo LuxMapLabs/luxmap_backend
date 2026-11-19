@@ -39,7 +39,7 @@ public sealed partial class IotDiagnosticsService
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy IoT server.");
         if (supplied != serverId && supplied != server.LegacyGatewayId)
             throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict,
-                "Gateway ID phải trùng server_id hoặc alias đã được xác nhận bằng migration.");
+                "Gateway ID phải trùng server_id hoặc alias đã được lưu từ phiên bản trước.");
         return serverId;
     }
 
@@ -76,36 +76,6 @@ public sealed partial class IotDiagnosticsService
         return PagedResult<IotServerNode>.From(page, matches.Count, result);
     }
 
-    public async Task MigrateServerIdentityAsync(string serverId, string legacyId, string? key, CancellationToken ct)
-    {
-        serverId = serverId.ToLowerInvariant();
-        if (!ValidMqttId(legacyId) || legacyId == serverId)
-            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, "Legacy Gateway ID không hợp lệ.");
-        var ids = await db.Set<IotNode>().AsNoTracking().Where(n => n.CabinetId != null).Select(n => n.NodeId).ToArrayAsync(ct);
-        var settings = await registry.ReadAsync(ids, ct);
-        if (settings.Servers.Any(p => !string.Equals(p.Key, serverId, StringComparison.OrdinalIgnoreCase) &&
-            (string.Equals(p.Key, legacyId, StringComparison.OrdinalIgnoreCase) || p.Value.LegacyGatewayId == legacyId)))
-            throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict,
-                "Legacy ID đã thuộc server khác.");
-        var uri = await ProvisioningOriginAsync(serverId, null, key, ct);
-        var devices = settings.Nodes.Values.Where(p => string.Equals(p.ServerId, serverId, StringComparison.OrdinalIgnoreCase))
-            .Select(p => p.DeviceId).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        // No guessing from the Bridge's other gateways. The source registry defines ownership.
-        await registry.MigrateIdentityAsync(serverId, legacyId, async token => {
-            using var request = ProvisioningRequest(HttpMethod.Post, uri,
-                $"gateways/{Uri.EscapeDataString(serverId)}/migration", key!);
-            request.Content = JsonContent.Create(new { legacyGatewayId = legacyId, deviceIds = devices });
-            try {
-                using var response = await client.SendAsync(request, token);
-                if (response.StatusCode == HttpStatusCode.Conflict)
-                    throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict,
-                        "Cần key/heartbeat online cho mã server mới và danh sách node cũ khớp nguồn đã đăng ký.");
-                if (response.StatusCode != HttpStatusCode.NoContent) throw Unavailable("Bridge chưa xác nhận chuyển danh tính.");
-            }
-            catch (Exception ex) when (IsSourceFailure(ex, token)) { throw Unavailable("Không chuyển được danh tính trên Bridge; có thể thử lại."); }
-        }, ct);
-    }
-
     private async Task ChangeBindingAsync(NodeProfile target, string? expected, bool detach, string commune,
         string? key, CancellationToken ct)
     {
@@ -139,7 +109,7 @@ public sealed partial class IotDiagnosticsService
                     throw new LuxMapException("IOT_REGISTRATION_CONFLICT", HttpStatusCode.Conflict, "Chỉ chuyển node giữa server cùng Bridge.");
                 await ChangeBindingAsync(target, previous.ServerId!.ToLowerInvariant(), false, commune, key, ct);
             }
-            else await EnsureGatewayRouteAsync(target.ServerId!, target.DeviceId, commune, key, ct);
+            else await EnsureGatewayRouteAsync(target.ServerId!, target.DeviceId, commune, key, ct, repairExisting: true);
         }
         else {
             await RequireMqttAuthorizationAsync(target.ServerId!, target.DeviceId, commune, key, ct);

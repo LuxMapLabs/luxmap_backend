@@ -2719,6 +2719,7 @@ Admin ManageSettings tạo server, Manager không có quyền. Không đổi sch
 
 
 ## IOT-SERVER-IDENTITY-1 — 19/11/2026
+Phần API gateway-migration bên dưới đã được thay thế bởi IOT-REMOVE-GATEWAY-MIGRATION-1; giữ nội dung để đối chiếu quyết định cũ.
 Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
 Mỗi server_id lowercase là đúng một MQTT Client ID/username/gateway; Bridge dùng chung không phải thiết bị.
 POST nodes bỏ gateway_id, RegisteredNode bỏ gateway_id. Key dùng /iot/servers/{serverId}/credential (POST/GET/DELETE).
@@ -2754,3 +2755,31 @@ Chỉ gỡ nguồn đo và binding MQTT/relay, giữ cabinet_id, node và mọi 
 để đóng khoảng đo theo feeder và kết thúc đợt lỗi; không thực hiện ON/OFF vật lý khi gỡ.
 Nguồn cấu hình tĩnh bị nguồn DB đã gỡ ghi đè để không tự sống lại. PUT cùng node_id để gắn lại feeder.
 DELETE /nodes/{nodeId} vẫn gỡ cả tủ và feeder như trước. Không migration DB, không FE.
+
+
+## IOT-REMOVE-GATEWAY-MIGRATION-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+Thay thế phần API chuyển đổi của IOT-SERVER-IDENTITY-1: gỡ POST /api/v1/iot/servers/{serverId}/gateway-migration
+và POST /api/luxmap/gateways/{gatewayId}/migration nội bộ Bridge, DTO và logic ghi alias/chuyển tuyến tương ứng.
+Luồng mới chỉ dùng server_id cho MQTT Client ID, username, key và đăng ký node; không có bước migration riêng.
+Giữ nguyên schema/migration DB đã phát hành, LegacyGatewayId đã lưu, tuyến/key của gateway hiện có và toàn bộ
+node/feeder/lịch sử điện/lệnh/lỗi. Không tự migrate hoặc thu hồi secret cũ khi deploy; mapping cũ đã lưu vẫn đọc được.
+Bộ cũ chưa chuyển phải được kiểm tra binding có đối chiếu sở hữu trước khi đổi cấu hình; không xóa dữ liệu để xử lý conflict.
+Endpoint đã gỡ trả 404 sau khi deploy BE/Bridge mới. Không sửa FE.
+
+
+## IOT-NODE-ROUTE-RECONCILE-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+POST nodes (kể cả replay 200) và PUT cùng nguồn đồng bộ lại tuyến MQTT, đọc xác nhận server_id/device_id.
+Nguồn DB hiện có có thể sửa ACL legacy chưa thuộc server đăng ký khác, dưới guard xã/nguồn và compare-and-swap.
+Không chiếm canonical ID/alias của server khác, không đoán cho nguồn mới, không thu hồi key, không sửa telemetry/lịch sử.
+Giữ nguyên schema request/response, quyền Admin POST/Manager PUT; Bridge không xác nhận thì 503, tranh chấp chủ tuyến 409.
+Không thêm lại gateway-migration và không sửa FE.
+
+
+## IOT-NODE-DETAIL-GET-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+Thêm GET /api/v1/iot/nodes/{nodeId}, ReadNetwork theo phạm vi xã, response IotNodeSourceDetails gồm
+node_id, server_id, device_id, feeder_id, nominal_voltage, nominal_current_ma, nominal_power_mw.
+Thông số danh định từ cấu hình đang hoạt động; không gọi Bridge, không trả secret/ngưỡng nội bộ, Cache-Control no-store.
+200 khi có cấu hình; 404 node thiếu/ngoài xã/chưa gán nguồn hoặc đã gỡ nguồn. Không sửa dữ liệu và FE.

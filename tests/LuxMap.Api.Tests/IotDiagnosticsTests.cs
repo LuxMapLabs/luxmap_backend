@@ -81,7 +81,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public async Task Server_identity_scopes_status_keys_nodes_and_explicit_legacy_migration()
+    public async Task Server_identity_scopes_status_keys_nodes_and_repairs_existing_source_routes()
     {
         var bridge = new IdentityBridge();
         using var factory = new LuxMapApiFactory();
@@ -129,6 +129,58 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var registration = await admin.PostAsJsonAsync("/api/v1/iot/nodes", Payload(first));
         Assert.True(registration.StatusCode == HttpStatusCode.Created, await registration.Content.ReadAsStringAsync());
         var node = (await registration.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("node_id").GetString();
+        // Replayed POST and unchanged PUT must repair a missing ACL, without creating another node.
+        bridge.Devices[first].Clear();
+        using var replay = await admin.PostAsJsonAsync("/api/v1/iot/nodes", Payload(first));
+        Assert.Equal(HttpStatusCode.OK, replay.StatusCode);
+        Assert.Equal(node, (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("node_id").GetString());
+        Assert.Contains("identity-probe", bridge.Devices[first]);
+        bridge.Devices[first].Clear();
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
+        Assert.Contains("identity-probe", bridge.Devices[first]);
+
+        // An established DB source may reconcile a leftover unregistered legacy MQTT owner.
+        bridge.Devices[first].Clear();
+        bridge.Devices["LEGACY-PROBE"] = ["identity-probe", "unrelated-device"];
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
+        Assert.Contains("identity-probe", bridge.Devices[first]);
+        Assert.Equal(new[] { "unrelated-device" }, bridge.Devices["LEGACY-PROBE"]);
+        bridge.Devices[first].Clear();
+        bridge.Devices["LEGACY-PROBE"].Add("identity-probe");
+        using var replayLegacy = await admin.PostAsJsonAsync("/api/v1/iot/nodes", Payload(first));
+        Assert.Equal(HttpStatusCode.OK, replayLegacy.StatusCode);
+        Assert.Contains("identity-probe", bridge.Devices[first]);
+
+        // The same operation must not steal an ACL from another registered server.
+        bridge.Devices[first].Clear();
+        bridge.Devices[second].Add("identity-probe");
+        using var conflict = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first));
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Equal("IOT_REGISTRATION_CONFLICT", (await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetProperty("code").GetString());
+        Assert.Contains("identity-probe", bridge.Devices[second]);
+        Assert.Empty(bridge.Devices[first]);
+        bridge.Devices[second].Clear();
+        bridge.Devices[first].Add("identity-probe");
+        // Configuration remains readable while Bridge is unavailable, without exposing secrets/internal thresholds.
+        bridge.RejectRequests = true;
+        using var detailsResponse = await manager.GetAsync($"/api/v1/iot/nodes/{node}");
+        Assert.Equal(HttpStatusCode.OK, detailsResponse.StatusCode);
+        Assert.True(detailsResponse.Headers.CacheControl?.NoStore == true);
+        var details = await detailsResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(7, details.EnumerateObject().Count());
+        Assert.Equal(node, details.GetProperty("node_id").GetString());
+        Assert.Equal(first, details.GetProperty("server_id").GetString());
+        Assert.Equal("identity-probe", details.GetProperty("device_id").GetString());
+        Assert.Equal(feeder, details.GetProperty("feeder_id").GetString());
+        Assert.Equal(5, details.GetProperty("nominal_voltage").GetDouble());
+        Assert.Equal(100, details.GetProperty("nominal_current_ma").GetDouble());
+        Assert.Equal(500, details.GetProperty("nominal_power_mw").GetDouble());
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/iot/nodes/NODE-999999999")).StatusCode);
+        using (var anonymous = host.CreateClient())
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
+        bridge.RejectRequests = false;
         var list = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/servers/{first}/nodes?page=1&page_size=1");
         Assert.Equal(1, list.GetProperty("total").GetInt32());
         Assert.Equal(node, list.GetProperty("items")[0].GetProperty("node_id").GetString());
@@ -138,11 +190,14 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.True(moved.StatusCode == HttpStatusCode.NoContent, await moved.Content.ReadAsStringAsync());
         Assert.Empty(bridge.Devices[first]);
         Assert.Contains("identity-probe", bridge.Devices[second]);
+        var movedDetails = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/nodes/{node}");
+        Assert.Equal(second, movedDetails.GetProperty("server_id").GetString());
         var unlinkPath = $"/api/v1/iot/nodes/{node}/feeder";
         Assert.Equal(HttpStatusCode.Forbidden, (await admin.DeleteAsync(unlinkPath)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.DeleteAsync(unlinkPath)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync(unlinkPath)).StatusCode);
         Assert.Empty(bridge.Devices[second]);
+        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
         var mounted = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/assets/iot-nodes/{node}");
         Assert.Equal(cabinet, mounted.GetProperty("cabinet_id").GetString());
         var removedSource = await fixture.QueryAsync(db => db.Set<IotSourceRegistration>().SingleAsync(s => s.NodeId == node));
@@ -170,26 +225,28 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Empty(bridge.Devices[second]);
         Assert.Equal(1, await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Entities.IotNode>().IgnoreQueryFilters().CountAsync(n => n.NodeId == node)));
 
-        const string legacy = "LEGACY-IDENTITY-TEST";
-        using var notReady = await admin.PostAsJsonAsync($"/api/v1/iot/servers/{second}/gateway-migration", new { legacy_gateway_id = legacy });
-        Assert.Equal(HttpStatusCode.Conflict, notReady.StatusCode);
-        bridge.Online.Add(second);
-        using var migration = await admin.PostAsJsonAsync($"/api/v1/iot/servers/{second}/gateway-migration", new { legacy_gateway_id = legacy });
-        Assert.Equal(HttpStatusCode.NoContent, migration.StatusCode);
-        using var alias = await admin.GetAsync($"/api/v1/iot/servers/{second}/gateways/{legacy}/credential");
-        Assert.Equal(HttpStatusCode.OK, alias.StatusCode);
-        Assert.Equal(second, (await alias.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("client_id").GetString());
+        // Removed endpoint must not mutate existing server registrations or bindings.
+        using var removedMigration = await admin.PostAsJsonAsync($"/api/v1/iot/servers/{second}/gateway-migration",
+            new { legacy_gateway_id = "LEGACY-IDENTITY-TEST" });
+        Assert.Equal(HttpStatusCode.NotFound, removedMigration.StatusCode);
         var row = await fixture.QueryAsync(db => db.Set<IotServerRegistration>().SingleAsync(s => s.ServerId == second));
-        Assert.Equal(legacy, row.LegacyGatewayId);
+        Assert.Null(row.LegacyGatewayId);
+        Assert.Empty(bridge.Devices[second]);
     }
 
     private sealed class IdentityBridge : HttpMessageHandler
     {
         public Dictionary<string, List<string>> Devices { get; } = [];
         public HashSet<string> Online { get; } = [];
+        public bool RejectRequests { get; set; }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
+            if (RejectRequests) throw new HttpRequestException("Bridge unavailable for configuration-read test");
             var parts = request.RequestUri!.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 4 && parts[2] == "gateways" && parts[3] == "routes")
+                return new(HttpStatusCode.OK) { Content = JsonContent.Create(Devices.Select(pair => new {
+                    gatewayId = pair.Key, deviceIds = pair.Value, credentialIssued = true,
+                })) };
             if (parts.Length < 5 || parts[2] != "gateways") return new(HttpStatusCode.NotFound);
             var id = parts[3]; var kind = parts[4];
             Devices.TryAdd(id, []);
@@ -199,15 +256,20 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             if (kind == "route") {
                 if (request.Method == HttpMethod.Put) {
                     var body = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
-                    Devices[id].Add(body.GetProperty("deviceId").GetString()!);
+                    var device = body.GetProperty("deviceId").GetString()!;
+                    if (Devices.Any(pair => pair.Key != id && pair.Value.Contains(device))) return new(HttpStatusCode.Conflict);
+                    if (!Devices[id].Contains(device)) Devices[id].Add(device);
                     return new(HttpStatusCode.NoContent);
                 }
                 return Json(new { gatewayId = id, deviceIds = Devices[id], credentialIssued = true });
             }
-            if (kind == "migration") return new(Online.Contains(id) ? HttpStatusCode.NoContent : HttpStatusCode.Conflict);
             if (kind == "devices" && parts.Length == 7 && parts[6] == "binding") {
                 var body = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
                 var device = parts[5];
+                var owner = Devices.SingleOrDefault(pair => pair.Value.Contains(device)).Key;
+                var expected = body.GetProperty("expectedGatewayId").GetString();
+                var detach = body.GetProperty("detach").GetBoolean();
+                if (owner != expected && !(owner == id && !detach) && !(owner is null && detach)) return new(HttpStatusCode.Conflict);
                 foreach (var devices in Devices.Values) devices.Remove(device);
                 if (!body.GetProperty("detach").GetBoolean()) Devices[id].Add(device);
                 return new(HttpStatusCode.NoContent);
@@ -258,7 +320,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             Assert.Equal($"/api/luxmap/gateways/{ServerId}/route", request.RequestUri.AbsolutePath);
             if (RejectAppend) return new(HttpStatusCode.ServiceUnavailable);
             var route = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
-            Devices.Add(route.GetProperty("deviceId").GetString()!);
+            var device = route.GetProperty("deviceId").GetString()!;
+            if (!Devices.Contains(device)) Devices.Add(device);
             return new(HttpStatusCode.NoContent);
         }
     }

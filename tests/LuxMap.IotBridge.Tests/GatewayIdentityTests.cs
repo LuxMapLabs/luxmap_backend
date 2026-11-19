@@ -15,7 +15,7 @@ namespace LuxMap.IotBridge.Tests;
 public sealed class GatewayIdentityTests
 {
     [Fact]
-    public async Task Migration_is_scoped_requires_new_heartbeat_and_preserves_routes_and_data_after_restart()
+    public async Task Canonical_registration_keeps_existing_gateway_routes_credentials_and_telemetry_after_restart()
     {
         var directory = Path.Combine(Path.GetTempPath(), "luxmap-identity-" + Guid.NewGuid().ToString("N"));
         var environment = new TestEnvironment(directory);
@@ -38,27 +38,24 @@ public sealed class GatewayIdentityTests
             await Heartbeat(old, "LUXMAP-GW001");
             await Wait(() => broker.GatewayIdentityStatus("LUXMAP-GW001") == "online");
             Assert.Equal("offline", broker.GatewayIdentityStatus("iot-server-01"));
-            Assert.False(await broker.MigrateGatewayAsync("LUXMAP-GW001", "iot-server-01", ["P001"]));
             await current.ConnectAsync(Options("iot-server-01", newSecret, port));
             await Heartbeat(current, "iot-server-01");
             await Wait(() => broker.GatewayIdentityStatus("iot-server-01") == "online");
-            Assert.False(await broker.MigrateGatewayAsync("LUXMAP-GW001", "iot-server-01", ["FOREIGN"]));
             store.AcceptTelemetry("LUXMAP-GW001", new TelemetryRequest("P001", "MANUAL", "ON",
                 10, 5, 100, 500, "2026-11-19T12:00:00", "retained-session", 1));
-            Assert.True(await broker.MigrateGatewayAsync("LUXMAP-GW001", "iot-server-01", ["P001"]));
-            Assert.True(await broker.MigrateGatewayAsync("LUXMAP-GW001", "iot-server-01", ["P001"])); // retry after DB failure
-            await Wait(() => !old.IsConnected);
-            Assert.False(credentials.IsIssued("LUXMAP-GW001"));
+            Assert.True(await broker.RegisterGatewayAsync("iot-server-01", "P002"));
+            Assert.True(old.IsConnected);
+            Assert.True(credentials.IsIssued("LUXMAP-GW001"));
             Assert.True(credentials.Validate("iot-server-01", "iot-server-01", newSecret));
-            Assert.Equal(new[] { "P001" }, broker.Gateways["iot-server-01"]);
-            Assert.Empty(broker.Gateways["LUXMAP-GW001"]);
+            Assert.Equal(new[] { "P002" }, broker.Gateways["iot-server-01"]);
+            Assert.Equal(new[] { "P001" }, broker.Gateways["LUXMAP-GW001"]);
             Assert.Equal(100, store.Read("P001")!.LatestTelemetry!.Data.Current);
             await broker.StopAsync(default);
             broker.Dispose();
             broker = new(store, credentials, configuration, environment, NullLogger<MqttBroker>.Instance);
             await broker.StartAsync(default);
-            Assert.Empty(broker.Gateways["LUXMAP-GW001"]); // appsettings must not resurrect old ACLs
-            Assert.Equal(new[] { "P001" }, broker.Gateways["iot-server-01"]);
+            Assert.Equal(new[] { "P001" }, broker.Gateways["LUXMAP-GW001"]); // Existing ACLs stay intact
+            Assert.Equal(new[] { "P002" }, broker.Gateways["iot-server-01"]);
             Assert.Equal(100, store.Read("P001")!.LatestTelemetry!.Data.Current);
         }
         finally {
