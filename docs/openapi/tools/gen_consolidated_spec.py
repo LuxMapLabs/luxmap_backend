@@ -129,7 +129,7 @@ iot_values = {
     ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
     ("IotDiagnosticSummaryItem", "diagnostic_status"): ["normal", "anomaly", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotAnomaly", "code"): [
-        "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
+        "telemetry_stale", "voltage_loss", "voltage_deviation", "current_drop",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",
         "ina226_unavailable", "ina226_read_failed", "ina226_shunt_out_of_range",
         "bh1750_unavailable", "bh1750_read_failed",
@@ -137,7 +137,7 @@ iot_values = {
         "lora_tx_blocked", "lora_rx_frame_error",
     ],
     ("IotSensorHealth", "status"): ["fresh", "stale", "unknown"],
-    ("LampCountEstimate", "status"): ["insufficient_samples", "undetermined", "estimated"],
+    ("ElectricalWindowAssessment", "status"): ["insufficient_samples", "evaluated"],
 }
 def iot_property(schema, field):
     properties = S.get(schema, {}).get("properties", {})
@@ -149,11 +149,20 @@ def iot_property(schema, field):
 for (schema, field), values in iot_values.items():
     iot_property(schema, field)["enum"] = values
 
+iot_property("IotDiagnosticHistoryItem", "status")["enum"] = ["active", "resolved", "interrupted"]
+iot_property("IotDiagnosticHistoryItem", "code")["enum"] = iot_values[("IotAnomaly", "code")]
+
 iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot_values[("IotAnomaly", "code")]
+
+iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [2]
 
 S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
 for schema in ("NodeProfile", "RegisterNodeRequest"):
+    for legacy_field in ("lamp_count_calibration", "installed_lamp_count", "use_ten_lamp_calibration"):
+        if legacy_field in S[schema].get("properties", {}):
+            iot_property(schema, legacy_field)["deprecated"] = True
+            iot_property(schema, legacy_field)["description"] = "Legacy input only; no lamp counting is performed."
     iot_property(schema, "lamp_count_calibration")["enum"] = ["4v", "5v", "5v-quiet-v1", None]
 
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
@@ -391,7 +400,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
 
 SECTION = {
     "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 (18/11/2026)",
-    "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S (18/11/2026)",
+    "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",
     "/api/v1/iot/servers/": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 (18/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
@@ -439,7 +448,9 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/diagnostics/summary"): "Chẩn đoán tổng hợp theo trang, job lưu DB và phạm vi xã",
-    ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Đọc chẩn đoán điện và ước lượng số bóng thiếu",
+    ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Chẩn đoán điện trung bình hai mẫu, tương thích route node cũ",
+    ("get", "/api/v1/iot/feeders/{feederId}/diagnostics"): "Lỗi hiện tại theo feeder: dòng giảm >5% và điện áp trung bình hai mẫu",
+    ("get", "/api/v1/iot/feeders/{feederId}/diagnostics/history"): "Lịch sử đợt lỗi feeder gộp theo phút, lọc khoảng thời gian và phân trang",
 })
 
 for kind, parent in [("poles", "pole_id"), ("cabinets", "cabinet_id")]:

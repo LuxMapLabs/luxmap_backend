@@ -93,6 +93,7 @@ public sealed class IotDiagnosticJob(
         var identity = JsonSerializer.Serialize(profile, LuxMapJsonOptions.Default);
         var evidence = JsonSerializer.Deserialize<DiagnosticEvidence>(state.Evidence, LuxMapJsonOptions.Default) ?? new();
         if (evidence.Source != identity) evidence = new() { Source = identity };
+        await IotDiagnosticHistory.ObserveAsync(db, state, profile, result, now, ct);
         state.FeederId = profile?.FeederId;
         state.DiagnosticStatus = status;
         state.EvaluatedAt = now;
@@ -115,7 +116,7 @@ public sealed class IotDiagnosticJob(
                 var active = IotDiagnosticRules.IsActive(result, code);
                 if (!evidence.Codes.TryGetValue(code, out var tracked))
                     evidence.Codes[code] = tracked = new();
-                if (!tracked.Observe(key, active, result.MeasurementSequence, now, code, result.LampCount?.EstimatedLit)) continue;
+                if (!tracked.Observe(key, active, result.MeasurementSequence, now, code)) continue;
                 var fault = faults.FirstOrDefault(f => f.IotAnomalyCode == code);
                 if (active && tracked.Ready(code, now) && fault is null && !tracked.Raised)
                 {
@@ -134,7 +135,7 @@ public sealed class IotDiagnosticJob(
                         DetectedAt = tracked.FirstSeen!.Value, CreatedAt = now, UpdatedAt = now,
                         Note = $"IoT {nodeId}, feeder {profile.FeederId}: {code}.",
                         IotEvidence = JsonSerializer.Serialize(new { result, algorithm_version = IotDiagnosticRules.Version,
-                            evidence_key = key, missing_lamps = result.LampCount?.EstimatedMissing }, LuxMapJsonOptions.Default),
+                            evidence_key = key, electrical_window = result.ElectricalWindow }, LuxMapJsonOptions.Default),
                     };
                     db.Add(fault);
                     StageAudit(db, fault, null, now, correlationId, AuditAction.Created);
@@ -196,20 +197,14 @@ public sealed class DiagnosticCodeEvidence
     public DateTime? FirstSeen { get; set; }
     public DateTime? LastSeen { get; set; }
     public DateTime? HealthySince { get; set; }
-    public int Windows { get; set; }
-    public long? WindowSequence { get; set; }
-    public string? WindowSession { get; set; }
-    public int? WindowLit { get; set; }
     public bool Raised { get; set; }
 
-    public bool Observe(string key, bool active, long? sequence, DateTime now, string code, int? estimatedLit = null)
+    public bool Observe(string key, bool active, long? sequence, DateTime now, string code)
     {
         if (key == Key) return false;
         if (LastSeen is { } previous && now - previous > TimeSpan.FromSeconds(90))
         {
             FirstSeen = HealthySince = null;
-            Windows = 0;
-            WindowSequence = null;
         }
         Key = key;
         LastSeen = now;
@@ -217,43 +212,25 @@ public sealed class DiagnosticCodeEvidence
         {
             HealthySince ??= now;
             FirstSeen = null;
-            Windows = 0;
-            WindowSequence = null;
             Raised = false;
             return true;
         }
         HealthySince = null;
         FirstSeen ??= now;
-        if (code == "lamp_count_shortfall")
-        {
-            var session = key.Split('/')[0];
-            if (session != WindowSession || estimatedLit != WindowLit)
-            {
-                Windows = 0;
-                WindowSequence = null;
-                WindowSession = session;
-                WindowLit = estimatedLit;
-            }
-            if (sequence is { } seq && (WindowSequence is null || seq - WindowSequence >= 25))
-            {
-                Windows++;
-                WindowSequence = seq;
-            }
-        }
+
         return true;
     }
 
-    public bool Ready(string code, DateTime now) => code == "lamp_count_shortfall"
-        ? Windows >= 2
-        : FirstSeen is { } first && now - first >= TimeSpan.FromMinutes(
-            code == "telemetry_stale" ? 0 : code.StartsWith("voltage_") ? 3 : 5);
+    public bool Ready(string code, DateTime now) => FirstSeen is { } first &&
+        now - first >= TimeSpan.FromMinutes(
+            code == "telemetry_stale" || code == "current_drop" || code.StartsWith("voltage_", StringComparison.Ordinal) ? 0 : 5);
 }
 
 public static class IotDiagnosticRules
 {
-    public const string Version = "iot-faults-v2-contact";
+    public const string Version = "iot-faults-v3-mean2";
     public static readonly string[] Codes = [
-        "telemetry_stale", "voltage_loss", "voltage_deviation", "lamp_count_shortfall",
+        "telemetry_stale", "voltage_loss", "voltage_deviation", "current_drop",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",
         "ina226_unavailable", "ina226_read_failed", "ina226_shunt_out_of_range",
         "bh1750_unavailable", "bh1750_read_failed",
@@ -270,7 +247,7 @@ public static class IotDiagnosticRules
         "telemetry_stale" => FaultType.NodeOffline,
         "voltage_loss" => FaultType.SegmentOutage,
         "voltage_deviation" => FaultType.VoltageAnomaly,
-        "lamp_count_shortfall" => FaultType.LampOut,
+        "current_drop" => FaultType.CurrentAnomaly,
         _ => FaultType.IotHardwareFault,
     };
 
@@ -289,7 +266,7 @@ public static class IotDiagnosticRules
             key = silent ? $"contact/{seen.Ticks}/{now.Ticks}" : $"contact/{seen.Ticks}";
             return true;
         }
-        if (code.Contains('_') && !code.StartsWith("voltage_") && code != "lamp_count_shortfall")
+        if (code.Contains('_') && !code.StartsWith("voltage_") && code != "current_drop")
         {
             key = result.SensorHealthKey ?? "";
             var component = code.Split('_')[0] + "_";
@@ -301,7 +278,8 @@ public static class IotDiagnosticRules
         if (key.Length == 0 || result.Measurement is not { LampCommand: "ON" } ||
             result.MeasuredAt is not { } measured || measured > now || now - measured > TimeSpan.FromSeconds(profile.MaxSilenceSeconds) ||
             result.Measurement.ReceivedAt > now || now - result.Measurement.ReceivedAt > TimeSpan.FromSeconds(profile.MaxSilenceSeconds) ||
-            result.Anomalies.Any(a => a.Code.StartsWith("ina226_"))) return false;
-        return code != "lamp_count_shortfall" || result.LampCount?.Status == "estimated";
+            result.Anomalies.Any(a => a.Code.StartsWith("ina226_") || a.Code.StartsWith("ds3231_"))) return false;
+        return result.ElectricalWindow?.Status == "evaluated" &&
+            (code != "current_drop" || result.ElectricalWindow.CurrentEvaluationAvailable);
     }
 }

@@ -9184,6 +9184,216 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/iot/feeders/{feederId}/diagnostics": {
+      "get": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "feederId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
+    "/api/v1/iot/feeders/{feederId}/diagnostics/history": {
+      "get": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "feederId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "PageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "schema": {
+              "type": "string",
+              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "schema": {
+              "type": "string",
+              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticHistoryItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticHistoryItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotDiagnosticHistoryItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/iot/nodes/{nodeId}/diagnostics": {
       "get": {
         "tags": [
@@ -20623,6 +20833,41 @@
         },
         "additionalProperties": false
       },
+      "ElectricalWindowAssessment": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "samples": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "required_samples": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "voltage_avg": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "current_ma_avg": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "power_mw_avg": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "current_evaluation_available": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "EvidenceItem": {
         "required": [
           "evidence_id",
@@ -20893,6 +21138,7 @@
           "node_offline",
           "runtime_decline",
           "voltage_anomaly",
+          "current_anomaly",
           "iot_hardware_fault"
         ],
         "type": "string"
@@ -21524,6 +21770,71 @@
         },
         "additionalProperties": false
       },
+      "IotDiagnosticHistoryItem": {
+        "type": "object",
+        "properties": {
+          "history_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "feeder_id": {
+            "type": "string"
+          },
+          "node_id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "closed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "anomaly": {
+            "$ref": "#/components/schemas/IotAnomaly"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotDiagnosticHistoryItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IotDiagnosticHistoryItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "IotDiagnosticResult": {
         "type": "object",
         "properties": {
@@ -21575,8 +21886,8 @@
             "format": "date-time",
             "nullable": true
           },
-          "lamp_count": {
-            "$ref": "#/components/schemas/LampCountEstimate"
+          "electrical_window": {
+            "$ref": "#/components/schemas/ElectricalWindowAssessment"
           },
           "measured_at": {
             "type": "string",
@@ -21629,16 +21940,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "estimated_lit": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "estimated_missing": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
           },
           "fault_ids": {
             "type": "array",
@@ -22385,82 +22686,6 @@
           "run_count": {
             "type": "integer",
             "format": "int64"
-          }
-        },
-        "additionalProperties": false
-      },
-      "LampCountEstimate": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string"
-          },
-          "samples": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "required_samples": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "required_votes": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "estimated_lit": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "estimated_missing": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "votes": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          "ambiguous_samples": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "outside_range_samples": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "median_current_ma": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "threshold_counts": {
-            "$ref": "#/components/schemas/LampCountThresholdCounts"
-          }
-        },
-        "additionalProperties": false
-      },
-      "LampCountThresholdCounts": {
-        "type": "object",
-        "properties": {
-          "above_65_ma": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "at_or_below_52_5_ma": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "at_or_above_50_ma": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "at_or_above_45_ma": {
-            "type": "integer",
-            "format": "int32"
           }
         },
         "additionalProperties": false

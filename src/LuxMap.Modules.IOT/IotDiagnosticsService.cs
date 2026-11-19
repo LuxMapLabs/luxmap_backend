@@ -43,14 +43,11 @@ public sealed record NodeProfile
     public int InstalledLampCount { get; init; } = 10;
     public string? LampCountCalibration { get; init; }
 
-    internal string? EffectiveLampCountCalibration => LampCountCalibration
-        ?? (UseTenLampCalibration ? LampCountEstimator.FiveVolt : null);
-
     internal bool IsValid() =>
         !string.IsNullOrWhiteSpace(DeviceId) && !string.IsNullOrWhiteSpace(FeederId) &&
         Positive(NominalVoltage) && Positive(NominalCurrentMa) && Positive(NominalPowerMw) &&
         Tolerance(VoltageTolerancePercent) && MaxSilenceSeconds > 0 && InstalledLampCount is > 0 and <= 1000 &&
-        LampCountCalibration is null or LampCountEstimator.FourVolt or LampCountEstimator.FiveVolt or LampCountEstimator.QuietFiveVolt;
+        LampCountCalibration is null or "4v" or "5v" or "5v-quiet-v1";
 
     private static bool Positive(double value) => double.IsFinite(value) && value > 0;
     private static bool Tolerance(double value) => Positive(value) && value <= 100;
@@ -76,7 +73,7 @@ public sealed record IotDiagnosticResult(
     public string ElectricalStatus { get; init; } = "no_data";
     public DateTime? LastSeenAt { get; init; }
     public DateTime? LastCommandAckAt { get; init; }
-    public LampCountEstimate? LampCount { get; init; }
+    public ElectricalWindowAssessment? ElectricalWindow { get; init; }
     public DateTime? MeasuredAt { get; init; }
     public string? MeasurementKey { get; init; }
     public string? SensorHealthKey { get; init; }
@@ -165,7 +162,7 @@ public sealed partial class IotDiagnosticsService(
             MeasurementSequence = device?.LatestTelemetry?.Data?.SequenceNumber,
             SensorHealthKey = report?.Data is { } health ? $"{health.SessionId}/{health.SequenceNumber}" : null,
             FirmwareVersion = report?.Data?.FirmwareVersion,
-            CalibrationVersion = profile.EffectiveLampCountCalibration,
+            CalibrationVersion = ElectricalWindowEvaluator.Version,
         };
         var measurement = ReadMeasurement(device);
         if (measurement is not null)
@@ -173,18 +170,14 @@ public sealed partial class IotDiagnosticsService(
             var electricalAvailable = !codes.Any(code => SensorHealthCode.GroupOf(code) == SensorHealthCode.Ina);
             diagnosis = Evaluate(diagnosis, measurement, profile, now, electricalAvailable);
             if (electricalAvailable && !codes.Any(code => SensorHealthCode.GroupOf(code) == SensorHealthCode.Rtc) &&
-                profile.EffectiveLampCountCalibration is { } calibration && diagnosis.Status != "stale" &&
-                measurement.LampCommand == "ON" && LampCountEstimator.InCalibrationRange(measurement.Voltage, calibration))
+                diagnosis.Status != "stale" && measurement.LampCommand == "ON")
             {
-                var estimate = LampCountEstimator.Evaluate(
-                    RecentOnCurrents(device!, calibration, now, profile.MaxSilenceSeconds), calibration, profile.InstalledLampCount);
-                diagnosis = diagnosis with { LampCount = estimate };
-                if (estimate.EstimatedMissing is > 0)
-                    diagnosis = diagnosis with
-                    {
-                        Status = "anomaly",
-                        Anomalies = [.. diagnosis.Anomalies, new("lamp_count_shortfall", estimate.EstimatedMissing)],
-                    };
+                var (window, alerts) = ElectricalWindowEvaluator.Evaluate(RecentOnMeasurements(device!, profile, now), profile);
+                diagnosis = diagnosis with {
+                    ElectricalWindow = window,
+                    Status = alerts.Count == 0 ? diagnosis.Status : "anomaly",
+                    Anomalies = [.. diagnosis.Anomalies, .. alerts],
+                };
             }
         }
 
@@ -192,7 +185,7 @@ public sealed partial class IotDiagnosticsService(
         if (measurement is not null && contact.ElectricalStatus == "stale" && diagnosis.Status != "stale")
             diagnosis = diagnosis with
             {
-                Status = "stale", LampCount = null,
+                Status = "stale", ElectricalWindow = null,
                 Anomalies = [new("telemetry_stale", Math.Max(0, (now - measurement.ReceivedAt).TotalSeconds),
                     null, null, profile.MaxSilenceSeconds)],
             };
@@ -840,43 +833,32 @@ public sealed partial class IotDiagnosticsService(
             System.Globalization.DateTimeStyles.None, out var local) && local.Ticks >= TimeSpan.FromHours(7).Ticks
             ? new DateTimeOffset(local, TimeSpan.FromHours(7)) : null;
 
-    private static IReadOnlyList<double> RecentOnCurrents(
-        PrototypeDevice device, string calibration, DateTimeOffset now, int maxSilenceSeconds)
+    private static IReadOnlyList<IotMeasurement> RecentOnMeasurements(PrototypeDevice device, NodeProfile profile, DateTimeOffset now)
     {
-        if (device.LatestTelemetry?.Data is not { SessionId: { Length: > 0 } session, SequenceNumber: > 0 } latest)
+        var maximumGap = TimeSpan.FromSeconds(profile.MaxSilenceSeconds);
+        var latest = device.LatestTelemetry;
+        if (latest?.Data is not { SessionId: { Length: > 0 } session, SequenceNumber: > 0,
+                LampCommand: "ON", Voltage: double voltage, Current: double current, Power: double power } data ||
+            !Valid(voltage) || !Valid(current) || !Valid(power) || latest.ReceivedAt > now ||
+            now - latest.ReceivedAt > maximumGap)
             return [];
-
-        var fourVolt = calibration != LampCountEstimator.FiveVolt;
-        var maximumGap = TimeSpan.FromSeconds(maxSilenceSeconds);
-        var newestTime = fourVolt ? MeasuredAt(latest.Timestamp) : null;
-        // A newly delivered backlog must not be interpreted as a fresh 4 V reading.
-        if (fourVolt && (newestTime is null || newestTime > now || newestTime < now - maximumGap))
-            return [];
-
-        // Use sequence order: replayed MQTT samples can arrive out of order.
-        var history = (device.History ?? [])
-            .Select(reading => reading.Data)
-            .Where(sample => sample?.SessionId == session)
-            .ToLookup(sample => sample!.SequenceNumber);
-        var currents = new List<double>(LampCountEstimator.WindowSize) { latest.Current!.Value };
-        for (var sequence = latest.SequenceNumber!.Value - 1;
-             sequence > 0 && currents.Count < LampCountEstimator.WindowSize; sequence--)
-        {
-            var candidates = history[sequence];
-            if (candidates.Count() != 1 ||
-                candidates.First() is not { LampCommand: "ON", Voltage: double voltage, Current: double current } sample ||
-                !LampCountEstimator.InCalibrationRange(voltage, calibration) || !double.IsFinite(current))
-                break;
-
-            if (fourVolt)
-            {
-                var older = MeasuredAt(sample.Timestamp);
-                if (older is null || older >= newestTime || newestTime - older > maximumGap) break;
-                newestTime = older;
-            }
-            currents.Add(current);
-        }
-        return currents;
+        var measured = MeasuredAt(data.Timestamp);
+        if (measured is null || measured > now || now - measured > maximumGap) return [];
+        var samples = new List<IotMeasurement> { new(latest.ReceivedAt.UtcDateTime, "ON", voltage, current, power) };
+        // Sorting by receipt time would mix SD replay with live samples. Require adjacent sequences.
+        var older = (device.History ?? []).Where(r => r.Data?.SessionId == session &&
+            r.Data.SequenceNumber == data.SequenceNumber - 1).ToArray();
+        if (older.Length != 1 || older[0].Data is not {
+                LampCommand: "ON", Voltage: double oldV, Current: double oldI, Power: double oldP } previous ||
+            !Valid(oldV) || !Valid(oldI) || !Valid(oldP) ||
+            older[0].ReceivedAt > now || now - older[0].ReceivedAt > maximumGap)
+            return samples;
+        var oldTime = MeasuredAt(previous.Timestamp);
+        if (oldTime is null || oldTime >= measured || measured - oldTime > maximumGap ||
+            now - oldTime > maximumGap)
+            return samples;
+        samples.Add(new(older[0].ReceivedAt.UtcDateTime, "ON", oldV, oldI, oldP));
+        return samples;
     }
 
     internal static IotDiagnosticResult Evaluate(
@@ -886,37 +868,13 @@ public sealed partial class IotDiagnosticsService(
         var silence = Math.Max(0, (now - reading.ReceivedAt).TotalSeconds);
         if (result.MeasuredAt is { } measured)
             silence = Math.Max(silence, (now - measured).TotalSeconds);
-        if (reading.ReceivedAt > now || result.MeasuredAt > now ||
-            silence > profile.MaxSilenceSeconds)
-            return result with
-            {
-                Status = "stale",
-                Measurement = reading,
+        if (reading.ReceivedAt > now || result.MeasuredAt > now || silence > profile.MaxSilenceSeconds)
+            return result with {
+                Status = "stale", Measurement = reading,
                 Anomalies = [new("telemetry_stale", silence, null, null, profile.MaxSilenceSeconds)],
             };
-
-        var anomalies = new List<IotAnomaly>();
-        if (electricalAvailable && reading.LampCommand == "ON")
-        {
-            if (Math.Abs(reading.Voltage) <= LampCountEstimator.VoltageLossLimit)
-                anomalies.Add(new("voltage_loss", reading.Voltage, null, null, LampCountEstimator.VoltageLossLimit));
-            else
-                Compare(anomalies, "voltage_deviation", reading.Voltage, profile.NominalVoltage, profile.VoltageTolerancePercent);
-        }
-
-        return result with
-        {
-            Status = anomalies.Count == 0 ? "normal" : "anomaly",
-            Measurement = reading,
-            Anomalies = anomalies,
-        };
-    }
-
-    private static void Compare(List<IotAnomaly> anomalies, string code, double observed, double reference, double tolerance)
-    {
-        var deviation = (observed - reference) / reference * 100;
-        if (Math.Abs(deviation) > tolerance)
-            anomalies.Add(new(code, observed, reference, Math.Round(deviation, 2), tolerance));
+        // Electrical anomalies are decided together by the two-sample window.
+        return result with { Status = "normal", Measurement = reading, Anomalies = [] };
     }
 
     private static bool Valid(double? value) => value is double number && double.IsFinite(number);

@@ -37,12 +37,11 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
                 failed ? [new("voltage_loss")] : [])
             {
                 MeasuredAt = now, MeasurementKey = $"session/{step + 1}", MeasurementSequence = step + 1,
+                ElectricalStatus = "fresh", ElectricalWindow = new("evaluated", 2, 2, failed ? 0 : 5, failed ? 0 : 100, failed ? 0 : 500),
             };
             await IotDiagnosticJob.SaveAsync(db, lookup, rig.Node, profile, result, result.Status, now, "job:iot-test", default);
         }
         for (var i = 0; i < 6; i++) await Pass(i, true);
-        await using (var db = contexts.Open(fixture.CommuneId))
-            Assert.False(await db.Set<Fault>().AnyAsync(f => f.OriginNodeId == rig.Node));
         await Pass(6, true);
         await Pass(6, true); // Same report and job retry cannot create another fault.
         await Pass(7, true);
@@ -115,6 +114,36 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
             Assert.Contains(await db.Set<AuditEvent>().Where(a => a.EntityId == faultId).ToListAsync(),
                 audit => audit.Action == AuditAction.Rejected);
         }
+    }
+
+    [Fact]
+    public async Task Current_drop_creates_one_current_anomaly_fault_with_window_evidence()
+    {
+        var rig = await new LightingTestRig(fixture).RigAsync(issueSecret: false);
+        var contexts = fixture.Services.GetRequiredService<JobContextFactory>();
+        var profile = new NodeProfile {
+            DeviceId = "P001", FeederId = rig.Feeders[0], NominalVoltage = 5,
+            NominalCurrentMa = 100, NominalPowerMw = 500,
+        };
+        var now = DateTime.UtcNow;
+        var result = new IotDiagnosticResult(rig.Node, profile.FeederId, "anomaly",
+            new(now, "ON", 5, 85, 425), [new("current_drop", 85, 100, -15, 5)]) {
+            MeasuredAt = now, MeasurementKey = "s/2", MeasurementSequence = 2,
+            ElectricalStatus = "fresh", ConnectionStatus = "online", LastSeenAt = now,
+            ElectricalWindow = new("evaluated", 2, 2, 5, 85, 425) { CurrentEvaluationAvailable = true },
+        };
+        for (var attempt = 0; attempt < 2; attempt++) {
+            await using var db = contexts.Open(fixture.CommuneId);
+            await IotDiagnosticJob.SaveAsync(db, new Assignments(false), rig.Node, profile,
+                result, result.Status, now, "job:current-drop-test", default);
+        }
+        await using var check = contexts.Open(fixture.CommuneId);
+        var fault = Assert.Single(await check.Set<Fault>().Where(f => f.OriginNodeId == rig.Node).ToListAsync());
+        Assert.Equal(FaultType.CurrentAnomaly, fault.FaultType);
+        Assert.Equal("current_drop", fault.IotAnomalyCode);
+        Assert.Contains("electrical_window", fault.IotEvidence);
+        Assert.DoesNotContain("lamp_count", fault.IotEvidence);
+        Assert.Single(await check.Set<AuditEvent>().Where(a => a.EntityId == fault.FaultId).ToListAsync());
     }
 
     private sealed class Assignments(bool assigned) : IActiveWorkOrderLookup

@@ -37,39 +37,51 @@ public sealed class IotDiagnosticRuleTests
         Assert.False(state.Ready("ina226_unavailable", now.AddMinutes(6)));
     }
 
-    [Fact]
-    public void Lamp_fault_requires_two_non_overlapping_windows_and_same_session()
+    [Theory]
+    [InlineData(95, 95, false)]
+    [InlineData(95, 94.9, true)]
+    [InlineData(86.6, 86.6, true)]
+    [InlineData(110, 110, false)]
+    public void Mean_two_current_has_a_strict_five_percent_threshold(double first, double second, bool alert)
     {
-        var state = new DiagnosticCodeEvidence();
         var now = DateTime.UtcNow;
-        state.Observe("a/25", true, 25, now, "lamp_count_shortfall");
-        state.Observe("a/26", true, 26, now.AddSeconds(30), "lamp_count_shortfall");
-        Assert.False(state.Ready("lamp_count_shortfall", now.AddSeconds(30)));
-        state.Observe("a/50", true, 50, now.AddSeconds(60), "lamp_count_shortfall");
-        Assert.True(state.Ready("lamp_count_shortfall", now.AddSeconds(60)));
-        state.Observe("b/25", true, 25, now.AddSeconds(75), "lamp_count_shortfall");
-        Assert.False(state.Ready("lamp_count_shortfall", now.AddSeconds(75)));
+        var profile = new NodeProfile { NominalVoltage = 5, NominalCurrentMa = 100, VoltageTolerancePercent = 10 };
+        var (window, anomalies) = ElectricalWindowEvaluator.Evaluate(
+            [new(now, "ON", 5, first, first * 5), new(now, "ON", 5, second, second * 5)], profile);
+        Assert.Equal(2, window.RequiredSamples);
+        Assert.Equal((first + second) / 2, window.CurrentMaAvg);
+        Assert.Equal(alert, anomalies.Any(a => a.Code == "current_drop"));
+        if (alert) Assert.Equal(5, Assert.Single(anomalies).Limit);
+    }
+
+    [Fact]
+    public void Voltage_uses_two_sample_mean_and_suppresses_current_drop_during_bad_supply()
+    {
+        var now = DateTime.UtcNow;
+        var profile = new NodeProfile { NominalVoltage = 5, NominalCurrentMa = 100, VoltageTolerancePercent = 10 };
+        IotMeasurement Sample(double v, double i = 0) => new(now, "ON", v, i, v * i);
+        var missing = ElectricalWindowEvaluator.Evaluate([Sample(0)], profile);
+        Assert.Equal("insufficient_samples", missing.Window.Status);
+        Assert.Empty(missing.Anomalies);
+        var loss = ElectricalWindowEvaluator.Evaluate([Sample(0.04), Sample(0.06)], profile);
+        Assert.Equal("voltage_loss", Assert.Single(loss.Anomalies).Code);
+        var deviation = ElectricalWindowEvaluator.Evaluate([Sample(4), Sample(4.4)], profile);
+        Assert.Equal("voltage_deviation", Assert.Single(deviation.Anomalies).Code);
+        Assert.Equal(4.2, deviation.Window.VoltageAvg);
+        var mixed = ElectricalWindowEvaluator.Evaluate([Sample(4), Sample(6)], profile);
+        Assert.Empty(mixed.Anomalies); // Mean 5 V, but neither individual voltage proves a valid load.
     }
 
     [Theory]
-    [InlineData(7, 68.75)]
-    [InlineData(8, 80)]
-    [InlineData(9, 86.25)]
-    [InlineData(10, 96.25)]
-    public void Quiet_calibration_reports_missing_lamps(int lit, double current)
+    [InlineData("current_drop")]
+    [InlineData("voltage_loss")]
+    [InlineData("voltage_deviation")]
+    public void Valid_electrical_window_can_raise_a_fault_without_old_debounce(string code)
     {
-        var result = LampCountEstimator.Evaluate(Enumerable.Repeat(current, 25).ToArray(), LampCountEstimator.QuietFiveVolt);
-        Assert.Equal("estimated", result.Status);
-        Assert.Equal(lit, result.EstimatedLit);
-        Assert.Equal(10 - lit, result.EstimatedMissing);
-    }
-
-    [Fact]
-    public void Quiet_calibration_keeps_overlap_and_unmeasured_counts_undetermined()
-    {
-        foreach (var current in new[] { 40d, 73.5, 83.5, 91.25 })
-            Assert.Equal("undetermined",
-                LampCountEstimator.Evaluate(Enumerable.Repeat(current, 25).ToArray(), LampCountEstimator.QuietFiveVolt).Status);
+        var evidence = new DiagnosticCodeEvidence();
+        var now = DateTime.UtcNow;
+        evidence.Observe("s/2", true, 2, now, code);
+        Assert.True(evidence.Ready(code, now));
     }
 
     [Fact]

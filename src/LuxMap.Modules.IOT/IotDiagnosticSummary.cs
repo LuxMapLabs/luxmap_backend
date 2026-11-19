@@ -11,7 +11,7 @@ namespace LuxMap.Modules.IOT;
 
 public sealed record IotDiagnosticSummaryItem(
     string NodeId, string? FeederId, string DiagnosticStatus, string[] AnomalyCodes,
-    int? EstimatedLit, int? EstimatedMissing, string[] FaultIds, DateTime? EvaluatedAt)
+    string[] FaultIds, DateTime? EvaluatedAt)
 {
     public string ConnectionStatus { get; init; } = "source_unavailable";
     public string ElectricalStatus { get; init; } = "source_unavailable";
@@ -44,7 +44,6 @@ public sealed class IotDiagnosticSummary(LuxMapDbContext db, TimeProvider clock)
             return new IotDiagnosticSummaryItem(id, state?.FeederId,
                 state is null ? "unconfigured" : recent ? state.DiagnosticStatus : "source_unavailable",
                 result?.Anomalies.Select(a => a.Code).Distinct().ToArray() ?? [],
-                result?.LampCount?.EstimatedLit, result?.LampCount?.EstimatedMissing,
                 faults.Where(f => f.OriginNodeId == id).Select(f => f.FaultId).ToArray(), state?.EvaluatedAt)
             {
                 ConnectionStatus = result?.ConnectionStatus ?? (state is null || recent && state.DiagnosticStatus == "unconfigured" ? "unconfigured" : "source_unavailable"),
