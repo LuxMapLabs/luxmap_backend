@@ -40,6 +40,20 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="repair-status">
+    <strong>REPAIR-STATUS — nghiệm thu sửa chữa công bố cột normal · 19/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Theo drift RS-1…RS-6 (Mỹ SELF-SIGNED, nền tạm chờ FW): verify phiếu repair công bố <code>normal</code> qua writer chung
+    <code>PoleStatusPublication</code>, chỉ cho cột có <code>lamp_out</code> / <code>lamp_dim</code> vừa verified; sự cố đèn mở khác chặn công bố;
+    mốc là <code>completed_at</code>, quan sát mới hơn được giữ. Khoá phiếu → cột ordinal; kết quả từng cột vào audit <code>verified</code>.
+    Cột ngoài scope xã không bị ghi. Không migration, không đổi hình dạng API.</p>
+    <p>Files: <code>IRepairStatusPublication.cs</code>, <code>RepairStatusPublisher.cs</code>, <code>WorkOrderService.cs</code>,
+    <code>SurveyModule.cs</code>, <code>PoleStatusPublication.cs</code>, <code>WorkOrderRepairStatusTests.cs</code>,
+    <code>SurveyPublicationTests.cs</code>, trap faults-workorders, drift. Test: 429 passed / 2 skipped (WorkOrder, Survey publication,
+    pole photo, GPS, cancellation, sync, fault review); phá thử 3 chốt (loại trừ sự cố vừa verify, mốc <code>completed_at</code>,
+    chặn sự cố đèn mở khác) đều đỏ rồi khôi phục xanh. Còn: báo WP5, FW xác nhận RS.</p>
+  </div>
+
   <div class="card">
     <strong>WB-21 — bỏ <code>geom_wkt</code> khỏi sheet Mạch điện · 19/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>
