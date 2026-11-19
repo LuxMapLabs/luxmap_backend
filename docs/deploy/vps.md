@@ -326,6 +326,7 @@ POST/GET/DELETE /api/v1/iot/servers/{serverId}/credential.
 Không gửi gateway_id khi POST /iot/nodes; gateway tự nhận danh sách node theo server_id.
 Các khóa môi trường, mạng Docker, TLS 8883 và volume dữ liệu giữ nguyên.
 
-Thiết bị đang dùng LUXMAP-GW001 phải được cấp key cho mã mới, đổi cấu hình firmware,
-chờ heartbeat rồi gọi gateway-migration; không chỉ đổi tên key trong file dữ liệu.
-Xem [toàn bộ API, JSON và quy trình migration](../IOT-SERVER-IDENTITY-API-CHANGES.md).
+Luồng mới chỉ dùng server_id; không có bước gọi gateway-migration (API đã gỡ).
+Dữ liệu/tuyến/key cũ giữ nguyên khi deploy; không tự đổi tên key hay chuyển tuyến của gateway cũ.
+Bộ cũ cần kiểm tra quyền sở hữu binding trước khi xử lý cấu hình; không xóa lịch sử.
+Xem [toàn bộ API và JSON](../IOT-SERVER-IDENTITY-API-CHANGES.md).

@@ -53,6 +53,10 @@ public sealed record NodeProfile
     private static bool Tolerance(double value) => Positive(value) && value <= 100;
 }
 
+/// <summary>Persisted source configuration; independent of MQTT availability.</summary>
+public sealed record IotNodeSourceDetails(string NodeId, string ServerId, string DeviceId, string FeederId,
+    double NominalVoltage, double NominalCurrentMa, double NominalPowerMw);
+
 public sealed record IotMeasurement(
     DateTime ReceivedAt, string LampCommand, double Voltage, double CurrentMa, double PowerMw);
 
@@ -340,7 +344,7 @@ public sealed partial class IotDiagnosticsService(
         char.IsAsciiLetterOrDigit(id[0]) && id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
     internal async Task<string> EnsureGatewayRouteAsync(string serverId, string deviceId,
-        string communeId, string? key, CancellationToken ct)
+        string communeId, string? key, CancellationToken ct, bool repairExisting = false)
     {
         serverId = serverId.ToLowerInvariant();
         var uri = await ProvisioningOriginAsync(serverId, communeId, key, ct);
@@ -348,9 +352,53 @@ public sealed partial class IotDiagnosticsService(
         if (target?.CredentialIssued != true)
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "Server cần có MQTT key trước khi thêm node.");
-        var assigned = target.DeviceIds.Contains(deviceId);
-        if (!assigned) await RegisterGatewayRouteAsync(serverId, serverId, new(deviceId), key, ct);
+        try {
+            // Even an existing assignment republishes the node list after a reconnect.
+            await RegisterGatewayRouteAsync(serverId, serverId, new(deviceId), key, ct);
+        }
+        catch (LuxMapException ex) when (ex.Code == "IOT_REGISTRATION_CONFLICT" && repairExisting) {
+            // Repair legacy ACL drift only for an already persisted, commune-visible source.
+            var owned = await (from source in db.Set<IotSourceRegistration>()
+                join node in db.Set<IotNode>() on source.NodeId equals node.NodeId
+                where source.ServerId == serverId && source.DeviceId == deviceId &&
+                    source.DetachedAt == null && node.CabinetId != null
+                select source.NodeId).AnyAsync(ct);
+            if (!owned) throw;
+            var owner = await ReadBridgeDeviceOwnerAsync(uri, deviceId, key!, ct);
+            var settings = await registry.ReadAsync([], ct);
+            // Never claim the canonical ID or saved alias of a different registered server.
+            if (owner is not null && settings.Servers.Any(pair =>
+                    !string.Equals(pair.Key, serverId, StringComparison.OrdinalIgnoreCase) &&
+                    (string.Equals(pair.Key, owner, StringComparison.OrdinalIgnoreCase) || pair.Value.LegacyGatewayId == owner)))
+                throw;
+            var profile = new NodeProfile { ServerId = serverId, DeviceId = deviceId };
+            await ChangeBindingAsync(profile, owner, false, communeId, key, ct);
+        }
+        var confirmed = await ReadServerRouteAsync(uri, serverId, key!, ct);
+        if (confirmed?.CredentialIssued != true || !confirmed.DeviceIds.Contains(deviceId))
+            throw Unavailable("Bridge chưa xác nhận node thuộc server đã chọn; vui lòng thử lại.");
         return serverId;
+    }
+
+    private async Task<string?> ReadBridgeDeviceOwnerAsync(Uri uri, string deviceId, string key, CancellationToken ct)
+    {
+        using var request = ProvisioningRequest(HttpMethod.Get, uri, "gateways/routes", key);
+        try {
+            using var response = await client.SendAsync(request, ct);
+            if (response.StatusCode != HttpStatusCode.OK || !IsJson(response))
+                throw Unavailable("Không đọc được chủ tuyến MQTT để đồng bộ node.");
+            var routes = await response.Content.ReadFromJsonAsync<IotGatewayRoute[]>(cancellationToken: ct);
+            if (routes is null || routes.Any(route => route is null || !ValidMqttId(route.GatewayId) ||
+                route.DeviceIds is null || route.DeviceIds.Length > 32 || route.DeviceIds.Any(id => !ValidMqttId(id))) ||
+                routes.Select(route => route.GatewayId).Distinct(StringComparer.Ordinal).Count() != routes.Length)
+                throw Unavailable("Bridge trả danh sách tuyến không hợp lệ.");
+            var owners = routes.Where(route => route.DeviceIds.Contains(deviceId)).Select(route => route.GatewayId).ToArray();
+            if (owners.Length > 1) throw Unavailable("Thiết bị có nhiều chủ tuyến MQTT; cần kiểm tra cấu hình.");
+            return owners.SingleOrDefault();
+        }
+        catch (Exception ex) when (IsSourceFailure(ex, ct)) {
+            throw Unavailable("Không đọc được tuyến MQTT để đồng bộ node.");
+        }
     }
 
     public async Task RegisterGatewayRouteAsync(string serverId, string gatewayId, IotGatewayRouteRequest request,
@@ -609,6 +657,20 @@ public sealed partial class IotDiagnosticsService(
         if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !TryServer(settings, profile, out _, out var uri))
             throw Unavailable("Chưa cấu hình nguồn điều khiển cho thiết bị IoT.");
         return (uri, profile.DeviceId, profile);
+    }
+
+    public async Task<IotNodeSourceDetails> NodeSourceDetailsAsync(string nodeId, CancellationToken ct)
+    {
+        var communeId = await db.Set<IotNode>().AsNoTracking().Where(node => node.NodeId == nodeId)
+            .Select(node => node.CommuneId).SingleOrDefaultAsync(ct);
+        if (communeId is null)
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Không tìm thấy thiết bị IoT.");
+        var settings = await registry.ReadAsync([nodeId], ct);
+        if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !ServerMatchesCommune(settings, profile, communeId))
+            throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound,
+                "Node chưa có cấu hình nguồn đo đang hoạt động.");
+        return new(nodeId, profile.ServerId ?? "default", profile.DeviceId, profile.FeederId,
+            profile.NominalVoltage, profile.NominalCurrentMa, profile.NominalPowerMw);
     }
 
     public async Task<IotElectricalResult> ElectricalAsync(string nodeId, CancellationToken ct)

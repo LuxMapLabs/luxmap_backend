@@ -313,3 +313,12 @@ voltage_loss/voltage_deviation cũng dùng áp trung bình 2 mẫu. electrical_w
 measurement vẫn là mẫu mới nhất. History một dòng/đợt/mã lỗi, cập nhật ended_at mỗi phút,
 status active/resolved/interrupted; lọc khoảng giao và phân trang. Mục này thay hướng dẫn đếm bóng cũ.
 Chi tiết JSON, ngưỡng, thời gian và 17 mã lỗi: [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
+
+
+## Đọc cấu hình node trước khi sửa (19/11/2026)
+
+GET /api/v1/iot/nodes/{nodeId}, Bearer token ReadNetwork trong phạm vi xã, Body none.
+Trả node_id, server_id, device_id, feeder_id, nominal_voltage (V), nominal_current_ma (mA), nominal_power_mw (mW).
+Đây là giá trị danh định đã lưu; không gọi Bridge và không trả secret. 404 khi node thiếu/ngoài xã/chưa có nguồn hoặc đã gỡ nguồn.
+Dùng sáu trường ngoài node_id cho PUT cùng URL bằng token Manager; Admin dùng POST tạo node.
+Xem JSON và chi tiết trong [IOT-SERVER-IDENTITY-API-CHANGES.md](IOT-SERVER-IDENTITY-API-CHANGES.md).

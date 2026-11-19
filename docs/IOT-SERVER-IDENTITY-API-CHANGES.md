@@ -26,8 +26,8 @@ key và tuyến của chính nó. Một gateway hỗ trợ tối đa 32 device_i
 | GET /api/v1/iot/servers/{serverId}/credential | Mới, xem lại key của đúng server | ManageSettings |
 | DELETE /api/v1/iot/servers/{serverId}/credential | Mới, thu hồi key, xóa heartbeat và ngắt MQTT | ManageSettings |
 | GET /api/v1/iot/servers/{serverId}/nodes | Mới, danh sách node đúng server, page/page_size | ReadNetwork, lọc xã |
-| POST /api/v1/iot/servers/{serverId}/gateway-migration | Mới, chuyển có kiểm tra từ mã gateway cũ sang server_id | ManageSettings |
 | POST /api/v1/iot/nodes | Bỏ gateway_id trong request/response; tự gán ACL theo server_id | ManageSettings |
+| GET /api/v1/iot/nodes/{nodeId} | Đọc cấu hình nguồn và ba chỉ số danh định; không gọi Bridge | ReadNetwork, lọc xã |
 | PUT /api/v1/iot/nodes/{nodeId} | Chuyển nguồn giữa server cùng Bridge và cùng xã: kiểm tra chủ hiện tại rồi chuyển ACL | ManageAssets (Manager), lọc xã |
 | DELETE /api/v1/iot/nodes/{nodeId}/feeder | Mới: gỡ khỏi feeder, giữ node trong tủ và giữ lịch sử | ManageAssets, lọc xã |
 | DELETE /api/v1/iot/nodes/{nodeId} | Gỡ quyền gửi MQTT của thiết bị khỏi gateway; giữ node và lịch sử | ManageAssets, lọc xã |
@@ -41,7 +41,7 @@ Kênh điều khiển vẫn là /api/v1/iot/nodes/{nodeId}/command.
 - PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route.
 - POST/GET/DELETE /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential.
 
-Ở các URL có gatewayId, giá trị phải bằng server_id hoặc alias đã chuyển thành công bằng gateway-migration.
+Ở các URL có gatewayId, giá trị phải bằng server_id hoặc alias đã lưu từ phiên bản trước. Không tạo alias mới qua API.
 Một gatewayId tùy ý, kể cả mã của server khác cùng Bridge, trả 409 IOT_REGISTRATION_CONFLICT.
 Alias cũ chỉ trỏ API đến mã mới, không cho phép MQTT đăng nhập bằng key/mã cũ.
 Luồng thêm mới không cần gọi API gán tuyến riêng.
@@ -164,35 +164,17 @@ ON đổi command thành ON. AUTO:
 
 Theo dõi bằng GET cùng URL. command_acknowledged=true xác nhận node đã thực hiện lệnh.
 
-## 4. Chuyển bộ đang dùng LUXMAP-GW001
+## 4. Chỉ dùng server_id — không có bước chuyển gateway
 
-Không tự đổi chữ thường của NVS cũ vì key gắn chính xác với Client ID. Firmware vẫn đọc cấu hình cũ
-cho đến khi người quản trị chủ động đổi. Sau khi BE mới deploy, các API trạng thái/key xác định theo
-server_id mới; cần hoàn tất chuyển đổi để bộ cũ hiện đúng trạng thái và cho phép gán nguồn mới.
+Luồng thêm mới chỉ dùng server_id để cấp key, cấu hình gateway và đăng ký node.
+API gateway-migration và endpoint migration nội bộ Bridge đã bị gỡ ngày 19/11/2026.
+Không gọi API chuyển đổi sau khi cấu hình Wi-Fi/MQTT; gateway gửi heartbeat bằng server_id.
+Wi-Fi có IP không chứng minh MQTT đã đăng nhập bằng đúng server_id và key.
 
-1. Backup PostgreSQL và toàn bộ volume data/ của Bridge, gồm credentials, keyring, routes và telemetry.
-2. Deploy BE và Bridge cùng phiên bản, áp dụng migration AddIotServerGatewayIdentity.
-   Migration chỉ thêm legacy_gateway_id nullable và unique index, không xóa nguồn/lịch sử.
-3. Admin POST /api/v1/iot/servers/iot-server-01/credential để cấp key cho mã mới (GET nếu đã cấp).
-4. Nạp espserver mới, mở cấu hình, đổi Server ID thành iot-server-01 và nhập secret mới.
-   Giữ nguyên broker TLS. Chờ mã mới kết nối và gửi heartbeat; danh sách node có thể tạm rỗng.
-5. Admin gọi:
-
-POST https://luxmap.com.vn/api/v1/iot/servers/iot-server-01/gateway-migration
-
-~~~json
-{"legacy_gateway_id":"LUXMAP-GW001"}
-~~~
-
-Thành công 204. Bridge chỉ chuyển các device_id trùng nguồn đang gắn cho server trong BE;
-nếu tuyến cũ có thiết bị ngoài danh sách đó thì 409, không tự chiếm tuyến của server khác.
-Mã mới phải có key và heartbeat online; nếu chưa đáp ứng trả 409. Server phải tồn tại trong DB.
-BE lưu alias và audit; Bridge gỡ tuyến cũ, thu hồi key cũ và ngắt phiên cũ.
-Gateway mới nhận danh sách node. Dữ liệu điện/lịch sử lệnh vẫn gắn device/node/feeder cũ, không đổi tên.
-Có thể gọi lại cùng request khi lần trước Bridge đã chuyển nhưng BE chưa commit được.
-
-URL cũ dùng LUXMAP-GW001 chỉ tương thích sau bước 5; MQTT Client ID/username vẫn phải là iot-server-01.
-Không gọi DELETE key qua alias cũ sau migration để dọn: alias trỏ key mới nên sẽ thu hồi key mới.
+Giữ nguyên dữ liệu nguồn, node, feeder, lịch sử điện/lệnh/lỗi và alias đã lưu từ phiên bản trước.
+Không tự chuyển tuyến, đổi tên key, thu hồi key cũ hoặc ngắt gateway cũ khi deploy.
+Bộ cũ chưa chuyển vẫn giữ cấu hình cũ; nếu còn tuyến đứng tên mã cũ, cần quản trị kiểm tra
+và xử lý binding có đối chiếu sở hữu, không xóa node/lịch sử hay cấp lại thiết bị để né xung đột.
 
 ## 5. PUT/DELETE nguồn và giới hạn vận hành
 
@@ -239,3 +221,47 @@ Gateway chỉ giữ secret MQTT của riêng server và broker TLS. Cổng 8883 
 HTTP 5000 nội bộ và MQTT không mã hóa 1883 không public internet.
 Không cần đổi chứng chỉ CA TLS hoặc firmware node cho việc gộp ID.
 Firmware espserver mới đã build; việc nạp thiết bị/deploy VPS thực hiện riêng sau khi kiểm thử.
+
+
+## Đồng bộ tuyến khi POST / PUT node (19/11/2026)
+
+POST /api/v1/iot/nodes (Admin) thêm tuyến MQTT theo server_id sau kiểm tra xã/tủ/feeder.
+Gửi lại POST cùng cấu hình trả 200 và cùng node_id, đồng thời khôi phục tuyến bị thiếu.
+PUT /api/v1/iot/nodes/{nodeId} (Manager cùng xã) với cấu hình hiện có cũng đồng bộ lại tuyến,
+không cần API gateway-migration. BE gửi lại danh sách node và đọc xác nhận Bridge trước khi trả thành công.
+Server phải có key; MQTT/Wi-Fi và LoRa còn phải hoạt động để nhận mẫu/ACK, không hứa online ngay khi lưu.
+
+Nếu tuyến của một nguồn DB đã tồn tại còn nằm ở gateway legacy chưa đăng ký thành server,
+BE kiểm tra quyền sở hữu nguồn trong phạm vi xã rồi chuyển đúng device_id bằng compare-and-swap.
+Không chuyển cả gateway, không thu hồi key cũ, giữ các device khác và toàn bộ lịch sử.
+Không tự lấy thiết bị từ canonical ID hoặc alias của server khác đã đăng ký: trả 409.
+Nguồn mới không được tự chiếm một tuyến đang có chủ; lỗi Bridge/không xác nhận được trả 503.
+
+
+## GET cấu hình node đã lưu
+
+GET https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
+
+Authorization: Bearer token có ReadNetwork, trong phạm vi xã node. Body none.
+Phản hồi 200 (ví dụ):
+
+```json
+{
+  "node_id": "NODE-004",
+  "server_id": "iot-server-01",
+  "device_id": "LUXMAP-P001",
+  "feeder_id": "FDR-009",
+  "nominal_voltage": 5,
+  "nominal_current_ma": 93,
+  "nominal_power_mw": 500
+}
+```
+
+nominal_voltage là V, nominal_current_ma là mA, nominal_power_mw là mW danh định đã cấu hình,
+không phải số đo trực tiếp. Không trả password, khóa Bridge hoặc các ngưỡng nội bộ.
+Đọc từ cấu hình đã lưu trong DB (hoặc cấu hình legacy đang hoạt động), không gọi Bridge;
+vẫn trả được khi gateway/Bridge offline. Cache-Control: no-store.
+401 chưa đăng nhập, 403 thiếu ReadNetwork, 404 node không tồn tại/ngoài xã hoặc chưa có nguồn đang hoạt động.
+Nguồn đã gỡ trả 404 ở GET cấu hình; node và lịch sử điện/lệnh vẫn giữ nguyên ở API tương ứng.
+FE có thể dùng sáu trường ngoài node_id cho PUT cùng URL bằng token Manager cùng xã.
+Admin tạo node qua POST; Admin không được cấp ManageAssets chỉ để gọi PUT.

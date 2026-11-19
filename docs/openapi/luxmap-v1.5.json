@@ -9831,156 +9831,6 @@
         "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
       }
     },
-    "/api/v1/iot/servers/{serverId}/gateway-migration": {
-      "post": {
-        "tags": [
-          "IotDiagnostics"
-        ],
-        "parameters": [
-          {
-            "name": "serverId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GatewayMigrationRequest"
-              }
-            },
-            "text/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GatewayMigrationRequest"
-              }
-            },
-            "application/*+json": {
-              "schema": {
-                "$ref": "#/components/schemas/GatewayMigrationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:manage_settings",
-        "x-luxmap-roles": [
-          "system_admin"
-        ],
-        "x-luxmap-client": "shared",
-        "summary": "Admin chuyển gateway cũ sang server_id sau khi mã mới có heartbeat",
-        "operationId": "postIotServersServeridGatewayMigration",
-        "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
-      }
-    },
     "/api/v1/iot/servers/{serverId}/gateways/routes": {
       "get": {
         "tags": [
@@ -11204,6 +11054,95 @@
       }
     },
     "/api/v1/iot/nodes/{nodeId}": {
+      "get": {
+        "tags": [
+          "IotDiagnostics"
+        ],
+        "parameters": [
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotNodeSourceDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotNodeSourceDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IotNodeSourceDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_network",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "Đọc cấu hình nguồn node và ba chỉ số danh định đã lưu, không gọi Bridge",
+        "operationId": "getIotNodesNodeid",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+      },
       "put": {
         "tags": [
           "IotDiagnostics"
@@ -26039,15 +25978,6 @@
         },
         "additionalProperties": false
       },
-      "GatewayMigrationRequest": {
-        "type": "object",
-        "properties": {
-          "legacy_gateway_id": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
       "Geometry": {
         "required": [
           "coordinates",
@@ -27155,6 +27085,36 @@
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotNodeSourceDetails": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "feeder_id": {
+            "type": "string"
+          },
+          "nominal_voltage": {
+            "type": "number",
+            "format": "double"
+          },
+          "nominal_current_ma": {
+            "type": "number",
+            "format": "double"
+          },
+          "nominal_power_mw": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false

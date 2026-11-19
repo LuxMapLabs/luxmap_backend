@@ -48,7 +48,6 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         return StatusCode(StatusCodes.Status201Created, new RegisteredServer(id));
     }
 
-    public sealed record GatewayMigrationRequest([Required] string LegacyGatewayId);
 
     /// <summary>Cấp MQTT key cho đúng server_id; Client ID và username bằng server_id.</summary>
     [HttpPost("servers/{serverId}/credential")]
@@ -99,24 +98,9 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<PagedResult<IotServerNode>> ServerNodesAsync(string serverId, [FromQuery] PageQuery page, CancellationToken ct)
         => diagnostics.ServerNodesAsync(serverId, page.ToPageRequest(), ct);
 
-    /// <summary>Admin chuyển gateway cũ sang server_id, sau khi mã mới đã có key và heartbeat.</summary>
-    [HttpPost("servers/{serverId}/gateway-migration")]
-    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public async Task<IActionResult> MigrateGatewayAsync(string serverId, GatewayMigrationRequest request,
-        [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
-    {
-        await diagnostics.MigrateServerIdentityAsync(serverId, request.LegacyGatewayId, configuration["Mqtt:ProvisioningKey"], ct);
-        return NoContent();
-    }
-
     public sealed record ServerLocationRequest(string CommuneId, IotLocation Location);
 
-    [Obsolete("Use server_id-only APIs. A legacy gateway ID requires an explicit migration mapping.")]
+    [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpGet("servers/{serverId}/gateways/routes")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType<IReadOnlyList<IotGatewayRoute>>(StatusCodes.Status200OK)]
@@ -126,7 +110,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
         => diagnostics.GatewayRoutesAsync(serverId, configuration["Mqtt:ProvisioningKey"], ct);
 
-    [Obsolete("Use server_id-only APIs. A legacy gateway ID requires an explicit migration mapping.")]
+    [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpPut("servers/{serverId}/gateways/{gatewayId}/route")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -142,7 +126,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         return NoContent();
     }
 
-    [Obsolete("Use server_id-only APIs. A legacy gateway ID requires an explicit migration mapping.")]
+    [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpPost("servers/{serverId}/gateways/{gatewayId}/credential")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType<IotGatewayCredential>(StatusCodes.Status200OK)]
@@ -159,7 +143,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
 
     /// <summary>Xem lại MQTT secret của gateway, dành cho Admin.</summary>
-    [Obsolete("Use server_id-only APIs. A legacy gateway ID requires an explicit migration mapping.")]
+    [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpGet("servers/{serverId}/gateways/{gatewayId}/credential")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType<IotGatewayCredential>(StatusCodes.Status200OK)]
@@ -175,7 +159,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     }
 
     /// <summary>Thu hồi MQTT secret và ngắt gateway đang kết nối.</summary>
-    [Obsolete("Use server_id-only APIs. A legacy gateway ID requires an explicit migration mapping.")]
+    [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpDelete("servers/{serverId}/gateways/{gatewayId}/credential")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -234,6 +218,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
     public sealed record RegisteredNode(string NodeId, string ServerId, string DeviceId, string FeederId);
 
+    /// <summary>Admin đăng ký node và đồng bộ quyền MQTT; gửi lại cùng cấu hình sửa tuyến bị thiếu.</summary>
     [HttpPost("nodes")]
     [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType<RegisteredNode>(StatusCodes.Status200OK)]
@@ -265,11 +250,23 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         {
             CabinetId = request.CabinetId, DataSource = DataSource.CalibrationRig,
             SupportsRemoteControl = true,
-        }, profile, nodes, sources, (communeId, token) =>
+        }, profile, nodes, sources, (communeId, existingSource, token) =>
             diagnostics.EnsureGatewayRouteAsync(profile.ServerId, request.DeviceId, communeId,
-                configuration["Mqtt:ProvisioningKey"], token), ct);
+                configuration["Mqtt:ProvisioningKey"], token, existingSource), ct);
         var result = new RegisteredNode(nodeId, profile.ServerId, profile.DeviceId, profile.FeederId);
         return created ? Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical", result) : Ok(result);
+    }
+
+    /// <summary>Đọc cấu hình nguồn node đã lưu, gồm server, thiết bị MQTT, feeder và ba chỉ số danh định.</summary>
+    /// <remarks>ReadNetwork trong phạm vi xã. Không gọi Bridge; nguồn đã gỡ hoặc chưa cấu hình trả 404.</remarks>
+    [HttpGet("nodes/{nodeId}")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<IotNodeSourceDetails>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public Task<IotNodeSourceDetails> NodeSourceDetailsAsync(string nodeId, CancellationToken ct)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return diagnostics.NodeSourceDetailsAsync(nodeId, ct);
     }
 
     public sealed record UpdateNodeRequest
@@ -282,6 +279,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [Required] public double NominalPowerMw { get; init; }
     }
 
+    /// <summary>Manager cập nhật nguồn và xác nhận quyền MQTT của node trên server đã chọn.</summary>
     [HttpPut("nodes/{nodeId}")]
     [Authorize(Policy = LuxMapPolicies.ManageAssets)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

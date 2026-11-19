@@ -180,19 +180,6 @@ app.MapPost("/api/luxmap/gateways/{gatewayId}/devices/{deviceId}/binding",
         ? Results.NoContent() : Results.Conflict();
 }).WithTags("MQTT");
 
-app.MapPost("/api/luxmap/gateways/{gatewayId}/migration",
-    async (string gatewayId, GatewayMigrationRequest request, HttpContext context,
-        MqttBroker mqtt, IConfiguration configuration) =>
-{
-    if (!GatewayCredentials.MatchesAdminKey(configuration["Mqtt:ProvisioningKey"],
-        context.Request.Headers["X-Iot-Provisioning-Key"].ToString())) return Results.Unauthorized();
-    if (!DeviceRules.ValidId(gatewayId) || !DeviceRules.ValidId(request.LegacyGatewayId) ||
-        request.DeviceIds is null || request.DeviceIds.Length > 32 ||
-        request.DeviceIds.Any(id => !DeviceRules.ValidId(id))) return Results.BadRequest();
-    return await mqtt.MigrateGatewayAsync(request.LegacyGatewayId, gatewayId, request.DeviceIds)
-        ? Results.NoContent() : Results.Conflict();
-}).WithTags("MQTT");
-
 app.MapGet("/api/luxmap/gateways/{gatewayId}/devices/{deviceId}/authorization",
     (string gatewayId, string deviceId, HttpContext context, MqttBroker mqtt,
         GatewayCredentials credentials, IConfiguration configuration) =>
@@ -293,4 +280,3 @@ app.Run();
 record GatewayRouteRequest(string? DeviceId);
 
 record GatewayBindingRequest(string? ExpectedGatewayId, bool Detach = false);
-record GatewayMigrationRequest(string LegacyGatewayId, string[] DeviceIds);

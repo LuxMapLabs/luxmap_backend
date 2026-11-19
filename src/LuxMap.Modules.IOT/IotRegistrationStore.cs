@@ -154,26 +154,6 @@ public sealed class IotRegistrationStore(
         await SaveAsync(ct);
     }
 
-    internal async Task MigrateIdentityAsync(string serverId, string legacyId,
-        Func<CancellationToken, Task> migrateBridge, CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM iot_server_registration WHERE server_id = {serverId} FOR UPDATE", ct);
-        var row = await db.Set<IotServerRegistration>().SingleOrDefaultAsync(s => s.ServerId == serverId, ct);
-        if (row is null) throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound, "Server chưa được đăng ký trong DB.");
-        if (row.LegacyGatewayId is not null && row.LegacyGatewayId != legacyId ||
-            await db.Set<IotServerRegistration>().AnyAsync(s => s.ServerId != serverId &&
-                (s.LegacyGatewayId == legacyId || s.ServerId == legacyId.ToLowerInvariant()), ct))
-            throw Conflict();
-        await migrateBridge(ct); // idempotent; if DB commit fails, the Admin can retry safely
-        row.LegacyGatewayId = legacyId;
-        RecordRegistration(serverId, null, JsonSerializer.Serialize(
-            new { action = "gateway_identity_migrated", legacy_gateway_id = legacyId, gateway_id = serverId }, LuxMapJsonOptions.Default));
-        await SaveAsync(ct);
-        await transaction.CommitAsync(ct);
-    }
-
     private async Task RequireCommuneAsync(string communeId, CancellationToken ct)
     {
         if (!await db.Set<AdministrativeUnit>().AnyAsync(unit => unit.CommuneId == communeId, ct))
@@ -182,7 +162,7 @@ public sealed class IotRegistrationStore(
 
     internal async Task<(string NodeId, string GatewayId, bool Created)> RegisterNodeAsync(CreateIotNodeRequest request,
         NodeProfile profile, IotNodeRegistryService nodes, IotFeederSourceLookup sources,
-        Func<string, CancellationToken, Task<string>> ensureGatewayRoute, CancellationToken ct)
+        Func<string, bool, CancellationToken, Task<string>> ensureGatewayRoute, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         // The feeder serializes repeat registrations. A new node row is private to this transaction.
@@ -203,7 +183,7 @@ public sealed class IotRegistrationStore(
                  existing.Profile.LampCountCalibration != profile.LampCountCalibration) ||
                 node.DataSource != request.DataSource || node.SupportsRemoteControl != request.SupportsRemoteControl)
                 throw Conflict();
-            return (existing.NodeId, await ensureGatewayRoute(feeder.CommuneId, ct), false);
+            return (existing.NodeId, await ensureGatewayRoute(feeder.CommuneId, true, ct), false);
         }
 
         // One physical MQTT device per bridge origin, including server aliases on the same VPS.
@@ -226,7 +206,7 @@ public sealed class IotRegistrationStore(
 
         var nodeId = await nodes.CreateAsync(request, ct);
         await SaveSourceAsync(nodeId, profile, createOnly: true, ct);
-        var gatewayId = await ensureGatewayRoute(feeder.CommuneId, ct);
+        var gatewayId = await ensureGatewayRoute(feeder.CommuneId, false, ct);
         await transaction.CommitAsync(ct);
         return (nodeId, gatewayId, true);
     }

@@ -169,32 +169,6 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         finally { commandGate.Release(); }
     }
 
-    public async Task<bool> MigrateGatewayAsync(string legacyId, string serverId, string[] expectedDevices)
-    {
-        await commandGate.WaitAsync();
-        try
-        {
-            if (legacyId == serverId || GatewayIdentityStatus(serverId) != "online") return false;
-            var old = gateways.GetValueOrDefault(legacyId) ?? [];
-            var current = gateways.GetValueOrDefault(serverId) ?? [];
-            var expected = expectedDevices.ToHashSet(StringComparer.Ordinal);
-            if (expected.Count != expectedDevices.Length || expected.Count > MaxNodesPerGateway ||
-                old.Any(id => !expected.Contains(id)) || current.Any(id => !expected.Contains(id)) ||
-                expected.Any(id => !old.Contains(id) && !current.Contains(id))) return false;
-            var next = new Dictionary<string, string[]>(gateways, StringComparer.Ordinal) {
-                [legacyId] = [], [serverId] = expectedDevices,
-            };
-            lock (registrationGate) SaveRoutes(next);
-            credentials.Revoke(legacyId);
-            authenticatedSessions.TryRemove(legacyId, out _);
-            lastHeartbeats.TryRemove(legacyId, out _);
-            await DisconnectAsync(legacyId);
-            await PublishNodeListAsync(serverId);
-            return true;
-        }
-        finally { commandGate.Release(); }
-    }
-
     public string GatewayStatus(string deviceId)
     {
         if (!IsRunning) return "broker_down";
