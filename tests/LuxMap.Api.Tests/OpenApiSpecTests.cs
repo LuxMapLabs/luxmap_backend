@@ -377,7 +377,7 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     [InlineData("FixtureStatus", new[] { "normal", "dim", "out", "unknown" })]
     [InlineData("SourceChannel", new[] { "cv", "iot", "field_report" })]
     [InlineData("DataSource", new[] { "field", "public_imagery", "calibration_rig", "simulated" })]
-    [InlineData("FaultType", new[] { "lamp_out", "lamp_dim", "segment_outage", "node_offline", "runtime_decline", "voltage_anomaly", "iot_hardware_fault" })]
+    [InlineData("FaultType", new[] { "lamp_out", "lamp_dim", "segment_outage", "node_offline", "runtime_decline", "voltage_anomaly", "current_anomaly", "iot_hardware_fault" })]
     [InlineData("RoadClass", new[] { "inter_commune", "inter_village" })]
     public void Enum_is_a_string_with_the_contract_values(string schemaName, string[] expected)
     {

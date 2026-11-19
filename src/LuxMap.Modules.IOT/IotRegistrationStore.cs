@@ -176,7 +176,7 @@ public sealed class IotRegistrationStore(
                 existing.Profile.NominalCurrentMa != profile.NominalCurrentMa ||
                 existing.Profile.NominalPowerMw != profile.NominalPowerMw ||
                 (profile.LampCountCalibration is not null &&
-                 existing.Profile.EffectiveLampCountCalibration != profile.LampCountCalibration) ||
+                 existing.Profile.LampCountCalibration != profile.LampCountCalibration) ||
                 node.DataSource != request.DataSource || node.SupportsRemoteControl != request.SupportsRemoteControl)
                 throw Conflict();
             return (existing.NodeId, await ensureGatewayRoute(feeder.CommuneId, ct), false);
@@ -282,6 +282,7 @@ public sealed class IotRegistrationStore(
         }
 
         if (row is not null) row.DetachedAt = now;
+        await IotDiagnosticHistory.InterruptNodeAsync(db, nodeId, now, ct);
         RecordRegistration(row?.ServerId ?? "default", nodeId, JsonSerializer.Serialize(new
         {
             action = "node_detached", cabinet_id = node.CabinetId, device_id = row?.DeviceId,

@@ -397,104 +397,71 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public Task Four_volt_diagnostics_counts_contiguous_samples_and_reports_only_supported_alerts()
+    public Task Feeder_diagnostics_uses_two_live_samples_for_current_and_voltage_without_lamp_counts()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, _services) =>
+        return WithSharedCabinetAsync(async (client, rig, services) =>
         {
-            var nodePath = $"/api/v1/iot/nodes/{rig.First}";
-            object Source(string calibration, double nominalVoltage = 4.08) => new
-            {
+            var path = $"/api/v1/iot/feeders/{rig.Feeder}/diagnostics";
+            using var configured = await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", new {
                 server_id = rig.Server, device_id = "probe", feeder_id = rig.Feeder,
-                nominal_voltage = nominalVoltage, nominal_current_ma = 100, nominal_power_mw = 500,
-                lamp_count_calibration = calibration,
-            };
-            using var invalid = await client.PutAsJsonAsync(nodePath, Source("bad"));
-            Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
-            using var created = await client.PutAsJsonAsync(nodePath, Source("4v"));
-            Assert.Equal(HttpStatusCode.NoContent, created.StatusCode);
-
-            var diagnoses = $"{nodePath}/diagnostics";
-            foreach (var (count, currents) in new[]
-            {
-                (10, Window(68.75, 13, 56.25)),
-                (9, Window(63.75, 13, 56.25)),
-                (8, Window(51.25, 12, 46.25)),
-                (7, Window(47.5, 14, 43.75)),
-                (6, Window(42.5, 13, 38.75)),
-            })
-            {
-                bridge.DiagnosticDevice = DiagnosticTelemetry(currents);
-                var payload = await client.GetFromJsonAsync<JsonElement>(diagnoses);
-                var estimate = payload.GetProperty("lamp_count");
-                Assert.Equal("estimated", estimate.GetProperty("status").GetString());
-                Assert.Equal(25, estimate.GetProperty("samples").GetInt32());
-                Assert.Equal(count, estimate.GetProperty("estimated_lit").GetInt32());
-                Assert.Equal(10 - count, estimate.GetProperty("estimated_missing").GetInt32());
-                Assert.Equal(currents.Count(current => current > 65),
-                    estimate.GetProperty("threshold_counts").GetProperty("above_65_ma").GetInt32());
-                var anomalies = payload.GetProperty("anomalies").EnumerateArray();
-                if (count == 10)
-                    Assert.Empty(anomalies);
-                else
-                {
-                    var alert = Assert.Single(anomalies);
-                    Assert.Equal("lamp_count_shortfall", alert.GetProperty("code").GetString());
-                    Assert.Equal(10 - count, alert.GetProperty("observed").GetDouble());
-                }
-            }
-
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(68.75, 1, 63.75));
-            await AssertStatusAsync("undetermined", 25);
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(47.5, 12, 43.75), skipSequence: 12);
-            await AssertStatusAsync("insufficient_samples", 13);
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(47.5, 12, 43.75), oldRtc: true);
-            var replayed = await client.GetFromJsonAsync<JsonElement>(diagnoses);
-            Assert.Equal("stale", replayed.GetProperty("electrical_status").GetString());
-            Assert.Equal("online", replayed.GetProperty("connection_status").GetString());
-            Assert.Equal(JsonValueKind.Null, replayed.GetProperty("lamp_count").ValueKind);
-            await AssertSingleAlertAsync("telemetry_stale");
-
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), voltage: 0.04);
-            await AssertSingleAlertAsync("voltage_loss");
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), voltage: 4.6);
-            await AssertSingleAlertAsync("voltage_deviation");
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), staleDelivery: true);
-            await AssertSingleAlertAsync("telemetry_stale");
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(50, 25, 50), lampCommand: "OFF");
-            var off = await client.GetFromJsonAsync<JsonElement>(diagnoses);
-            Assert.Empty(off.GetProperty("anomalies").EnumerateArray());
-            Assert.Equal(JsonValueKind.Null, off.GetProperty("lamp_count").ValueKind);
-
-            using var updated = await client.PutAsJsonAsync(nodePath, new
-            {
-                server_id = rig.Server, device_id = "probe", feeder_id = rig.Feeder,
-                nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500, use_ten_lamp_calibration = true,
+                nominal_voltage = 5, nominal_current_ma = 93.5546875, nominal_power_mw = 467.7734375,
             });
-            Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
-            bridge.DiagnosticDevice = DiagnosticTelemetry(Window(100, 25, 100), voltage: 5);
-            var legacy = await client.GetFromJsonAsync<JsonElement>(diagnoses);
-            var legacyCount = legacy.GetProperty("lamp_count");
-            Assert.Equal(10, legacyCount.GetProperty("estimated_lit").GetInt32());
-            Assert.Equal(15, legacyCount.GetProperty("required_votes").GetInt32());
-            Assert.False(legacyCount.TryGetProperty("threshold_counts", out _));
-
-            async Task AssertStatusAsync(string status, int samples)
+            Assert.Equal(HttpStatusCode.NoContent, configured.StatusCode);
+            foreach (var (current, expected) in new[] {
+                (93.5546875, false), (86.6015625, true), (77.8515625, true), (68.515625, true) })
             {
-                var payload = await client.GetFromJsonAsync<JsonElement>(diagnoses);
-                var estimate = payload.GetProperty("lamp_count");
-                Assert.Equal(status, estimate.GetProperty("status").GetString());
-                Assert.Equal(samples, estimate.GetProperty("samples").GetInt32());
-                Assert.Equal(JsonValueKind.Null, estimate.GetProperty("estimated_missing").ValueKind);
+                bridge.DiagnosticDevice = DiagnosticTelemetry([current, current], voltage: 5);
+                var result = await client.GetFromJsonAsync<JsonElement>(path);
+                Assert.Equal(rig.Feeder, result.GetProperty("feeder_id").GetString());
+                Assert.False(result.TryGetProperty("lamp_count", out _));
+                var window = result.GetProperty("electrical_window");
+                Assert.Equal("evaluated", window.GetProperty("status").GetString());
+                Assert.Equal(2, window.GetProperty("samples").GetInt32());
+                Assert.Equal(2, window.GetProperty("required_samples").GetInt32());
+                var anomalies = result.GetProperty("anomalies").EnumerateArray().ToArray();
+                if (expected) {
+                    var alert = Assert.Single(anomalies);
+                    Assert.Equal("current_drop", alert.GetProperty("code").GetString());
+                    Assert.Equal(current, alert.GetProperty("observed").GetDouble());
+                    Assert.Equal(93.5546875, alert.GetProperty("reference").GetDouble());
+                    Assert.Equal(5, alert.GetProperty("limit").GetDouble());
+                } else Assert.Empty(anomalies);
+            }
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d], voltage: 5);
+            await Insufficient();
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d], voltage: 5, skipSequence: 2);
+            await Insufficient();
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d], voltage: 5, duplicatePrevious: true);
+            await Insufficient();
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d], voltage: 5, foreignPrevious: true);
+            await Insufficient();
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d], voltage: 0.04);
+            await SingleAlert("voltage_loss");
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d], voltage: 4.4);
+            await SingleAlert("voltage_deviation");
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d], voltage: 5, oldRtc: true);
+            await SingleAlert("telemetry_stale");
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d], voltage: 5, lampCommand: "OFF");
+            var off = await client.GetFromJsonAsync<JsonElement>(path);
+            Assert.Empty(off.GetProperty("anomalies").EnumerateArray());
+            Assert.Equal(JsonValueKind.Null, off.GetProperty("electrical_window").ValueKind);
+
+            using var foreignToken = await fixture.ForeignCommuneClientAsync();
+            using var foreignFactory = new LuxMapApiFactory();
+            using var foreign = AuthorizedClient(foreignFactory.CreateClient(), foreignToken);
+            Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync(path)).StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync(path + "/history")).StatusCode);
+
+            async Task Insufficient() {
+                var payload = await client.GetFromJsonAsync<JsonElement>(path);
+                Assert.Equal("insufficient_samples", payload.GetProperty("electrical_window").GetProperty("status").GetString());
+                Assert.Equal(1, payload.GetProperty("electrical_window").GetProperty("samples").GetInt32());
                 Assert.Empty(payload.GetProperty("anomalies").EnumerateArray());
             }
-
-            async Task AssertSingleAlertAsync(string code)
-            {
-                var payload = await client.GetFromJsonAsync<JsonElement>(diagnoses);
-                Assert.Equal(code, Assert.Single(payload.GetProperty("anomalies").EnumerateArray())
-                    .GetProperty("code").GetString());
-                Assert.Equal(JsonValueKind.Null, payload.GetProperty("lamp_count").ValueKind);
+            async Task SingleAlert(string code) {
+                var payload = await client.GetFromJsonAsync<JsonElement>(path);
+                Assert.Equal(code, Assert.Single(payload.GetProperty("anomalies").EnumerateArray()).GetProperty("code").GetString());
             }
         }, bridge);
     }
@@ -557,11 +524,9 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }, bridge);
     }
 
-    private static double[] Window(double first, int count, double rest) =>
-        [.. Enumerable.Repeat(first, count), .. Enumerable.Repeat(rest, 25 - count)];
-
-    private static object DiagnosticTelemetry(double[] currents, double voltage = 4.07, string lampCommand = "ON",
-        int? skipSequence = null, bool oldRtc = false, bool staleDelivery = false)
+    private static object DiagnosticTelemetry(double[] currents, double voltage = 5, string lampCommand = "ON",
+        int? skipSequence = null, bool oldRtc = false, bool staleDelivery = false,
+        bool duplicatePrevious = false, bool foreignPrevious = false)
     {
         var now = DateTimeOffset.UtcNow;
         var measured = now.AddSeconds(oldRtc ? -120 : -5);
@@ -572,7 +537,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             return new
             {
                 receivedAt = index == currents.Length - 1 ? received : received.AddSeconds(-offset),
-                data = new { lampCommand, voltage, current, power = voltage * current, sessionId = "calibration",
+                data = new { lampCommand, voltage, current, power = voltage * current, sessionId = foreignPrevious && index < currents.Length - 1 ? "foreign" : "calibration",
                     sequenceNumber = index + 1, timestamp = measured.AddSeconds(-offset).ToOffset(TimeSpan.FromHours(7))
                         .ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) },
             };
@@ -580,7 +545,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         return new
         {
             deviceId = "probe", latestTelemetry = rows[^1],
-            history = rows.Where(row => row.data.sequenceNumber != skipSequence)
+            history = rows.Concat(duplicatePrevious && rows.Length > 1 ? [rows[^2]] : []).Where(row => row.data.sequenceNumber != skipSequence)
                 .OrderBy(row => row.data.sequenceNumber % 2).ToArray(),
         };
     }

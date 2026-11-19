@@ -15,6 +15,7 @@ public sealed class IotDiagnosticState : ICommuneScoped
     public string Result { get; set; } = "{}";
     public string Evidence { get; set; } = "{}";
     public DateTime EvaluatedAt { get; set; }
+    public DateTime? HistorySampledAt { get; set; }
 }
 
 public sealed class IotDiagnosticStateConfiguration : IEntityTypeConfiguration<IotDiagnosticState>

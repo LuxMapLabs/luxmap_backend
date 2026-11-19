@@ -50,6 +50,7 @@ public enum FaultType
     NodeOffline,
     RuntimeDecline,
     VoltageAnomaly,
+    CurrentAnomaly,
     IotHardwareFault,
 }
 

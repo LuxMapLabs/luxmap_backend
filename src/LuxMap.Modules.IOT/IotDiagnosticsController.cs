@@ -257,6 +257,26 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromQuery] PageQuery page, [FromServices] IotDiagnosticSummary summary, CancellationToken ct)
         => summary.ListAsync(page.ToPageRequest(), ct);
 
+    /// <summary>Lỗi hiện tại của feeder, đọc trực tiếp nguồn IoT hiện có.</summary>
+    [HttpGet("feeders/{feederId}/diagnostics")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<IotDiagnosticResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<IotDiagnosticResult> FeederDiagnosticsAsync(string feederId, CancellationToken ct)
+        => diagnostics.FeederDiagnosticsAsync(feederId, ct);
+
+    /// <summary>Lịch sử đợt lỗi feeder, gộp theo phút UTC, lọc khoảng thời gian và phân trang.</summary>
+    [HttpGet("feeders/{feederId}/diagnostics/history")]
+    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
+    [ProducesResponseType<PagedResult<IotDiagnosticHistoryItem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    public Task<PagedResult<IotDiagnosticHistoryItem>> DiagnosticHistoryAsync(
+        string feederId, [FromQuery] PageQuery page, CancellationToken ct,
+        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
+        => diagnostics.DiagnosticHistoryAsync(feederId, page.ToPageRequest(), from, to, ct);
+
     [HttpGet("nodes/{nodeId}/diagnostics")]
     [ProducesResponseType<IotDiagnosticResult>(StatusCodes.Status200OK)]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]

@@ -2681,3 +2681,26 @@ Nay workbook **giữ** hình mạch như đã giữ hình tuyến (đúng WB-5);
 | GR-3 | Không kiểm lại dữ liệu đã lưu; production 18/11/2026: 0 tài sản ngoài phạm vi. `PUT /assets/poles/{id}/location` đã kiểm sẵn (không đổi) |
 
 **Cần báo:** WP5 — form và import có thể trả lỗi mới cho toạ độ ngoài phạm vi. **Chưa báo.**
+
+
+
+## IOT-CURRENT-DROP-HISTORY-1 — 19/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+Bỏ lamp_count_shortfall, lamp_count, estimated_lit/estimated_missing khỏi response chẩn đoán; không đếm bóng.
+current_drop, voltage_loss và voltage_deviation dùng trung bình HAI mẫu ON hợp lệ liên tiếp, cùng session,
+sequence kề nhau, giờ đo tăng, cả hai còn mới (<=max_silence_seconds), không nhận replay/trùng/mất mẫu.
+current_drop khi dòng trung bình < nominal_current_ma*0.95 (đúng 5% không báo); chỉ xét khi CẢ HAI mẫu áp
+trong dung sai và >0.1 V. voltage_loss khi |áp trung bình|<=0.1 V; còn lại so áp trung bình với nominal_voltage.
+electrical_window nêu số mẫu/required_samples=2 và các trung bình; measurement vẫn mẫu mới nhất.
+Giữ các trường cấu hình đếm bóng cũ để đọc profile/client cũ nhưng không dùng tính toán.
+Thêm FaultType current_anomaly; lỗi điện đủ hai mẫu là chứng cứ tạo Fault (không chờ 25 mẫu/3 phút).
+Giữ hardware debounce 5 phút, recovery/audit 90 giây và chống trùng như cũ. Fault cũ không bị xóa.
+GET /iot/feeders/{feederId}/diagnostics và /diagnostics/history, ReadNetwork, scope xã; GET không ghi log.
+Giữ node diagnostics và summary để tương thích đường dẫn, shape mới không còn số bóng hư.
+Lịch sử do job ghi tối đa mỗi phút UTC: cùng feeder/node/code/nguồn/chuẩn thì gộp, ended_at là phút cuối
+xác nhận vẫn có lỗi. Độ giảm thay đổi không tách log; phục hồi -> resolved, đổi nguồn/chuẩn hoặc khoảng
+quan sát gián đoạn >1 phút -> interrupted. Không có upstream/dữ liệu hợp lệ không được coi đã phục hồi.
+from inclusive/to exclusive lọc đợt lỗi giao khoảng, page/page_size<=200, started_at desc/id desc.
+Thêm bảng iot_diagnostic_episode và history_sampled_at; giữ lịch sử khi gỡ/thay node.
+Dòng chuẩn bộ 10 bóng 5V đo 93.5546875 mA (R002, AVG16, LoRa nghỉ 1500ms), nhập nominal_current_ma theo feeder.
+Không hardcode dòng chuẩn cho mọi thiết bị, không tự học lại từ mẫu đang lỗi.

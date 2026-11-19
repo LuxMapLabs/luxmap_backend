@@ -305,3 +305,13 @@ Summary thêm connection_status/electrical_status và các thời điểm từ s
 telemetry_stale nói mẫu điện cũ; không dùng nó một mình làm nhãn “Node mất tín hiệu”.
 Các lỗi điện/phần cứng không được xóa chỉ vì node trả ACK.
 [Chi tiết và JSON Postman](IOT-NODE-STATUS.md).
+
+
+## Cập nhật 19/11/2026 — lỗi điện trung bình hai mẫu và lịch sử feeder
+Dùng GET /api/v1/iot/feeders/{feederId}/diagnostics cho hiện tại và
+GET /api/v1/iot/feeders/{feederId}/diagnostics/history?page=1&page_size=20&from=...&to=... cho lịch sử.
+Bỏ lamp_count/estimated_lit/estimated_missing; current_drop so trung bình 2 mẫu với nominal_current_ma, giảm >5%.
+voltage_loss/voltage_deviation cũng dùng áp trung bình 2 mẫu. electrical_window nêu mẫu/trung bình;
+measurement vẫn là mẫu mới nhất. History một dòng/đợt/mã lỗi, cập nhật ended_at mỗi phút,
+status active/resolved/interrupted; lọc khoảng giao và phân trang. Mục này thay hướng dẫn đếm bóng cũ.
+Chi tiết JSON, ngưỡng, thời gian và 17 mã lỗi: [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
