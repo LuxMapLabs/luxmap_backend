@@ -137,11 +137,11 @@ API đọc audit từ database LuxMap, mỗi yêu cầu gửi lệnh qua Bridge 
 }
 ```
 
-- `MANUAL` đi với `command: "ON"` hoặc `"OFF"`. `AUTO` đi với `command: null`. `auto_schedule` là lịch trong request gốc và có thể là `null` nếu request dùng lại lịch hiện có.
+- Lệnh `MANUAL` đi với `command: "ON"` hoặc `"OFF"`. Lệnh `AUTO` do người dùng gửi có `command: null`; sự kiện tự đổi trạng thái trong AUTO có `command: "ON"` hoặc `"OFF"`, `requested_by: "sensor"` và `auto_schedule: null`. `auto_schedule` là lịch trong request gốc và có thể là `null` nếu request dùng lại lịch hiện có.
 - `requested_by` là tên hiển thị của người gửi. Khi thiếu tên, API trả mã tài khoản đã ghi audit. `requested_at` là lúc backend ghi nhận yêu cầu, theo UTC.
 - `bridge_accepted_at` là lúc backend ghi nhận Bridge chấp nhận lệnh. Khi giá trị là `null`, chưa có bản ghi xác nhận từ Bridge. Muốn xem ACK của ESP32 cho lệnh hiện tại, gọi [GET /api/v1/iot/nodes/NODE-004/command](https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/command) rồi đối chiếu `command_id` và `command_acknowledged`.
 
-`status` là `success` nếu Bridge nhận ACK hợp lệ trong 12 giây tính từ `requested_at`, `pending` khi còn chờ ACK hoặc `expired` khi hết thời gian chờ. ACK muộn vẫn có trạng thái `expired`.
+`status` chỉ còn `pending` khi chưa có ACK và `success` khi có ACK hợp lệ, kể cả ACK muộn; không có quá hạn trong lịch sử. Sự kiện AUTO từ telemetry có `status: "success"`, `requested_at` là giờ đo (UTC) và `bridge_accepted_at` là giờ nhận mẫu. Lệnh và sự kiện cùng phân trang, mới nhất trước. Xem quy tắc chống trùng, gửi bù và giới hạn dữ liệu theo thời gian gán nguồn tại [LUXMAP-IOT-FE.md](LUXMAP-IOT-FE.md).
 
 ## 5. API lịch sử dữ liệu điện theo feeder
 
@@ -170,3 +170,40 @@ Xem [JSON, quy tắc trung bình, múi giờ, gửi bù và phân trang](IOT-ELE
 404 khi feeder không thấy trong phạm vi xã, 503 khi Bridge không đọc được.
 Feeder chưa có nguồn trả total=0, items=[].
 Deploy đồng thời BE và Bridge; giữ volume data/telemetry.sqlite.
+
+
+## AUTO cả ngày và AUTO theo giờ
+
+API:
+`POST https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/command`
+
+AUTO dùng cảm biến cả ngày:
+```json
+{
+  "mode": "AUTO",
+  "auto_type": "full_time"
+}
+```
+
+AUTO theo giờ:
+```json
+{
+  "mode": "AUTO",
+  "auto_type": "scheduled",
+  "auto_schedule": {
+    "day_start": "06:00",
+    "night_start": "18:00"
+  }
+}
+```
+
+- `full_time`: BH1750 điều khiển cả 24 giờ; không gửi auto_schedule.
+- `scheduled`: từ 06:00 đến trước 18:00 dùng cảm biến; từ 18:00 đến trước 06:00 hôm sau luôn bật. Giờ DS3231 theo Việt Nam.
+- Dưới 50 lux bật, trên 50 lux tắt **sau 5 mẫu hợp lệ liên tiếp**. Đúng 50 lux hoặc đọc lỗi reset bộ đếm và giữ đầu ra. Thay chế độ/lịch reset chuỗi; khoảng ban đêm scheduled luôn bật ngay.
+- AUTO cũ không gửi auto_type/null vẫn là scheduled. Scheduled bỏ lịch thì dùng lịch Bridge đang có; nếu không có lịch, mặc định cũ 06:00–18:01. Muốn đúng 18:00 hãy gửi lịch như ví dụ.
+- MANUAL ON/OFF không gửi auto_type hoặc gửi null. auto_type sai, MANUAL có auto_type, full_time kèm lịch hoặc lịch không hợp lệ trả 400 VALIDATION_FAILED.
+- GET `/api/v1/iot/nodes/NODE-004/command` và POST response có auto_type. full_time có auto_schedule null; scheduled có lịch; MANUAL có auto_type null.
+- GET `/api/v1/iot/nodes/NODE-004/command/history?page=1&page_size=20` trả auto_type của lệnh lúc gửi hoặc của telemetry AUTO lúc đo. Lệnh AUTO người gửi có command null; AUTO tự đổi đầu ra có command ON/OFF và requested_by sensor. Bản ghi cũ thiếu trường được hiểu scheduled.
+- Node lưu loại AUTO và lịch trong NVS, giữ qua mất điện. ACK full_time phải có autoType full_time; ACK firmware cũ không được dùng để xác nhận full_time.
+- Không đổi R002, trung bình INA226 16 lần, chế độ đo FAST, nguồn relay hay lịch truyền LoRa. Firmware chưa được nạp tự động.
+- Cần deploy BE + Bridge mới và nạp cả firmware node/gateway. full_time vẫn dùng cơ chế xác thực, quyền, TTL và ACK hiện có; RTC cần hợp lệ để nhận lệnh mới có hạn.

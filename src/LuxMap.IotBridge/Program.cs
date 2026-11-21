@@ -72,9 +72,18 @@ api.MapPost("/command-receipts", (CommandReceiptKey[] keys, DeviceStore store) =
     return Results.Ok(store.ReadCommandReceipts(keys.Distinct().ToArray()));
 }).Produces<IReadOnlyList<CommandReceipt>>().Produces(400);
 
+api.MapPost("/auto-transitions", (AutoHistoryWindow[] windows, DeviceStore store) =>
+{
+    if (windows.Length is < 1 or > 10000 || windows.Any(w => w is null || !DeviceRules.ValidId(w.DeviceId) ||
+        string.IsNullOrWhiteSpace(w.FeederId) || w.From < DateTimeOffset.UnixEpoch ||
+        (w.Until is { } until && until <= w.From)))
+        return Results.BadRequest(new { error = "Invalid AUTO history windows." });
+    return Results.Ok(store.ReadAutoTransitions(windows));
+}).Produces<IReadOnlyList<AutoHistoryEvent>>().Produces(400);
+
 // An unknown device starts in AUTO, matching the firmware's startup mode.
 api.MapGet("/{deviceId}/command", (string deviceId, DeviceStore store) =>
-    Results.Ok(store.Read(deviceId)?.DesiredCommand ?? new LampCommand("AUTO", null, "initial-auto", 0)))
+    Results.Ok(store.Read(deviceId)?.DesiredCommand ?? new LampCommand("AUTO", null, "initial-auto", 0, AutoType: "scheduled")))
     .WithSummary("Đọc lệnh đang chờ ESP32 thực hiện").Produces<LampCommand>();
 
 api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest request, MqttBroker mqtt, CancellationToken cancellationToken) =>
@@ -85,12 +94,13 @@ api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest reques
         return Results.BadRequest(new { error = "mode must be AUTO or MANUAL." });
     if (mode == "MANUAL" && command != "ON" && command != "OFF")
         return Results.BadRequest(new { error = "MANUAL requires command ON or OFF." });
-    if (request.AutoSchedule is { } schedule && (mode != "AUTO" || !schedule.IsValid()))
-        return Results.BadRequest(new { error = "AUTO schedule needs two distinct minutes between 0 and 1439." });
+    string? autoType;
+    try { autoType = AutoControl.Resolve(mode, request.AutoType, request.AutoSchedule); }
+    catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
     if (request.CommandId is not null && !Guid.TryParseExact(request.CommandId, "N", out _))
         return Results.BadRequest(new { error = "Invalid command ID." });
     var desired = new LampCommand(mode, mode == "AUTO" ? null : command,
-        CommandId: request.CommandId, AutoSchedule: request.AutoSchedule);
+        CommandId: request.CommandId, AutoSchedule: request.AutoSchedule, AutoType: autoType);
     try
     {
         var saved = await mqtt.SetCommandAsync(deviceId, desired, cancellationToken);
@@ -100,7 +110,8 @@ api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest reques
 }).WithSummary("Điều khiển đèn: ON / OFF / AUTO")
   .WithDescription("Nhập deviceId LUXMAP-P001, chọn ví dụ ON, OFF hoặc AUTO, bấm Try it out và Execute. " +
       "MANUAL giữ trạng thái bật/tắt. Lịch AUTO mặc định dùng cảm biến từ 06:00 đến hết 18:00. " +
-      "Dưới 50 lux bật, trên 50 lux tắt sau một mẫu, đúng 50 lux giữ trạng thái. " +
+      "Dưới 50 lux bật, trên 50 lux tắt sau 5 mẫu liên tiếp, đúng 50 lux giữ trạng thái. " +
+      "autoType full_time dùng cảm biến cả ngày; scheduled (mặc định) dùng lịch giờ. " +
       "Từ 18:01 đến 05:59, AUTO luôn bật. Gửi autoSchedule với dayStartMinute và nightStartMinute " +
       "(phút tính từ 00:00 theo giờ RTC của node) để đổi lịch. API LuxMap dùng auto_schedule theo định dạng HH:mm.")
   .Produces<LampCommand>().Produces(400);

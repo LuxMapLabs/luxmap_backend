@@ -22234,6 +22234,10 @@
           },
           "status": {
             "$ref": "#/components/schemas/IotCommandHistoryStatus"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -22265,8 +22269,7 @@
       "IotCommandHistoryStatus": {
         "enum": [
           "success",
-          "pending",
-          "expired"
+          "pending"
         ],
         "type": "string"
       },
@@ -22283,6 +22286,10 @@
           },
           "auto_schedule": {
             "$ref": "#/components/schemas/IotAutoSchedule"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -22317,6 +22324,10 @@
           },
           "power_state": {
             "$ref": "#/components/schemas/FeederPowerState"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

@@ -12,6 +12,8 @@ static class DeviceRules
             return "sessionId and sequenceNumber (1..4294967295) are required for replay/deduplication.";
         if (data.Mode is not ("AUTO" or "MANUAL") || data.LampCommand is not ("ON" or "OFF"))
             return "mode: AUTO/MANUAL; lampCommand: ON/OFF.";
+        if (data.AutoType is not null && (data.Mode != "AUTO" || data.AutoType is not ("full_time" or "scheduled")))
+            return "autoType: full_time/scheduled, only for AUTO.";
         if (data.Lux is not { } lux || !double.IsFinite(lux) || lux < 0 ||
             data.Voltage is not { } voltage || !double.IsFinite(voltage) ||
             data.Current is not { } current || !double.IsFinite(current) ||

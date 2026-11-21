@@ -416,7 +416,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotDiagnosticResult> GetAsync(string nodeId, CancellationToken ct)
         => diagnostics.GetAsync(nodeId, ct);
 
-    /// <summary>Gửi ON, OFF hoặc AUTO đến node. Đọc GET command để xem ACK.</summary>
+    /// <summary>Gửi ON, OFF hoặc AUTO (full_time/scheduled) đến node. Đọc GET command để xem ACK.</summary>
     [HttpPost("nodes/{nodeId}/command")]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
     [Authorize(Policy = LuxMapPolicies.ControlLighting)]
@@ -437,7 +437,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
         => diagnostics.CommandAsync(nodeId, ct);
 
-    /// <summary>Đọc lịch sử lệnh và trạng thái ACK trong thời hạn 12 giây, mới nhất trước.</summary>
+    /// <summary>Đọc lịch sử lệnh và chuyển trạng thái AUTO; chờ ACK không giới hạn thời gian, mới nhất trước.</summary>
     [HttpGet("nodes/{nodeId}/command/history")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<PagedResult<IotCommandHistoryItem>>(StatusCodes.Status200OK)]
