@@ -346,7 +346,8 @@ sealed class MqttBroker(DeviceStore store, GatewayCredentials credentials, IConf
         {
         kind = "command", deviceId = id, mode = command.Mode, command = command.Command,
         commandId = command.CommandId ?? "initial-auto", version = command.Version,
-        autoSchedule = command.AutoSchedule, expiresAtUnixSeconds = command.ExpiresAtUnixSeconds
+        autoSchedule = command.AutoSchedule, expiresAtUnixSeconds = command.ExpiresAtUnixSeconds,
+        autoType = command.Mode == "AUTO" ? command.AutoType ?? "scheduled" : null
         }, true);
     }
     private Task PublishAsync(string id, string kind, object value, bool retained)

@@ -424,8 +424,9 @@ public sealed class IotRegistrationStore(
     }
 
     internal async Task<PagedResult<IotCommandHistoryItem>> ReadCommandHistoryAsync(
-        string nodeId, PageRequest page, CancellationToken ct)
+        string nodeId, PageRequest page, CancellationToken ct, IReadOnlyList<IotCommandHistoryItem>? automatic = null)
     {
+        var sensorJson = JsonSerializer.Serialize(automatic ?? [], LuxMapJsonOptions.Default);
         var requests = db.Database.SqlQuery<CommandHistoryRow>($"""
             SELECT requested.id, requested.node_id, requested.server_id, requested.details::text AS details,
                    coalesce(nullif(sender.full_name, ''), requested.created_by) AS requested_by, requested.created_at,
@@ -439,6 +440,12 @@ public sealed class IotRegistrationStore(
             FROM iot_registration_audit requested
             LEFT JOIN app_user sender ON sender.user_id = requested.created_by
             WHERE requested.node_id = {nodeId} AND requested.details ->> 'event_type' = 'command_requested'
+            UNION ALL
+            SELECT 0::bigint AS id, entry ->> 'node_id', entry ->> 'server_id', entry::text,
+                   'sensor', (entry ->> 'requested_at')::timestamptz,
+                   (entry ->> 'bridge_accepted_at')::timestamptz
+            FROM jsonb_array_elements({sensorJson}::jsonb) AS entry
+            WHERE entry ->> 'node_id' = {nodeId}
             """)
             .Where(row => db.Set<IotNode>().Any(node => node.NodeId == row.NodeId));
 
@@ -446,16 +453,55 @@ public sealed class IotRegistrationStore(
         if (((long)page.Page - 1) * page.PageSize >= total)
             return PagedResult<IotCommandHistoryItem>.From(page, total, []);
 
-        var rows = await requests.OrderByDescending(row => row.CreatedAt).ThenByDescending(row => row.Id)
+        var rows = await requests.OrderByDescending(row => row.CreatedAt).ThenByDescending(row => row.Id).ThenBy(row => row.Details)
             .Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
         var items = rows.Select(row =>
         {
             var details = JsonSerializer.Deserialize<RequestedCommandDetails>(row.Details, LuxMapJsonOptions.Default)!;
             return new IotCommandHistoryItem(details.CommandId, row.NodeId, details.FeederId, row.ServerId,
                 details.DeviceId, details.Mode, details.Command, details.AutoSchedule,
-                row.RequestedBy, row.CreatedAt, row.BridgeAcceptedAt);
+                row.RequestedBy, row.CreatedAt, row.BridgeAcceptedAt,
+                details.Status ?? IotCommandHistoryStatus.Pending,
+                details.Mode == "AUTO" ? details.AutoType ?? "scheduled" : null);
         }).ToArray();
         return PagedResult<IotCommandHistoryItem>.From(page, total, items);
+    }
+
+    internal async Task<IReadOnlyList<AutoHistoryBinding>> AutoHistoryBindingsAsync(string nodeId, CancellationToken ct)
+    {
+        var node = await db.Set<IotNode>().AsNoTracking().SingleAsync(n => n.NodeId == nodeId, ct);
+        var rows = await db.Database.SqlQuery<AutoHistoryBinding>($"""
+            WITH changes AS (
+                SELECT id, server_id, details ->> 'device_id' AS device_id,
+                       details ->> 'feeder_id' AS feeder_id,
+                       coalesce((details ->> 'effective_from')::timestamptz, created_at) AS assigned_at
+                FROM iot_registration_audit WHERE node_id = {nodeId}
+                  AND ((details ? 'nominal_voltage' AND details ? 'feeder_id')
+                    OR details ->> 'action' IN ('node_detached', 'source_removed'))
+            ), timeline AS (
+                SELECT *, lead(assigned_at) OVER (ORDER BY assigned_at, id) AS until FROM changes
+            )
+            SELECT server_id, device_id, feeder_id, assigned_at, until FROM timeline
+            WHERE feeder_id IS NOT NULL AND device_id IS NOT NULL
+              AND (until IS NULL OR until > assigned_at)
+            """).ToListAsync(ct);
+        if (rows.Count > 0) return rows;
+        var source = await db.Set<IotSourceRegistration>().AsNoTracking().SingleOrDefaultAsync(s => s.NodeId == nodeId, ct);
+        var profile = source is null ? options.Value.Nodes.GetValueOrDefault(nodeId)
+            : JsonSerializer.Deserialize<NodeProfile>(source.Profile, LuxMapJsonOptions.Default);
+        return profile is null ? [] : [new() {
+            ServerId = profile.ServerId ?? "default", DeviceId = profile.DeviceId, FeederId = profile.FeederId,
+            AssignedAt = node.CreatedAt, Until = source?.DetachedAt
+        }];
+    }
+
+    internal sealed class AutoHistoryBinding
+    {
+        [Column("server_id")] public required string ServerId { get; init; }
+        [Column("device_id")] public required string DeviceId { get; init; }
+        [Column("feeder_id")] public required string FeederId { get; init; }
+        [Column("assigned_at")] public DateTimeOffset AssignedAt { get; init; }
+        [Column("until")] public DateTimeOffset? Until { get; init; }
     }
 
     private sealed class CommandHistoryRow
@@ -470,7 +516,8 @@ public sealed class IotRegistrationStore(
     }
 
     private sealed record RequestedCommandDetails(
-        string CommandId, string FeederId, string DeviceId, string Mode, string? Command, IotAutoSchedule? AutoSchedule);
+        string CommandId, string FeederId, string DeviceId, string Mode, string? Command, IotAutoSchedule? AutoSchedule,
+        IotCommandHistoryStatus? Status = null, string? AutoType = null);
 
     // No FK to the registered objects: deleting a node must not erase its registration history.
     private void RecordRegistration(string serverId, string? nodeId, string details) =>

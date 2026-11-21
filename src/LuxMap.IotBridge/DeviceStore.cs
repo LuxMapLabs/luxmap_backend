@@ -6,15 +6,15 @@ record AutoSchedule(int? DayStartMinute, int? NightStartMinute)
     public bool IsValid() => DayStartMinute is >= 0 and < 1440 &&
         NightStartMinute is >= 0 and < 1440 && DayStartMinute != NightStartMinute;
 }
-record CommandRequest(string? Mode, string? Command, AutoSchedule? AutoSchedule = null, string? CommandId = null);
+record CommandRequest(string? Mode, string? Command, AutoSchedule? AutoSchedule = null, string? CommandId = null, string? AutoType = null);
 record LampCommand(string Mode, string? Command, string? CommandId = null, long Version = 0,
-    AutoSchedule? AutoSchedule = null, long? ExpiresAtUnixSeconds = null);
+    AutoSchedule? AutoSchedule = null, long? ExpiresAtUnixSeconds = null, string? AutoType = null);
 record TelemetryRequest(string? DeviceId, string? Mode, string? LampCommand,
     double? Lux, double? Voltage, double? Current, double? Power, string? Timestamp,
-    string? SessionId = null, long? SequenceNumber = null, string? AppliedCommandId = null);
+    string? SessionId = null, long? SequenceNumber = null, string? AppliedCommandId = null, string? AutoType = null);
 record TelemetryReading(TelemetryRequest Data, DateTimeOffset ReceivedAt, string? GatewayId = null);
 record SequenceRange(long Start, long End);
-record CommandAcknowledgement(string? DeviceId, string? CommandId, string? Mode, string? LampCommand);
+record CommandAcknowledgement(string? DeviceId, string? CommandId, string? Mode, string? LampCommand, string? AutoType = null);
 record ReceivedCommandAck(CommandAcknowledgement Data, DateTimeOffset ReceivedAt);
 record DeviceState(string DeviceId, LampCommand DesiredCommand, DateTimeOffset? CommandUpdatedAt,
     TelemetryReading? LatestTelemetry, List<TelemetryReading> History,
@@ -45,16 +45,24 @@ sealed class DeviceStore
             ? JsonSerializer.Deserialize<Dictionary<string, DeviceState>>(File.ReadAllText(path), json)
                 ?? throw new InvalidDataException("Invalid device storage.")
             : new();
+        devices = devices.ToDictionary(pair => pair.Key, pair => pair.Value with {
+            DesiredCommand = pair.Value.DesiredCommand with {
+                AutoType = pair.Value.DesiredCommand.Mode == "AUTO"
+                    ? pair.Value.DesiredCommand.AutoType ?? "scheduled" : null
+            }
+        });
         archive = new TelemetryArchive(directory, devices.Values);
     }
     private DeviceState Get(string id) => devices.GetValueOrDefault(id)
-        ?? new(id, new("AUTO", null, "initial-auto", 0), null, null, new());
+        ?? new(id, new("AUTO", null, "initial-auto", 0, AutoType: "scheduled"), null, null, new());
     public DeviceState? Read(string id) { lock (gate) return devices.GetValueOrDefault(id); }
     public DeviceState[] ReadAll() { lock (gate) return devices.Values.ToArray(); }
     public TelemetryPage ReadTelemetryHistory(string id, long after, int limit) =>
         archive.ReadPage(id, after, limit);
     public TelemetryHistoryPage ReadTelemetryHistoryPage(string id, int page, int pageSize, bool measuredAt) =>
         archive.ReadHistoryPage(id, page, pageSize, measuredAt);
+
+    public IReadOnlyList<AutoHistoryEvent> ReadAutoTransitions(AutoHistoryWindow[] windows) => archive.ReadAutoTransitions(windows);
 
     public IReadOnlyList<CommandReceipt> ReadCommandReceipts(CommandReceiptKey[] keys) =>
         archive.ReadCommandReceipts(keys);
@@ -82,10 +90,13 @@ sealed class DeviceStore
         lock (gate)
         {
             var state = Get(id);
+            var autoType = AutoControl.Resolve(command.Mode, command.AutoType, command.AutoSchedule);
             command = command with
             {
                 CommandId = command.CommandId ?? Guid.NewGuid().ToString("N"), ExpiresAtUnixSeconds = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
-                AutoSchedule = command.AutoSchedule ?? state.DesiredCommand.AutoSchedule,
+                AutoType = autoType,
+                AutoSchedule = autoType == "full_time" ? null : command.AutoSchedule ?? state.DesiredCommand.AutoSchedule ??
+                    (command.Mode == "AUTO" ? new AutoSchedule(360, 1081) : null),
                 Version = Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), checked(state.DesiredCommand.Version + 1))
             };
             archive.TrackCommand(id, command);

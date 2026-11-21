@@ -50,6 +50,19 @@ sealed partial class TelemetryArchive
                 ON telemetry (device_id, json_extract(reading, '$.receivedAt') DESC, id DESC);
             """;
         schema.ExecuteNonQuery();
+        using (var info = connection.CreateCommand())
+        {
+            info.CommandText = "PRAGMA table_info(command_receipts);";
+            using var fields = info.ExecuteReader();
+            var hasType = false;
+            while (fields.Read()) hasType |= fields.GetString(1) == "auto_type";
+            fields.Close();
+            if (!hasType)
+            {
+                info.CommandText = "ALTER TABLE command_receipts ADD COLUMN auto_type TEXT;";
+                info.ExecuteNonQuery();
+            }
+        }
 
         using var transaction = connection.BeginTransaction();
         foreach (var device in existingDevices)
@@ -64,7 +77,7 @@ sealed partial class TelemetryArchive
             if (device.LastCommandAck is { Data: { CommandId: { } id, Mode: "AUTO" or "MANUAL" } ack } previous &&
                 Guid.TryParseExact(id, "N", out _))
             {
-                TrackCommand(device.DeviceId, new(ack.Mode, ack.Mode == "MANUAL" ? ack.LampCommand : null, id));
+                TrackCommand(device.DeviceId, new(ack.Mode, ack.Mode == "MANUAL" ? ack.LampCommand : null, id, AutoType: ack.AutoType));
                 RecordReceipt(ack, previous.ReceivedAt);
             }
         }
@@ -242,15 +255,18 @@ sealed partial class TelemetryArchive
         using var connection = Open();
         using var sql = connection.CreateCommand();
         sql.CommandText = """
-            INSERT INTO command_receipts (device_id, command_id, mode, command)
-            VALUES ($device, $id, $mode, $command)
+            INSERT INTO command_receipts (device_id, command_id, mode, command, auto_type)
+            VALUES ($device, $id, $mode, $command, $autoType)
             ON CONFLICT (device_id, command_id) DO UPDATE SET mode = excluded.mode
-            WHERE mode = excluded.mode AND command IS excluded.command;
+            WHERE mode = excluded.mode AND command IS excluded.command
+              AND (mode <> 'AUTO' OR coalesce(auto_type, 'scheduled') = coalesce(excluded.auto_type, 'scheduled'));
             """;
         sql.Parameters.AddWithValue("$device", deviceId);
         sql.Parameters.AddWithValue("$id", command.CommandId);
         sql.Parameters.AddWithValue("$mode", command.Mode);
         sql.Parameters.AddWithValue("$command", (object?)command.Command ?? DBNull.Value);
+        sql.Parameters.AddWithValue("$autoType", command.Mode == "AUTO"
+            ? command.AutoType ?? "scheduled" : (object)DBNull.Value);
         if (sql.ExecuteNonQuery() == 0) throw new ArgumentException("Command ID already belongs to a different command.");
     }
 
@@ -264,6 +280,7 @@ sealed partial class TelemetryArchive
             UPDATE command_receipts SET received_at = coalesce(received_at, $received)
             WHERE device_id = $device AND command_id = $id AND mode = $mode
                 AND (mode = 'AUTO' OR command = $lamp)
+                AND (mode <> 'AUTO' OR coalesce(auto_type, 'scheduled') = $autoType)
             RETURNING received_at;
             """;
         sql.Parameters.AddWithValue("$received", receivedAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
@@ -271,6 +288,7 @@ sealed partial class TelemetryArchive
         sql.Parameters.AddWithValue("$id", ack.CommandId!);
         sql.Parameters.AddWithValue("$mode", ack.Mode);
         sql.Parameters.AddWithValue("$lamp", ack.LampCommand);
+        sql.Parameters.AddWithValue("$autoType", ack.AutoType ?? "scheduled");
         return sql.ExecuteScalar() is string timestamp
             ? DateTimeOffset.Parse(timestamp, System.Globalization.CultureInfo.InvariantCulture) : null;
     }

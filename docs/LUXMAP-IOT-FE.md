@@ -129,7 +129,7 @@ Từ 07:00 đến trước 19:00, AUTO điều khiển theo cảm biến ánh s�
 4. Hiển thị **Bật** hoặc **Tắt** theo `power_state` do backend trả. Trong AUTO, đọc lại để cập nhật khi lịch hoặc cảm biến làm mạch đổi đầu ra. Khi dữ liệu đầu ra thiếu hoặc quá hạn, hiển thị **Chưa rõ**.
 5. Khi cần xác minh mạch thực sự ngắt tải, đọc mẫu điện mới sau OFF. ACK xác nhận firmware đã xử lý lệnh.
 
-Lệnh mới có `expires_at` theo UTC và hết hạn sau 5 phút. Nếu đến hạn mà chưa nhận ACK cho đúng mã lệnh, hiển thị **Hết hạn chờ xác nhận**. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
+Lệnh mới có `expires_at` theo UTC để giới hạn thực thi sau 5 phút. Đây không phải hạn trạng thái lịch sử: khi chưa có ACK, lịch sử tiếp tục trả `pending`, không hiển thị `expired`. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
 
 ### Lịch sử điều khiển
 
@@ -139,7 +139,35 @@ Response có `page`, `page_size`, `total` và `items`. Mới nhất ở đầu. 
 
 Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, `mode`, `command`, lịch đã gửi trong `auto_schedule`, tên hiển thị của người gửi trong `requested_by` và giờ UTC `requested_at`. Nếu tài khoản đã bị xóa, `requested_by` trả mã tài khoản đã ghi audit. `bridge_accepted_at` ghi lúc backend lưu xác nhận chấp nhận lệnh từ Bridge.
 
-`status` có ba giá trị: `success` khi Bridge nhận ACK của node đúng mã lệnh trong vòng 12 giây từ `requested_at`; `pending` khi còn trong thời gian chờ; `expired` khi đã hết 12 giây và thiếu ACK đúng hạn. ACK muộn vẫn hiện `expired`. Mốc này dành cho lịch sử, hạn thực thi lệnh vẫn là 5 phút. Có thể xem khi gateway offline. Khi Bridge không truy cập được để đối chiếu ACK, API trả `503`.
+`status` chỉ có `pending` (chưa nhận ACK đúng mã lệnh) và `success` (đã nhận ACK hợp lệ từ node). Không còn hạn 12 giây hay trạng thái `expired` trong lịch sử: ACK muộn vẫn chuyển thành `success`; chưa ACK thì tiếp tục `pending`. Đây là trạng thái xác nhận; hạn thực thi lệnh của Bridge vẫn giữ 5 phút để tránh thực hiện lệnh cũ ngoài ý muốn. Khi Bridge không truy cập được, API trả `503`.
+
+Lịch sử cũng gồm các lần AUTO thực sự đổi ON/OFF theo telemetry của node:
+- `requested_by: "sensor"`, `mode: "AUTO"`, `command: "ON"` hoặc `"OFF"`, `status: "success"`.
+- `command_id: "sensor-<cursor>"` định danh sự kiện quan sát, không phải mã lệnh gửi xuống node.
+- `requested_at` là giờ đo DS3231 đổi sang UTC; nếu không có giờ đo dùng giờ nhận. `bridge_accepted_at` là giờ Bridge nhận mẫu chứng minh chuyển trạng thái.
+- `auto_schedule: null` cho sự kiện cảm biến vì mẫu điện không chứa bản sao lịch lúc đo. Lệnh AUTO của người dùng vẫn có `command: null` và tên người gửi.
+- Mẫu đầu tiên chỉ làm mốc; chỉ ghi khi hai mẫu kế tiếp cùng AUTO có trạng thái khác nhau. Không ghi lại trạng thái giữ nguyên, không tính lần chuyển từ MANUAL sang AUTO như một sự kiện sensor.
+- Dữ liệu nguồn là telemetry SQLite bền vững, không phụ thuộc cache 1.000 mẫu hay việc FE có gọi API; gửi bù được xếp theo giờ đo và bản tin trùng không sinh thêm log. Khoảng gắn node–feeder giới hạn dữ liệu của từng nguồn.
+- Sự kiện sensor và lệnh người dùng được gộp trước khi đếm `total`, sắp xếp mới nhất trước và phân trang. Phải deploy cả BE và Bridge mới; Bridge cũ thiếu endpoint nội bộ sẽ trả `503`.
+
+Ví dụ một mục AUTO tự đổi trạng thái:
+```json
+{
+  "command_id": "sensor-123",
+  "node_id": "NODE-004",
+  "feeder_id": "FDR-009",
+  "server_id": "iot-server-01",
+  "device_id": "LUXMAP-P001",
+  "mode": "AUTO",
+  "command": "OFF",
+  "auto_schedule": null,
+  "requested_by": "sensor",
+  "requested_at": "2026-11-21T09:00:00Z",
+  "bridge_accepted_at": "2026-11-21T09:00:02Z",
+  "status": "success"
+}
+```
+
 
 ## 5. Dữ liệu điện và lỗi
 
@@ -322,3 +350,40 @@ Trả node_id, server_id, device_id, feeder_id, nominal_voltage (V), nominal_cur
 Đây là giá trị danh định đã lưu; không gọi Bridge và không trả secret. 404 khi node thiếu/ngoài xã/chưa có nguồn hoặc đã gỡ nguồn.
 Dùng sáu trường ngoài node_id cho PUT cùng URL bằng token Manager; Admin dùng POST tạo node.
 Xem JSON và chi tiết trong [IOT-SERVER-IDENTITY-API-CHANGES.md](IOT-SERVER-IDENTITY-API-CHANGES.md).
+
+
+## AUTO cả ngày và AUTO theo giờ
+
+API:
+`POST https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/command`
+
+AUTO dùng cảm biến cả ngày:
+```json
+{
+  "mode": "AUTO",
+  "auto_type": "full_time"
+}
+```
+
+AUTO theo giờ:
+```json
+{
+  "mode": "AUTO",
+  "auto_type": "scheduled",
+  "auto_schedule": {
+    "day_start": "06:00",
+    "night_start": "18:00"
+  }
+}
+```
+
+- `full_time`: BH1750 điều khiển cả 24 giờ; không gửi auto_schedule.
+- `scheduled`: từ 06:00 đến trước 18:00 dùng cảm biến; từ 18:00 đến trước 06:00 hôm sau luôn bật. Giờ DS3231 theo Việt Nam.
+- Dưới 50 lux bật, trên 50 lux tắt **sau 5 mẫu hợp lệ liên tiếp**. Đúng 50 lux hoặc đọc lỗi reset bộ đếm và giữ đầu ra. Thay chế độ/lịch reset chuỗi; khoảng ban đêm scheduled luôn bật ngay.
+- AUTO cũ không gửi auto_type/null vẫn là scheduled. Scheduled bỏ lịch thì dùng lịch Bridge đang có; nếu không có lịch, mặc định cũ 06:00–18:01. Muốn đúng 18:00 hãy gửi lịch như ví dụ.
+- MANUAL ON/OFF không gửi auto_type hoặc gửi null. auto_type sai, MANUAL có auto_type, full_time kèm lịch hoặc lịch không hợp lệ trả 400 VALIDATION_FAILED.
+- GET `/api/v1/iot/nodes/NODE-004/command` và POST response có auto_type. full_time có auto_schedule null; scheduled có lịch; MANUAL có auto_type null.
+- GET `/api/v1/iot/nodes/NODE-004/command/history?page=1&page_size=20` trả auto_type của lệnh lúc gửi hoặc của telemetry AUTO lúc đo. Lệnh AUTO người gửi có command null; AUTO tự đổi đầu ra có command ON/OFF và requested_by sensor. Bản ghi cũ thiếu trường được hiểu scheduled.
+- Node lưu loại AUTO và lịch trong NVS, giữ qua mất điện. ACK full_time phải có autoType full_time; ACK firmware cũ không được dùng để xác nhận full_time.
+- Không đổi R002, trung bình INA226 16 lần, chế độ đo FAST, nguồn relay hay lịch truyền LoRa. Firmware chưa được nạp tự động.
+- Cần deploy BE + Bridge mới và nạp cả firmware node/gateway. full_time vẫn dùng cơ chế xác thực, quyền, TTL và ACK hiện có; RTC cần hợp lệ để nhận lệnh mới có hạn.

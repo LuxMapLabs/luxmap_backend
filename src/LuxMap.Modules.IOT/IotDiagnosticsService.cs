@@ -120,7 +120,7 @@ public sealed record IotArchivedData(string? Timestamp, string? SessionId, long?
     string? Mode, string? LampCommand, double? Lux, double? Voltage, double? Current, double? Power);
 
 public sealed record IotAutoSchedule(string? DayStart, string? NightStart);
-public sealed record IotCommandRequest(string? Mode, string? Command, IotAutoSchedule? AutoSchedule = null);
+public sealed record IotCommandRequest(string? Mode, string? Command, IotAutoSchedule? AutoSchedule = null, string? AutoType = null);
 public sealed record IotGatewayRouteRequest(string? DeviceId);
 public sealed record IotGatewayRoute(string GatewayId, string[] DeviceIds, bool CredentialIssued);
 public sealed record IotGatewayCredential(string ClientId, string Username, string Password, string[] NodeIds)
@@ -128,15 +128,15 @@ public sealed record IotGatewayCredential(string ClientId, string Username, stri
     public string? ServerId { get; init; }
 }
 public sealed record IotCommandStatus(
-    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null, FeederPowerState PowerState = FeederPowerState.Unknown);
+    string NodeId, string? CommandId, string Mode, string? Command, bool CommandAcknowledged, IotAutoSchedule? AutoSchedule = null, DateTimeOffset? ExpiresAt = null, FeederPowerState PowerState = FeederPowerState.Unknown, string? AutoType = null);
 
 public sealed record IotCommandHistoryItem(
     string CommandId, string NodeId, string FeederId, string ServerId, string DeviceId,
     string Mode, string? Command, IotAutoSchedule? AutoSchedule,
     string RequestedBy, DateTime RequestedAt, DateTime? BridgeAcceptedAt,
-    IotCommandHistoryStatus Status = IotCommandHistoryStatus.Pending);
+    IotCommandHistoryStatus Status = IotCommandHistoryStatus.Pending, string? AutoType = null);
 
-public enum IotCommandHistoryStatus { Success, Pending, Expired }
+public enum IotCommandHistoryStatus { Success, Pending }
 
 public sealed partial class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources,
@@ -525,13 +525,20 @@ public sealed partial class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
                 "Dùng MANUAL với ON hoặc OFF, hoặc AUTO với command null.");
 
+        var autoType = mode == "AUTO" ? request.AutoType?.Trim().ToLowerInvariant() ?? "scheduled" : null;
+        if ((mode == "MANUAL" && request.AutoType is not null) ||
+            (mode == "AUTO" && autoType is not ("full_time" or "scheduled")))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "auto_type chỉ nhận full_time hoặc scheduled trong chế độ AUTO.",
+                new Dictionary<string, object?> { ["field"] = "auto_type" });
+
         BridgeAutoSchedule? bridgeSchedule = null;
         if (request.AutoSchedule is { } schedule)
         {
-            if (mode != "AUTO" || !TryParseClock(schedule.DayStart, out var day) ||
+            if (mode != "AUTO" || autoType != "scheduled" || !TryParseClock(schedule.DayStart, out var day) ||
                 !TryParseClock(schedule.NightStart, out var night) || day == night)
                 throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                    "Lịch AUTO cần hai giờ khác nhau theo định dạng HH:mm.");
+                    "Lịch chỉ dùng với AUTO scheduled và cần hai giờ khác nhau theo định dạng HH:mm.");
 
             bridgeSchedule = new(day.Hour * 60 + day.Minute, night.Hour * 60 + night.Minute);
         }
@@ -545,23 +552,24 @@ public sealed partial class IotDiagnosticsService(
         {
             event_type = "command_requested", command_id = commandId, mode, command,
             device_id = deviceId, feeder_id = profile.FeederId,
-            auto_schedule = request.AutoSchedule,
+            auto_schedule = request.AutoSchedule, auto_type = autoType,
         }, ct);
 
         var endpoint = new Uri(uri, $"api/luxmap/devices/{Uri.EscapeDataString(deviceId)}/command");
         try
         {
-            using var response = await client.PostAsJsonAsync(endpoint, new { mode, command, commandId, autoSchedule = bridgeSchedule }, ct);
+            using var response = await client.PostAsJsonAsync(endpoint, new { mode, command, commandId, autoSchedule = bridgeSchedule, autoType }, ct);
             response.EnsureSuccessStatusCode();
             if (!IsJson(response)) throw Unavailable("Server IoT không trả về JSON.");
             var saved = await response.Content.ReadFromJsonAsync<PrototypeCommand>(cancellationToken: ct);
-            if (saved is null || saved.CommandId != commandId || saved.Mode != mode || saved.Command != command)
+            if (saved is null || saved.CommandId != commandId || saved.Mode != mode || saved.Command != command ||
+                (mode == "AUTO" && (saved.AutoType ?? "scheduled") != autoType))
                 throw Unavailable("Server IoT trả về lệnh không khớp yêu cầu.");
             await registry.AuditCommandAsync(serverId, nodeId, new
             {
                 event_type = "command_accepted", command_id = commandId, mode, command,
             }, ct);
-            return new(nodeId, commandId, mode!, command, false, saved.AutoSchedule?.ToApi(), saved.ExpiresAt);
+            return new(nodeId, commandId, mode!, command, false, saved.AutoSchedule?.ToApi(), saved.ExpiresAt, AutoType: autoType);
         }
         catch (Exception ex) when (IsSourceFailure(ex, ct))
         {
@@ -576,14 +584,16 @@ public sealed partial class IotDiagnosticsService(
         if (device?.DesiredCommand is not { Mode: "AUTO" or "MANUAL" } command)
             throw Unavailable("Server IoT chưa có trạng thái lệnh cho thiết bị.");
         return new(nodeId, command.CommandId, command.Mode!, command.Command, device.CommandAcknowledged, command.AutoSchedule?.ToApi(), command.ExpiresAt,
-            PowerStateOf(device, profile.MaxSilenceSeconds, DateTimeOffset.UtcNow));
+            PowerStateOf(device, profile.MaxSilenceSeconds, DateTimeOffset.UtcNow),
+            command.Mode == "AUTO" ? command.AutoType ?? "scheduled" : null);
     }
 
     public async Task<PagedResult<IotCommandHistoryItem>> CommandHistoryAsync(
         string nodeId, PageRequest page, CancellationToken ct)
     {
         await RequireNodeAsync(nodeId, ct);
-        var history = await registry.ReadCommandHistoryAsync(nodeId, page, ct);
+        var automatic = await ReadAutoHistoryAsync(nodeId, ct);
+        var history = await registry.ReadCommandHistoryAsync(nodeId, page, ct, automatic);
         if (history.Items.Count == 0) return history;
 
         var settings = await registry.ReadAsync([], ct);
@@ -595,9 +605,8 @@ public sealed partial class IotDiagnosticsService(
                 : throw Unavailable("Chưa cấu hình địa chỉ Bridge để kiểm tra ACK của lịch sử.");
         }
 
-        // Evaluate unanswered requests at the start of the receipt lookup.
-        var now = clock.GetUtcNow();
-        var groups = history.Items.GroupBy(ResolveBridge).ToArray();
+        var groups = history.Items.Where(item => item.Status != IotCommandHistoryStatus.Success)
+            .GroupBy(ResolveBridge).ToArray();
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(TimeSpan.FromSeconds(5));
         var resolved = new System.Collections.Concurrent.ConcurrentDictionary<string, DateTimeOffset>(StringComparer.Ordinal);
@@ -622,11 +631,9 @@ public sealed partial class IotDiagnosticsService(
         {
             Items = [.. history.Items.Select(item =>
             {
-                var deadline = item.RequestedAt.AddSeconds(12);
-                var status = resolved.TryGetValue(item.CommandId, out var ack) &&
-                    ack >= item.RequestedAt && ack <= deadline
-                    ? IotCommandHistoryStatus.Success
-                    : now >= deadline ? IotCommandHistoryStatus.Expired : IotCommandHistoryStatus.Pending;
+                var status = item.Status == IotCommandHistoryStatus.Success ||
+                    (resolved.TryGetValue(item.CommandId, out var ack) && ack >= item.RequestedAt)
+                    ? IotCommandHistoryStatus.Success : IotCommandHistoryStatus.Pending;
                 return item with { Status = status };
             })],
         };
@@ -953,7 +960,7 @@ public sealed partial class IotDiagnosticsService(
         private static string Format(int minute) => FormattableString.Invariant($"{minute / 60:00}:{minute % 60:00}");
     }
 
-    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId, BridgeAutoSchedule? AutoSchedule, long? ExpiresAtUnixSeconds)
+    private sealed record PrototypeCommand(string? Mode, string? Command, string? CommandId, BridgeAutoSchedule? AutoSchedule, long? ExpiresAtUnixSeconds, string? AutoType = null)
     {
         public DateTimeOffset? ExpiresAt => ExpiresAtUnixSeconds is >= 0 and <= 253402300799
             ? DateTimeOffset.FromUnixTimeSeconds(ExpiresAtUnixSeconds.Value) : null;

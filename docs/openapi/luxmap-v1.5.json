@@ -11980,6 +11980,36 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/IotCommandRequest"
+              },
+              "examples": {
+                "ON": {
+                  "value": {
+                    "mode": "MANUAL",
+                    "command": "ON"
+                  }
+                },
+                "OFF": {
+                  "value": {
+                    "mode": "MANUAL",
+                    "command": "OFF"
+                  }
+                },
+                "AUTO full_time": {
+                  "value": {
+                    "mode": "AUTO",
+                    "auto_type": "full_time"
+                  }
+                },
+                "AUTO scheduled": {
+                  "value": {
+                    "mode": "AUTO",
+                    "auto_type": "scheduled",
+                    "auto_schedule": {
+                      "day_start": "06:00",
+                      "night_start": "18:00"
+                    }
+                  }
+                }
               }
             },
             "text/json": {
@@ -26188,6 +26218,7 @@
           "command": {
             "type": "string",
             "nullable": true,
+            "description": "ON/OFF cho MANUAL hoặc sự kiện sensor trong AUTO; null cho yêu cầu chuyển sang AUTO.",
             "enum": [
               "ON",
               "OFF",
@@ -26198,7 +26229,8 @@
             "$ref": "#/components/schemas/IotAutoSchedule"
           },
           "requested_by": {
-            "type": "string"
+            "type": "string",
+            "description": "Tên người gửi (fallback user ID); sensor cho lần AUTO đổi ON/OFF đã được telemetry xác nhận."
           },
           "requested_at": {
             "type": "string",
@@ -26213,6 +26245,16 @@
           },
           "status": {
             "$ref": "#/components/schemas/IotCommandHistoryStatus"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "full_time",
+              "scheduled",
+              null
+            ],
+            "description": "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
           }
         },
         "additionalProperties": false
@@ -26244,8 +26286,7 @@
       "IotCommandHistoryStatus": {
         "enum": [
           "success",
-          "pending",
-          "expired"
+          "pending"
         ],
         "type": "string"
       },
@@ -26271,6 +26312,16 @@
           },
           "auto_schedule": {
             "$ref": "#/components/schemas/IotAutoSchedule"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "full_time",
+              "scheduled",
+              null
+            ],
+            "description": "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
           }
         },
         "additionalProperties": false
@@ -26314,6 +26365,16 @@
           },
           "power_state": {
             "$ref": "#/components/schemas/FeederPowerState"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "full_time",
+              "scheduled",
+              null
+            ],
+            "description": "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
           }
         },
         "additionalProperties": false

@@ -158,12 +158,38 @@ iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot
 
 iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [2]
 
+S["IotCommandHistoryStatus"]["enum"] = ["success", "pending"]
+iot_property("IotCommandHistoryItem", "requested_by")["description"] = (
+    "Tên người gửi (fallback user ID); sensor cho lần AUTO đổi ON/OFF đã được telemetry xác nhận."
+)
+iot_property("IotCommandHistoryItem", "command")["description"] = (
+    "ON/OFF cho MANUAL hoặc sự kiện sensor trong AUTO; null cho yêu cầu chuyển sang AUTO."
+)
+
 S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
     iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
     iot_property(schema, "command")["enum"] = ["ON", "OFF", None]
     iot_property(schema, "auto_schedule")
+    auto_type = iot_property(schema, "auto_type")
+    auto_type["enum"] = ["full_time", "scheduled", None]
+    auto_type["nullable"] = True
+    auto_type["description"] = (
+        "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. "
+        "Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. "
+        "Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
+    )
+
+
+iot_command_path = "/api/v1/iot/nodes/{nodeId}/command"
+d["paths"][iot_command_path]["post"]["requestBody"]["content"]["application/json"]["examples"] = {
+    "ON": {"value": {"mode": "MANUAL", "command": "ON"}},
+    "OFF": {"value": {"mode": "MANUAL", "command": "OFF"}},
+    "AUTO full_time": {"value": {"mode": "AUTO", "auto_type": "full_time"}},
+    "AUTO scheduled": {"value": {"mode": "AUTO", "auto_type": "scheduled",
+        "auto_schedule": {"day_start": "06:00", "night_start": "18:00"}}},
+}
 
 if "IotAutoSchedule" not in S:
     raise ValueError("IoT OpenAPI override requires schema IotAutoSchedule; check the Swagger export")
