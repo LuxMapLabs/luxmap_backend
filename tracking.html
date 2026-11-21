@@ -40,6 +40,18 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="scheduling-claude-review">
+    <strong>WO-SCHEDULING-SUGGESTIONS — Claude review · 21/11/2026</strong>
+    <p><span class="tag t-done">Đã review độc lập · không sửa BE, không push / PR</span>
+    Claude Code (<code>claude-sonnet-5-5</code>) review commit <code>96797a7</code> so với nền <code>7d20bf3</code>,
+    hai trục Standards và Spec trong hai phiên chỉ đọc. Không phát hiện vi phạm cứng hay lỗi chức năng P0–P2.
+    Gợi ý P3: dùng chung hạng severity và helper query. Ghi chú về unknown/confirmed đã đối chiếu với writer và
+    luật repair; không phải lỗi đã xác nhận. Không chạy lại test, không sửa logic.
+    Commit message: <code>docs(review): record Claude scheduling suggestions review</code>.</p>
+    <p><a href=".ai/reviews/WO-SCHEDULING-SUGGESTIONS-by-claude.md">Kết quả, bản gốc và đối chiếu</a>.
+    Còn: FE tích hợp/deploy theo yêu cầu; lỗi nền IoT 503 giữ nguyên ghi nhận từ lượt kiểm trước.</p>
+  </div>
+
   <div class="card" id="scheduling-suggestions">
     <strong>WO-SCHEDULING-SUGGESTIONS — gợi ý khi Quản lý phân lịch · 19/11/2026</strong>
     <p><span class="tag t-next">Xong · River đã review · commit local, không push / PR</span>
