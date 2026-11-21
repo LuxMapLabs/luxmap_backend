@@ -40,6 +40,23 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="scheduling-pr-readiness">
+    <strong>WO-SCHEDULING-SUGGESTIONS — Claude xác nhận sẵn sàng mở PR · 21/11/2026</strong>
+    <p><span class="tag t-next">Ready to open vào dev · chưa push / PR</span>
+    Claude Code <code>claude-sonnet-5-5</code> review độc lập Standards và Spec/FE trên nền
+    <code>5e3178a</code>: cả hai GO, không có lỗi BE xác nhận chặn mở PR. Điều kiện local đã hoàn tất
+    ở merge commit <code>99ea6cc</code> (build và 206 + 20 test xanh). CI nhánh chưa có; hai shard bắt buộc
+    phải pass trước merge. Lỗi IoT 503 của full-suite cũ vẫn ghi đúng phạm vi kiểm chứng.</p>
+    <p>Đã đối chiếu FE <code>origin/dev b1ad915</code>: tái sử dụng form survey/GPS/inspection/repair;
+    cần nối hai GET, UI gợi ý và sửa prefill/validation/selection. Thử generator FE ở thư mục tạm
+    với consolidated spec: sinh DTO/enum và strict typecheck riêng DTO pass. Không sửa repo FE.
+    <a href="docs/work-order-scheduling-suggestions.md">Handoff WP5 và checklist</a> ·
+    <a href=".ai/reviews/WO-SCHEDULING-SUGGESTIONS-pr-readiness.md">Review Claude và bằng chứng</a>.
+    Files: hướng dẫn tích hợp, ba báo cáo review, <code>tracking.html</code>, kết quả phase 2.
+    Commit message: <code>docs(work-orders): record PR readiness and frontend handoff</code>.
+    Còn: người dùng cho phép push/mở PR; CI, WP5 tích hợp, xác nhận consumer và deploy.</p>
+  </div>
+
   <div class="card" id="scheduling-dev-sync">
     <strong>WO-SCHEDULING-SUGGESTIONS — đồng bộ dev để kiểm PR · 21/11/2026</strong>
     <p><span class="tag t-next">Đã kiểm trên dev mới · local, chưa push / PR</span>

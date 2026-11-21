@@ -108,3 +108,19 @@ No manual OpenAPI JSON edits. Endpoint paths use static `/suggestions/items` to 
 
 River reviews run via configured `river` provider, `deepseek-ai/DeepSeek-V4.1-Flash-1017`, separate read-only Standards
 and Spec sessions. Their final reports and any resolutions are kept under `.ai/reviews/`.
+
+## PR readiness follow-up — 21/11/2026
+
+Synced current dev 5e3178a (PR289) locally, preserving SS and IIS drift sections; merge commit 99ea6cc.
+Fresh candidate: build warnaserror 0 warnings/errors; 206 selected HTTP/GPS/sync/capability/OpenAPI/import
+regressions and 20 Python tests passed (exit 0). Raw Swagger matches, consolidated unchanged;
+CI-pinned Redocly 2.0.0 validates (9 warnings). Original FE generator rehearsed in a temporary directory
+with consolidated spec; generated work-order types strict-typecheck exit 0. No FE working-tree edits.
+
+Two independent native Claude Code claude-sonnet-5-5 readiness sessions both GO for opening a BE PR,
+0 confirmed backend blockers. Conditions (finish merge, focused tests) resolved locally. Feature CI
+has not run, and full-suite historical failure remains historical (not asserted absent on current dev).
+Evidence, original reports, corrections and concrete FE handoff:
+[PR readiness review](../reviews/WO-SCHEDULING-SUGGESTIONS-pr-readiness.md),
+[WP5 handoff](../../docs/work-order-scheduling-suggestions.md).
+No push, PR, FE mutation, consumer notification or deployment. Publication still requires user's permission.
