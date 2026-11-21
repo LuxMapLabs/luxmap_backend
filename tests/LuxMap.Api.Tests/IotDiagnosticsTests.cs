@@ -20,6 +20,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         using var factory = new LuxMapApiFactory();
         using var host = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseSetting("IotDiagnostics:BaseUrl", "https://registration.example.test");
             builder.UseSetting("IotDiagnostics:AllowedOrigins:0", "https://registration.example.test");
             builder.UseSetting("Mqtt:ProvisioningKey", new string('a', 32));
             builder.ConfigureServices(services => services.AddHttpClient<IotDiagnosticsService>()
