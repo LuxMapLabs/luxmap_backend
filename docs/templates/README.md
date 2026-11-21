@@ -35,7 +35,7 @@ Sheet vắng bỏ qua; không có sheet tài sản → lỗi. Sheet khác như `
 | `Tuyến đường` | `external_ref`*, `segment_name`*, `road_class`*, `length_m`, `geom_wkt` |
 | `Tủ điện` | `external_ref`*, `cabinet_name`*, `geom_wkt`* |
 | `Mạch điện` | `external_ref`*, `feeder_name`*, `cabinet_external_ref`, `cabinet_source` — **không** `geom_wkt` (WB-21) |
-| `Cột điện` | `external_ref`*, `segment_external_ref`, `feeder_external_ref`, `feeder_source`, `geom_wkt`, `near_sensitive_poi`, `note` |
+| `Cột điện` | `external_ref`*, `segment_external_ref`, `feeder_external_ref`, `feeder_source`, `geom_wkt`, `near_sensitive_poi`, `note`, `initial_status` |
 | `Bóng đèn` | `pole_external_ref`*, `fixture_type`*, `power_source`*, `lamp_watt`*, `install_date`*, `lamp_count`, `removed_date`, `warranty_expiry`, `note` |
 
 Luật từng cột theo CSV bên dưới, với các khác biệt workbook:
@@ -372,6 +372,7 @@ Trụ là **tài sản**, có hay không có thiết bị IoT đều tồn tại
 | `geom_wkt` | Không | Point | `geometry(Point,4326)`, **nullable** (POLE-GEOM-NULL). Để trống / không có cột = cột có trong sổ sách nhưng **chưa có GPS**; nạp lại với ô trống **giữ** vị trí đã có. Sai định dạng vẫn là lỗi dòng |
 | `near_sensitive_poi` | Không | bool | `true` / `false`. Mặc định `false`. Gần trường học, chợ, cầu, ngã ba |
 | `data_source` | **Có** | enum | `field` · `public_imagery` · `calibration_rig` · `simulated` — `ck_pole_data_source` |
+| `initial_status` | Không | `normal` / `dim` / `out` | **Chỉ để demo** (IMPORT-INITIAL-STATUS): cột **mới** nạp xong có ngay trạng thái, bản đồ tô đúng màu không cần đợt khảo sát. **Chỉ chấp nhận khi `data_source` = `simulated`** (khác → lỗi dòng); `unknown` không hợp lệ (không có dòng = `unknown`). Cột đã tồn tại: ô bị bỏ qua kèm cảnh báo, trạng thái đang có không bao giờ bị ghi đè. Trống / không có cột = không tạo trạng thái. Workbook: cột cuối của sheet `Cột điện`, cùng luật |
 
 ## `fixtures.csv`
 

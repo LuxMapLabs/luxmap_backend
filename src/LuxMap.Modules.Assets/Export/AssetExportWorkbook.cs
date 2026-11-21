@@ -75,7 +75,7 @@ public sealed class AssetExportWorkbook(LuxMapDbContext db)
                     x.SegmentId is null ? null : segmentRefs.GetValueOrDefault(x.SegmentId),
                     x.FeederId is null ? null : feederRefs.GetValueOrDefault(x.FeederId),
                     x.FeederSource is { } fs ? WireEnum.Name(fs) : null, x.Geom?.AsText(),
-                    x.NearSensitivePoi ? "true" : "false", x.Note }).ToList(),
+                    x.NearSensitivePoi ? "true" : "false", x.Note, null }).ToList(),
             [ImportKind.Fixtures] = fixtures.Where(x => Include("fixtures", x.FixtureId, x.CommuneId,
                     poleRefs.GetValueOrDefault(x.PoleId), poleRefs.GetValueOrDefault(x.PoleId) is null ? "Cột của bộ đèn thiếu mã kiểm kê hoặc ngoài phạm vi." : null))
                 .Select(x => new object?[] { poleRefs[x.PoleId], WireEnum.Name(x.FixtureType), WireEnum.Name(x.PowerSource),
@@ -209,7 +209,7 @@ public sealed class AssetExportWorkbook(LuxMapDbContext db)
             var formula = layout.Columns[i] switch
             {
                 "road_class" => "\"inter_commune,inter_village\"", "fixture_type" => "\"led_road_lamp\"", "power_source" => "\"grid\"",
-                "cabinet_source" or "feeder_source" => "\"verified,inferred\"", "near_sensitive_poi" => "\"true,false\"", "lamp_count" => "\"1,2,3,4\"",
+                "cabinet_source" or "feeder_source" => "\"verified,inferred\"", "near_sensitive_poi" => "\"true,false\"", "initial_status" => "\"normal,dim,out\"", "lamp_count" => "\"1,2,3,4\"",
                 "segment_external_ref" => "ds_tuyen_duong", "cabinet_external_ref" => "ds_tu_dien",
                 "feeder_external_ref" => "ds_mach_dien", "pole_external_ref" => "ds_cot_dien", _ => null,
             };

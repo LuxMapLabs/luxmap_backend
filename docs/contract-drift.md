@@ -2821,3 +2821,21 @@ Không tạo staging inventory mới, không migration hay thêm task_kind.
 
 Đặc tả đầy đủ / hướng dẫn tích hợp: [work-order-scheduling-suggestions.md](work-order-scheduling-suggestions.md).
 WP5/WP6 chưa được báo; implementation không bao gồm giao diện FE.
+
+## IMPORT-INITIAL-STATUS — import cột có ngay trạng thái, chỉ demo (20/11/2026)
+
+| | |
+|---|---|
+| **Nguồn** | Demo: nạp file xong đèn phải sáng xanh ngay, không chờ đợt khảo sát |
+| **Decision maker / Date** | **Mỹ SELF-SIGNED 20/11/2026** (đồng ý trong chat). Thêm cột tuỳ chọn vào file import, không đổi API đọc ⇒ nền tạm, chờ FW xác nhận |
+| **Consumer** | WP5: ô `initial_status` mới ở sheet `Cột điện` (dropdown `normal,dim,out`); bản đồ không đổi. WP6: không đổi. **Chưa báo** |
+| **Scope** | `POST /assets/import/poles` (CSV / GeoJSON) và `POST /assets/import/workbook`; không migration |
+
+| Mã | Quyết định |
+|---|---|
+| **IIS-1** | Cột tuỳ chọn `initial_status` ∈ `normal` / `dim` / `out`. Trống hoặc không có cột = không tạo trạng thái (cột `unknown`). `unknown` và giá trị khác → lỗi dòng nêu ba giá trị hợp lệ |
+| **IIS-2** | Chỉ khi `data_source` của file = `simulated`; khác → lỗi dòng cột `initial_status`. Lý do: dữ liệu không ai quan sát không được nằm cạnh `field` |
+| **IIS-3** | Chỉ cho cột do file tạo. Cột đã tồn tại: ô bị bỏ qua, `warnings[]` có một dòng cột `initial_status`; trạng thái đang có không bao giờ bị ghi đè |
+| **IIS-4** | Dòng trạng thái: `status_confidence` NULL, `last_sweep_id` / `last_run_id` NULL, `last_seen_at` = `last_evaluated_at` = lúc nạp. Ghi qua cổng `IInitialPoleStatus` → `PoleStatusPublication.StageForNewPole` (một writer), cùng `SaveChanges` với cột |
+| **IIS-5** | Cột chưa GPS vẫn nhận trạng thái nhưng không hiện trên bản đồ (không có điểm) |
+| **IIS-6** | Workbook: `initial_status` là cột cuối `Cột điện`, tuỳ chọn (workbook cũ không có cột vẫn nạp được); export để trống cột này. Template `assets-workbook*.xlsx` và `poles*.csv` đã cập nhật |

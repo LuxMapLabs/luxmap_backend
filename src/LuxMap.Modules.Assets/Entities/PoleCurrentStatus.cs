@@ -16,8 +16,8 @@ namespace LuxMap.Modules.Assets.Entities;
 /// <remarks>
 /// <b>Schema here, writes elsewhere.</b> BE-09 creates the table because BE-14 (<c>GET /poles</c>)
 /// runs BEFORE BE-15 and needs these four properties. But the publication writer OWNS the writes: asset
-/// CRUD and CSV import (BE-12) must never touch this table, which is why it is separate from
-/// <c>pole</c> rather than four more columns on it.
+/// CRUD and CSV import (BE-12) must never touch this table — except through <c>IInitialPoleStatus</c> for a new
+/// <c>simulated</c> pole (IMPORT-INITIAL-STATUS) — which is why it is separate from <c>pole</c> rather than four more columns on it.
 /// <para>
 /// A missing row means no published observation yet; a row saying <c>unknown</c> means the latest
 /// published sweep could not see this pole. Confirmed photos can establish a status without a sweep.

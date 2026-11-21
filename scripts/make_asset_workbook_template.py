@@ -16,12 +16,12 @@ SHEETS = [
     ('Tuyến đường', 'segments', ['external_ref', 'segment_name', 'road_class', 'length_m', 'geom_wkt'], 3),
     ('Tủ điện', 'cabinets', ['external_ref', 'cabinet_name', 'geom_wkt'], 3),
     ('Mạch điện', 'feeders', ['external_ref', 'feeder_name', 'cabinet_external_ref', 'cabinet_source'], 2),
-    ('Cột điện', 'poles', ['external_ref', 'segment_external_ref', 'feeder_external_ref', 'feeder_source', 'geom_wkt', 'near_sensitive_poi', 'note'], 1),
+    ('Cột điện', 'poles', ['external_ref', 'segment_external_ref', 'feeder_external_ref', 'feeder_source', 'geom_wkt', 'near_sensitive_poi', 'note', 'initial_status'], 1),
     ('Bóng đèn', 'fixtures', ['pole_external_ref', 'fixture_type', 'power_source', 'lamp_watt', 'install_date', 'lamp_count', 'removed_date', 'warranty_expiry', 'note'], 5),
 ]
 DROPDOWNS = {
     'road_class': '"inter_commune,inter_village"', 'fixture_type': '"led_road_lamp"', 'power_source': '"grid"',
-    'cabinet_source': '"verified,inferred"', 'feeder_source': '"verified,inferred"', 'near_sensitive_poi': '"true,false"',
+    'cabinet_source': '"verified,inferred"', 'feeder_source': '"verified,inferred"', 'near_sensitive_poi': '"true,false"', 'initial_status': '"normal,dim,out"',
     'lamp_count': '"1,2,3,4"', 'segment_external_ref': 'ds_tuyen_duong', 'cabinet_external_ref': 'ds_tu_dien',
     'feeder_external_ref': 'ds_mach_dien', 'pole_external_ref': 'ds_cot_dien',
 }

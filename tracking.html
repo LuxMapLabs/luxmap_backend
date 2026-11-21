@@ -40,6 +40,19 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="scheduling-dev-sync">
+    <strong>WO-SCHEDULING-SUGGESTIONS — đồng bộ dev để kiểm PR · 21/11/2026</strong>
+    <p><span class="tag t-next">Đã kiểm trên dev mới · local, chưa push / PR</span>
+    Đồng bộ <code>origin/dev 5e3178a</code> (PR #289). Xung đột duy nhất ở cuối
+    <code>docs/contract-drift.md</code>: giữ cả SS-1…SS-5 và IIS-1…IIS-6; không đổi logic gợi ý.
+    Build <code>--disable-build-servers -warnaserror</code> 0 warning/error; 206 test API liên quan
+    (gợi ý/GPS/sync/phân quyền/OpenAPI/import trạng thái ban đầu) pass, 20 test Python pass.
+    Swagger xuất mới trùng file đã commit; consolidated spec sinh lại không lệch; Redocly 2.0.0 hợp lệ, 9 warning.
+    Full suite chưa chạy lại ở lượt đồng bộ này; lỗi nền IoT 503 của lượt trước vẫn được ghi nhận riêng.
+    Files: các thay đổi upstream PR #289, <code>docs/contract-drift.md</code>, <code>tracking.html</code>.
+    Commit message: <code>chore: sync scheduling suggestions with current dev</code>.</p>
+  </div>
+
   <div class="card" id="scheduling-claude-review">
     <strong>WO-SCHEDULING-SUGGESTIONS — Claude review · 21/11/2026</strong>
     <p><span class="tag t-done">Đã review độc lập · không sửa BE, không push / PR</span>
@@ -101,6 +114,17 @@
     Áp cho form tài sản, import CSV / GeoJSON / workbook. Drift GR-1…GR-3, SELF-SIGNED. Production: 0 tài sản ngoài phạm vi.</p>
     <p>Phát hiện khi nạp thử file demo Review 2 (<code>POINT(10.97 106.49)</code> được lưu). 10 test mới; phá thử (tắt kiểm) → 7 đỏ.
     Còn: báo WP5.</p>
+  </div>
+
+  <div class="card" id="import-initial-status">
+    <strong>IMPORT-INITIAL-STATUS — import cột có ngay trạng thái (demo) · 20/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Cột tuỳ chọn <code>initial_status</code> (<code>normal</code>/<code>dim</code>/<code>out</code>) ở poles CSV / GeoJSON và sheet <code>Cột điện</code>:
+    cột mới nạp xong là có trạng thái, bản đồ tô màu ngay, không cần khảo sát. Chỉ khi <code>data_source = simulated</code>; chỉ cột do file tạo.
+    Ghi qua cổng <code>IInitialPoleStatus</code> (Survey hiện thực, một writer). Drift IIS-1…IIS-6, SELF-SIGNED.</p>
+    <div class="bar"><i style="width:100%"></i></div>
+    <p><code>dotnet test</code> xanh (Api 1947 / 7 skip). 15 test mới; phá thử: bỏ lệnh gọi cổng → 6 đỏ, bỏ kiểm <code>simulated</code> → 4 đỏ.
+    Còn: báo WP5 (ô mới ở sheet); chưa deploy VPS.</p>
   </div>
 
   <div class="card" id="asset-workbook-multisheet">

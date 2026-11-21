@@ -2,6 +2,7 @@ using System.Text.Json;
 using LuxMap.Modules.Assets.Crud;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Persistence;
+using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Csv;
@@ -39,7 +40,8 @@ namespace LuxMap.Modules.Assets.Import;
 /// </para>
 /// </remarks>
 public sealed partial class AssetImportService(
-    LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices)
+    LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
+    IInitialPoleStatus initialStatuses)
 {
     public Task<ImportResult> ImportCsvAsync(ImportKind kind, string text, CancellationToken cancellationToken)
     {
@@ -403,6 +405,9 @@ public sealed partial class AssetImportService(
 
             var note = OptionalNote(reader);
 
+            // IMPORT-INITIAL-STATUS: demo seeding only, so the file's data_source must be `simulated`.
+            var initialStatus = InitialStatus(reader, dataSource);
+
             // POLE-SEGMENT-NULL D-2: the cell is optional. Blank or a missing column leaves a NEW pole on no segment and KEEPS an
             // existing pole's segment (only PUT null takes a pole off its segment). A reference that matches nothing is still a row
             // error — Resolve reports it — so a typo can never turn into "no segment".
@@ -464,6 +469,12 @@ public sealed partial class AssetImportService(
                 pole.NearSensitivePoi = nearPoi;
                 pole.DataSource = dataSource;
                 ImportNote(reader, pole, note, warnings);
+                if (initialStatus is not null)
+                {
+                    warnings.Add(new ImportRowError(reader.Row.Row, "initial_status",
+                        $"Ignored: '{externalRef}' already exists. initial_status only gives a status to a pole this file creates."));
+                }
+
                 Count(pole, ref updated, ref unchanged);
                 continue;
             }
@@ -483,11 +494,45 @@ public sealed partial class AssetImportService(
 
             dbContext.Set<Pole>().Add(created);
             Touch(created);
+            if (initialStatus is { } status)
+            {
+                initialStatuses.StageForNewPole(created, status);
+            }
+
             existing[(communeId!, externalRef!)] = created;
             inserted++;
         }
 
         return new WritePlan(inserted, updated, unchanged);
+    }
+
+    private static readonly FixtureStatus[] SeedableStatuses = [FixtureStatus.Normal, FixtureStatus.Dim, FixtureStatus.Out];
+
+    /// <summary>
+    /// The optional <c>initial_status</c> of a poles file (IMPORT-INITIAL-STATUS): blank = none. Only <c>normal</c>, <c>dim</c> or
+    /// <c>out</c> (<c>unknown</c> is "no row"), and only for <c>data_source = simulated</c> — a status nobody observed must never
+    /// sit beside field data.
+    /// </summary>
+    private static FixtureStatus? InitialStatus(ImportRowReader reader, DataSource dataSource)
+    {
+        var text = reader.Optional("initial_status");
+        if (text is null)
+        {
+            return null;
+        }
+
+        var status = SeedableStatuses.Cast<FixtureStatus?>()
+            .FirstOrDefault(candidate => string.Equals(ContractEnum.ToDbValue(candidate!.Value), text, StringComparison.Ordinal));
+        if (status is null)
+        {
+            reader.Fail("initial_status", $"'{text}' is not one of: {string.Join(", ", SeedableStatuses.Select(ContractEnum.ToDbValue))}.");
+        }
+        else if (reader.IsValid && dataSource != DataSource.Simulated)
+        {
+            reader.Fail("initial_status", "Allowed only when data_source is simulated: a status nobody observed cannot be field data.");
+        }
+
+        return status;
     }
 
     /// <summary>
