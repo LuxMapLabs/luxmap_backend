@@ -24,4 +24,20 @@ internal static class PoleStatusPublication
         current.LastSweepId = sweepId; current.UpdatedAt = now;
         return true;
     }
+
+    /// <summary>
+    /// The first status of a pole the asset import is inserting (IMPORT-INITIAL-STATUS): no sweep and no run behind it, no AI
+    /// score, evaluated and seen now. The pole has no id yet, so the row hangs on <see cref="Pole.CurrentStatus"/> and EF
+    /// inserts it, keyed by the generated id, in the same save as the pole.
+    /// </summary>
+    public static void StageForNewPole(Pole pole, FixtureStatus status, DateTime now)
+    {
+        if (status == FixtureStatus.Unknown)
+            throw new ArgumentOutOfRangeException(nameof(status), "Unknown is the absence of a status row.");
+        pole.CurrentStatus = new PoleCurrentStatus
+        {
+            PoleId = pole.PoleId, CommuneId = pole.CommuneId, FixtureStatus = status, StatusConfidence = null,
+            LastSeenAt = now, LastEvaluatedAt = now, LastSweepId = null, LastRunId = null, UpdatedAt = now,
+        };
+    }
 }

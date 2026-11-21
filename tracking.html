@@ -73,6 +73,17 @@
     Còn: báo WP5.</p>
   </div>
 
+  <div class="card" id="import-initial-status">
+    <strong>IMPORT-INITIAL-STATUS — import cột có ngay trạng thái (demo) · 20/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Cột tuỳ chọn <code>initial_status</code> (<code>normal</code>/<code>dim</code>/<code>out</code>) ở poles CSV / GeoJSON và sheet <code>Cột điện</code>:
+    cột mới nạp xong là có trạng thái, bản đồ tô màu ngay, không cần khảo sát. Chỉ khi <code>data_source = simulated</code>; chỉ cột do file tạo.
+    Ghi qua cổng <code>IInitialPoleStatus</code> (Survey hiện thực, một writer). Drift IIS-1…IIS-6, SELF-SIGNED.</p>
+    <div class="bar"><i style="width:100%"></i></div>
+    <p><code>dotnet test</code> xanh (Api 1947 / 7 skip). 15 test mới; phá thử: bỏ lệnh gọi cổng → 6 đỏ, bỏ kiểm <code>simulated</code> → 4 đỏ.
+    Còn: báo WP5 (ô mới ở sheet); chưa deploy VPS.</p>
+  </div>
+
   <div class="card" id="asset-workbook-multisheet">
     <strong>ASSET-WORKBOOK-MULTISHEET — workbook mỗi loại tài sản một sheet · 18/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>

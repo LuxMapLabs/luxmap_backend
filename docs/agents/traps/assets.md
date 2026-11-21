@@ -552,6 +552,20 @@ và không để lỗi thành 500. Snapshot audit trước/sau ẩn giữ cả c
   loại tài sản thiếu mã. Sheet `Không xuất` phải nêu mọi loại thiếu mã và cột có mạch thiếu mã / fitting có cột thiếu mã; không bỏ im lặng.
   `Hướng dẫn` ghi số theo data_source, cảnh báo nhiều xã không nạp lại được và upload chỉ một nguồn.
 
+## IMPORT-INITIAL-STATUS — cột nạp xong có ngay trạng thái, chỉ cho demo (20/11/2026)
+
+- **Đổi luật cũ có chủ đích:** trước đây import / CRUD tài sản không được đụng `pole_current_status` (`commune-scope.md`, BE-09 rule 2).
+  Nay import poles (CSV, GeoJSON, workbook) nhận cột tuỳ chọn `initial_status` (`normal` / `dim` / `out`) **chỉ khi `data_source = simulated`**,
+  và **chỉ cho cột do chính file đó tạo**. Cột đã có: bỏ qua + cảnh báo; không bao giờ ghi đè một trạng thái đang có.
+- **Vẫn một writer:** `AssetImportService` không ghi bảng này. Nó gọi cổng `IInitialPoleStatus` (khai ở Assets), Survey hiện thực bằng
+  `PoleStatusPublication.StageForNewPole`. Cột mới chưa có `pole_id` (DB sinh), nên dòng trạng thái treo ở `Pole.CurrentStatus` và
+  chung một `SaveChanges` với cột — đừng đổi sang `StageAsync` (cần id có trước).
+- **Dòng trạng thái do import tạo:** confidence `NULL`, `last_sweep_id` / `last_run_id` `NULL`, `last_seen_at` = `last_evaluated_at` = lúc nạp.
+  Một sweep hay ảnh được duyệt sau đó ghi đè bình thường qua `SurveyPublicationRules.IsNewer`.
+- **Vì sao chỉ `simulated`:** trạng thái không ai quan sát mà nằm cạnh dữ liệu `field` là đúng lỗi luật "testbed không bao giờ mang `field`"
+  sinh ra để chặn. `unknown` bị từ chối: không có dòng = `unknown`.
+- Canh bằng `AssetImportInitialStatusTests` (bỏ lệnh gọi cổng → 6 đỏ; bỏ kiểm `simulated` → 4 đỏ).
+
 ## ASSET-GEOM-RANGE — toạ độ ngoài EPSG:4326 (18/11/2026)
 
 - **WKTReader và PostGIS đều nhận `POINT(10.97 106.49)`** (vĩ độ 106°): cột `geometry(Point,4326)` không kiểm phạm vi. Chốt chặn

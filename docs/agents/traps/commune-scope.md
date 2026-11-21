@@ -87,7 +87,7 @@ Vì sao FK này không phải cầu toàn: `commune_id` mồ côi **không gây 
 **2. Tạo schema và quyền ghi là hai chuyện khác nhau.**
 
 `pole_current_status` do **BE-09 tạo bảng** (BE-14 chạy trước BE-15 và cần 4 trường đó), nhưng
-**BE-15/BE-17 sở hữu quyền ghi**. BE-12 (CRUD tài sản + import CSV) **không được đụng vào bảng này**.
+**BE-15/BE-17 sở hữu quyền ghi**. BE-12 (CRUD tài sản + import CSV) **không được đụng vào bảng này** — ngoại lệ duy nhất: import cột mới `simulated` với `initial_status`, đi qua cổng `IInitialPoleStatus` do Survey hiện thực (IMPORT-INITIAL-STATUS, `assets.md`).
 Đó là lý do nó là bảng riêng chứ không phải 4 cột trên `pole` — ranh giới nằm trong lược đồ, không
 chỉ trong quy ước.
 
