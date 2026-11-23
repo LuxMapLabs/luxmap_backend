@@ -22238,6 +22238,24 @@
           "auto_type": {
             "type": "string",
             "nullable": true
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "late_ack": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -22269,7 +22287,8 @@
       "IotCommandHistoryStatus": {
         "enum": [
           "success",
-          "pending"
+          "pending",
+          "expired"
         ],
         "type": "string"
       },
@@ -22305,7 +22324,8 @@
             "nullable": true
           },
           "mode": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "command": {
             "type": "string",
@@ -22328,6 +22348,22 @@
           "auto_type": {
             "type": "string",
             "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "late_ack": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

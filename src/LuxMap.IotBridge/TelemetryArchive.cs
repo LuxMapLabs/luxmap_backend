@@ -7,7 +7,8 @@ record TelemetryPage(IReadOnlyList<ArchivedTelemetry> Items, long NextCursor, bo
 record TelemetryHistoryPage(int Page, int PageSize, int Total, IReadOnlyList<ArchivedTelemetry> Items);
 
 record CommandReceiptKey(string DeviceId, string CommandId);
-record CommandReceipt(string DeviceId, string CommandId, DateTimeOffset ReceivedAt);
+record CommandReceipt(string DeviceId, string CommandId, DateTimeOffset ReceivedAt,
+    long? ExecutedAtUnixSeconds = null, long? ExpiresAtUnixSeconds = null);
 
 record FeederTelemetryWindow(string NodeId, string ServerId, string DeviceId, DateTimeOffset From, DateTimeOffset? Until);
 record FeederArchivedTelemetry(long Cursor, TelemetryReading Reading, string NodeId, string ServerId, bool Active);
@@ -62,6 +63,20 @@ sealed partial class TelemetryArchive
                 info.CommandText = "ALTER TABLE command_receipts ADD COLUMN auto_type TEXT;";
                 info.ExecuteNonQuery();
             }
+        }
+
+        using (var info = connection.CreateCommand())
+        {
+            info.CommandText = "PRAGMA table_info(command_receipts);";
+            var columns = new HashSet<string>();
+            using (var reader = info.ExecuteReader())
+                while (reader.Read()) columns.Add(reader.GetString(1));
+            foreach (var (name, type) in new[] { ("expires_at", "INTEGER"), ("executed_at", "INTEGER"), ("command_json", "TEXT") })
+                if (!columns.Contains(name))
+                {
+                    info.CommandText = $"ALTER TABLE command_receipts ADD COLUMN {name} {type};";
+                    info.ExecuteNonQuery();
+                }
         }
 
         using var transaction = connection.BeginTransaction();
@@ -255,15 +270,19 @@ sealed partial class TelemetryArchive
         using var connection = Open();
         using var sql = connection.CreateCommand();
         sql.CommandText = """
-            INSERT INTO command_receipts (device_id, command_id, mode, command, auto_type)
-            VALUES ($device, $id, $mode, $command, $autoType)
-            ON CONFLICT (device_id, command_id) DO UPDATE SET mode = excluded.mode
+            INSERT INTO command_receipts (device_id, command_id, mode, command, auto_type, expires_at, command_json)
+            VALUES ($device, $id, $mode, $command, $autoType, $expires, $json)
+            ON CONFLICT (device_id, command_id) DO UPDATE SET mode = excluded.mode,
+                command_json = coalesce(command_json, excluded.command_json),
+                expires_at = coalesce(expires_at, excluded.expires_at)
             WHERE mode = excluded.mode AND command IS excluded.command
               AND (mode <> 'AUTO' OR coalesce(auto_type, 'scheduled') = coalesce(excluded.auto_type, 'scheduled'));
             """;
         sql.Parameters.AddWithValue("$device", deviceId);
         sql.Parameters.AddWithValue("$id", command.CommandId);
         sql.Parameters.AddWithValue("$mode", command.Mode);
+        sql.Parameters.AddWithValue("$expires", (object?)command.ExpiresAtUnixSeconds ?? DBNull.Value);
+        sql.Parameters.AddWithValue("$json", JsonSerializer.Serialize(command, Json));
         sql.Parameters.AddWithValue("$command", (object?)command.Command ?? DBNull.Value);
         sql.Parameters.AddWithValue("$autoType", command.Mode == "AUTO"
             ? command.AutoType ?? "scheduled" : (object)DBNull.Value);
@@ -274,16 +293,24 @@ sealed partial class TelemetryArchive
     {
         if (!Guid.TryParseExact(ack.CommandId, "N", out _) || ack.Mode is not ("MANUAL" or "AUTO") ||
             ack.LampCommand is not ("ON" or "OFF")) return null;
+        if (ack.ExecutedAtUnixSeconds is { } executed && (executed < 0 || executed > receivedAt.ToUnixTimeSeconds())) return null;
         using var connection = Open();
         using var sql = connection.CreateCommand();
         sql.CommandText = """
-            UPDATE command_receipts SET received_at = coalesce(received_at, $received)
+            UPDATE command_receipts SET received_at = coalesce(received_at, $received),
+                executed_at = CASE WHEN received_at IS NULL THEN $executed ELSE executed_at END
             WHERE device_id = $device AND command_id = $id AND mode = $mode
                 AND (mode = 'AUTO' OR command = $lamp)
                 AND (mode <> 'AUTO' OR coalesce(auto_type, 'scheduled') = $autoType)
+                AND (received_at IS NOT NULL OR expires_at IS NULL OR
+                    ($executed IS NULL AND $receivedUnix < expires_at) OR
+                    ($executed IS NOT NULL AND $executed < expires_at AND $executed <= $receivedUnix
+                        AND $executed >= expires_at - 20))
             RETURNING received_at;
             """;
         sql.Parameters.AddWithValue("$received", receivedAt.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        sql.Parameters.AddWithValue("$receivedUnix", receivedAt.ToUnixTimeSeconds());
+        sql.Parameters.AddWithValue("$executed", (object?)ack.ExecutedAtUnixSeconds ?? DBNull.Value);
         sql.Parameters.AddWithValue("$device", ack.DeviceId!);
         sql.Parameters.AddWithValue("$id", ack.CommandId!);
         sql.Parameters.AddWithValue("$mode", ack.Mode);
@@ -298,7 +325,7 @@ sealed partial class TelemetryArchive
         using var connection = Open();
         using var sql = connection.CreateCommand();
         sql.CommandText = """
-            SELECT receipts.device_id, receipts.command_id, receipts.received_at
+            SELECT receipts.device_id, receipts.command_id, receipts.received_at, receipts.executed_at, receipts.expires_at
             FROM json_each($keys) AS key
             JOIN command_receipts AS receipts
               ON receipts.device_id = json_extract(key.value, '$.deviceId')
@@ -310,8 +337,36 @@ sealed partial class TelemetryArchive
         var receipts = new List<CommandReceipt>();
         while (reader.Read())
             receipts.Add(new(reader.GetString(0), reader.GetString(1),
-                DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture)));
+                DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture),
+                reader.IsDBNull(3) ? null : reader.GetInt64(3), reader.IsDBNull(4) ? null : reader.GetInt64(4)));
         return receipts;
+    }
+
+    public LampCommand? ReadTrackedCommand(string deviceId, string commandId)
+    {
+        using var connection = Open();
+        using var sql = connection.CreateCommand();
+        sql.CommandText = "SELECT command_json FROM command_receipts WHERE device_id = $device AND command_id = $id;";
+        sql.Parameters.AddWithValue("$device", deviceId);
+        sql.Parameters.AddWithValue("$id", commandId);
+        return sql.ExecuteScalar() is string json ? JsonSerializer.Deserialize<LampCommand>(json, Json) : null;
+    }
+
+    public (LampCommand Command, ReceivedCommandAck Ack)? ReadLastSuccess(string deviceId)
+    {
+        using var connection = Open();
+        using var sql = connection.CreateCommand();
+        sql.CommandText = """
+            SELECT command_json, received_at, executed_at FROM command_receipts
+            WHERE device_id = $device AND received_at IS NOT NULL AND command_json IS NOT NULL
+            ORDER BY json_extract(command_json, '$.version') DESC, received_at DESC LIMIT 1;
+            """;
+        sql.Parameters.AddWithValue("$device", deviceId);
+        using var reader = sql.ExecuteReader();
+        if (!reader.Read()) return null;
+        var command = JsonSerializer.Deserialize<LampCommand>(reader.GetString(0), Json)!;
+        return (command, new(new(deviceId, command.CommandId, command.Mode, command.Command, command.AutoType,
+            reader.IsDBNull(2) ? null : reader.GetInt64(2)), DateTimeOffset.Parse(reader.GetString(1), System.Globalization.CultureInfo.InvariantCulture)));
     }
 
     private static TelemetryReading Read(string? value) =>

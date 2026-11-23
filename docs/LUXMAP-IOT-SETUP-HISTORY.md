@@ -141,7 +141,7 @@ API đọc audit từ database LuxMap, mỗi yêu cầu gửi lệnh qua Bridge 
 - `requested_by` là tên hiển thị của người gửi. Khi thiếu tên, API trả mã tài khoản đã ghi audit. `requested_at` là lúc backend ghi nhận yêu cầu, theo UTC.
 - `bridge_accepted_at` là lúc backend ghi nhận Bridge chấp nhận lệnh. Khi giá trị là `null`, chưa có bản ghi xác nhận từ Bridge. Muốn xem ACK của ESP32 cho lệnh hiện tại, gọi [GET /api/v1/iot/nodes/NODE-004/command](https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/command) rồi đối chiếu `command_id` và `command_acknowledged`.
 
-`status` chỉ còn `pending` khi chưa có ACK và `success` khi có ACK hợp lệ, kể cả ACK muộn; không có quá hạn trong lịch sử. Sự kiện AUTO từ telemetry có `status: "success"`, `requested_at` là giờ đo (UTC) và `bridge_accepted_at` là giờ nhận mẫu. Lệnh và sự kiện cùng phân trang, mới nhất trước. Xem quy tắc chống trùng, gửi bù và giới hạn dữ liệu theo thời gian gán nguồn tại [LUXMAP-IOT-FE.md](LUXMAP-IOT-FE.md).
+`status` gồm `pending`, `success`, `expired`; lệnh mới hết hạn sau 20 giây nếu chưa xác nhận. ACK muộn chỉ chuyển thành success khi giờ thực hiện chứng minh còn hạn; trả thêm executed_at, acknowledged_at, expires_at, late_ack. GET command trả lệnh thành công gần nhất, không trả lệnh đang chờ; chưa có trả status no_data. Sự kiện AUTO từ telemetry vẫn success và không chịu hạn 20 giây. Lệnh và sự kiện cùng phân trang, mới nhất trước. Xem [LUXMAP-IOT-FE.md](LUXMAP-IOT-FE.md).
 
 ## 5. API lịch sử dữ liệu điện theo feeder
 

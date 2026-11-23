@@ -2857,3 +2857,11 @@ POST /api/v1/iot/nodes bỏ cabinet_id khỏi request và nhận radius_km với
 PUT /api/v1/iot/nodes/{nodeId} cập nhật radius_km cùng nguồn; GET node chi tiết và GET danh sách node trả radius_km.
 Lưu radius của server trong iot_server_registration và radius của node trong iot_node, migration AddIotCoverageRadius. Giữ nguyên lịch sử điện, lỗi và lệnh; không sửa FE.
 Quyết định này mở rộng hợp đồng 6 trường ở mục IOT-NODE-FEEDER-DETACH-1: PUT hiện có thêm radius_km; POST node cũng nhận radius_km và không nhận cabinet_id.
+
+## IOT-COMMAND-DEADLINE-20 — 23/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+Thay thế cơ chế pending vô hạn: lệnh mới có hạn thực hiện 20 giây, hết hạn ngừng phát và node từ chối thực hiện mới. Không tự đảo đầu ra khi hết hạn; AUTO đã áp dụng vẫn tiếp tục.
+GET /api/v1/iot/nodes/{nodeId}/command trả lệnh thành công gần nhất (status success); chưa có trả status no_data và mode/command/command_id null. POST cùng đường dẫn trả pending với expires_at.
+GET /api/v1/iot/nodes/{nodeId}/command/history giữ phân trang, status success/pending/expired; bổ sung executed_at, acknowledged_at, expires_at và late_ack. Sự kiện sensor vẫn success, không áp hạn chấp nhận lệnh cho AUTO chuyển trạng thái.
+ACK thêm executedAtUnixSeconds UTC: ACK sau hạn chỉ hợp lệ nếu thực hiện trong cửa sổ trước hạn. ACK hợp lệ muộn đổi cùng dòng lịch sử expired thành success, ghi audit command_late_ack khi BE đối chiếu; Bridge giữ sổ receipt bền vững. ACK cũ không ghi đè thành công có version mới hơn. GET command không còn phản ánh yêu cầu chưa ACK; FE theo dõi lệnh đang chờ bằng command_id trong history.
+Đồng bộ BE/Bridge/node/gateway; firmware cũ thiếu executedAtUnixSeconds chỉ xác nhận được khi ACK về trước hạn. DS3231 phải có giờ đúng. Giữ nguyên mã nguồn FE và dữ liệu lịch sử.

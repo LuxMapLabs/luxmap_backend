@@ -157,6 +157,53 @@ public sealed class NodeContactTests : IDisposable
         Assert.True(restored.Read("probe")!.CommandAcknowledged);
     }
 
+    [Fact]
+    public void Successful_command_survives_new_pending_command_and_restart()
+    {
+        var first = store.SetCommand("probe", new("MANUAL", "OFF"));
+        store.AcknowledgeCommand(new("probe", first.CommandId, "MANUAL", "OFF"));
+        var next = store.SetCommand("probe", new("MANUAL", "ON"));
+        var restored = new DeviceStore(new TestEnvironment(directory), clock).Read("probe")!;
+        Assert.Equal(next.CommandId, restored.DesiredCommand.CommandId);
+        Assert.Equal(first.CommandId, restored.LastSuccessfulCommand!.CommandId);
+        Assert.False(restored.CommandAcknowledged);
+    }
+
+    [Fact]
+    public void Late_receipt_requires_execution_before_deadline_and_preserves_execution_time()
+    {
+        var start = clock.GetUtcNow();
+        var command = store.SetCommand("probe", new("MANUAL", "ON"));
+        Assert.Equal(start.AddSeconds(20).ToUnixTimeSeconds(), command.ExpiresAtUnixSeconds);
+        clock.Advance(21);
+        Assert.Equal(command, store.SetCommand("probe", new("MANUAL", "ON", command.CommandId)));
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON"));
+        Assert.Null(store.Read("probe")!.LastSuccessfulCommand);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.AddSeconds(20).ToUnixTimeSeconds()));
+        Assert.Null(store.Read("probe")!.LastSuccessfulCommand);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.AddSeconds(18).ToUnixTimeSeconds()));
+        Assert.Equal(command, store.Read("probe")!.LastSuccessfulCommand);
+        var receipt = Assert.Single(store.ReadCommandReceipts([new("probe", command.CommandId!)]));
+        Assert.Equal(start.AddSeconds(18).ToUnixTimeSeconds(), receipt.ExecutedAtUnixSeconds);
+        Assert.Equal(start.AddSeconds(21), receipt.ReceivedAt);
+        clock.Advance(60);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.AddSeconds(18).ToUnixTimeSeconds()));
+        Assert.Equal(start.AddSeconds(21), store.Read("probe")!.LastCommandAckAt);
+    }
+
+    [Fact]
+    public void Older_late_success_cannot_replace_a_newer_success()
+    {
+        var start = clock.GetUtcNow();
+        var old = store.SetCommand("probe", new("MANUAL", "ON"));
+        clock.Advance(1);
+        var next = store.SetCommand("probe", new("MANUAL", "OFF"));
+        store.AcknowledgeCommand(new("probe", next.CommandId, "MANUAL", "OFF"));
+        clock.Advance(20);
+        store.AcknowledgeCommand(new("probe", old.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.ToUnixTimeSeconds()));
+        Assert.Equal(next, store.Read("probe")!.LastSuccessfulCommand);
+    }
+
     private sealed class ManualClock : TimeProvider
     {
         private DateTimeOffset now = DateTimeOffset.Parse("2026-11-18T07:00:00Z");

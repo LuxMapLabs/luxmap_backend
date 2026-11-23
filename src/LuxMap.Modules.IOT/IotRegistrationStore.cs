@@ -428,6 +428,25 @@ public sealed class IotRegistrationStore(
         return SaveAsync(ct);
     }
 
+    internal async Task AuditLateReceiptAsync(string serverId, string nodeId, string commandId,
+        DateTimeOffset receivedAt, long executedAt, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var key = "iot-late-receipt/" + nodeId + "/" + commandId;
+        await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))", ct);
+        var exists = await db.Database.SqlQuery<int>($"""
+            SELECT count(*)::int AS "Value" FROM iot_registration_audit
+            WHERE node_id = {nodeId} AND details ->> 'command_id' = {commandId}
+                AND details ->> 'event_type' = 'command_late_ack'
+            """).SingleAsync(ct);
+        if (exists == 0)
+            await AuditCommandAsync(serverId, nodeId, new {
+                event_type = "command_late_ack", command_id = commandId, status = "success",
+                acknowledged_at = receivedAt, executed_at = DateTimeOffset.FromUnixTimeSeconds(executedAt),
+            }, ct);
+        await transaction.CommitAsync(ct);
+    }
+
     internal async Task<PagedResult<IotCommandHistoryItem>> ReadCommandHistoryAsync(
         string nodeId, PageRequest page, CancellationToken ct, IReadOnlyList<IotCommandHistoryItem>? automatic = null)
     {
@@ -467,7 +486,7 @@ public sealed class IotRegistrationStore(
                 details.DeviceId, details.Mode, details.Command, details.AutoSchedule,
                 row.RequestedBy, row.CreatedAt, row.BridgeAcceptedAt,
                 details.Status ?? IotCommandHistoryStatus.Pending,
-                details.Mode == "AUTO" ? details.AutoType ?? "scheduled" : null);
+                details.Mode == "AUTO" ? details.AutoType ?? "scheduled" : null, ExpiresAt: details.ExpiresAt);
         }).ToArray();
         return PagedResult<IotCommandHistoryItem>.From(page, total, items);
     }
@@ -522,7 +541,7 @@ public sealed class IotRegistrationStore(
 
     private sealed record RequestedCommandDetails(
         string CommandId, string FeederId, string DeviceId, string Mode, string? Command, IotAutoSchedule? AutoSchedule,
-        IotCommandHistoryStatus? Status = null, string? AutoType = null);
+        IotCommandHistoryStatus? Status = null, string? AutoType = null, DateTimeOffset? ExpiresAt = null);
 
     // No FK to the registered objects: deleting a node must not erase its registration history.
     private void RecordRegistration(string serverId, string? nodeId, string details) =>
