@@ -563,12 +563,12 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         }
 
         var on = await SubmitAsync("MANUAL", "ON");
-        await AssertPowerAsync("unknown", on, false);
+        await AssertPowerAsync("unknown", null, false);
         bridge.Acknowledge("ON");
         await AssertPowerAsync("on", on, true);
 
         var off = await SubmitAsync("MANUAL", "OFF");
-        await AssertPowerAsync("on", off, false);
+        await AssertPowerAsync("on", on, true);
         bridge.Acknowledge("OFF");
         await AssertPowerAsync("off", off, true);
 
@@ -613,7 +613,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var rejectedAt = newest[0].GetProperty("requested_at").GetDateTimeOffset();
         clock.SetUtcNow(rejectedAt.AddDays(1));
         var waiting = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=1&page_size=1");
-        Assert.Equal("pending", waiting.GetProperty("items")[0].GetProperty("status").GetString());
+        Assert.Equal("expired", waiting.GetProperty("items")[0].GetProperty("status").GetString());
         bridge.ReceiptTimes[newest[0].GetProperty("command_id").GetString()!] = rejectedAt.AddSeconds(12.001);
         var lateAck = await manager.GetFromJsonAsync<JsonElement>($"{history}?page=1&page_size=1");
         Assert.Equal("success", lateAck.GetProperty("items")[0].GetProperty("status").GetString());
@@ -1217,6 +1217,44 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     [Fact]
+    public Task Late_execution_receipt_recovers_expired_history_and_audits_once()
+    {
+        var bridge = new ReportedPowerBridge();
+        var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        return WithSharedCabinetAsync(async (client, rig, _) =>
+        {
+            Assert.Equal(HttpStatusCode.NoContent,
+                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+            var path = $"/api/v1/iot/nodes/{rig.First}/command";
+            using var sent = await client.PostAsJsonAsync(path, new { mode = "MANUAL", command = "ON" });
+            Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
+            var pending = await sent.Content.ReadFromJsonAsync<JsonElement>();
+            var id = pending.GetProperty("command_id").GetString()!;
+            var expires = pending.GetProperty("expires_at").GetDateTimeOffset();
+            Assert.Equal("no_data", (await client.GetFromJsonAsync<JsonElement>(path)).GetProperty("status").GetString());
+            time.SetUtcNow(expires.AddSeconds(1));
+            var expired = await client.GetFromJsonAsync<JsonElement>($"{path}/history");
+            Assert.Equal("expired", expired.GetProperty("items")[0].GetProperty("status").GetString());
+            bridge.ReceiptTimes[id] = time.GetUtcNow();
+            bridge.ExecutionTimes[id] = expires.AddSeconds(-2).ToUnixTimeSeconds();
+            bridge.ExpiryTimes[id] = expires.ToUnixTimeSeconds();
+            var success = await client.GetFromJsonAsync<JsonElement>($"{path}/history");
+            var item = success.GetProperty("items")[0];
+            Assert.Equal(1, success.GetProperty("total").GetInt32());
+            Assert.Equal(id, item.GetProperty("command_id").GetString());
+            Assert.Equal("success", item.GetProperty("status").GetString());
+            Assert.True(item.GetProperty("late_ack").GetBoolean());
+            Assert.Equal(expires.AddSeconds(-2), item.GetProperty("executed_at").GetDateTimeOffset());
+            await client.GetFromJsonAsync<JsonElement>($"{path}/history");
+            Assert.Equal(1, await fixture.QueryAsync(db => db.Database.SqlQuery<int>($"""
+                SELECT count(*)::int AS "Value" FROM iot_registration_audit
+                WHERE node_id = {rig.First} AND details ->> 'command_id' = {id}
+                    AND details ->> 'event_type' = 'command_late_ack'
+                """).SingleAsync()));
+        }, bridge, time);
+    }
+
+    [Fact]
     public Task Node_contact_and_electrical_freshness_are_independent_and_ack_expires()
     {
         var bridge = new ReportedPowerBridge();
@@ -1447,6 +1485,8 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         public object[] AutoTransitions { get; set; } = [];
         public Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? FeederHistory { get; set; }
         private JsonElement? desired;
+        private JsonElement? successful;
+        private Ack? successfulAck;
         private Ack? lastAck;
         private Sample? latestTelemetry;
 
@@ -1456,10 +1496,14 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         private string CommandId => desired!.Value.GetProperty("commandId").GetString()!;
 
         public Dictionary<string, DateTimeOffset> ReceiptTimes { get; } = [];
+        public Dictionary<string, long?> ExecutionTimes { get; } = [];
+        public Dictionary<string, long?> ExpiryTimes { get; } = [];
         public void Acknowledge(string lampCommand)
         {
             lastAck = new(DateTimeOffset.UtcNow.AddSeconds(-20), CommandId, lampCommand);
             ReceiptTimes[CommandId] = DateTimeOffset.UtcNow;
+            successful = desired;
+            successfulAck = lastAck;
         }
 
         private async Task<HttpResponseMessage> ReadReceiptsAsync(HttpRequestMessage request, CancellationToken ct)
@@ -1468,7 +1512,9 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             var receipts = keys.EnumerateArray()
                 .Select(key => new { deviceId = key.GetProperty("deviceId").GetString(), commandId = key.GetProperty("commandId").GetString()! })
                 .Where(key => key.deviceId == "probe" && ReceiptTimes.ContainsKey(key.commandId))
-                .Select(key => new { key.deviceId, key.commandId, receivedAt = ReceiptTimes[key.commandId] });
+                .Select(key => new { key.deviceId, key.commandId, receivedAt = ReceiptTimes[key.commandId],
+                    executedAtUnixSeconds = ExecutionTimes.GetValueOrDefault(key.commandId),
+                    expiresAtUnixSeconds = ExpiryTimes.GetValueOrDefault(key.commandId) });
             return Json(receipts);
         }
 
@@ -1518,6 +1564,10 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
                 {
                     deviceId = "probe",
                     desiredCommand = desired,
+                    lastSuccessfulCommand = successful,
+                    lastSuccessfulAck = successfulAck is { } success ? new {
+                        receivedAt = success.ReceivedAt, data = new { success.CommandId, success.LampCommand },
+                    } : null,
                     commandAcknowledged = desired is not null && lastAck?.CommandId == CommandId,
                     lastCommandAck = lastAck is { } ack ? new
                     {

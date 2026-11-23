@@ -99,8 +99,11 @@ api.MapPost("/{deviceId}/command", async (string deviceId, CommandRequest reques
     catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
     if (request.CommandId is not null && !Guid.TryParseExact(request.CommandId, "N", out _))
         return Results.BadRequest(new { error = "Invalid command ID." });
+    if (request.ExpiresAtUnixSeconds is { } expiry && expiry <= DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+        return Results.BadRequest(new { error = "Command has expired." });
     var desired = new LampCommand(mode, mode == "AUTO" ? null : command,
-        CommandId: request.CommandId, AutoSchedule: request.AutoSchedule, AutoType: autoType);
+        CommandId: request.CommandId, AutoSchedule: request.AutoSchedule, AutoType: autoType,
+        ExpiresAtUnixSeconds: request.ExpiresAtUnixSeconds);
     try
     {
         var saved = await mqtt.SetCommandAsync(deviceId, desired, cancellationToken);

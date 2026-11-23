@@ -125,12 +125,12 @@ Giữ nguyên chữ HOA trong `mode` và `command` của kênh IoT bridge. Đây
 Từ 07:00 đến trước 19:00, AUTO điều khiển theo cảm biến ánh sáng. Từ 19:00 đến trước 07:00 hôm sau, AUTO luôn bật. Node dùng giờ địa phương từ DS3231. Lệnh MANUAL giữ lại lịch AUTO đã lưu.
 
 1. Khi POST trả `202 Accepted`, giữ `command_id` và hiển thị **Đang chờ node xác nhận**.
-2. Gọi `GET /api/v1/iot/nodes/{nodeId}/command` để đọc lịch, trạng thái lệnh hiện tại và `power_state`.
-3. Hiển thị **Node đã xác nhận** khi `command_id` khớp và `command_acknowledged: true`. Nếu GET trả mã khác, lệnh mới đã thay lệnh đang theo dõi.
+2. Gọi `GET /api/v1/iot/nodes/{nodeId}/command` để đọc lệnh thành công gần nhất, lịch đã xác nhận và `power_state`. Lệnh mới đang chờ không thay kết quả GET. Chưa có lệnh thành công: `status: no_data`, command_id/mode/command null, command_acknowledged false.
+3. Theo dõi lệnh vừa POST bằng command_id trong `GET /api/v1/iot/nodes/{nodeId}/command/history`. GET command chỉ đổi sang ID đó khi node xác nhận; ID khác có thể là lệnh thành công trước đó.
 4. Hiển thị **Bật** hoặc **Tắt** theo `power_state` do backend trả. Trong AUTO, đọc lại để cập nhật khi lịch hoặc cảm biến làm mạch đổi đầu ra. Khi dữ liệu đầu ra thiếu hoặc quá hạn, hiển thị **Chưa rõ**.
 5. Khi cần xác minh mạch thực sự ngắt tải, đọc mẫu điện mới sau OFF. ACK xác nhận firmware đã xử lý lệnh.
 
-Lệnh mới có `expires_at` theo UTC để giới hạn thực thi sau 5 phút. Đây không phải hạn trạng thái lịch sử: khi chưa có ACK, lịch sử tiếp tục trả `pending`, không hiển thị `expired`. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
+Lệnh mới có `expires_at` theo UTC, hạn thực hiện 20 giây tính từ lúc BE tiếp nhận. Bridge và gateway ngừng phát lại khi hết hạn; node kiểm tra RTC ngay trước đổi đầu ra. Hết hạn không tự đảo trạng thái đèn. AUTO đã áp dụng tiếp tục chạy. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
 
 ### Lịch sử điều khiển
 
@@ -140,7 +140,11 @@ Response có `page`, `page_size`, `total` và `items`. Mới nhất ở đầu. 
 
 Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, `mode`, `command`, lịch đã gửi trong `auto_schedule`, tên hiển thị của người gửi trong `requested_by` và giờ UTC `requested_at`. Nếu tài khoản đã bị xóa, `requested_by` trả mã tài khoản đã ghi audit. `bridge_accepted_at` ghi lúc backend lưu xác nhận chấp nhận lệnh từ Bridge.
 
-`status` chỉ có `pending` (chưa nhận ACK đúng mã lệnh) và `success` (đã nhận ACK hợp lệ từ node). Không còn hạn 12 giây hay trạng thái `expired` trong lịch sử: ACK muộn vẫn chuyển thành `success`; chưa ACK thì tiếp tục `pending`. Đây là trạng thái xác nhận; hạn thực thi lệnh của Bridge vẫn giữ 5 phút để tránh thực hiện lệnh cũ ngoài ý muốn. Khi Bridge không truy cập được, API trả `503`.
+`status`: `pending` khi chưa có ACK và còn hạn; `expired` khi hết 20 giây chưa có xác nhận hợp lệ; `success` khi node xác nhận thực hiện. ACK nhận ở giây 21 chỉ được công nhận nếu executed_at chứng minh đã thực hiện trước hạn (ví dụ giây 18); ACK sau hạn thiếu giờ thực hiện bị từ chối. ACK trễ hợp lệ đổi đúng dòng lịch sử từ expired sang success, có late_ack=true và ghi audit command_late_ack một lần. Các trường bổ sung: expires_at, executed_at (có thể null với firmware cũ), acknowledged_at, late_ack. Khi Bridge không truy cập được, API trả `503`, không suy diễn trạng thái ACK.
+
+GET command trả status success hoặc no_data; POST trả status pending. GET command lấy lệnh thành công mới nhất theo version phát lệnh, ACK cũ về trễ không ghi đè thành công mới hơn. Trong AUTO, mode AUTO không biểu thị đèn đang ON hay OFF; power_state và mẫu điện phản ánh đầu ra quan sát.
+
+Phải deploy đồng bộ BE, Bridge và nạp firmware node/gateway; RTC DS3231 giữ giờ Việt Nam, ACK chuyển sang UTC Unix seconds. Đồng hồ sai sẽ ảnh hưởng xét hạn. Firmware cũ không có giờ thực hiện chỉ được công nhận nếu ACK về trước hạn. Không có thay đổi mã nguồn FE trong đợt này.
 
 Lịch sử cũng gồm các lần AUTO thực sự đổi ON/OFF theo telemetry của node:
 - `requested_by: "sensor"`, `mode: "AUTO"`, `command: "ON"` hoặc `"OFF"`, `status: "success"`.

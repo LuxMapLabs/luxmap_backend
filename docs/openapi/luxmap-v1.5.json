@@ -12260,7 +12260,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Đọc lệnh hiện tại và ACK của node IoT",
+        "summary": "Đọc lệnh thành công gần nhất; no_data nếu chưa có ACK hợp lệ",
         "operationId": "getIotNodesNodeidCommand",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
@@ -26255,6 +26255,24 @@
               null
             ],
             "description": "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "late_ack": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -26286,7 +26304,8 @@
       "IotCommandHistoryStatus": {
         "enum": [
           "success",
-          "pending"
+          "pending",
+          "expired"
         ],
         "type": "string"
       },
@@ -26338,9 +26357,11 @@
           },
           "mode": {
             "type": "string",
+            "nullable": true,
             "enum": [
               "AUTO",
-              "MANUAL"
+              "MANUAL",
+              null
             ]
           },
           "command": {
@@ -26375,6 +26396,28 @@
               null
             ],
             "description": "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "success",
+              "no_data"
+            ],
+            "description": "POST: pending. GET: success của lệnh được node xác nhận gần nhất, hoặc no_data."
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "late_ack": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

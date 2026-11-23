@@ -158,7 +158,9 @@ iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot
 
 iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [2]
 
-S["IotCommandHistoryStatus"]["enum"] = ["success", "pending"]
+S["IotCommandHistoryStatus"]["enum"] = ["success", "pending", "expired"]
+iot_property("IotCommandStatus", "status")["enum"] = ["pending", "success", "no_data"]
+iot_property("IotCommandStatus", "status")["description"] = "POST: pending. GET: success của lệnh được node xác nhận gần nhất, hoặc no_data."
 iot_property("IotCommandHistoryItem", "requested_by")["description"] = (
     "Tên người gửi (fallback user ID); sensor cho lần AUTO đổi ON/OFF đã được telemetry xác nhận."
 )
@@ -169,7 +171,7 @@ iot_property("IotCommandHistoryItem", "command")["description"] = (
 S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
-    iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
+    iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"] + ([None] if schema == "IotCommandStatus" else [])
     iot_property(schema, "command")["enum"] = ["ON", "OFF", None]
     iot_property(schema, "auto_schedule")
     auto_type = iot_property(schema, "auto_type")
@@ -471,7 +473,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes/{nodeId}"): "Đọc cấu hình nguồn node và ba chỉ số danh định đã lưu, không gọi Bridge",
     ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
-    ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",
+    ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh thành công gần nhất; no_data nếu chưa có ACK hợp lệ",
     ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/diagnostics/summary"): "Chẩn đoán tổng hợp theo trang, job lưu DB và phạm vi xã",

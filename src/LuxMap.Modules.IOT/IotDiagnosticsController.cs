@@ -445,7 +445,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         string nodeId, IotCommandRequest request, CancellationToken ct)
         => Accepted(await diagnostics.SendCommandAsync(nodeId, request, ct));
 
-    /// <summary>Đọc lệnh hiện tại và ACK từ node.</summary>
+    /// <summary>Đọc lệnh thành công gần nhất; no_data nếu chưa có lệnh được node xác nhận.</summary>
     [HttpGet("nodes/{nodeId}/command")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<IotCommandStatus>(StatusCodes.Status200OK)]
@@ -454,7 +454,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<IotCommandStatus> CommandAsync(string nodeId, CancellationToken ct)
         => diagnostics.CommandAsync(nodeId, ct);
 
-    /// <summary>Đọc lịch sử lệnh và chuyển trạng thái AUTO; chờ ACK không giới hạn thời gian, mới nhất trước.</summary>
+    /// <summary>Đọc lịch sử lệnh pending/success/expired, hạn thực hiện 20 giây; mới nhất trước.</summary>
     [HttpGet("nodes/{nodeId}/command/history")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<PagedResult<IotCommandHistoryItem>>(StatusCodes.Status200OK)]

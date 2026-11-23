@@ -6,7 +6,8 @@ record AutoSchedule(int? DayStartMinute, int? NightStartMinute)
     public bool IsValid() => DayStartMinute is >= 0 and < 1440 &&
         NightStartMinute is >= 0 and < 1440 && DayStartMinute != NightStartMinute;
 }
-record CommandRequest(string? Mode, string? Command, AutoSchedule? AutoSchedule = null, string? CommandId = null, string? AutoType = null);
+record CommandRequest(string? Mode, string? Command, AutoSchedule? AutoSchedule = null, string? CommandId = null, string? AutoType = null,
+    long? ExpiresAtUnixSeconds = null);
 record LampCommand(string Mode, string? Command, string? CommandId = null, long Version = 0,
     AutoSchedule? AutoSchedule = null, long? ExpiresAtUnixSeconds = null, string? AutoType = null);
 record TelemetryRequest(string? DeviceId, string? Mode, string? LampCommand,
@@ -14,7 +15,8 @@ record TelemetryRequest(string? DeviceId, string? Mode, string? LampCommand,
     string? SessionId = null, long? SequenceNumber = null, string? AppliedCommandId = null, string? AutoType = null);
 record TelemetryReading(TelemetryRequest Data, DateTimeOffset ReceivedAt, string? GatewayId = null);
 record SequenceRange(long Start, long End);
-record CommandAcknowledgement(string? DeviceId, string? CommandId, string? Mode, string? LampCommand, string? AutoType = null);
+record CommandAcknowledgement(string? DeviceId, string? CommandId, string? Mode, string? LampCommand, string? AutoType = null,
+    long? ExecutedAtUnixSeconds = null);
 record ReceivedCommandAck(CommandAcknowledgement Data, DateTimeOffset ReceivedAt);
 record DeviceState(string DeviceId, LampCommand DesiredCommand, DateTimeOffset? CommandUpdatedAt,
     TelemetryReading? LatestTelemetry, List<TelemetryReading> History,
@@ -23,6 +25,8 @@ record DeviceState(string DeviceId, LampCommand DesiredCommand, DateTimeOffset? 
 {
     public DateTimeOffset? LastSeenAt { get; init; }
     public DateTimeOffset? LastCommandAckAt { get; init; }
+    public LampCommand? LastSuccessfulCommand { get; init; }
+    public ReceivedCommandAck? LastSuccessfulAck { get; init; }
     public bool CommandAcknowledged => DesiredCommand.CommandId is not null &&
         LastCommandAck?.Data.CommandId == DesiredCommand.CommandId;
 }
@@ -52,6 +56,10 @@ sealed class DeviceStore
             }
         });
         archive = new TelemetryArchive(directory, devices.Values);
+        foreach (var id in devices.Keys.ToArray())
+            if (archive.ReadLastSuccess(id) is { } success &&
+                (devices[id].LastSuccessfulCommand is null || success.Command.Version > devices[id].LastSuccessfulCommand!.Version))
+                devices[id] = devices[id] with { LastSuccessfulCommand = success.Command, LastSuccessfulAck = success.Ack };
     }
     private DeviceState Get(string id) => devices.GetValueOrDefault(id)
         ?? new(id, new("AUTO", null, "initial-auto", 0, AutoType: "scheduled"), null, null, new());
@@ -91,16 +99,24 @@ sealed class DeviceStore
         {
             var state = Get(id);
             var autoType = AutoControl.Resolve(command.Mode, command.AutoType, command.AutoSchedule);
+            if (command.CommandId is { } key && archive.ReadTrackedCommand(id, key) is { } previous)
+            {
+                if (previous.Mode != command.Mode || previous.Command != command.Command || previous.AutoType != autoType ||
+                    command.AutoSchedule is not null && previous.AutoSchedule != command.AutoSchedule)
+                    throw new ArgumentException("Command ID already belongs to a different command.");
+                return previous; // A retry cannot extend the execution deadline or supersede a newer command.
+            }
             command = command with
             {
-                CommandId = command.CommandId ?? Guid.NewGuid().ToString("N"), ExpiresAtUnixSeconds = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
+                CommandId = command.CommandId ?? Guid.NewGuid().ToString("N"),
+                ExpiresAtUnixSeconds = Math.Min(command.ExpiresAtUnixSeconds ?? long.MaxValue, clock.GetUtcNow().AddSeconds(20).ToUnixTimeSeconds()),
                 AutoType = autoType,
                 AutoSchedule = autoType == "full_time" ? null : command.AutoSchedule ?? state.DesiredCommand.AutoSchedule ??
                     (command.Mode == "AUTO" ? new AutoSchedule(360, 1081) : null),
-                Version = Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), checked(state.DesiredCommand.Version + 1))
+                Version = Math.Max(clock.GetUtcNow().ToUnixTimeMilliseconds(), checked(state.DesiredCommand.Version + 1))
             };
             archive.TrackCommand(id, command);
-            Commit(state with { DesiredCommand = command, CommandUpdatedAt = DateTimeOffset.UtcNow });
+            Commit(state with { DesiredCommand = command, CommandUpdatedAt = clock.GetUtcNow() });
             return command;
         }
     }
@@ -175,6 +191,13 @@ sealed class DeviceStore
                 var receipt = archive.RecordReceipt(ack, receivedAt);
                 if (receipt is null) return;
                 receivedAt = receipt.Value;
+            }
+            var successful = archive.ReadTrackedCommand(ack.DeviceId!, ack.CommandId!);
+            if (successful is not null && (state.LastSuccessfulCommand is null ||
+                successful.Version > state.LastSuccessfulCommand.Version))
+            {
+                state = state with { LastSuccessfulCommand = successful, LastSuccessfulAck = new(ack, receivedAt) };
+                Commit(state);
             }
             if (isCurrent && !state.CommandAcknowledged)
                 Commit(state with
