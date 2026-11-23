@@ -19,7 +19,13 @@ namespace LuxMap.Modules.IOT;
 [Route("api/v{version:apiVersion}/iot")]
 public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
 {
-    public sealed record RegisterServerRequest(string ServerId, string? CommuneId = null, IotLocation? Location = null, [property: Range(0, 1000)] double RadiusKm = 0);
+    public sealed record RegisterServerRequest
+    {
+        public string ServerId { get; init; } = "";
+        public string? CommuneId { get; init; }
+        public IotLocation? Location { get; init; }
+        [Range(0, 1000)] public double RadiusKm { get; init; }
+    }
     public sealed record RegisteredServer(string ServerId);
 
     [HttpPost("servers")]
@@ -98,7 +104,12 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<PagedResult<IotServerNode>> ServerNodesAsync(string serverId, [FromQuery] PageQuery page, CancellationToken ct)
         => diagnostics.ServerNodesAsync(serverId, page.ToPageRequest(), ct);
 
-    public sealed record ServerLocationRequest(string CommuneId, IotLocation Location, [property: Range(0, 1000)] double RadiusKm = 0);
+    public sealed record ServerLocationRequest
+    {
+        public string CommuneId { get; init; } = "";
+        public IotLocation Location { get; init; } = null!;
+        [Range(0, 1000)] public double RadiusKm { get; init; }
+    }
 
     [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpGet("servers/{serverId}/gateways/routes")]

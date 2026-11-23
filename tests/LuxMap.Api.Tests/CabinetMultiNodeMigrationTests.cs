@@ -49,7 +49,7 @@ public sealed class CabinetMultiNodeMigrationTests(AssetImportFixture fixture)
             var nextSql = $"SELECT {PrefixedIds.IotNode.DefaultValueSql} AS \"Value\"";
             var originalNodeId = await db.Database.SqlQueryRaw<string>(nextSql).SingleAsync();
             await db.Database.ExecuteSqlRawAsync(
-                "INSERT INTO iot_node (node_id, cabinet_id, commune_id, data_source) VALUES ({0}, {1}, {2}, 'simulated')",
+                "INSERT INTO iot_node (node_id, cabinet_id, commune_id, data_source, node_role) VALUES ({0}, {1}, {2}, 'simulated', 'segment_controller')",
                 originalNodeId, cabinet.CabinetId, commune.CommuneId);
             var original = new IotNode { NodeId = originalNodeId, CabinetId = cabinet.CabinetId, CommuneId = commune.CommuneId };
 
