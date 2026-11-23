@@ -19,7 +19,7 @@ namespace LuxMap.Modules.IOT;
 [Route("api/v{version:apiVersion}/iot")]
 public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
 {
-    public sealed record RegisterServerRequest(string ServerId, string? CommuneId = null, IotLocation? Location = null);
+    public sealed record RegisterServerRequest(string ServerId, string? CommuneId = null, IotLocation? Location = null, [property: Range(0, 1000)] double RadiusKm = 0);
     public sealed record RegisteredServer(string ServerId);
 
     [HttpPost("servers")]
@@ -32,8 +32,8 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromServices] IotRegistrationStore registry, [FromServices] IOptions<IotOptions> options, CancellationToken ct)
     {
         var settings = options.Value;
-        if (!ValidServerId(request.ServerId))
-            throw Invalid("Server ID không hợp lệ.");
+        if (!ValidServerId(request.ServerId) || !ValidRadius(request.RadiusKm))
+            throw Invalid("Server ID hoặc radius_km không hợp lệ.");
         var baseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? null : settings.BaseUrl;
         // Backwards compatible with deployments configured with a single allowlisted Bridge.
         if (baseUrl is null && settings.AllowedOrigins.Length == 1) baseUrl = settings.AllowedOrigins[0];
@@ -44,7 +44,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         var id = request.ServerId.ToLowerInvariant();
         if (request.CommuneId is not null || request.Location is not null)
             ValidateLocation(request.CommuneId, request.Location);
-        await registry.RegisterServerAsync(id, uri, request.CommuneId, request.Location, ct);
+        await registry.RegisterServerAsync(id, uri, request.CommuneId, request.Location, request.RadiusKm, ct);
         return StatusCode(StatusCodes.Status201Created, new RegisteredServer(id));
     }
 
@@ -98,7 +98,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public Task<PagedResult<IotServerNode>> ServerNodesAsync(string serverId, [FromQuery] PageQuery page, CancellationToken ct)
         => diagnostics.ServerNodesAsync(serverId, page.ToPageRequest(), ct);
 
-    public sealed record ServerLocationRequest(string CommuneId, IotLocation Location);
+    public sealed record ServerLocationRequest(string CommuneId, IotLocation Location, [property: Range(0, 1000)] double RadiusKm = 0);
 
     [Obsolete("Use server_id-only APIs. Only legacy aliases saved by earlier releases are supported.")]
     [HttpGet("servers/{serverId}/gateways/routes")]
@@ -184,11 +184,13 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public async Task<IActionResult> UpdateServerLocationAsync(string serverId, ServerLocationRequest request,
         [FromServices] IotRegistrationStore registry, CancellationToken ct)
     {
-        if (!ValidServerId(serverId)) throw Invalid("Server ID không hợp lệ.");
+        if (!ValidServerId(serverId) || !ValidRadius(request.RadiusKm)) throw Invalid("Server ID hoặc radius_km không hợp lệ.");
         ValidateLocation(request.CommuneId, request.Location);
-        await registry.UpdateServerLocationAsync(serverId.ToLowerInvariant(), request.CommuneId, request.Location, ct);
+        await registry.UpdateServerLocationAsync(serverId.ToLowerInvariant(), request.CommuneId, request.Location, request.RadiusKm, ct);
         return NoContent();
     }
+
+    private static bool ValidRadius(double radiusKm) => double.IsFinite(radiusKm) && radiusKm >= 0 && radiusKm <= 1000;
 
     private static void ValidateLocation(string? communeId, IotLocation? location)
     {
@@ -208,12 +210,13 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     public sealed record RegisterNodeRequest
     {
         [Required] public string ServerId { get; init; } = "";
-        [Required, MaxLength(32)] public string CabinetId { get; init; } = "";
+
         [Required, MaxLength(32)] public string FeederId { get; init; } = "";
         [Required] public string DeviceId { get; init; } = "";
         [Required] public double NominalVoltage { get; init; }
         [Required] public double NominalCurrentMa { get; init; }
         [Required] public double NominalPowerMw { get; init; }
+        [Range(0, 1000)] public double RadiusKm { get; init; }
     }
 
     public sealed record RegisteredNode(string NodeId, string ServerId, string DeviceId, string FeederId);
@@ -242,13 +245,14 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             NominalVoltage = request.NominalVoltage,
             NominalCurrentMa = request.NominalCurrentMa,
             NominalPowerMw = request.NominalPowerMw,
+            RadiusKm = request.RadiusKm,
         };
-        if (!profile.IsValid())
-            throw Invalid("Thông tin feeder hoặc ngưỡng đo không hợp lệ.");
+        if (!profile.IsValid() || !ValidRadius(request.RadiusKm))
+            throw Invalid("Thông tin feeder, bán kính hoặc ngưỡng đo không hợp lệ.");
 
         var (nodeId, _, created) = await registry.RegisterNodeAsync(new CreateIotNodeRequest
         {
-            CabinetId = request.CabinetId, DataSource = DataSource.CalibrationRig,
+            DataSource = DataSource.CalibrationRig,
             SupportsRemoteControl = true,
         }, profile, nodes, sources, (communeId, existingSource, token) =>
             diagnostics.EnsureGatewayRouteAsync(profile.ServerId, request.DeviceId, communeId,
@@ -277,6 +281,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [Required] public double NominalVoltage { get; init; }
         [Required] public double NominalCurrentMa { get; init; }
         [Required] public double NominalPowerMw { get; init; }
+        [Range(0, 1000)] public double RadiusKm { get; init; }
     }
 
     /// <summary>Manager cập nhật nguồn và xác nhận quyền MQTT của node trên server đã chọn.</summary>
@@ -295,8 +300,9 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             ServerId = request.ServerId.ToLowerInvariant(), DeviceId = request.DeviceId, FeederId = request.FeederId,
             NominalVoltage = request.NominalVoltage, NominalCurrentMa = request.NominalCurrentMa,
             NominalPowerMw = request.NominalPowerMw,
+            RadiusKm = request.RadiusKm,
         };
-        if (!profile.IsValid() || !ValidServerId(profile.ServerId) ||
+        if (!profile.IsValid() || !ValidRadius(request.RadiusKm) || !ValidServerId(profile.ServerId) ||
             !IotDiagnosticsService.ValidMqttId(profile.DeviceId))
             throw Invalid("Thiếu server ID, thông tin thiết bị, tài sản hoặc ngưỡng đo hợp lệ.");
 

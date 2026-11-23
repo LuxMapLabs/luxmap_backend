@@ -39,13 +39,17 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         const string register = "/api/v1/iot/nodes";
         using var serverResponse = await admin.PostAsJsonAsync("/api/v1/iot/servers", new
         {
-            server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
+            server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 }, radius_km = 0.75,
         });
         Assert.Equal(HttpStatusCode.Created, serverResponse.StatusCode);
+        var serverRow = await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.IotServerRegistration>().SingleAsync(row => row.ServerId == server));
+        Assert.Equal(0.75, serverRow.RadiusKm);
+        using var invalidServerRadius = await admin.PutAsJsonAsync($"/api/v1/iot/servers/{server}/location", new { commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 }, radius_km = -0.1 });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidServerRadius.StatusCode);
 
         object Payload(string feederId, string deviceId) => new
         {
-            server_id = server, cabinet_id = cabinet, feeder_id = feederId, device_id = deviceId,
+            server_id = server, feeder_id = feederId, device_id = deviceId, radius_km = 0.1,
             nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
         };
 
@@ -67,6 +71,10 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
             .SingleAsync(node => node.NodeId == firstBody.GetProperty("node_id").GetString()));
         Assert.Equal(LuxMap.Shared.Contracts.Enums.DataSource.CalibrationRig, storedNode.DataSource);
         Assert.True(storedNode.SupportsRemoteControl);
+        Assert.Equal(cabinet, storedNode.CabinetId);
+        Assert.Equal(0.1, storedNode.RadiusKm);
+        using var invalidNodeRadius = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{storedNode.NodeId}", new { server_id = server, feeder_id = feeder, device_id = "P001", nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500, radius_km = 1001.0 });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidNodeRadius.StatusCode);
         using var repeat = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
         Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
         var repeatBody = await repeat.Content.ReadFromJsonAsync<JsonElement>();
@@ -103,7 +111,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var second = "identity-" + Guid.NewGuid().ToString("N");
         foreach (var server in new[] { first, second }) {
             using var created = await admin.PostAsJsonAsync("/api/v1/iot/servers", new {
-                server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 },
+                server_id = server, commune_id = fixture.CommuneId, location = new { lat = 13.5, lng = 109.5 }, radius_km = 0.75,
             });
             Assert.Equal(HttpStatusCode.Created, created.StatusCode);
             using var key = await admin.PostAsync($"/api/v1/iot/servers/{server}/credential", null);
@@ -116,6 +124,11 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var servers = await manager.GetFromJsonAsync<JsonElement>("/api/v1/iot/servers");
         Assert.Equal("online", servers.EnumerateArray().Single(x => x.GetProperty("server_id").GetString() == first).GetProperty("status").GetString());
         Assert.Equal("offline", servers.EnumerateArray().Single(x => x.GetProperty("server_id").GetString() == second).GetProperty("status").GetString());
+        Assert.Equal(0.75, servers.EnumerateArray().Single(x => x.GetProperty("server_id").GetString() == first).GetProperty("radius_km").GetDouble());
+        using var serverLocation = await admin.PutAsJsonAsync($"/api/v1/iot/servers/{first}/location", new { commune_id = fixture.CommuneId, location = new { lat = 13.6, lng = 109.6 }, radius_km = 1.25 });
+        Assert.Equal(HttpStatusCode.NoContent, serverLocation.StatusCode);
+        var updatedServers = await manager.GetFromJsonAsync<JsonElement>("/api/v1/iot/servers");
+        Assert.Equal(1.25, updatedServers.EnumerateArray().Single(x => x.GetProperty("server_id").GetString() == first).GetProperty("radius_km").GetDouble());
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/v1/iot/servers/{first}/nodes")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsync($"/api/v1/iot/servers/{first}/credential", null)).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await admin.GetAsync($"/api/v1/iot/servers/{first}/gateways/{second}/credential")).StatusCode);
@@ -123,8 +136,9 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var setup = new LightingTestRig(fixture);
         var cabinet = await setup.NewCabinetAsync();
         var feeder = await setup.NewFeederAsync(cabinet);
+        var requestedRadius = 0.25;
         object Payload(string server) => new {
-            server_id = server, cabinet_id = cabinet, feeder_id = feeder, device_id = "identity-probe",
+            server_id = server, feeder_id = feeder, device_id = "identity-probe", radius_km = requestedRadius,
             nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
         };
         using var registration = await admin.PostAsJsonAsync("/api/v1/iot/nodes", Payload(first));
@@ -162,13 +176,17 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Empty(bridge.Devices[first]);
         bridge.Devices[second].Clear();
         bridge.Devices[first].Add("identity-probe");
+        requestedRadius = 0.4;
+        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
+        var radiusUpdated = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/nodes/{node}");
+        Assert.Equal(0.4, radiusUpdated.GetProperty("radius_km").GetDouble());
         // Configuration remains readable while Bridge is unavailable, without exposing secrets/internal thresholds.
         bridge.RejectRequests = true;
         using var detailsResponse = await manager.GetAsync($"/api/v1/iot/nodes/{node}");
         Assert.Equal(HttpStatusCode.OK, detailsResponse.StatusCode);
         Assert.True(detailsResponse.Headers.CacheControl?.NoStore == true);
         var details = await detailsResponse.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(7, details.EnumerateObject().Count());
+        Assert.Equal(8, details.EnumerateObject().Count());
         Assert.Equal(node, details.GetProperty("node_id").GetString());
         Assert.Equal(first, details.GetProperty("server_id").GetString());
         Assert.Equal("identity-probe", details.GetProperty("device_id").GetString());
@@ -176,6 +194,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal(5, details.GetProperty("nominal_voltage").GetDouble());
         Assert.Equal(100, details.GetProperty("nominal_current_ma").GetDouble());
         Assert.Equal(500, details.GetProperty("nominal_power_mw").GetDouble());
+        Assert.Equal(0.4, details.GetProperty("radius_km").GetDouble());
         Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.GetAsync($"/api/v1/iot/nodes/{node}")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync("/api/v1/iot/nodes/NODE-999999999")).StatusCode);
@@ -216,6 +235,7 @@ public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
         var nodeList = await manager.GetFromJsonAsync<JsonElement>("/api/v1/iot/nodes?page=1&page_size=200");
         var unbound = nodeList.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("node_id").GetString() == node);
         Assert.Equal("unconfigured", unbound.GetProperty("status").GetString());
+        Assert.Equal(0.4, unbound.GetProperty("radius_km").GetDouble());
         Assert.Contains("identity-probe", removedSource.Profile); // preserved for historical lookups
         options.Nodes.Remove(node!);
         using var reattached = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(second));

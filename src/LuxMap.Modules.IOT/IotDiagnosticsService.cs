@@ -23,7 +23,7 @@ public sealed class IotOptions
     public Dictionary<string, NodeProfile> Nodes { get; set; } = new(StringComparer.Ordinal);
 }
 
-public sealed record IotServerProfile(string? BaseUrl, string? CommuneId = null, double? Latitude = null, double? Longitude = null, string? LegacyGatewayId = null);
+public sealed record IotServerProfile(string? BaseUrl, string? CommuneId = null, double? Latitude = null, double? Longitude = null, string? LegacyGatewayId = null, double RadiusKm = 0);
 
 public sealed record NodeProfile
 {
@@ -33,6 +33,7 @@ public sealed record NodeProfile
     public double NominalVoltage { get; init; }
     public double NominalCurrentMa { get; init; }
     public double NominalPowerMw { get; init; }
+    public double RadiusKm { get; init; }
     public double VoltageTolerancePercent { get; init; } = 10;
     // Legacy source fields retained for existing clients and stored profiles.
     public double CurrentTolerancePercent { get; init; } = 25;
@@ -55,7 +56,7 @@ public sealed record NodeProfile
 
 /// <summary>Persisted source configuration; independent of MQTT availability.</summary>
 public sealed record IotNodeSourceDetails(string NodeId, string ServerId, string DeviceId, string FeederId,
-    double NominalVoltage, double NominalCurrentMa, double NominalPowerMw);
+    double NominalVoltage, double NominalCurrentMa, double NominalPowerMw, double RadiusKm = 0);
 
 public sealed record IotMeasurement(
     DateTime ReceivedAt, string LampCommand, double Voltage, double CurrentMa, double PowerMw);
@@ -96,6 +97,7 @@ public sealed record IotNodeStatus(
     public string? CabinetId { get; init; }
     public string? CommuneId { get; init; }
     public IotLocation? Location { get; init; }
+    public double RadiusKm { get; init; }
 }
 
 public sealed record IotElectricalResult(
@@ -109,7 +111,7 @@ public sealed record IotElectricalResult(
 public sealed record IotLocation(
     [property: System.Text.Json.Serialization.JsonRequired] double Lat,
     [property: System.Text.Json.Serialization.JsonRequired] double Lng);
-public sealed record IotServerStatus(string ServerId, string Status, string? CommuneId = null, IotLocation? Location = null)
+public sealed record IotServerStatus(string ServerId, string Status, string? CommuneId = null, IotLocation? Location = null, double RadiusKm = 0)
 {
     public bool CredentialIssued { get; init; }
 }
@@ -677,7 +679,7 @@ public sealed partial class IotDiagnosticsService(
             throw new LuxMapException(ErrorCodes.AssetNotFound, HttpStatusCode.NotFound,
                 "Node chưa có cấu hình nguồn đo đang hoạt động.");
         return new(nodeId, profile.ServerId ?? "default", profile.DeviceId, profile.FeederId,
-            profile.NominalVoltage, profile.NominalCurrentMa, profile.NominalPowerMw);
+            profile.NominalVoltage, profile.NominalCurrentMa, profile.NominalPowerMw, profile.RadiusKm);
     }
 
     public async Task<IotElectricalResult> ElectricalAsync(string nodeId, CancellationToken ct)
@@ -732,14 +734,14 @@ public sealed partial class IotDiagnosticsService(
             from node in nodes
             join cabinet in db.Set<ElectricalCabinet>().AsNoTracking() on node.CabinetId equals cabinet.CabinetId
             where ids.Contains(node.NodeId)
-            select new { node.NodeId, node.CabinetId, node.CommuneId, Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X })
+            select new { node.NodeId, node.CabinetId, node.CommuneId, node.RadiusKm, Lat = cabinet.Geom.Y, Lng = cabinet.Geom.X })
             .ToDictionaryAsync(row => row.NodeId, ct);
         for (var index = 0; index < result.Length; index++)
             if (positions.TryGetValue(ids[index], out var position))
                 result[index] = result[index] with
                 {
                     CabinetId = position.CabinetId, CommuneId = position.CommuneId,
-                    Location = new(position.Lat, position.Lng),
+                    Location = new(position.Lat, position.Lng), RadiusKm = position.RadiusKm,
                 };
         return PagedResult<IotNodeStatus>.From(page, total, result);
     }
@@ -775,7 +777,7 @@ public sealed partial class IotDiagnosticsService(
             var location = visible && profile is { Latitude: double lat, Longitude: double lng }
                 ? new IotLocation(lat, lng) : null;
             var health = await ReadServerHealthAsync(uri, id, token);
-            result[index] = new(id, health.Status ?? "unreachable", visible ? communeId : null, location) {
+            result[index] = new(id, health.Status ?? "unreachable", visible ? communeId : null, location, visible ? profile?.RadiusKm ?? 0 : 0) {
                 CredentialIssued = health.CredentialIssued,
             };
         });

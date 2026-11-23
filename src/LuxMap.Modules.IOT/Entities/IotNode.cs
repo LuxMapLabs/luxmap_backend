@@ -39,6 +39,9 @@ public class IotNode : ICommuneScoped
     /// </summary>
     public required string? CabinetId { get; set; }
 
+    /// <summary>Configured coverage radius in kilometers.</summary>
+    public double RadiusKm { get; set; }
+
     /// <summary>
     /// <c>true</c> only for the self-built testbed (D-R7): the team never operates a commune's grid,
     /// so a device in the field only measures and reports.

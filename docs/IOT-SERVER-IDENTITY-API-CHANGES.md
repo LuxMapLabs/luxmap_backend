@@ -19,9 +19,9 @@ key và tuyến của chính nó. Một gateway hỗ trợ tối đa 32 device_i
 
 | API | Thay đổi | Quyền |
 |---|---|---|
-| POST /api/v1/iot/servers | JSON giữ nguyên; server_id chuẩn hóa chữ thường, dùng luôn cho MQTT | ManageSettings (Admin) |
-| GET /api/v1/iot/servers | Heartbeat theo đúng server_id, thêm credential_issued, không dựa vào gateway khác cùng Bridge | ReadNetwork, lọc xã |
-| PUT /api/v1/iot/servers/{serverId}/location | Không đổi JSON; cập nhật xã và GPS của cùng mã | ManageSettings |
+| POST /api/v1/iot/servers | Thêm radius_km (0–1000, mặc định 0); server_id chuẩn hóa chữ thường, dùng luôn cho MQTT | ManageSettings (Admin) |
+| GET /api/v1/iot/servers | Heartbeat theo đúng server_id, thêm credential_issued và radius_km, không dựa vào gateway khác cùng Bridge | ReadNetwork, lọc xã |
+| PUT /api/v1/iot/servers/{serverId}/location | Nhận radius_km (0–1000, mặc định 0); cập nhật xã, GPS và bán kính | ManageSettings |
 | POST /api/v1/iot/servers/{serverId}/credential | Mới, cấp key cho Client ID = username = server_id | ManageSettings |
 | GET /api/v1/iot/servers/{serverId}/credential | Mới, xem lại key của đúng server | ManageSettings |
 | DELETE /api/v1/iot/servers/{serverId}/credential | Mới, thu hồi key, xóa heartbeat và ngắt MQTT | ManageSettings |
@@ -59,7 +59,8 @@ POST https://luxmap.com.vn/api/v1/iot/servers
 {
   "server_id": "iot-server-01",
   "commune_id": "COM-070",
-  "location": { "lat": 10.965681, "lng": 106.504581 }
+  "location": { "lat": 10.965681, "lng": 106.504581 },
+  "radius_km": 0.75
 }
 ~~~
 
@@ -100,8 +101,8 @@ POST https://luxmap.com.vn/api/v1/iot/nodes
 ~~~json
 {
   "server_id": "iot-server-01",
-  "cabinet_id": "CAB-011",
   "feeder_id": "FDR-009",
+  "radius_km": 0.2,
   "device_id": "LUXMAP-P001",
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
@@ -116,7 +117,7 @@ POST https://luxmap.com.vn/api/v1/iot/nodes
 ~~~
 
 BE thêm device_id vào quyền MQTT của đúng server_id, gateway tự nhận danh sách mới.
-Request chỉ có 7 trường ở trên. Không gửi gateway_id, lamp_count_calibration, installed_lamp_count, data_source hoặc supports_remote_control. BE tự đặt data_source=calibration_rig và supports_remote_control=true cho bộ IoT testbed. Không thay đổi node đã có hoặc API /assets/iot-nodes.
+Request có 7 trường: server_id, feeder_id, device_id, ba ngưỡng danh định và radius_km. BE suy ra cabinet_id từ feeder_id; feeder phải được gán vào một tủ điện trong cùng xã với server. Nếu feeder chưa gán tủ, API trả 400. Bán kính hợp lệ từ 0 đến 1000 km. Không gửi gateway_id, lamp_count_calibration, installed_lamp_count, data_source hoặc supports_remote_control. BE tự đặt data_source=calibration_rig và supports_remote_control=true cho bộ IoT testbed. Không thay đổi node đã có hoặc API /assets/iot-nodes.
 Một device_id không được đồng thời thuộc hai nguồn trên cùng Bridge.
 
 ### Bước 4 — đọc trạng thái và danh sách node
@@ -124,7 +125,7 @@ Một device_id không được đồng thời thuộc hai nguồn trên cùng B
 GET https://luxmap.com.vn/api/v1/iot/servers
 
 ~~~json
-[{"server_id":"iot-server-01","status":"online","commune_id":"COM-070","location":{"lat":10.965681,"lng":106.504581},"credential_issued":true}]
+[{"server_id":"iot-server-01","status":"online","commune_id":"COM-070","location":{"lat":10.965681,"lng":106.504581},"radius_km":0.75,"credential_issued":true}]
 ~~~
 
 status: online (heartbeat trong 30 giây), offline (hết hạn/chưa heartbeat), unconfigured (chưa có tuyến),
@@ -178,7 +179,7 @@ và xử lý binding có đối chiếu sở hữu, không xóa node/lịch sử
 
 ## 5. PUT/DELETE nguồn và giới hạn vận hành
 
-PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004 dùng đúng 6 trường:
+PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004 dùng 7 trường, gồm radius_km:
 
 ~~~json
 {
@@ -187,7 +188,8 @@ PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004 dùng đúng 6 trường:
   "feeder_id": "FDR-009",
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
-  "nominal_power_mw": 500
+  "nominal_power_mw": 500,
+  "radius_km": 0.2
 }
 ~~~
 
@@ -253,7 +255,8 @@ Phản hồi 200 (ví dụ):
   "feeder_id": "FDR-009",
   "nominal_voltage": 5,
   "nominal_current_ma": 93,
-  "nominal_power_mw": 500
+  "nominal_power_mw": 500,
+  "radius_km": 0.2
 }
 ```
 
@@ -263,5 +266,5 @@ không phải số đo trực tiếp. Không trả password, khóa Bridge hoặc
 vẫn trả được khi gateway/Bridge offline. Cache-Control: no-store.
 401 chưa đăng nhập, 403 thiếu ReadNetwork, 404 node không tồn tại/ngoài xã hoặc chưa có nguồn đang hoạt động.
 Nguồn đã gỡ trả 404 ở GET cấu hình; node và lịch sử điện/lệnh vẫn giữ nguyên ở API tương ứng.
-FE có thể dùng sáu trường ngoài node_id cho PUT cùng URL bằng token Manager cùng xã.
+FE có thể dùng bảy trường ngoài node_id, gồm radius_km, cho PUT cùng URL bằng token Manager cùng xã.
 Admin tạo node qua POST; Admin không được cấp ManageAssets chỉ để gọi PUT.

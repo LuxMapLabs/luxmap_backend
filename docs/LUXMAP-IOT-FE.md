@@ -30,11 +30,12 @@ Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán n
 {
   "server_id": "iot-server-01",
   "commune_id": "COM-070",
-  "location": { "lat": 10.965681, "lng": 106.504581 }
+  "location": { "lat": 10.965681, "lng": 106.504581 },
+  "radius_km": 0.75
 }
 ```
 
-Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. JSON tạo server không có trường `base_url`; FE chỉ gửi server_id, commune_id và location. Địa chỉ Bridge do người triển khai cấu hình; nếu thiếu/sai hoặc chưa allowlist thì API trả 503 IOT_SOURCE_UNAVAILABLE. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường và GPS.
+Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. JSON tạo server không có trường `base_url`; FE gửi server_id, commune_id, location và radius_km (0–1000 km, mặc định 0). Địa chỉ Bridge do người triển khai cấu hình; nếu thiếu/sai hoặc chưa allowlist thì API trả 503 IOT_SOURCE_UNAVAILABLE. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường, GPS và radius_km.
 
 ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Client ID và username tự bằng server_id. Firmware tự yêu cầu danh sách node trên MQTT sau khi kết nối và làm mới mỗi 10 giây. Với gateway vật lý mới, Admin gọi `POST /api/v1/iot/servers/{serverId}/credential` một lần và nhập `password` từ phản hồi trên trang cấu hình ESP32. Gateway có thể kết nối khi danh sách node còn rỗng. Tránh lưu secret vào log hoặc bộ nhớ của FE.
 
@@ -45,8 +46,8 @@ ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Cl
 ```json
 {
   "server_id": "iot-server-01",
-  "cabinet_id": "CAB-011",
   "feeder_id": "FDR-009",
+  "radius_km": 0.2,
   "device_id": "LUXMAP-P001",
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
@@ -54,7 +55,7 @@ ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Cl
 }
 ```
 
-Request tạo node chỉ có 7 trường như trên. BE tự đặt data_source=calibration_rig và supports_remote_control=true; không nhập hiệu chuẩn hay số bóng. Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
+Request tạo node chỉ có 7 trường: server_id, feeder_id, device_id, ba ngưỡng danh định và radius_km. Backend suy ra cabinet_id từ feeder_id; feeder phải đã thuộc tủ điện trong cùng xã với server. radius_km hợp lệ từ 0 đến 1000 km, mặc định 0. BE tự đặt data_source=calibration_rig và supports_remote_control=true; không nhập hiệu chuẩn hay số bóng. Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
 
 API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response có `node_id`, `server_id`, `device_id`, `feeder_id`. Dùng `node_id` cho API điều khiển và đọc dữ liệu. Thêm node bằng API này tự thêm tuyến, dùng lại secret và liên kết trực tiếp với feeder. Các trụ và bóng được xác định theo feeder.
 
@@ -62,15 +63,15 @@ API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response 
 
 - Đọc `GET /api/v1/iot/servers` để lấy credential_issued và heartbeat của từng server. `GET /api/v1/iot/servers/{serverId}/nodes?page=1&page_size=20` trả node thuộc đúng server, có lọc xã. API routes cũ deprecated, chỉ trả tuyến của server đang chọn.
 - Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/feeder` (Body none) để chỉ gỡ khỏi feeder: 204 idempotent; giữ node trong tủ, giữ lịch sử, gỡ binding MQTT và relay. Không tự gửi ON/OFF. Sau đó dùng PUT để gắn lại.
-- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
+- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id`, `radius_km` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
 - Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, dữ liệu lịch sử và secret gateway được giữ; quyền MQTT của device_id bị gỡ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
 
 ## 3. Hiển thị trên bản đồ
 
 | API | Dữ liệu FE dùng |
 |---|---|
-| `GET /api/v1/iot/servers` | Marker gateway từ `server_id`, `commune_id`, `location.lat/lng` và `status`. `location: null` nghĩa là chưa có tọa độ hiển thị. |
-| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status`, `last_received_at`, `last_seen_at`, `last_command_ack_at` và `electrical_status`. status phản ánh liên lạc node; last_received_at vẫn là giờ nhận mẫu điện. |
+| `GET /api/v1/iot/servers` | Marker gateway từ `server_id`, `commune_id`, `location.lat/lng`, `radius_km` và `status`. `location: null` nghĩa là chưa có tọa độ hiển thị. |
+| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `radius_km`, `status`, `last_received_at`, `last_seen_at`, `last_command_ack_at` và `electrical_status`. status phản ánh liên lạc node; last_received_at vẫn là giờ nhận mẫu điện. |
 | `GET /api/v1/iot/poles/{poleId}/control` | Khi bấm trụ, lấy `feeder_id`, `node_id` và `can_control_feeder`. |
 | `GET /api/v1/map/poles` | `features[].properties.power_state` là trạng thái cấp điện của mạch chứa trụ. |
 | `GET /api/v1/map/poles/{poleId}` | `power_state` của trụ và của các bóng trong `fixtures[]`. |
@@ -236,7 +237,7 @@ Node gửi snapshot khi trạng thái đổi và định kỳ 30 giây khi đã 
 API dùng trung bình 2 mẫu điện hợp lệ, cảnh báo current_drop khi dòng giảm quá 5% so với nominal_current_ma.
 Không đếm bóng hư; không gửi lamp_count_calibration hoặc installed_lamp_count khi tạo node.
 Đặt nominal_voltage, nominal_current_ma và nominal_power_mw theo nguồn đo thực tế của cả feeder.
-PUT dùng UpdateNodeRequest chỉ 6 trường: server_id, device_id, feeder_id và 3 nominal_*. Không xuất các thuộc tính NodeProfile nội bộ ra Swagger; cấu hình/profile cũ vẫn đọc được.
+PUT dùng UpdateNodeRequest gồm 7 trường: server_id, device_id, feeder_id, radius_km và 3 nominal_*. Không xuất các thuộc tính NodeProfile nội bộ ra Swagger; cấu hình/profile cũ vẫn đọc được.
 
 | HTTP | `error.code` | Ý nghĩa |
 |---|---|---|
@@ -346,9 +347,9 @@ Chi tiết JSON, ngưỡng, thời gian và 17 mã lỗi: [IOT-DIAGNOSTICS.md](I
 ## Đọc cấu hình node trước khi sửa (19/11/2026)
 
 GET /api/v1/iot/nodes/{nodeId}, Bearer token ReadNetwork trong phạm vi xã, Body none.
-Trả node_id, server_id, device_id, feeder_id, nominal_voltage (V), nominal_current_ma (mA), nominal_power_mw (mW).
+Trả node_id, server_id, device_id, feeder_id, nominal_voltage (V), nominal_current_ma (mA), nominal_power_mw (mW) và radius_km.
 Đây là giá trị danh định đã lưu; không gọi Bridge và không trả secret. 404 khi node thiếu/ngoài xã/chưa có nguồn hoặc đã gỡ nguồn.
-Dùng sáu trường ngoài node_id cho PUT cùng URL bằng token Manager; Admin dùng POST tạo node.
+Dùng bảy trường ngoài node_id, gồm radius_km, cho PUT cùng URL bằng token Manager; Admin dùng POST tạo node.
 Xem JSON và chi tiết trong [IOT-SERVER-IDENTITY-API-CHANGES.md](IOT-SERVER-IDENTITY-API-CHANGES.md).
 
 

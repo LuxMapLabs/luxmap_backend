@@ -9270,7 +9270,7 @@
         "summary": "Admin đăng ký IoT server và vị trí, tự dùng Bridge cấu hình sẵn (không nhận base_url)",
         "operationId": "postIotServers",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "get": {
         "tags": [
@@ -9338,7 +9338,7 @@
         "summary": "Xem trạng thái các server IoT trong phạm vi truy cập",
         "operationId": "getIotServers",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/credential": {
@@ -9486,7 +9486,7 @@
         "summary": "Admin cấp MQTT key; Client ID và username bằng server_id",
         "operationId": "postIotServersServeridCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "get": {
         "tags": [
@@ -9612,7 +9612,7 @@
         "summary": "Admin xem lại key của đúng server_id; no-store",
         "operationId": "getIotServersServeridCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "delete": {
         "tags": [
@@ -9701,7 +9701,7 @@
         "summary": "Admin thu hồi key và ngắt kết nối server",
         "operationId": "deleteIotServersServeridCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/nodes": {
@@ -9828,7 +9828,7 @@
         "summary": "Danh sách node thuộc đúng server trong phạm vi xã, phân trang",
         "operationId": "getIotServersServeridNodes",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/gateways/routes": {
@@ -9946,7 +9946,7 @@
         "summary": "Liệt kê tuyến và trạng thái cấp secret trên bridge",
         "operationId": "getIotServersServeridGatewaysRoutes",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route": {
@@ -10105,7 +10105,7 @@
         "summary": "Đăng ký tuyến MQTT cho gateway và node",
         "operationId": "putIotServersServeridGatewaysGatewayidRoute",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential": {
@@ -10262,7 +10262,7 @@
         "summary": "Cấp MQTT key mới cho gateway",
         "operationId": "postIotServersServeridGatewaysGatewayidCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "get": {
         "tags": [
@@ -10417,7 +10417,7 @@
         "summary": "Admin xem lại MQTT secret của gateway",
         "operationId": "getIotServersServeridGatewaysGatewayidCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "delete": {
         "tags": [
@@ -10535,7 +10535,7 @@
         "summary": "Thu hồi MQTT secret và ngắt gateway",
         "operationId": "deleteIotServersServeridGatewaysGatewayidCredential",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/servers/{serverId}/location": {
@@ -10682,10 +10682,10 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Cập nhật xã/phường và tọa độ gateway",
+        "summary": "Cập nhật xã/phường, GPS và radius_km của gateway",
         "operationId": "putIotServersServeridLocation",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/poles/{poleId}/control": {
@@ -10970,10 +10970,10 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Admin đăng ký node với 7 trường; tự đặt calibration_rig và cho phép điều khiển",
+        "summary": "Admin đăng ký node với feeder_id và radius_km; backend suy ra cabinet_id",
         "operationId": "postIotNodes",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "get": {
         "tags": [
@@ -11050,7 +11050,7 @@
         "summary": "Xem trạng thái các node IoT trong phạm vi truy cập",
         "operationId": "getIotNodes",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/nodes/{nodeId}": {
@@ -11141,7 +11141,7 @@
         "summary": "Đọc cấu hình nguồn node và ba chỉ số danh định đã lưu, không gọi Bridge",
         "operationId": "getIotNodesNodeid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "put": {
         "tags": [
@@ -11286,10 +11286,10 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Manager cập nhật nguồn đo với 6 trường, kiểm phạm vi xã",
+        "summary": "Manager cập nhật nguồn đo và radius_km, kiểm phạm vi xã",
         "operationId": "putIotNodesNodeid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "delete": {
         "tags": [
@@ -11398,7 +11398,7 @@
         "summary": "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",
         "operationId": "deleteIotNodesNodeid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/nodes/{nodeId}/feeder": {
@@ -11509,7 +11509,7 @@
         "summary": "Gỡ node khỏi feeder, giữ node trong tủ và giữ lịch sử",
         "operationId": "deleteIotNodesNodeidFeeder",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/diagnostics/summary": {
@@ -11957,7 +11957,7 @@
         "summary": "Chẩn đoán điện trung bình hai mẫu, tương thích route node cũ",
         "operationId": "getIotNodesNodeidDiagnostics",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/nodes/{nodeId}/command": {
@@ -12154,7 +12154,7 @@
         "summary": "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
         "operationId": "postIotNodesNodeidCommand",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       },
       "get": {
         "tags": [
@@ -12263,7 +12263,7 @@
         "summary": "Đọc lệnh hiện tại và ACK của node IoT",
         "operationId": "getIotNodesNodeidCommand",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/nodes/{nodeId}/command/history": {
@@ -12410,7 +12410,7 @@
         "summary": "Đọc lịch sử điều khiển node IoT theo trang",
         "operationId": "getIotNodesNodeidCommandHistory",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/nodes/{nodeId}/electrical": {
@@ -12521,7 +12521,7 @@
         "summary": "Đọc mẫu điện gần nhất của node IoT",
         "operationId": "getIotNodesNodeidElectrical",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)"
+        "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
       }
     },
     "/api/v1/iot/feeders/{feederId}/electrical": {
@@ -27176,6 +27176,10 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -27240,6 +27244,10 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -27402,6 +27410,10 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           },
           "credential_issued": {
             "type": "boolean"
@@ -29258,7 +29270,6 @@
       },
       "RegisterNodeRequest": {
         "required": [
-          "cabinet_id",
           "device_id",
           "feeder_id",
           "nominal_current_ma",
@@ -29269,11 +29280,6 @@
         "type": "object",
         "properties": {
           "server_id": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "cabinet_id": {
-            "maxLength": 32,
             "minLength": 1,
             "type": "string"
           },
@@ -29297,6 +29303,12 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -29313,6 +29325,12 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -30030,6 +30048,12 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -31446,6 +31470,12 @@
             "format": "double"
           },
           "nominal_power_mw": {
+            "type": "number",
+            "format": "double"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
             "type": "number",
             "format": "double"
           }

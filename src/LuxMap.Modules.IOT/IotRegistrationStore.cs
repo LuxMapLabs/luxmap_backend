@@ -27,6 +27,7 @@ internal sealed record IotServerRegistration(string ServerId, string BaseUrl)
     public string? LegacyGatewayId { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
+    public double RadiusKm { get; set; }
 }
 internal sealed record IotSourceRegistration(string NodeId, string ServerId, string DeviceId, string Profile)
 {
@@ -96,7 +97,7 @@ public sealed class IotRegistrationStore(
     {
         var servers = new Dictionary<string, IotServerProfile>(configured.Servers, StringComparer.OrdinalIgnoreCase);
         foreach (var row in await db.Set<IotServerRegistration>().AsNoTracking().ToListAsync(ct))
-            servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude, row.LegacyGatewayId);
+            servers[row.ServerId] = new(row.BaseUrl, row.CommuneId, row.Latitude, row.Longitude, row.LegacyGatewayId, row.RadiusKm);
 
         var nodes = new Dictionary<string, NodeProfile>(StringComparer.Ordinal);
         var visibleNodes = db.Set<IotNode>().AsNoTracking()
@@ -121,7 +122,7 @@ public sealed class IotRegistrationStore(
         return new() { BaseUrl = configured.BaseUrl, Servers = servers, Nodes = nodes, AllowedOrigins = configured.AllowedOrigins };
     }
 
-    internal async Task RegisterServerAsync(string id, Uri uri, string? communeId, IotLocation? location, CancellationToken ct)
+    internal async Task RegisterServerAsync(string id, Uri uri, string? communeId, IotLocation? location, double radiusKm, CancellationToken ct)
     {
         if (options.Value.Servers.Keys.Contains(id, StringComparer.OrdinalIgnoreCase))
             throw Conflict();
@@ -129,13 +130,13 @@ public sealed class IotRegistrationStore(
         if (communeId is not null) await RequireCommuneAsync(communeId, ct);
         db.Add(new IotServerRegistration(id, origin)
         {
-            CommuneId = communeId, Latitude = location?.Lat, Longitude = location?.Lng,
+            CommuneId = communeId, Latitude = location?.Lat, Longitude = location?.Lng, RadiusKm = radiusKm,
         });
-        RecordRegistration(id, null, JsonSerializer.Serialize(new { base_url = origin, commune_id = communeId, location }, LuxMapJsonOptions.Default));
+        RecordRegistration(id, null, JsonSerializer.Serialize(new { base_url = origin, commune_id = communeId, location, radius_km = radiusKm }, LuxMapJsonOptions.Default));
         await SaveAsync(ct);
     }
 
-    internal async Task UpdateServerLocationAsync(string id, string communeId, IotLocation location, CancellationToken ct)
+    internal async Task UpdateServerLocationAsync(string id, string communeId, IotLocation location, double radiusKm, CancellationToken ct)
     {
         await RequireCommuneAsync(communeId, ct);
         var row = await db.Set<IotServerRegistration>().SingleOrDefaultAsync(server => server.ServerId == id, ct);
@@ -150,7 +151,8 @@ public sealed class IotRegistrationStore(
         row.CommuneId = communeId;
         row.Latitude = location.Lat;
         row.Longitude = location.Lng;
-        RecordRegistration(id, null, JsonSerializer.Serialize(new { commune_id = communeId, location }, LuxMapJsonOptions.Default));
+        row.RadiusKm = radiusKm;
+        RecordRegistration(id, null, JsonSerializer.Serialize(new { commune_id = communeId, location, radius_km = radiusKm }, LuxMapJsonOptions.Default));
         await SaveAsync(ct);
     }
 
@@ -167,9 +169,10 @@ public sealed class IotRegistrationStore(
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         // The feeder serializes repeat registrations. A new node row is private to this transaction.
         var feeder = await FeederControllerBinding.LockFeederAsync(db, profile.FeederId, ct);
-        if (feeder.CabinetId != request.CabinetId)
+        if (feeder.CabinetId is null)
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
-                "Feeder phải thuộc tủ điện đã chọn.");
+                "Feeder chưa được gán vào tủ điện.");
+        request = request with { CabinetId = feeder.CabinetId };
 
         var (settings, links) = await sources.LinksAsync(db, [profile.FeederId], ct);
         if (links.TryGetValue(profile.FeederId, out var existing))
@@ -178,7 +181,7 @@ public sealed class IotRegistrationStore(
             if (existing.Profile.ServerId != profile.ServerId || existing.Profile.DeviceId != profile.DeviceId ||
                 existing.Profile.NominalVoltage != profile.NominalVoltage ||
                 existing.Profile.NominalCurrentMa != profile.NominalCurrentMa ||
-                existing.Profile.NominalPowerMw != profile.NominalPowerMw ||
+                existing.Profile.NominalPowerMw != profile.NominalPowerMw || existing.Profile.RadiusKm != profile.RadiusKm ||
                 (profile.LampCountCalibration is not null &&
                  existing.Profile.LampCountCalibration != profile.LampCountCalibration) ||
                 node.DataSource != request.DataSource || node.SupportsRemoteControl != request.SupportsRemoteControl)
@@ -205,6 +208,7 @@ public sealed class IotRegistrationStore(
             throw Conflict();
 
         var nodeId = await nodes.CreateAsync(request, ct);
+        var createdNode = await nodes.NodeAsync(nodeId, ct);
         await SaveSourceAsync(nodeId, profile, createOnly: true, ct);
         var gatewayId = await ensureGatewayRoute(feeder.CommuneId, false, ct);
         await transaction.CommitAsync(ct);
@@ -266,6 +270,7 @@ public sealed class IotRegistrationStore(
             node.UpdatedAt = UtcMicrosecondClock.UtcNow();
         }
         var details = JsonSerializer.Serialize(profile with { ServerId = id }, LuxMapJsonOptions.Default);
+        node.RadiusKm = profile.RadiusKm;
         if (existing is null) db.Add(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
         else db.Entry(existing).CurrentValues.SetValues(new IotSourceRegistration(nodeId, id, profile.DeviceId, details));
         RecordRegistration(id, nodeId, details);

@@ -1857,6 +1857,12 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("node_role");
 
+                    b.Property<double>("RadiusKm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.0)
+                        .HasColumnName("radius_km");
+
                     b.Property<bool>("SupportsRemoteControl")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -2017,6 +2023,10 @@ namespace LuxMap.Persistence.Migrations
                     b.Property<double?>("Longitude")
                         .HasColumnType("double precision")
                         .HasColumnName("longitude");
+
+                    b.Property<double>("RadiusKm")
+                        .HasColumnType("double precision")
+                        .HasColumnName("radius_km");
 
                     b.HasKey("ServerId")
                         .HasName("pk_iot_server_registration");
