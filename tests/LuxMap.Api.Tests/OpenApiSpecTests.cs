@@ -47,17 +47,17 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     {
         var fields = Schema("RegisterNodeRequest").GetProperty("properties").EnumerateObject()
             .Select(p => p.Name).Order(StringComparer.Ordinal).ToArray();
-        Assert.Equal(new[] { "cabinet_id", "device_id", "feeder_id", "nominal_current_ma",
-            "nominal_power_mw", "nominal_voltage", "server_id" }, fields);
+        Assert.Equal(new[] { "device_id", "feeder_id", "nominal_current_ma",
+            "nominal_power_mw", "nominal_voltage", "radius_km", "server_id" }, fields);
     }
 
     [Fact]
-    public void Iot_node_update_has_six_fields_and_feeder_unlink_has_no_body()
+    public void Iot_node_update_has_seven_fields_and_feeder_unlink_has_no_body()
     {
         var fields = Schema("UpdateNodeRequest").GetProperty("properties").EnumerateObject()
             .Select(p => p.Name).Order(StringComparer.Ordinal).ToArray();
         Assert.Equal(new[] { "device_id", "feeder_id", "nominal_current_ma", "nominal_power_mw",
-            "nominal_voltage", "server_id" }, fields);
+            "nominal_voltage", "radius_km", "server_id" }, fields);
         var unlink = Spec.GetProperty("paths").GetProperty("/api/v1/iot/nodes/{nodeId}/feeder").GetProperty("delete");
         Assert.False(unlink.TryGetProperty("requestBody", out _));
         Assert.Equal(LuxMapPolicies.ManageAssets, unlink.GetProperty("x-luxmap-capability").GetString());
