@@ -23066,6 +23066,10 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -23130,6 +23134,10 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -23266,6 +23274,10 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           },
           "credential_issued": {
             "type": "boolean"
@@ -25100,7 +25112,6 @@
       },
       "RegisterNodeRequest": {
         "required": [
-          "cabinet_id",
           "device_id",
           "feeder_id",
           "nominal_current_ma",
@@ -25111,11 +25122,6 @@
         "type": "object",
         "properties": {
           "server_id": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "cabinet_id": {
-            "maxLength": 32,
             "minLength": 1,
             "type": "string"
           },
@@ -25139,6 +25145,12 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -25155,6 +25167,12 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -25859,6 +25877,12 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -27273,6 +27297,12 @@
             "format": "double"
           },
           "nominal_power_mw": {
+            "type": "number",
+            "format": "double"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
             "type": "number",
             "format": "double"
           }

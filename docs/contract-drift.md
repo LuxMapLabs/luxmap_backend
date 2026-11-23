@@ -2849,3 +2849,11 @@ Thông số danh định từ cấu hình đang hoạt động; không gọi Bri
 | **IIS-4** | Dòng trạng thái: `status_confidence` NULL, `last_sweep_id` / `last_run_id` NULL, `last_seen_at` = `last_evaluated_at` = lúc nạp. Ghi qua cổng `IInitialPoleStatus` → `PoleStatusPublication.StageForNewPole` (một writer), cùng `SaveChanges` với cột |
 | **IIS-5** | Cột chưa GPS vẫn nhận trạng thái nhưng không hiện trên bản đồ (không có điểm) |
 | **IIS-6** | Workbook: `initial_status` là cột cuối `Cột điện`, tuỳ chọn (workbook cũ không có cột vẫn nạp được); export để trống cột này. Template `assets-workbook*.xlsx` và `poles*.csv` đã cập nhật |
+
+## IOT-COVERAGE-RADIUS-1 — 23/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+POST /api/v1/iot/servers và PUT /api/v1/iot/servers/{serverId}/location nhận radius_km: số hữu hạn từ 0 đến 1000, mặc định 0; GET servers trả bán kính theo phạm vi xã.
+POST /api/v1/iot/nodes bỏ cabinet_id khỏi request và nhận radius_km với cùng giới hạn; backend khoá feeder, suy ra cabinet_id từ feeder đã gán tủ, rồi tạo node trong tủ đó. Feeder chưa thuộc tủ hoặc khác xã trả 400.
+PUT /api/v1/iot/nodes/{nodeId} cập nhật radius_km cùng nguồn; GET node chi tiết và GET danh sách node trả radius_km.
+Lưu radius của server trong iot_server_registration và radius của node trong iot_node, migration AddIotCoverageRadius. Giữ nguyên lịch sử điện, lỗi và lệnh; không sửa FE.
+Quyết định này mở rộng hợp đồng 6 trường ở mục IOT-NODE-FEEDER-DETACH-1: PUT hiện có thêm radius_km; POST node cũng nhận radius_km và không nhận cabinet_id.
