@@ -284,9 +284,9 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [Range(0, 1000)] public double RadiusKm { get; init; }
     }
 
-    /// <summary>Manager cập nhật nguồn và xác nhận quyền MQTT của node trên server đã chọn.</summary>
+    /// <summary>SystemAdmin cập nhật nguồn và xác nhận quyền MQTT của node trên server đã chọn.</summary>
     [HttpPut("nodes/{nodeId}")]
-    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
@@ -329,7 +329,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
     }
 
     [HttpDelete("nodes/{nodeId}")]
-    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
@@ -342,7 +342,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
 
     /// <summary>Gỡ nguồn và quyền MQTT của node khỏi feeder, giữ node trong tủ và giữ lịch sử.</summary>
     [HttpDelete("nodes/{nodeId}/feeder")]
-    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
