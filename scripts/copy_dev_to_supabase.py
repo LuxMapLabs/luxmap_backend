@@ -112,7 +112,6 @@ PLAN = [
     # when revoked, revoked). The code column carries what is printed on the pole — the target must be as trusted as the source.
     ("qr_code", QR_KEPT, "created_at, length(qr_id), qr_id"),
     ("fault_cluster", IN_COMMUNES, "cluster_id"),
-    ("lux_reading", IN_COMMUNES, "lux_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.
     ("work_order", IN_COMMUNES, "root_work_order_id IS NOT NULL, created_at, work_order_id"),
     ("survey_recurring_schedule", IN_COMMUNES, "created_at, length(schedule_id), schedule_id"),
@@ -141,6 +140,10 @@ PLAN = [
     ("luminance_history", f"{IN_COMMUNES} AND {KEPT_RUNS}", "sweep_id, pole_id"),
     ("pole_current_status", IN_COMMUNES, "pole_id"),
     ("work_order_pole_photo", POLE_PHOTO_KEPT, "captured_at, uploaded_at, length(photo_id), photo_id"),
+    # LUX-PHOTO: a reading may name the photo it was taken with (composite RESTRICT key), so it follows the photos and keeps
+    # only links to photos copied above, the same way FAULT_KEPT treats origin_pole_photo_id.
+    ("lux_reading", f"{IN_COMMUNES} AND (photo_id IS NULL OR photo_id IN "
+     f"(SELECT photo_id FROM public.work_order_pole_photo WHERE {POLE_PHOTO_KEPT}))", "lux_id"),
     ("fault", FAULT_KEPT, "fault_id"),
     ("work_order_fault", f"{IN_COMMUNES} AND fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT})",
      "work_order_id, fault_id"),

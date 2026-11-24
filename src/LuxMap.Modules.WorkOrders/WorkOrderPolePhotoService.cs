@@ -27,7 +27,7 @@ namespace LuxMap.Modules.WorkOrders;
 public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurrentActorAccessor actor,
     IObjectStore store, IOriginalJpegReader images, ISingleLampPhotoHinter hinter, IAuditTrail audit,
     WorkOrderPoleService poles, IPolePhotoPublication publication, IClipFrameSampler sampler, IOptions<PoleVideoOptions> videoOptions,
-    TimeProvider clock)
+    TimeProvider clock, IPhotoLuxLookup lux)
 {
     public const long MaxUploadBytes = 16 * 1024 * 1024;
     public const long MaxRequestBytes = 17 * 1024 * 1024;
@@ -76,7 +76,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         if (row.WithdrawnAt is not null)
             throw new LuxMapException("POLE_PHOTO_WITHDRAWN", HttpStatusCode.Conflict, "Use a new client_op_id for a new capture.",
                 new Dictionary<string, object?> { ["photo_id"] = row.PhotoId });
-        return Item(row);
+        return await Item(row, ct);
     }
 
     /// <summary>A hint the model port may return: a state, a confidence exactly when it is on or off, versions that say what produced it.</summary>
@@ -187,7 +187,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             if (await Replay() is { } winner) return (winner, false);
             throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
         }
-        return (Item(row), true);
+        return (await Item(row, ct), true);
     }
 
     public async Task<PagedResult<PolePhotoItem>> ListAsync(string id, string? poleId, PageRequest page, CancellationToken ct)
@@ -197,7 +197,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         if (poleId is not null) query = query.Where(p => p.PoleId == poleId);
         var count = await query.CountAsync(ct);
         var rows = await query.InCaptureOrder().Skip(page.Skip).Take(page.PageSize).ToArrayAsync(ct);
-        return PagedResult<PolePhotoItem>.From(page, count, rows.Select(Item).ToArray());
+        return PagedResult<PolePhotoItem>.From(page, count, await Items(rows, ct));
     }
 
     private async Task<WorkOrderPolePhoto> Photo(string id, string photoId, CancellationToken ct, bool includeWithdrawn = false)
@@ -206,7 +206,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         return await Photos(includeWithdrawn).AsNoTracking().SingleOrDefaultAsync(p => p.WorkOrderId == id && p.PhotoId == photoId, ct)
             ?? throw Error("POLE_PHOTO_NOT_FOUND", HttpStatusCode.NotFound);
     }
-    public async Task<PolePhotoItem> DetailAsync(string id, string photoId, CancellationToken ct) => Item(await Photo(id, photoId, ct));
+    public async Task<PolePhotoItem> DetailAsync(string id, string photoId, CancellationToken ct) => await Item(await Photo(id, photoId, ct), ct);
     public async Task<Stream> OpenAsync(string id, string photoId, bool thumbnail, CancellationToken ct)
     {
         var row = await Photo(id, photoId, ct);
@@ -256,7 +256,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
         if (row.Decision is not null) throw Error("POLE_PHOTO_ALREADY_DECIDED", HttpStatusCode.Conflict);
         if (request.FinalCvState != row.CvState && note is null) throw OptionalJson.Invalid("review_note");
         if (row.FinalCvState == request.FinalCvState && row.ReviewNote == note && row.ReviewedBy == ActorId)
-            return Item(row);
+            return await Item(row, ct);
         var before = new { row.PhotoId, row.FinalCvState, row.ReviewNote, row.ReviewedBy, row.ReviewedAt };
         row.FinalCvState = request.FinalCvState; row.ReviewNote = note; row.ReviewedBy = ActorId;
         row.ReviewedAt = UtcMicrosecondClock.UtcNow();
@@ -265,7 +265,7 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             new { row.PhotoId, row.FinalCvState, row.ReviewNote, row.ReviewedBy, row.ReviewedAt }));
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return Item(row);
+        return await Item(row, ct);
     }
 
     public async Task<PolePhotoItem> DecideAsync(string id, string photoId, PolePhotoDecisionRequest request, CancellationToken ct)
@@ -305,10 +305,21 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
             new { row.PhotoId, row.PoleId, row.CvState, row.Decision, row.StatusApplied, row.StatusReason, row.ArtifactVersion, provenance = input.LabelSnapshot }, row.DecisionNote));
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return Item(row);
+        return await Item(row, ct);
     }
 
-    private static PolePhotoItem Item(WorkOrderPolePhoto p)
+    private async Task<PolePhotoItem> Item(WorkOrderPolePhoto p, CancellationToken ct) => (await Items([p], ct))[0];
+
+    /// <summary>The snapshot of each row plus its linked lux reading, read live through <see cref="IPhotoLuxLookup"/> in one query.</summary>
+    private async Task<PolePhotoItem[]> Items(IReadOnlyList<WorkOrderPolePhoto> rows, CancellationToken ct)
+    {
+        var linked = await lux.ForPhotosAsync(rows.Select(p => p.PhotoId).ToArray(), ct);
+        return rows.Select(p => linked.TryGetValue(p.PhotoId, out var reading)
+            ? Snapshot(p) with { LuxId = reading.LuxId, LuxValue = reading.LuxValue, LuxMeasuredAt = reading.MeasuredAt }
+            : Snapshot(p)).ToArray();
+    }
+
+    private static PolePhotoItem Snapshot(WorkOrderPolePhoto p)
     {
         var path = $"/api/v1/work-orders/{p.WorkOrderId}/pole-photos/{p.PhotoId}";
         return new(p.PhotoId, p.WorkOrderId, p.PoleId, p.DataSource, p.CapturedAt, p.Lat, p.Lng, p.UploadedBy, p.UploadedAt,

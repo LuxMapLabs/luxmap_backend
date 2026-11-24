@@ -32,6 +32,16 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Lux_readings_and_pole_photos_carry_the_LUX_PHOTO_link()
+    {
+        foreach (var name in new[] { "CreateLuxReadingRequest", "LuxReadingResponse", "LuxReadingWithLuminanceResponse" })
+            Assert.True(Schema(name).GetProperty("properties").TryGetProperty("photo_id", out _), name);
+        var photo = Schema("PolePhotoItem").GetProperty("properties");
+        foreach (var field in new[] { "lux_id", "lux_value", "lux_measured_at" })
+            Assert.True(photo.TryGetProperty(field, out _), field);
+    }
+
+    [Fact]
     public void Iot_gateway_identity_is_derived_from_server_id_in_new_contract()
     {
         Assert.False(Schema("RegisterNodeRequest").GetProperty("properties").TryGetProperty("gateway_id", out _));

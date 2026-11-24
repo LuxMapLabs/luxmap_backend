@@ -43,6 +43,7 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddScoped<LuxMap.Modules.WorkOrders.IPolePhotoPublication, Review.ReviewedPolePhotoPublisher>();
         services.AddScoped<LuxMap.Modules.WorkOrders.IRepairStatusPublication, Review.RepairStatusPublisher>();
         services.AddScoped<LuxMap.Modules.WorkOrders.ISurveyFindingLookup, Review.SurveyFindingLookup>();
+        services.AddScoped<LuxMap.Modules.WorkOrders.IPhotoLuxLookup, LuxReadings.PhotoLuxLookup>();
         services.AddSingleton<LuxMap.Modules.Assets.IInitialPoleStatus, Review.InitialPoleStatusPublisher>();
         services.AddScoped<Review.SurveyMediaAccess>();
         services.AddOptions<Review.SurveyReviewOptions>().Bind(configuration.GetSection("SurveyReview"))

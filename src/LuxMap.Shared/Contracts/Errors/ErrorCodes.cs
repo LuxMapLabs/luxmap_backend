@@ -142,6 +142,18 @@ public static class ErrorCodes
     /// </remarks>
     public const string ServerOwnedField = "SERVER_OWNED_FIELD";
 
+    /// <summary>404 — the pole photo does not exist, was withdrawn, or is outside the caller's commune scope.</summary>
+    public const string PolePhotoNotFound = "POLE_PHOTO_NOT_FOUND";
+
+    /// <summary>400 — <c>POST /lux-readings</c> named a photo of a different pole than its <c>pole_id</c> (LUX-PHOTO).</summary>
+    public const string PhotoPoleMismatch = "PHOTO_POLE_MISMATCH";
+
+    /// <summary>
+    /// 409 — the photo already has a lux reading (LUX-PHOTO: at most one per photo). Retrying the SAME reading reuses its
+    /// <c>client_op_id</c> and gets 200; this code means a different reading.
+    /// </summary>
+    public const string PhotoLuxAlreadyLinked = "PHOTO_LUX_ALREADY_LINKED";
+
     // ── Authentication — Contract v1.2 section 2.10.6, except UNAUTHENTICATED (BE-08) ───
 
     /// <summary>

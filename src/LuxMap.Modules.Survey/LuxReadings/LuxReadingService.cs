@@ -1,6 +1,8 @@
 using System.Net;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Survey.Entities;
+using LuxMap.Modules.WorkOrders;
+using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts.Enums;
@@ -80,12 +82,18 @@ public sealed class LuxReadingService(LuxMapDbContext dbContext, ILogger<LuxRead
                 HttpStatusCode.NotFound,
                 "That pole does not exist, or it is outside your permitted commune scope.");
 
+        if (request.PhotoId is not null)
+        {
+            await CheckPhotoAsync(request.PhotoId, pole.PoleId, cancellationToken);
+        }
+
         var measuredAt = DateTime.SpecifyKind(request.MeasuredAt!.Value.ToUniversalTime(), DateTimeKind.Utc);
 
         var reading = new LuxReading
         {
             ClientOpId = request.ClientOpId!,
             PoleId = pole.PoleId,
+            PhotoId = request.PhotoId,
 
             // Taken from the pole, never from the body. The write guard checks that a commune is
             // inside the caller's scope; it does NOT check that it matches the pole's commune, so a
@@ -117,7 +125,14 @@ public sealed class LuxReadingService(LuxMapDbContext dbContext, ILogger<LuxRead
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException exception) when (IsDuplicateClientOp(exception))
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception, PhotoLinkIndex))
+        {
+            // Lost the race for this photo to another reading. No query after the failure: under /sync/push this may
+            // run inside a transaction the failure has already aborted.
+            dbContext.Entry(reading).State = EntityState.Detached;
+            throw PhotoAlreadyLinked(request.PhotoId!);
+        }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception, ClientOpIndex))
         {
             // Two retries can pass the lookup above at the same time; the unique index is the real
             // guard. Losing that race is still a duplicate, and a duplicate is a 200.
@@ -224,6 +239,7 @@ public sealed class LuxReadingService(LuxMapDbContext dbContext, ILogger<LuxRead
                 reading.LuxId,
                 reading.ClientOpId,
                 reading.PoleId,
+                reading.PhotoId,
                 reading.MeasuredAt,
                 reading.LuxValue,
                 reading.MeterModel,
@@ -240,13 +256,55 @@ public sealed class LuxReadingService(LuxMapDbContext dbContext, ILogger<LuxRead
             reading.LuxId,
             reading.ClientOpId,
             reading.PoleId,
+            reading.PhotoId,
             reading.MeasuredAt,
             reading.LuxValue,
             reading.MeterModel,
             ContractEnum.ToDbValue(reading.DataSource),
             reading.Note);
 
-    private static bool IsDuplicateClientOp(DbUpdateException exception)
+    private const string ClientOpIndex = "ux_lux_reading_client_op_id";
+    private const string PhotoLinkIndex = "ux_lux_reading_photo_id";
+
+    /// <summary>
+    /// LUX-PHOTO: the named photo must be live, in scope, of the same pole, and not yet carry a reading. Read through the
+    /// query filter, so a photo outside the caller's communes is simply not found (404, as for the pole).
+    /// </summary>
+    private async Task CheckPhotoAsync(string photoId, string poleId, CancellationToken cancellationToken)
+    {
+        var photoPoleId = await dbContext.Set<WorkOrderPolePhoto>()
+            .NotWithdrawn()
+            .Where(photo => photo.PhotoId == photoId)
+            .Select(photo => photo.PoleId)
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? throw new LuxMapException(
+                ErrorCodes.PolePhotoNotFound,
+                HttpStatusCode.NotFound,
+                "That photo does not exist, was withdrawn, or is outside your permitted commune scope.");
+
+        if (photoPoleId != poleId)
+        {
+            throw new LuxMapException(
+                ErrorCodes.PhotoPoleMismatch,
+                HttpStatusCode.BadRequest,
+                "That photo was taken at a different pole than pole_id.",
+                new Dictionary<string, object?> { ["photo_id"] = photoId, ["photo_pole_id"] = photoPoleId });
+        }
+
+        if (await dbContext.Set<LuxReading>().AnyAsync(reading => reading.PhotoId == photoId, cancellationToken))
+        {
+            throw PhotoAlreadyLinked(photoId);
+        }
+    }
+
+    private static LuxMapException PhotoAlreadyLinked(string photoId)
+        => new(
+            ErrorCodes.PhotoLuxAlreadyLinked,
+            HttpStatusCode.Conflict,
+            "That photo already has a lux reading. A retry of the same reading must reuse its client_op_id.",
+            new Dictionary<string, object?> { ["photo_id"] = photoId });
+
+    private static bool IsUniqueViolation(DbUpdateException exception, string constraint)
         => exception.InnerException is Npgsql.PostgresException { SqlState: "23505" } postgres
-           && postgres.ConstraintName == "ux_lux_reading_client_op_id";
+           && postgres.ConstraintName == constraint;
 }

@@ -2865,3 +2865,20 @@ GET /api/v1/iot/nodes/{nodeId}/command trả lệnh thành công gần nhất (s
 GET /api/v1/iot/nodes/{nodeId}/command/history giữ phân trang, status success/pending/expired; bổ sung executed_at, acknowledged_at, expires_at và late_ack. Sự kiện sensor vẫn success, không áp hạn chấp nhận lệnh cho AUTO chuyển trạng thái.
 ACK thêm executedAtUnixSeconds UTC: ACK sau hạn chỉ hợp lệ nếu thực hiện trong cửa sổ trước hạn. ACK hợp lệ muộn đổi cùng dòng lịch sử expired thành success, ghi audit command_late_ack khi BE đối chiếu; Bridge giữ sổ receipt bền vững. ACK cũ không ghi đè thành công có version mới hơn. GET command không còn phản ánh yêu cầu chưa ACK; FE theo dõi lệnh đang chờ bằng command_id trong history.
 Đồng bộ BE/Bridge/node/gateway; firmware cũ thiếu executedAtUnixSeconds chỉ xác nhận được khi ACK về trước hạn. DS3231 phải có giờ đúng. Giữ nguyên mã nguồn FE và dữ liệu lịch sử.
+
+## LUX-PHOTO — số đo lux gắn với ảnh cột, máy đo cầm tay (24/11/2026)
+
+| | |
+|---|---|
+| **Nguồn** | Yêu cầu WP6 (24/11): đo lux tuỳ chọn bằng máy đo ESP32 cầm tay (Bluetooth) ngay sau khi chụp ảnh / quay video cột trong phiếu; cần biết chắc số lux nào đi với ảnh nào thay vì ghép theo `pole_id` + thời gian |
+| **Decision maker / Date** | **Mỹ SELF-SIGNED 24/11/2026** (chốt trong chat). Chạm bề mặt API ⇒ nền tạm, chờ FW kế tiếp xác nhận. Contract **v1.23** |
+| **Consumer** | WP6: gửi `photo_id` sau khi upload ảnh thành công; ảnh lỗi hẳn thì gửi không kèm. WP5: hiện `lux_value` cạnh ảnh từ `PolePhotoItem`. WP4 / CV-12: `photo_id` trên `GET /lux-readings`. **Chưa báo** |
+| **Scope** | `POST /lux-readings`, hai `GET` lux, `POST /sync/push` (`lux_reading`), mọi response `PolePhotoItem`; migration `AddLuxReadingPhotoLink` |
+
+| Mã | Quyết định |
+|---|---|
+| **LUX-PHOTO-1** | `photo_id` tuỳ chọn trên `POST /lux-readings` = id `PPH-…` của ảnh hoặc clip cột. Kiểm trong `LuxReadingService` (sync dùng chung): ảnh không có / đã rút / ngoài phạm vi → `404 POLE_PHOTO_NOT_FOUND` (ngoài phạm vi KHÔNG trả 400, để không lộ ảnh tồn tại); khác cột → `400 PHOTO_POLE_MISMATCH`; đã gắn → `409 PHOTO_LUX_ALREADY_LINKED`. Trùng `client_op_id` vẫn trả `200` bản ghi cũ, không so `photo_id` |
+| **LUX-PHOTO-2** | **Mỗi ảnh tối đa một số đo.** Unique partial `ux_lux_reading_photo_id` trên `(photo_id, pole_id, commune_id) WHERE photo_id IS NOT NULL` — tương đương unique trên `photo_id` vì FK ghim hai cột còn lại; index này cũng phục vụ FK. Đua nhau → bắt `23505` theo tên → 409, không truy vấn sau lỗi. Đo lại = chụp ảnh mới |
+| **LUX-PHOTO-3** | FK ghép `fk_lux_reading_pole_photo` `(photo_id, pole_id, commune_id)` → `work_order_pole_photo`, `Restrict` — DB tự chặn ảnh khác cột / khác xã. Rút ảnh (xoá mềm) **không** đụng số đo và liên kết: lux là ground truth RQ1 |
+| **LUX-PHOTO-4** | `PolePhotoItem` thêm `lux_id`, `lux_value`, `lux_measured_at` (null khi chưa gắn), đọc **live** qua port `IPhotoLuxLookup` (WorkOrders khai, Survey hiện thực, một truy vấn theo lô). Không ghép theo thời gian. `photo_id` thêm vào response của cả ba endpoint lux |
+| **LUX-PHOTO-5** | §5.7 diễn đạt lại D-R15: `lux_value` từ điện thoại **hoặc máy đo cầm tay** (`meter_model = "LuxMap_ESP32"`), vẫn tương đối; **chỉ so cùng `meter_model`** — trộn hai thiết bị phá điều kiện "cùng máy" của D-R15. `meter_model` giữ không bắt buộc (không đổi tính bắt buộc), Contract ghi client nên luôn gửi. Server **không** dùng `LuxReading` để phân loại `dim` (dim từ sweep, D-R20); `photo_id` phục vụ ghép cặp cho đối chiếu RQ1 / CV-12. Yêu cầu này **mở lại D-R27** (từng nói không cần thêm trường cho `POST /lux-readings`) |

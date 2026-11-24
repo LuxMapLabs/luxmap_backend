@@ -1,6 +1,7 @@
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.Identity.Entities;
 using LuxMap.Modules.Survey.Entities;
+using LuxMap.Modules.WorkOrders.Entities;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Contracts;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
         builder.Property(reading => reading.MeasuredBy).HasColumnType("text").IsRequired();
         builder.Property(reading => reading.MeterModel).HasColumnType("text");
         builder.Property(reading => reading.Note).HasColumnType("text");
+        builder.Property(reading => reading.PhotoId).HasColumnType("text");
 
         // double precision, matching PoleCurrentStatus.StatusConfidence. A lux meter resolves to
         // about 0.1 lux and its own error dwarfs anything IEEE 754 introduces, so exact decimal
@@ -83,6 +85,24 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
             .WithMany()
             .HasForeignKey(reading => reading.PoleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // LUX-PHOTO: the photo the reading was taken with. Composite, so the database itself refuses a photo of another
+        // pole or commune (same shape as FaultOriginPolePhotoConfiguration); MATCH SIMPLE skips the check when photo_id is
+        // null. RESTRICT like every FK here, and photos are only ever withdrawn (soft), never deleted.
+        builder.HasOne<WorkOrderPolePhoto>()
+            .WithMany()
+            .HasForeignKey(reading => new { reading.PhotoId, reading.PoleId, reading.CommuneId })
+            .HasPrincipalKey(photo => new { photo.PhotoId, photo.PoleId, photo.CommuneId })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_lux_reading_pole_photo");
+
+        // At most one reading per photo. Unique on the FK's three columns rather than photo_id alone: photo_id is the
+        // photo's primary key and the FK pins the other two to it, so the two are equivalent — and this one index also
+        // serves the FK, so EF adds no second one. LuxReadingService maps a violation to 409 PHOTO_LUX_ALREADY_LINKED.
+        builder.HasIndex(reading => new { reading.PhotoId, reading.PoleId, reading.CommuneId })
+            .IsUnique()
+            .HasFilter("photo_id IS NOT NULL")
+            .HasDatabaseName("ux_lux_reading_photo_id");
 
         // Same shape for the person who took the reading. RESTRICT so an account cannot be removed
         // while measurements still point at it: losing who measured what would break the audit trail

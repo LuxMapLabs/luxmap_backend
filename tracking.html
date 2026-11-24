@@ -40,6 +40,21 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="lux-photo">
+    <strong>LUX-PHOTO — số đo lux gắn với ảnh cột · 24/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Theo yêu cầu WP6 (đo lux bằng máy ESP32 cầm tay ngay sau khi chụp ảnh / quay video cột): <code>photo_id</code> tuỳ chọn ở
+    <code>POST /lux-readings</code> (và <code>/sync/push</code>), trả lại ở cả ba endpoint lux; <code>PolePhotoItem</code> có thêm
+    <code>lux_id</code> / <code>lux_value</code> / <code>lux_measured_at</code> qua port <code>IPhotoLuxLookup</code>. Mỗi ảnh tối đa một số đo;
+    lỗi <code>POLE_PHOTO_NOT_FOUND</code> 404, <code>PHOTO_POLE_MISMATCH</code> 400, <code>PHOTO_LUX_ALREADY_LINKED</code> 409. FK ghép
+    <code>(photo_id, pole_id, commune_id)</code>, migration <code>AddLuxReadingPhotoLink</code>. Contract v1.23, drift LUX-PHOTO-1…5, SELF-SIGNED.</p>
+    <div class="bar"><i style="width:100%"></i></div>
+    <p><code>dotnet test</code> xanh (Api 1959 / 7 skip). 9 test mới (khứ hồi, không ảnh, ảnh không có / đã rút / ngoài xã, khác cột,
+    một số đo mỗi ảnh, đua 4 request, sync, rút ảnh giữ số đo) + 1 test OpenAPI + 1 ca script chép DB. Phá thử: bỏ kiểm cùng cột → 1 đỏ;
+    bỏ query filter xã → 1 đỏ. Kèm sửa: script chép Supabase chép <code>lux_reading</code> sau ảnh cột. Còn: báo WP6 / WP5; deploy VPS
+    (có migration).</p>
+  </div>
+
   <div class="card" id="repair-status">
     <strong>REPAIR-STATUS — nghiệm thu sửa chữa công bố cột normal · 19/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>

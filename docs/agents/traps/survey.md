@@ -47,6 +47,13 @@ không phải kết luận "không có điểm trong ±48 giờ". Quyết địn
 Lux là sự kiện đã xảy ra và là ground truth RQ1 — xoá pole không được âm thầm xoá dữ liệu nghiên cứu.
 Guard không thấy cascade của DB: xem `docs/agents/traps/commune-scope.md`, mục 1c. `measured_by` cũng `Restrict` tới `app_user` — xoá được người đo là mất dấu vết.
 
+**5. `lux_reading.photo_id` (LUX-PHOTO) đi sau ảnh cột ở mọi chỗ xoá / chép.**
+
+FK ghép `(photo_id, pole_id, commune_id)` → `work_order_pole_photo`, `Restrict`: teardown test xoá `lux_reading` **trước**
+`work_order_pole_photo`, `scripts/copy_dev_to_supabase.py` chép nó **sau** (và chỉ giữ liên kết tới ảnh được chép). Lux trên
+`PolePhotoItem` đọc live qua `IPhotoLuxLookup`, không nằm trong bản chụp lúc upload — mọi đường trả `PolePhotoItem` phải đi qua
+`Items(...)` của `WorkOrderPolePhotoService`, không gọi thẳng `Snapshot(...)`.
+
 **Phân quyền (Contract v1.7):** `POST` = `RecordLuxReading` (**chỉ Kỹ sư hiện trường**), `GET` =
 `ReadLuxReadings` (cả bốn vai trò). Phạm vi xã vẫn canh riêng qua đọc pole và guard; lịch sử D-R5 ở `docs/contract-drift.md`.
 

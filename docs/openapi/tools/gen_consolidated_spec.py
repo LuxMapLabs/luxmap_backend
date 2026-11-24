@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.22"
+d["info"]["version"] = "1.23"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -56,6 +56,7 @@ d["info"]["description"] = (
     "v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. "
     "v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. "
     "v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. "
+    "v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. "
     "WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm "
     "/work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
@@ -95,7 +96,7 @@ TAGS = OrderedDict([
     ("PoleAssetPhotos", "Gallery cột online-only — APH-1; upload manager/field_engineer, đọc ReadNetwork, ẩn ManageAssets."),
     ("CabinetAssetPhotos", "Gallery tủ online-only — APH-1; Evidence, giữ bytes khi ẩn."),
     ("AssetImport", "Nhập tài sản CSV/GeoJSON theo từng loại file — Contract §5.3."),
-    ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
+    ("LuxReadings", "Số đo sáng TƯƠNG ĐỐI bằng điện thoại hoặc máy đo cầm tay; chỉ so cùng meter_model — Contract §5.7. Ghi = Kỹ sư hiện trường (cap:record_lux_reading)."),
     ("Poles", "Cột đèn trên bản đồ — Contract §5.1. CHƯA HIỆN THỰC (BE-14, BE-20)."),
     ("Segments", "Đoạn đường — Contract §5.2. CHƯA HIỆN THỰC (BE-14)."),
     ("Faults", "Sự cố — Contract §5.4. GET (BE-40, F-1…F-6) và PATCH (BE-19, R-1…R-9) đã hiện thực; POST (BE-41) CHƯA."),
@@ -252,7 +253,7 @@ SUMMARY = {
     # POLE-PHOTO-AI, PP-1…PP-10 — Mỹ SELF-SIGNED 15/10/2026, nền tạm; WP5/WP6 chưa báo.
     ("post", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Người được giao tải JPEG một cột: AI on/off/inconclusive; 201 mới / 200 replay. Chỉ đổi trạng thái khi Quản lý xác nhận",
     ("get", "/api/v1/work-orders/{id}/pole-photos"): "[TẠM — POLE-PHOTO] Ảnh đã lưu theo phiếu, lọc pole_id, phân trang; không suy luận lại",
-    ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO] Kết quả AI và quyết định đã lưu; quyền qua phiếu và xã của ảnh",
+    ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO] Kết quả AI và quyết định đã lưu; quyền qua phiếu và xã của ảnh. lux_id / lux_value / lux_measured_at: số đo gắn bằng photo_id (LUX-PHOTO), null khi chưa có",
     ("delete", "/api/v1/work-orders/{id}/pole-photos/{photo_id}"): "[TẠM — POLE-PHOTO-WITHDRAW PP-16…PP-19] Người được giao hủy mềm ảnh/clip chưa quyết, phiếu in_progress; 204 idempotent kể cả retry sau done. Giữ bytes/audit; ảnh đã hủy không còn đọc/duyệt được, replay upload trả 409 POLE_PHOTO_WITHDRAWN (details.photo_id), cần client_op_id mới",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/thumbnail"): "[TẠM — POLE-PHOTO] JPEG thumbnail bỏ metadata, proxy có kiểm quyền, no-store",
     ("get", "/api/v1/work-orders/{id}/pole-photos/{photo_id}/original"): "[TẠM — POLE-PHOTO] JPEG gốc nguyên byte, proxy có kiểm quyền, no-store",
@@ -326,7 +327,7 @@ SUMMARY = {
     ("get", "/api/v1/admin/artifact-versions/{id}/usage"): "[BE-34] Kết quả nào do phiên bản này sinh ra: đếm theo loại, theo data_source",
     ("post", "/api/v1/auth/refresh"): "Xoay vòng refresh token (mobile)",
     ("post", "/api/v1/auth/logout"): "Thu hồi refresh token (mobile); luôn 204",
-    ("post", "/api/v1/lux-readings"): "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ",
+    ("post", "/api/v1/lux-readings"): "Ghi số đo lux; trùng client_op_id trả 200 kèm bản ghi cũ. photo_id tuỳ chọn (LUX-PHOTO): ảnh/clip còn hiệu lực của cùng cột, mỗi ảnh tối đa một số đo — không thấy 404 POLE_PHOTO_NOT_FOUND, khác cột 400 PHOTO_POLE_MISMATCH, đã gắn 409 PHOTO_LUX_ALREADY_LINKED",
     ("get", "/api/v1/lux-readings"): "Kéo số đo lux hàng loạt kèm nearest_luminance (hiện luôn null)",
     ("get", "/api/v1/lux-readings/poles/{poleId}"): "Chuỗi số đo của một cột, sắp theo measured_at, có phân trang",
     ("post", "/api/v1/auth/web/login"): "Đăng nhập web; refresh token vào cookie",

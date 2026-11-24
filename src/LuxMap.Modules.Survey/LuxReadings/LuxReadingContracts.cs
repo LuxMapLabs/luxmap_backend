@@ -33,6 +33,13 @@ public sealed record CreateLuxReadingRequest
     [Range(0, double.MaxValue, ErrorMessage = "lux_value must be zero or greater.")]
     public double? LuxValue { get; init; }
 
+    /// <summary>
+    /// Optional <c>PPH-…</c> id of the pole photo or clip this reading was taken with (LUX-PHOTO). Must be a live photo of
+    /// the same pole, inside the caller's scope, with no reading linked yet.
+    /// </summary>
+    [MaxLength(32)]
+    public string? PhotoId { get; init; }
+
     [MaxLength(128)]
     public string? MeterModel { get; init; }
 
@@ -61,6 +68,7 @@ public sealed record LuxReadingResponse(
     string LuxId,
     string ClientOpId,
     string PoleId,
+    string? PhotoId,
     DateTime MeasuredAt,
     double LuxValue,
     string? MeterModel,
@@ -83,6 +91,7 @@ public sealed record LuxReadingWithLuminanceResponse(
     string LuxId,
     string ClientOpId,
     string PoleId,
+    string? PhotoId,
     DateTime MeasuredAt,
     double LuxValue,
     string? MeterModel,
