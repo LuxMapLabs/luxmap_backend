@@ -392,3 +392,46 @@ AUTO theo giờ:
 - Node lưu loại AUTO và lịch trong NVS, giữ qua mất điện. ACK full_time phải có autoType full_time; ACK firmware cũ không được dùng để xác nhận full_time.
 - Không đổi R002, trung bình INA226 16 lần, chế độ đo FAST, nguồn relay hay lịch truyền LoRa. Firmware chưa được nạp tự động.
 - Cần deploy BE + Bridge mới và nạp cả firmware node/gateway. full_time vẫn dùng cơ chế xác thực, quyền, TTL và ACK hiện có; RTC cần hợp lệ để nhận lệnh mới có hạn.
+
+## Thêm nhiều node bằng Excel (24/11/2026)
+
+`POST https://luxmap.com.vn/api/v1/iot/nodes/import`
+
+Dùng Bearer token **Admin**. Postman → Body → form-data → key `file`, đổi kiểu từ Text sang File và chọn `.xlsx`. Không gửi JSON và không tự gõ header Content-Type; Postman tạo multipart boundary. Swagger có ô chọn file trên cùng endpoint.
+
+Đọc sheet tên `Nodes` nếu có; nếu không, đọc sheet đầu tiên. File mẫu `example.xlsx` có `Sheet1` được hỗ trợ. Dòng đầu là tiêu đề; mỗi dòng tiếp theo là một node. Các cột có thể đổi thứ tự, tên cột không phân biệt hoa/thường và được bỏ khoảng trắng hai đầu.
+
+| Cột | Yêu cầu |
+|---|---|
+| server_id | Bắt buộc, server đã đăng ký và cấp quyền gateway |
+| feeder_id | Bắt buộc, feeder đã thuộc tủ cùng xã với server; BE tự suy cabinet_id |
+| device_id | Bắt buộc, khớp DEVICE_ID trên ESP32 node |
+| nominal_voltage | Số dương, đơn vị V |
+| nominal_current_ma | Số dương, dòng chuẩn của cả feeder khi đủ tải, đơn vị mA |
+| nominal_power_mw | Số dương, đơn vị mW |
+| radius_km | Tùy chọn, bỏ trống hoặc thiếu cột mặc định 0; 0–1000 km |
+
+Chỉ nhập số hoặc giá trị text có dấu chấm thập phân, không kèm đơn vị. Không nhận công thức: cần dán giá trị trước khi upload. Giới hạn 100 dòng dữ liệu/file và 5 MiB/file; bỏ qua dòng trống. File sai cấu trúc/cột hoặc quá giới hạn bị từ chối trước khi tạo node.
+
+HTTP 200 nghĩa là file đã được xử lý; **phải kiểm tra failed và từng items**. Ví dụ:
+
+```json
+{
+  "sheet": "Sheet1",
+  "total": 3,
+  "created": 2,
+  "existing": 0,
+  "failed": 1,
+  "items": [
+    { "row": 2, "server_id": "iot-server-01", "feeder_id": "FDR-009", "device_id": "LUXMAP-P001", "status": "created", "node_id": "NODE-004", "error": null },
+    { "row": 3, "server_id": "iot-server-01", "feeder_id": "FDR-010", "device_id": "LUXMAP-P002", "status": "failed", "node_id": null, "error": { "code": "ASSET_NOT_FOUND", "message": "Không tìm thấy feeder.", "field": null } },
+    { "row": 4, "server_id": "iot-server-02", "feeder_id": "FDR-011", "device_id": "LUXMAP-P003", "status": "created", "node_id": "NODE-005", "error": null }
+  ]
+}
+```
+
+Các mã node trong ví dụ là minh họa; BE tự cấp mã thực tế. `row` là số dòng Excel, tính cả header ở dòng 1. `error.field` cho biết cột sai nếu xác định được. Lỗi từng dòng giữ mã nghiệp vụ như VALIDATION_FAILED, ASSET_NOT_FOUND, IOT_REGISTRATION_CONFLICT, IOT_SOURCE_UNAVAILABLE.
+
+Mỗi dòng có transaction riêng: dòng lỗi không xóa những node đã tạo ở dòng trước. Gửi lại cùng file/cấu hình trả existing và đúng node_id cũ; không tạo thêm node. Cấu hình đã có mà khác ngưỡng/thiết bị trả conflict; dùng API PUT để sửa. Dòng trùng feeder hoặc cặp server_id/device_id trong cùng file bị báo failed ở lần xuất hiện sau. Sau khi sửa lỗi có thể gửi lại toàn bộ file.
+
+Import tự đồng bộ quyền MQTT như POST /iot/nodes; không có bước gán relay/pole/cabinet trong Excel. Không tự cấp lại secret gateway hoặc đổi firmware. Có thể có dòng failed nếu Bridge không truy cập được, tuyến MQTT không hợp lệ hoặc feeder/server không cùng xã. API này tạo thiết bị thật; không phải preview hay dry-run.

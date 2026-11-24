@@ -11,7 +11,7 @@ using Microsoft.Extensions.Time.Testing;
 namespace LuxMap.Api.Tests;
 
 [Collection(nameof(AssetDatabaseCollection))]
-public sealed class IotDiagnosticsTests(AssetImportFixture fixture)
+public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 {
     [Fact]
     public async Task Admin_registers_two_feeders_on_one_gateway_and_retries_without_creating_another_node()

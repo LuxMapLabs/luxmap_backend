@@ -17,7 +17,7 @@ namespace LuxMap.Modules.IOT;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/iot")]
-public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
+public sealed partial class IotDiagnosticsController(IotDiagnosticsService diagnostics) : ControllerBase
 {
     public sealed record RegisterServerRequest
     {
@@ -246,6 +246,19 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
         [FromServices] IotFeederSourceLookup sources,
         [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
     {
+        var (result, created) = await RegisterNodeCoreAsync(request, diagnostics, registry, nodes, sources, configuration, ct);
+        return created ? Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(result.NodeId)}/electrical", result) : Ok(result);
+    }
+
+    private static async Task<(RegisteredNode Result, bool Created)> RegisterNodeCoreAsync(
+        RegisterNodeRequest request, IotDiagnosticsService diagnostics, IotRegistrationStore registry,
+        IotNodeRegistryService nodes, IotFeederSourceLookup sources,
+        Microsoft.Extensions.Configuration.IConfiguration configuration, CancellationToken ct)
+    {
+        var errors = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(request, new ValidationContext(request), errors, validateAllProperties: true))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest, errors[0].ErrorMessage!,
+                new Dictionary<string, object?> { ["field"] = errors[0].MemberNames.FirstOrDefault() });
         if (!ValidServerId(request.ServerId) || !IotDiagnosticsService.ValidMqttId(request.DeviceId))
             throw Invalid("Server ID hoặc Device ID không hợp lệ.");
         var profile = new NodeProfile
@@ -269,7 +282,7 @@ public sealed class IotDiagnosticsController(IotDiagnosticsService diagnostics) 
             diagnostics.EnsureGatewayRouteAsync(profile.ServerId, request.DeviceId, communeId,
                 configuration["Mqtt:ProvisioningKey"], token, existingSource), ct);
         var result = new RegisteredNode(nodeId, profile.ServerId, profile.DeviceId, profile.FeederId);
-        return created ? Created($"/api/v1/iot/nodes/{Uri.EscapeDataString(nodeId)}/electrical", result) : Ok(result);
+        return (result, created);
     }
 
     /// <summary>Đọc cấu hình nguồn node đã lưu, gồm server, thiết bị MQTT, feeder và ba chỉ số danh định.</summary>
