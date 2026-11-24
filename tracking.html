@@ -1433,6 +1433,12 @@
         <td><code>docs(work-orders): explain photos in the pole GPS update schedule for FE</code></td>
       </tr>
       <tr>
+        <td>24/11/2026</td>
+        <td><code>DEPLOY-PRUNE</code> VPS đầy 80% (cache build Docker 21.7 GB, mỗi deploy thêm ~1.7 GB). Đã dọn tay (còn 37%, 24 GB trống); <code>deploy.sh</code> giờ tự <code>docker builder prune --reserved-space 3gb</code> sau khi API mới lên, lỗi prune chỉ cảnh báo.</td>
+        <td><code>deploy/deploy.sh</code>, <code>docs/deploy/update.md</code>, tracking</td>
+        <td><code>chore(deploy): prune docker build cache after each deploy</code></td>
+      </tr>
+      <tr>
         <td>15/11/2026</td>
         <td><code>THUMB-ORIENT</code> Thumbnail xoay theo EXIF Orientation trước khi bỏ metadata (<code>AutoOrient</code> trong <code>ThumbnailFactory</code>); 3 test mới, Storage.Tests 87/87 xanh, bỏ fix → 3 đỏ.</td>
         <td><code>ThumbnailFactory.cs</code>, <code>ThumbnailOrientationTests.cs</code>, <code>TestImages.cs</code>, <code>media-storage.md</code>, tracking</td>
