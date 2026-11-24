@@ -4688,6 +4688,65 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPhotoCopy", b =>
+                {
+                    b.Property<string>("EvidenceId")
+                        .HasColumnType("text")
+                        .HasColumnName("evidence_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("PhotoId")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("EvidenceId")
+                        .HasName("pk_work_order_photo_copy");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_work_order_photo_copy_commune_id");
+
+                    b.HasIndex("PhotoId")
+                        .HasDatabaseName("ix_work_order_photo_copy_photo_id");
+
+                    b.HasIndex("PoleId")
+                        .HasDatabaseName("ix_work_order_photo_copy_pole_id");
+
+                    b.HasIndex("WorkOrderId", "CommuneId")
+                        .HasDatabaseName("ix_work_order_photo_copy_work_order_id_commune_id");
+
+                    b.ToTable("work_order_photo_copy", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_work_order_photo_copy_outcome", "\"outcome\" IN ('copied', 'skipped_limit', 'skipped_pixels', 'missing_object')");
+
+                            t.HasCheckConstraint("ck_work_order_photo_copy_photo", "(outcome = 'copied') = (photo_id IS NOT NULL)");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", b =>
                 {
                     b.Property<string>("PhotoId")
@@ -6731,6 +6790,44 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_work_order_overdue_notice_work_order");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPhotoCopy", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_photo_copy_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.RepairEvidence", null)
+                        .WithMany()
+                        .HasForeignKey("EvidenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_photo_copy_repair_evidence_evidence_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.PoleAssetPhoto", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_work_order_photo_copy_pole_asset_photo_photo_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_photo_copy_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId", "CommuneId")
+                        .HasPrincipalKey("WorkOrderId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_work_order_photo_copy_work_order");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", b =>

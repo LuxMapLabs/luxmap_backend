@@ -38,6 +38,8 @@ public sealed class WorkOrdersModule : ILuxMapModule
         // BE-26 — runs under the scheduled job runner (LuxMap.Persistence.Jobs).
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.WorkOrderOverdueJob>();
         services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.SurveyRecurringGenerateJob>();
+        // POLE-GPS-PHOTO PGP-3: verified GPS-update photos into the poles' galleries.
+        services.AddSingleton<LuxMap.Persistence.Jobs.IScheduledJob, Jobs.PolePhotoCopyJob>();
 
         // BE-35 — what these tables hold in the store, for the storage totals and the orphan check.
         services.AddSingleton(StoredObjectColumn.Original(StorageBucket.Evidence, "repair_evidence"));

@@ -127,6 +127,7 @@ public partial class WorkOrderTests
         var before = await GeomOf(located);
         var id = await CreateGps([unlocated, located]);
         await Send("a", "POST", $"/{id}/start", null, 200);
+        await Photograph(id, unlocated, located);
 
         var done = await Send("a", "POST", $"/{id}/complete", new
         {
@@ -169,6 +170,7 @@ public partial class WorkOrderTests
         var before = await GeomOf(near);
         var id = await CreateGps([near, unlocated]);
         await Send("a", "POST", $"/{id}/start", null, 200);
+        await Photograph(id, near, unlocated);
         await Send("a", "POST", $"/{id}/complete", new
         {
             report_note = "Một cột đo lệch xa tuyến.",
@@ -197,6 +199,7 @@ public partial class WorkOrderTests
         var stranger = await PlantPole(.6);
         var id = await CreateGps([one, two]);
         await Send("a", "POST", $"/{id}/start", null, 200);
+        await Photograph(id, one, two);
         const string note = "Đã lấy toạ độ các cột.";
 
         await Send("a", "POST", $"/{id}/complete", new { report_note = note }, 400, "VALIDATION_FAILED");

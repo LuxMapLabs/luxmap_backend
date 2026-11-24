@@ -199,6 +199,9 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
 
     [HttpPost("{id}/complete")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
+    [ProducesResponseType(typeof(WorkOrderDetail), 200)]
+    // AFTER_EVIDENCE_REQUIRED (repair), POLE_EVIDENCE_REQUIRED (pole_gps_update, PGP-2), INVALID_STATE_TRANSITION.
+    [ProducesResponseType(typeof(ApiErrorResponse), 409)]
     public Task<WorkOrderDetail> Complete(string id, CompleteWorkOrderRequest request, CancellationToken ct)
         => service.Act(id, "complete", request.ReportNote, request.FaultOutcomes, ct, request.MaterialsUsed, request.PerformedAt,
             request.PoleLocations);

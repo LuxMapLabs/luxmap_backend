@@ -99,8 +99,7 @@ public sealed class AssetPhotoService(LuxMapDbContext db, ICurrentActorAccessor 
         var target = await Target<T>(id, ct);
         await using var input = photo.OpenReadStream();
         var image = await images.ReadAsync(input, MaxUploadBytes, MaxPixels, ct);
-        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(id + "\n"
-            + Convert.ToHexStringLower(SHA256.HashData(image.Original)))));
+        var hash = RequestHash(id, image.Original);
         if (await Replay<T>(id, op, hash, ct) is { } replay) return (Item<T, TItem>(replay, id), false);
         var spec = IsPole<T>() ? PrefixedIds.PoleAssetPhoto : PrefixedIds.CabinetAssetPhoto;
         // Only registry-controlled SQL, never a request identifier.
@@ -145,7 +144,12 @@ public sealed class AssetPhotoService(LuxMapDbContext db, ICurrentActorAccessor 
         return (Item<T, TItem>(row, id), true);
     }
 
-    private static IReadOnlyDictionary<string, object?> Snapshot<T>(T row, string id) where T : IAssetPhoto
+    /// <summary>The idempotency fingerprint of a photo: its parent and the SHA-256 of its original bytes.</summary>
+    internal static string RequestHash(string parentId, byte[] original)
+        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(parentId + "\n"
+            + Convert.ToHexStringLower(SHA256.HashData(original)))));
+
+    internal static IReadOnlyDictionary<string, object?> Snapshot<T>(T row, string id) where T : IAssetPhoto
         => new Dictionary<string, object?>
         {
             ["photo_id"] = row.PhotoId,

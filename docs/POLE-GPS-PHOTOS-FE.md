@@ -3,7 +3,7 @@
 Cập nhật 24/11/2026. Đặc tả gốc: `docs/contract-drift.md` mục **WO-POLE-GPS** (PG-1…PG-13), **EV-3 / EV-4** (mục *Ảnh bằng chứng*)
 và **POLE-GPS-PHOTO** (PGP-1…PGP-5, Mỹ chốt 24/11). Tất cả đều **SELF-SIGNED**, chưa hợp nhất Contract. Tài liệu này là phần BE báo cho WP5 / WP6.
 
-> **Đánh dấu 🆕 = đã chốt, BE chưa hiện thực** (ticket `POLE-GPS-PHOTO`). FE làm giao diện theo luật mới luôn; BE bật sau.
+> **🆕 = phần mới của POLE-GPS-PHOTO (24/11/2026).** BE đã hiện thực trên nhánh `feat/POLE-GPS-PHOTO`; **chưa merge `dev`, chưa deploy VPS** — kiểm trạng thái ở `tracking.html` trước khi bật trên app.
 
 ## 1. Một câu
 
@@ -146,7 +146,7 @@ Và ở `complete`:
 
 | Mã | Khi nào | FE làm gì |
 |---|---|---|
-| 🆕 `409 POLE_EVIDENCE_REQUIRED` | Cột trong `pole_locations` chưa có ảnh gắn cột | Gọi trực tiếp: mở lại các cột trong `details.pole_ids`, yêu cầu chụp. Qua `/sync/push`: lỗi nằm trong `conflicts[]` của op `work_order_complete` với `code` này nhưng **không có `details`** — app tự tính cột thiếu từ ảnh đã chụp |
+| 🆕 `409 POLE_EVIDENCE_REQUIRED` | Cột trong `pole_locations` chưa có ảnh gắn cột | Gọi trực tiếp: mở lại các cột trong `details.pole_ids`, yêu cầu chụp. Qua `/sync/push`: lỗi nằm trong `conflicts[]` của op `work_order_complete`, trường `reason` = mã này, **không có `details`** — app tự tính cột thiếu từ ảnh đã chụp |
 
 ## 6. WP6 — mobile
 
@@ -188,7 +188,7 @@ Bảng, mỗi dòng một cột theo thứ tự `pole_ids`:
 
 | Mã | Câu hỏi | Trạng thái |
 |---|---|---|
-| Q-1 | Có **bắt buộc** ít nhất một ảnh cho mỗi cột có toạ độ khi `complete` không? | **Có** — Mỹ chốt 24/11 (PGP-2), BE chưa hiện thực |
-| Q-2 | Sau `verify`, có **chép ảnh** sang thư viện ảnh tài sản của cột (kênh C) không? | **Có**, bằng job nền sau `verify` — Mỹ chốt 24/11 (PGP-3, PGP-6), BE chưa hiện thực |
+| Q-1 | Có **bắt buộc** ít nhất một ảnh cho mỗi cột có toạ độ khi `complete` không? | **Có** — Mỹ chốt 24/11 (PGP-2), BE đã làm (chưa deploy) |
+| Q-2 | Sau `verify`, có **chép ảnh** sang thư viện ảnh tài sản của cột (kênh C) không? | **Có**, bằng job nền sau `verify` — Mỹ chốt 24/11 (PGP-3, PGP-6), BE đã làm (chưa deploy) |
 | Q-3 | Có **chặn** `/pole-photos` (kênh B) ở phiếu `pole_gps_update` không? | **Còn mở** — hiện chưa chặn (chỉ chặn cột chưa GPS); FE đừng gọi |
 | Q-4 | GPS ghi vào EXIF hay gửi riêng? | **Gửi riêng** — Mỹ chốt 24/11 (PGP-1); EXIF tuỳ mobile, BE không đọc |

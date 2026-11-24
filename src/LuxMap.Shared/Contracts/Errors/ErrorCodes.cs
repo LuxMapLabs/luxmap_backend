@@ -239,6 +239,12 @@ public static class ErrorCodes
     public const string PoleLocationRequired = "POLE_LOCATION_REQUIRED";
 
     /// <summary>
+    /// 409 — <c>complete</c> of a <c>pole_gps_update</c> order where a pole in <c>pole_locations</c> has no <c>observation</c> photo tied
+    /// to it on this order (POLE-GPS-PHOTO PGP-2). <c>details</c> carries <c>work_order_id</c> and <c>pole_ids</c>, in the order's order.
+    /// </summary>
+    public const string PoleEvidenceRequired = "POLE_EVIDENCE_REQUIRED";
+
+    /// <summary>
     /// 409 — <c>POST /sweeps</c> on a work order with a road that has no geometry yet (ROAD-SEGMENT-GEOM-NULL RG-7): a night
     /// survey drives a drawn route. <c>details</c> carries <c>work_order_id</c> and <c>segment_ids</c> (the undrawn roads, in
     /// order position). Creating, assigning and scheduling the order are unaffected.
