@@ -2968,6 +2968,7 @@ JSON và hướng dẫn: [USER-PERSONAL-DETAILS.md](USER-PERSONAL-DETAILS.md).
 | PGP-8 | **Sync và FE** (D-7, D-8): 409 `POLE_EVIDENCE_REQUIRED` qua `/sync/push` nằm trong `conflicts[]` với `reason = POLE_EVIDENCE_REQUIRED`, **không có `details`** (hình dạng sync không đổi) — mobile tự tính cột thiếu ảnh. `WorkOrderDetail` không thêm thông tin chép; FE ghi "ảnh sẽ được thêm vào hồ sơ cột trong ít phút" |
 | PGP-5 | Không đổi: tập nhãn EV-3, `/pole-photos` (Q-3 của tài liệu FE **vẫn mở**), luật hành lang PL-3, quyền `UploadAssetPhotos`, kênh `PUT /assets/poles/{id}/location` (đường vòng của kỹ sư vẫn còn — WO-POLE-GPS) |
 
-**Phải báo:** WP6 (màn cột: một nút "Chụp ảnh cột" lấy GPS + ảnh cùng lúc; chặn "Hoàn thành" khi cột có toạ độ chưa có ảnh; xử lý 409
-`POLE_EVIDENCE_REQUIRED`, kể cả kết quả op qua `/sync/push`), WP5 (màn duyệt: sau `verify` gallery của cột có ảnh trong ít phút — job nền). **Chưa báo** — gửi cùng
-`docs/POLE-GPS-PHOTOS-FE.md` khi BE xong.
+**Đã báo WP5 / WP6 — 24/11/2026** (Mỹ gửi tin nhắn nhóm, kèm link `docs/POLE-GPS-PHOTOS-FE.md` trên nhánh PR #299; lúc gửi PR **chưa merge,
+chưa deploy**): WP6 (màn cột: một nút "Chụp ảnh cột" lấy GPS + ảnh cùng lúc; đẩy hết ảnh trước `complete`; chặn "Hoàn thành" khi cột có
+toạ độ chưa có ảnh; xử lý 409 `POLE_EVIDENCE_REQUIRED`, kể cả `conflicts[]` của `/sync/push`), WP5 (màn duyệt: sau `verify` gallery của cột có
+ảnh trong ít phút — job nền). Còn phải báo lại khi deploy. Chưa có phản hồi; vẫn là nền SELF-SIGNED tới FW kế tiếp.

@@ -1410,7 +1410,7 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>24/11/2026</td>
-        <td><code>POLE-GPS-PHOTO</code> Phase 2 (ticket <strong>review</strong>, <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/299">PR #299 → dev</a>): <code>complete</code> lịch GPS đòi ảnh gắn cột (<code>409 POLE_EVIDENCE_REQUIRED</code>); job <code>pole_photo_copy</code> (1 phút) chép ảnh của lệnh đã duyệt sang ảnh tài sản của cột, sổ <code>work_order_photo_copy</code>, migration <code>AddWorkOrderPhotoCopy</code> (chưa áp dev / VPS). Toàn bộ test xanh (2021 Api + 604 khác), phá thử 3 chốt đỏ. Codex không chạy được sol nên Claude tự làm.</td>
+        <td><code>POLE-GPS-PHOTO</code> Phase 2 (ticket <strong>review</strong>, <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/299">PR #299 → dev</a>): <code>complete</code> lịch GPS đòi ảnh gắn cột (<code>409 POLE_EVIDENCE_REQUIRED</code>); job <code>pole_photo_copy</code> (1 phút) chép ảnh của lệnh đã duyệt sang ảnh tài sản của cột, sổ <code>work_order_photo_copy</code>, migration <code>AddWorkOrderPhotoCopy</code> (chưa áp dev / VPS). Toàn bộ test xanh (2021 Api + 604 khác), phá thử 3 chốt đỏ. Codex không chạy được sol nên Claude tự làm. Đã báo WP5 / WP6 ngày 24/11 (drift cập nhật); còn báo lại khi deploy.</td>
         <td><code>WorkOrderService.cs</code>, <code>Jobs/PolePhotoCopyJob.cs</code>, <code>PoleAssetPhotoCopy.cs</code>, <code>WorkOrderPhotoCopy*.cs</code>, migration, <code>WorkOrderPoleGpsPhotoTests.cs</code>, OpenAPI, trap, tài liệu FE</td>
         <td><code>feat(work-orders): require pole photos on GPS updates and copy verified photos to pole galleries</code></td>
       </tr>
