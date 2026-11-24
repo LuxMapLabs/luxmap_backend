@@ -5,9 +5,33 @@ using LuxMap.Shared.Contracts.Enums;
 namespace LuxMap.Modules.Identity.Accounts;
 
 /// <summary>
-/// <c>POST /admin/users</c>. No password: the account receives an invitation link by email (D-1).
+/// Nullable personal details. Setters track PATCH omission separately from explicit null.
 /// </summary>
-public sealed class CreateUserRequest
+public abstract class UserPersonalDetailsRequest
+{
+    private readonly HashSet<string> supplied = [];
+    internal bool Has(string property) => supplied.Contains(property);
+    private DateOnly? valueDateOfBirth;
+    public DateOnly? DateOfBirth { get => valueDateOfBirth; init { valueDateOfBirth = value; supplied.Add(nameof(DateOfBirth)); } }
+    private string? valueGender;
+    [AllowedValues(null, "male", "female", "other")]
+    public string? Gender { get => valueGender; init { valueGender = value; supplied.Add(nameof(Gender)); } }
+    private string? valueAddress;
+    [MaxLength(500)]
+    public string? Address { get => valueAddress; init { valueAddress = value; supplied.Add(nameof(Address)); } }
+    private string? valuePhoneNumber;
+    [MaxLength(32)]
+    public string? PhoneNumber { get => valuePhoneNumber; init { valuePhoneNumber = value; supplied.Add(nameof(PhoneNumber)); } }
+    private string? valueIdentityNumber;
+    [MaxLength(64)]
+    public string? IdentityNumber { get => valueIdentityNumber; init { valueIdentityNumber = value; supplied.Add(nameof(IdentityNumber)); } }
+    private string? valueIdentityType;
+    [AllowedValues(null, "citizen_id", "identity_card", "passport", "other")]
+    public string? IdentityType { get => valueIdentityType; init { valueIdentityType = value; supplied.Add(nameof(IdentityType)); } }
+}
+
+/// <summary>POST /admin/users: no password; an invitation link is sent by email.</summary>
+public sealed class CreateUserRequest : UserPersonalDetailsRequest
 {
     /// <summary>Server-owned: omit this field, including null. Presence is rejected (ACCT-2).</summary>
     public JsonElement Username { get; init; }
@@ -32,11 +56,11 @@ public sealed class CreateUserRequest
 /// <summary>
 /// <c>PATCH /admin/users/{id}</c>. An absent field stays as it is; <c>username</c> never changes (D-11).
 /// </summary>
-public sealed class UpdateUserRequest
+public sealed class UpdateUserRequest : UserPersonalDetailsRequest
 {
-    [EmailAddress]
-    [MaxLength(256)]
-    public string? Email { get; init; }
+    // Capture legacy email attempts without exposing an editable email field in Swagger.
+    [System.Text.Json.Serialization.JsonExtensionData]
+    public Dictionary<string, JsonElement>? ExtraFields { get; init; }
 
     [MinLength(2)]
     [MaxLength(256)]
@@ -47,6 +71,16 @@ public sealed class UpdateUserRequest
     /// <summary>Sets the single assigned commune when present (ACCT-1).</summary>
     public IReadOnlyList<string>? CommuneIds { get; init; }
 }
+
+/// <summary>Admin changes the email separately from the personal-details PATCH.</summary>
+public sealed class ChangeUserEmailRequest
+{
+    [Required, EmailAddress, MaxLength(256)]
+    public string? Email { get; init; }
+}
+
+/// <summary>The change is persisted even if SMTP fails; retry the same email to resend notification.</summary>
+public sealed record ChangeUserEmailResponse(UserAccountItem User, bool NotificationSent);
 
 /// <summary><c>POST /auth/password/set</c>: redeem an invite or reset link.</summary>
 public sealed class SetPasswordRequest
@@ -65,6 +99,17 @@ public sealed class SetPasswordRequest
     public string? NewPassword { get; init; }
 
     public const int MinimumPasswordLength = 12;
+}
+
+/// <summary>POST /auth/password/change: the signed-in caller changes only their own password.</summary>
+[System.Text.Json.Serialization.JsonUnmappedMemberHandling(System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow)]
+public sealed class ChangePasswordRequest
+{
+    [Required, MaxLength(1024)]
+    public string? OldPassword { get; init; }
+
+    [Required, MinLength(SetPasswordRequest.MinimumPasswordLength), MaxLength(1024)]
+    public string? NewPassword { get; init; }
 }
 
 /// <summary><c>POST /auth/password/forgot</c>.</summary>
@@ -92,7 +137,13 @@ public sealed record UserAccountItem(
     string Status,
     DateTime CreatedAt,
     DateTime? PasswordSetAt,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    DateOnly? DateOfBirth = null,
+    string? Gender = null,
+    string? Address = null,
+    string? PhoneNumber = null,
+    string? IdentityNumber = null,
+    string? IdentityType = null);
 
 /// <summary>
 /// What creating an account returns: the account, and whether the invitation mail went out (D-3).

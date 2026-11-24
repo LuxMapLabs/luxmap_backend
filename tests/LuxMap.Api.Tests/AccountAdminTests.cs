@@ -17,7 +17,7 @@ namespace LuxMap.Api.Tests;
 /// admin can change, lock and re-invite. Every account here uses a throwaway email under
 /// <see cref="AccountTestFactory.UsernamePrefix"/>; the seeded accounts are only used to sign in.
 /// </summary>
-public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper output)
+public partial class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper output)
     : IClassFixture<AccountTestFactory>, IAsyncLifetime
 {
     private const string NewPassword = "a-long-enough-new-password";
@@ -356,10 +356,10 @@ public class AccountAdminTests(AccountTestFactory factory, ITestOutputHelper out
         var first = await CreateFieldEngineerAsync();
         var second = await CreateFieldEngineerAsync();
 
-        var response = await (await AdminAsync()).PatchAsJsonAsync($"/api/v1/admin/users/{second.UserId}", new { email = first.Email });
+        var response = await (await AdminAsync()).PatchAsJsonAsync($"/api/v1/admin/users/{second.UserId}/email", new { email = first.Email });
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
 
-        var same = await (await AdminAsync()).PatchAsJsonAsync($"/api/v1/admin/users/{second.UserId}", new { email = second.Email.ToUpperInvariant() });
+        var same = await (await AdminAsync()).PatchAsJsonAsync($"/api/v1/admin/users/{second.UserId}/email", new { email = second.Email.ToUpperInvariant() });
         Assert.Equal(HttpStatusCode.OK, same.StatusCode);
     }
 

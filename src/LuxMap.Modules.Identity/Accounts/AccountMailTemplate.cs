@@ -65,7 +65,47 @@ public static class AccountMailTemplate
             LuxMap
             """;
 
+        var afterButton = $"Liên kết có hiệu lực đến {expires} (giờ Việt Nam) và chỉ dùng được một lần.";
+        return (subject, text, RenderHtml(subject, preheader, eyebrow, heading, fullName, opening,
+            username, link, action, afterButton, ignoreNote));
+    }
+
+    public static (string Subject, string Text, string Html) RenderEmailChanged(
+        string fullName, string username, string email, Uri link, bool hasPassword)
+    {
+        const string subject = "LuxMap — Đổi email thành công";
+        const string opening = "Email tài khoản của bạn đã được cập nhật thành công.";
+        var passwordNote = hasPassword
+            ? "Mật khẩu hiện tại vẫn giữ nguyên. Bạn có thể đăng nhập bằng tên đăng nhập hoặc email mới và mật khẩu cũ."
+            : "Tài khoản chưa đặt mật khẩu. Vui lòng liên hệ Quản trị để nhận lại lời mời tại email mới và đặt mật khẩu.";
+        const string help = "Nếu bạn không nhận ra thay đổi này, vui lòng liên hệ Quản trị hệ thống LuxMap.";
+        var text = $"""
+            Chào {fullName},
+
+            {opening}
+            Tên đăng nhập: {username}
+            Email mới: {email}
+
+            {passwordNote}
+            Truy cập LuxMap: {link}
+
+            {help}
+            LuxMap
+            """;
+        return (subject, text, RenderHtml(subject, "Email tài khoản LuxMap đã được cập nhật thành công.",
+            "Thông tin tài khoản", "Đổi email thành công", fullName, opening, username, link,
+            "Truy cập LuxMap", passwordNote, help, email));
+    }
+
+    private static string RenderHtml(string subject, string preheader, string eyebrow, string heading,
+        string fullName, string opening, string username, Uri link, string action,
+        string afterButton, string ignoreNote, string? email = null)
+    {
         var e = Encoder;
+        var emailRow = email is null ? "" : $"""
+            <tr><td style="padding-top:12px;font-size:13px;line-height:20px;color:{Muted};">Email mới</td>
+            <td align="right" style="padding-top:12px;font-size:14px;line-height:20px;color:{Navy};word-break:break-word;">{e.Encode(email)}</td></tr>
+            """;
         var html = $"""
             <!DOCTYPE html>
             <html lang="vi">
@@ -100,6 +140,7 @@ public static class AccountMailTemplate
                             <td style="font-size:13px;line-height:20px;color:{Muted};">Tên đăng nhập</td>
                             <td align="right" style="font-size:16px;line-height:20px;font-weight:700;color:{Navy};font-family:Consolas,Menlo,'Courier New',monospace;">{e.Encode(username)}</td>
                           </tr>
+                          {emailRow}
                         </table>
                       </td></tr>
                     </table>
@@ -108,7 +149,7 @@ public static class AccountMailTemplate
                         <a href="{e.Encode(link.AbsoluteUri)}" target="_blank" style="display:block;padding:14px 24px;font-size:16px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:8px;">{e.Encode(action)}</a>
                       </td></tr>
                     </table>
-                    <p style="margin:0 0 24px;font-size:13px;line-height:20px;color:{Muted};text-align:center;">Liên kết có hiệu lực đến <strong style="color:{Ink};">{e.Encode(expires)}</strong> (giờ Việt Nam) và chỉ dùng được một lần.</p>
+                    <p style="margin:0 0 24px;font-size:13px;line-height:20px;color:{Muted};text-align:center;">{e.Encode(afterButton)}</p>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                       <tr><td style="border-top:1px solid {Line};padding-top:18px;">
                         <p style="margin:0;font-size:13px;line-height:20px;color:{Muted};">{e.Encode(ignoreNote)}</p>
@@ -126,6 +167,6 @@ public static class AccountMailTemplate
             </html>
             """;
 
-        return (subject, text, html);
+        return html;
     }
 }

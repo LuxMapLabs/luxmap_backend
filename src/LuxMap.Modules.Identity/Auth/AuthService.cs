@@ -180,7 +180,8 @@ public sealed class AuthService(
             communeIds,
             communes,
             mapBounds,
-            AvatarUrls.For(user));
+            AvatarUrls.For(user),
+            user.DateOfBirth, user.Gender, user.Address, user.PhoneNumber, user.IdentityNumber, user.IdentityType);
     }
 
     /// <summary>

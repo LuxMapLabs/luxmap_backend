@@ -2355,6 +2355,11 @@ namespace LuxMap.Persistence.Migrations
                         .HasDefaultValueSql("luxmap_format_id('USR', nextval('user_id_seq'), 3)")
                         .HasAnnotation("LuxMap:PrefixedIdSequence", "user_id_seq");
 
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
                     b.Property<long?>("AvatarByteCount")
                         .HasColumnType("bigint")
                         .HasColumnName("avatar_byte_count");
@@ -2381,6 +2386,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date")
+                        .HasColumnName("date_of_birth");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text")
@@ -2391,11 +2400,26 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("full_name");
 
+                    b.Property<string>("Gender")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("gender");
+
                     b.Property<bool>("HasSystemWideScope")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("has_system_wide_scope");
+
+                    b.Property<string>("IdentityNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("identity_number");
+
+                    b.Property<string>("IdentityType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("identity_type");
 
                     b.Property<bool>("IsLocked")
                         .ValueGeneratedOnAdd()
@@ -2415,6 +2439,11 @@ namespace LuxMap.Persistence.Migrations
                     b.Property<DateTime?>("PasswordSetAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("password_set_at");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("phone_number");
 
                     b.Property<string>("Role")
                         .IsRequired()
@@ -2443,9 +2472,19 @@ namespace LuxMap.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_app_user_username");
 
+                    b.HasIndex("IdentityType", "IdentityNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_app_user_identity_type_identity_number");
+
                     b.ToTable("app_user", null, t =>
                         {
                             t.HasCheckConstraint("ck_app_user_avatar_all_or_none", "(avatar_object_key IS NULL AND avatar_byte_count IS NULL AND avatar_thumbnail_key IS NULL AND avatar_thumbnail_bytes IS NULL AND avatar_updated_at IS NULL) OR (avatar_object_key IS NOT NULL AND avatar_byte_count IS NOT NULL AND avatar_byte_count >= 0 AND avatar_thumbnail_key IS NOT NULL AND avatar_thumbnail_bytes IS NOT NULL AND avatar_thumbnail_bytes >= 0 AND avatar_updated_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_app_user_gender", "gender IN ('male', 'female', 'other')");
+
+                            t.HasCheckConstraint("ck_app_user_identity_pair", "(identity_type IS NULL) = (identity_number IS NULL)");
+
+                            t.HasCheckConstraint("ck_app_user_identity_type", "identity_type IN ('citizen_id', 'identity_card', 'passport', 'other')");
 
                             t.HasCheckConstraint("ck_app_user_password_set_together", "(password_hash IS NULL) = (password_set_at IS NULL)");
 

@@ -2909,3 +2909,41 @@ GET /api/v1/iot/feeders/{feederId}/diagnostics/history giữ schema/phân trang/
 Decision maker: Đạt (yêu cầu trực tiếp, file example.xlsx); SELF-SIGNED, nền tạm chờ maintainer duyệt.
 POST /api/v1/iot/nodes/import (IotDiagnostics, ManageSettings/Admin) nhận multipart/form-data field file, .xlsx tối đa 5 MiB, tối đa 100 dòng node. Sheet Nodes nếu có, không thì sheet đầu tiên (hỗ trợ Sheet1 như mẫu). Dòng 1 gồm server_id, feeder_id, device_id, nominal_voltage, nominal_current_ma, nominal_power_mw; radius_km tùy chọn/mặc định0. Không nhận công thức, không tạo feeder/server/tủ, không sửa file gốc.
 200 IotNodeImportResult: sheet/total/created/existing/failed/items; item có row, server_id, feeder_id, device_id, status created|existing|failed, node_id và error(code,message,field). Mỗi dòng dùng cùng core đăng ký node/feeder/MQTT và transaction độc lập, không rollback dòng thành công khi dòng khác lỗi. Lỗi cấu trúc/file400 hoặc415/413; lỗi từng dòng trả trong items. Gửi lại cấu hình giống hệt dùng node đã có, cấu hình khác trả conflict, không tự sửa qua PUT. Feeder/thiết bị trùng trong file: dòng sau failed. Các kiểm tra xã/allowlist/quyền gateway/audit và cabinet suy từ feeder giữ nguyên. API đơn POST /iot/nodes giữ hợp đồng hiện có; không sửa FE.
+
+
+## USER-PERSONAL-DETAILS — 2026-11-24 (SELF-SIGNED)
+
+Decision maker: Đạt, theo yêu cầu bổ sung hồ sơ; nền tạm chờ maintainer review.
+POST /admin/users và PATCH /admin/users/{id} thêm sáu trường nullable:
+`date_of_birth`, `gender`, `address`, `phone_number`, `identity_type`, `identity_number`.
+GET /admin/users/{id} và GET /auth/me trả đầy đủ; danh sách admin che identity_number.
+PATCH /auth/me giữ nguyên request và hành vi chỉ sửa full_name.
+Gender: male/female/other. Identity type: citizen_id/identity_card/passport/other.
+PATCH bỏ trường giữ nguyên, null xóa; hai trường định danh phải cùng có hoặc cùng null.
+Cặp loại/mã định danh duy nhất sau trim và uppercase; điện thoại không unique. Không thêm PII vào JWT/log.
+Migration chỉ thêm cột nullable, index và CHECK; tài khoản cũ không cần điền bổ sung.
+Chi tiết: [USER-PERSONAL-DETAILS.md](USER-PERSONAL-DETAILS.md).
+
+
+## ACCT-EMAIL — 2026-11-24 (SELF-SIGNED)
+
+Decision maker: Đạt theo yêu cầu tách đổi email khỏi PATCH hồ sơ, nền tạm chờ maintainer review.
+- PATCH /admin/users/{id} bỏ email; phát hiện trường email (kể cả null) trả 400 VALIDATION_FAILED, details.field=email, không ghi hồ sơ.
+- PATCH /admin/users/{id}/email (ManageUsers/system_admin) nhận {email}, kiểm đúng định dạng, max256, không trùng bất kể hoa thường; 200 {user,notification_sent}.
+- Email lưu trước SMTP. Gửi xác nhận đến địa chỉ mới qua cùng SMTP và AccountMailTemplate; giữ nguyên mật khẩu/username/phiên. Không log email hay mật khẩu trong luồng mới.
+- SMTP lỗi: notification_sent=false, dữ liệu đã lưu; gọi lại cùng email để resend. true chỉ xác nhận SMTP chấp nhận gửi.
+- Thu hồi link mời/reset chưa dùng gửi tới email cũ. Account invited cần Admin gửi lại invite; template không hứa mật khẩu cũ nếu chưa đặt mật khẩu.
+- 400/401/403/404/409 theo envelope chuẩn. POST /admin/users và PATCH /auth/me không thay hành vi.
+Chi tiết và JSON: [USER-PERSONAL-DETAILS.md](USER-PERSONAL-DETAILS.md).
+
+
+## ACCT-PASSWORD-CHANGE — 2026-11-24 (SELF-SIGNED)
+
+Decision maker: Đạt theo yêu cầu tự đổi mật khẩu với mật khẩu cũ đúng; nền tạm chờ maintainer review.
+- POST /auth/password/change: Authorize ManageOwnProfile cho cả bốn vai trò, không AllowAnonymous. Body {old_password,new_password}; tài khoản luôn từ actor.UserId, không nhận ID khác.
+- new_password dùng min12/max1024 và Required giống SetPasswordRequest; old_password Required/max1024, không ép min12 cho mật khẩu legacy. Không trim; trường lạ trả 400.
+- Mật khẩu cũ sai: 400 VALIDATION_FAILED, details.field=old_password; không ghi dữ liệu.
+- Thành công 204, giữ username/email; cập nhật hash bằng cùng hasher, thu hồi refresh sessions (reason PasswordReset hiện có) và link invite/reset chưa dùng. JWT access đã cấp vẫn sống đến hết hạn như reset cũ; client đăng nhập lại.
+- Dùng chung rate policy Login, response 400/401/403/429. Hai luồng reset/change khóa account trước token để ngăn tái dùng credential và deadlock.
+- Không thêm migration; không sửa PATCH /auth/me hoặc FE; không log mật khẩu.
+JSON và hướng dẫn: [USER-PERSONAL-DETAILS.md](USER-PERSONAL-DETAILS.md).

@@ -34,6 +34,19 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
         builder.Property(user => user.AvatarThumbnailBytes).HasColumnType("bigint");
         builder.Property(user => user.AvatarUpdatedAt).HasColumnType("timestamp with time zone");
 
+        builder.Property(user => user.DateOfBirth).HasColumnType("date");
+        builder.Property(user => user.Gender).HasMaxLength(16);
+        builder.Property(user => user.Address).HasMaxLength(500);
+        builder.Property(user => user.PhoneNumber).HasMaxLength(32);
+        builder.Property(user => user.IdentityNumber).HasMaxLength(64);
+        builder.Property(user => user.IdentityType).HasMaxLength(32);
+        builder.HasIndex(user => new { user.IdentityType, user.IdentityNumber }).IsUnique();
+        builder.ToTable(table => {
+            table.HasCheckConstraint("ck_app_user_identity_pair", "(identity_type IS NULL) = (identity_number IS NULL)");
+            table.HasCheckConstraint("ck_app_user_gender", "gender IN ('male', 'female', 'other')");
+            table.HasCheckConstraint("ck_app_user_identity_type", "identity_type IN ('citizen_id', 'identity_card', 'passport', 'other')");
+        });
+
         builder.HasContractEnum(user => user.Role);
 
         builder.ToTable(table =>

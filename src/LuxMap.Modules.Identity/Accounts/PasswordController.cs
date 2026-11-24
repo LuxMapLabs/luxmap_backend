@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using LuxMap.Shared.Contracts.Errors;
+using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -28,6 +29,22 @@ public sealed class PasswordController(PasswordService service) : ControllerBase
     public async Task<IActionResult> Set([FromBody] SetPasswordRequest request, CancellationToken ct)
     {
         await service.SetPasswordAsync(request, ct);
+        return NoContent();
+    }
+
+    /// <summary>Changes only the signed-in user's password after checking old_password.</summary>
+    /// <remarks>Same 12–1024 character new-password validation as /set. Ends refresh sessions and unused password links; sign in again.</remarks>
+    [HttpPost("change")]
+    [Authorize(Policy = LuxMapPolicies.ManageOwnProfile)]
+    [EnableRateLimiting(LuxMapRateLimits.Login)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> Change([FromBody] ChangePasswordRequest request, CancellationToken ct)
+    {
+        await service.ChangePasswordAsync(request, ct);
         return NoContent();
     }
 

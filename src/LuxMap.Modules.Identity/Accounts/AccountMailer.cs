@@ -30,6 +30,25 @@ public sealed class AccountMailer(IEmailSender sender, EmailOptions options, ILo
         }
     }
 
+    public async Task<bool> TrySendEmailChangedAsync(AppUser user, CancellationToken ct)
+    {
+        var (subject, text, html) = AccountMailTemplate.RenderEmailChanged(
+            user.FullName, user.Username, user.Email, options.WebAppBaseUrl, user.PasswordSetAt is not null);
+        try
+        {
+            await sender.SendAsync(new EmailMessage(user.Email, user.FullName, subject, text, html), ct);
+            logger.LogInformation("Sent email-change notification to account {UserId}.", user.UserId);
+            return true;
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Do not log the SMTP exception: it may include the recipient's email address.
+            logger.LogError("Could not send email-change notification to account {UserId}; failure type {FailureType}.",
+                user.UserId, exception.GetType().Name);
+            return false;
+        }
+    }
+
     internal static EmailMessage Compose(AppUser user, AccountTokenPurpose purpose, Uri link, DateTime expiresAt)
     {
         var expires = new DateTimeOffset(expiresAt, TimeSpan.Zero).ToOffset(VietnamOffset)

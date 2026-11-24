@@ -3,6 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using LuxMap.Modules.Identity.Entities;
+using LuxMap.Modules.Identity.Accounts;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using LuxMap.Modules.Identity.Seeding;
 using LuxMap.Shared.Contracts.Enums;
 using Microsoft.AspNetCore.Identity;
@@ -94,7 +98,7 @@ public sealed class EmailLoginTests(AuthTestFactory factory) : IAsyncLifetime
         await AssertSubjectAsync(await LoginAsync(web, email.ToUpperInvariant()), user.UserId);
     }
 
-    // (h): use the public PATCH path, then fresh login requests (no stale tracked entities).
+    // (h): use the dedicated email PATCH, then fresh web/mobile logins (no stale tracked entities).
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -103,12 +107,22 @@ public sealed class EmailLoginTests(AuthTestFactory factory) : IAsyncLifetime
         var user = await CreateAsync();
         await AssertSubjectAsync(await LoginAsync(web, user.Email), user.UserId);
         var newEmail = $"{Prefix}{Guid.NewGuid():N}@changed.test";
-        using var admin = factory.CreateClient();
+        var mail = new RecordingEmailSender();
+        using var emailHost = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(mail);
+        }));
+        using var admin = emailHost.CreateClient();
         var tokens = await admin.LoginAsync("admin", "SEED_ADMIN_PASSWORD");
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
-        using var patched = await admin.PatchAsJsonAsync($"/api/v1/admin/users/{user.UserId}", new { email = newEmail });
+        using var patched = await admin.PatchAsJsonAsync($"/api/v1/admin/users/{user.UserId}/email", new { email = newEmail });
         Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
-        Assert.Equal(newEmail, (await BodyAsync(patched)).GetProperty("email").GetString());
+        var body = await BodyAsync(patched);
+        Assert.Equal(newEmail, body.GetProperty("user").GetProperty("email").GetString());
+        Assert.True(body.GetProperty("notification_sent").GetBoolean());
+        Assert.Single(mail.To(newEmail));
+        Assert.Empty(mail.To(user.Email));
 
         await AssertInvalidAsync(await LoginAsync(web, user.Email));
         await AssertSubjectAsync(await LoginAsync(web, newEmail), user.UserId);
