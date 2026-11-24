@@ -2832,6 +2832,23 @@ Thông số danh định từ cấu hình đang hoạt động; không gọi Bri
 
 Đường ảnh cột trên phiếu sửa chữa (PP-3, PP-9) vẫn giữ.
 
+### WO-SCHEDULING-SUGGESTIONS — cảnh báo khi Quản lý phân lịch (19/11/2026)
+
+Mỹ yêu cầu hiện thực luồng gợi ý và review bằng provider River; không push / PR khi chưa cho phép.
+Nền origin/dev 7d20bf3 đã có cột chưa GPS, import nullable geometry, pole_gps_update và offline complete.
+Không tạo staging inventory mới, không migration hay thêm task_kind.
+
+| # | Quyết định (SELF-SIGNED, nền tạm chờ WP5/WP6) |
+|---|---|
+| SS-1 | Thêm GET /work-orders/suggestions (summary) và GET /work-orders/suggestions/items?kind=… (phân trang), chỉ ManageWorkOrders |
+| SS-2 | Năm nhóm fault_inspection / fault_repair / missing_gps / survey_needed / overdue; phân biệt số fault, số cột/tuyến duy nhất; unknown chỉ là gợi ý khảo sát |
+| SS-3 | Giữ warning đang có phiếu và trả work_order_id; ready / in_work_order / blocked. Chỉ ready trả recommended_task_kind. Command gốc vẫn kiểm lại dưới khoá, không tự tạo khi GET |
+| SS-4 | commune_id lặp, segment_id, data_source CSV; mặc định field, tách testbed. Không giới hạn theo tháng lịch. Overdue dùng luật ca đêm của BE-26; nguồn theo targets, một phiếu nhiều nguồn không được cộng các lượt lọc |
+| SS-5 | Dùng lại PG/GN/WSC và luồng survey; prerequisites trả lý do. Tên tuyến vẫn qua scope. Không ngưỡng khảo sát cũ chưa được duyệt, không nới quyền mobile |
+
+Đặc tả đầy đủ / hướng dẫn tích hợp: [work-order-scheduling-suggestions.md](work-order-scheduling-suggestions.md).
+WP5/WP6 chưa được báo; implementation không bao gồm giao diện FE.
+
 ## IMPORT-INITIAL-STATUS — import cột có ngay trạng thái, chỉ demo (20/11/2026)
 
 | | |

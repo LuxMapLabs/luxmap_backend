@@ -13935,6 +13935,302 @@
         "x-luxmap-client": "web"
       }
     },
+    "/api/v1/work-orders/suggestions": {
+      "get": {
+        "tags": [
+          "SchedulingSuggestions"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "description": "CSV data sources; defaults to field. Other sources require an explicit selection.",
+            "schema": {
+              "type": "string",
+              "default": "field"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulingSuggestionSummary"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulingSuggestionSummary"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulingSuggestionSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "x-luxmap-contract": "drift SS-1…SS-5 (19/11/2026, SELF-SIGNED)"
+      }
+    },
+    "/api/v1/work-orders/suggestions/items": {
+      "get": {
+        "tags": [
+          "SchedulingSuggestions"
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "fault_inspection",
+                "fault_repair",
+                "missing_gps",
+                "survey_needed",
+                "overdue"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "description": "CSV data sources; defaults to field. Other sources require an explicit selection.",
+            "schema": {
+              "type": "string",
+              "default": "field"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "ready",
+                "in_work_order",
+                "blocked"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Out-of-range values are clamped; non-numeric values use the default.",
+            "schema": {
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Out-of-range values are clamped; non-numeric values use the default.",
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer",
+              "format": "int32",
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulingSuggestionItemPagedResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulingSuggestionItemPagedResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulingSuggestionItemPagedResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_work_orders",
+        "x-luxmap-roles": [
+          "manager"
+        ],
+        "x-luxmap-client": "shared",
+        "x-luxmap-contract": "drift SS-1…SS-5 (19/11/2026, SELF-SIGNED)"
+      }
+    },
     "/api/v1/statistics/fixture-status": {
       "get": {
         "tags": [
@@ -25664,6 +25960,205 @@
         ],
         "type": "string"
       },
+      "SchedulingSuggestionGroup": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SchedulingSuggestionKind"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ready_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "in_work_order_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "blocked_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pole_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "segment_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchedulingSuggestionItem": {
+        "required": [
+          "commune_id",
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SchedulingSuggestionKind"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SchedulingSuggestionState"
+          },
+          "commune_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "segment_has_geometry": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "pole_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "external_ref": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_type": {
+            "$ref": "#/components/schemas/FaultType"
+          },
+          "fault_status": {
+            "$ref": "#/components/schemas/FaultStatus"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "work_order_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "work_order_title": {
+            "type": "string",
+            "nullable": true
+          },
+          "assigned_to": {
+            "type": "string",
+            "nullable": true
+          },
+          "wo_status": {
+            "$ref": "#/components/schemas/WorkOrderStatus"
+          },
+          "recommended_task_kind": {
+            "$ref": "#/components/schemas/TaskKind"
+          },
+          "blocking_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "observed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduled_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchedulingSuggestionItemPagedResult": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchedulingSuggestionItem"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "SchedulingSuggestionKind": {
+        "enum": [
+          "fault_inspection",
+          "fault_repair",
+          "missing_gps",
+          "survey_needed",
+          "overdue"
+        ],
+        "type": "string"
+      },
+      "SchedulingSuggestionState": {
+        "enum": [
+          "ready",
+          "in_work_order",
+          "blocked"
+        ],
+        "type": "string"
+      },
+      "SchedulingSuggestionSummary": {
+        "type": "object",
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchedulingSuggestionGroup"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "SegmentCoverage": {
         "type": "object",
         "properties": {
@@ -28660,6 +29155,9 @@
     },
     {
       "name": "QrCodes"
+    },
+    {
+      "name": "SchedulingSuggestions"
     },
     {
       "name": "Statistics"

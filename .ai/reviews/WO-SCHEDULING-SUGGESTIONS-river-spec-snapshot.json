@@ -1,0 +1,14 @@
+{
+  "axis": "spec",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "src/LuxMap.Modules.WorkOrders/SchedulingSuggestions.cs",
+      "line": 198,
+      "problem": "Never-observed poles get observed_at = 0001-01-01, not null.",
+      "fix": "Project the optional row through a nullable value: `.Select(s => (DateTime?)s.LastSeenAt).FirstOrDefault()` (or make FirstOrDefault nullable), so a missing PoleCurrentStatus row yields null instead of the coalesced DateTime.MinValue."
+    }
+  ]
+  ,
+  "conclusion": "No other actionable spec/functional findings in the supplied snapshot."
+}
