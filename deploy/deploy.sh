@@ -28,3 +28,8 @@ docker compose run --rm minio-mc
 docker compose run --rm migrate
 docker compose up -d --remove-orphans api caddy iot-bridge
 docker compose ps
+# Each build leaves ~1.7 GB of build cache and nothing else removes it; on the 38 GB VPS that filled the disk (80% on
+# 24/11/2026, 21.7 GB of cache). Prune only after the new API is up, so a failed deploy keeps its cache for the retry;
+# keep the newest 3 GB so the next build still reuses the ffmpeg / restore layers. The deploy already succeeded here,
+# so a prune error only warns.
+docker builder prune -f --reserved-space 3gb || echo "warning: docker builder prune failed; free space by hand (docs/deploy/update.md)" >&2
