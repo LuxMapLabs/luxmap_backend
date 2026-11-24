@@ -13,7 +13,7 @@ namespace LuxMap.Api.Tests;
 public sealed class IotDiagnosticHistoryTests(AssetImportFixture fixture)
 {
     [Fact]
-    public async Task Minute_episodes_merge_changing_drop_recover_and_keep_history_after_detach()
+    public async Task Five_second_episodes_merge_changing_drop_recover_and_keep_history_after_detach()
     {
         var rig = await new LightingTestRig(fixture).RigAsync(issueSecret: false);
         var contexts = fixture.Services.GetRequiredService<JobContextFactory>();
@@ -35,13 +35,24 @@ public sealed class IotDiagnosticHistoryTests(AssetImportFixture fixture)
                 current < 95 ? "anomaly" : "normal", new(now, "ON", 5, current.Value, current.Value * 5),
                 current < 95 ? [new("current_drop", current, 100, current - 100, 5)] : []) {
                     ConnectionStatus = "online", ElectricalStatus = "fresh",
-                    ElectricalWindow = new("evaluated", 2, 2, 5, current, current * 5) { CurrentEvaluationAvailable = true },
+                    ElectricalWindow = new("evaluated", 5, 5, 5, current, current * 5) { CurrentEvaluationAvailable = true },
                 };
             await IotDiagnosticHistory.ObserveAsync(db, state, profile, result, now, default);
             await db.SaveChangesAsync();
         }
         await Pass(0, 90);
-        await Pass(30, 80); // same UTC minute: no second write
+        await Pass(4, 80); // same five-second bucket: no second write
+        await using (var check = contexts.Open(fixture.CommuneId)) {
+            var row = await check.Set<IotDiagnosticEpisode>().SingleAsync(e => e.NodeId == rig.Node);
+            Assert.Equal(origin, row.EndedAt);
+            Assert.Contains("90", row.Anomaly);
+        }
+        await Pass(5, 80);
+        await using (var check = contexts.Open(fixture.CommuneId)) {
+            var row = await check.Set<IotDiagnosticEpisode>().SingleAsync(e => e.NodeId == rig.Node);
+            Assert.Equal(origin.AddSeconds(5), row.EndedAt);
+            Assert.Contains("80", row.Anomaly);
+        }
         await Pass(60, 85);
         await Pass(120, 80);
         await using (var db = contexts.Open(fixture.CommuneId)) {

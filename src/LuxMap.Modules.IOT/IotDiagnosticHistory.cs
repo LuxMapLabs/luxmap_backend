@@ -63,39 +63,41 @@ public sealed partial class IotDiagnosticsService
 
 internal static class IotDiagnosticHistory
 {
+    private static DateTime Bucket(DateTime now) => new(
+        now.Ticks - now.Ticks % (5 * TimeSpan.TicksPerSecond), DateTimeKind.Utc);
     internal static async Task InterruptNodeAsync(LuxMapDbContext db, string nodeId, DateTime now, CancellationToken ct)
     {
-        var minute = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerMinute, DateTimeKind.Utc);
+        var bucket = Bucket(now);
         foreach (var row in await db.Set<IotDiagnosticEpisode>().Where(e => e.NodeId == nodeId && e.ClosedAt == null).ToListAsync(ct))
-            Close(row, minute < row.EndedAt ? row.EndedAt : minute, "interrupted");
+            Close(row, bucket < row.EndedAt ? row.EndedAt : bucket, "interrupted");
     }
 
     internal static async Task ObserveAsync(LuxMapDbContext db, IotDiagnosticState state,
         NodeProfile? profile, IotDiagnosticResult? result, DateTime now, CancellationToken ct)
     {
         if (result is null || profile is null) return; // unavailable is not recovery
-        var minute = new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerMinute, DateTimeKind.Utc);
-        if (state.HistorySampledAt >= minute) return;
-        state.HistorySampledAt = minute;
+        var bucket = Bucket(now);
+        if (state.HistorySampledAt >= bucket) return;
+        state.HistorySampledAt = bucket;
         var rows = await db.Set<IotDiagnosticEpisode>()
             .Where(e => (e.NodeId == state.NodeId || e.FeederId == profile.FeederId) && e.ClosedAt == null).ToListAsync(ct);
         var active = result.Anomalies.ToDictionary(a => a.Code, StringComparer.Ordinal);
         foreach (var row in rows)
         {
             var changedSource = row.FeederId != profile.FeederId || row.NodeId != state.NodeId;
-            var gap = minute - row.EndedAt > TimeSpan.FromMinutes(1);
+            var gap = bucket - row.EndedAt > TimeSpan.FromMinutes(1);
             active.TryGetValue(row.Code, out var anomaly);
             var signature = anomaly is null ? null : Signature(anomaly, profile);
             if (changedSource || gap || (signature is not null && signature != row.Signature))
-                Close(row, minute, "interrupted");
+                Close(row, bucket, "interrupted");
             else if (anomaly is not null)
             {
-                row.EndedAt = minute;
+                row.EndedAt = bucket;
                 row.Anomaly = JsonSerializer.Serialize(anomaly, LuxMapJsonOptions.Default);
                 active.Remove(row.Code);
             }
             else if (CanRecover(result, row.Code))
-                Close(row, minute, "resolved");
+                Close(row, bucket, "resolved");
         }
         // Save closures before inserts to satisfy the unique active node/code index.
         await db.SaveChangesAsync(ct);
@@ -107,7 +109,7 @@ internal static class IotDiagnosticHistory
                 CommuneId = state.CommuneId, FeederId = profile.FeederId, NodeId = state.NodeId,
                 Code = anomaly.Code, Signature = Signature(anomaly, profile),
                 Anomaly = JsonSerializer.Serialize(anomaly, LuxMapJsonOptions.Default),
-                StartedAt = minute, EndedAt = minute,
+                StartedAt = bucket, EndedAt = bucket,
             });
         }
     }
@@ -115,9 +117,9 @@ internal static class IotDiagnosticHistory
     private static string Signature(IotAnomaly a, NodeProfile profile) =>
         a.Code + "/" + JsonSerializer.Serialize(profile, LuxMapJsonOptions.Default);
 
-    private static void Close(IotDiagnosticEpisode row, DateTime minute, string status)
+    private static void Close(IotDiagnosticEpisode row, DateTime bucket, string status)
     {
-        row.ClosedAt = minute;
+        row.ClosedAt = bucket;
         row.Status = status;
     }
 
