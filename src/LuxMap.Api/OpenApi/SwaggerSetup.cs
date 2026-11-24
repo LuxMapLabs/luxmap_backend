@@ -44,6 +44,7 @@ public static class SwaggerSetup
             options.OperationFilter<ClientSurfaceOperationFilter>();
             options.OperationFilter<AiDetectOperationFilter>();
             options.OperationFilter<IotTelemetryHistoryOperationFilter>();
+            options.OperationFilter<SchedulingSuggestionOperationFilter>();
             options.SchemaFilter<IotConnectivitySchemaFilter>();
 
             // Contract section 0 distinguishes two time types. Declare them explicitly rather than
