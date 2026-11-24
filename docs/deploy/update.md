@@ -160,7 +160,7 @@ Backend cập nhật không cần build lại app, trừ khi API đổi hình d�
 | Workflow web đỏ ở *Upload* / *Install the deploy key* | Secret `VPS_DEPLOY_KEY` sai, key bị thu hồi, hoặc host key VPS đổi | Kiểm secret / dòng key trên VPS / `VPS_KNOWN_HOSTS` |
 | Web lỗi mạng, DevTools thấy gọi `localhost` | Build thiếu `VITE_API_URL` (chỉ xảy ra với B2; workflow tự chặn) | Build lại với `VITE_API_URL=/api/v1` |
 | Upload lớn trả **413** | Đúng giới hạn (clip 300 MiB, ảnh cột 16 MiB) | Không phải lỗi deploy |
-| Đĩa đầy | Video khảo sát + cache build Docker | `df -h`, `docker system df`; xoá cache build: `docker builder prune` |
+| Đĩa đầy | Video khảo sát + cache build Docker | `df -h`, `docker system df`. `deploy.sh` đã tự giữ cache build ≤ 3 GB sau mỗi lần deploy thành công; còn đầy thì `docker builder prune -f --reserved-space 3gb` (xoá sạch bằng `-a` thì lần build sau cài lại ffmpeg, chậm hơn) |
 | Sửa `deploy/caddy/Caddyfile` không ăn | Caddy chưa nạp lại | `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` |
 
 ## KHÔNG BAO GIỜ
