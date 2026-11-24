@@ -310,11 +310,13 @@ SUMMARY = {
     ("post", "/api/v1/auth/login"): "Đăng nhập mobile; trả đúng bốn trường",
     # BE-33a — Contract v1.8 §4.8 / §4.9, SELF-SIGNED tới FW.
     ("post", "/api/v1/auth/password/set"): "[BE-33a] Đặt mật khẩu bằng link mời / đặt lại trong email; dùng một lần, kết thúc mọi phiên cũ",
+    ("post", "/api/v1/auth/password/change"): "[ACCT-PASSWORD-CHANGE] Người đăng nhập đổi mật khẩu của chính mình, yêu cầu mật khẩu cũ đúng",
     ("post", "/api/v1/auth/password/forgot"): "[BE-33a] Gửi link đặt lại mật khẩu; LUÔN 202 cùng một body; giới hạn 5 lần / 15 phút / địa chỉ",
     ("post", "/api/v1/admin/users"): "[BE-33a] Quản trị tạo tài khoản không mật khẩu và gửi email mời (72 giờ)",
     ("get", "/api/v1/admin/users"): "[BE-33a] Danh sách tài khoản; lọc role, status (invited/active/locked)",
     ("get", "/api/v1/admin/users/{id}"): "[BE-33a] Chi tiết một tài khoản",
-    ("patch", "/api/v1/admin/users/{id}"): "[BE-33a] Sửa họ tên, email, vai trò, xã; username không đổi",
+    ("patch", "/api/v1/admin/users/{id}"): "[BE-33a] Sửa hồ sơ, vai trò, xã; email dùng API riêng; username không đổi",
+    ("patch", "/api/v1/admin/users/{id}/email"): "[ACCT-EMAIL] Admin đổi email và gửi thông báo đến email mới; giữ mật khẩu cũ",
     ("post", "/api/v1/admin/users/{id}/lock"): "[BE-33a] Khoá và thu hồi mọi phiên; không tự khoá, không khoá Quản trị cuối",
     ("post", "/api/v1/admin/users/{id}/unlock"): "[BE-33a] Mở khoá",
     ("post", "/api/v1/admin/users/{id}/invite"): "[BE-33a] Gửi lại email mời; link cũ hết hiệu lực",
@@ -427,6 +429,8 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/auth/password/change": "drift ACCT-PASSWORD-CHANGE (24/11/2026, SELF-SIGNED)",
+    "/api/v1/admin/users/{id}/email": "drift ACCT-EMAIL (24/11/2026, SELF-SIGNED)",
     "/api/v1/iot/nodes/import": "drift IOT-NODE-EXCEL-IMPORT (24/11/2026, SELF-SIGNED)",
     "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",

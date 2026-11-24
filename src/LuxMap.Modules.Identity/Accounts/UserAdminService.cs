@@ -84,6 +84,7 @@ public sealed class UserAdminService(
                 .Select(commune => new AppUserCommune { UserId = userId, CommuneId = commune, AssignedAt = now })
                 .ToList(),
         };
+        UserPersonalDetails.Apply(user, request, DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime));
         db.Set<AppUser>().Add(user);
         var (raw, expiresAt) = await AccountTokens.IssueAsync(db, user, AccountTokenPurpose.Invite, now, ct);
         await SaveAsync(ct);
@@ -118,7 +119,7 @@ public sealed class UserAdminService(
             .OrderBy(user => user.CreatedAt).ThenBy(user => user.UserId.Length).ThenBy(user => user.UserId)
             .Skip(page.Skip).Take(page.PageSize)
             .ToListAsync(ct);
-        return PagedResult<UserAccountItem>.From(page, total, users.Select(Item).ToList());
+        return PagedResult<UserAccountItem>.From(page, total, users.Select(user => Item(user) with { IdentityNumber = UserPersonalDetails.Mask(user.IdentityNumber) }).ToList());
     }
 
     public async Task<UserAccountItem> GetAsync(string userId, CancellationToken ct)
@@ -129,11 +130,9 @@ public sealed class UserAdminService(
         var user = await FindAsync(userId, tracked: true, ct);
         var now = UtcMicrosecondClock.UtcNow(clock);
 
-        if (request.Email is { } requestedEmail)
+        if (request.ExtraFields?.Keys.Any(key => string.Equals(key, "email", StringComparison.OrdinalIgnoreCase)) == true)
         {
-            var email = requestedEmail.Trim();
-            await RequireFreeAsync(username: null, email, exceptUserId: user.UserId, ct);
-            user.Email = email;
+            throw Invalid("email", "Use PATCH /admin/users/{id}/email to change email.");
         }
 
         if (request.FullName is { } fullName)
@@ -157,6 +156,7 @@ public sealed class UserAdminService(
             ReplaceCommunes(user, await ValidCommunesAsync(role, requested, ct), now);
         }
 
+        UserPersonalDetails.Apply(user, request, DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime));
         user.Role = role;
         user.HasSystemWideScope = role == UserRole.SystemAdmin;
         user.UpdatedAt = now;
@@ -166,6 +166,28 @@ public sealed class UserAdminService(
             "Account {UserId} updated by {AdminId}: role {Role}, communes {Communes}.",
             user.UserId, actor.UserId, ContractEnum.ToDbValue(user.Role), CurrentCommunes(user));
         return Item(user);
+    }
+
+    /// <summary>Changes only email. No password or session changes; notification goes to the new mailbox.</summary>
+    public async Task<ChangeUserEmailResponse> ChangeEmailAsync(string userId, ChangeUserEmailRequest request, CancellationToken ct)
+    {
+        var user = await FindAsync(userId, tracked: true, ct);
+        var email = request.Email!.Trim();
+        await RequireFreeAsync(username: null, email, exceptUserId: user.UserId, ct);
+        if (!string.Equals(user.Email, email, StringComparison.Ordinal))
+        {
+            // Links delivered to the old mailbox must not remain usable after the change.
+            var unusedLinks = await db.Set<AccountToken>()
+                .Where(token => token.UserId == user.UserId && token.UsedAt == null).ToListAsync(ct);
+            db.Set<AccountToken>().RemoveRange(unusedLinks);
+            user.Email = email;
+            user.UpdatedAt = UtcMicrosecondClock.UtcNow(clock);
+            await SaveAsync(ct);
+            logger.LogInformation("Account {UserId} email changed by {AdminId}.", user.UserId, actor.UserId);
+        }
+
+        var sent = await mailer.TrySendEmailChangedAsync(user, ct);
+        return new ChangeUserEmailResponse(Item(user), sent);
     }
 
     /// <summary>
@@ -246,7 +268,8 @@ public sealed class UserAdminService(
             user.IsLocked ? AccountStatus.Locked : user.PasswordSetAt is null ? AccountStatus.Invited : AccountStatus.Active,
             user.CreatedAt,
             user.PasswordSetAt,
-            AvatarUrls.For(user, admin: true));
+            AvatarUrls.For(user, admin: true),
+            user.DateOfBirth, user.Gender, user.Address, user.PhoneNumber, user.IdentityNumber, user.IdentityType);
 
     private static Expression<Func<AppUser, bool>> StatusIs(string status) => status switch
     {
@@ -340,7 +363,7 @@ public sealed class UserAdminService(
         if (taken.Count > 0)
         {
             throw new LuxMapException(KnownErrors.IdentifierTaken.Code, KnownErrors.IdentifierTaken.StatusCode,
-                "That username or email address is already used by another account.", taken);
+                "That username, email address or identity document is already used by another account.", taken);
         }
     }
 
@@ -361,7 +384,7 @@ public sealed class UserAdminService(
         {
             // Lost a race against a concurrent create or email change; the unique index caught it.
             throw new LuxMapException(KnownErrors.IdentifierTaken.Code, KnownErrors.IdentifierTaken.StatusCode,
-                "That username or email address is already used by another account.");
+                "That username, email address or identity document is already used by another account.");
         }
     }
 

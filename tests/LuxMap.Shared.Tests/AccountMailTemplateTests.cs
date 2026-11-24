@@ -8,6 +8,32 @@ namespace LuxMap.Shared.Tests;
 /// <summary>The invitation and reset mails: HTML with a plain-text twin, and nothing from an account becomes markup.</summary>
 public class AccountMailTemplateTests
 {
+    [Fact]
+    public void Email_change_template_uses_the_same_layout_and_encodes_account_values()
+    {
+        var (subject, text, html) = AccountMailTemplate.RenderEmailChanged("Nguyễn <script>An</script>",
+            "an\"><b>", "new+<x>@example.invalid", new Uri("https://luxmap.com.vn/"), true);
+        Assert.Equal("LuxMap — Đổi email thành công", subject);
+        Assert.Contains("mật khẩu cũ", text);
+        Assert.Contains("mật khẩu cũ", html);
+        Assert.Contains("&lt;x&gt;@example.invalid", html);
+        Assert.DoesNotContain("<script>", html);
+        Assert.DoesNotContain("\"><b>", html);
+        Assert.Contains("#0f2a44", html);
+        Assert.Contains("#f5a623", html);
+        Assert.Contains("href=\"https://luxmap.com.vn/\"", html);
+        Assert.DoesNotContain("set-password?token=", html);
+    }
+
+    [Fact]
+    public void Email_change_for_an_invited_account_does_not_claim_a_password_already_exists()
+    {
+        var (_, text, html) = AccountMailTemplate.RenderEmailChanged("An", "an", "an@example.invalid", new Uri("https://luxmap.com.vn/"), false);
+        Assert.Contains("Tài khoản chưa đặt mật khẩu", text);
+        Assert.Contains("nhận lại lời mời", html);
+        Assert.DoesNotContain("mật khẩu cũ", text);
+    }
+
     private static readonly Uri Link = new("http://localhost:5173/set-password?token=abc-DEF_123&x=1");
 
     [Fact]

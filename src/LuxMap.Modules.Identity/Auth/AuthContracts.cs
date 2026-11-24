@@ -89,4 +89,10 @@ public sealed record CurrentUserResponse(
     IReadOnlyList<string> CommuneIds,
     IReadOnlyList<CommuneSummary> Communes,
     MapBounds? MapBounds,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    DateOnly? DateOfBirth = null,
+    string? Gender = null,
+    string? Address = null,
+    string? PhoneNumber = null,
+    string? IdentityNumber = null,
+    string? IdentityType = null);

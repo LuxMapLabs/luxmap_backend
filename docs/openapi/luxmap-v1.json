@@ -1053,6 +1053,170 @@
         "x-luxmap-client": "web"
       }
     },
+    "/api/v1/admin/users/{id}/email": {
+      "patch": {
+        "tags": [
+          "AdminUsers"
+        ],
+        "summary": "[Web] ChangeEmail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeUserEmailRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeUserEmailRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeUserEmailRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeUserEmailResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeUserEmailResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeUserEmailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_users",
+        "x-luxmap-roles": [
+          "system_admin"
+        ],
+        "x-luxmap-client": "web"
+      }
+    },
     "/api/v1/admin/users/{id}/lock": {
       "post": {
         "tags": [
@@ -12821,6 +12985,125 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/auth/password/change": {
+      "post": {
+        "tags": [
+          "Password"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:manage_own_profile",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "field_engineer",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/auth/password/forgot": {
       "post": {
         "tags": [
@@ -20295,6 +20578,53 @@
         ],
         "type": "string"
       },
+      "ChangePasswordRequest": {
+        "required": [
+          "new_password",
+          "old_password"
+        ],
+        "type": "object",
+        "properties": {
+          "old_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 1024,
+            "minLength": 12,
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeUserEmailRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeUserEmailResponse": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserAccountItem"
+          },
+          "notification_sent": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "CitizenFeedbackRow": {
         "required": [
           "accepted",
@@ -21433,6 +21763,53 @@
         ],
         "type": "object",
         "properties": {
+          "date_of_birth": {
+            "type": "string",
+            "description": "Nullable YYYY-MM-DD; future dates rejected against the server UTC date. PATCH omission preserves; null clears.",
+            "format": "date",
+            "nullable": true
+          },
+          "gender": {
+            "enum": [
+              "male",
+              "female",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Nullable gender. PATCH omission preserves; null clears.",
+            "nullable": true
+          },
+          "address": {
+            "maxLength": 500,
+            "type": "string",
+            "description": "Personal address, max 500 characters; does not change commune scope.",
+            "nullable": true
+          },
+          "phone_number": {
+            "maxLength": 32,
+            "type": "string",
+            "description": "7–15 digits with optional leading +. Spaces, dots, hyphens and parentheses removed; not unique.",
+            "nullable": true
+          },
+          "identity_number": {
+            "maxLength": 64,
+            "type": "string",
+            "description": "Max 64 characters, trimmed and uppercased; unique per identity_type. Masked in admin list, full in admin detail and own profile.",
+            "nullable": true
+          },
+          "identity_type": {
+            "enum": [
+              "citizen_id",
+              "identity_card",
+              "passport",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Must be set or cleared together with identity_number.",
+            "nullable": true
+          },
           "username": { },
           "email": {
             "maxLength": 256,
@@ -21577,6 +21954,50 @@
           },
           "avatar_url": {
             "type": "string",
+            "nullable": true
+          },
+          "date_of_birth": {
+            "type": "string",
+            "description": "Nullable YYYY-MM-DD; future dates rejected against the server UTC date. PATCH omission preserves; null clears.",
+            "format": "date",
+            "nullable": true
+          },
+          "gender": {
+            "enum": [
+              "male",
+              "female",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Nullable gender. PATCH omission preserves; null clears.",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "description": "Personal address, max 500 characters; does not change commune scope.",
+            "nullable": true
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "7–15 digits with optional leading +. Spaces, dots, hyphens and parentheses removed; not unique.",
+            "nullable": true
+          },
+          "identity_number": {
+            "type": "string",
+            "description": "Max 64 characters, trimmed and uppercased; unique per identity_type. Masked in admin list, full in admin detail and own profile.",
+            "nullable": true
+          },
+          "identity_type": {
+            "enum": [
+              "citizen_id",
+              "identity_card",
+              "passport",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Must be set or cleared together with identity_number.",
             "nullable": true
           }
         },
@@ -28187,10 +28608,51 @@
       "UpdateUserRequest": {
         "type": "object",
         "properties": {
-          "email": {
-            "maxLength": 256,
+          "date_of_birth": {
             "type": "string",
-            "format": "email",
+            "description": "Nullable YYYY-MM-DD; future dates rejected against the server UTC date. PATCH omission preserves; null clears.",
+            "format": "date",
+            "nullable": true
+          },
+          "gender": {
+            "enum": [
+              "male",
+              "female",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Nullable gender. PATCH omission preserves; null clears.",
+            "nullable": true
+          },
+          "address": {
+            "maxLength": 500,
+            "type": "string",
+            "description": "Personal address, max 500 characters; does not change commune scope.",
+            "nullable": true
+          },
+          "phone_number": {
+            "maxLength": 32,
+            "type": "string",
+            "description": "7–15 digits with optional leading +. Spaces, dots, hyphens and parentheses removed; not unique.",
+            "nullable": true
+          },
+          "identity_number": {
+            "maxLength": 64,
+            "type": "string",
+            "description": "Max 64 characters, trimmed and uppercased; unique per identity_type. Masked in admin list, full in admin detail and own profile.",
+            "nullable": true
+          },
+          "identity_type": {
+            "enum": [
+              "citizen_id",
+              "identity_card",
+              "passport",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Must be set or cleared together with identity_number.",
             "nullable": true
           },
           "full_name": {
@@ -28210,7 +28672,7 @@
             "nullable": true
           }
         },
-        "additionalProperties": false
+        "additionalProperties": { }
       },
       "UserAccountItem": {
         "type": "object",
@@ -28252,6 +28714,50 @@
           },
           "avatar_url": {
             "type": "string",
+            "nullable": true
+          },
+          "date_of_birth": {
+            "type": "string",
+            "description": "Nullable YYYY-MM-DD; future dates rejected against the server UTC date. PATCH omission preserves; null clears.",
+            "format": "date",
+            "nullable": true
+          },
+          "gender": {
+            "enum": [
+              "male",
+              "female",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Nullable gender. PATCH omission preserves; null clears.",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "description": "Personal address, max 500 characters; does not change commune scope.",
+            "nullable": true
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "7–15 digits with optional leading +. Spaces, dots, hyphens and parentheses removed; not unique.",
+            "nullable": true
+          },
+          "identity_number": {
+            "type": "string",
+            "description": "Max 64 characters, trimmed and uppercased; unique per identity_type. Masked in admin list, full in admin detail and own profile.",
+            "nullable": true
+          },
+          "identity_type": {
+            "enum": [
+              "citizen_id",
+              "identity_card",
+              "passport",
+              "other",
+              null
+            ],
+            "type": "string",
+            "description": "Must be set or cleared together with identity_number.",
             "nullable": true
           }
         },

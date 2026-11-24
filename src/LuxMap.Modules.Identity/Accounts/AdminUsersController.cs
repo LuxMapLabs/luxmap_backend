@@ -50,13 +50,26 @@ public sealed class AdminUsersController(UserAdminService service) : ControllerB
     public Task<UserAccountItem> Detail(string id, CancellationToken ct) => service.GetAsync(id, ct);
 
     /// <summary>
-    /// Changes <c>full_name</c>, <c>email</c>, <c>role</c> and <c>commune_ids</c>; absent fields stay.
+    /// Changes personal details, role and commune_ids; absent fields stay. Email uses the separate /email endpoint.
     /// <c>username</c> never changes. Takes effect at the account's next token refresh, within 60 minutes.
     /// </summary>
     [HttpPatch("{id}")]
     [Authorize(Policy = LuxMapPolicies.ManageUsers)]
     public Task<UserAccountItem> Update(string id, [FromBody] UpdateUserRequest request, CancellationToken ct)
         => service.UpdateAsync(id, request, ct);
+
+    /// <summary>Changes email and sends confirmation to the new mailbox. Existing password stays unchanged.</summary>
+    /// <remarks>notification_sent=false means the email was saved but delivery failed; repeat with the same email to resend.</remarks>
+    [HttpPatch("{id}/email")]
+    [Authorize(Policy = LuxMapPolicies.ManageUsers)]
+    [ProducesResponseType<ChangeUserEmailResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public Task<ChangeUserEmailResponse> ChangeEmail(string id, [FromBody] ChangeUserEmailRequest request, CancellationToken ct)
+        => service.ChangeEmailAsync(id, request, ct);
 
     /// <summary>Blocks sign-in and revokes every session. Not your own account, not the last active system admin.</summary>
     [HttpPost("{id}/lock")]
