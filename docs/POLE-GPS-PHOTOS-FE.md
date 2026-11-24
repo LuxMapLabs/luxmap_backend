@@ -55,9 +55,9 @@ Quản lý (web)                         Kỹ sư (mobile)                      
                                                                                          done (GIS chưa đổi)
 8. Mở báo cáo: mỗi cột
    GPS cũ │ GPS mới │ ảnh của cột
-9a. verify                       ──►                                                     ghi pole.geom
-                                                                                         🆕 chép ảnh → ảnh tài sản
-                                                                                         verified
+9a. verify                       ──►                                                     ghi pole.geom, verified
+                                                                                         🆕 job nền (≤ 1 phút): chép ảnh
+                                                                                            → ảnh tài sản của cột
 9b. return (kèm ghi chú)         ──►  quay lại bước 5                                    in_progress
 ```
 
@@ -69,9 +69,11 @@ Quản lý (web)                         Kỹ sư (mobile)                      
   này (ảnh vòng trước `return` vẫn tính; ảnh không gắn cột không tính). Thiếu → `409 POLE_EVIDENCE_REQUIRED`,
   `details {work_order_id, pole_ids: [...]}`. Cột kỹ sư không báo toạ độ thì không cần ảnh.
 - `verify` chỉ đọc `pole_locations` để ghi GIS. Toạ độ `lat/lng` đi kèm ảnh **không bao giờ** được dùng làm toạ độ cột.
-- 🆕 **`verify` chép ảnh:** mọi ảnh `observation` gắn cột (của các cột có toạ độ) thành ảnh tài sản của cột đó, trong cùng giao dịch
-  với ghi GIS. Không có ảnh mới nào được tải lên — dùng chung file. `verify` bị `409 POLE_OFF_SEGMENT` thì không chép gì. Ảnh không ưng
-  thì Quản lý ẩn trong gallery của cột (ẩn ở gallery không đụng ảnh của phiếu).
+- 🆕 **Sau `verify`, ảnh được chép sang hồ sơ cột:** một job nền (chạy mỗi phút) chép mọi ảnh `observation` gắn cột (của các cột có toạ
+  độ) thành ảnh tài sản của cột đó — bản sao riêng, ảnh của phiếu vẫn còn. Gallery có ảnh **trong vòng khoảng 1 phút** sau `verify`, không
+  ngay trong response. `verify` không đổi gì (thời gian, lỗi, response). `verify` bị `409 POLE_OFF_SEGMENT` thì lệnh chưa duyệt, không chép.
+- 🆕 Gallery hiện tối đa **10 ảnh** mỗi cột: job chép ảnh **mới nhất** trước tới khi đầy, phần dư không chép (vẫn xem được ở phiếu). Ảnh
+  trên 40 MP hoặc file hỏng cũng không chép. Ảnh không ưng thì Quản lý ẩn trong gallery của cột (ẩn ở gallery không đụng ảnh của phiếu).
 
 ## 4. API
 
@@ -144,7 +146,7 @@ Và ở `complete`:
 
 | Mã | Khi nào | FE làm gì |
 |---|---|---|
-| 🆕 `409 POLE_EVIDENCE_REQUIRED` | Cột trong `pole_locations` chưa có ảnh gắn cột | Mở lại các cột trong `details.pole_ids`, yêu cầu chụp; với `/sync/push` đây là kết quả lỗi của op `work_order_complete` |
+| 🆕 `409 POLE_EVIDENCE_REQUIRED` | Cột trong `pole_locations` chưa có ảnh gắn cột | Gọi trực tiếp: mở lại các cột trong `details.pole_ids`, yêu cầu chụp. Qua `/sync/push`: lỗi nằm trong `conflicts[]` của op `work_order_complete` với `code` này nhưng **không có `details`** — app tự tính cột thiếu từ ảnh đã chụp |
 
 ## 6. WP6 — mobile
 
@@ -174,8 +176,9 @@ Bảng, mỗi dòng một cột theo thứ tự `pole_ids`:
   điểm gần nhau là dấu hiệu tốt. Vị trí chụp ảnh chỉ để tham khảo, không bao giờ là toạ độ cột.
 - Mục "Ảnh chung của phiếu" cho ảnh `pole_id == null`.
 - Ảnh từ nhiều vòng (`return` rồi `complete` lại) nằm chung; sắp theo `captured_at` như API trả.
-- 🆕 Sau `verify` thành công, gallery của từng cột (`GET /assets/poles/{id}/photos`) có ảnh vừa duyệt; cột chưa có ảnh bìa thì
-  ảnh bìa hiện theo luật bìa hiện có. Màn duyệt nên báo "Đã thêm N ảnh vào hồ sơ cột".
+- 🆕 Sau `verify` thành công, màn duyệt báo "Ảnh sẽ được thêm vào hồ sơ cột trong ít phút". Gallery của từng cột
+  (`GET /assets/poles/{id}/photos`) có ảnh sau khoảng 1 phút; cột chưa có ảnh bìa thì ảnh bìa hiện theo luật bìa hiện có. API không trả
+  số ảnh đã chép.
 - **Duyệt:** `verify` — tất cả hoặc không. Có cột lệch hành lang tuyến → `409 POLE_OFF_SEGMENT`,
   `details.poles[] {pole_id, segment_id, distance_m, corridor_m}`: tô đỏ các dòng đó, không cột nào đổi, phiếu vẫn `done` → Quản lý
   `return` kèm ghi chú.
@@ -186,6 +189,6 @@ Bảng, mỗi dòng một cột theo thứ tự `pole_ids`:
 | Mã | Câu hỏi | Trạng thái |
 |---|---|---|
 | Q-1 | Có **bắt buộc** ít nhất một ảnh cho mỗi cột có toạ độ khi `complete` không? | **Có** — Mỹ chốt 24/11 (PGP-2), BE chưa hiện thực |
-| Q-2 | Sau `verify`, có **chép ảnh** sang thư viện ảnh tài sản của cột (kênh C) không? | **Có** — Mỹ chốt 24/11 (PGP-3), BE chưa hiện thực |
+| Q-2 | Sau `verify`, có **chép ảnh** sang thư viện ảnh tài sản của cột (kênh C) không? | **Có**, bằng job nền sau `verify` — Mỹ chốt 24/11 (PGP-3, PGP-6), BE chưa hiện thực |
 | Q-3 | Có **chặn** `/pole-photos` (kênh B) ở phiếu `pole_gps_update` không? | **Còn mở** — hiện chưa chặn (chỉ chặn cột chưa GPS); FE đừng gọi |
 | Q-4 | GPS ghi vào EXIF hay gửi riêng? | **Gửi riêng** — Mỹ chốt 24/11 (PGP-1); EXIF tuỳ mobile, BE không đọc |
