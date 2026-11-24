@@ -1410,6 +1410,12 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>24/11/2026</td>
+        <td><code>POLE-GPS-PHOTO</code> Phase 1: bắt buộc ảnh ở <code>complete</code> làm được như chốt; chép ảnh lúc <code>verify</code> <strong>không</strong> làm được kiểu "trỏ chung key" (CHECK <code>ck_pole_asset_photo_keys</code>, thiếu kích thước, trần 40 MP, dung lượng đếm đôi). Đề xuất chép byte bằng job nền + bảng sổ <code>work_order_photo_copy</code>. Chờ Mỹ chốt D-1…D-8.</td>
+        <td><code>.ai/results/POLE-GPS-PHOTO-p1.md</code>, ticket, drift (ghi chú PGP-3/4), tracking</td>
+        <td><code>docs(POLE-GPS-PHOTO): phase 1 survey, eight decisions for Mỹ</code></td>
+      </tr>
+      <tr>
+        <td>24/11/2026</td>
         <td><code>POLE-GPS-PHOTO</code> Mỹ chốt PGP-1…PGP-5 (SELF-SIGNED, chạm API): GPS là trường riêng, BE không đọc EXIF; mỗi cột báo toạ độ bắt buộc ≥ 1 ảnh (<code>409 POLE_EVIDENCE_REQUIRED</code>); <code>verify</code> chép ảnh sang ảnh tài sản của cột. Mở ticket, <strong>chưa hiện thực</strong>; tài liệu FE đánh dấu 🆕. Q-3 (chặn <code>/pole-photos</code>) còn mở.</td>
         <td><code>docs/contract-drift.md</code>, <code>.ai/tasks/POLE-GPS-PHOTO.md</code>, <code>docs/POLE-GPS-PHOTOS-FE.md</code>, tracking</td>
         <td><code>docs(work-orders): record pole GPS photo decisions and open POLE-GPS-PHOTO</code></td>

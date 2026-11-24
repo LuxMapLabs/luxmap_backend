@@ -1,9 +1,9 @@
 ---
 ticket: POLE-GPS-PHOTO
 title: Lịch "Cập nhật vị trí cột" — bắt buộc ảnh cho mỗi cột báo toạ độ, verify chép ảnh sang ảnh tài sản của cột
-status: todo
+status: blocked
 phase: 1
-owner: chưa giao
+owner: claude (P1)
 branch: feat/POLE-GPS-PHOTO
 contract_refs:
   - "drift POLE-GPS-PHOTO PGP-1…PGP-5 (SELF-SIGNED 24/11/2026) — đặc tả của ticket này"
@@ -33,6 +33,9 @@ tài sản của cột (PGP-3, PGP-4). Hôm nay ảnh là tuỳ chọn và ở l
    một phần + FK **DB-only** (Assets không reference ngược WorkOrders — ranh giới module). Lõi tạo ảnh tài sản nằm ở Assets, WorkOrders gọi.
 
 ## Phase 1 — khảo sát, dừng chờ Mỹ
+
+**Xong 24/11/2026** — `.ai/results/POLE-GPS-PHOTO-p1.md`. PGP-3 / PGP-4 như đã ghi **không làm được** (CHECK key của ảnh tài sản);
+chờ Mỹ chốt D-1…D-8 rồi mới sang Phase 2. Phần Yêu cầu 2 bên trên sẽ viết lại theo D-item.
 
 Trả lời rồi dừng (không viết code):
 
