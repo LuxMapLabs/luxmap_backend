@@ -72,6 +72,20 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     }
 
     [Fact]
+    public void Iot_node_excel_import_has_a_required_file_admin_policy_and_row_results()
+    {
+        var op = Spec.GetProperty("paths").GetProperty("/api/v1/iot/nodes/import").GetProperty("post");
+        Assert.Equal(LuxMapPolicies.ManageSettings, op.GetProperty("x-luxmap-capability").GetString());
+        Assert.Equal(new[] { "system_admin" }, op.GetProperty("x-luxmap-roles").EnumerateArray().Select(v => v.GetString()));
+        var body = op.GetProperty("requestBody").GetProperty("content").GetProperty("multipart/form-data").GetProperty("schema");
+        Assert.Contains("file", body.GetProperty("required").EnumerateArray().Select(v => v.GetString()));
+        Assert.Equal("binary", body.GetProperty("properties").GetProperty("file").GetProperty("format").GetString());
+        var result = Schema("IotNodeImportResult").GetProperty("properties");
+        foreach (var field in new[] { "sheet", "total", "created", "existing", "failed", "items" })
+            Assert.True(result.TryGetProperty(field, out _));
+    }
+
+    [Fact]
     public void Iot_node_registration_only_exposes_seven_fields()
     {
         var fields = Schema("RegisterNodeRequest").GetProperty("properties").EnumerateObject()

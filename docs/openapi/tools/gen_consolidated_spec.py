@@ -160,6 +160,8 @@ iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot
 iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [5]
 
 S["IotCommandHistoryStatus"]["enum"] = ["success", "pending", "expired"]
+iot_property("IotNodeImportItem", "status")["enum"] = ["created", "existing", "failed"]
+iot_property("IotNodeImportItem", "row")["description"] = "Số dòng trong Excel, header ở dòng 1."
 iot_property("IotCommandStatus", "status")["enum"] = ["pending", "success", "no_data"]
 iot_property("IotCommandStatus", "status")["description"] = "POST: pending. GET: success của lệnh được node xác nhận gần nhất, hoặc no_data."
 iot_property("IotCommandHistoryItem", "requested_by")["description"] = (
@@ -425,6 +427,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/nodes/import": "drift IOT-NODE-EXCEL-IMPORT (24/11/2026, SELF-SIGNED)",
     "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",
     "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)",
@@ -454,6 +457,7 @@ SECTION = {
 }
 
 SUMMARY.update({
+    ("post", "/api/v1/iot/nodes/import"): "Admin thêm nhiều node từ Excel .xlsx; kết quả theo dòng, gửi lại cùng cấu hình không tạo trùng",
     ("post", "/api/v1/iot/servers/{serverId}/credential"): "Admin cấp MQTT key; Client ID và username bằng server_id",
     ("get", "/api/v1/iot/servers/{serverId}/credential"): "Admin xem lại key của đúng server_id; no-store",
     ("delete", "/api/v1/iot/servers/{serverId}/credential"): "Admin thu hồi key và ngắt kết nối server",
