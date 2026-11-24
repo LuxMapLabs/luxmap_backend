@@ -23,7 +23,7 @@ trước, đúng PGP-2). Tập cột cần ảnh = `targets` có `ReportedLat !=
 `complete` đọc) chỉ cho ra 409 thừa, gửi lại là qua. Không cần thêm khoá.
 
 **`/sync/push`:** op lỗi được cô lập (`ResetAsync`: rollback + `ChangeTracker.Clear`), nên `Report` đã sửa target trong bộ nhớ không rò sang
-op sau. Nhưng 409 (khác `IDEMPOTENCY_CONFLICT`) đi vào **`conflicts[]`**, và `conflicts[]` mang `code`, `message`, `server_state`,
+op sau. Nhưng 409 (khác `IDEMPOTENCY_CONFLICT`) đi vào **`conflicts[]`**, và `conflicts[]` mang `reason` (mã lỗi), `message`, `server_state`,
 **không mang `details`** (`SyncPushService` dòng 126). Mobile sẽ **không** nhận được `details.pole_ids` qua sync → D-7.
 
 **Mã lỗi:** `POLE_EVIDENCE_REQUIRED` mới trong `ErrorCodes`. Khuôn: `AFTER_EVIDENCE_REQUIRED`.

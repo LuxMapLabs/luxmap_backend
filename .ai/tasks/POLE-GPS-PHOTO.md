@@ -1,9 +1,9 @@
 ---
 ticket: POLE-GPS-PHOTO
 title: Lịch "Cập nhật vị trí cột" — bắt buộc ảnh cho mỗi cột báo toạ độ, ảnh đã duyệt được chép sang ảnh tài sản của cột
-status: in_progress
+status: review
 phase: 2
-owner: claude (P1, brief, kiểm), codex (P2 code)
+owner: claude (P1, P2 — Codex không chạy được sol 24/11)
 branch: feat/POLE-GPS-PHOTO
 contract_refs:
   - "drift POLE-GPS-PHOTO PGP-1…PGP-8 (SELF-SIGNED 24/11/2026) — đặc tả của ticket này"
@@ -48,15 +48,19 @@ PGP-3 / PGP-4 và thêm PGP-6…PGP-8; **đọc drift, không đọc bản cũ t
 
 ## Tiêu chí xong
 
-- [ ] `dotnet build` không cảnh báo mới; `dotnet test` mã thoát 0
-- [ ] Test complete: thiếu ảnh một cột → 409 đúng `pole_ids` (thứ tự target); ảnh không gắn cột không tính; ảnh vòng trước `return` tính;
+Kết quả và phá thử: `.ai/results/POLE-GPS-PHOTO-p2.md`. Điều kiện "chưa có dòng sổ" không phá thử riêng được (khoá chính của sổ
+cũng chặn trùng) — ghi ở kết quả.
+
+
+- [x] `dotnet build` không cảnh báo mới; `dotnet test` mã thoát 0
+- [x] Test complete: thiếu ảnh một cột → 409 đúng `pole_ids` (thứ tự target); ảnh không gắn cột không tính; ảnh vòng trước `return` tính;
   cột không báo toạ độ không cần ảnh; `/sync/push` ra `conflicts[]` mã `POLE_EVIDENCE_REQUIRED`; lệnh loại khác không đổi
-- [ ] Test job: lệnh `verified` → đúng số ảnh tài sản, object mới, `uploaded_by` = người chụp, audit `system`; chạy lại không chép trùng;
+- [x] Test job: lệnh `verified` → đúng số ảnh tài sản, object mới, `uploaded_by` = người chụp, audit `system`; chạy lại không chép trùng;
   lệnh `done` / `cancelled` không chép; cột còn 1 chỗ → 1 `copied` (ảnh mới nhất) + phần còn lại `skipped_limit`; object mất → `missing_object`;
   ảnh > 40 MP → `skipped_pixels`; xoá cột sau khi chép vẫn từ chối 409 `ASSET_IN_USE` và rollback sạch
-- [ ] Phá thử: bỏ kiểm ảnh ở complete → test đỏ; bỏ điều kiện "chưa có dòng sổ" → test chép trùng đỏ; bỏ đếm chỗ → test giới hạn đỏ
-- [ ] Migration: đọc `Up()` / `Down()` trước khi apply; `Down()` đối xứng
-- [ ] OpenAPI + generator + lint
+- [x] Phá thử: bỏ kiểm ảnh ở complete → test đỏ; bỏ điều kiện "chưa có dòng sổ" → test chép trùng đỏ; bỏ đếm chỗ → test giới hạn đỏ
+- [x] Migration: đọc `Up()` / `Down()` trước khi apply; `Down()` đối xứng
+- [x] OpenAPI + generator + lint
 
 ## KHÔNG ĐƯỢC làm
 
