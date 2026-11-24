@@ -20,6 +20,7 @@ class PolePhotoCopyPlanTests(unittest.TestCase):
                 CREATE TABLE public.work_order_pole_photo(photo_id TEXT, work_order_id TEXT, pole_id TEXT,
                     commune_id TEXT, uploaded_by TEXT, decided_by TEXT, reviewed_by TEXT, video_viewed_by TEXT, withdrawn_by TEXT);
                 CREATE TABLE public.fault(fault_id TEXT, commune_id TEXT, origin_pole_photo_id TEXT);
+                CREATE TABLE public.lux_reading(lux_id TEXT, commune_id TEXT, photo_id TEXT);
                 CREATE TABLE public.work_order_fault(work_order_id TEXT, fault_id TEXT, commune_id TEXT);
                 CREATE TABLE public.repair_evidence(evidence_id TEXT, fault_id TEXT, commune_id TEXT);
                 CREATE TABLE public.citizen_report(report_id TEXT, fault_id TEXT, commune_id TEXT, decided_by TEXT);
@@ -40,6 +41,8 @@ class PolePhotoCopyPlanTests(unittest.TestCase):
                 INSERT INTO public.fault VALUES ('keep-fault','COM-001','keep-photo'),
                     ('drop-fault','COM-001','drop-photo'), ('drop-review-fault','COM-001','drop-review'),
                     ('drop-viewer-fault','COM-001','drop-viewer'), ('ordinary-fault','COM-001',NULL);
+                INSERT INTO public.lux_reading VALUES ('keep-lux','COM-001','keep-photo'),
+                    ('drop-lux','COM-001','drop-photo'), ('unlinked-lux','COM-001',NULL);
                 INSERT INTO public.work_order_fault VALUES ('order','keep-fault','COM-001'), ('order','drop-fault','COM-001');
                 INSERT INTO public.repair_evidence VALUES ('keep-evidence','keep-fault','COM-001'),
                     ('drop-evidence','drop-fault','COM-001'), ('order-evidence',NULL,'COM-001');
@@ -53,6 +56,7 @@ class PolePhotoCopyPlanTests(unittest.TestCase):
             cases = [
                 ("work_order_pole_photo", "photo_id", ["keep-photo", "keep-unreviewed", "keep-withdrawn"]),
                 ("fault", "fault_id", ["keep-fault", "ordinary-fault"]),
+                ("lux_reading", "lux_id", ["keep-lux", "unlinked-lux"]),
                 ("work_order_fault", "fault_id", ["keep-fault"]),
                 ("repair_evidence", "evidence_id", ["keep-evidence", "order-evidence"]),
                 ("citizen_report", "report_id", ["keep-report", "pending-report"]),

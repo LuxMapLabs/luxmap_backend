@@ -875,7 +875,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
             await using var db = Db();
             var audit = new AuditTrail(db, new Correlation());
             var publisher = new ReviewedPolePhotoPublisher(db, audit, new Actor(user), Options.Create(new SurveyReviewOptions()));
-            var service = new WorkOrderPolePhotoService(db, new Actor(user), objects, null!, null!, audit, null!, publisher, null!, null!, TimeProvider.System);
+            var service = new WorkOrderPolePhotoService(db, new Actor(user), objects, null!, null!, audit, null!, publisher, null!, null!, TimeProvider.System,
+                new LuxMap.Modules.Survey.LuxReadings.PhotoLuxLookup(db));
             await service.DecideAsync(workOrder ?? order, photoId, new() { Decision = decision }, default);
         }
         return photoId;

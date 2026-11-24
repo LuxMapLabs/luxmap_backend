@@ -8,6 +8,7 @@ Thiết bị IoT, firmware, registry, điều khiển HTTP/MQTT, job offline và
 `src/LuxMap.Modules.IOT` (phase 2-A). Project `Modules.Telemetry` đã được hợp nhất; dữ liệu đo và lịch sử vẫn được giữ.
 
 - Đặc tả API: [`docs/api-contract-v1.1.md`](docs/api-contract-v1.1.md) — nguồn sự thật, thắng mọi tài liệu khác
+- Gợi ý phân lịch cho Quản lý (5 nhóm cảnh báo, GPS và khảo sát): [`docs/work-order-scheduling-suggestions.md`](docs/work-order-scheduling-suggestions.md)
 - Đọc code từ đâu: [`docs/code-walkthrough.md`](docs/code-walkthrough.md)
 - Sơ đồ trạng thái (sự cố, phiếu, khảo sát, QR, lệnh đèn…), viết bằng tiếng Anh: [`docs/state-machines.md`](docs/state-machines.md)
 - Quy ước lõi và bảng tra cứu theo vùng: [`CLAUDE.md`](CLAUDE.md); bẫy chi tiết ở [`docs/agents/traps/`](docs/agents/traps/)

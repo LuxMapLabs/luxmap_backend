@@ -69,6 +69,17 @@ public class LuxReading : ICommuneScoped
     /// </remarks>
     public required string CommuneId { get; set; }
 
+    /// <summary>
+    /// The pole photo (or clip) this reading was taken with — <c>PPH-…</c>, optional (LUX-PHOTO).
+    /// </summary>
+    /// <remarks>
+    /// Pairs a reading with ONE photo exactly, instead of guessing by pole and time. A composite foreign key
+    /// <c>(photo_id, pole_id, commune_id)</c> makes the database refuse a photo of another pole; a unique index allows at
+    /// most one reading per photo. Withdrawing the photo later leaves the reading and this link alone: the reading is
+    /// RQ1 ground truth. It is NOT an input to <c>dim</c> classification, which comes from sweeps (D-R20).
+    /// </remarks>
+    public string? PhotoId { get; set; }
+
     /// <summary>When the measurement was taken. <c>TIMESTAMPTZ</c>, always <c>DateTimeKind.Utc</c>.</summary>
     public DateTime MeasuredAt { get; set; }
 

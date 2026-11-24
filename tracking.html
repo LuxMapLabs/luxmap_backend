@@ -40,6 +40,82 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="lux-photo">
+    <strong>LUX-PHOTO — số đo lux gắn với ảnh cột · 24/11/2026</strong>
+    <p><span class="tag t-next">Xong · chờ PR vào dev</span>
+    Theo yêu cầu WP6 (đo lux bằng máy ESP32 cầm tay ngay sau khi chụp ảnh / quay video cột): <code>photo_id</code> tuỳ chọn ở
+    <code>POST /lux-readings</code> (và <code>/sync/push</code>), trả lại ở cả ba endpoint lux; <code>PolePhotoItem</code> có thêm
+    <code>lux_id</code> / <code>lux_value</code> / <code>lux_measured_at</code> qua port <code>IPhotoLuxLookup</code>. Mỗi ảnh tối đa một số đo;
+    lỗi <code>POLE_PHOTO_NOT_FOUND</code> 404, <code>PHOTO_POLE_MISMATCH</code> 400, <code>PHOTO_LUX_ALREADY_LINKED</code> 409. FK ghép
+    <code>(photo_id, pole_id, commune_id)</code>, migration <code>AddLuxReadingPhotoLink</code>. Contract v1.23, drift LUX-PHOTO-1…5, SELF-SIGNED.</p>
+    <div class="bar"><i style="width:100%"></i></div>
+    <p><code>dotnet test</code> xanh (Api 1959 / 7 skip). 9 test mới (khứ hồi, không ảnh, ảnh không có / đã rút / ngoài xã, khác cột,
+    một số đo mỗi ảnh, đua 4 request, sync, rút ảnh giữ số đo) + 1 test OpenAPI + 1 ca script chép DB. Phá thử: bỏ kiểm cùng cột → 1 đỏ;
+    bỏ query filter xã → 1 đỏ. Kèm sửa: script chép Supabase chép <code>lux_reading</code> sau ảnh cột. Còn: báo WP6 / WP5; deploy VPS
+    (có migration).</p>
+  </div>
+
+  <div class="card" id="scheduling-pr-readiness">
+    <strong>WO-SCHEDULING-SUGGESTIONS — Claude xác nhận sẵn sàng mở PR · 21/11/2026</strong>
+    <p><span class="tag t-next">Ready to open vào dev · chưa push / PR</span>
+    Claude Code <code>claude-sonnet-5-5</code> review lại độc lập Standards và Spec trên nền
+    <code>623d4e8</code>: cả hai GO, không có lỗi BE xác nhận chặn mở PR. Merge commit candidate
+    <code>6f81d2a</code> build sạch; regression chọn lọc pass 225 test, test IoT lỗi khi chạy gộp pass khi chạy riêng;
+    20 test Python pass. OpenAPI export/generator không đổi spec (206 operations). CI nhánh chưa có; hai shard bắt buộc
+    phải pass trước merge. Lỗi IoT 503 của full-suite cũ vẫn ghi đúng phạm vi kiểm chứng.</p>
+    <p>Đã đối chiếu FE <code>origin/dev b1ad915</code>: tái sử dụng form survey/GPS/inspection/repair;
+    cần nối hai GET, UI gợi ý và sửa prefill/validation/selection. Thử generator FE ở thư mục tạm
+    với consolidated spec: sinh DTO/enum và strict typecheck riêng DTO pass. Không sửa repo FE.
+    <a href="docs/work-order-scheduling-suggestions.md">Handoff WP5 và checklist</a> ·
+    <a href=".ai/reviews/WO-SCHEDULING-SUGGESTIONS-pr-readiness.md">Review Claude và bằng chứng</a>.
+    Files: hướng dẫn tích hợp, ba báo cáo review, <code>tracking.html</code>, kết quả phase 2.
+    Commit message: <code>docs(work-orders): record PR readiness and frontend handoff</code>.
+    Còn: người dùng cho phép push/mở PR; CI, WP5 tích hợp, xác nhận consumer và deploy.</p>
+  </div>
+
+  <div class="card" id="scheduling-dev-sync">
+    <strong>WO-SCHEDULING-SUGGESTIONS — đồng bộ dev để kiểm PR · 21/11/2026</strong>
+    <p><span class="tag t-next">Đã kiểm trên dev mới · local, chưa push / PR</span>
+    Đồng bộ <code>origin/dev 5e3178a</code> (PR #289). Xung đột duy nhất ở cuối
+    <code>docs/contract-drift.md</code>: giữ cả SS-1…SS-5 và IIS-1…IIS-6; không đổi logic gợi ý.
+    Build <code>--disable-build-servers -warnaserror</code> 0 warning/error; 206 test API liên quan
+    (gợi ý/GPS/sync/phân quyền/OpenAPI/import trạng thái ban đầu) pass, 20 test Python pass.
+    Swagger xuất mới trùng file đã commit; consolidated spec sinh lại không lệch; Redocly 2.0.0 hợp lệ, 9 warning.
+    Full suite chưa chạy lại ở lượt đồng bộ này; lỗi nền IoT 503 của lượt trước vẫn được ghi nhận riêng.
+    Files: các thay đổi upstream PR #289, <code>docs/contract-drift.md</code>, <code>tracking.html</code>.
+    Commit message: <code>chore: sync scheduling suggestions with current dev</code>.</p>
+  </div>
+
+  <div class="card" id="scheduling-claude-review">
+    <strong>WO-SCHEDULING-SUGGESTIONS — Claude review · 21/11/2026</strong>
+    <p><span class="tag t-done">Đã review độc lập · không sửa BE, không push / PR</span>
+    Claude Code (<code>claude-sonnet-5-5</code>) review commit <code>96797a7</code> so với nền <code>7d20bf3</code>,
+    hai trục Standards và Spec trong hai phiên chỉ đọc. Không phát hiện vi phạm cứng hay lỗi chức năng P0–P2.
+    Gợi ý P3: dùng chung hạng severity và helper query. Ghi chú về unknown/confirmed đã đối chiếu với writer và
+    luật repair; không phải lỗi đã xác nhận. Không chạy lại test, không sửa logic.
+    Commit message: <code>docs(review): record Claude scheduling suggestions review</code>.</p>
+    <p><a href=".ai/reviews/WO-SCHEDULING-SUGGESTIONS-by-claude.md">Kết quả, bản gốc và đối chiếu</a>.
+    Còn: FE tích hợp/deploy theo yêu cầu; lỗi nền IoT 503 giữ nguyên ghi nhận từ lượt kiểm trước.</p>
+  </div>
+
+  <div class="card" id="scheduling-suggestions">
+    <strong>WO-SCHEDULING-SUGGESTIONS — gợi ý khi Quản lý phân lịch · 19/11/2026</strong>
+    <p><span class="tag t-next">Xong · River đã review · commit local, không push / PR</span>
+    Hai API chỉ đọc: summary và danh sách phân trang cho sự cố cần kiểm tra/sửa, cột thiếu GPS, cột cần khảo sát,
+    phiếu quá hạn. Tách số sự cố/cột/tuyến, field mặc định, scope xã, trạng thái ready/in_work_order/blocked;
+    GET không ghi và không tự tạo phiếu. Dùng lại nullable geometry, pole_gps_update và offline hiện có; không migration.</p>
+    <p>Files: <code>SchedulingSuggestions.cs</code>, <code>SchedulingSuggestionsController.cs</code>, module registration,
+    <code>SchedulingSuggestionTests.cs</code>, OpenAPI và tài liệu tích hợp. Commit message:
+    <code>feat(work-orders): suggest scheduling work from actionable warnings</code>.
+    <a href="docs/work-order-scheduling-suggestions.md">Hướng dẫn WP5/WP6</a> ·
+    <a href=".ai/reviews/WO-SCHEDULING-SUGGESTIONS-by-river.md">River review và xử lý nhận xét</a>.</p>
+    <p>Kiểm: build 0 warning/error; 191 test HTTP/GPS/offline/phân quyền/OpenAPI pass (13 mới), 20 test Python pass;
+    6 phá thử đỏ đúng rồi khôi phục xanh. Spec 206 operation, 10 warning nền, sinh lại không lệch.
+    Full suite có 1 lỗi nền đăng ký IoT server 503, tái hiện trên dev nguyên gốc (7d20bf3); không báo full suite xanh.
+    River: không còn phát hiện xác thực; thêm coverage, đối chiếu các giả định sai bằng kiểu thật và JSON/HTTP thật.
+    Còn: FE tích hợp, báo WP5/WP6 và deploy theo yêu cầu tiếp theo; không tự push / PR.</p>
+  </div>
+
   <div class="card" id="repair-status">
     <strong>REPAIR-STATUS — nghiệm thu sửa chữa công bố cột normal · 19/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>

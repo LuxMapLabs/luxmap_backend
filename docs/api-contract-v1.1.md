@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.22 (BẢN HỢP NHẤT, SELF-SIGNED)
+# LuxMap — API Contract v1.23 (BẢN HỢP NHẤT, SELF-SIGNED)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -21,7 +21,8 @@
 **v1.19:** 26/10/2026 (WO-CANCEL-REQUEST — xin hủy / từ chối lịch, SELF-SIGNED) ·
 **v1.20:** 26/10/2026 (WO-REASSIGN-DATE — giao lại kèm ngày khác, SELF-SIGNED) ·
 **v1.21:** 28/10/2026 (ASSET-PHOTOS — trạng thái mạch và ảnh tài sản, SELF-SIGNED; phần A hiện thực 12/11/2026) ·
-**v1.22:** 29/10/2026 (ACCOUNT-ONE-COMMUNE — mỗi tài khoản đúng một xã, trừ Quản trị hệ thống; ACCT-1).
+**v1.22:** 29/10/2026 (ACCOUNT-ONE-COMMUNE — mỗi tài khoản đúng một xã, trừ Quản trị hệ thống; ACCT-1) ·
+**v1.23:** 24/11/2026 (LUX-PHOTO — số đo lux gắn với ảnh cột qua `photo_id`, máy đo cầm tay, SELF-SIGNED).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
@@ -137,6 +138,7 @@ client **không** parse.
 | `LOCATION_REQUIRED` | 400 | `POST /faults` không `pole_id` và không `location` |
 | `FAULT_TYPE_NOT_REPORTABLE` | 400 | `POST /faults` với `fault_type` chỉ engine sinh |
 | `SERVER_OWNED_FIELD` | 400 | Body mang trường server sở hữu (`lux_id`, `commune_id` ở `POST /lux-readings`) |
+| `PHOTO_POLE_MISMATCH` | 400 | `POST /lux-readings`: `photo_id` là ảnh của cột khác `pole_id` (v1.23) |
 | `UNAUTHENTICATED` | 401 | Access token thiếu / sai chữ ký / hết hạn / sai `iss` / sai `aud` — một mã. **Route không tồn tại khi chưa đăng nhập cũng trả 401** (không dò được route) |
 | `INVALID_CREDENTIALS` | 401 | Sai tài khoản **hoặc** mật khẩu — một mã |
 | `INVALID_REFRESH_TOKEN` | 401 | Refresh token thiếu/sai/hết hạn/thu hồi/dùng lại/sai nhóm — một mã |
@@ -145,6 +147,7 @@ client **không** parse.
 | `ROLE_FORBIDDEN` | 403 | Đã đăng nhập nhưng **vai trò** không nằm trong danh sách của capability mà endpoint yêu cầu (mục 2; v1.4, D-4) |
 | `ORIGIN_NOT_ALLOWED` | 403 | `Origin` thiếu / lạ / `null` — chỉ nhóm `/auth/web/*` |
 | `POLE_NOT_FOUND` | 404 | `pole_id` không tồn tại **hoặc ngoài phạm vi** — cùng một câu trả lời |
+| `POLE_PHOTO_NOT_FOUND` | 404 | Ảnh / clip cột không tồn tại, đã rút, **hoặc ngoài phạm vi** — cùng một câu trả lời |
 | `ASSET_NOT_FOUND` | 404 | Tài sản (`/assets/…`) không tồn tại **hoặc ngoài phạm vi** |
 | `ASSET_PHOTO_NOT_FOUND` | 404 | Ảnh tài sản sai cha, ngoài xã hoặc đã ẩn (v1.21, APH-1) |
 | `NOT_FOUND` | 404 | Route không tồn tại (đã đăng nhập) |
@@ -157,6 +160,7 @@ client **không** parse.
 | `IDENTIFIER_TAKEN` | 409 | Username hoặc email đã có tài khoản khác dùng, không phân biệt hoa thường (`POST`/`PATCH /admin/users`; v1.8) |
 | `LAST_SYSTEM_ADMIN` | 409 | Thao tác sẽ không còn Quản trị hệ thống nào đăng nhập được (hạ vai trò, khoá; v1.8) |
 | `CANNOT_LOCK_SELF` | 409 | Quản trị tự khoá tài khoản của chính mình (v1.8) |
+| `PHOTO_LUX_ALREADY_LINKED` | 409 | `POST /lux-readings`: ảnh đã có một số đo lux khác (mỗi ảnh tối đa một; gửi lại cùng `client_op_id` vẫn `200`) (v1.23) |
 | `ACCOUNT_ALREADY_ACTIVE` | 409 | Gửi lại lời mời cho tài khoản đã đặt mật khẩu (v1.8) |
 | `RATE_LIMITED` | 429 | Quá số lần cho phép từ một địa chỉ (`POST /auth/password/forgot`); header `Retry-After` (v1.8) |
 | `EXTERNAL_REF_TAKEN` | 409 | `(commune_id, external_ref)` đã có |
@@ -1045,15 +1049,18 @@ nghĩa on/off, sensor từng relay, freshness, ngưỡng và mapping khi nối l
 ### 5.7 Số đo lux — `implemented`
 
 Một trong các nguồn ground truth cho RQ1; CV-12 đối chiếu với phân loại của hệ thống. ⚠️ **Số đọc TƯƠNG
-ĐỐI** (v1.7, D-R15): `lux_value` là số đọc cảm biến ánh sáng của **điện thoại**, theo quy trình cố định —
-cùng máy, cùng app, cùng tư thế đo. Chỉ dùng để so giữa các cột và giữa các đêm; **không** phải giá trị
-lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chuẩn chiếu sáng.
+ĐỐI** (v1.7, D-R15; v1.23): `lux_value` là số đọc cảm biến ánh sáng của **điện thoại** hoặc của **máy đo cầm
+tay** (module ESP32 của nhóm, qua Bluetooth, `meter_model = "LuxMap_ESP32"`), theo quy trình cố định — cùng
+thiết bị, cùng app, cùng tư thế đo. **Chỉ so số đo cùng `meter_model`**: số điện thoại và số máy đo cầm tay
+không so với nhau được. Chỉ dùng để so giữa các cột và giữa các đêm; **không** phải giá trị
+lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chuẩn chiếu sáng. Server **không** dùng số đo này
+để phân loại `dim` (`dim` đến từ sweep, D-R20).
 
 **`POST /api/v1/lux-readings`**
 
 ```json
 { "client_op_id": "uuid", "pole_id": "POLE-0047", "measured_at": "2026-10-02T19:42:00Z",
-  "lux_value": 12.4, "meter_model": "Pixel 7a", "data_source": "field", "note": "..." }
+  "photo_id": "PPH-000123", "lux_value": 12.4, "meter_model": "LuxMap_ESP32", "data_source": "field", "note": "..." }
 ```
 
 | Trường | Bắt buộc | Ghi chú |
@@ -1061,15 +1068,22 @@ lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chu�
 | `client_op_id` | Có | UUID, khử trùng lặp |
 | `pole_id` | Có | Bộ hiệu chuẩn cũng là cột thật |
 | `measured_at` | Có | ISO 8601 UTC `Z` |
+| `photo_id` | Không | (v1.23) Ảnh hoặc clip cột (`PPH-…`) mà số đo đi kèm. Phải là ảnh **còn hiệu lực** (chưa rút), **trong phạm vi**, **cùng `pole_id`**, chưa gắn số đo nào: không thấy → `404 POLE_PHOTO_NOT_FOUND`; khác cột → `400 PHOTO_POLE_MISMATCH`; đã gắn → `409 PHOTO_LUX_ALREADY_LINKED`. Mỗi ảnh tối đa **một** số đo. Không gửi → như trước v1.23. Rút ảnh sau đó **không** xoá số đo và giữ nguyên liên kết |
 | `lux_value` | Có | Số đọc tương đối, số thực, không âm, **hữu hạn** (NaN/Infinity → `400`); không có trần. Trên 200 server chỉ log cảnh báo và vẫn lưu — đó là **kiểm tra hợp lệ dữ liệu thô**, không mang nghĩa trắc quang |
 | `data_source` | Có | Đo ngoài thực địa → `field`; đo trên testbed → `calibration_rig` (mục 1.6) |
-| `meter_model` | Không | **Model điện thoại** dùng để đo |
+| `meter_model` | Không | Model **thiết bị đo** (điện thoại, hoặc `LuxMap_ESP32` cho máy đo cầm tay). Không bắt buộc nhưng client **nên luôn gửi** — thiếu nó thì không tách được số đo theo thiết bị |
 | `note` | Không | |
 | `lux_id`, `commune_id` | **Cấm** | Server sở hữu → `400 SERVER_OWNED_FIELD`; `commune_id` tra từ cột |
 
 `measured_by` = user trong JWT, lưu FK, **không emit**. `201` kèm `lux_id`; trùng `client_op_id` →
-**`200`** bản ghi đã có; `404 POLE_NOT_FOUND` (cả khi ngoài phạm vi). Response: `lux_id, client_op_id,
-pole_id, measured_at, lux_value, meter_model, data_source, note`.
+**`200`** bản ghi đã có; `404 POLE_NOT_FOUND` (cả khi ngoài phạm vi). Thứ tự kiểm: `client_op_id` trùng → cột →
+ảnh. Response: `lux_id, client_op_id, pole_id, photo_id, measured_at, lux_value, meter_model, data_source, note`
+(`photo_id` luôn có mặt, `null` khi không gắn ảnh); hai `GET` bên dưới cũng trả `photo_id`. `POST /sync/push`
+loại `lux_reading` kiểm `photo_id` y hệt.
+
+**Ảnh cột hiện số đo (v1.23).** Mọi response `PolePhotoItem` (`/work-orders/{id}/pole-photos…`, kể cả clip) có
+thêm `lux_id`, `lux_value`, `lux_measured_at` — số đo gắn **bằng `photo_id`**, đọc lúc trả (không phải bản chụp
+lúc upload); `null` khi chưa gắn. Server **không** ghép theo thời gian.
 
 **`GET /api/v1/lux-readings/poles/{poleId}`** — chuỗi của một cột, sắp `measured_at` tăng dần, **có phân
 trang** (một cột rig tích hàng trăm điểm). **Đổi đường dẫn ở v1.3 (BREAKING)** — đường cũ
@@ -1259,6 +1273,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.23 | 24/11/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **LUX-PHOTO** (drift LUX-PHOTO-1…5; yêu cầu WP6 24/11). **Thêm** `photo_id` tuỳ chọn ở `POST /lux-readings` và trong response của cả ba endpoint lux; `lux_id` / `lux_value` / `lux_measured_at` trên `PolePhotoItem`; mã `PHOTO_POLE_MISMATCH` (400), `PHOTO_LUX_ALREADY_LINKED` (409), ghi `POLE_PHOTO_NOT_FOUND` (404, đã dùng ở ảnh cột) vào bảng. **Diễn đạt lại** §5.7: `lux_value` từ điện thoại **hoặc máy đo cầm tay** (`LuxMap_ESP32`), chỉ so cùng `meter_model`; server không dùng lux thủ công để phân loại `dim`. Một migration (cột `lux_reading.photo_id`, FK ghép, unique). Chỉ thêm — client cũ không đổi. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.22 | 29/10/2026 | **Mỹ (Dylan), quyết định 29/10** | **ACCOUNT-ONE-COMMUNE (ACCT-1)**: mỗi tài khoản superior/manager/field_engineer đúng một xã; system_admin không gán xã. Giữ commune_ids[] trên request/response/JWT; siết số phần tử. UNIQUE user_id, migration giữ xã gán sớm nhất (hòa → ordinal commune_id), Down không khôi phục dòng bị xóa. Thay D-R3 nhiều xã; không đổi capability/endpoint |
 | v1.21 | 28/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **ASSET-PHOTOS A + B** (APH-1, FPS-1): `control` + `power_state` trên feeder inventory, `feeders[]` trên map cabinets giữ `feeder_ids[]`; power luôn unknown đến khi có telemetry đo điện. Phần A hiện thực 12/11/2026: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa/gallery, ẩn giữ bytes, UploadAssetPhotos; một migration. Additive, không đổi sync. Baseline hiện tại 169 →179 operation (dev thêm 3 operation IoT: electrical history, vị trí gateway, điều khiển theo trụ); giữ v1.22 (D-14). Evidence không thêm bucket; §4.10 sửa thành năm bucket theo ACCT-5 (D-13). Đồng bộ heading/info.version đang sót v1.19 dù đã có changelog v1.20 (#190). Nền tạm tới FW; WP5/WP6/BE2 chưa xác nhận |
 | v1.20 | 26/10/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **WO-REASSIGN-DATE — giao lại kèm ngày khác** (mục 5.5, drift CR-7). **Thêm** hai trường tuỳ chọn `scheduled_date`, `due_date` vào body `PUT /work-orders/{id}/assignee`; đổi người + ngày là một thao tác, một audit. Chỉ thêm, client cũ không đổi, không migration, spec vẫn 141 op. Nền tạm tới FW |

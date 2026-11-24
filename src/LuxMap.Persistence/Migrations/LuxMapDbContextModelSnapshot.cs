@@ -3013,6 +3013,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
+                    b.Property<string>("PhotoId")
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id");
+
                     b.Property<string>("PoleId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -3036,6 +3040,11 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasIndex("PoleId", "MeasuredAt")
                         .HasDatabaseName("ix_lux_reading_pole_id_measured_at");
+
+                    b.HasIndex("PhotoId", "PoleId", "CommuneId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_lux_reading_photo_id")
+                        .HasFilter("photo_id IS NOT NULL");
 
                     b.ToTable("lux_reading", null, t =>
                         {
@@ -6233,6 +6242,13 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_lux_reading_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoId", "PoleId", "CommuneId")
+                        .HasPrincipalKey("PhotoId", "PoleId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_lux_reading_pole_photo");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.PoleObservation", b =>

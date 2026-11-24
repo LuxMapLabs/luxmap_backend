@@ -1,0 +1,13 @@
+{
+  "axis": "standards",
+  "findings": [
+    {
+      "severity": "medium",
+      "file": "src/LuxMap.Api/OpenApi/SchedulingSuggestionOperationFilter.cs",
+      "line": 42,
+      "problem": "The OpenAPI numeric bounds are emitted as JSON strings. `Minimum = \"1\"` and `Maximum = PageRequest.MaxPageSize.ToString(...)` assign string nodes to `OpenApiSchema.Minimum`/`Maximum`, which are `JsonNode` properties. The generated specification therefore contains string bounds instead of numbers.",
+      "fix": "Use numeric values: `Minimum = JsonValue.Create(PageRequest.FirstPage)` and `Maximum = name == \"page_size\" ? JsonValue.Create(PageRequest.MaxPageSize) : null`. Remove the now-unused `System.Globalization` import."
+    }
+  ],
+  "conclusion": "One actionable standards finding; no other concrete correctness or security violations were found in the supplied text."
+}

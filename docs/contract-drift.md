@@ -2832,6 +2832,23 @@ Thông số danh định từ cấu hình đang hoạt động; không gọi Bri
 
 Đường ảnh cột trên phiếu sửa chữa (PP-3, PP-9) vẫn giữ.
 
+### WO-SCHEDULING-SUGGESTIONS — cảnh báo khi Quản lý phân lịch (19/11/2026)
+
+Mỹ yêu cầu hiện thực luồng gợi ý và review bằng provider River; không push / PR khi chưa cho phép.
+Nền origin/dev 7d20bf3 đã có cột chưa GPS, import nullable geometry, pole_gps_update và offline complete.
+Không tạo staging inventory mới, không migration hay thêm task_kind.
+
+| # | Quyết định (SELF-SIGNED, nền tạm chờ WP5/WP6) |
+|---|---|
+| SS-1 | Thêm GET /work-orders/suggestions (summary) và GET /work-orders/suggestions/items?kind=… (phân trang), chỉ ManageWorkOrders |
+| SS-2 | Năm nhóm fault_inspection / fault_repair / missing_gps / survey_needed / overdue; phân biệt số fault, số cột/tuyến duy nhất; unknown chỉ là gợi ý khảo sát |
+| SS-3 | Giữ warning đang có phiếu và trả work_order_id; ready / in_work_order / blocked. Chỉ ready trả recommended_task_kind. Command gốc vẫn kiểm lại dưới khoá, không tự tạo khi GET |
+| SS-4 | commune_id lặp, segment_id, data_source CSV; mặc định field, tách testbed. Không giới hạn theo tháng lịch. Overdue dùng luật ca đêm của BE-26; nguồn theo targets, một phiếu nhiều nguồn không được cộng các lượt lọc |
+| SS-5 | Dùng lại PG/GN/WSC và luồng survey; prerequisites trả lý do. Tên tuyến vẫn qua scope. Không ngưỡng khảo sát cũ chưa được duyệt, không nới quyền mobile |
+
+Đặc tả đầy đủ / hướng dẫn tích hợp: [work-order-scheduling-suggestions.md](work-order-scheduling-suggestions.md).
+WP5/WP6 chưa được báo; implementation không bao gồm giao diện FE.
+
 ## IMPORT-INITIAL-STATUS — import cột có ngay trạng thái, chỉ demo (20/11/2026)
 
 | | |
@@ -2870,3 +2887,20 @@ ACK thêm executedAtUnixSeconds UTC: ACK sau hạn chỉ hợp lệ nếu thực
 Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
 GET /api/v1/iot/feeders/{feederId}/diagnostics và route node/summary dùng trung bình cộng 5 mẫu ON mới nhất cùng session, sequence liên tiếp và còn fresh. required_samples=5; 0–4 mẫu insufficient_samples, không kết luận lỗi điện. Ngưỡng current_drop vẫn giảm quá 5%, điện áp dùng trung bình 5 mẫu; baseline vẫn nominal_current_ma của feeder, không tự đổi theo dữ liệu lỗi.
 GET /api/v1/iot/feeders/{feederId}/diagnostics/history giữ schema/phân trang/lọc thời gian, worker kiểm tra mỗi 5 giây và gộp theo mốc UTC 5 giây. Lỗi liên tục giữ một dòng và cập nhật ended_at; khoảng trống hơn một phút vẫn interrupted, không đổi lịch sử cũ. Scheduler poll không chậm hơn chu kỳ job ngắn nhất, thực tế có thêm thời gian xử lý. Không sửa FE, không đổi firmware/chu kỳ telemetry 10 giây hay lịch sử điện trung bình 30 giây.
+
+## LUX-PHOTO — số đo lux gắn với ảnh cột, máy đo cầm tay (24/11/2026)
+
+| | |
+|---|---|
+| **Nguồn** | Yêu cầu WP6 (24/11): đo lux tuỳ chọn bằng máy đo ESP32 cầm tay (Bluetooth) ngay sau khi chụp ảnh / quay video cột trong phiếu; cần biết chắc số lux nào đi với ảnh nào thay vì ghép theo `pole_id` + thời gian |
+| **Decision maker / Date** | **Mỹ SELF-SIGNED 24/11/2026** (chốt trong chat). Chạm bề mặt API ⇒ nền tạm, chờ FW kế tiếp xác nhận. Contract **v1.23** |
+| **Consumer** | WP6: gửi `photo_id` sau khi upload ảnh thành công; ảnh lỗi hẳn thì gửi không kèm. WP5: hiện `lux_value` cạnh ảnh từ `PolePhotoItem`. WP4 / CV-12: `photo_id` trên `GET /lux-readings`. **Chưa báo** |
+| **Scope** | `POST /lux-readings`, hai `GET` lux, `POST /sync/push` (`lux_reading`), mọi response `PolePhotoItem`; migration `AddLuxReadingPhotoLink` |
+
+| Mã | Quyết định |
+|---|---|
+| **LUX-PHOTO-1** | `photo_id` tuỳ chọn trên `POST /lux-readings` = id `PPH-…` của ảnh hoặc clip cột. Kiểm trong `LuxReadingService` (sync dùng chung): ảnh không có / đã rút / ngoài phạm vi → `404 POLE_PHOTO_NOT_FOUND` (ngoài phạm vi KHÔNG trả 400, để không lộ ảnh tồn tại); khác cột → `400 PHOTO_POLE_MISMATCH`; đã gắn → `409 PHOTO_LUX_ALREADY_LINKED`. Trùng `client_op_id` vẫn trả `200` bản ghi cũ, không so `photo_id` |
+| **LUX-PHOTO-2** | **Mỗi ảnh tối đa một số đo.** Unique partial `ux_lux_reading_photo_id` trên `(photo_id, pole_id, commune_id) WHERE photo_id IS NOT NULL` — tương đương unique trên `photo_id` vì FK ghim hai cột còn lại; index này cũng phục vụ FK. Đua nhau → bắt `23505` theo tên → 409, không truy vấn sau lỗi. Đo lại = chụp ảnh mới |
+| **LUX-PHOTO-3** | FK ghép `fk_lux_reading_pole_photo` `(photo_id, pole_id, commune_id)` → `work_order_pole_photo`, `Restrict` — DB tự chặn ảnh khác cột / khác xã. Rút ảnh (xoá mềm) **không** đụng số đo và liên kết: lux là ground truth RQ1 |
+| **LUX-PHOTO-4** | `PolePhotoItem` thêm `lux_id`, `lux_value`, `lux_measured_at` (null khi chưa gắn), đọc **live** qua port `IPhotoLuxLookup` (WorkOrders khai, Survey hiện thực, một truy vấn theo lô). Không ghép theo thời gian. `photo_id` thêm vào response của cả ba endpoint lux |
+| **LUX-PHOTO-5** | §5.7 diễn đạt lại D-R15: `lux_value` từ điện thoại **hoặc máy đo cầm tay** (`meter_model = "LuxMap_ESP32"`), vẫn tương đối; **chỉ so cùng `meter_model`** — trộn hai thiết bị phá điều kiện "cùng máy" của D-R15. `meter_model` giữ không bắt buộc (không đổi tính bắt buộc), Contract ghi client nên luôn gửi. Server **không** dùng `LuxReading` để phân loại `dim` (dim từ sweep, D-R20); `photo_id` phục vụ ghép cặp cho đối chiếu RQ1 / CV-12. Yêu cầu này **mở lại D-R27** (từng nói không cần thêm trường cho `POST /lux-readings`) |

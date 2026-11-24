@@ -4,12 +4,17 @@ using LuxMap.Shared.Contracts.Enums;
 namespace LuxMap.Modules.WorkOrders;
 
 /// <summary>Snapshot stored on upload; GET and replay never run inference.</summary>
+/// <remarks>
+/// <c>LuxId</c> / <c>LuxValue</c> / <c>LuxMeasuredAt</c> are NOT part of the snapshot: they are read live from the lux reading
+/// linked by <c>photo_id</c> (LUX-PHOTO), and are null while none is linked.
+/// </remarks>
 public sealed record PolePhotoItem(string PhotoId, string WorkOrderId, string PoleId, DataSource DataSource,
     DateTime CapturedAt, double Lat, double Lng, string UploadedBy, DateTime UploadedAt,
     string AiStatus, string? CvState, double? Confidence, string? ModelVersion, string? ArtifactVersion,
     DateTime? AnalyzedAt, string? FinalCvState, string? ReviewNote, string? ReviewedBy, DateTime? ReviewedAt,
     string? Decision, string? DecidedBy, DateTime? DecidedAt, string? DecisionNote,
-    bool StatusApplied, string? StatusReason, string ThumbnailUrl, string OriginalUrl, PolePhotoVideoItem? Video = null);
+    bool StatusApplied, string? StatusReason, string ThumbnailUrl, string OriginalUrl, PolePhotoVideoItem? Video = null,
+    string? LuxId = null, double? LuxValue = null, DateTime? LuxMeasuredAt = null);
 
 /// <summary>
 /// The clip behind a photo taken from a video (POLE-VIDEO); null on a plain photo. <c>ByteCount</c> is the CLIP's size — the photo's own

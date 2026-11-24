@@ -186,12 +186,12 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 // again on a later run, and the next suite dies on pk_pole looking like flake.
                 // Every test that writes a fault was quietly leaking poles this way.
                 "DELETE FROM fault WHERE commune_id = @c OR commune_id = @f;",
-                "DELETE FROM work_order_pole_photo WHERE commune_id = @c OR commune_id = @f;",
-
                 // Same RESTRICT edge, same trap. Currently no test here leaves one behind, but a net
                 // with a known hole in it is not much of a net — and the hole is invisible until a
                 // later suite dies on pk_pole for reasons that point nowhere near the cause.
+                // Before the photos: a reading may hold one (LUX-PHOTO).
                 "DELETE FROM lux_reading WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM work_order_pole_photo WHERE commune_id = @c OR commune_id = @f;",
 
                 // CITIZEN-QR: a code holds its pole and its issuer with RESTRICT.
                 "DELETE FROM qr_code WHERE commune_id = @c OR commune_id = @f;",
