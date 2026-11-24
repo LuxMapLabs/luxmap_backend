@@ -81,6 +81,129 @@ public sealed class NodeContactTests : IDisposable
         Assert.Equal(seen, store.Read("probe")!.LastSeenAt);
     }
 
+    [Fact]
+    public void Auto_history_is_durable_deduplicated_and_ordered_by_measurement_not_replay_receipt()
+    {
+        var start = clock.GetUtcNow();
+        TelemetryRequest Sample(int second, string mode, string lamp) => new(
+            "probe", mode, lamp, 10, 5, 100, 500,
+            start.AddSeconds(second).ToOffset(TimeSpan.FromHours(7)).ToString("yyyy-MM-ddTHH:mm:ss"),
+            "session", second + 1);
+        var bounds = new[] { new AutoHistoryWindow("probe", "feeder", start.AddSeconds(-1), null) };
+        Assert.True(store.AcceptTelemetry("gateway", Sample(0, "AUTO", "ON")));
+        Assert.True(store.AcceptTelemetry("gateway", Sample(1, "AUTO", "ON")));
+        Assert.Empty(store.ReadAutoTransitions(bounds)); // Initial state and unchanged reports are not switches.
+        Assert.True(store.AcceptTelemetry("gateway", Sample(3, "AUTO", "OFF")));
+        Assert.True(store.AcceptTelemetry("gateway", Sample(2, "AUTO", "ON"))); // Late replay.
+        Assert.False(store.AcceptTelemetry("gateway", Sample(3, "AUTO", "OFF")));
+        Assert.True(store.AcceptTelemetry("gateway", Sample(4, "AUTO", "OFF")));
+        Assert.True(store.AcceptTelemetry("gateway", Sample(5, "MANUAL", "ON")));
+        Assert.True(store.AcceptTelemetry("gateway", Sample(6, "AUTO", "OFF"))); // Mode entry is a user command.
+        Assert.True(store.AcceptTelemetry("gateway", Sample(7, "AUTO", "ON") with { AutoType = "full_time" }));
+        var events = store.ReadAutoTransitions(bounds);
+        Assert.Equal(2, events.Count);
+        Assert.Equal("full_time", events[0].AutoType);
+        Assert.Equal("scheduled", events[1].AutoType);
+        Assert.Equal(new[] { "ON", "OFF" }, events.Select(e => e.Command));
+        Assert.Equal(new[] { start.AddSeconds(7), start.AddSeconds(3) }, events.Select(e => e.OccurredAt));
+        Assert.Equal(events.Count, events.Select(e => e.EventId).Distinct().Count());
+        Assert.All(events, e => Assert.StartsWith("sensor-", e.EventId));
+        Assert.Empty(store.ReadAutoTransitions([new("other", "feeder", start, null)]));
+        Assert.Empty(store.ReadAutoTransitions([new("probe", "feeder", start.AddSeconds(7), null)]));
+        var restored = new DeviceStore(new TestEnvironment(directory), clock);
+        Assert.Equal(events, restored.ReadAutoTransitions(bounds));
+    }
+
+    [Fact]
+    public void Full_time_is_persisted_and_requires_an_ack_that_confirms_the_same_auto_type()
+    {
+        var command = store.SetCommand("probe", new("AUTO", null, AutoType: "full_time"));
+        Assert.Equal("full_time", command.AutoType);
+        Assert.Null(command.AutoSchedule);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "AUTO", "ON"));
+        Assert.False(store.Read("probe")!.CommandAcknowledged); // Legacy node only implements scheduled.
+        store.AcknowledgeCommand(new("probe", command.CommandId, "AUTO", "ON", "scheduled"));
+        Assert.False(store.Read("probe")!.CommandAcknowledged);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "AUTO", "ON", "full_time"));
+        Assert.True(store.Read("probe")!.CommandAcknowledged);
+        var restored = new DeviceStore(new TestEnvironment(directory), clock);
+        Assert.Equal("full_time", restored.Read("probe")!.DesiredCommand.AutoType);
+        Assert.True(restored.Read("probe")!.CommandAcknowledged);
+        var legacy = restored.SetCommand("probe", new("AUTO", null));
+        Assert.Equal("scheduled", legacy.AutoType);
+        Assert.True(legacy.AutoSchedule!.IsValid());
+        restored.AcknowledgeCommand(new("probe", legacy.CommandId, "AUTO", "OFF"));
+        Assert.True(restored.Read("probe")!.CommandAcknowledged);
+        Assert.Throws<ArgumentException>(() => restored.SetCommand("probe", new("AUTO", null, AutoType: "invalid")));
+        Assert.Throws<ArgumentException>(() => restored.SetCommand("probe",
+            new("AUTO", null, AutoSchedule: new(360, 1080), AutoType: "full_time")));
+        Assert.Throws<ArgumentException>(() => restored.SetCommand("probe", new("MANUAL", "ON", AutoType: "full_time")));
+    }
+
+    [Fact]
+    public void Existing_sqlite_receipts_are_upgraded_and_old_auto_commands_remain_scheduled()
+    {
+        var command = store.SetCommand("probe", new("AUTO", null));
+        using (var db = new SqliteConnection(new SqliteConnectionStringBuilder {
+            DataSource = Path.Combine(directory, "data", "telemetry.sqlite") }.ToString()))
+        {
+            db.Open();
+            using var sql = db.CreateCommand();
+            sql.CommandText = "ALTER TABLE command_receipts DROP COLUMN auto_type;";
+            sql.ExecuteNonQuery();
+        }
+        var restored = new DeviceStore(new TestEnvironment(directory), clock);
+        restored.AcknowledgeCommand(new("probe", command.CommandId, "AUTO", "ON"));
+        Assert.True(restored.Read("probe")!.CommandAcknowledged);
+    }
+
+    [Fact]
+    public void Successful_command_survives_new_pending_command_and_restart()
+    {
+        var first = store.SetCommand("probe", new("MANUAL", "OFF"));
+        store.AcknowledgeCommand(new("probe", first.CommandId, "MANUAL", "OFF"));
+        var next = store.SetCommand("probe", new("MANUAL", "ON"));
+        var restored = new DeviceStore(new TestEnvironment(directory), clock).Read("probe")!;
+        Assert.Equal(next.CommandId, restored.DesiredCommand.CommandId);
+        Assert.Equal(first.CommandId, restored.LastSuccessfulCommand!.CommandId);
+        Assert.False(restored.CommandAcknowledged);
+    }
+
+    [Fact]
+    public void Late_receipt_requires_execution_before_deadline_and_preserves_execution_time()
+    {
+        var start = clock.GetUtcNow();
+        var command = store.SetCommand("probe", new("MANUAL", "ON"));
+        Assert.Equal(start.AddSeconds(20).ToUnixTimeSeconds(), command.ExpiresAtUnixSeconds);
+        clock.Advance(21);
+        Assert.Equal(command, store.SetCommand("probe", new("MANUAL", "ON", command.CommandId)));
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON"));
+        Assert.Null(store.Read("probe")!.LastSuccessfulCommand);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.AddSeconds(20).ToUnixTimeSeconds()));
+        Assert.Null(store.Read("probe")!.LastSuccessfulCommand);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.AddSeconds(18).ToUnixTimeSeconds()));
+        Assert.Equal(command, store.Read("probe")!.LastSuccessfulCommand);
+        var receipt = Assert.Single(store.ReadCommandReceipts([new("probe", command.CommandId!)]));
+        Assert.Equal(start.AddSeconds(18).ToUnixTimeSeconds(), receipt.ExecutedAtUnixSeconds);
+        Assert.Equal(start.AddSeconds(21), receipt.ReceivedAt);
+        clock.Advance(60);
+        store.AcknowledgeCommand(new("probe", command.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.AddSeconds(18).ToUnixTimeSeconds()));
+        Assert.Equal(start.AddSeconds(21), store.Read("probe")!.LastCommandAckAt);
+    }
+
+    [Fact]
+    public void Older_late_success_cannot_replace_a_newer_success()
+    {
+        var start = clock.GetUtcNow();
+        var old = store.SetCommand("probe", new("MANUAL", "ON"));
+        clock.Advance(1);
+        var next = store.SetCommand("probe", new("MANUAL", "OFF"));
+        store.AcknowledgeCommand(new("probe", next.CommandId, "MANUAL", "OFF"));
+        clock.Advance(20);
+        store.AcknowledgeCommand(new("probe", old.CommandId, "MANUAL", "ON", ExecutedAtUnixSeconds: start.ToUnixTimeSeconds()));
+        Assert.Equal(next, store.Read("probe")!.LastSuccessfulCommand);
+    }
+
     private sealed class ManualClock : TimeProvider
     {
         private DateTimeOffset now = DateTimeOffset.Parse("2026-11-18T07:00:00Z");

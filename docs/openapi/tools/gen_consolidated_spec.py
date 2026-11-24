@@ -158,12 +158,40 @@ iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot
 
 iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [2]
 
+S["IotCommandHistoryStatus"]["enum"] = ["success", "pending", "expired"]
+iot_property("IotCommandStatus", "status")["enum"] = ["pending", "success", "no_data"]
+iot_property("IotCommandStatus", "status")["description"] = "POST: pending. GET: success của lệnh được node xác nhận gần nhất, hoặc no_data."
+iot_property("IotCommandHistoryItem", "requested_by")["description"] = (
+    "Tên người gửi (fallback user ID); sensor cho lần AUTO đổi ON/OFF đã được telemetry xác nhận."
+)
+iot_property("IotCommandHistoryItem", "command")["description"] = (
+    "ON/OFF cho MANUAL hoặc sự kiện sensor trong AUTO; null cho yêu cầu chuyển sang AUTO."
+)
+
 S["IotAnomaly"]["required"] = ["code", "observed", "reference", "deviation_percent", "limit"]
 
 for schema in ("IotCommandRequest", "IotCommandStatus", "IotCommandHistoryItem"):
-    iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"]
+    iot_property(schema, "mode")["enum"] = ["AUTO", "MANUAL"] + ([None] if schema == "IotCommandStatus" else [])
     iot_property(schema, "command")["enum"] = ["ON", "OFF", None]
     iot_property(schema, "auto_schedule")
+    auto_type = iot_property(schema, "auto_type")
+    auto_type["enum"] = ["full_time", "scheduled", None]
+    auto_type["nullable"] = True
+    auto_type["description"] = (
+        "AUTO full_time: cảm biến cả ngày; scheduled: cảm biến trong khoảng giờ, ngoài khoảng luôn bật. "
+        "Bỏ qua trường trong request AUTO cũ mặc định scheduled; MANUAL dùng null/không truyền. "
+        "Cảm biến đổi đầu ra sau 5 mẫu hợp lệ liên tiếp; lux đúng 50 hoặc lỗi đọc đặt lại bộ đếm."
+    )
+
+
+iot_command_path = "/api/v1/iot/nodes/{nodeId}/command"
+d["paths"][iot_command_path]["post"]["requestBody"]["content"]["application/json"]["examples"] = {
+    "ON": {"value": {"mode": "MANUAL", "command": "ON"}},
+    "OFF": {"value": {"mode": "MANUAL", "command": "OFF"}},
+    "AUTO full_time": {"value": {"mode": "AUTO", "auto_type": "full_time"}},
+    "AUTO scheduled": {"value": {"mode": "AUTO", "auto_type": "scheduled",
+        "auto_schedule": {"day_start": "06:00", "night_start": "18:00"}}},
+}
 
 if "IotAutoSchedule" not in S:
     raise ValueError("IoT OpenAPI override requires schema IotAutoSchedule; check the Swagger export")
@@ -396,9 +424,9 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
-    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 (19/11/2026)",
+    "/api/v1/iot/nodes": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)",
     "/api/v1/iot/feeders/": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)",
-    "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 (19/11/2026)",
+    "/api/v1/iot/servers": "drift IOT-DIAGNOSTICS + IOT-GATEWAY-KEY-2 + IOT-SERVER-DEFAULT-BRIDGE-1 + IOT-SERVER-IDENTITY-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)",
     "/api/v1/iot/diagnostics/summary": "drift IOT-FAULTS-1 + IOT-CONTACT-1 (18/11/2026)",
     "/api/v1/iot/": "drift IOT-DIAGNOSTICS (đề xuất, chờ duyệt)",
     "/api/v1/statistics/work-orders": "drift STAT-WO ST-12 (SELF-SIGNED, nền tạm tới FW)",
@@ -432,15 +460,15 @@ SUMMARY.update({
     ("get", "/api/v1/iot/feeders/{feederId}/electrical"): "Đọc mẫu điện mới nhất của mạch",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Trung bình điện 30 giây theo giờ đo DS3231, lọc thời gian và phân trang",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical/history/received"): "Trung bình điện 30 giây theo giờ Bridge nhận, lọc thời gian và phân trang",
-    ("post", "/api/v1/iot/nodes"): "Admin đăng ký node với 7 trường; tự đặt calibration_rig và cho phép điều khiển",
-    ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường và tọa độ gateway",
+    ("post", "/api/v1/iot/nodes"): "Admin đăng ký node với feeder_id và radius_km; backend suy ra cabinet_id",
+    ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường, GPS và radius_km của gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",
     ("put", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route"): "Đăng ký tuyến MQTT cho gateway và node",
     ("get", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Admin xem lại MQTT secret của gateway",
     ("delete", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Thu hồi MQTT secret và ngắt gateway",
     ("post", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Cấp MQTT key mới cho gateway",
     ("get", "/api/v1/iot/servers/{serverId}/gateways/routes"): "Liệt kê tuyến và trạng thái cấp secret trên bridge",
-    ("put", "/api/v1/iot/nodes/{nodeId}"): "Manager cập nhật nguồn đo với 6 trường, kiểm phạm vi xã",
+    ("put", "/api/v1/iot/nodes/{nodeId}"): "Manager cập nhật nguồn đo và radius_km, kiểm phạm vi xã",
     ("delete", "/api/v1/iot/nodes/{nodeId}/feeder"): "Gỡ node khỏi feeder, giữ node trong tủ và giữ lịch sử",
     ("delete", "/api/v1/iot/nodes/{nodeId}"): "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",
     ("post", "/api/v1/iot/servers"): "Admin đăng ký IoT server và vị trí, tự dùng Bridge cấu hình sẵn (không nhận base_url)",
@@ -448,7 +476,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/nodes/{nodeId}"): "Đọc cấu hình nguồn node và ba chỉ số danh định đã lưu, không gọi Bridge",
     ("get", "/api/v1/iot/nodes"): "Xem trạng thái các node IoT trong phạm vi truy cập",
     ("post", "/api/v1/iot/nodes/{nodeId}/command"): "Gửi lệnh ON, OFF hoặc AUTO đến node IoT",
-    ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh hiện tại và ACK của node IoT",
+    ("get", "/api/v1/iot/nodes/{nodeId}/command"): "Đọc lệnh thành công gần nhất; no_data nếu chưa có ACK hợp lệ",
     ("get", "/api/v1/iot/nodes/{nodeId}/command/history"): "Đọc lịch sử điều khiển node IoT theo trang",
     ("get", "/api/v1/iot/nodes/{nodeId}/electrical"): "Đọc mẫu điện gần nhất của node IoT",
     ("get", "/api/v1/iot/diagnostics/summary"): "Chẩn đoán tổng hợp theo trang, job lưu DB và phạm vi xã",

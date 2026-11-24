@@ -1,5 +1,32 @@
 # Chỗ lệch giữa code và Contract — log mới từ v1.4 (18/09/2026)
 
+## IOT-AUTO-TYPE — AUTO cả ngày hoặc theo giờ (21/11/2026)
+
+**Decision maker:** Đạt yêu cầu triển khai trực tiếp 21/11/2026; **SELF-SIGNED**, nền tạm của đường Bridge; không đổi đường Lighting chính thức.
+- `POST /api/v1/iot/nodes/{nodeId}/command` nhận thêm `auto_type: full_time | scheduled` trong AUTO. Bỏ qua/null → scheduled để giữ request cũ. MANUAL không nhận auto_type khác null.
+- `full_time`: dùng BH1750 cả ngày; không nhận auto_schedule. `scheduled`: trong [day_start, night_start) dùng BH1750, ngoài khoảng luôn ON. Giờ Việt Nam của DS3231; hỗ trợ khoảng qua nửa đêm.
+- Ngưỡng 50 lux và 5 mẫu hợp lệ liên tiếp giữ nguyên: <50 bật, >50 tắt; đúng 50/lỗi đọc/mẫu thuận trạng thái hiện tại đặt lại chuỗi đếm. Đổi chế độ/lịch cũng reset chuỗi. Ngoài khoảng scheduled luôn ON, không chờ 5 mẫu.
+- Lịch scheduled bỏ qua thì dùng lịch hiện có của Bridge; nếu chưa có (gồm vừa rời full_time), mặc định firmware cũ 06:00–18:01. Request ví dụ 06:00–18:00 vẫn có hiệu lực đúng giờ được gửi.
+- GET command, POST response và command/history trả thêm auto_type; MANUAL null, AUTO cũ scheduled, sự kiện sensor lấy loại AUTO của mẫu lúc đo (mẫu cũ fallback scheduled).
+- Bridge MQTT/LoRa dùng autoType camelCase; node lưu NVS, gửi autoType trong ACK và telemetry. ACK thiếu autoType chỉ tương thích scheduled, không xác nhận full_time. SQLite command_receipts nâng cấp thêm cột auto_type tại khởi động, bảo toàn ACK cũ; không thêm migration PostgreSQL.
+- full_time điều khiển không cần RTC khi chạy, nhưng kiểm hạn lệnh mới vẫn cần RTC hợp lệ theo cơ chế TTL hiện hành.
+- Deploy đồng bộ BE + Bridge và nạp cả gateway + node để dùng full_time. Không sửa FE.
+
+
+
+## IOT-COMMAND-HISTORY-2 — ACK không quá hạn và lịch sử chuyển trạng thái AUTO (21/11/2026)
+
+**Decision maker:** Đạt yêu cầu trực tiếp trong phiên làm việc 21/11/2026; **SELF-SIGNED**, nền tạm của đường IoT Bridge.
+- Giữ endpoint `GET /api/v1/iot/nodes/{nodeId}/command/history`, quyền ReadNetwork và filter xã.
+- Bỏ `expired` khỏi `IotCommandHistoryStatus`; `pending → success` khi nhận ACK đúng lệnh, kể cả sau 12 giây. Không đổi TTL thực thi 5 phút hoặc vòng đời lệnh của kênh Lighting chính thức.
+- Bổ sung sự kiện AUTO ON/OFF từ telemetry lưu bền vững ở Bridge, `requested_by: sensor`, trạng thái success, không giả ACK cho một lệnh người dùng. `command_id` có dạng sensor-<cursor>; `auto_schedule` null khi mẫu không chứa lịch.
+- Mẫu đầu và chuyển MANUAL→AUTO chỉ làm mốc. Trạng thái AUTO giữ nguyên và bản tin trùng không tạo thêm mục. Gửi bù sắp theo giờ đo; lịch sử tuân theo khoảng gán nguồn.
+- Giờ sự kiện là giờ RTC UTC+7 đổi UTC, fallback giờ nhận. `bridge_accepted_at` của sensor là giờ nhận telemetry. Thiết bị chỉ gửi mẫu định kỳ: không thể khôi phục các lần bật rồi tắt nằm hoàn toàn giữa hai mẫu.
+- Nguồn lịch sử AUTO là telemetry.sqlite, không thêm bảng PostgreSQL/migration. Mọi lệnh người dùng vẫn giữ audit cũ. BE và Bridge phải được deploy cùng phiên bản; API báo 503 khi không đọc được Bridge.
+- Không sửa FE. Chi tiết payload ở docs/LUXMAP-IOT-FE.md.
+
+
+
 **Log cũ (v1.0 → v1.3, drift 1–43, quyết định A–F)** đã **archive** tại
 [`docs/archive/contract-drift-v1.md`](archive/contract-drift-v1.md). Mọi mục trong đó đã được gộp vào
 Contract v1.4 (xem changelog mục 10 của [`api-contract-v1.1.md`](api-contract-v1.1.md)) hoặc chuyển
@@ -62,7 +89,7 @@ signer Dylan → `SELF-SIGNED`; (4) không "bàn thêm" vô thời hạn — ph�
 | `GET /api/v1/iot/servers` | `ReadNetwork` | Hiện server có vị trí trong xã được xem hoặc có node thuộc xã được xem. `online` khi broker nhận heartbeat của gateway trong 30 giây gần nhất, `offline` khi chưa nhận hoặc đã quá hạn. `unconfigured` khi chưa xác định được gateway duy nhất từ ánh xạ thiết bị, `broker_down` khi broker dừng và `unreachable` khi nguồn trạng thái không truy cập được hoặc trả dữ liệu không hợp lệ. |
 | `POST /api/v1/iot/nodes/{nodeId}/command` | `ControlLighting` | Gửi ON, OFF hoặc AUTO qua nguồn IoT đã đăng ký của node trong phạm vi xã. Trả 202 khi bridge chấp nhận. Gateway phải online. Yêu cầu và phản hồi chấp nhận được audit theo mã lệnh. Lệnh có hạn 5 phút (expires_at). |
 | `GET /api/v1/iot/nodes/{nodeId}/command` | `ReadNetwork` | Đọc mã lệnh hiện tại, ACK và `power_state` của node trong phạm vi xã. |
-| `GET /api/v1/iot/nodes/{nodeId}/command/history` | `ReadNetwork` | Lịch sử lệnh qua IoT Bridge theo node và phạm vi xã, mới nhất trước. Đọc audit theo `page` và `page_size`. `requested_by` ưu tiên tên hiển thị, dùng mã tài khoản audit nếu thiếu tên. `status` là `pending`, `success` hoặc `expired` theo ACK đã lưu ở Bridge và hạn 12 giây từ `requested_at`. Trả `503` khi không thể đối chiếu ACK. |
+| `GET /api/v1/iot/nodes/{nodeId}/command/history` | `ReadNetwork` | Lịch sử lệnh qua IoT Bridge theo node và phạm vi xã, mới nhất trước. Đọc audit theo `page` và `page_size`. `requested_by` ưu tiên tên hiển thị, dùng mã tài khoản audit nếu thiếu tên. `status` là `pending` cho tới khi nhận ACK hợp lệ, sau đó `success`, không giới hạn thời gian chờ. Gộp các lần AUTO đổi ON/OFF từ telemetry với `requested_by: sensor`, `command: ON/OFF`, `status: success` trước khi phân trang. Trả `503` khi không thể đối chiếu ACK. |
 | `PUT /api/v1/iot/servers/{serverId}/location` | `ManageSettings` | Lưu xã/phường và GPS gateway. GET servers trả vị trí trong phạm vi xã. |
 | `GET /api/v1/iot/poles/{poleId}/control` | `ReadNetwork` | Tra feeder và node của trụ. `control_channel` là `iot_bridge` khi node cho phép điều khiển qua bridge. |
 | `PUT /api/v1/iot/servers/{serverId}/gateways/{gatewayId}/route` | `ManageSettings` | Gán Gateway ID với Device ID qua bridge đang chạy. |
@@ -2839,3 +2866,19 @@ WP5/WP6 chưa được báo; implementation không bao gồm giao diện FE.
 | **IIS-4** | Dòng trạng thái: `status_confidence` NULL, `last_sweep_id` / `last_run_id` NULL, `last_seen_at` = `last_evaluated_at` = lúc nạp. Ghi qua cổng `IInitialPoleStatus` → `PoleStatusPublication.StageForNewPole` (một writer), cùng `SaveChanges` với cột |
 | **IIS-5** | Cột chưa GPS vẫn nhận trạng thái nhưng không hiện trên bản đồ (không có điểm) |
 | **IIS-6** | Workbook: `initial_status` là cột cuối `Cột điện`, tuỳ chọn (workbook cũ không có cột vẫn nạp được); export để trống cột này. Template `assets-workbook*.xlsx` và `poles*.csv` đã cập nhật |
+
+## IOT-COVERAGE-RADIUS-1 — 23/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+POST /api/v1/iot/servers và PUT /api/v1/iot/servers/{serverId}/location nhận radius_km: số hữu hạn từ 0 đến 1000, mặc định 0; GET servers trả bán kính theo phạm vi xã.
+POST /api/v1/iot/nodes bỏ cabinet_id khỏi request và nhận radius_km với cùng giới hạn; backend khoá feeder, suy ra cabinet_id từ feeder đã gán tủ, rồi tạo node trong tủ đó. Feeder chưa thuộc tủ hoặc khác xã trả 400.
+PUT /api/v1/iot/nodes/{nodeId} cập nhật radius_km cùng nguồn; GET node chi tiết và GET danh sách node trả radius_km.
+Lưu radius của server trong iot_server_registration và radius của node trong iot_node, migration AddIotCoverageRadius. Giữ nguyên lịch sử điện, lỗi và lệnh; không sửa FE.
+Quyết định này mở rộng hợp đồng 6 trường ở mục IOT-NODE-FEEDER-DETACH-1: PUT hiện có thêm radius_km; POST node cũng nhận radius_km và không nhận cabinet_id.
+
+## IOT-COMMAND-DEADLINE-20 — 23/11/2026
+Decision maker: Đạt (yêu cầu trực tiếp); SELF-SIGNED, nền tạm chờ maintainer duyệt.
+Thay thế cơ chế pending vô hạn: lệnh mới có hạn thực hiện 20 giây, hết hạn ngừng phát và node từ chối thực hiện mới. Không tự đảo đầu ra khi hết hạn; AUTO đã áp dụng vẫn tiếp tục.
+GET /api/v1/iot/nodes/{nodeId}/command trả lệnh thành công gần nhất (status success); chưa có trả status no_data và mode/command/command_id null. POST cùng đường dẫn trả pending với expires_at.
+GET /api/v1/iot/nodes/{nodeId}/command/history giữ phân trang, status success/pending/expired; bổ sung executed_at, acknowledged_at, expires_at và late_ack. Sự kiện sensor vẫn success, không áp hạn chấp nhận lệnh cho AUTO chuyển trạng thái.
+ACK thêm executedAtUnixSeconds UTC: ACK sau hạn chỉ hợp lệ nếu thực hiện trong cửa sổ trước hạn. ACK hợp lệ muộn đổi cùng dòng lịch sử expired thành success, ghi audit command_late_ack khi BE đối chiếu; Bridge giữ sổ receipt bền vững. ACK cũ không ghi đè thành công có version mới hơn. GET command không còn phản ánh yêu cầu chưa ACK; FE theo dõi lệnh đang chờ bằng command_id trong history.
+Đồng bộ BE/Bridge/node/gateway; firmware cũ thiếu executedAtUnixSeconds chỉ xác nhận được khi ACK về trước hạn. DS3231 phải có giờ đúng. Giữ nguyên mã nguồn FE và dữ liệu lịch sử.

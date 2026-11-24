@@ -22530,6 +22530,28 @@
           },
           "status": {
             "$ref": "#/components/schemas/IotCommandHistoryStatus"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "late_ack": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -22579,6 +22601,10 @@
           },
           "auto_schedule": {
             "$ref": "#/components/schemas/IotAutoSchedule"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -22594,7 +22620,8 @@
             "nullable": true
           },
           "mode": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "command": {
             "type": "string",
@@ -22613,6 +22640,26 @@
           },
           "power_state": {
             "$ref": "#/components/schemas/FeederPowerState"
+          },
+          "auto_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "executed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "acknowledged_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "late_ack": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -23351,6 +23398,10 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -23415,6 +23466,10 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -23551,6 +23606,10 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "type": "number",
+            "format": "double"
           },
           "credential_issued": {
             "type": "boolean"
@@ -25385,7 +25444,6 @@
       },
       "RegisterNodeRequest": {
         "required": [
-          "cabinet_id",
           "device_id",
           "feeder_id",
           "nominal_current_ma",
@@ -25396,11 +25454,6 @@
         "type": "object",
         "properties": {
           "server_id": {
-            "minLength": 1,
-            "type": "string"
-          },
-          "cabinet_id": {
-            "maxLength": 32,
             "minLength": 1,
             "type": "string"
           },
@@ -25424,6 +25477,12 @@
           "nominal_power_mw": {
             "type": "number",
             "format": "double"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -25440,6 +25499,12 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -26343,6 +26408,12 @@
           },
           "location": {
             "$ref": "#/components/schemas/IotLocation"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -27757,6 +27828,12 @@
             "format": "double"
           },
           "nominal_power_mw": {
+            "type": "number",
+            "format": "double"
+          },
+          "radius_km": {
+            "maximum": 1000,
+            "minimum": 0,
             "type": "number",
             "format": "double"
           }

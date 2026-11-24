@@ -30,11 +30,12 @@ Chuẩn bị tủ điện có GPS và feeder thuộc tủ đó. Có thể gán n
 {
   "server_id": "iot-server-01",
   "commune_id": "COM-070",
-  "location": { "lat": 10.965681, "lng": 106.504581 }
+  "location": { "lat": 10.965681, "lng": 106.504581 },
+  "radius_km": 0.75
 }
 ```
 
-Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. JSON tạo server không có trường `base_url`; FE chỉ gửi server_id, commune_id và location. Địa chỉ Bridge do người triển khai cấu hình; nếu thiếu/sai hoặc chưa allowlist thì API trả 503 IOT_SOURCE_UNAVAILABLE. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường và GPS.
+Backend dùng địa chỉ mặc định được cấu hình ở `IotDiagnostics:BaseUrl` hoặc origin duy nhất trong allowlist. Trên VPS, origin nội bộ thường là `http://iot-bridge:5000`. JSON tạo server không có trường `base_url`; FE gửi server_id, commune_id, location và radius_km (0–1000 km, mặc định 0). Địa chỉ Bridge do người triển khai cấu hình; nếu thiếu/sai hoặc chưa allowlist thì API trả 503 IOT_SOURCE_UNAVAILABLE. Dùng `PUT /api/v1/iot/servers/{serverId}/location` để cập nhật xã/phường, GPS và radius_km.
 
 ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Client ID và username tự bằng server_id. Firmware tự yêu cầu danh sách node trên MQTT sau khi kết nối và làm mới mỗi 10 giây. Với gateway vật lý mới, Admin gọi `POST /api/v1/iot/servers/{serverId}/credential` một lần và nhập `password` từ phản hồi trên trang cấu hình ESP32. Gateway có thể kết nối khi danh sách node còn rỗng. Tránh lưu secret vào log hoặc bộ nhớ của FE.
 
@@ -45,8 +46,8 @@ ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Cl
 ```json
 {
   "server_id": "iot-server-01",
-  "cabinet_id": "CAB-011",
   "feeder_id": "FDR-009",
+  "radius_km": 0.2,
   "device_id": "LUXMAP-P001",
   "nominal_voltage": 5,
   "nominal_current_ma": 100,
@@ -54,7 +55,7 @@ ESP32 gateway dùng địa chỉ broker TLS, Server ID và secret đã cấp. Cl
 }
 ```
 
-Request tạo node chỉ có 7 trường như trên. BE tự đặt data_source=calibration_rig và supports_remote_control=true; không nhập hiệu chuẩn hay số bóng. Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
+Request tạo node chỉ có 7 trường: server_id, feeder_id, device_id, ba ngưỡng danh định và radius_km. Backend suy ra cabinet_id từ feeder_id; feeder phải đã thuộc tủ điện trong cùng xã với server. radius_km hợp lệ từ 0 đến 1000 km, mặc định 0. BE tự đặt data_source=calibration_rig và supports_remote_control=true; không nhập hiệu chuẩn hay số bóng. Tủ, feeder và server phải cùng xã. `device_id` khớp `DEVICE_ID` trong firmware node. Các ngưỡng danh định dùng V, mA và mW của cả feeder. Backend thêm thiết bị vào đúng server_id đã cấp key. Không gửi gateway_id; mỗi gateway hỗ trợ tối đa 32 node được phép.
 
 API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response có `node_id`, `server_id`, `device_id`, `feeder_id`. Dùng `node_id` cho API điều khiển và đọc dữ liệu. Thêm node bằng API này tự thêm tuyến, dùng lại secret và liên kết trực tiếp với feeder. Các trụ và bóng được xác định theo feeder.
 
@@ -62,15 +63,15 @@ API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response 
 
 - Đọc `GET /api/v1/iot/servers` để lấy credential_issued và heartbeat của từng server. `GET /api/v1/iot/servers/{serverId}/nodes?page=1&page_size=20` trả node thuộc đúng server, có lọc xã. API routes cũ deprecated, chỉ trả tuyến của server đang chọn.
 - Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}/feeder` (Body none) để chỉ gỡ khỏi feeder: 204 idempotent; giữ node trong tủ, giữ lịch sử, gỡ binding MQTT và relay. Không tự gửi ON/OFF. Sau đó dùng PUT để gắn lại.
-- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
+- Manager gọi `PUT /api/v1/iot/nodes/{nodeId}` với `server_id`, `device_id`, `feeder_id`, `radius_km` và các ngưỡng đo để gắn hoặc cập nhật nguồn. Thành công trả `204`. Với node đã gỡ khỏi tủ, chọn feeder có tủ trong cùng xã để gắn lại cùng `node_id`. Thiết bị phải có tuyến MQTT và gateway đã được cấp secret.
 - Manager gọi `DELETE /api/v1/iot/nodes/{nodeId}` để gỡ node khỏi tủ và mạch. Thành công trả `204`, kể cả khi gọi lại. Node rời danh sách IoT đang lắp và bản đồ. Có thể xem hồ sơ qua `GET /api/v1/assets/iot-nodes/{nodeId}` với `cabinet_id: null`, và vẫn gọi được các endpoint lịch sử nếu node đã có nguồn. Liên kết relay bị gỡ, dữ liệu lịch sử và secret gateway được giữ; quyền MQTT của device_id bị gỡ. Cấu hình nguồn khai báo tĩnh cần được đưa vào DB khi muốn sửa qua API. Khi gỡ node, backend lưu bản sao nguồn tĩnh để tra cứu lịch sử.
 
 ## 3. Hiển thị trên bản đồ
 
 | API | Dữ liệu FE dùng |
 |---|---|
-| `GET /api/v1/iot/servers` | Marker gateway từ `server_id`, `commune_id`, `location.lat/lng` và `status`. `location: null` nghĩa là chưa có tọa độ hiển thị. |
-| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `status`, `last_received_at`, `last_seen_at`, `last_command_ack_at` và `electrical_status`. status phản ánh liên lạc node; last_received_at vẫn là giờ nhận mẫu điện. |
+| `GET /api/v1/iot/servers` | Marker gateway từ `server_id`, `commune_id`, `location.lat/lng`, `radius_km` và `status`. `location: null` nghĩa là chưa có tọa độ hiển thị. |
+| `GET /api/v1/iot/nodes?page=1&page_size=12` | Marker node từ `items[].location`, lấy theo tọa độ tủ điện. API phân trang và trả thêm `cabinet_id`, `commune_id`, `server_id`, `radius_km`, `status`, `last_received_at`, `last_seen_at`, `last_command_ack_at` và `electrical_status`. status phản ánh liên lạc node; last_received_at vẫn là giờ nhận mẫu điện. |
 | `GET /api/v1/iot/poles/{poleId}/control` | Khi bấm trụ, lấy `feeder_id`, `node_id` và `can_control_feeder`. |
 | `GET /api/v1/map/poles` | `features[].properties.power_state` là trạng thái cấp điện của mạch chứa trụ. |
 | `GET /api/v1/map/poles/{poleId}` | `power_state` của trụ và của các bóng trong `fixtures[]`. |
@@ -124,12 +125,12 @@ Giữ nguyên chữ HOA trong `mode` và `command` của kênh IoT bridge. Đây
 Từ 07:00 đến trước 19:00, AUTO điều khiển theo cảm biến ánh sáng. Từ 19:00 đến trước 07:00 hôm sau, AUTO luôn bật. Node dùng giờ địa phương từ DS3231. Lệnh MANUAL giữ lại lịch AUTO đã lưu.
 
 1. Khi POST trả `202 Accepted`, giữ `command_id` và hiển thị **Đang chờ node xác nhận**.
-2. Gọi `GET /api/v1/iot/nodes/{nodeId}/command` để đọc lịch, trạng thái lệnh hiện tại và `power_state`.
-3. Hiển thị **Node đã xác nhận** khi `command_id` khớp và `command_acknowledged: true`. Nếu GET trả mã khác, lệnh mới đã thay lệnh đang theo dõi.
+2. Gọi `GET /api/v1/iot/nodes/{nodeId}/command` để đọc lệnh thành công gần nhất, lịch đã xác nhận và `power_state`. Lệnh mới đang chờ không thay kết quả GET. Chưa có lệnh thành công: `status: no_data`, command_id/mode/command null, command_acknowledged false.
+3. Theo dõi lệnh vừa POST bằng command_id trong `GET /api/v1/iot/nodes/{nodeId}/command/history`. GET command chỉ đổi sang ID đó khi node xác nhận; ID khác có thể là lệnh thành công trước đó.
 4. Hiển thị **Bật** hoặc **Tắt** theo `power_state` do backend trả. Trong AUTO, đọc lại để cập nhật khi lịch hoặc cảm biến làm mạch đổi đầu ra. Khi dữ liệu đầu ra thiếu hoặc quá hạn, hiển thị **Chưa rõ**.
 5. Khi cần xác minh mạch thực sự ngắt tải, đọc mẫu điện mới sau OFF. ACK xác nhận firmware đã xử lý lệnh.
 
-Lệnh mới có `expires_at` theo UTC và hết hạn sau 5 phút. Nếu đến hạn mà chưa nhận ACK cho đúng mã lệnh, hiển thị **Hết hạn chờ xác nhận**. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
+Lệnh mới có `expires_at` theo UTC, hạn thực hiện 20 giây tính từ lúc BE tiếp nhận. Bridge và gateway ngừng phát lại khi hết hạn; node kiểm tra RTC ngay trước đổi đầu ra. Hết hạn không tự đảo trạng thái đèn. AUTO đã áp dụng tiếp tục chạy. Backend từ chối gửi khi gateway chưa online. API tra điều khiển trụ trả `control_channel: "iot_bridge"` cho mạch điều khiển qua bridge.
 
 ### Lịch sử điều khiển
 
@@ -139,7 +140,39 @@ Response có `page`, `page_size`, `total` và `items`. Mới nhất ở đầu. 
 
 Mỗi mục có `command_id`, `node_id`, `feeder_id`, `server_id`, `device_id`, `mode`, `command`, lịch đã gửi trong `auto_schedule`, tên hiển thị của người gửi trong `requested_by` và giờ UTC `requested_at`. Nếu tài khoản đã bị xóa, `requested_by` trả mã tài khoản đã ghi audit. `bridge_accepted_at` ghi lúc backend lưu xác nhận chấp nhận lệnh từ Bridge.
 
-`status` có ba giá trị: `success` khi Bridge nhận ACK của node đúng mã lệnh trong vòng 12 giây từ `requested_at`; `pending` khi còn trong thời gian chờ; `expired` khi đã hết 12 giây và thiếu ACK đúng hạn. ACK muộn vẫn hiện `expired`. Mốc này dành cho lịch sử, hạn thực thi lệnh vẫn là 5 phút. Có thể xem khi gateway offline. Khi Bridge không truy cập được để đối chiếu ACK, API trả `503`.
+`status`: `pending` khi chưa có ACK và còn hạn; `expired` khi hết 20 giây chưa có xác nhận hợp lệ; `success` khi node xác nhận thực hiện. ACK nhận ở giây 21 chỉ được công nhận nếu executed_at chứng minh đã thực hiện trước hạn (ví dụ giây 18); ACK sau hạn thiếu giờ thực hiện bị từ chối. ACK trễ hợp lệ đổi đúng dòng lịch sử từ expired sang success, có late_ack=true và ghi audit command_late_ack một lần. Các trường bổ sung: expires_at, executed_at (có thể null với firmware cũ), acknowledged_at, late_ack. Khi Bridge không truy cập được, API trả `503`, không suy diễn trạng thái ACK.
+
+GET command trả status success hoặc no_data; POST trả status pending. GET command lấy lệnh thành công mới nhất theo version phát lệnh, ACK cũ về trễ không ghi đè thành công mới hơn. Trong AUTO, mode AUTO không biểu thị đèn đang ON hay OFF; power_state và mẫu điện phản ánh đầu ra quan sát.
+
+Phải deploy đồng bộ BE, Bridge và nạp firmware node/gateway; RTC DS3231 giữ giờ Việt Nam, ACK chuyển sang UTC Unix seconds. Đồng hồ sai sẽ ảnh hưởng xét hạn. Firmware cũ không có giờ thực hiện chỉ được công nhận nếu ACK về trước hạn. Không có thay đổi mã nguồn FE trong đợt này.
+
+Lịch sử cũng gồm các lần AUTO thực sự đổi ON/OFF theo telemetry của node:
+- `requested_by: "sensor"`, `mode: "AUTO"`, `command: "ON"` hoặc `"OFF"`, `status: "success"`.
+- `command_id: "sensor-<cursor>"` định danh sự kiện quan sát, không phải mã lệnh gửi xuống node.
+- `requested_at` là giờ đo DS3231 đổi sang UTC; nếu không có giờ đo dùng giờ nhận. `bridge_accepted_at` là giờ Bridge nhận mẫu chứng minh chuyển trạng thái.
+- `auto_schedule: null` cho sự kiện cảm biến vì mẫu điện không chứa bản sao lịch lúc đo. Lệnh AUTO của người dùng vẫn có `command: null` và tên người gửi.
+- Mẫu đầu tiên chỉ làm mốc; chỉ ghi khi hai mẫu kế tiếp cùng AUTO có trạng thái khác nhau. Không ghi lại trạng thái giữ nguyên, không tính lần chuyển từ MANUAL sang AUTO như một sự kiện sensor.
+- Dữ liệu nguồn là telemetry SQLite bền vững, không phụ thuộc cache 1.000 mẫu hay việc FE có gọi API; gửi bù được xếp theo giờ đo và bản tin trùng không sinh thêm log. Khoảng gắn node–feeder giới hạn dữ liệu của từng nguồn.
+- Sự kiện sensor và lệnh người dùng được gộp trước khi đếm `total`, sắp xếp mới nhất trước và phân trang. Phải deploy cả BE và Bridge mới; Bridge cũ thiếu endpoint nội bộ sẽ trả `503`.
+
+Ví dụ một mục AUTO tự đổi trạng thái:
+```json
+{
+  "command_id": "sensor-123",
+  "node_id": "NODE-004",
+  "feeder_id": "FDR-009",
+  "server_id": "iot-server-01",
+  "device_id": "LUXMAP-P001",
+  "mode": "AUTO",
+  "command": "OFF",
+  "auto_schedule": null,
+  "requested_by": "sensor",
+  "requested_at": "2026-11-21T09:00:00Z",
+  "bridge_accepted_at": "2026-11-21T09:00:02Z",
+  "status": "success"
+}
+```
+
 
 ## 5. Dữ liệu điện và lỗi
 
@@ -208,7 +241,7 @@ Node gửi snapshot khi trạng thái đổi và định kỳ 30 giây khi đã 
 API dùng trung bình 2 mẫu điện hợp lệ, cảnh báo current_drop khi dòng giảm quá 5% so với nominal_current_ma.
 Không đếm bóng hư; không gửi lamp_count_calibration hoặc installed_lamp_count khi tạo node.
 Đặt nominal_voltage, nominal_current_ma và nominal_power_mw theo nguồn đo thực tế của cả feeder.
-PUT dùng UpdateNodeRequest chỉ 6 trường: server_id, device_id, feeder_id và 3 nominal_*. Không xuất các thuộc tính NodeProfile nội bộ ra Swagger; cấu hình/profile cũ vẫn đọc được.
+PUT dùng UpdateNodeRequest gồm 7 trường: server_id, device_id, feeder_id, radius_km và 3 nominal_*. Không xuất các thuộc tính NodeProfile nội bộ ra Swagger; cấu hình/profile cũ vẫn đọc được.
 
 | HTTP | `error.code` | Ý nghĩa |
 |---|---|---|
@@ -318,7 +351,44 @@ Chi tiết JSON, ngưỡng, thời gian và 17 mã lỗi: [IOT-DIAGNOSTICS.md](I
 ## Đọc cấu hình node trước khi sửa (19/11/2026)
 
 GET /api/v1/iot/nodes/{nodeId}, Bearer token ReadNetwork trong phạm vi xã, Body none.
-Trả node_id, server_id, device_id, feeder_id, nominal_voltage (V), nominal_current_ma (mA), nominal_power_mw (mW).
+Trả node_id, server_id, device_id, feeder_id, nominal_voltage (V), nominal_current_ma (mA), nominal_power_mw (mW) và radius_km.
 Đây là giá trị danh định đã lưu; không gọi Bridge và không trả secret. 404 khi node thiếu/ngoài xã/chưa có nguồn hoặc đã gỡ nguồn.
-Dùng sáu trường ngoài node_id cho PUT cùng URL bằng token Manager; Admin dùng POST tạo node.
+Dùng bảy trường ngoài node_id, gồm radius_km, cho PUT cùng URL bằng token Manager; Admin dùng POST tạo node.
 Xem JSON và chi tiết trong [IOT-SERVER-IDENTITY-API-CHANGES.md](IOT-SERVER-IDENTITY-API-CHANGES.md).
+
+
+## AUTO cả ngày và AUTO theo giờ
+
+API:
+`POST https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/command`
+
+AUTO dùng cảm biến cả ngày:
+```json
+{
+  "mode": "AUTO",
+  "auto_type": "full_time"
+}
+```
+
+AUTO theo giờ:
+```json
+{
+  "mode": "AUTO",
+  "auto_type": "scheduled",
+  "auto_schedule": {
+    "day_start": "06:00",
+    "night_start": "18:00"
+  }
+}
+```
+
+- `full_time`: BH1750 điều khiển cả 24 giờ; không gửi auto_schedule.
+- `scheduled`: từ 06:00 đến trước 18:00 dùng cảm biến; từ 18:00 đến trước 06:00 hôm sau luôn bật. Giờ DS3231 theo Việt Nam.
+- Dưới 50 lux bật, trên 50 lux tắt **sau 5 mẫu hợp lệ liên tiếp**. Đúng 50 lux hoặc đọc lỗi reset bộ đếm và giữ đầu ra. Thay chế độ/lịch reset chuỗi; khoảng ban đêm scheduled luôn bật ngay.
+- AUTO cũ không gửi auto_type/null vẫn là scheduled. Scheduled bỏ lịch thì dùng lịch Bridge đang có; nếu không có lịch, mặc định cũ 06:00–18:01. Muốn đúng 18:00 hãy gửi lịch như ví dụ.
+- MANUAL ON/OFF không gửi auto_type hoặc gửi null. auto_type sai, MANUAL có auto_type, full_time kèm lịch hoặc lịch không hợp lệ trả 400 VALIDATION_FAILED.
+- GET `/api/v1/iot/nodes/NODE-004/command` và POST response có auto_type. full_time có auto_schedule null; scheduled có lịch; MANUAL có auto_type null.
+- GET `/api/v1/iot/nodes/NODE-004/command/history?page=1&page_size=20` trả auto_type của lệnh lúc gửi hoặc của telemetry AUTO lúc đo. Lệnh AUTO người gửi có command null; AUTO tự đổi đầu ra có command ON/OFF và requested_by sensor. Bản ghi cũ thiếu trường được hiểu scheduled.
+- Node lưu loại AUTO và lịch trong NVS, giữ qua mất điện. ACK full_time phải có autoType full_time; ACK firmware cũ không được dùng để xác nhận full_time.
+- Không đổi R002, trung bình INA226 16 lần, chế độ đo FAST, nguồn relay hay lịch truyền LoRa. Firmware chưa được nạp tự động.
+- Cần deploy BE + Bridge mới và nạp cả firmware node/gateway. full_time vẫn dùng cơ chế xác thực, quyền, TTL và ACK hiện có; RTC cần hợp lệ để nhận lệnh mới có hạn.

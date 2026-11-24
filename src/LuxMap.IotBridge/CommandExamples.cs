@@ -20,13 +20,17 @@ sealed class CommandExamples : IOperationFilter
         {
             ["OFF"] = Example("Tắt đèn", "MANUAL", "OFF"),
             ["ON"] = Example("Bật đèn", "MANUAL", "ON"),
-            ["AUTO"] = Example("Tự động theo RTC và lux", "AUTO", null)
+            ["AUTO scheduled"] = Example("Tự động theo lịch và lux", "AUTO", null, "scheduled"),
+            ["AUTO full_time"] = Example("Tự động theo lux cả ngày", "AUTO", null, "full_time")
         };
     }
 
-    private static OpenApiExample Example(string summary, string mode, string? command)
+    private static OpenApiExample Example(string summary, string mode, string? command, string? autoType = null)
     {
         var value = new OpenApiObject { ["mode"] = new OpenApiString(mode) };
+        if (autoType is not null) value["autoType"] = new OpenApiString(autoType);
+        if (autoType == "scheduled") value["autoSchedule"] = new OpenApiObject {
+            ["dayStartMinute"] = new OpenApiInteger(360), ["nightStartMinute"] = new OpenApiInteger(1080) };
         if (command is not null) value["command"] = new OpenApiString(command);
         return new OpenApiExample { Summary = summary, Value = value };
     }

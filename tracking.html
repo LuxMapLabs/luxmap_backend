@@ -43,9 +43,10 @@
   <div class="card" id="scheduling-pr-readiness">
     <strong>WO-SCHEDULING-SUGGESTIONS — Claude xác nhận sẵn sàng mở PR · 21/11/2026</strong>
     <p><span class="tag t-next">Ready to open vào dev · chưa push / PR</span>
-    Claude Code <code>claude-sonnet-5-5</code> review độc lập Standards và Spec/FE trên nền
-    <code>5e3178a</code>: cả hai GO, không có lỗi BE xác nhận chặn mở PR. Điều kiện local đã hoàn tất
-    ở merge commit <code>99ea6cc</code> (build và 206 + 20 test xanh). CI nhánh chưa có; hai shard bắt buộc
+    Claude Code <code>claude-sonnet-5-5</code> review lại độc lập Standards và Spec trên nền
+    <code>623d4e8</code>: cả hai GO, không có lỗi BE xác nhận chặn mở PR. Merge commit candidate
+    <code>6f81d2a</code> build sạch; regression chọn lọc pass 225 test, test IoT lỗi khi chạy gộp pass khi chạy riêng;
+    20 test Python pass. OpenAPI export/generator không đổi spec (206 operations). CI nhánh chưa có; hai shard bắt buộc
     phải pass trước merge. Lỗi IoT 503 của full-suite cũ vẫn ghi đúng phạm vi kiểm chứng.</p>
     <p>Đã đối chiếu FE <code>origin/dev b1ad915</code>: tái sử dụng form survey/GPS/inspection/repair;
     cần nối hai GET, UI gợi ý và sửa prefill/validation/selection. Thử generator FE ở thư mục tạm

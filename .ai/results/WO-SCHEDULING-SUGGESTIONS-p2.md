@@ -124,3 +124,16 @@ Evidence, original reports, corrections and concrete FE handoff:
 [PR readiness review](../reviews/WO-SCHEDULING-SUGGESTIONS-pr-readiness.md),
 [WP5 handoff](../../docs/work-order-scheduling-suggestions.md).
 No push, PR, FE mutation, consumer notification or deployment. Publication still requires user's permission.
+
+
+## Latest dev sync — 24/11/2026
+
+Fetched origin/dev 623d4e89 (PRs #290–292); local no-commit merge was conflict-free. Claude Sonnet 5.5
+independent Standards + Spec checks: GO, no hard/functional blockers; required latest-dev checks identified
+and completed below. `dotnet build --disable-build-servers -warnaserror`: 0 warnings/errors.
+Python scripts: 20 passed. Focused combined API regression: 225/226 pass; the one IoT registration case
+(expected 201, actual503) passed in an immediate isolated rerun on the same candidate. This is a transient
+combined-run/environment result; report both accurately. Fresh focused test binary also verified the IoT case.
+Raw Swagger exported and byte-compared to docs/openapi/luxmap-v1.json; consolidated generator wrote
+158 paths / 206 operations / 340 schemas and `git diff` remained empty for both specs. No merge conflicts.
+`git diff --check` and staged diff check clean.
