@@ -25,8 +25,8 @@ Ví dụ các trường chính:
   },
   "electrical_window": {
     "status": "evaluated",
-    "samples": 2,
-    "required_samples": 2,
+    "samples": 5,
+    "required_samples": 5,
     "voltage_avg": 5.08,
     "current_ma_avg": 86.6,
     "power_mw_avg": 439.928,
@@ -50,45 +50,45 @@ Ví dụ các trường chính:
 
 Response còn có connection_status, electrical_status, last_seen_at, last_command_ack_at, measured_at,
 measurement_key/sequence, sensor_health_key, firmware_version và calibration_version.
-measurement là mẫu mới nhất; observed của lỗi điện là trung bình HAI mẫu, không nhất thiết bằng measurement.
+measurement là mẫu mới nhất; observed của lỗi điện là trung bình NĂM mẫu, không nhất thiết bằng measurement.
 Không còn lamp_count, estimated_lit, estimated_missing, votes hoặc threshold_counts.
 
-## 2. Trung bình HAI mẫu
+## 2. Trung bình NĂM mẫu
 
-Hai mẫu phải ON, V/mA/mW hữu hạn, cùng session, sequence kề nhau, không trùng.
-Giờ đo DS3231 tăng theo sequence, giờ đo/giờ nhận CẢ HAI mẫu còn trong max_silence_seconds.
-Không nhận SD replay cũ, đứt sequence hoặc lặp bản tin làm hai mẫu. Không đánh giá lỗi điện khi INA226/DS3231 báo lỗi.
-Chỉ có 0/1 mẫu: electrical_window.status=insufficient_samples, required_samples=2, các trung bình null.
-Đủ hai mẫu: status=evaluated. OFF/stale/hardware lỗi: electrical_window=null.
-Đây là hai bản tin đo độc lập, không phải số lần INA226 lấy trung bình nội bộ.
+Năm mẫu phải ON, V/mA/mW hữu hạn, cùng session, sequence kề nhau, không trùng.
+Giờ đo DS3231 tăng theo sequence, giờ đo/giờ nhận CẢ NĂM mẫu còn trong max_silence_seconds.
+Không nhận SD replay cũ, đứt sequence hoặc lặp bản tin làm năm mẫu. Không đánh giá lỗi điện khi INA226/DS3231 báo lỗi.
+Chưa đủ 5 mẫu: electrical_window.status=insufficient_samples, required_samples=5, các trung bình null.
+Đủ năm mẫu: status=evaluated. OFF/stale/hardware lỗi: electrical_window=null.
+Đây là năm bản tin đo độc lập, không phải số lần INA226 lấy trung bình nội bộ.
 
 ### current_drop
 
-current_avg = (I1 + I2) / 2.
+current_avg = (I1 + I2 + I3 + I4 + I5) / 5.
 deviation_percent = (current_avg - nominal_current_ma) / nominal_current_ma * 100.
 
 Chỉ báo khi current_avg < nominal_current_ma * 0.95; đúng 5% không báo, tăng dòng không thuộc lỗi này.
-CẢ HAI điện áp phải >0.1 V và trong dung sai nominal_voltage. current_evaluation_available cho biết điều kiện xét dòng.
+CẢ NĂM điện áp phải >0.1 V và trong dung sai nominal_voltage. current_evaluation_available cho biết điều kiện xét dòng.
 Mất áp/sai áp không được coi dòng tải giảm. Ngưỡng 5% cố định, không dùng current_tolerance_percent cũ.
 Baseline là nominal_current_ma của từng feeder; không tự học từ mẫu đang lỗi, không gán 93.55 mA cho mọi feeder.
-Bộ 10 bóng vừa đo: 93.5546875 mA (~93.55). Cần cập nhật nguồn bằng PUT trong mục 6 để dùng đúng chuẩn.
-Hai mẫu nhạy nhiễu hơn 25 mẫu; giữ firmware R002, AVG16, chờ LoRa nghỉ 1500ms đã kiểm chứng.
+93.5546875 mA (~93.55) là ví dụ hiệu chuẩn trước đây, không phải baseline chung. Lượt đo thực tế 5 log của bộ đủ 10 đèn ngày 24/11/2026 có dòng trung bình 106.5 mA tại áp trung bình 5.3996 V. Người quản trị chọn baseline đúng điều kiện nguồn và cập nhật bằng PUT trong mục 6; thay đổi này không tự sửa nominal_current_ma trong DB.
+Giữ INA226 R002 và AVG16; cách đo/truyền LoRa theo firmware đã nạp. Việc đổi cửa sổ trên BE không thay lịch đo của node.
 
 ### voltage_loss / voltage_deviation
 
-Áp trung bình = (V1+V2)/2.
+Áp trung bình = (V1+V2+V3+V4+V5)/5.
 - |áp trung bình| <=0.1 V: voltage_loss; observed=áp trung bình, reference/deviation_percent=null, limit=0.1 V.
 - Còn lại lệch quá voltage_tolerance_percent so với nominal_voltage: voltage_deviation.
   observed=áp trung bình, reference=nominal_voltage, deviation_percent có dấu, limit là % (mặc định 10).
 - Đúng dung sai không báo. Hai lỗi áp loại trừ nhau.
-- Job khoảng 30 giây: đủ hai mẫu có thể tạo Fault ở lần đánh giá tiếp theo, không còn chờ 25 mẫu/3 phút.
+- Job khoảng 5 giây: đủ năm mẫu có thể tạo Fault ở lần đánh giá tiếp theo, không còn chờ 25 mẫu/3 phút.
   API hiện tại không đợi job.
 
 ## 3. Danh sách 17 mã lỗi — DTO chung
 
 | code | Ý nghĩa |
 |---|---|
-| current_drop | Dòng trung bình 2 mẫu giảm quá 5% |
+| current_drop | Dòng trung bình 5 mẫu giảm quá 5% |
 | telemetry_stale | Điện cũ, không đồng nghĩa node mất kết nối |
 | voltage_loss | Áp trung bình gần 0 khi ON |
 | voltage_deviation | Áp trung bình lệch quá dung sai |
@@ -152,12 +152,12 @@ total là số đợt sau lọc, không phải số mẫu hay số phút.
 }
 ~~~
 
-- Job chạy ~30 giây, ghi tối đa một lượt mỗi phút UTC cho mỗi node.
+- Job chạy khoảng 5 giây, ghi tối đa một lượt mỗi khoảng 5 giây UTC cho mỗi node.
 - 00:01 lỗi, 00:02/00:03 vẫn lỗi: một log started_at=00:01, ended_at cập nhật đến 00:03.
 - Dòng giảm 7% rồi 10% vẫn cùng log; anomaly là bằng chứng ở lần ghi gần nhất.
 - Mỗi code có đợt riêng; nhiều lỗi đồng thời có nhiều log.
-- active: chưa đóng; ended_at là phút cuối XÁC NHẬN lỗi, không khẳng định lỗi vẫn có ở thời điểm GET.
-- resolved: có cửa sổ/health hợp lệ xác nhận hết lỗi; closed_at là phút phục hồi, ended_at vẫn là phút lỗi cuối.
+- active: chưa đóng; ended_at là mốc 5 giây cuối XÁC NHẬN lỗi, không khẳng định lỗi vẫn có ở thời điểm GET.
+- resolved: có cửa sổ/health hợp lệ xác nhận hết lỗi; closed_at là mốc 5 giây phục hồi, ended_at vẫn là mốc 5 giây xác nhận lỗi cuối.
 - interrupted: đổi node/feeder/nguồn/ngưỡng hoặc không có quan sát lỗi liên tục qua hơn một phút; không coi là phục hồi.
 - Upstream không dùng được không kéo dài ended_at và không tự đóng resolved.
 - GET không ghi log. Lịch sử lưu PostgreSQL, vẫn đọc theo feeder khi gỡ/thay node.
@@ -167,7 +167,7 @@ total là số đợt sau lọc, không phải số mẫu hay số phút.
 
 current_drop -> current_anomaly; voltage_loss -> segment_outage; voltage_deviation -> voltage_anomaly;
 hardware -> iot_hardware_fault. telemetry_stale chỉ tạo node_offline khi node thực sự offline (không chỉ replay/điện cũ).
-Lỗi điện đủ 2 mẫu tạo Fault, hardware giữ debounce 5 phút, chống trùng Fault chưa đóng giữ nguyên.
+Lỗi điện đủ 5 mẫu tạo Fault, hardware giữ debounce 5 phút, chống trùng Fault chưa đóng giữ nguyên.
 Phục hồi đủ chứng cứ mới 90 giây: detected chưa có WorkOrder -> rejected + audit;
 đã giao việc thì chỉ ghi chú phục hồi, không tự bỏ công việc. Lịch sử lỗi khác với vòng đời Fault/WorkOrder.
 Fault cũ không bị xóa khi bỏ đếm bóng.
@@ -193,3 +193,5 @@ PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
 
 Các trường cấu hình đếm bóng cũ còn được nhận để tương thích nhưng không ảnh hưởng chẩn đoán.
 Cần deploy BE và apply migration AddIotDiagnosticEpisodes. Không cần nạp lại firmware cho thay đổi thuật toán BE này.
+
+Cập nhật 24/11/2026: dùng cửa sổ trượt 5 mẫu ON mới nhất, cùng session và sequence liên tiếp; không phải mỗi 5 lượt GET. Mỗi mẫu V/mA/mW có trọng số bằng nhau. Lịch sử kiểm tra mỗi 5 giây, tối đa khoảng 12 lượt/phút; chưa có mẫu mới có thể vẫn dùng cửa sổ còn fresh. Không tự tạo mẫu đo. Firmware vẫn tạo telemetry khoảng 10 giây/lần, nên 5 mẫu mới cần khoảng 50 giây. Khoảng trống hơn một phút vẫn ngắt đợt lỗi như trước. Poll runner được giới hạn bởi chu kỳ job nhanh nhất; chu kỳ thực tế còn phụ thuộc thời gian xử lý và tải hệ thống. Không sửa FE, không đổi trung bình lịch sử điện 30 giây.

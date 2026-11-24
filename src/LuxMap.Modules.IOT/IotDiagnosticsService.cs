@@ -927,18 +927,22 @@ public sealed partial class IotDiagnosticsService(
         if (measured is null || measured > now || now - measured > maximumGap) return [];
         var samples = new List<IotMeasurement> { new(latest.ReceivedAt.UtcDateTime, "ON", voltage, current, power) };
         // Sorting by receipt time would mix SD replay with live samples. Require adjacent sequences.
-        var older = (device.History ?? []).Where(r => r.Data?.SessionId == session &&
-            r.Data.SequenceNumber == data.SequenceNumber - 1).ToArray();
-        if (older.Length != 1 || older[0].Data is not {
-                LampCommand: "ON", Voltage: double oldV, Current: double oldI, Power: double oldP } previous ||
-            !Valid(oldV) || !Valid(oldI) || !Valid(oldP) ||
-            older[0].ReceivedAt > now || now - older[0].ReceivedAt > maximumGap)
-            return samples;
-        var oldTime = MeasuredAt(previous.Timestamp);
-        if (oldTime is null || oldTime >= measured || measured - oldTime > maximumGap ||
-            now - oldTime > maximumGap)
-            return samples;
-        samples.Add(new(older[0].ReceivedAt.UtcDateTime, "ON", oldV, oldI, oldP));
+        for (var offset = 1; offset < ElectricalWindowEvaluator.WindowSize; offset++)
+        {
+            var older = (device.History ?? []).Where(r => r.Data?.SessionId == session &&
+                r.Data.SequenceNumber == data.SequenceNumber - offset).ToArray();
+            if (older.Length != 1 || older[0].Data is not {
+                    LampCommand: "ON", Voltage: double oldV, Current: double oldI, Power: double oldP } previous ||
+                !Valid(oldV) || !Valid(oldI) || !Valid(oldP) ||
+                older[0].ReceivedAt > now || now - older[0].ReceivedAt > maximumGap)
+                return samples;
+            var oldTime = MeasuredAt(previous.Timestamp);
+            if (oldTime is null || oldTime >= measured || measured - oldTime > maximumGap ||
+                now - oldTime > maximumGap)
+                return samples;
+            samples.Add(new(older[0].ReceivedAt.UtcDateTime, "ON", oldV, oldI, oldP));
+            measured = oldTime;
+        }
         return samples;
     }
 
@@ -954,7 +958,7 @@ public sealed partial class IotDiagnosticsService(
                 Status = "stale", Measurement = reading,
                 Anomalies = [new("telemetry_stale", silence, null, null, profile.MaxSilenceSeconds)],
             };
-        // Electrical anomalies are decided together by the two-sample window.
+        // Electrical anomalies are decided together by the five-sample window.
         return result with { Status = "normal", Measurement = reading, Anomalies = [] };
     }
 

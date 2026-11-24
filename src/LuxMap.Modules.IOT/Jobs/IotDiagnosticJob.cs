@@ -26,7 +26,7 @@ public sealed class IotDiagnosticJob(
     ILogger<IotDiagnosticJob> log) : IScheduledJob
 {
     public string Name => "iot_diagnostics";
-    public TimeSpan Interval => TimeSpan.FromSeconds(30);
+    public TimeSpan Interval => TimeSpan.FromSeconds(5);
 
     public async Task RunAsync(DateTime now, string correlationId, CancellationToken ct)
     {
@@ -228,7 +228,7 @@ public sealed class DiagnosticCodeEvidence
 
 public static class IotDiagnosticRules
 {
-    public const string Version = "iot-faults-v3-mean2";
+    public const string Version = "iot-faults-v4-mean5";
     public static readonly string[] Codes = [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "current_drop",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",

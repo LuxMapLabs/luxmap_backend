@@ -238,7 +238,7 @@ Node gửi snapshot khi trạng thái đổi và định kỳ 30 giây khi đã 
 
 ### Ngưỡng điện hiện hành
 
-API dùng trung bình 2 mẫu điện hợp lệ, cảnh báo current_drop khi dòng giảm quá 5% so với nominal_current_ma.
+API dùng trung bình 5 mẫu điện hợp lệ, cảnh báo current_drop khi dòng giảm quá 5% so với nominal_current_ma.
 Không đếm bóng hư; không gửi lamp_count_calibration hoặc installed_lamp_count khi tạo node.
 Đặt nominal_voltage, nominal_current_ma và nominal_power_mw theo nguồn đo thực tế của cả feeder.
 PUT dùng UpdateNodeRequest gồm 7 trường: server_id, device_id, feeder_id, radius_km và 3 nominal_*. Không xuất các thuộc tính NodeProfile nội bộ ra Swagger; cấu hình/profile cũ vẫn đọc được.
@@ -338,12 +338,12 @@ Các lỗi điện/phần cứng không được xóa chỉ vì node trả ACK.
 [Chi tiết và JSON Postman](IOT-NODE-STATUS.md).
 
 
-## Cập nhật 19/11/2026 — lỗi điện trung bình hai mẫu và lịch sử feeder
+## Cập nhật 24/11/2026 — lỗi điện trung bình năm mẫu và lịch sử feeder mỗi 5 giây
 Dùng GET /api/v1/iot/feeders/{feederId}/diagnostics cho hiện tại và
 GET /api/v1/iot/feeders/{feederId}/diagnostics/history?page=1&page_size=20&from=...&to=... cho lịch sử.
-Bỏ lamp_count/estimated_lit/estimated_missing; current_drop so trung bình 2 mẫu với nominal_current_ma, giảm >5%.
-voltage_loss/voltage_deviation cũng dùng áp trung bình 2 mẫu. electrical_window nêu mẫu/trung bình;
-measurement vẫn là mẫu mới nhất. History một dòng/đợt/mã lỗi, cập nhật ended_at mỗi phút,
+Bỏ lamp_count/estimated_lit/estimated_missing; current_drop so trung bình 5 mẫu với nominal_current_ma, giảm >5%.
+voltage_loss/voltage_deviation cũng dùng áp trung bình 5 mẫu. electrical_window nêu mẫu/trung bình;
+measurement vẫn là mẫu mới nhất. History một dòng/đợt/mã lỗi, cập nhật ended_at mỗi 5 giây,
 status active/resolved/interrupted; lọc khoảng giao và phân trang. Mục này thay hướng dẫn đếm bóng cũ.
 Chi tiết JSON, ngưỡng, thời gian và 17 mã lỗi: [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
 

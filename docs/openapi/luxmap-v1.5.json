@@ -11696,7 +11696,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Lỗi hiện tại theo feeder: dòng giảm >5% và điện áp trung bình hai mẫu",
+        "summary": "Lỗi hiện tại theo feeder: dòng giảm >5% và điện áp trung bình năm mẫu",
         "operationId": "getIotFeedersFeederidDiagnostics",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)"
@@ -11843,7 +11843,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Lịch sử đợt lỗi feeder gộp theo phút, lọc khoảng thời gian và phân trang",
+        "summary": "Lịch sử đợt lỗi feeder cập nhật mỗi 5 giây, lọc khoảng thời gian và phân trang",
         "operationId": "getIotFeedersFeederidDiagnosticsHistory",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)"
@@ -11954,7 +11954,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Chẩn đoán điện trung bình hai mẫu, tương thích route node cũ",
+        "summary": "Chẩn đoán điện trung bình năm mẫu, tương thích route node cũ",
         "operationId": "getIotNodesNodeidDiagnostics",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
@@ -25673,7 +25673,7 @@
             "type": "integer",
             "format": "int32",
             "enum": [
-              2
+              5
             ]
           },
           "voltage_avg": {

@@ -37,7 +37,7 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
                 failed ? [new("voltage_loss")] : [])
             {
                 MeasuredAt = now, MeasurementKey = $"session/{step + 1}", MeasurementSequence = step + 1,
-                ElectricalStatus = "fresh", ElectricalWindow = new("evaluated", 2, 2, failed ? 0 : 5, failed ? 0 : 100, failed ? 0 : 500),
+                ElectricalStatus = "fresh", ElectricalWindow = new("evaluated", 5, 5, failed ? 0 : 5, failed ? 0 : 100, failed ? 0 : 500),
             };
             await IotDiagnosticJob.SaveAsync(db, lookup, rig.Node, profile, result, result.Status, now, "job:iot-test", default);
         }
@@ -130,7 +130,7 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
             new(now, "ON", 5, 85, 425), [new("current_drop", 85, 100, -15, 5)]) {
             MeasuredAt = now, MeasurementKey = "s/2", MeasurementSequence = 2,
             ElectricalStatus = "fresh", ConnectionStatus = "online", LastSeenAt = now,
-            ElectricalWindow = new("evaluated", 2, 2, 5, 85, 425) { CurrentEvaluationAvailable = true },
+            ElectricalWindow = new("evaluated", 5, 5, 5, 85, 425) { CurrentEvaluationAvailable = true },
         };
         for (var attempt = 0; attempt < 2; attempt++) {
             await using var db = contexts.Open(fixture.CommuneId);

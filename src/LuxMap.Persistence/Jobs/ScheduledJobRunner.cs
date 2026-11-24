@@ -130,7 +130,10 @@ public sealed class ScheduledJobWorker(
                 logger.LogError(error, "Background job runner iteration failed; the next poll retries.");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(options.PollSeconds), stoppingToken);
+            // A configured slow poll must not prevent a registered short-interval job from running.
+            var pollSeconds = byName.Count == 0 ? options.PollSeconds :
+                Math.Min(options.PollSeconds, Math.Max(1, byName.Values.Min(job => job.Interval.TotalSeconds)));
+            await Task.Delay(TimeSpan.FromSeconds(pollSeconds), stoppingToken);
         }
     }
 
