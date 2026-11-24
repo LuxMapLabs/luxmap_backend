@@ -147,6 +147,6 @@ public sealed partial class WorkOrderPolePhotoService
             if (await Replay() is { } winner) return (winner, false);
             throw Error("IDEMPOTENCY_CONFLICT", HttpStatusCode.Conflict);
         }
-        return (Item(row), true);
+        return (await Item(row, ct), true);
     }
 }

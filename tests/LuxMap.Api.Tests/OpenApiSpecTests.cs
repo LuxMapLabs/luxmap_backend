@@ -32,6 +32,16 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 
     [Fact]
+    public void Lux_readings_and_pole_photos_carry_the_LUX_PHOTO_link()
+    {
+        foreach (var name in new[] { "CreateLuxReadingRequest", "LuxReadingResponse", "LuxReadingWithLuminanceResponse" })
+            Assert.True(Schema(name).GetProperty("properties").TryGetProperty("photo_id", out _), name);
+        var photo = Schema("PolePhotoItem").GetProperty("properties");
+        foreach (var field in new[] { "lux_id", "lux_value", "lux_measured_at" })
+            Assert.True(photo.TryGetProperty(field, out _), field);
+    }
+
+    [Fact]
     public void Scheduling_suggestions_publish_manager_policy_wire_kinds_and_real_pagination()
     {
         foreach (var path in new[] { "/api/v1/work-orders/suggestions", "/api/v1/work-orders/suggestions/items" })
