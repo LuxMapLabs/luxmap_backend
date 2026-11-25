@@ -41,11 +41,11 @@ sau rollback, chỉ để lại object mồ côi), nên test vẫn xanh — hai 
 ## Migration
 
 `Up()` chỉ `CreateTable work_order_photo_copy` + 4 index; `Down()` chỉ `DropTable`. Snapshot: EF sinh lại hai CHECK nhiều dòng với `\n` thay
-`\r\n` — đã trả về nguyên bản để diff chỉ còn bảng mới. **Chưa áp** lên `luxmap_dev` / VPS.
+`\r\n` — đã trả về nguyên bản để diff chỉ còn bảng mới. Đã áp lên `luxmap_dev` 25/11/2026 (Mỹ duyệt, không backup), cùng 6 migration của `dev` mà DB còn thiếu: AddIotDiagnosticFaults, AddIotDiagnosticEpisodes, AddIotServerGatewayIdentity, AddIotCoverageRadius, AddLuxReadingPhotoLink, AddUserPersonalDetails — `Up()` đều chỉ thêm. **Chưa áp VPS.**
 
 ## Chưa làm / cần biết
 
-- Chưa áp migration, chưa deploy. Job chạy được ngay khi deploy (`Jobs:Enabled`), không cần cấu hình.
+- Chưa áp migration lên VPS, chưa deploy. Job chạy được ngay khi deploy (`Jobs:Enabled`), không cần cấu hình.
 - Dung lượng: mỗi ảnh được chép tốn thêm một bản (D-1).
 - Lệnh đã `verified` **trước** khi deploy cũng sẽ được chép ở lần chạy đầu (truy vấn không lọc theo ngày). Muốn chỉ áp cho lệnh mới thì
   phải chốt thêm — hiện theo đúng chữ PGP-3.
