@@ -1,8 +1,8 @@
 ---
 ticket: LUX-BASELINE
 title: Nối số lux đo đứng yên (gắn ảnh cột trong phiếu khảo sát) vào baseline và phân loại dim
-status: blocked
-phase: 1
+status: review
+phase: 2
 owner: claude
 branch: feat/LUX-BASELINE
 contract_refs:
@@ -34,6 +34,24 @@ Nhưng số lux **chưa được dùng để kết luận gì**:
 Ticket này nối số lux đo theo quy trình vào baseline của chính cột và chấm `dim` lúc Quản lý quyết định ảnh.
 Bên chờ: **WP6** (trường quy trình trên số đo, mẫu thô, màn đo lại tại chỗ), **WP5** (hiện tỉ lệ / kết luận trên ảnh, chi tiết
 cột, tóm tắt phiếu), **FO** (buổi đo B bằng tấm lọc ND, D-R23).
+
+## Quyết định đã chốt (26/11/2026, Mỹ: "chốt theo khuyến nghị hết")
+
+D-1…D-16 chốt **theo khuyến nghị**, kèm các sửa của Phase 1 (`.ai/results/LUX-BASELINE-p1.md` mục 8):
+
+- D-2: cổng `TaskKind == Survey` trong `ReviewedPolePhotoPublisher`.
+- D-3: số đo theo quy trình = có `protocol`, không dựa vào `meter_model`.
+- D-4: mẫu thô ở bảng con bất biến `lux_reading_sample`.
+- D-5: options `LuxProtocol` trong appsettings.
+- D-7: phương án (B).
+- D-8: đánh giá + baseline chạy trước nhánh `not_newer`.
+- D-10: khoá `work_order → pole → photo` khi tạo lux; đã quyết → 409 `POLE_PHOTO_ALREADY_DECIDED`.
+- D-13: `Merge` dùng `classified_as` của đánh giá.
+- D-16: nhận, không chấm.
+- **D-15** (Phase 1 chưa nêu một hướng duy nhất; Claude chọn khi hiện thực, Mỹ xác nhận khi review): Contract **theo app**.
+  `meter_model` là chuỗi model thiết bị app đọc được (dữ liệu thật: `ESP32C3_LUX`), không ép một giá trị cố định. Ghi drift.
+
+Phase 2 do Claude làm, kèm phần WP5 (web) và WP6 (mobile) theo yêu cầu của Mỹ.
 
 ## Luồng đích
 
