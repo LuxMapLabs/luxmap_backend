@@ -105,8 +105,9 @@ public sealed class StationaryLuxEvaluator(LuxMapDbContext db, IOptions<LuxProto
             EvaluatedAt = input.Now, EvaluatedBy = actorId, CvState = input.EffectiveCvState, ClassifiedAs = status, LuxValue = reading.LuxValue,
             BaselineId = usable?.BaselineId, BaselineValue = usable?.Value, BaselineRatio = ratio, DimThresholdRatio = threshold,
             DimEvaluationEligible = dimEligible, ExpectedRatio = filter,
-            BaselineEligible = status == FixtureStatus.Normal && filter is null && reading.DataSource == pole.DataSource
-                && (installed is null || reading.MeasuredAt >= installed),
+            // Sources stay apart because every baseline is keyed by the READING's data_source, not because the reading must match
+            // the pole's: a pole inventoried from public imagery is still measured in the field (E2E 26/11).
+            BaselineEligible = status == FixtureStatus.Normal && filter is null && (installed is null || reading.MeasuredAt >= installed),
             ReasonCodes = JsonSerializer.Serialize(reasons), AlgorithmVersionId = algorithm,
         };
         db.Add(evaluation);

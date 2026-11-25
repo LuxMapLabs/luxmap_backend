@@ -68,10 +68,10 @@ public sealed class StationaryLuxBaselineTests(AssetImportFixture factory) : IAs
         db.Add(person); await db.SaveChangesAsync(); return person.UserId;
     }
 
-    private async Task<string> Pole(DateOnly? installed = null)
+    private async Task<string> Pole(DateOnly? installed = null, DataSource source = DataSource.Simulated)
     {
         await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
-        var pole = new Pole { CommuneId = commune, SegmentId = road, DataSource = DataSource.Simulated, Geom = new Point(108, 16) { SRID = 4326 } };
+        var pole = new Pole { CommuneId = commune, SegmentId = road, DataSource = source, Geom = new Point(108, 16) { SRID = 4326 } };
         db.Add(pole); await db.SaveChangesAsync();
         db.Add(new Fixture { PoleId = pole.PoleId, CommuneId = commune, FixtureType = FixtureType.LedRoadLamp, PowerSource = PowerSource.Grid,
             LampWatt = 60, InstallDate = installed ?? new DateOnly(2025, 1, 1), DataSource = DataSource.Simulated });
@@ -97,9 +97,11 @@ public sealed class StationaryLuxBaselineTests(AssetImportFixture factory) : IAs
     private async Task<string> Photo(string order, string pole, DateTime at, string state = "on")
     {
         await using var db = Db(); using var seed = db.EnterUnscopedSystemWriteBackdoor();
+        // A photo carries its pole's data_source (WorkOrderPolePhotoService), so read it from the pole.
+        var source = await db.Set<Pole>().Where(p => p.PoleId == pole).Select(p => p.DataSource).SingleAsync();
         var photo = new WorkOrderPolePhoto
         {
-            WorkOrderId = order, PoleId = pole, CommuneId = commune, DataSource = DataSource.Simulated, UploadedBy = engineer,
+            WorkOrderId = order, PoleId = pole, CommuneId = commune, DataSource = source, UploadedBy = engineer,
             UploadedAt = at, CapturedAt = at, Lat = 16, Lng = 108, ClientOpId = Guid.NewGuid(), RequestHash = new('a', 64),
             ObjectKey = "stationary-photo", ThumbnailKey = "stationary-thumb", ByteCount = 4, ThumbnailBytes = 4, Width = 1, Height = 1,
             CvState = state, Confidence = .9, ModelVersion = "stationary-model", ArtifactVersion = "stationary-artifact", AnalyzedAt = at,
@@ -111,6 +113,8 @@ public sealed class StationaryLuxBaselineTests(AssetImportFixture factory) : IAs
     private static LuxProtocolRequest Protocol(double lux, double height = 1.0, string module = "M01", double? filter = null, double[]? samples = null)
         => new() { Samples = samples ?? [lux * .995, lux, lux * 1.005, lux, lux], SensorHeightM = height, ModuleId = module, OpticalFilterTransmittance = filter };
 
+    private DataSource readingSource = DataSource.Simulated;
+
     private async Task<LuxReadingResponse> Lux(string pole, string? photo, DateTime at, double lux, LuxProtocolRequest? protocol)
     {
         await using var db = Db(engineer, UserRole.FieldEngineer);
@@ -118,7 +122,7 @@ public sealed class StationaryLuxBaselineTests(AssetImportFixture factory) : IAs
         var (_, reading) = await service.CreateAsync(new CreateLuxReadingRequest
         {
             ClientOpId = Guid.NewGuid().ToString(), PoleId = pole, PhotoId = photo, MeasuredAt = at, LuxValue = lux,
-            MeterModel = "ESP32C3_LUX", DataSource = DataSource.Simulated, Protocol = protocol,
+            MeterModel = "ESP32C3_LUX", DataSource = readingSource, Protocol = protocol,
         }, engineer, default);
         return reading;
     }
@@ -207,6 +211,21 @@ public sealed class StationaryLuxBaselineTests(AssetImportFixture factory) : IAs
         Assert.Equal(10.1, detail.StationaryLuminanceBaseline.Value, 6);
         Assert.Equal(["normal", "normal", "normal", "dim", "normal"],
             detail.StationaryLuminanceHistory.Select(p => ContractEnumName(p.ClassifiedAs)).ToArray());
+    }
+
+    [Fact]
+    public async Task Field_readings_on_a_pole_inventoried_from_public_imagery_still_build_its_baseline()
+    {
+        // Found end-to-end on a copy of luxmap_dev: most poles were inventoried from photos (public_imagery) and are measured in the field.
+        var pole = await Pole(source: DataSource.PublicImagery); var order = await Order();
+        readingSource = DataSource.Field;
+
+        for (var night = 1; night <= 3; night++) await Night(order, pole, night, 10.0);
+        var dim = await Night(order, pole, 4, 7.0);
+
+        Assert.Equal(3, (await Detail(pole)).StationaryLuminanceBaseline!.MemberCount);
+        Assert.Equal("dim", dim.LuxClassifiedAs);
+        Assert.Equal(DataSource.PublicImagery, Assert.Single(await OpenDimFaults(pole)).DataSource);
     }
 
     [Fact]
