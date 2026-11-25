@@ -10,6 +10,8 @@ Capstone W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2, phụ trác
 báo sự cố qua mã QR trên cột (`/public/…`, không token), Quản lý duyệt ở `/citizen-reports`.
 
 **Phiếu v1.3 hiện hành (31/10/2026) cô đọng hơn v1.4 và không nhắc lại BH1750 / xe khảo sát; phần dưới là chi tiết kênh đo từ v1.4, vẫn là cách repo chạy cho tới khi nhóm chốt khác.**
+**25/11/2026 — D-R29:** nhóm đã chốt đo lux **đứng yên, ngay dưới đèn, từng cột** (sào độ cao cố định), thay đo trên xe. Code vẫn
+chạy đường cũ tới khi có ticket đặc tả; ticket lux / baseline mới đọc `docs/contract-drift.md`, mục D-R29, trước.
 
 **Phiếu v1.4 (27/09/2026) — kênh đo độ sáng.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750 gắn trên xe khảo sát**, lấy mẫu
 liên tục suốt sweep; **`dim` = CV nói ON + đỉnh lux lúc ngang cột dưới ngưỡng baseline của chính cột**. Mỗi phiên = video + log lux

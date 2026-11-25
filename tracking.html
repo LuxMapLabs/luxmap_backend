@@ -40,6 +40,16 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="lux-stationary">
+    <strong>D-R29 — đo lux đứng yên, ngay dưới đèn · 25/11/2026</strong>
+    <p><span class="tag t-block">Chốt hướng (Mỹ) · chờ FW xác nhận · chưa đặc tả API</span>
+    Lux đo từng cột, thiết bị trên sào độ cao cố định ngay dưới đầu đèn, thay module gắn xe (phần lux của D-R21). Phân loại giữ D-R20,
+    baseline trung vị tối thiểu 3, mỗi đêm một lần, một baseline mỗi cột. Đo trong phiếu khảo sát, không thêm <code>task_kind</code>.
+    Kèm commit đưa Phiếu v1.3 (31/10) vào repo, trước đây chỉ nằm ở cây làm việc. Chỉ tài liệu, không đổi Contract / code.</p>
+    <p>Còn mở O-1…O-5 (nguồn ON/OFF, hình dạng API, con số quy trình, kiểm CV, số phận pipeline sweep); chưa đặt hạn. Chưa báo
+    WP6 / IoT / WP4 / FO.</p>
+  </div>
+
   <div class="card" id="lux-photo">
     <strong>LUX-PHOTO — số đo lux gắn với ảnh cột · 24/11/2026</strong>
     <p><span class="tag t-next">Xong · chờ PR vào dev</span>
@@ -1414,6 +1424,13 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>25/11/2026</td>
+        <td><code>D-R29</code> ghi quyết định đo lux đứng yên ngay dưới đèn (thay phần lux của D-R21, giải D-R27), con trỏ ở <code>CLAUDE.md</code>,
+        trap survey, kịch bản quay thử. Commit trước đưa Phiếu v1.3 vào repo. Chỉ tài liệu.</td>
+        <td><code>docs/contract-drift.md</code>, <code>CLAUDE.md</code>, <code>docs/agents/traps/survey.md</code>, <code>docs/field/BE-15-pilot-drive.md</code>, <code>docs/registration/FA26SE222_v1.3.md</code></td>
+        <td><code>docs(drift): record stationary lux measurement decision D-R29</code></td>
+      </tr>
       <tr>
         <td>25/11/2026</td>
         <td><code>POLE-GPS-PHOTO</code> <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/299">PR #299</a> merged vào <code>dev</code> (<code>7670e47</code>, Mỹ duyệt admin merge sau CI xanh — ruleset đòi review code owner). Ticket <strong>done</strong>. <code>luxmap_dev</code> đã migrate; <strong>VPS chưa deploy</strong> — khi deploy nhớ báo lại WP5 / WP6.</td>
