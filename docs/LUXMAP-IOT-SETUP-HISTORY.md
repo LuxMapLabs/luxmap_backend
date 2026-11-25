@@ -145,24 +145,15 @@ API đọc audit từ database LuxMap, mỗi yêu cầu gửi lệnh qua Bridge 
 
 ## 5. API lịch sử dữ liệu điện theo feeder
 
-Theo giờ đo:
-
 ```http
-GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&from=2026-11-18T07:00:00Z&to=2026-11-18T08:00:00Z
+GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&sort_by=measured_at&from=2026-11-25T07:00:00Z&to=2026-11-25T08:00:00Z
 ```
 
-Theo giờ Bridge nhận:
-
-```http
-GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history/received?page=1&page_size=20&from=2026-11-18T07:00:00Z&to=2026-11-18T08:00:00Z
-```
-
-Cả hai ReadNetwork, scope xã của feeder, mới nhất trước. Mỗi dòng trung bình 30 giây;
-total đếm khoảng có mẫu sau lọc; page_size mặc định 20, tối đa 200.
-API lịch sử theo node đã bỏ. sort_by/after/limit không dùng ở lịch sử công khai nữa.
-Lịch sử lệnh ở mục 4 vẫn theo node, không đổi.
-
-Xem [JSON, quy tắc trung bình, múi giờ, gửi bù và phân trang](IOT-ELECTRICAL-HISTORY.md).
+Chỉ một API, mặc định dùng measured_at để lọc và sắp xếp, mới nhất trước. Có thể đổi sort_by=received_at để đối chiếu giờ nhận. Route /history/received đã bỏ; lịch sử theo node vẫn không phục hồi.
+Mỗi dòng là một mẫu gốc, không trung bình 30 giây; có measured_at, received_at, reception_type (live/backfill/null), voltage/current_ma/power_mw và lamp_command.
+ReadNetwork, scope xã feeder, page_size mặc định20/tối đa200. from bao gồm, to loại trừ theo sort_by.
+Firmware mới tạo mẫu mục tiêu mỗi giây; tốc độ nhận thực tế phụ thuộc LoRa và mạng. Lịch sử lệnh vẫn theo node.
+Xem [JSON, múi giờ, gửi bù và phân trang](IOT-ELECTRICAL-HISTORY.md).
 
 ## 6. Đọc lỗi và triển khai
 

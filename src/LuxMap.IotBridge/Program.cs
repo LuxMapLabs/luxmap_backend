@@ -146,9 +146,9 @@ api.MapGet("/{deviceId}/telemetry/history/page", (string deviceId, int page, int
 }).WithSummary("Đọc lịch sử đo theo trang, mẫu mới nhất trước")
   .Produces<TelemetryHistoryPage>().Produces(400);
 
-api.MapPost("/feeder-history", (FeederTelemetryWindow[] windows, long skip, int take, string sortBy, DeviceStore store) =>
+api.MapPost("/feeder-history", (FeederTelemetryWindow[] windows, long skip, int take, string sortBy, DateTimeOffset? from, DateTimeOffset? to, DeviceStore store) =>
 {
-    if (windows.Length == 0 || skip < 0 || take is < 1 or > 200 ||
+    if (windows.Length is 0 or > 10000 || skip < 0 || take is < 1 or > 200 || (from.HasValue && to.HasValue && from >= to) ||
         sortBy is not ("measured_at" or "received_at") ||
         windows.Any(window => window?.DeviceId is not { } id || !DeviceRules.ValidId(id) ||
             string.IsNullOrWhiteSpace(window.NodeId) || string.IsNullOrWhiteSpace(window.ServerId) ||
@@ -156,22 +156,9 @@ api.MapPost("/feeder-history", (FeederTelemetryWindow[] windows, long skip, int 
             (window.Until is { } until && (until <= window.From || until >= DateTimeOffset.MaxValue.AddDays(-1)))))
         return Results.BadRequest(new { error = "Invalid feeder telemetry windows or pagination." });
 
-    return Results.Ok(store.ReadFeederHistory(windows, skip, take, sortBy == "measured_at"));
+    return Results.Ok(store.ReadFeederHistory(windows, skip, take, sortBy == "measured_at", from, to));
 }).WithSummary("Đọc mẫu theo các khoảng thời gian từng node gắn vào feeder")
   .Produces<FeederTelemetryBatch>().Produces(400);
-
-api.MapPost("/feeder-history/averages", (FeederTelemetryWindow[] windows, long skip, int take,
-    string timeBasis, DateTimeOffset? from, DateTimeOffset? to, bool? keysOnly, DeviceStore store) =>
-{
-    if (windows.Length is 0 or > 10000 || skip < 0 || take is < 1 or > 200 ||
-        timeBasis is not ("measured_at" or "received_at") || (from.HasValue && to.HasValue && from >= to) ||
-        windows.Any(window => window?.DeviceId is not { } id || !DeviceRules.ValidId(id) ||
-            string.IsNullOrWhiteSpace(window.NodeId) || string.IsNullOrWhiteSpace(window.ServerId) ||
-            window.From < DateTimeOffset.UnixEpoch || window.From >= DateTimeOffset.MaxValue.AddDays(-1) ||
-            (window.Until is { } until && (until <= window.From || until >= DateTimeOffset.MaxValue.AddDays(-1)))))
-        return Results.BadRequest(new { error = "Invalid feeder average query." });
-    return Results.Ok(store.ReadFeederAverages(windows, skip, take, timeBasis == "measured_at", from, to, keysOnly ?? false));
-}).WithSummary("Trung bình điện theo feeder mỗi 30 giây").Produces<FeederAverageBatch>().Produces(400);
 
 app.MapGet("/api/luxmap/mqtt", (MqttBroker mqtt) => Results.Ok(new { running = mqtt.IsRunning, transport = "MQTT TCP" })).WithTags("MQTT").WithSummary("Trạng thái MQTT broker");
 

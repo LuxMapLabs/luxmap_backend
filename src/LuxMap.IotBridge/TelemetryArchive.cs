@@ -189,7 +189,7 @@ sealed partial class TelemetryArchive
         return new(page, pageSize, total, items);
     }
 
-    public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt)
+    public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt, DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
         using var connection = Open();
         using var transaction = connection.BeginTransaction(deferred: true);
@@ -205,12 +205,22 @@ sealed partial class TelemetryArchive
         sql.Parameters.AddWithValue("$bounds", JsonSerializer.Serialize(bounds, Json));
         // A sample belongs to the half-open assignment window containing its measurement time.
         // For records without an RTC timestamp use the UTC Bridge receipt time.
-        sql.CommandText = FeederReadingsSql + "SELECT count(*) FROM readings;";
+        var filter = " WHERE 1=1";
+        var time = measuredAt ? "rtc" : "receipt";
+        if (from is { } start) {
+            filter += $" AND {time} >= $from";
+            sql.Parameters.AddWithValue("$from", measuredAt ? RtcBound(start) : ReceiptBound(start));
+        }
+        if (to is { } finish) {
+            filter += $" AND {time} < $to";
+            sql.Parameters.AddWithValue("$to", measuredAt ? RtcBound(finish) : ReceiptBound(finish));
+        }
+        sql.CommandText = FeederReadingsSql + "SELECT count(*) FROM readings" + filter + ";";
         var total = Convert.ToInt32(sql.ExecuteScalar());
         if (skip >= total) return new(total, []);
 
         var order = measuredAt ? "rtc DESC, id DESC" : "receipt DESC, id DESC";
-        sql.CommandText = FeederReadingsSql + $"SELECT id, reading, node_id, server_id, until_rtc IS NULL FROM readings ORDER BY {order} LIMIT $take OFFSET $skip;";
+        sql.CommandText = FeederReadingsSql + $"SELECT id, reading, node_id, server_id, until_rtc IS NULL FROM readings{filter} ORDER BY {order} LIMIT $take OFFSET $skip;";
         sql.Parameters.AddWithValue("$take", take);
         sql.Parameters.AddWithValue("$skip", skip);
         using var reader = sql.ExecuteReader();

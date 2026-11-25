@@ -1034,41 +1034,20 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
                             data = new
                             {
                                 voltage = 4.07, current = 50, power = 203.5, lampCommand = "ON",
+                                receptionType = sample.Id == 3 ? "live" : "backfill",
                                 timestamp = sample.Measured.ToOffset(TimeSpan.FromHours(7)).ToString(
                                     "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture),
                             },
                         },
                     }).ToArray();
-                if (request.RequestUri.AbsolutePath.EndsWith("/averages", StringComparison.Ordinal))
-                {
-                    var basis = query["timeBasis"].ToString();
-                    DateTimeOffset? from = DateTimeOffset.TryParse(query.GetValueOrDefault("from"), out var lower) ? lower : null;
-                    DateTimeOffset? to = DateTimeOffset.TryParse(query.GetValueOrDefault("to"), out var upper) ? upper : null;
-                    var buckets = selected.Select(sample => new
-                    {
-                        Sample = sample,
-                        At = basis == "received_at" ? sample.reading.receivedAt
-                            : new DateTimeOffset(DateTime.ParseExact(sample.reading.data.timestamp,
-                                "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture), TimeSpan.FromHours(7)),
-                    }).Where(sample => (from is null || sample.At >= from) && (to is null || sample.At < to))
-                        .GroupBy(sample => sample.At.ToUnixTimeSeconds() / 30 * 30)
-                        .OrderByDescending(group => group.Key)
-                        .Select(group => new
-                        {
-                            period = group.Key, sampleCount = group.LongCount(),
-                            voltageAvg = group.Average(item => item.Sample.reading.data.voltage),
-                            currentMaAvg = group.Average(item => item.Sample.reading.data.current),
-                            powerMwAvg = group.Average(item => item.Sample.reading.data.power),
-                        }).ToArray();
-                    return new(HttpStatusCode.OK)
-                    {
-                        Content = JsonContent.Create(new
-                        {
-                            total = buckets.Length, periods = buckets.Select(bucket => bucket.period),
-                            items = query["keysOnly"] == "True" ? buckets.Take(0) : buckets.Skip(skip).Take(take),
-                        }),
-                    };
-                }
+                DateTimeOffset? from = DateTimeOffset.TryParse(query.GetValueOrDefault("from"), out var lower) ? lower : null;
+                DateTimeOffset? to = DateTimeOffset.TryParse(query.GetValueOrDefault("to"), out var upper) ? upper : null;
+                selected = selected.Where(sample => {
+                    var at = sortBy == "received_at" ? sample.reading.receivedAt :
+                        new DateTimeOffset(DateTime.ParseExact(sample.reading.data.timestamp,
+                            "yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture), TimeSpan.FromHours(7));
+                    return (from is null || at >= from) && (to is null || at < to);
+                }).ToArray();
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = JsonContent.Create(new { total = selected.Length, items = selected.Skip(skip).Take(take) }),
@@ -1101,17 +1080,22 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             using var debugMeasured = await client.GetAsync($"{feeder}/history?page=1&page_size=1");
             Assert.True(debugMeasured.IsSuccessStatusCode, await debugMeasured.Content.ReadAsStringAsync());
             var measured = await debugMeasured.Content.ReadFromJsonAsync<JsonElement>();
-            Assert.Equal("measured_at", measured.GetProperty("time_basis").GetString());
-            Assert.Equal(30, measured.GetProperty("interval_seconds").GetInt32());
+            Assert.Equal("measured_at", measured.GetProperty("sort_by").GetString());
+            Assert.False(measured.TryGetProperty("interval_seconds", out var removedInterval));
             Assert.Equal(2, measured.GetProperty("total").GetInt32());
-            Assert.Equal(1, measured.GetProperty("items")[0].GetProperty("sample_count").GetInt64());
+            Assert.Equal(50, measured.GetProperty("items")[0].GetProperty("current_ma").GetDouble());
+            Assert.Equal("live", measured.GetProperty("items")[0].GetProperty("reception_type").GetString());
             var next = await client.GetFromJsonAsync<JsonElement>($"{feeder}/history?page=2&page_size=1");
-            Assert.True(next.GetProperty("items")[0].GetProperty("period_start").GetDateTime() <
-                measured.GetProperty("items")[0].GetProperty("period_start").GetDateTime());
-            var received = await client.GetFromJsonAsync<JsonElement>($"{feeder}/history/received?page_size=1");
-            Assert.Equal("received_at", received.GetProperty("time_basis").GetString());
-            Assert.Equal(2, received.GetProperty("items").EnumerateArray().Sum(item => item.GetProperty("sample_count").GetInt64()) +
-                (received.GetProperty("total").GetInt32() > 1 ? 1 : 0));
+            Assert.True(next.GetProperty("items")[0].GetProperty("measured_at").GetDateTime() <
+                measured.GetProperty("items")[0].GetProperty("measured_at").GetDateTime());
+            var received = await client.GetFromJsonAsync<JsonElement>($"{feeder}/history?sort_by=received_at&page_size=1");
+            Assert.Equal("received_at", received.GetProperty("sort_by").GetString());
+            Assert.Equal(2, received.GetProperty("total").GetInt32());
+            Assert.Equal("backfill", received.GetProperty("items")[0].GetProperty("reception_type").GetString());
+            Assert.True(received.GetProperty("items")[0].GetProperty("measured_at").GetDateTime() <
+                measured.GetProperty("items")[0].GetProperty("measured_at").GetDateTime());
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"{feeder}/history/received")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"{feeder}/history?sort_by=invalid")).StatusCode);
             var from = Uri.EscapeDataString(after.AddSeconds(-1).ToString("O"));
             var to = Uri.EscapeDataString(after.AddSeconds(1).ToString("O"));
             var filtered = await client.GetFromJsonAsync<JsonElement>($"{feeder}/history?from={from}&to={to}");
@@ -1121,7 +1105,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             Assert.Equal("VALIDATION_FAILED", (await reversed.Content.ReadFromJsonAsync<JsonElement>())
                 .GetProperty("error").GetProperty("code").GetString());
             Assert.Equal(HttpStatusCode.BadRequest,
-                (await client.GetAsync($"{feeder}/history/received?from=18/11/2026")).StatusCode);
+                (await client.GetAsync($"{feeder}/history?sort_by=received_at&from=18/11/2026")).StatusCode);
             var empty = await client.GetFromJsonAsync<JsonElement>($"{feeder}/history?page=999");
             Assert.Empty(empty.GetProperty("items").EnumerateArray());
             Assert.Equal(2, empty.GetProperty("total").GetInt32());
@@ -1137,7 +1121,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public Task Feeder_average_history_merges_overlapping_bridge_buckets_by_sample_count()
+    public Task Feeder_raw_history_merges_pages_from_multiple_bridges_without_averaging()
     {
         var bridge = new ReportedPowerBridge();
         return WithSharedCabinetAsync(async (client, rig, services) =>
@@ -1170,43 +1154,41 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
                 })).StatusCode);
 
             var period = DateTimeOffset.UtcNow.AddMinutes(-5).ToUnixTimeSeconds() / 30 * 30;
-            bridge.FeederHistory = (request, _) =>
+            bridge.FeederHistory = async (request, ct) =>
             {
                 var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(request.RequestUri!.Query);
                 var second = request.RequestUri.Host == "alternate.example.test";
-                var all = new[]
+                var windows = await request.Content!.ReadFromJsonAsync<JsonElement>(ct);
+                var window = windows[0];
+                var all = new[] { period + (second ? 30 : -30), period }.OrderDescending().Select((stamp, index) => new
                 {
-                    new { period = period + (second ? 30 : -30), sampleCount = 1L, voltageAvg = 5.0,
-                        currentMaAvg = 5.0, powerMwAvg = 25.0 },
-                    new { period, sampleCount = second ? 3L : 1L, voltageAvg = 5.0,
-                        currentMaAvg = second ? 30.0 : 10.0, powerMwAvg = second ? 150.0 : 50.0 },
-                };
-                var lower = DateTimeOffset.TryParse(query.GetValueOrDefault("from"), out var from) ? from.ToUnixTimeSeconds() : long.MinValue;
-                var upper = DateTimeOffset.TryParse(query.GetValueOrDefault("to"), out var to) ? to.ToUnixTimeSeconds() : long.MaxValue;
-                var selected = all.Where(row => row.period >= lower && row.period < upper)
-                    .OrderByDescending(row => row.period).ToArray();
+                    cursor = (long)index + 1,
+                    nodeId = window.GetProperty("nodeId").GetString(), serverId = window.GetProperty("serverId").GetString(),
+                    active = true,
+                    reading = new { receivedAt = DateTimeOffset.FromUnixTimeSeconds(stamp), gatewayId = "gateway",
+                        data = new { timestamp = DateTimeOffset.FromUnixTimeSeconds(stamp).ToOffset(TimeSpan.FromHours(7)).ToString("yyyy-MM-ddTHH:mm:ss"),
+                            voltage = 5.0, current = second ? 30.0 : 10.0, power = second ? 150.0 : 50.0,
+                            lampCommand = "ON", receptionType = second ? "live" : "backfill" } }
+                }).ToArray();
+                var lower = DateTimeOffset.TryParse(query.GetValueOrDefault("from"), out var from) ? from : DateTimeOffset.MinValue;
+                var upper = DateTimeOffset.TryParse(query.GetValueOrDefault("to"), out var to) ? to : DateTimeOffset.MaxValue;
+                var selected = all.Where(row => row.reading.receivedAt >= lower && row.reading.receivedAt < upper).ToArray();
                 var skip = int.Parse(query["skip"].ToString(), System.Globalization.CultureInfo.InvariantCulture);
                 var take = int.Parse(query["take"].ToString(), System.Globalization.CultureInfo.InvariantCulture);
-                var keysOnly = bool.TryParse(query["keysOnly"], out var keys) && keys;
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = JsonContent.Create(new
-                    {
-                        total = selected.Length, periods = selected.Select(row => row.period),
-                        items = keysOnly ? selected.Take(0) : selected.Skip(skip).Take(take),
-                    }),
-                });
+                return new HttpResponseMessage(HttpStatusCode.OK) {
+                    Content = JsonContent.Create(new { total = selected.Length, items = selected.Skip(skip).Take(take) }) };
             };
             var url = $"/api/v1/iot/feeders/{rig.Feeder}/electrical/history";
             using var debugPage = await client.GetAsync($"{url}?page=2&page_size=1");
             Assert.True(debugPage.IsSuccessStatusCode, await debugPage.Content.ReadAsStringAsync());
             var page = await debugPage.Content.ReadFromJsonAsync<JsonElement>();
-            Assert.Equal(3, page.GetProperty("total").GetInt32()); // Union, not sum of Bridge counts.
+            Assert.Equal(4, page.GetProperty("total").GetInt32()); // Raw samples stay separate, even at the same second.
             var item = Assert.Single(page.GetProperty("items").EnumerateArray());
-            Assert.Equal(4, item.GetProperty("sample_count").GetInt64());
-            Assert.Equal(25, item.GetProperty("current_ma_avg").GetDouble());
-            Assert.Equal(125, item.GetProperty("power_mw_avg").GetDouble());
-            Assert.True(item.GetProperty("is_complete").GetBoolean());
+            Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(period).UtcDateTime, item.GetProperty("measured_at").GetDateTime());
+            Assert.Contains(item.GetProperty("current_ma").GetDouble(), new[] { 10.0, 30.0 });
+            Assert.False(item.TryGetProperty("sample_count", out var removedSampleCount));
+            var third = await client.GetFromJsonAsync<JsonElement>($"{url}?page=3&page_size=1");
+            Assert.NotEqual(item.GetProperty("node_id").GetString(), third.GetProperty("items")[0].GetProperty("node_id").GetString());
             var defaults = await client.GetFromJsonAsync<JsonElement>(url);
             Assert.Equal(20, defaults.GetProperty("page_size").GetInt32());
             bridge.FeederHistory = (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
@@ -1557,7 +1539,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
                 },
                 "/api/luxmap/devices/probe/telemetry/history" when request.RequestUri.Query == "?after=0&limit=1"
                     => Json(new { items = new[] { Archived(1) }, nextCursor = 1, hasMore = true }),
-                "/api/luxmap/devices/feeder-history" or "/api/luxmap/devices/feeder-history/averages"
+                "/api/luxmap/devices/feeder-history"
                     when FeederHistory is { } history => await history(request, ct),
                 "/api/luxmap/devices/auto-transitions" => Json(AutoTransitions),
                 "/api/luxmap/devices/command-receipts" => await ReadReceiptsAsync(request, ct),

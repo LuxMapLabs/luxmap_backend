@@ -1,100 +1,79 @@
-# Lịch sử điện theo feeder — trung bình mỗi 30 giây
+# Lịch sử từng mẫu điện theo feeder
 
-Cả hai API dùng Bearer token với quyền ReadNetwork trong phạm vi xã của feeder.
-Postman chọn Body → none. Dữ liệu cũ vẫn thuộc feeder qua các lần tháo hoặc thay node.
-
-## Hai API
-
-Theo giờ đo DS3231:
+## Một API duy nhất
 
 ```http
-GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&from=2026-11-18T07:00:00Z&to=2026-11-18T08:00:00Z
+GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&sort_by=measured_at
 ```
 
-Theo giờ Bridge nhận:
+Dùng Bearer token có ReadNetwork và đúng xã của feeder; GET không có body. Mặc định lấy thời gian **measured_at** từ DS3231, mới nhất trước. Không lấy received_at thay giờ đo khi gửi bù.
+API `/electrical/history/received` đã bỏ (404); API theo node không được khôi phục. Không còn gom/trung bình 30 giây.
 
-```http
-GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history/received?page=1&page_size=20&from=2026-11-18T07:00:00Z&to=2026-11-18T08:00:00Z
-```
-
-Cả hai sắp mới nhất trước. API cũ theo node đã bỏ.
-Không dùng sort_by, after hoặc limit cho lịch sử điện công khai nữa.
-
-| Tham số | Ý nghĩa |
+| Tham số | Quy tắc |
 |---|---|
-| from | Tùy chọn, lấy mẫu từ thời điểm này, bao gồm |
-| to | Tùy chọn, lấy mẫu trước thời điểm này, loại trừ; phải lớn hơn from |
+| sort_by | Mặc định measured_at; có thể chọn received_at nếu cần đối chiếu giờ nhận |
+| from | ISO 8601, bao gồm thời điểm bắt đầu; theo sort_by (mặc định measured_at) |
+| to | ISO 8601, loại trừ thời điểm kết thúc; phải lớn hơn from |
 | page | Mặc định 1 |
-| page_size | Mặc định 20, chuẩn hóa từ 1 đến 200 theo quy ước phân trang chung |
+| page_size | Mặc định 20, tối đa 200 theo quy ước phân trang |
 
-from/to là ISO 8601. Nên gửi UTC với Z; 07:00Z tương ứng 14:00 Việt Nam.
-Nếu dùng offset +07:00, URL encode dấu + thành %2B. Thời gian không có offset được hiểu UTC theo convention BE.
-from/to được áp dụng trên giờ đo ở API thứ nhất, giờ nhận ở API thứ hai.
-Bỏ một cận nghĩa là không giới hạn phía đó; bỏ cả hai đọc toàn bộ lịch sử.
+Ví dụ lọc theo giờ đo:
+```http
+GET https://luxmap.com.vn/api/v1/iot/feeders/FDR-009/electrical/history?page=1&page_size=20&from=2026-11-25T07:00:00Z&to=2026-11-25T08:00:00Z
+```
 
-## Phản hồi 200
+## JSON phản hồi minh họa
 
 ```json
 {
   "feeder_id": "FDR-009",
-  "time_basis": "measured_at",
-  "interval_seconds": 30,
+  "sort_by": "measured_at",
   "page": 1,
   "page_size": 20,
   "total": 120,
   "items": [
     {
-      "period_start": "2026-11-18T07:59:30Z",
-      "period_end": "2026-11-18T08:00:00Z",
-      "sample_count": 3,
-      "voltage_avg": 5.02,
-      "current_ma_avg": 96.5,
-      "power_mw_avg": 484.43,
-      "is_complete": true
+      "node_id": "NODE-004",
+      "measured_at": "2026-11-25T07:59:59Z",
+      "received_at": "2026-11-25T08:00:00Z",
+      "reception_type": "live",
+      "voltage": 5.02,
+      "current_ma": 96.5,
+      "power_mw": 484.43,
+      "lamp_command": "ON"
+    },
+    {
+      "node_id": "NODE-004",
+      "measured_at": "2026-11-25T07:59:58Z",
+      "received_at": "2026-11-25T08:05:00Z",
+      "reception_type": "backfill",
+      "voltage": 5.01,
+      "current_ma": 95,
+      "power_mw": 475.95,
+      "lamp_command": "ON"
     }
   ]
 }
 ```
 
-Đây là ví dụ minh họa; API thứ hai trả time_basis = received_at với cùng DTO.
+- total đếm mẫu sau lọc trước phân trang; mỗi item là mẫu gốc, không phải trung bình.
+- measured_at: giờ đo DS3231, được đổi từ giờ Việt Nam sang UTC. Z là UTC, cộng 7 giờ để hiển thị Việt Nam. Không có RTC hợp lệ thì null; mẫu đó không khớp bộ lọc from/to theo giờ đo.
+- received_at: giờ Bridge nhận và lưu mẫu lần đầu. Retry không làm thay đổi giờ này.
+- reception_type: live là node phát mẫu mới; backfill là gửi bù hàng đợi; null nếu firmware cũ chưa có metadata. Không suy loại nhận từ chênh lệch giờ đo và giờ nhận trên server.
+- voltage/current_ma/power_mw lần lượt V/mA/mW; lamp_command là ON/OFF của mẫu đo. Mẫu OFF bằng 0 vẫn được trả.
+- Giữ lịch sử theo feeder qua các lần tháo/thay node. Việc gán mẫu vào feeder dùng khoảng hiệu lực của binding tại giờ đo; không chuyển mẫu cũ sang feeder đang gắn hiện tại.
+- Không sinh mẫu giả, không điền 0 cho khoảng mất dữ liệu. Mặc định sắp theo measured_at nên gửi bù về đúng vị trí giờ đo. Có thể dùng sort_by=received_at để kiểm tra đợt gửi bù, vẫn cùng API.
+- Trang có thể dịch chuyển khi có mẫu mới hoặc gửi bù; nên truyền from/to cố định khi xem lịch sử.
 
-| Trường | Ý nghĩa |
-|---|---|
-| feeder_id | Mạch điện cần xem |
-| time_basis | measured_at hoặc received_at |
-| interval_seconds | Luôn 30 |
-| total | Số khoảng 30 giây có mẫu hợp lệ sau lọc, trước phân trang |
-| period_start / period_end | Mốc UTC của khoảng [bắt đầu, kết thúc) |
-| sample_count | Số mẫu hợp lệ thực tế dùng tính trung bình |
-| voltage_avg | Trung bình điện áp (V) |
-| current_ma_avg | Trung bình dòng điện (mA) |
-| power_mw_avg | Trung bình công suất từng mẫu (mW), không nhân hai giá trị trung bình |
-| is_complete | false nếu khoảng giờ chưa kết thúc; true chỉ nói thời gian đã qua |
+## Firmware và lưu trữ
 
-## Quy tắc tính
+Node tạo bản ghi mục tiêu mỗi giây (trước đây 10 giây), giữ INA226 R002 và trung bình 16 lần. Mỗi bản ghi lưu SD trước gửi; vẫn chỉ bỏ khi ACK lưu bền vững từ Bridge. Gửi trực tiếp/bù được đánh dấu receptionType trên wire, không thay bản gốc SD. Mẫu thuộc phiên hiện tại mới tạo trong cửa sổ 2,5 giây được đánh dấu live; hàng đợi cũ hoặc sau restart là backfill. Mẫu lặp giữ loại nhận đầu tiên tại Bridge.
 
-- Chia theo đồng hồ thành giây 00–29 và 30–59 của từng phút. Mỗi phút tối đa hai dòng.
-- Lọc thời gian trước khi tính: from/to nằm giữa khoảng sẽ chỉ lấy những mẫu trong giới hạn.
-- Một mẫu phải có cả V/mA/mW dạng số hợp lệ. Mẫu OFF có giá trị 0 vẫn là mẫu hợp lệ.
-- Không tạo dòng cho khoảng trống, không điền 0 thay dữ liệu bị mất.
-- Mẫu thiếu RTC bị bỏ ở API theo giờ đo, vẫn có thể xuất hiện ở API giờ nhận.
-- Giờ DS3231 không có offset được hiểu UTC+07 rồi đổi UTC. Giờ nhận là UTC.
-- Mẫu gửi bù microSD vẫn về đúng giờ đo ở API thứ nhất; API thứ hai gom theo lúc Bridge nhận.
-- is_complete=true không đảm bảo bất biến: mẫu gửi bù có thể cập nhật các khoảng cũ.
-- Không trung bình trạng thái ON/OFF; DTO này chỉ trả số đo. Xem điện hiện tại qua
-  GET /api/v1/iot/feeders/FDR-009/electrical.
-- Nếu thay node/Bridge trong một khoảng, gộp theo sample_count, không trung bình hai trung bình.
-- Trang rỗng vẫn trả total đúng; khi đổi khoảng thời gian quay về page=1.
+Gateway chuyển JSON qua MQTT ngay sau khi nhận LoRa, không chờ gom 30 giây; giữ ACK server. Server lưu từng mẫu ngay, không chờ cron hoặc timer 1 giây. Mục tiêu mỗi giây tạo một mẫu **không bảo đảm mỗi giây server nhận đúng một mẫu**: LoRa half-duplex, ACK, nguồn và mạng quyết định tốc độ thực tế; khi mất mạng mẫu nhận dồn sau đó. Cần nạp firmware và đo trên phần cứng để xác nhận tốc độ.
 
-## Lỗi và triển khai
+Bộ nhớ đệm SD hiện giới hạn file 64 MiB; nếu tốc độ LoRa thấp hơn tốc độ tạo mẫu kéo dài, hàng đợi sẽ tăng. Không coi HTTP polling là bằng chứng dữ liệu mới đã đến. FE có thể gọi GET lại mỗi giây; chưa triển khai SSE/WebSocket.
 
-400 VALIDATION_FAILED cho from/to sai thứ tự hoặc ngày không đúng ISO.
-404 ASSET_NOT_FOUND nếu feeder không tồn tại hoặc ngoài xã được xem.
-503 IOT_SOURCE_UNAVAILABLE nếu Bridge lỗi hoặc dữ liệu upstream sai định dạng.
-Feeder chưa từng có nguồn trả total=0, items=[].
+## Triển khai và lỗi
 
-Deploy đồng thời BE và IoT Bridge mới. Giữ volume data/ và telemetry.sqlite.
-Không thay firmware, không xóa mẫu thô; chẩn đoán 25 mẫu và đọc điện mới nhất vẫn dùng mẫu thô.
-Bridge tính nhóm tại SQLite, BE chỉ đọc các khoảng đã tổng hợp. Khi feeder qua nhiều Bridge,
-BE đọc danh sách mốc khoảng để đếm hợp và gộp trang theo trọng số, trong ngân sách upstream 5 giây.
-Khoảng truy vấn dài có thể tốn thời gian hơn; FE nên truyền from/to theo cửa sổ người dùng xem.
+Deploy BE + Bridge cùng phiên bản; nạp node/gateway mới nếu muốn nhịp 1 giây và reception_type. Giữ volume data/telemetry.sqlite, không xóa lịch sử và không có migration Postgres mới.
+400 khi sort_by/from/to sai; 404 khi feeder không tồn tại/ngoài xã hoặc gọi route cũ; 503 khi Bridge lỗi/upstream sai; feeder chưa có binding trả total=0/items=[].

@@ -46,7 +46,7 @@ public sealed partial class IotDiagnosticsService
     }
 
     private async Task<PagedResult<IotFeederArchivedSample>> FeederTelemetryHistoryAsync(
-        string feederId, PageRequest page, string sortBy, CancellationToken ct)
+        string feederId, PageRequest page, string sortBy, CancellationToken ct, DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
         if (sortBy is not ("received_at" or "measured_at"))
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
@@ -65,7 +65,7 @@ public sealed partial class IotDiagnosticsService
         }
 
         var groups = bindings.GroupBy(ResolveOrigin).OrderBy(group => group.Key.AbsoluteUri, StringComparer.Ordinal)
-            .Select(group => new FeederBridgePage(group.Key, group.ToArray())).ToArray();
+            .Select(group => new FeederBridgePage(group.Key, group.ToArray(), from, to)).ToArray();
         var offset = ((long)page.Page - 1) * page.PageSize;
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(TimeSpan.FromSeconds(5));
@@ -125,11 +125,15 @@ public sealed partial class IotDiagnosticsService
         FeederBridgePage group, long offset, int take, string sortBy, CancellationToken ct)
     {
         var path = FormattableString.Invariant($"api/luxmap/devices/feeder-history?skip={offset}&take={take}&sortBy={sortBy}");
+        if (group.From is { } start) path += "&from=" + Uri.EscapeDataString(start.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        if (group.To is { } end) path += "&to=" + Uri.EscapeDataString(end.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         using var response = await client.PostAsJsonAsync(new Uri(group.Origin, path), group.Bindings, ct);
         response.EnsureSuccessStatusCode();
         if (!IsJson(response)) throw Unavailable("IoT Bridge không trả JSON cho lịch sử mạch điện.");
         var batch = await response.Content.ReadFromJsonAsync<FeederArchiveBatch>(cancellationToken: ct);
-        if (batch is not { Items: not null, Total: >= 0 } || batch.Items.Count != Math.Min(take, Math.Max(0, batch.Total - offset)))
+        if (batch is not { Items: not null, Total: >= 0 } || batch.Items.Count != Math.Min(take, Math.Max(0, batch.Total - offset)) ||
+            batch.Items.Any(sample => sample is null || sample.Reading?.Data is null ||
+                !group.Bindings.Any(binding => binding.NodeId == sample.NodeId && binding.ServerId == sample.ServerId)))
             throw Unavailable("IoT Bridge trả trang lịch sử mạch điện không hợp lệ.");
         return batch;
     }
@@ -145,8 +149,10 @@ public sealed partial class IotDiagnosticsService
     private sealed record BridgeFeederSample(long Cursor, IotArchivedReading Reading, string NodeId, string ServerId, bool Active);
     private sealed record FeederArchiveBatch(int Total, IReadOnlyList<BridgeFeederSample> Items);
 
-    private sealed class FeederBridgePage(Uri origin, FeederTelemetryBinding[] bindings)
+    private sealed class FeederBridgePage(Uri origin, FeederTelemetryBinding[] bindings, DateTimeOffset? from, DateTimeOffset? to)
     {
+        public DateTimeOffset? From { get; } = from;
+        public DateTimeOffset? To { get; } = to;
         public Uri Origin { get; } = origin;
         public FeederTelemetryBinding[] Bindings { get; } = bindings;
         public FeederArchiveBatch Batch { get; set; } = new(0, []);

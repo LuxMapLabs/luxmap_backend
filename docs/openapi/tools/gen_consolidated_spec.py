@@ -124,7 +124,8 @@ iot_values = {
     ("IotDiagnosticResult", "connection_status"): ["online", "offline", "no_data"],
     ("IotDiagnosticSummaryItem", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotDiagnosticSummaryItem", "connection_status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
-    ("IotFeederHistoryResult", "time_basis"): ["measured_at", "received_at"],
+    ("IotFeederHistoryResult", "sort_by"): ["measured_at", "received_at"],
+    ("IotFeederHistorySample", "reception_type"): ["live", "backfill", None],
     ("IotServerStatus", "status"): ["online", "offline", "unconfigured", "broker_down", "unreachable"],
     ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
@@ -429,6 +430,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/iot/feeders/{feederId}/electrical/history": "drift IOT-HISTORY-RAW-1 (25/11/2026, SELF-SIGNED)",
     "/api/v1/auth/password/change": "drift ACCT-PASSWORD-CHANGE (24/11/2026, SELF-SIGNED)",
     "/api/v1/admin/users/{id}/email": "drift ACCT-EMAIL (24/11/2026, SELF-SIGNED)",
     "/api/v1/iot/nodes/import": "drift IOT-NODE-EXCEL-IMPORT (24/11/2026, SELF-SIGNED)",
@@ -467,8 +469,7 @@ SUMMARY.update({
     ("delete", "/api/v1/iot/servers/{serverId}/credential"): "Admin thu hồi key và ngắt kết nối server",
     ("get", "/api/v1/iot/servers/{serverId}/nodes"): "Danh sách node thuộc đúng server trong phạm vi xã, phân trang",
     ("get", "/api/v1/iot/feeders/{feederId}/electrical"): "Đọc mẫu điện mới nhất của mạch",
-    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Trung bình điện 30 giây theo giờ đo DS3231, lọc thời gian và phân trang",
-    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history/received"): "Trung bình điện 30 giây theo giờ Bridge nhận, lọc thời gian và phân trang",
+    ("get", "/api/v1/iot/feeders/{feederId}/electrical/history"): "Lịch sử từng mẫu điện; sort_by measured_at/received_at, loại nhận live/backfill, lọc thời gian và phân trang",
     ("post", "/api/v1/iot/nodes"): "Admin đăng ký node với feeder_id và radius_km; backend suy ra cabinet_id",
     ("put", "/api/v1/iot/servers/{serverId}/location"): "Cập nhật xã/phường, GPS và radius_km của gateway",
     ("get", "/api/v1/iot/poles/{poleId}/control"): "Tìm feeder, node và relay điều khiển mạch của trụ đèn",

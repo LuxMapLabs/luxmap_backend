@@ -10759,9 +10759,22 @@
             }
           },
           {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Cơ sở sắp xếp và lọc from/to; mới nhất trước.",
+            "schema": {
+              "enum": [
+                "measured_at",
+                "received_at"
+              ],
+              "type": "string",
+              "default": "measured_at"
+            }
+          },
+          {
             "name": "from",
             "in": "query",
-            "description": "ISO 8601 UTC, bao gồm thời điểm này; lọc mẫu trước khi tính trung bình.",
+            "description": "ISO 8601 UTC, bao gồm thời điểm này; lọc từng mẫu theo sort_by.",
             "schema": {
               "type": "string",
               "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
@@ -10869,158 +10882,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "x-luxmap-contract": "drift IOT-HISTORY-30S (18/11/2026)"
-      }
-    },
-    "/api/v1/iot/feeders/{feederId}/electrical/history/received": {
-      "get": {
-        "tags": [
-          "IotDiagnostics"
-        ],
-        "parameters": [
-          {
-            "name": "feederId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "description": "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.",
-            "schema": {
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "description": "Giá trị ngoài giới hạn được chuẩn hóa theo quy ước phân trang.",
-            "schema": {
-              "maximum": 200,
-              "minimum": 1,
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "description": "ISO 8601 UTC, bao gồm thời điểm này; lọc mẫu trước khi tính trung bình.",
-            "schema": {
-              "type": "string",
-              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "description": "ISO 8601 UTC, loại trừ thời điểm này; phải lớn hơn from.",
-            "schema": {
-              "type": "string",
-              "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-              "format": "date-time"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/IotFeederHistoryResult"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IotFeederHistoryResult"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IotFeederHistoryResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-luxmap-capability": "cap:read_network",
-        "x-luxmap-roles": [
-          "superior",
-          "manager",
-          "field_engineer",
-          "system_admin"
-        ],
-        "x-luxmap-client": "shared",
-        "x-luxmap-contract": "drift IOT-HISTORY-30S (18/11/2026)"
+        "x-luxmap-contract": "drift IOT-HISTORY-RAW-1 (25/11/2026)"
       }
     },
     "/api/v1/iot/nodes/import": {
@@ -23519,41 +23381,6 @@
         },
         "additionalProperties": false
       },
-      "IotFeederAverage": {
-        "type": "object",
-        "properties": {
-          "period_start": {
-            "type": "string",
-            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-            "format": "date-time"
-          },
-          "period_end": {
-            "type": "string",
-            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-            "format": "date-time"
-          },
-          "sample_count": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "voltage_avg": {
-            "type": "number",
-            "format": "double"
-          },
-          "current_ma_avg": {
-            "type": "number",
-            "format": "double"
-          },
-          "power_mw_avg": {
-            "type": "number",
-            "format": "double"
-          },
-          "is_complete": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false
-      },
       "IotFeederElectricalResult": {
         "type": "object",
         "properties": {
@@ -23586,16 +23413,12 @@
           "feeder_id": {
             "type": "string"
           },
-          "time_basis": {
+          "sort_by": {
             "enum": [
               "measured_at",
               "received_at"
             ],
             "type": "string"
-          },
-          "interval_seconds": {
-            "type": "integer",
-            "format": "int32"
           },
           "page": {
             "type": "integer",
@@ -23612,8 +23435,53 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/IotFeederAverage"
+              "$ref": "#/components/schemas/IotFeederHistorySample"
             }
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotFeederHistorySample": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "measured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "received_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "reception_type": {
+            "enum": [
+              "live",
+              "backfill",
+              null
+            ],
+            "type": "string",
+            "description": "live: mẫu gửi trực tiếp; backfill: gửi bù; null: firmware cũ chưa đánh dấu. Giữ giá trị lần nhận đầu.",
+            "nullable": true
+          },
+          "voltage": {
+            "type": "number",
+            "format": "double"
+          },
+          "current_ma": {
+            "type": "number",
+            "format": "double"
+          },
+          "power_mw": {
+            "type": "number",
+            "format": "double"
+          },
+          "lamp_command": {
+            "type": "string"
           }
         },
         "additionalProperties": false

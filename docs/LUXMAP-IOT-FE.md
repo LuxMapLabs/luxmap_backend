@@ -179,16 +179,14 @@ Ví dụ một mục AUTO tự đổi trạng thái:
 | API | Cách dùng |
 |---|---|
 | `GET /api/v1/iot/feeders/{feederId}/electrical` | Mẫu mới nhất đã ghi cho mạch. Sau khi tháo node, có thể xem mẫu cuối với `status: offline` và `power_state: unknown`. Feeder chưa có mẫu trả `no_data` nếu đã gắn nguồn hoặc `unconfigured` nếu chưa gắn. |
-| `GET /api/v1/iot/feeders/{feederId}/electrical/history?page=1&page_size=20` | Trung bình mỗi 30 giây theo giờ DS3231. |
-| `GET /api/v1/iot/feeders/{feederId}/electrical/history/received?page=1&page_size=20` | Trung bình mỗi 30 giây theo giờ Bridge nhận. |
+| `GET /api/v1/iot/feeders/{feederId}/electrical/history?page=1&page_size=20&sort_by=measured_at` | Từng mẫu điện, mặc định theo giờ đo DS3231. |
 | `GET /api/v1/iot/nodes/{nodeId}/diagnostics` | Hiện cảnh báo ở cấp `feeder_id` từ `anomalies[]` và kết quả ước lượng số bóng thiếu khi có. |
 
-Hai API lịch sử trả feeder_id, time_basis, interval_seconds=30, page, page_size, total, items.
-Mặc định 20 khoảng mỗi trang, tối đa 200. Thêm from/to ISO 8601 để lọc mẫu trước khi tính;
-from bao gồm, to loại trừ. Cả hai mới nhất trước. API lịch sử theo node đã bỏ, không dùng sort_by/after/limit.
-Mỗi item có period_start, period_end, sample_count, voltage_avg (V), current_ma_avg (mA),
-power_mw_avg (mW), is_complete. Khoảng trống không tạo dòng. Mẫu OFF vẫn được tính.
-Mẫu gửi bù nằm theo giờ đo ở API thứ nhất, giờ nhận ở API thứ hai; thiếu RTC chỉ có ở API thứ hai.
+Một API lịch sử trả feeder_id, sort_by (mặc định measured_at), page, page_size, total, items.
+Mặc định 20 mẫu mỗi trang, tối đa 200; from bao gồm, to loại trừ theo sort_by. Không còn trung bình 30 giây.
+Item gồm node_id, measured_at, received_at, reception_type (live/backfill/null), voltage, current_ma, power_mw, lamp_command.
+Mẫu gửi bù giữ measured_at gốc; received_at và reception_type giữ lần nhận đầu. Route /history/received đã bỏ.
+Mục tiêu firmware tạo mẫu mỗi giây; tốc độ nhận thực tế phụ thuộc LoRa/ACK/mạng, không tạo mẫu giả.
 Xem [hướng dẫn và JSON đầy đủ](IOT-ELECTRICAL-HISTORY.md).
 
 Mẫu điện mới nhất vẫn trả measurement.voltage/current_ma/power_mw, không dùng giá trị trung bình lịch sử.
