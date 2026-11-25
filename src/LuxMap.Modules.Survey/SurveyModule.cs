@@ -63,6 +63,9 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddSingleton<Processing.SurveyProcessor>();
         services.AddHostedService<Processing.SurveyProcessingWorker>();
         services.AddScoped<LuxReadingService>();
+        services.AddOptions<Review.LuxProtocolOptions>().Bind(configuration.GetSection("LuxProtocol"))
+            .Validate(o => o.IsValid(), "Invalid LuxProtocol options.").ValidateOnStart();
+        services.AddScoped<Review.StationaryLuxEvaluator>();
         services.AddScoped<Ingest.SurveyIngestService>();
 
         // BE-35 — what these tables hold in the store, for the storage totals and the orphan check.
@@ -80,5 +83,7 @@ public sealed class SurveyModule : ILuxMapModule
         services.AddSingleton(VersionedResultColumn.Through("survey_pass", "survey_pass", "run_id", "survey_processing_run", "run_id"));
         services.AddSingleton(VersionedResultColumn.Through("pole_observation", "pole_observation", "run_id", "survey_processing_run", "run_id", "data_source"));
         services.AddSingleton(VersionedResultColumn.Through("luminance_history", "luminance_history", "run_id", "survey_processing_run", "run_id", "data_source"));
+        services.AddSingleton(new VersionedResultColumn("stationary_baseline", "stationary_baseline", "algorithm_version_id", VersionReference.Id, "data_source"));
+        services.AddSingleton(new VersionedResultColumn("lux_evaluation", "lux_evaluation", "algorithm_version_id", VersionReference.Id, "data_source"));
     }
 }

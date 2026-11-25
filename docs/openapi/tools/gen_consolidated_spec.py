@@ -23,7 +23,7 @@ DST = "docs/openapi/luxmap-v1.5.json"
 d = json.load(open(SRC), object_pairs_hook=OrderedDict)
 
 # ── info / servers ──────────────────────────────────────────────────────────────
-d["info"]["version"] = "1.23"
+d["info"]["version"] = "1.24"
 d["info"]["title"] = "LuxMap API"
 # ĐẾM, không gõ tay. Con số này từng là hằng số và nó lệch ngay lần thêm endpoint kế tiếp — cùng lớp
 # lỗi với cái tên file `luxmap-v1.4.json` đã trỏ vào hư không. Nguồn chỉ chứa operation đã hiện thực.
@@ -56,6 +56,7 @@ d["info"]["description"] = (
     "v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. "
     "v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. "
     "v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. "
+    "v1.24 (LUX-BASELINE, SELF-SIGNED — LUX-BASELINE-1…6): protocol tuỳ chọn trên số đo lux (đo đứng yên dưới đèn), evaluation do backend chấm khi Quản lý xác nhận ảnh cột, lux_classified_as/lux_baseline_ratio/lux_reason_codes trên PolePhotoItem, stationary_luminance_* ở chi tiết cột; lux vào ảnh đã quyết → 409. "
     "v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. "
     "WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm "
     "/work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không). "

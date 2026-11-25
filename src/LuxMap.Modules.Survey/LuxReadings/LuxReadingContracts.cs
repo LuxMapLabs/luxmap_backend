@@ -54,7 +54,45 @@ public sealed record CreateLuxReadingRequest
 
     /// <summary>Server-owned. Present only to be rejected — see the remarks on this type.</summary>
     public string? CommuneId { get; init; }
+
+    /// <summary>
+    /// LUX-BASELINE D-4, optional: the stationary protocol this reading followed. Absent → a reference reading, stored as before and
+    /// never classified (D-3). Present → checked against <c>LuxProtocol</c> and refused with a reason when off (D-5).
+    /// </summary>
+    public LuxProtocolRequest? Protocol { get; init; }
 }
+
+/// <summary>The stationary protocol of one reading (LUX-BASELINE D-4). A class with init, not a positional record (500 trap).</summary>
+public sealed class LuxProtocolRequest
+{
+    /// <summary>The raw window, in the order measured. <c>lux_value</c> must be its median.</summary>
+    [Required]
+    [MaxLength(10_000)]
+    public double[]? Samples { get; init; }
+
+    [Required]
+    public double? SensorHeightM { get; init; }
+
+    [Required]
+    [MaxLength(64)]
+    public string? ModuleId { get; init; }
+
+    public long? ModuleFirmwareVersionId { get; init; }
+
+    /// <summary>D-12: set only during a neutral-density filter test; 0 &lt; x ≤ 1.</summary>
+    public double? OpticalFilterTransmittance { get; init; }
+}
+
+/// <summary>The protocol as stored; <c>window_spread</c> is the server's, the samples stay server-side.</summary>
+public sealed record LuxProtocolResponse(double SensorHeightM, string ModuleId, long? ModuleFirmwareVersionId,
+    double? OpticalFilterTransmittance, double WindowSpread, int SampleCount);
+
+/// <summary>
+/// The verdict on a protocol reading (LUX-BASELINE D-8, D-13), written when the Manager decides its photo; null until then and on
+/// every reference reading. Computed on the backend — clients never derive a ratio themselves.
+/// </summary>
+public sealed record LuxEvaluationResponse(string ClassifiedAs, double? BaselineRatio, double? BaselineValue, int? BaselineMemberCount,
+    double DimThresholdRatio, bool DimEvaluationEligible, double? ExpectedRatio, IReadOnlyList<string> ReasonCodes, DateTime EvaluatedAt);
 
 /// <summary>
 /// One lux reading as returned by the API.
@@ -73,7 +111,9 @@ public sealed record LuxReadingResponse(
     double LuxValue,
     string? MeterModel,
     string DataSource,
-    string? Note);
+    string? Note,
+    LuxProtocolResponse? Protocol,
+    LuxEvaluationResponse? Evaluation);
 
 /// <summary>
 /// A lux reading plus the luminance point nearest to it in TIME — Contract section 2.9, for CV-12.
@@ -97,7 +137,9 @@ public sealed record LuxReadingWithLuminanceResponse(
     string? MeterModel,
     string DataSource,
     string? Note,
-    NearestLuminance? NearestLuminance);
+    NearestLuminance? NearestLuminance,
+    LuxProtocolResponse? Protocol,
+    LuxEvaluationResponse? Evaluation);
 
 /// <summary>The shape section 2.9 specifies for <c>nearest_luminance</c>. Nothing produces one yet.</summary>
 public sealed record NearestLuminance(double BaselineRatio, string ClassifiedAs, DateTime ObservedAt);

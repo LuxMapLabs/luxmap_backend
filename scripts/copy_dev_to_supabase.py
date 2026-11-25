@@ -80,6 +80,10 @@ SUBMISSION_KEPT = (f"{IN_COMMUNES} AND report_id IN (SELECT report_id FROM publi
 # (table, row filter, ORDER BY). Order = foreign-key order; checked against the catalogue at runtime.
 # Survey tables (BE-15, added 04/10/2026) follow the chain sweep -> run -> pass/frame -> observation -> history;
 # pole_current_status and fault now point INTO that chain, so they come after it.
+# LUX-BASELINE: the lux readings copied (the lux_reading row of PLAN below uses the same condition).
+LUX_KEPT = (f"{IN_COMMUNES} AND (photo_id IS NULL OR photo_id IN "
+            f"(SELECT photo_id FROM public.work_order_pole_photo WHERE {POLE_PHOTO_KEPT}))")
+
 PLAN = [
     ("administrative_unit", IN_COMMUNES, "commune_id"),
     ("app_user", IN_USERS, "user_id"),
@@ -142,8 +146,13 @@ PLAN = [
     ("work_order_pole_photo", POLE_PHOTO_KEPT, "captured_at, uploaded_at, length(photo_id), photo_id"),
     # LUX-PHOTO: a reading may name the photo it was taken with (composite RESTRICT key), so it follows the photos and keeps
     # only links to photos copied above, the same way FAULT_KEPT treats origin_pole_photo_id.
-    ("lux_reading", f"{IN_COMMUNES} AND (photo_id IS NULL OR photo_id IN "
-     f"(SELECT photo_id FROM public.work_order_pole_photo WHERE {POLE_PHOTO_KEPT}))", "lux_id"),
+    ("lux_reading", LUX_KEPT, "lux_id"),
+    # LUX-BASELINE: raw windows, stationary baselines and verdicts follow the readings copied above (all RESTRICT).
+    ("lux_reading_sample", f"lux_id IN (SELECT lux_id FROM public.lux_reading WHERE {LUX_KEPT})", "lux_id, seq"),
+    ("stationary_baseline", IN_COMMUNES, "baseline_id"),
+    ("stationary_baseline_member", f"baseline_id IN (SELECT baseline_id FROM public.stationary_baseline WHERE {IN_COMMUNES}) "
+     f"AND lux_id IN (SELECT lux_id FROM public.lux_reading WHERE {LUX_KEPT})", "baseline_id, lux_id"),
+    ("lux_evaluation", f"{IN_COMMUNES} AND lux_id IN (SELECT lux_id FROM public.lux_reading WHERE {LUX_KEPT})", "lux_id"),
     ("fault", FAULT_KEPT, "fault_id"),
     ("work_order_fault", f"{IN_COMMUNES} AND fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT})",
      "work_order_id, fault_id"),

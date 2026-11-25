@@ -124,4 +124,35 @@ public class LuxReading : ICommuneScoped
     public required string MeasuredBy { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// LUX-BASELINE D-4: the stationary protocol the reading followed — all null on a reference reading (a hand-held meter, or
+    /// any reading taken before the protocol existed), all set on a protocol reading. Only protocol readings are classified
+    /// and become baseline members (D-3); the raw window is in <see cref="LuxReadingSample"/>.
+    /// </summary>
+    public double? SensorHeightM { get; set; }
+
+    /// <summary>The label the team sticks on the module. With <see cref="SensorHeightM"/> it fingerprints a baseline (D-9).</summary>
+    public string? ModuleId { get; set; }
+
+    /// <summary>The module firmware as the app states it (BE-34 registry id); stored, not checked — the app works offline.</summary>
+    public long? ModuleFirmwareVersionId { get; set; }
+
+    /// <summary>D-12: the transmittance of a neutral-density filter over the sensor; null when none. Never a baseline member.</summary>
+    public double? OpticalFilterTransmittance { get; set; }
+
+    /// <summary>Server-computed spread of the window, <c>(max − min) / median</c>.</summary>
+    public double? WindowSpread { get; set; }
+
+    public bool HasProtocol => SensorHeightM is not null;
+
+    public List<LuxReadingSample> Samples { get; set; } = [];
+}
+
+/// <summary>One raw sample of a protocol reading's window (LUX-BASELINE D-4). Immutable, reached only through its reading.</summary>
+public sealed class LuxReadingSample : LuxMap.Persistence.Conventions.IImmutableRecord
+{
+    public required string LuxId { get; set; }
+    public int Seq { get; set; }
+    public double Lux { get; set; }
 }
