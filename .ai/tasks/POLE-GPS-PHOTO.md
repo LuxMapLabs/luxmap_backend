@@ -1,7 +1,7 @@
 ---
 ticket: POLE-GPS-PHOTO
 title: Lịch "Cập nhật vị trí cột" — bắt buộc ảnh cho mỗi cột báo toạ độ, ảnh đã duyệt được chép sang ảnh tài sản của cột
-status: review
+status: done
 phase: 2
 owner: claude (P1, P2 — Codex không chạy được sol 24/11)
 branch: feat/POLE-GPS-PHOTO
