@@ -106,3 +106,10 @@ AssetDatabaseCollection đã tạo hơn 200 feeder, feeder mới nằm trang sau
 (run 44312524635, PR #280). Khi kiểm tra một tài sản bằng endpoint danh sách, duyệt page cho tới khi
 thấy ID hoặc đã đọc hết total; không coi page_size lớn là lấy tất cả. Giữ kiểm tra trên endpoint
 danh sách nếu đó là hành vi cần kiểm, không thay bằng GET chi tiết để che lỗi phân trang.
+
+## DDL trong teardown có thể deadlock (25/11/2026)
+
+Các collection chạy song song trên **một** DB. `DROP TABLE` của một bảng có FK (như bảng probe của `ScopeTestFixture`) khoá cả bảng
+được tham chiếu (`administrative_unit`), nên có thể deadlock với test của collection khác, và Postgres chọn lệnh DROP làm nạn nhân —
+test vẫn xanh hết nhưng `dotnet test` thoát mã 1 ("Test Collection Cleanup Failure", PR #299). DDL trong teardown thử lại khi gặp
+`40P01` (`PostgresErrorCodes.DeadlockDetected`); lệnh bị chọn làm nạn nhân chưa làm gì nên chạy lại là an toàn.

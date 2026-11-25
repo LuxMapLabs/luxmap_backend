@@ -2947,3 +2947,28 @@ Decision maker: Đạt theo yêu cầu tự đổi mật khẩu với mật kh�
 - Dùng chung rate policy Login, response 400/401/403/429. Hai luồng reset/change khóa account trước token để ngăn tái dùng credential và deadlock.
 - Không thêm migration; không sửa PATCH /auth/me hoặc FE; không log mật khẩu.
 JSON và hướng dẫn: [USER-PERSONAL-DETAILS.md](USER-PERSONAL-DETAILS.md).
+
+
+## POLE-GPS-PHOTO — ảnh cột bắt buộc khi báo GPS, chép sang ảnh tài sản khi duyệt (24/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 24/11/2026** trong chat — ba câu hỏi Q-1…Q-3 của `docs/POLE-GPS-PHOTOS-FE.md`, chọn theo khuyến nghị; cùng ngày chốt D-1…D-8 của Phase 1 (`.ai/results/POLE-GPS-PHOTO-p1.md`) theo khuyến nghị, sửa PGP-3 / PGP-4, thêm PGP-6…PGP-8. Bối cảnh: cột import chưa có toạ độ thì kỹ sư đi gắn GPS **và** chụp ảnh cột cùng lúc |
+| **Chạm API** | **Có** (PGP-2 thêm một luật từ chối + mã lỗi mới; PGP-3 đổi hệ quả của `verify`). PGP-1 không đổi API |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW kế tiếp, xây trên WO-POLE-GPS / EV-3 / EV-4 / APH-1 (đều SELF-SIGNED). Im lặng 3 ngày làm việc = **ESCALATE**. **Đang hiện thực** (Phase 2) — ticket `.ai/tasks/POLE-GPS-PHOTO.md` |
+
+| Mã | Quyết định |
+|---|---|
+| PGP-1 | **GPS là trường riêng, BE không bao giờ đọc GPS từ EXIF.** Toạ độ cột chỉ đến từ `pole_locations[]` của `complete`; toạ độ ảnh chỉ đến từ form `lat` / `lng` của `POST …/evidence`. App nên dùng **một lần đo GPS lúc bấm chụp** cho cả hai (cùng `lat`, `lng`; `accuracy_m` của lần đo đó). Mobile **được** ghi thêm GPS vào EXIF — ảnh gốc giữ nguyên byte nên EXIF còn trong bản gốc, thumbnail vẫn bỏ metadata (`media-storage.md`) — nhưng đó chỉ là bản sao, không phải nguồn. Lý do: ảnh lấy từ thư viện trên Android 10+ bị xoá GPS khi app thiếu `ACCESS_MEDIA_LOCATION`; EXIF hiếm khi có độ chính xác; đọc metadata phía server là thêm một đường giải mã ngoài `ThumbnailFactory.JpegOnly`. Hai nguồn đều do máy khách khai, nên tin cậy như nhau |
+| PGP-2 | **Ảnh bắt buộc cho mỗi cột có toạ độ báo** (thay câu "ảnh không bắt buộc" của EV-3 riêng cho `pole_gps_update`). `POST /work-orders/{id}/complete` (và op `work_order_complete` của `/sync/push`) ở lệnh `pole_gps_update`: mỗi `pole_id` trong `pole_locations[]` phải có **≥ 1** ảnh `repair_evidence` của **chính lệnh này**, `kind = observation`, `pole_id` = cột đó (ảnh vòng trước `return` vẫn tính). Thiếu → **409 `POLE_EVIDENCE_REQUIRED`**, `details {work_order_id, pole_ids: [...]}` (mọi cột thiếu, theo thứ tự `pole_ids` của lệnh), không ghi gì. Cột không báo toạ độ thì không cần ảnh. Ảnh không gắn cột không tính. Kiểm **sau** kiểm hình dạng `pole_locations` (400 vẫn đi trước) |
+| PGP-3 | **Ảnh đã duyệt được chép sang ảnh tài sản của cột** — sửa 24/11 theo Phase 1 (D-1, D-2): **chép byte**, không trỏ chung key (`ck_pole_asset_photo_keys` bắt key theo `photo_id` của ảnh tài sản; ảnh bằng chứng không lưu kích thước, không có trần 40 MP; báo cáo dung lượng đếm theo dòng). Một **job nền** (`scheduled_job`, chu kỳ 1 phút) chép **sau khi `verify` commit**: ảnh `observation` của lệnh `pole_gps_update` đã `verified`, `pole_id` thuộc cột có toạ độ báo ở lần `complete` cuối, chưa có dòng sổ (PGP-4). Mỗi ảnh đi đúng đường upload ảnh tài sản (đọc + kiểm JPEG, trần 40 MP, thumbnail, object mới `PAP-…`). `verify` **không đổi** thời gian, lỗi hay response; gallery có ảnh sau ≤ một chu kỳ. Lệnh `verify` 409 không bao giờ thành `verified` nên không có gì để chép |
+| PGP-4 | **Sổ chép** — sửa 24/11 (D-5): bảng `work_order_photo_copy` thuộc WorkOrders (không thêm cột vào `pole_asset_photo` — Assets không trỏ ngược WorkOrders): `evidence_id` (PK, FK), `work_order_id`, `pole_id`, `commune_id`, `outcome` `copied \| skipped_limit \| skipped_pixels \| missing_object`, `photo_id` (FK `pole_asset_photo`, có ⇔ `copied`), `decided_at`. Mọi FK `Restrict`. Item gallery **không** đổi. Mỗi ảnh bằng chứng xử lý đúng một lần |
+| PGP-6 | **Hết chỗ / ảnh không chép được** (D-3, D-4): gallery hiện tối đa 10 ảnh — mỗi cột chép ảnh **mới nhất theo `captured_at`** trước cho tới khi đầy, còn lại `skipped_limit`. Ảnh > 40 MP → `skipped_pixels`; object mất / không giải mã được → `missing_object`, log cảnh báo. Không tự thu nhỏ; không bao giờ làm `verify` lỗi |
+| PGP-7 | **Dòng chép** (D-6): `uploaded_by` = người chụp, `client_op_id` = UUIDv5(namespace cố định, `evidence_id`), `request_hash` theo công thức upload, `created_at` = lúc chép, `data_source` lấy từ cột. Mỗi ảnh một `SaveChanges` với đúng một audit `pole_asset_photo / created`, actor `system`, `after` thêm `evidence_id`, `work_order_id` |
+| PGP-8 | **Sync và FE** (D-7, D-8): 409 `POLE_EVIDENCE_REQUIRED` qua `/sync/push` nằm trong `conflicts[]` với `reason = POLE_EVIDENCE_REQUIRED`, **không có `details`** (hình dạng sync không đổi) — mobile tự tính cột thiếu ảnh. `WorkOrderDetail` không thêm thông tin chép; FE ghi "ảnh sẽ được thêm vào hồ sơ cột trong ít phút" |
+| PGP-5 | Không đổi: tập nhãn EV-3, `/pole-photos` (Q-3 của tài liệu FE **vẫn mở**), luật hành lang PL-3, quyền `UploadAssetPhotos`, kênh `PUT /assets/poles/{id}/location` (đường vòng của kỹ sư vẫn còn — WO-POLE-GPS) |
+
+**Đã báo WP5 / WP6 — 24/11/2026** (Mỹ gửi tin nhắn nhóm, kèm link `docs/POLE-GPS-PHOTOS-FE.md` trên nhánh PR #299; lúc gửi PR **chưa merge,
+chưa deploy**): WP6 (màn cột: một nút "Chụp ảnh cột" lấy GPS + ảnh cùng lúc; đẩy hết ảnh trước `complete`; chặn "Hoàn thành" khi cột có
+toạ độ chưa có ảnh; xử lý 409 `POLE_EVIDENCE_REQUIRED`, kể cả `conflicts[]` của `/sync/push`), WP5 (màn duyệt: sau `verify` gallery của cột có
+ảnh trong ít phút — job nền). Còn phải báo lại khi deploy. Chưa có phản hồi; vẫn là nền SELF-SIGNED tới FW kế tiếp.

@@ -250,6 +250,7 @@ public partial class WorkOrderTests
         var pole = await UnlocatedPole();
         var order = await CreateGps([pole]);
         await Send("a", "POST", $"/{order}/start", null, 200);
+        await Photograph(order, pole);
         await Send("a", "POST", $"/{order}/complete", new
         {
             report_note = "Đã đo vị trí cột trên danh sách giấy.",

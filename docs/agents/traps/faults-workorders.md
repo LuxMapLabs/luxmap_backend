@@ -395,3 +395,19 @@ Lịch có audit nội bộ `SurveyRecurringSchedule`, action `Created` / `Detai
   unique index một phần `ux_work_order_pole_target_pole_id_active` là chốt chặn đua của PG-3 (`Save` nhận diện theo tên).
 - `/sync/push` op `work_order_complete` chuyển `pole_locations` thẳng vào `WorkOrderService.Act` — kiểm tra nằm ở service, không ở controller.
 - FK cùng xã từ mục tiêu tới cột chỉ có ở DB (`fk_work_order_pole_target_same_commune`, dùng lại `ak_pole_photo_target`), như ảnh cột.
+
+## POLE-GPS-PHOTO — ảnh bắt buộc và job chép ảnh (24/11/2026, drift PGP-1…PGP-8)
+
+- `complete` của `pole_gps_update` kiểm ảnh **sau** `Report(...)` (400 hình dạng đi trước 409), một truy vấn cho mọi cột. Không cần khoá:
+  ảnh bằng chứng không có đường xoá, nên "đã thấy ảnh rồi ảnh biến mất" không xảy ra. Có thêm đường xoá ảnh bằng chứng thì phải xem lại chỗ này.
+- `PolePhotoCopyJob` (chu kỳ 1 phút) chép ảnh **sau** khi `verify` commit — đừng dời vào `verify`: I/O object không được nằm trong
+  transaction / dưới khoá, và lỗi kho ảnh không được làm hỏng việc ghi GIS.
+- Sổ `work_order_photo_copy` là luật "mỗi ảnh xử lý một lần": **mọi** kết cục (kể cả bỏ qua) đều ghi một dòng, trừ lỗi hạ tầng (để chu kỳ sau thử lại).
+  Thêm kết cục mới thì thêm giá trị enum + CHECK, đừng "không ghi gì" — ảnh đó sẽ bị quét lại mãi.
+- Thứ tự: đọc + kiểm JPEG + ghi object **trước**, rồi transaction: khoá `pole` (cùng khoá upload / ẩn ảnh tài sản lấy) → **đếm lại** ảnh đang
+  hiện → chèn ảnh + audit + dòng sổ trong **một** `SaveChanges`. Ảnh tài sản là `IAudited`: mỗi ảnh một `SaveChanges`, đúng một audit.
+- Ảnh chép là **object riêng** (`PAP-…`), không trỏ key của bằng chứng: `ck_pole_asset_photo_keys` bắt key theo `photo_id`, và báo cáo dung
+  lượng đếm theo dòng.
+- `client_op_id` của ảnh chép = UUIDv5(`PolePhotoCopyJob.ClientOpNamespace`, `evidence_id`). **Không đổi namespace.**
+- Test: `PhotoStore.OpenAsync` trả `STORAGE_OBJECT_MISSING` như adapter S3 khi thiếu object; JPEG "quá 40 MP" dựng rẻ bằng cách sửa kích
+  thước trong header SOF0 (`WithSize`) — reader dừng ở `IdentifyAsync`, không giải mã.

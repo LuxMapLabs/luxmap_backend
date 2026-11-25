@@ -22,8 +22,12 @@ internal sealed class PhotoStore : IObjectStore
         return new(bucket, original, prepared.OriginalBytes, thumbnail, prepared.ThumbnailBytes);
     }
 
+    /// <summary>A missing object answers as the S3 adapter does: 503 <c>STORAGE_OBJECT_MISSING</c>.</summary>
     public Task<Stream> OpenAsync(StorageBucket bucket, string key, CancellationToken cancellationToken = default)
-        => Task.FromResult<Stream>(new MemoryStream(Objects[(bucket, key)], false));
+        => Objects.TryGetValue((bucket, key), out var bytes)
+            ? Task.FromResult<Stream>(new MemoryStream(bytes, false))
+            : throw new LuxMap.Shared.Http.LuxMapException("STORAGE_OBJECT_MISSING", System.Net.HttpStatusCode.ServiceUnavailable,
+                "Stored media is unavailable; storage repair is required.");
 
     /// <summary>Counts range reads and keeps the last range asked for, so a test can prove the API asked for the bytes it sent.</summary>
     public int RangeReads { get; private set; }

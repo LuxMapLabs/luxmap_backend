@@ -149,6 +149,11 @@ PLAN = [
      "work_order_id, fault_id"),
     ("repair_evidence", f"{IN_COMMUNES} AND (fault_id IS NULL OR fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT}))",
      "evidence_id"),
+    # POLE-GPS-PHOTO PGP-4: the photo copy ledger follows its evidence photo and, when copied, the pole asset photo (both RESTRICT).
+    ("work_order_photo_copy", f"{IN_COMMUNES} AND evidence_id IN (SELECT evidence_id FROM public.repair_evidence WHERE {IN_COMMUNES} "
+     f"AND (fault_id IS NULL OR fault_id IN (SELECT fault_id FROM public.fault WHERE {FAULT_KEPT}))) AND (photo_id IS NULL OR photo_id IN "
+     f"(SELECT photo_id FROM public.pole_asset_photo WHERE {IN_COMMUNES} AND uploaded_by IN {COPIED_USERS} "
+     f"AND (deleted_by IS NULL OR deleted_by IN {COPIED_USERS})))", "decided_at, length(evidence_id), evidence_id"),
     # CITIZEN-QR P2b: report → submission → photo (all RESTRICT). A report may point at a fault and its decider, so it follows
     # fault and the copied accounts; submissions follow their report and code; photos have no commune and go by their submission.
     ("citizen_report", REPORT_KEPT, "created_at, length(report_id), report_id"),

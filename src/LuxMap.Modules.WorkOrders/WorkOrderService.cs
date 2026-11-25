@@ -12,6 +12,7 @@ using LuxMap.Persistence.Audit;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts;
 using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
@@ -617,7 +618,11 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                 foreach (var link in links) link.InspectionOutcome = reports.Single(x => x.FaultId == link.FaultId).Outcome;
             }
             else if (OptionalJson.Present(outcomes)) throw OptionalJson.Invalid("fault_outcomes");
-            if (wo.TaskKind == TaskKind.PoleGpsUpdate) Report(targets, poleLocations);
+            if (wo.TaskKind == TaskKind.PoleGpsUpdate)
+            {
+                Report(targets, poleLocations);
+                await RequirePolePhotosAsync(id, targets, ct);
+            }
             else if (OptionalJson.Present(poleLocations)) throw OptionalJson.Invalid("pole_locations");
         }
         var now = UtcMicrosecondClock.UtcNow();
@@ -747,6 +752,22 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             target.ReportedAccuracyM = found ? value.Accuracy : null;
             target.ReportedCapturedAt = found ? value.At : null;
         }
+    }
+
+    /// <summary>
+    /// PGP-2: every pole with a reported position needs at least one <c>observation</c> photo of THIS order tied to it — photos of an
+    /// earlier round before a <c>return</c> count, photos tied to no pole do not. Evidence has no delete path, so a photo seen here
+    /// cannot vanish before the save; a photo still uploading only costs the engineer a retry.
+    /// </summary>
+    private async Task RequirePolePhotosAsync(string id, List<WorkOrderPoleTarget> targets, CancellationToken ct)
+    {
+        var reported = targets.Where(x => x.ReportedLat is not null).Select(x => x.PoleId).ToArray();
+        var photographed = await db.Set<RepairEvidence>()
+            .Where(x => x.WorkOrderId == id && x.Kind == EvidenceKind.Observation && x.PoleId != null && reported.Contains(x.PoleId))
+            .Select(x => x.PoleId!).Distinct().ToListAsync(ct);
+        var missing = reported.Except(photographed, StringComparer.Ordinal).ToArray();
+        if (missing.Length > 0)
+            throw Error(ErrorCodes.PoleEvidenceRequired, HttpStatusCode.Conflict, ("work_order_id", id), ("pole_ids", missing));
     }
 
     /// <summary>

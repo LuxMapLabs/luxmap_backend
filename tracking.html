@@ -1410,6 +1410,30 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>24/11/2026</td>
+        <td><code>POLE-GPS-PHOTO</code> Phase 2 (ticket <strong>review</strong>, <a href="https://github.com/LuxMapLabs/luxmap_backend/pull/299">PR #299 → dev</a>): <code>complete</code> lịch GPS đòi ảnh gắn cột (<code>409 POLE_EVIDENCE_REQUIRED</code>); job <code>pole_photo_copy</code> (1 phút) chép ảnh của lệnh đã duyệt sang ảnh tài sản của cột, sổ <code>work_order_photo_copy</code>, migration <code>AddWorkOrderPhotoCopy</code> (đã áp <code>luxmap_dev</code> 25/11 cùng 6 migration của <code>dev</code> còn thiếu; chưa áp VPS). Toàn bộ test xanh (2021 Api + 604 khác), phá thử 3 chốt đỏ. Codex không chạy được sol nên Claude tự làm. Đã báo WP5 / WP6 ngày 24/11 (drift cập nhật); còn báo lại khi deploy.</td>
+        <td><code>WorkOrderService.cs</code>, <code>Jobs/PolePhotoCopyJob.cs</code>, <code>PoleAssetPhotoCopy.cs</code>, <code>WorkOrderPhotoCopy*.cs</code>, migration, <code>WorkOrderPoleGpsPhotoTests.cs</code>, OpenAPI, trap, tài liệu FE</td>
+        <td><code>feat(work-orders): require pole photos on GPS updates and copy verified photos to pole galleries</code></td>
+      </tr>
+      <tr>
+        <td>24/11/2026</td>
+        <td><code>POLE-GPS-PHOTO</code> Phase 1: bắt buộc ảnh ở <code>complete</code> làm được như chốt; chép ảnh lúc <code>verify</code> <strong>không</strong> làm được kiểu "trỏ chung key" (CHECK <code>ck_pole_asset_photo_keys</code>, thiếu kích thước, trần 40 MP, dung lượng đếm đôi). Đề xuất chép byte bằng job nền + bảng sổ <code>work_order_photo_copy</code>. Chờ Mỹ chốt D-1…D-8.</td>
+        <td><code>.ai/results/POLE-GPS-PHOTO-p1.md</code>, ticket, drift (ghi chú PGP-3/4), tracking</td>
+        <td><code>docs(POLE-GPS-PHOTO): phase 1 survey, eight decisions for Mỹ</code></td>
+      </tr>
+      <tr>
+        <td>24/11/2026</td>
+        <td><code>POLE-GPS-PHOTO</code> Mỹ chốt PGP-1…PGP-5 (SELF-SIGNED, chạm API): GPS là trường riêng, BE không đọc EXIF; mỗi cột báo toạ độ bắt buộc ≥ 1 ảnh (<code>409 POLE_EVIDENCE_REQUIRED</code>); <code>verify</code> chép ảnh sang ảnh tài sản của cột. Mở ticket, <strong>chưa hiện thực</strong>; tài liệu FE đánh dấu 🆕. Q-3 (chặn <code>/pole-photos</code>) còn mở.</td>
+        <td><code>docs/contract-drift.md</code>, <code>.ai/tasks/POLE-GPS-PHOTO.md</code>, <code>docs/POLE-GPS-PHOTOS-FE.md</code>, tracking</td>
+        <td><code>docs(work-orders): record pole GPS photo decisions and open POLE-GPS-PHOTO</code></td>
+      </tr>
+      <tr>
+        <td>24/11/2026</td>
+        <td><code>POLE-GPS-PHOTOS-FE</code> Tài liệu nghiệp vụ cho WP5 / WP6: ảnh trong lịch <code>pole_gps_update</code> là ảnh bằng chứng <code>observation</code> (EV-3/EV-4), tuỳ chọn, gắn cột tuỳ chọn; tách khỏi <code>pole_locations</code>; thứ tự mobile "đẩy ảnh trước <code>complete</code>"; màn duyệt web; ba câu hỏi mở Q-1…Q-3 chờ Mỹ. Không đổi code / API.</td>
+        <td><code>docs/POLE-GPS-PHOTOS-FE.md</code>, tracking</td>
+        <td><code>docs(work-orders): explain photos in the pole GPS update schedule for FE</code></td>
+      </tr>
+      <tr>
+        <td>24/11/2026</td>
         <td><code>DEPLOY-PRUNE</code> VPS đầy 80% (cache build Docker 21.7 GB, mỗi deploy thêm ~1.7 GB). Đã dọn tay (còn 37%, 24 GB trống); <code>deploy.sh</code> giờ tự <code>docker builder prune --reserved-space 3gb</code> sau khi API mới lên, lỗi prune chỉ cảnh báo.</td>
         <td><code>deploy/deploy.sh</code>, <code>docs/deploy/update.md</code>, tracking</td>
         <td><code>chore(deploy): prune docker build cache after each deploy</code></td>
