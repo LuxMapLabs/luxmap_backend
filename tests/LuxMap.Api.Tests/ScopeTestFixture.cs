@@ -87,7 +87,21 @@ public sealed class ScopeTestFixture : LuxMapTestHost, IAsyncLifetime
         await using (var scope = Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LuxMapDbContext>();
-            await db.Database.ExecuteSqlRawAsync(ScopeProbeSchema.DropSql);
+            // The probe's foreign key makes DROP TABLE lock administrative_unit too. Collections run in parallel on one database, so a
+            // test elsewhere holding a lock there can deadlock with it, and Postgres may pick the DROP as the victim (seen on CI,
+            // PR #299). A victim's statement did nothing: run it again.
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    await db.Database.ExecuteSqlRawAsync(ScopeProbeSchema.DropSql);
+                    break;
+                }
+                catch (Npgsql.PostgresException error) when (error.SqlState == Npgsql.PostgresErrorCodes.DeadlockDetected && attempt < 5)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(200 * attempt));
+                }
+            }
 
             string[] mine = [SecondCommune, OutOfScopeCommune];
 
