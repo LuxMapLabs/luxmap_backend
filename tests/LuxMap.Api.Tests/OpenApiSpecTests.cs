@@ -133,31 +133,43 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     }
 
     [Fact]
-    public void Feeder_history_has_two_averaged_time_bases_and_no_public_node_history()
+    public void Feeder_history_uses_one_raw_route_with_measured_time_default_and_reception_metadata()
     {
         var paths = Spec.GetProperty("paths");
+        const string root = "/api/v1/iot/feeders/{feederId}/electrical/history";
+        Assert.False(paths.TryGetProperty(root + "/received", out _));
         Assert.False(paths.TryGetProperty("/api/v1/iot/nodes/{nodeId}/electrical/history", out _));
-        foreach (var suffix in new[] { "", "/received" })
-        {
-            var get = paths.GetProperty("/api/v1/iot/feeders/{feederId}/electrical/history" + suffix).GetProperty("get");
-            var names = get.GetProperty("parameters").EnumerateArray().Select(parameter => parameter.GetProperty("name").GetString()).ToArray();
-            Assert.Contains("from", names); Assert.Contains("to", names);
-            Assert.Contains("page", names); Assert.Contains("page_size", names);
-            Assert.DoesNotContain("sort_by", names); Assert.DoesNotContain("after", names);
-            var pageSize = Assert.Single(get.GetProperty("parameters").EnumerateArray(),
-                parameter => parameter.GetProperty("name").GetString() == "page_size").GetProperty("schema");
-            Assert.Equal(20, pageSize.GetProperty("default").GetInt32());
-            Assert.Equal(200, pageSize.GetProperty("maximum").GetInt32());
-            Assert.True(get.TryGetProperty("x-luxmap-contract", out _));
-            foreach (var code in new[] { "200", "400", "404", "503" })
-                Assert.True(get.GetProperty("responses").TryGetProperty(code, out _));
-        }
-        var fields = Schema("IotFeederAverage").GetProperty("properties");
-        foreach (var name in new[] { "period_start", "period_end", "sample_count", "voltage_avg", "current_ma_avg", "power_mw_avg", "is_complete" })
+        var get = paths.GetProperty(root).GetProperty("get");
+        var parameters = get.GetProperty("parameters").EnumerateArray().ToArray();
+        var names = parameters.Select(parameter => parameter.GetProperty("name").GetString()).ToArray();
+        foreach (var name in new[] { "from", "to", "page", "page_size", "sort_by" }) Assert.Contains(name, names);
+        Assert.DoesNotContain("after", names);
+        Assert.DoesNotContain("limit", names);
+        var pageSize = Assert.Single(parameters, parameter => parameter.GetProperty("name").GetString() == "page_size").GetProperty("schema");
+        Assert.Equal(20, pageSize.GetProperty("default").GetInt32());
+        Assert.Equal(200, pageSize.GetProperty("maximum").GetInt32());
+        var sort = Assert.Single(parameters, parameter => parameter.GetProperty("name").GetString() == "sort_by").GetProperty("schema");
+        Assert.Equal("measured_at", sort.GetProperty("default").GetString());
+        Assert.Equal(new[] { "measured_at", "received_at" }, sort.GetProperty("enum").EnumerateArray().Select(value => value.GetString()));
+        Assert.True(get.TryGetProperty("x-luxmap-contract", out _));
+        Assert.Equal(LuxMapPolicies.ReadNetwork, get.GetProperty("x-luxmap-capability").GetString());
+        foreach (var code in new[] { "200", "400", "404", "503" })
+            Assert.True(get.GetProperty("responses").TryGetProperty(code, out _));
+
+        var result = Schema("IotFeederHistoryResult").GetProperty("properties");
+        Assert.Equal(new[] { "feeder_id", "items", "page", "page_size", "sort_by", "total" },
+            result.EnumerateObject().Select(field => field.Name).Order(StringComparer.Ordinal));
+        Assert.Equal("#/components/schemas/IotFeederHistorySample",
+            result.GetProperty("items").GetProperty("items").GetProperty("$ref").GetString());
+        var fields = Schema("IotFeederHistorySample").GetProperty("properties");
+        foreach (var name in new[] { "node_id", "measured_at", "received_at", "reception_type", "voltage", "current_ma", "power_mw", "lamp_command" })
             Assert.True(fields.TryGetProperty(name, out _));
-        Assert.Equal(new[] { "measured_at", "received_at" },
-            Schema("IotFeederHistoryResult").GetProperty("properties").GetProperty("time_basis").GetProperty("enum")
-                .EnumerateArray().Select(value => value.GetString()));
+        Assert.Equal(new string?[] { "live", "backfill", null },
+            fields.GetProperty("reception_type").GetProperty("enum").EnumerateArray().Select(value => value.GetString()));
+        foreach (var name in new[] { "measured_at", "received_at" })
+            Assert.Equal("date-time", fields.GetProperty(name).GetProperty("format").GetString());
+        foreach (var name in new[] { "period_start", "period_end", "sample_count", "voltage_avg", "current_ma_avg", "power_mw_avg", "is_complete" })
+            Assert.False(fields.TryGetProperty(name, out _));
     }
 
     [Fact]

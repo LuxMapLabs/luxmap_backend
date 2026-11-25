@@ -10,6 +10,7 @@ static class DeviceRules
         if (data is null || data.DeviceId != id) return "deviceId must match the node topic.";
         if (data.SessionId is null || !ValidId(data.SessionId) || data.SequenceNumber is null or <= 0 or > uint.MaxValue)
             return "sessionId and sequenceNumber (1..4294967295) are required for replay/deduplication.";
+        if (data.ReceptionType is not (null or "live" or "backfill")) return "receptionType: live/backfill.";
         if (data.Mode is not ("AUTO" or "MANUAL") || data.LampCommand is not ("ON" or "OFF"))
             return "mode: AUTO/MANUAL; lampCommand: ON/OFF.";
         if (data.AutoType is not null && (data.Mode != "AUTO" || data.AutoType is not ("full_time" or "scheduled")))

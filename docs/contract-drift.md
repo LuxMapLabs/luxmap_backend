@@ -2972,3 +2972,14 @@ JSON và hướng dẫn: [USER-PERSONAL-DETAILS.md](USER-PERSONAL-DETAILS.md).
 chưa deploy**): WP6 (màn cột: một nút "Chụp ảnh cột" lấy GPS + ảnh cùng lúc; đẩy hết ảnh trước `complete`; chặn "Hoàn thành" khi cột có
 toạ độ chưa có ảnh; xử lý 409 `POLE_EVIDENCE_REQUIRED`, kể cả `conflicts[]` của `/sync/push`), WP5 (màn duyệt: sau `verify` gallery của cột có
 ảnh trong ít phút — job nền). Còn phải báo lại khi deploy. Chưa có phản hồi; vẫn là nền SELF-SIGNED tới FW kế tiếp.
+
+## IOT-HISTORY-RAW-1 — 25/11/2026 (SELF-SIGNED)
+
+Decision maker: Đạt yêu cầu gộp hai API, bỏ API cũ, nhận từng mẫu và dùng measured_at làm mặc định. Nền tạm chờ maintainer review.
+- GET /iot/feeders/{feederId}/electrical/history là API duy nhất: page/page_size/from/to/sort_by, mặc định measured_at, lựa chọn đối chiếu received_at; mới nhất trước.
+- Bỏ /history/received (404), không giữ alias. Bỏ endpoint averages của Bridge. Không đổi quyền ReadNetwork/phạm vi xã hay lịch sử binding feeder.
+- Thay DTO trung bình 30 giây bằng mẫu thô; bỏ interval_seconds/time_basis và các trường *_avg/period*. Thêm measured_at/received_at/reception_type live|backfill|null và node_id, voltage/current_ma/power_mw/lamp_command.
+- Lọc from/to trước phân trang theo sort_by, mặc định giờ đo DS3231. Giữ received_at/loại nhận đầu tiên khi duplicate/restart. Firmware cũ trả loại null, không đoán từ độ trễ trên server.
+- Node tạo mẫu mục tiêu 1 giây, giữ R002/trung bình16; gateway forward ngay. Giữ SD/ACK; nhịp nhận cần kiểm tra phần cứng, không bảo đảm 1Hz qua E32.
+- Không migration/xóa mẫu cũ, không sửa FE. Deploy đồng bộ BE/Bridge, nạp firmware node/gateway để có metadata/nhịp mới.
+Chi tiết: [IOT-ELECTRICAL-HISTORY.md](IOT-ELECTRICAL-HISTORY.md).

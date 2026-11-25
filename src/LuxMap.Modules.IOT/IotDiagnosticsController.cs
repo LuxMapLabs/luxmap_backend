@@ -496,31 +496,18 @@ public sealed partial class IotDiagnosticsController(IotDiagnosticsService diagn
     public Task<IotFeederElectricalResult> FeederElectricalAsync(string feederId, CancellationToken ct)
         => diagnostics.FeederElectricalAsync(feederId, ct);
 
-    /// <summary>Lịch sử điện trung bình 30 giây theo giờ đo DS3231, mới nhất trước.</summary>
+    /// <summary>Lịch sử từng mẫu điện theo feeder; sort_by=measured_at hoặc received_at, mới nhất trước.</summary>
     [HttpGet("feeders/{feederId}/electrical/history")]
     [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
     [ProducesResponseType<IotFeederHistoryResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public Task<IotFeederHistoryResult> FeederMeasuredHistoryAsync(string feederId, CancellationToken ct,
+    public Task<IotFeederHistoryResult> FeederHistoryAsync(string feederId, CancellationToken ct,
         [FromQuery] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null,
+        [FromQuery(Name = "sort_by")] string sortBy = "measured_at",
         [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
-        => diagnostics.FeederAveragedHistoryAsync(feederId, PageRequest.Create(page, pageSize ?? 20),
-            "measured_at", from, to, ct);
-
-    /// <summary>Lịch sử điện trung bình 30 giây theo giờ server nhận, mới nhất trước.</summary>
-    [HttpGet("feeders/{feederId}/electrical/history/received")]
-    [Authorize(Policy = LuxMapPolicies.ReadNetwork)]
-    [ProducesResponseType<IotFeederHistoryResult>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
-    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status503ServiceUnavailable)]
-    public Task<IotFeederHistoryResult> FeederReceivedHistoryAsync(string feederId, CancellationToken ct,
-        [FromQuery] int? page = null, [FromQuery(Name = "page_size")] int? pageSize = null,
-        [FromQuery] DateTime? from = null, [FromQuery] DateTime? to = null)
-        => diagnostics.FeederAveragedHistoryAsync(feederId, PageRequest.Create(page, pageSize ?? 20),
-            "received_at", from, to, ct);
+        => diagnostics.FeederRawHistoryAsync(feederId, PageRequest.Create(page, pageSize ?? 20), sortBy, from, to, ct);
 
     [HttpGet("nodes")]
     [ProducesResponseType<PagedResult<IotNodeStatus>>(StatusCodes.Status200OK)]

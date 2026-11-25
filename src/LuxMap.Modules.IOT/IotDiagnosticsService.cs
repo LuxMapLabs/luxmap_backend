@@ -119,7 +119,7 @@ public sealed record IotPoleControl(string PoleId, string? FeederId, string? Nod
 
 public sealed record IotArchivedReading(IotArchivedData Data, DateTimeOffset ReceivedAt, string? GatewayId);
 public sealed record IotArchivedData(string? Timestamp, string? SessionId, long? SequenceNumber,
-    string? Mode, string? LampCommand, double? Lux, double? Voltage, double? Current, double? Power);
+    string? Mode, string? LampCommand, double? Lux, double? Voltage, double? Current, double? Power, string? ReceptionType = null);
 
 public sealed record IotAutoSchedule(string? DayStart, string? NightStart);
 public sealed record IotCommandRequest(string? Mode, string? Command, IotAutoSchedule? AutoSchedule = null, string? AutoType = null);

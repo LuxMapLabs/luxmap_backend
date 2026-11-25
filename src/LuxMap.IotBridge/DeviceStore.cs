@@ -12,7 +12,7 @@ record LampCommand(string Mode, string? Command, string? CommandId = null, long 
     AutoSchedule? AutoSchedule = null, long? ExpiresAtUnixSeconds = null, string? AutoType = null);
 record TelemetryRequest(string? DeviceId, string? Mode, string? LampCommand,
     double? Lux, double? Voltage, double? Current, double? Power, string? Timestamp,
-    string? SessionId = null, long? SequenceNumber = null, string? AppliedCommandId = null, string? AutoType = null);
+    string? SessionId = null, long? SequenceNumber = null, string? AppliedCommandId = null, string? AutoType = null, string? ReceptionType = null);
 record TelemetryReading(TelemetryRequest Data, DateTimeOffset ReceivedAt, string? GatewayId = null);
 record SequenceRange(long Start, long End);
 record CommandAcknowledgement(string? DeviceId, string? CommandId, string? Mode, string? LampCommand, string? AutoType = null,
@@ -75,8 +75,8 @@ sealed class DeviceStore
     public IReadOnlyList<CommandReceipt> ReadCommandReceipts(CommandReceiptKey[] keys) =>
         archive.ReadCommandReceipts(keys);
 
-    public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt) =>
-        archive.ReadFeederHistory(windows, skip, take, measuredAt);
+    public FeederTelemetryBatch ReadFeederHistory(FeederTelemetryWindow[] windows, long skip, int take, bool measuredAt, DateTimeOffset? from = null, DateTimeOffset? to = null) =>
+        archive.ReadFeederHistory(windows, skip, take, measuredAt, from, to);
 
     public FeederAverageBatch ReadFeederAverages(FeederTelemetryWindow[] windows, long skip, int take,
         bool measuredAt, DateTimeOffset? from, DateTimeOffset? to, bool keysOnly) =>
