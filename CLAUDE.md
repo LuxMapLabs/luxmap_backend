@@ -1,13 +1,15 @@
 # LuxMap — Backend (WP2)
 
 Nền tảng GIS + IoT + Computer Vision quản lý tài sản và sự cố chiếu sáng đường nông thôn. Đề tài **LuxMap: A GIS, IoT
-and Computer Vision Platform for Rural Road Lighting Asset and Fault Management** (Phiếu FA26SE222 v1.4,
-`docs/registration/FA26SE222_v1.4.md` — nguồn chuẩn cho actor, chức năng, NFR, deliverable; bản v1.2 là lịch sử).
+and Computer Vision Platform for Rural Road Lighting Asset and Fault Management** (Phiếu FA26SE222 v1.3 hiện hành,
+`docs/registration/FA26SE222_v1.3.md` — nguồn chuẩn cho actor, chức năng, NFR, deliverable; v1.4 và v1.2 là lịch sử).
 Capstone W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2, phụ trách: BE1 – Mỹ**.
 
 **Ai gọi API:** Web SPA (WP5), Android native (WP6), engine CV (WP4) — ba consumer ứng dụng; cộng **thiết bị IoT testbed**
 (`/api/v1/device/…`, scheme `Device`) và **broker MQTT** (callback xác thực, scheme `Broker`). **Công dân không có tài khoản**:
 báo sự cố qua mã QR trên cột (`/public/…`, không token), Quản lý duyệt ở `/citizen-reports`.
+
+**Phiếu v1.3 hiện hành (31/10/2026) cô đọng hơn v1.4 và không nhắc lại BH1750 / xe khảo sát; phần dưới là chi tiết kênh đo từ v1.4, vẫn là cách repo chạy cho tới khi nhóm chốt khác.**
 
 **Phiếu v1.4 (27/09/2026) — kênh đo độ sáng.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750 gắn trên xe khảo sát**, lấy mẫu
 liên tục suốt sweep; **`dim` = CV nói ON + đỉnh lux lúc ngang cột dưới ngưỡng baseline của chính cột**. Mỗi phiên = video + log lux

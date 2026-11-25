@@ -36,7 +36,7 @@ thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 > ghi tài sản, "Nhánh C". Không sửa lại; vai trò hiện hành ở mục *Registration v1.2* bên dưới và
 > Contract v1.7 §2.
 >
-> 📄 **Nguồn phiếu hiện hành: v1.4 (27/09/2026)** — mục *Registration v1.4* bên dưới. Vai trò không đổi so
+> 📄 **Nguồn phiếu hiện hành: v1.3 (ngày phiếu 20/08/2026, áp dụng vào repo 31/10/2026)** — mục *Registration v1.3 hiện hành* bên dưới; v1.4 (27/09/2026) là lịch sử nhưng các D-R20…D-R28 của nó còn hiệu lực. Vai trò không đổi so
 > với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R28 = A **chốt 02/10** (BE-15 Phase 1); D-R26 ghi nhận; D-R25, D-R27 **còn chờ quyết**.
 
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
@@ -438,6 +438,15 @@ Bốn câu hỏi firmware/BE2 còn mở (D-09, qua Mỹ, chưa gửi):
 Chỉ thêm trường đọc, client cũ không đổi. Rollback code/spec/docs bỏ các trường thêm; không đổi schema/dữ liệu.
 Đồng bộ heading Contract và info.version v1.19 bị sót ở #190 dù changelog đã có v1.20.
 
+### Gom sự cố theo đoạn đường — đề xuất đổi Phiếu v1.3 (01/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Sự cố gom theo **đoạn đường**; giữ cảnh báo dòng điện cấp feeder cho nguyên nhân chung. Thay chữ "group faults along the same power feeder" của Phiếu v1.3, thay SF-12. Chưa đổi Contract, chưa đổi code |
+| **Decision maker** | Mỹ |
+| **Date** | 01/11/2026 |
+| **Scope** | BM01 mục 1.1 và G-06; cần ghi BM03, chờ giảng viên phản biện chốt ở Review 2 |
+
 ### JSON-ENUM — enum trong body JSON chỉ nhận chuỗi (04/10/2026)
 
 | | |
@@ -534,6 +543,28 @@ Ma trận §2 dùng con số 13.
 - **WP6:** đổi giá trị `role`; **bỏ màn đăng ký** (`/auth/register` deprecated); `POST /lux-readings` chỉ
   Kỹ sư hiện trường.
 - **Thịnh/Ngọc:** xác nhận hoặc lật D-R5, D-R6, D-R10, D-R11, D-R12 ở FW kế tiếp.
+
+### Registration v1.3 hiện hành — phiếu cô đọng, đổi nguồn chuẩn (31/10/2026)
+
+| | |
+|---|---|
+| **Decision** | Nguồn chuẩn cho scope / actor / FR / NFR / deliverable chuyển sang **Phiếu FA26SE222 v1.3** (`docs/registration/FA26SE222_v1.3.md`, từ Google Doc nhóm đang dùng); `FA26SE222_v1.4.md` thành lịch sử. **Chỉ tầng tài liệu** — chưa đổi Contract, OpenAPI, migration, `src/`. D-R20 … D-R28 **giữ nguyên trạng thái** cho tới khi nhóm quyết khác |
+| **Decision maker** | Nguồn phiếu: nhóm (nhóm xác nhận phiếu đang dùng). Không có D-item mới |
+| **Date** | 31/10/2026 |
+| **Scope** | `docs/registration/FA26SE222_v1.3.md` (mới), banner ở `FA26SE222_v1.4.md`, mục này, `CLAUDE.md` (con trỏ nguồn). **Không** đụng Contract, `docs/openapi/*`, migration, `src/` |
+
+**Tên trùng.** Các mục *Registration v1.4* ở trên nói "v1.3 bị bỏ qua có chủ đích" (CV chấm mặt đường theo đoạn). Phiếu v1.3 **hiện hành** này **không** phải bản đó: CV chỉ ON/OFF, mỗi cột một số đọc ánh sáng so với baseline của chính cột, ra Normal / Dim / Out. Phân biệt bằng ngày phiếu và nội dung.
+
+**Khác biệt so với v1.4 cần để mắt (chưa đánh giá tác động từng mục lên code):**
+
+| Chỗ | v1.3 hiện hành | Ghi chú cho backend |
+|---|---|---|
+| Kênh đo độ sáng | "light sensor", "paired light-sensing module", mỗi cột một "light reading"; **không** nêu BH1750FVI, xe khảo sát, đỉnh lux lúc ngang cột, đồng bộ đồng hồ | Phiếu bớt chi tiết chứ không phủ định v1.4; D-R20 / D-R21 / D-R23 vẫn là cách repo chạy. Hỏi nhóm nếu muốn bỏ hẳn mô hình "đỉnh lux ngang cột" |
+| Mức quan trọng của đoạn đường | Có (`importance level`), dùng xếp ưu tiên sửa chữa | Đối chiếu cột/field tương ứng ở `road_segments` trước khi coi là đã đủ |
+| NFR có số | toạ độ ≤ 5 m; ≥ 95% quan sát gắn đúng cột; ON/OFF F1 ≥ 0,85; Normal/Dim/Out khớp thực địa ≥ 85%; CV số đọc ≤ 10%; phiên ≤ 100 cột có kết quả ≤ 5 phút; offline ≥ 24 giờ không mất bản ghi; ≥ 90% tác vụ usability với ≥ 3 người thử | Đây là chỉ tiêu chấm đồ án, không phải ràng buộc API; ≤ 5 phút / 100 cột và ≥ 24 giờ offline đụng trực tiếp xử lý phiên khảo sát và đồng bộ |
+| Manager | "segments with consecutive failed poles"; "supported streetlights" cho ON/OFF/AUTO | Chưa kiểm tra có endpoint/rule cho đoạn có cột hỏng liên tiếp hay chưa |
+| Field Engineer | "re-survey rejected segments" | Chưa kiểm tra luồng từ chối phiên → khảo sát lại |
+| Citizen, Superior, System Admin | Không đổi so với v1.4 | — |
 
 ### Registration v1.4 — CV chỉ ON/OFF, độ sáng đo bằng BH1750 trên xe (27/09/2026)
 
