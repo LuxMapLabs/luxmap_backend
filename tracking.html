@@ -1425,6 +1425,13 @@
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
+        <td>26/11/2026</td>
+        <td><code>LUX-BASELINE</code> Phase 1 (Claude, không sửa code): schema thật trên <code>luxmap_dev</code>, đếm chỉ đọc trên VPS (13 lux, 0 baseline),
+        chỗ cắm ở <code>ReviewedPolePhotoPublisher</code>, đua tạo lux với quyết định ảnh. Ticket chuyển <code>blocked</code> chờ chốt D-item.</td>
+        <td><code>.ai/results/LUX-BASELINE-p1.md</code>, ticket, tracking</td>
+        <td><code>docs(LUX-BASELINE): record phase 1 survey</code></td>
+      </tr>
+      <tr>
         <td>25/11/2026</td>
         <td><code>LUX-BASELINE</code> viết đặc tả ticket: luồng đích, D-1…D-14 có khuyến nghị, Phase 1 tám câu khảo sát, tiêu chí xong và
         danh sách cấm. Chỉ tài liệu, chưa code.</td>
@@ -1776,7 +1783,7 @@
       <tr><td>Quy tắc <code>fixture_status</code> từ ON/OFF + lux; <code>source_channel</code> của <code>lamp_dim</code> giữ <code>cv</code>?</td><td>D-R20 · chạm API (ngữ nghĩa)</td><td><span class="tag t-done">Chốt 07/10 — giữ <code>cv</code></span></td></tr>
       <tr><td>Profile cấu hình quay cố định (ISO, shutter, lấy nét vô cực, WB, độ phân giải/fps; tắt EIS/HDR/night mode) — chốt số sau buổi quay thử; server từ chối phiên lệch profile, thay kiểm từng JPEG của BE-16</td><td>D-R24 · SELF-SIGNED 27/09</td><td><span class="tag t-todo">Chờ quay thử</span></td></tr>
       <tr><td>Controlled Reference Capture Set rời deliverable — xác nhận; <code>calibration_rig</code> giữ trong enum. Gộp với follow-up v1.2 về <code>data_source</code> telemetry testbed</td><td>D-R25 · Contract O-9</td><td><span class="tag t-todo">Chờ quyết</span></td></tr>
-      <tr><td><strong>LUX-BASELINE</strong> — nối số lux đo đứng yên (gắn ảnh cột trong phiếu khảo sát) vào baseline, chấm <code>dim</code> lúc Quản lý quyết định ảnh. Ticket <code>.ai/tasks/LUX-BASELINE.md</code>, D-1…D-14 đề xuất (khuyến nghị bảng baseline song song, D-7 B). Chờ Phase 1 rồi Mỹ chốt</td><td>D-R29 · chạm API + migration</td><td><span class="tag t-next">Ticket sẵn sàng · Phase 1 chưa chạy</span></td></tr>
+      <tr><td><strong>LUX-BASELINE</strong> — nối số lux đo đứng yên (gắn ảnh cột trong phiếu khảo sát) vào baseline, chấm <code>dim</code> lúc Quản lý quyết định ảnh. Ticket <code>.ai/tasks/LUX-BASELINE.md</code>, D-1…D-14 đề xuất (khuyến nghị bảng baseline song song, D-7 B). <strong>26/11: Phase 1 xong</strong> (<code>.ai/results/LUX-BASELINE-p1.md</code>): sửa D-2 / D-3 / D-10, D-7 (B) có bằng chứng schema, thêm D-15 (<code>meter_model</code> trên VPS <code>ESP32C3_LUX</code> ≠ Contract <code>LuxMap_ESP32</code>) và D-16</td><td>D-R29 · chạm API + migration</td><td><span class="tag t-block">Chờ Mỹ chốt D-1…D-16</span></td></tr>
       <tr><td>Phase 2 (sau khi chốt): Contract §5.7 / §5.2, XML doc <code>LuxReading.cs</code> (còn ghi "ABSOLUTE <code>lux_value</code>"), mô tả BE-42 trong <code>tasks-backend.csv</code>, mốc FO-14</td><td>D-R21…D-R28</td><td><span class="tag t-todo">Chưa làm</span></td></tr>
     </table>
   </div>

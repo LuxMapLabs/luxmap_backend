@@ -1,9 +1,9 @@
 ---
 ticket: LUX-BASELINE
 title: Nối số lux đo đứng yên (gắn ảnh cột trong phiếu khảo sát) vào baseline và phân loại dim
-status: ready
+status: blocked
 phase: 1
-owner: unassigned
+owner: claude
 branch: feat/LUX-BASELINE
 contract_refs:
   - "mục 5.7 — Số đo lux"
@@ -224,3 +224,9 @@ Tiêu chí xong — mỗi dòng kiểm bằng lệnh:
 - Không viết lại tập trạng thái mở (`FaultStatusSets`), ngưỡng `dim` (`SystemSettingValues`), định nghĩa "đêm" ở nhiều chỗ.
 - Không viết định danh cột / constraint từ trí nhớ; đọc schema thật rồi dán output.
 - Không chạy test trên `luxmap_dev`. Không ghi gì lên VPS.
+
+## Ghi chú triage
+
+- 26/11/2026 — Phase 1 xong (`.ai/results/LUX-BASELINE-p1.md`). Sửa D-2, D-3, D-10 (mã lỗi có sẵn `POLE_PHOTO_ALREADY_DECIDED`,
+  khoá ảnh khi tạo lux; ảnh không đi qua `/sync/push`); D-7 (B) có bằng chứng schema; thêm D-15 (`meter_model` lệch Contract),
+  D-16. Chặn chờ Mỹ chốt D-1…D-16.
