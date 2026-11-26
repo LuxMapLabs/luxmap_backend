@@ -35,6 +35,17 @@ sweep (LUX-BASELINE-1).
 **Phải báo:** WP6 (ghi phiên sweep), IoT / Member 2 (D-FS-20), WP4 (ON/OFF lại từ video sweep), FO (gắn module ở đầu xe theo
 `BE-15-pilot-drive.md`). **Chưa báo.**
 
+## IOT-DIAG-5 — cửa sổ năm mẫu qua nhiều gói LoRa (26/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Giữ trung bình **5 mẫu** và ngưỡng `current_drop` **giảm >5%**. Chọn 5 mẫu ON mới nhất cùng session, không trùng identity; không bắt sequence liền nhau vì firmware gửi tối đa 4 mẫu/gói. Vẫn kiểm giờ đo/giờ nhận, dung sai áp, và không ghép qua lần OFF hoặc dữ liệu hỏng. Loại `reception_type=backfill`; client cũ chưa gửi loại nhận vẫn phải qua kiểm tra thời gian. |
+| **Decision maker** | Người dùng xác nhận kế hoạch trong phiên làm việc: “ok sửa đi”, 26/11/2026. **SELF-SIGNED**, chờ maintainer review vì bổ sung giá trị trạng thái đã công bố. |
+| **API** | `GET /iot/feeders/{feederId}/diagnostics`, alias theo node và `GET /iot/diagnostics/summary`: thêm `insufficient_samples` vào `status` / `diagnostic_status`. Bốn mẫu không còn trả `normal`. Không thêm mã anomaly, không đổi request hoặc quyền. |
+| **Recovery** | Thiếu mẫu không chứng minh phục hồi, không đóng Fault/đợt lỗi. Giữ vòng đời Fault/inspection hiện tại; không đổi cơ chế audit. |
+| **Version** | `calibration_version=electrical-mean5-batched-v2`; kết quả cũ giữ version đã lưu. Không migration, không sửa FE hoặc firmware. Cần deploy BE mới trên VPS. |
+
+
 ## LUX-BASELINE — số lux đo đứng yên được chấm so với baseline của chính cột (26/11/2026)
 
 | | |

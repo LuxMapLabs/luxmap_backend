@@ -22,7 +22,7 @@ public sealed class IotDiagnosticHistoryTests(AssetImportFixture fixture)
             DeviceId = "P001", FeederId = rig.Feeders[0], NominalVoltage = 5,
             NominalCurrentMa = 100, NominalPowerMw = 500,
         };
-        async Task Pass(int seconds, double? current)
+        async Task Pass(int seconds, double? current, bool complete = true)
         {
             await using var db = contexts.Open(fixture.CommuneId);
             var state = await db.Set<IotDiagnosticState>().SingleOrDefaultAsync(s => s.NodeId == rig.Node);
@@ -32,10 +32,12 @@ public sealed class IotDiagnosticHistoryTests(AssetImportFixture fixture)
             }
             var now = origin.AddSeconds(seconds);
             IotDiagnosticResult? result = current is null ? null : new(rig.Node, profile.FeederId,
-                current < 95 ? "anomaly" : "normal", new(now, "ON", 5, current.Value, current.Value * 5),
+                !complete ? "insufficient_samples" : current < 95 ? "anomaly" : "normal", new(now, "ON", 5, current.Value, current.Value * 5),
                 current < 95 ? [new("current_drop", current, 100, current - 100, 5)] : []) {
                     ConnectionStatus = "online", ElectricalStatus = "fresh",
-                    ElectricalWindow = new("evaluated", 5, 5, 5, current, current * 5) { CurrentEvaluationAvailable = true },
+                    ElectricalWindow = complete
+                        ? new("evaluated", 5, 5, 5, current, current * 5) { CurrentEvaluationAvailable = true }
+                        : new("insufficient_samples", 4, 5, null, null, null),
                 };
             await IotDiagnosticHistory.ObserveAsync(db, state, profile, result, now, default);
             await db.SaveChangesAsync();
@@ -61,6 +63,13 @@ public sealed class IotDiagnosticHistoryTests(AssetImportFixture fixture)
             Assert.Equal(origin.AddMinutes(2), row.EndedAt);
             Assert.Equal("active", row.Status);
             Assert.Contains("80", row.Anomaly);
+        }
+        await Pass(125, 100, complete: false);
+        await Pass(130, 100, complete: false);
+        await using (var check = contexts.Open(fixture.CommuneId)) {
+            var active = await check.Set<IotDiagnosticEpisode>().SingleAsync(e => e.NodeId == rig.Node);
+            Assert.Equal("active", active.Status);
+            Assert.Null(active.ClosedAt);
         }
         await Pass(180, 100);
         await Pass(240, 90);
