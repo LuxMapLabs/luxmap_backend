@@ -109,6 +109,8 @@ Controlled Reference Capture Set **rời deliverable** ở v1.4; giá trị `cal
   thẳng từ entity đang track: dùng **`UtcMicrosecondClock.UtcNow()`** (Postgres chỉ lưu µs; Linux có tick 100 ns).
 - **Ngày không giờ `YYYY-MM-DD`.** Ngày / giờ trên query string nhận bằng kiểu `DateOnly` / `DateTime` (đi qua
   `IsoDateQueryModelBinderProvider` + `UtcNormalization.ToUtc`), không nhận `string` rồi tự parse — binder mặc định đọc `06/10` thành 10/06.
+- **Số trên form multipart đọc theo culture invariant** (`UseLuxMapInvariantCulture`, `InvariantRequestCultureTests`): client gửi
+  dấu chấm thập phân. Dấu phẩy là phân cách hàng nghìn — `10,82` thành 1082 (lỗi 400 báo cáo công dân, 26/11/2026).
 - **Số thực trên JSON:** `FiniteDoubleConverter` chặn `"NaN"` / `"Infinity"` — giữ nó (`JsonNumberHandlingTests`).
 - **ID là chuỗi có prefix** (`POLE-0001`, `FAULT-0001`, `SEG-001`, `COM-001`), sinh ở DB bằng
   `DEFAULT luxmap_format_id('POLE', nextval('pole_id_seq'), 4)`; bảng prefix ở `PrefixedId.cs`. Không dùng `LPAD(…, 4, '0')`: nó **cắt**

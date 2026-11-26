@@ -114,6 +114,8 @@ if (SeedCommand.IsRequested(args))
 //      records the real status instead of logging the exception a second time
 // 0. Forwarded headers first: everything after it — log line, rate limiters — must see the real client address.
 app.UseLuxMapForwardedHeaders();
+// Before anything reads the request: a form number must parse the same on a vi-VN Windows host as on the VPS.
+app.UseLuxMapInvariantCulture();
 app.UseLuxMapCorrelationId();
 app.UseLuxMapRequestLogging();
 app.UseLuxMapErrorHandling();
