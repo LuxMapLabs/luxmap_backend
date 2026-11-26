@@ -70,6 +70,36 @@ sweep (LUX-BASELINE-1).
 **Không đổi:** baseline của **sweep** vẫn đếm theo run và chia theo chiều (`SurveyPublicationRules.Members`); luật "mỗi đêm một lần"
 chỉ hiện thực cho baseline đứng yên. `nearest_luminance` vẫn `null` (đối chứng A là việc khác).
 
+## COMMUNE-BOUNDARY-GUARD — ranh giới xã thành chốt chặn khi ghi tài sản dạng điểm (26/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Đổi CBD-1: ranh giới xã không còn "chỉ để vẽ". Cột (`pole`) và tủ điện (`electrical_cabinet`) phải nằm TRONG ranh giới xã của chính nó; xã chưa có ranh giới thì từ chối lần ghi mang toạ độ. D-1…D-12 chốt trên `.ai/results/COMMUNE-BOUNDARY-GUARD-p1.md` |
+| **Decision maker** | **Mỹ (Dylan)**, 26/11/2026 — sau khi import vào `COM-070` nhận cột ở Phường Long Bình. **SELF-SIGNED**, chạm bề mặt API (thêm lý do 400, đổi hành vi import / dời cột / sync push), nền tạm tới FW kế tiếp |
+| **Consumer** | WP5 (form tài sản, màn import: hiện lỗi theo dòng), WP6 (nếu có đường gửi vị trí cột / GPS verify). **Chưa báo** |
+| **Scope** | `Modules.Assets` (CRUD cột + tủ, import CSV / GeoJSON / workbook), `Modules.WorkOrders` (GPS verify), `Modules.Admin` (khoá hàng khi PUT ranh giới). **Không** migration, **không** index |
+
+| Mã | Nội dung | Ai bị ảnh hưởng |
+|---|---|---|
+| CBG-1 | Luật chỉ áp cho tài sản **dạng điểm**: `pole`, `electrical_cabinet`. Tuyến và feeder **không** kiểm (`inter_commune` được băng qua nhiều xã). Điểm phải nằm trong ranh giới của **chính xã ghi trên tài sản**; dung sai 0 m, điểm trên đường biên tính là trong (`Covers`, tương đương `ST_Covers`; không `Contains`) | WP5 / WP6: toạ độ gửi lên phải thật nằm trong xã đã chọn |
+| CBG-2 | **Xã chưa có ranh giới → từ chối** lần ghi mang toạ độ (không bỏ qua kiểm). Cột tạo với `geom = null` vẫn được tạo ở xã chưa có ranh giới; lần đặt vị trí đầu tiên mới kiểm | WP5: phải nạp ranh giới trước khi đặt cột / tủ qua form hoặc import |
+| CBG-3 | **D-2** — lỗi **400 `VALIDATION_FAILED`**, `details { field, reason, commune_id }`; `reason` ∈ `OUTSIDE_COMMUNE_BOUNDARY` \| `COMMUNE_BOUNDARY_MISSING` (chuỗi ổn định). **Không** thêm mã vào `ErrorCodes`. Thông điệp nêu tên + id xã và lý do, **không** nêu toạ độ ranh giới | WP5 / WP6: hiện đúng `reason`, đừng parse thông điệp |
+| CBG-4 | **D-1 / D-4 / D-10** — chỉ kiểm khi lần ghi **mang toạ độ và toạ độ đổi** (X hoặc Y khác — khuôn `PoleRelocation.Measured.Unchanged`; không `Equals`). Sửa ghi chú / bóng / mạch của cột cũ đang lệch mà gửi lại đúng toạ độ vẫn được. Tạo mới luôn kiểm | WP5: form sửa phải gửi lại toạ độ hiện có, không được gửi toạ độ "chuẩn hoá" khác |
+| CBG-5 | **D-3 / D-12** — thứ tự: các **409 hiện có trước** (`POLE_OFF_SEGMENT` khi dời cột / GPS verify, `CROSS_COMMUNE_REFERENCE` khi feeder khác xã), ranh giới **sau** → điểm vừa ngoài tuyến vừa ngoài xã vẫn nhận 409 như trước | WP6: 409 là lỗi tuyến, 400 là lỗi ranh giới |
+| CBG-6 | **D-2 / D-5 / D-12** — import (CSV / GeoJSON / workbook dùng chung planner): lỗi **theo dòng**. Ngoài ranh giới → cột `geom_wkt`; xã thiếu ranh giới → cột `commune_id`; thông điệp cùng câu với CRUD. Dòng trong vẫn được ghi | WP5: hiện lỗi theo dòng như các lỗi import khác |
+| CBG-7 | **D-4** — `POST /sync/push`: lỗi ranh giới là 400 → vào **`rejected[]`**, không phải `conflicts[]` (client sửa rồi gửi lại; không phải "server đã khác"). Không mã lỗi mới | **WP6**: xử lý `rejected` như lỗi dữ liệu, không hỏi lại server state |
+| CBG-8 | **D-5 / D-6 / D-9** — khoá hàng: import và dời cột lấy `FOR SHARE` trên `administrative_unit` (import một truy vấn cho mỗi loại tài sản trong file — workbook dùng lại planner nên mỗi sheet một lần; theo thứ tự id); `PUT /admin/communes/{id}/boundary` không khoá tường minh — câu `UPDATE` tự giữ `FOR NO KEY UPDATE` tới commit, xung đột với `FOR SHARE`. Không index và không migration: predicate chạy trong bộ nhớ trên hàng đọc theo khoá chính | Nội bộ BE |
+| CBG-9 | **Không suy `commune_id` từ ranh giới** và không dùng `bbox`. Phân quyền vẫn theo claim `commune_ids` + cột `commune_id` (§7); phần "suy xã" của Q17 vẫn mở | WP5: chọn xã vẫn là thao tác của người dùng / file |
+| CBG-10 | `PUT /admin/communes/{id}/boundary` **không đổi hình dạng hay quyền**; không thêm khoá: câu `UPDATE` ranh giới chờ import / dời cột đang giữ `FOR SHARE` xong mới ghi | WP5: màn Quản trị → Xã giữ nguyên |
+| CBG-11 | **D-11** — hiện **không** đường API nào sửa `commune_id` của cột / tủ (chỉ tạo mới đặt). Mọi lần ghi toạ độ đều kiểm theo `commune_id` **hiện tại của bản ghi** (không phải giá trị client gửi), nên nếu SQL thô / seed đổi xã thì lần ghi sau đã kiểm theo xã mới; không có nhánh riêng vì không đường nào với tới | Không |
+
+**Dữ liệu:** `COM-070` (xã mock "Commune 01") nhận một hình chữ nhật `106.488–106.506 / 10.964–10.978` trong
+`scripts/data/commune-boundaries.geojson` với `properties.mock = true` — **không phải ranh giới thật**, chỉ để dữ liệu mock còn sửa
+được vị trí sau khi luật có hiệu lực. Nạp bằng `python3 scripts/load_commune_boundaries.py --apply`.
+
+**Phải báo:** WP5 (import / form tài sản: lỗi 400 mới, `reason`, và việc phải có ranh giới trước khi đặt điểm), WP6 (GPS verify /
+sync push). **Chưa báo.**
+
 ## D-R29 — đo lux đứng yên, ngay dưới đèn (25/11/2026)
 
 > ⛔ **Bị huỷ bởi D-R30 (26/11/2026)** — lux lại gắn trên xe, lấy mẫu khi chạy. Giữ mục này làm lịch sử.
@@ -2044,15 +2074,16 @@ Ba xã trên `luxmap_dev` (`COM-070`, `COM-001`, `COM-002`) **chưa có khung** 
 
 | Mã | Quyết định |
 |---|---|
-| CBD-1 | `administrative_unit` thêm `boundary geometry(MultiPolygon,4326) NULL` — **chỉ để vẽ**. Phân quyền vẫn theo `commune_id` (§7); tài sản ngoài ranh giới **không** bị ẩn, lọc hay từ chối, và **không** suy `commune_id` từ ranh giới (phần "suy xã" của Q17 chưa làm, cần quyết định riêng vì đổi BE-18 quy tắc 2) |
+| CBD-1 | `administrative_unit` thêm `boundary geometry(MultiPolygon,4326) NULL`. Lúc 13/11/2026 cột này **chỉ để vẽ**: tài sản ngoài ranh giới **không** bị ẩn, lọc hay từ chối. **Từ 26/11/2026 (COMMUNE-BOUNDARY-GUARD, CBG-1…CBG-11) ranh giới LÀ chốt chặn khi ghi `pole` / `electrical_cabinet`** — câu "chỉ để vẽ" ở đây là lịch sử, không còn hiệu lực. Phân quyền vẫn theo `commune_id` (§7), và **không** suy `commune_id` từ ranh giới (phần "suy xã" của Q17 vẫn chưa làm, cần quyết định riêng vì đổi BE-18 quy tắc 2) |
 | CBD-2 | `PUT /api/v1/admin/communes/{id}/boundary` (`ManageCommunes`), body `{"boundary": <GeoJSON Polygon \| MultiPolygon> \| null}` — khoá **bắt buộc** (thiếu → 400), `null` xoá ranh giới. Polygon đơn được lưu thành MultiPolygon. → 200 `CommuneItem`. Tách khỏi `PUT /{id}` để form tên + khung không phải mang polygon |
 | CBD-3 | Kiểm: toạ độ `[lng, lat]` hữu hạn trong ±180 / ±90 (số thứ ba = độ cao theo RFC 7946 được nhận rồi bỏ; `null` hay giá trị thứ tư → 400), vòng khép kín ≥ 4 điểm, hình hợp lệ OGC (không tự cắt), tối đa 10 000 đỉnh → sai là 400 `VALIDATION_FAILED` kèm lý do; id lạ → 404 `COMMUNE_NOT_FOUND`. DB có CHECK `ck_administrative_unit_boundary_valid` (`ST_IsValid` và không rỗng). Gửi lại đúng polygon cũ không đổi `updated_at` |
 | CBD-4 | `CommuneItem` (mọi response `/admin/communes`) **thêm** `has_boundary: bool`. Polygon không nằm trong item, không nằm trong `/auth/me` |
 | CBD-5 | `GET /api/v1/map/communes` (`ReadNetwork`) → `FeatureCollection`, mỗi feature một xã **trong phạm vi của người gọi** có ranh giới: `geometry` MultiPolygon, `properties {commune_id, name}`, không `feature.id`. Không có `bbox` (một người giữ vài xã). `?commune_id=` thu hẹp như các lớp khác, xã ngoài phạm vi → 403 `COMMUNE_FORBIDDEN`. Xã chưa có ranh giới bị bỏ qua |
 | CBD-6 | `bbox` / `map_bounds` (CB-1…CB-5) **giữ nguyên**: FE vẫn dùng `map_bounds.bbox` cho `maxBounds`, vẽ viền từ CBD-5 |
 
-**Lược đồ:** migration `CommuneBoundary` — cột `boundary` + CHECK. Không index (chỉ đọc ra để vẽ). `Down()` xoá cột (mất ranh giới đã
-nạp; nạp lại bằng script).
+**Lược đồ:** migration `CommuneBoundary` — cột `boundary` + CHECK. **Không index**: COMMUNE-BOUNDARY-GUARD đọc ranh giới theo khoá
+chính rồi chạy `Covers` trong bộ nhớ, không chạy `ST_Covers` quét không gian (D-9). `Down()` xoá cột (mất ranh giới đã nạp; nạp lại
+bằng script).
 
 **Dữ liệu:** `scripts/data/commune-boundaries.geojson` — COM-001 Phường Long Phước (OSM relation 7342308), COM-002 Phường Long Bình
 (OSM relation 7342307), tải 01/10/2026; © OpenStreetMap contributors, ODbL — phải ghi nguồn khi hiển thị. Nạp bằng

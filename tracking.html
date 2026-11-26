@@ -40,6 +40,22 @@
 <body>
 <div class="wrap">
 
+  <div class="card" id="commune-boundary-guard">
+    <strong>COMMUNE-BOUNDARY-GUARD — ranh giới xã thành chốt chặn khi ghi cột / tủ điện · 26/11/2026</strong>
+    <p><span class="tag t-next">Nhánh <code>feat/COMMUNE-BOUNDARY-guard</code>, chưa PR · chưa deploy</span>
+    Phát hiện: import vào <code>COM-070</code> (Củ Chi) nhận cột nằm ở Phường Long Bình — import / CRUD không so toạ độ với xã.
+    Nay <code>pole</code> và <code>electrical_cabinet</code> phải nằm trong ranh giới xã của chính nó (0 m, trên biên tính là trong);
+    xã chưa có ranh giới thì từ chối lần ghi mang toạ độ. 400 <code>VALIDATION_FAILED</code> + <code>reason</code>
+    <code>OUTSIDE_COMMUNE_BOUNDARY</code> | <code>COMMUNE_BOUNDARY_MISSING</code>; import báo lỗi theo dòng; chỉ kiểm khi toạ độ đổi;
+    409 tuyến / feeder giữ ưu tiên. Drift <strong>CBG-1…CBG-11</strong> (SELF-SIGNED, chạm API). Không migration, không index.</p>
+    <p>Codex hiện thực (phase 1 + 2), Claude review: bỏ khoá <code>FOR UPDATE</code> thừa ở <code>PUT boundary</code> (phá đi test vẫn xanh —
+    chính câu <code>UPDATE</code> đã xung đột với <code>FOR SHARE</code>). 2095 + 454 + 90 + 47 + 21 test xanh (7 skip có sẵn), mã thoát 0;
+    phá thử luật ranh giới (5 đỏ) và khoá import (1 đỏ). Spec v1.5 sinh lại, lint 10 cảnh báo như cũ.
+    <b>Còn:</b> nạp ranh giới trên <code>luxmap_dev</code> / VPS bằng <code>scripts/load_commune_boundaries.py --apply</code> (COM-001, COM-002,
+    COM-070 mock) <b>trước khi</b> deploy — nếu không, mọi lần ghi cột / tủ có toạ độ ở xã đó bị từ chối; báo WP5 (form + import) và WP6 (GPS verify / sync <code>rejected[]</code>).
+    <a href=".ai/results/COMMUNE-BOUNDARY-GUARD-p2.md">Kết quả</a> · <a href=".ai/results/COMMUNE-BOUNDARY-GUARD-p1.md">Khảo sát</a>.</p>
+  </div>
+
   <div class="card" id="lux-stationary">
     <strong>D-R29 — đo lux đứng yên, ngay dưới đèn · 25/11/2026</strong>
     <p><span class="tag t-block">Chốt hướng (Mỹ) · chờ FW xác nhận · chưa đặc tả API</span>
@@ -1436,6 +1452,13 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>26/11/2026</td>
+        <td><code>COMMUNE-BOUNDARY-GUARD</code> Cột / tủ điện ngoài ranh giới xã (hoặc xã chưa có ranh giới) bị từ chối ở CRUD, import, dời cột, GPS verify, sync push.
+        10 test mới, toàn bộ suite xanh, 2 phá thử đỏ đúng test, spec v1.5 sinh lại.</td>
+        <td><code>CommuneBoundary.cs</code>, <code>CommuneBoundaryGuard.cs</code>, <code>AssetCrudService.cs</code>, <code>PoleRelocation.cs</code>, <code>AssetImportService.cs</code>, <code>WorkOrderService.cs</code>, <code>CommuneBoundaryGuardTests.cs</code>, fixture, drift, traps, ERD, OpenAPI, geojson COM-070 mock</td>
+        <td><code>feat(assets): refuse point assets outside their commune boundary</code></td>
+      </tr>
       <tr>
         <td>26/11/2026</td>
         <td><code>D-R30</code> (Mỹ): huỷ D-R29 — lux lại <strong>gắn trên xe, lấy mẫu khi chạy</strong> (D-R21, pipeline sweep BE-15 chưa từng gỡ).

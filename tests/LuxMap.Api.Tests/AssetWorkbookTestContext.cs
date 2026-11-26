@@ -23,6 +23,10 @@ public abstract class AssetWorkbookTestContext(AssetImportFixture fixture) : IAs
         {
             var a = new AdministrativeUnit { Name = $"wb-multi-a-{Guid.NewGuid():N}" };
             var b = new AdministrativeUnit { Name = $"wb-multi-b-{Guid.NewGuid():N}" };
+            // COMMUNE-BOUNDARY-GUARD D-7: the workbook's coordinates are all inside this outline, so the guard refuses
+            // only the rows a test deliberately puts outside.
+            a.Boundary = AssetImportFixture.Rectangles(AssetImportFixture.TestArea);
+            b.Boundary = AssetImportFixture.Rectangles(AssetImportFixture.TestArea);
             db.AddRange(a, b);
             await db.SaveChangesAsync();
             return (a.CommuneId, b.CommuneId);

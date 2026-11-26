@@ -802,6 +802,9 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
                     pole_id = x.Pole.PoleId, segment_id = x.Pole.SegmentId,
                     distance_m = Math.Round(x.SegmentDistanceM!.Value, 1), corridor_m = relocation.CorridorM,
                 }).ToArray()));
+        // COMMUNE-BOUNDARY-GUARD D-3: after the corridor 409, so an off-road point keeps the more specific complaint; a
+        // point that is still on the road but outside its commune is a 400 (sync push turns it into a rejected row, D-4).
+        await relocation.RequireInsideBoundaryAsync(moves, "pole_locations", ct);
         foreach (var move in moves) relocation.Stage(move, wo.WorkOrderId);
         await db.SaveChangesAsync(ct);
     }

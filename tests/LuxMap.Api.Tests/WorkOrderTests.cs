@@ -41,6 +41,10 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
             var communes = new[] { new AdministrativeUnit { Name = "WO test home " + Guid.NewGuid() }, new AdministrativeUnit { Name = "WO test foreign " + Guid.NewGuid() } };
+            // COMMUNE-BOUNDARY-GUARD D-7: GPS verification writes pole positions through the same service as the location
+            // endpoint, so these test-owned communes need an outline around their roads and reported points.
+            foreach (var commune in communes)
+                commune.Boundary = AssetImportFixture.Rectangles((107.95, 15.90, 108.40, 16.40));
             db.AddRange(communes);
             await db.SaveChangesAsync();
             home = communes[0].CommuneId; foreign = communes[1].CommuneId;

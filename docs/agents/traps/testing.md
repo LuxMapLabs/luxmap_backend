@@ -113,3 +113,17 @@ Các collection chạy song song trên **một** DB. `DROP TABLE` của một b�
 được tham chiếu (`administrative_unit`), nên có thể deadlock với test của collection khác, và Postgres chọn lệnh DROP làm nạn nhân —
 test vẫn xanh hết nhưng `dotnet test` thoát mã 1 ("Test Collection Cleanup Failure", PR #299). DDL trong teardown thử lại khi gặp
 `40P01` (`PostgresErrorCodes.DeadlockDetected`); lệnh bị chọn làm nạn nhân chưa làm gì nên chạy lại là an toàn.
+
+## Ranh giới xã trong fixture dùng chung (COMMUNE-BOUNDARY-GUARD, 26/11/2026)
+
+Từ COMMUNE-BOUNDARY-GUARD, mọi lần ghi `pole` / `electrical_cabinet` **mang toạ độ** qua API / service đều kiểm ranh giới xã.
+Fixture collection dùng chung phải đặt ranh giới cho xã của nó, nếu không **hàng trăm test** đỏ với 400 `COMMUNE_BOUNDARY_MISSING`:
+
+- `AssetImportFixture` đặt `TestArea` (một MultiPolygon gồm các chữ nhật quanh mọi cụm toạ độ test đang dùng) trên **cả hai** xã của nó.
+  `AssetWorkbookTestContext` làm tương tự cho hai xã workbook. Thêm một cụm toạ độ mới vào suite thì thêm chữ nhật vào `TestArea`.
+- Test cần **ngoài ranh giới**, **trên biên**, hoặc **xã chưa có ranh giới** phải **tự tạo xã riêng** — đừng xoá / thay ranh giới
+  của xã dùng chung (test khác chạy sau sẽ đỏ, và teardown của class không trả lại được hình cũ cho đúng).
+- Class tự tạo xã (work-order, sync) mà có ghi toạ độ cột phải đặt ranh giới trên xã đó; xã chỉ để chứa segment / fault / telemetry
+  thì không cần.
+- Muốn chứng minh một lệnh **có lấy khoá**, giữ khoá bằng `FOR NO KEY UPDATE` trên `administrative_unit`, không `FOR UPDATE`: FK tới
+  xã tự lấy `KEY SHARE`, nên `FOR UPDATE` cho xanh giả. Import / dời cột lấy `FOR SHARE`; `PUT boundary` không khoá riêng — chính `UPDATE` giữ `FOR NO KEY UPDATE`, xung đột với `FOR SHARE`.

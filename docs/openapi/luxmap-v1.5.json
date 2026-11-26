@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Chỉ để vẽ — phân quyền vẫn theo commune_id. POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. v1.24 (LUX-BASELINE, SELF-SIGNED — LUX-BASELINE-1…6): protocol tuỳ chọn trên số đo lux (đo đứng yên dưới đèn), evaluation do backend chấm khi Quản lý xác nhận ảnh cột, lux_classified_as/lux_baseline_ratio/lux_reason_codes trên PolePhotoItem, stationary_luminance_* ở chi tiết cột; lux vào ảnh đã quyết → 409. v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm /work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 209 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6, COMMUNE-BOUNDARY-GUARD CBG-1…CBG-11): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Từ COMMUNE-BOUNDARY-GUARD ranh giới là LUẬT GHI cho tài sản dạng điểm (pole, electrical_cabinet): ngoài ranh giới → 400 OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → 400 COMMUNE_BOUNDARY_MISSING; không lọc, không ẩn tài sản và không suy commune_id. POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5, D-3 của COMMUNE-BOUNDARY-GUARD): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit; ngoài hành lang → 409 POLE_OFF_SEGMENT trước, rồi mới kiểm ranh giới xã → 400. v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. v1.24 (LUX-BASELINE, SELF-SIGNED — LUX-BASELINE-1…6): protocol tuỳ chọn trên số đo lux (đo đứng yên dưới đèn), evaluation do backend chấm khi Quản lý xác nhận ảnh cột, lux_classified_as/lux_baseline_ratio/lux_reason_codes trên PolePhotoItem, stationary_luminance_* ở chi tiết cột; lux vào ảnh đã quyết → 409. v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13, D-3 của COMMUNE-BOUNDARY-GUARD): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm /work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không); verify kiểm hành lang trước (409 POLE_OFF_SEGMENT), ranh giới xã sau (400). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 209 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.24"
   },
   "paths": {
@@ -717,7 +717,7 @@
         "tags": [
           "AdminCommunes"
         ],
-        "summary": "[Web] [TẠM — COMMUNE-BOUNDARY] Đặt ranh giới xã (GeoJSON Polygon | MultiPolygon, EPSG:4326); khoá bắt buộc, null = xoá. Chỉ để vẽ, không lọc tài sản",
+        "summary": "[Web] [TẠM — COMMUNE-BOUNDARY] Đặt ranh giới xã (GeoJSON Polygon | MultiPolygon, EPSG:4326); khoá bắt buộc, null = xoá. Từ COMMUNE-BOUNDARY-GUARD đây là ranh giới dùng để từ chối tài sản dạng điểm nằm ngoài (pole, electrical_cabinet) và là nơi DUY NHẤT nạp ranh giới; vẫn không lọc / không ẩn tài sản, không suy commune_id, không kiểm tuyến / feeder. Ghi ranh giới chờ import / dời cột đang kiểm (chúng giữ FOR SHARE trên hàng xã) nên không đổi hình giữa chừng",
         "parameters": [
           {
             "name": "id",
@@ -2003,7 +2003,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Nạp 5 sheet tài sản .xlsx, xã và data_source qua multipart, all-or-nothing (WB-12…WB-20); 200 kèm committed + lỗi theo sheet/dòng Excel",
+        "summary": "Nạp 5 sheet tài sản .xlsx, xã và data_source qua multipart, all-or-nothing (WB-12…WB-20); 200 kèm committed + lỗi theo sheet/dòng Excel. Từ COMMUNE-BOUNDARY-GUARD: workbook dùng lại cùng planner nên dòng ngoài ranh giới / xã thiếu ranh giới là lỗi dòng như import một loại",
         "operationId": "postAssetsImportWorkbook",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -2141,7 +2141,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Nạp MỘT loại file kiểm kê (segments|cabinets|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
+        "summary": "Nạp MỘT loại file kiểm kê (segments|cabinets|feeders|poles|fixtures); 200 kèm kết quả theo dòng. Từ COMMUNE-BOUNDARY-GUARD: dòng pole/electrical_cabinet ngoài ranh giới xã là lỗi dòng geom_wkt, xã chưa có ranh giới là lỗi dòng commune_id (reason trong message); các dòng hợp lệ khác vẫn vào",
         "operationId": "postAssetsImportKind",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -3572,7 +3572,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body",
+        "summary": "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body. Điểm phải nằm trong ranh giới xã (trên biên tính là trong); ngoài → 400 OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → COMMUNE_BOUNDARY_MISSING [COMMUNE-BOUNDARY-GUARD D-1/D-2]",
         "operationId": "postAssetsCabinets",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift CAB-1…CAB-8 + CAB-MN-1…CAB-MN-5 (SELF-SIGNED, nền tạm tới FW)"
@@ -3801,7 +3801,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được",
+        "summary": "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được. Từ COMMUNE-BOUNDARY-GUARD chỉ kiểm ranh giới khi X hoặc Y thật sự đổi; gửi lại toạ độ cũ vẫn sửa được field khác",
         "operationId": "putAssetsCabinetsCabinetid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift CAB-1…CAB-8 + CAB-MN-1…CAB-MN-5 (SELF-SIGNED, nền tạm tới FW)"
@@ -4132,7 +4132,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Tạo cột; 201 + Location, không body. segment_id vắng hoặc null = cột chưa tuyến [POLE-SEGMENT-NULL]",
+        "summary": "Tạo cột; 201 + Location, không body. segment_id vắng hoặc null = cột chưa tuyến [POLE-SEGMENT-NULL]. Có geom_wkt thì điểm phải nằm trong ranh giới xã của cột (trên biên tính là trong), ngoài → 400 VALIDATION_FAILED details.reason=OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → COMMUNE_BOUNDARY_MISSING; cột geom_wkt null tạo được ở xã chưa có ranh giới [COMMUNE-BOUNDARY-GUARD D-1/D-2]",
         "operationId": "postAssetsPoles",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -4361,7 +4361,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột. Khoá segment_id BẮT BUỘC (thiếu = 400); null = tháo cột khỏi tuyến [POLE-SEGMENT-NULL]",
+        "summary": "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột. Khoá segment_id BẮT BUỘC (thiếu = 400); null = tháo cột khỏi tuyến [POLE-SEGMENT-NULL]. Từ COMMUNE-BOUNDARY-GUARD chỉ kiểm ranh giới khi X hoặc Y thật sự đổi: gửi lại toạ độ cũ của cột đang lệch vẫn sửa được field khác; đổi tới điểm ngoài → 400 như POST",
         "operationId": "putAssetsPolesPoleid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -5016,7 +5016,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[POLE-LOCATION] Kỹ sư hiện trường / Quản lý dời cột tới vị trí thật ({lat, lng}); quá 25 m khỏi tuyến của cột → 409 POLE_OFF_SEGMENT; mỗi lần dời ghi audit",
+        "summary": "[POLE-LOCATION] Kỹ sư hiện trường / Quản lý dời cột tới vị trí thật ({lat, lng}); quá 25 m khỏi tuyến của cột → 409 POLE_OFF_SEGMENT (kiểm trước); điểm còn trên tuyến nhưng ngoài ranh giới xã → 400 VALIDATION_FAILED như POST/PUT cột [COMMUNE-BOUNDARY-GUARD D-3]; mỗi lần dời ghi audit",
         "operationId": "putAssetsPolesPoleidLocation",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.3"
@@ -19463,7 +19463,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id",
+        "summary": "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id. Từ COMMUNE-BOUNDARY-GUARD thao tác ghi vị trí cột ngoài ranh giới xã là 400 nên vào rejected[], không phải conflicts[] (D-4)",
         "operationId": "postSyncPush",
         "x-luxmap-status": "implemented"
       }
@@ -23223,7 +23223,7 @@
             }
           },
           "409": {
-            "description": "INVALID_STATE_TRANSITION / CONCURRENT_MODIFICATION; survey: POLE_PHOTOS_UNDECIDED, details.photo_ids là mảng ID ảnh/clip chưa hủy và decision=null, theo captured_at, uploaded_at, length(photo_id), photo_id. Không đổi allowed_actions; inspection/repair/pole_gps_update giữ nguyên (kể cả POLE_OFF_SEGMENT của PG-12).",
+            "description": "INVALID_STATE_TRANSITION / CONCURRENT_MODIFICATION; survey: POLE_PHOTOS_UNDECIDED, details.photo_ids là mảng ID ảnh/clip chưa hủy và decision=null, theo captured_at, uploaded_at, length(photo_id), photo_id. Không đổi allowed_actions; inspection/repair giữ nguyên. pole_gps_update: POLE_OFF_SEGMENT của PG-12 vẫn kiểm TRƯỚC; sau đó ranh giới xã là 400 VALIDATION_FAILED (COMMUNE-BOUNDARY-GUARD D-3).",
             "content": {
               "application/json": {
                 "schema": {
@@ -23258,7 +23258,7 @@
           "manager"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)",
+        "summary": "[TẠM — WO-1…WO-12] Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12); vị trí ngoài hành lang → 409 POLE_OFF_SEGMENT trước, ngoài ranh giới xã → 400 VALIDATION_FAILED [COMMUNE-BOUNDARY-GUARD D-3]",
         "operationId": "postWorkOrdersIdVerify",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"

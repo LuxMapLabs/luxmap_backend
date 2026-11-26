@@ -26,10 +26,12 @@ namespace LuxMap.Persistence;
 /// query the <c>commune_ids</c> claim explicitly. Do not "fix" this for consistency.
 /// </para>
 /// <para>
-/// Two optional shapes, both for DRAWING only: a map FRAME (COMMUNE-BBOX) — four numbers an administrator types in, so a
-/// user's map opens on their commune and stays there — and a BOUNDARY polygon (COMMUNE-BOUNDARY), the outline the map
-/// draws around the commune. Neither decides anything: section 7 compares the claim against the <c>commune_id</c> column,
-/// never spatial containment, so nothing is filtered, hidden or refused for lying outside either.
+/// Two optional shapes: a map FRAME (COMMUNE-BBOX) — four numbers an administrator types in, so a user's map opens on their
+/// commune and stays there — and a BOUNDARY polygon (COMMUNE-BOUNDARY), the outline the map draws around the commune. The
+/// frame only draws. Since COMMUNE-BOUNDARY-GUARD the boundary is also a WRITE RULE for point assets: <c>pole</c> and
+/// <c>electrical_cabinet</c> positions must fall inside it (or be refused with a 400). Neither shape decides scope: section
+/// 7 still compares the claim against the <c>commune_id</c> column, never spatial containment, so nothing is filtered or
+/// hidden for lying outside either, and <c>commune_id</c> is never inferred from the polygon.
 /// </para>
 /// </remarks>
 public class AdministrativeUnit
@@ -67,7 +69,8 @@ public class AdministrativeUnit
 
     /// <summary>
     /// The commune's outline, EPSG:4326, stored as a MultiPolygon (a single Polygon is wrapped). <c>NULL</c> until an
-    /// administrator sets one. A drawing aid, not a scope — see the remarks.
+    /// administrator sets one. It is a scope WRITE RULE for point assets (COMMUNE-BOUNDARY-GUARD) and a drawing aid, never
+    /// a scope filter — see the remarks.
     /// </summary>
     public MultiPolygon? Boundary { get; set; }
 
@@ -131,7 +134,8 @@ public sealed class AdministrativeUnitConfiguration : IEntityTypeConfiguration<A
         builder.Property(unit => unit.CommuneId).HasPrefixedId(PrefixedIds.AdministrativeUnit);
         builder.Property(unit => unit.Name).HasColumnType("text").IsRequired();
         builder.Property(unit => unit.SeedKey).HasColumnType("text");
-        // No GIST index: the outline is only read back for drawing, never searched spatially.
+        // No GIST index: every check reads one row by primary key and compares in memory (CommuneBoundary.Verdict); the
+        // outline is never the predicate of a spatial search, so an index would only cost writes (COMMUNE-BOUNDARY-GUARD D-9).
         builder.Property(unit => unit.Boundary).HasColumnType($"geometry(MultiPolygon,{SpatialConstants.Srid})");
         builder.Property(unit => unit.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(unit => unit.UpdatedAt).HasDefaultValueSql("now()");
