@@ -3173,7 +3173,7 @@ Dữ liệu rejected cũ không tự mở hàng loạt; script riêng chỉ xử
 |---|---|
 | **Decision maker** | **Mỹ (Dylan), 26/11/2026** trong chat. Bối cảnh: buổi demo phải chọn ảnh từ album, mà ảnh trong album không có độ chính xác GPS; điền số giả bị loại vì Quản lý dựa vào `accuracy_m` để duyệt toạ độ vào GIS |
 | **Chạm API** | **Có**, dạng **nới**: request bỏ bắt buộc một trường, response có thể trả `null`. App cũ gửi đủ trường vẫn chạy như trước |
-| **Nền** | **SELF-SIGNED**, nền tạm tới FW kế tiếp, xây trên WO-POLE-GPS PG-10 / PG-11 và POLE-GPS-PHOTO PGP-1. Im lặng 3 ngày làm việc = **ESCALATE**. Migration `AllowUnknownPoleReportAccuracy`, chưa áp lên `luxmap_dev` / VPS |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW kế tiếp, xây trên WO-POLE-GPS PG-10 / PG-11 và POLE-GPS-PHOTO PGP-1. Im lặng 3 ngày làm việc = **ESCALATE**. Migration `AllowUnknownPoleReportAccuracy`: merge #309 (`b97528a`), đã áp VPS 26/11 12:47 UTC và `luxmap_dev` 26/11 |
 
 | Mã | Quyết định |
 |---|---|

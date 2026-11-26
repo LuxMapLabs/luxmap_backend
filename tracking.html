@@ -1456,7 +1456,7 @@
         <td>26/11/2026</td>
         <td><code>POLE-GPS-ACCURACY</code> (drift PG-14…PG-16, SELF-SIGNED): <code>accuracy_m</code> trong <code>pole_locations[]</code> thành tuỳ chọn —
         thiếu / <code>null</code> = không rõ, để demo lấy toạ độ cột từ ảnh trong album mà không điền số giả. BE vẫn không đọc EXIF.
-        Migration <code>AllowUnknownPoleReportAccuracy</code> (chỉ nới một CHECK; chưa áp <code>luxmap_dev</code> / VPS). 1 test mới, phá thử 2 chốt đỏ,
+        Migration <code>AllowUnknownPoleReportAccuracy</code> (chỉ nới một CHECK; PR #309 merge <code>b97528a</code>, đã áp VPS 26/11 12:47 UTC và <code>luxmap_dev</code> 26/11). 1 test mới, phá thử 2 chốt đỏ,
         spec v1.5 sinh lại (lint 10 cảnh báo như <code>dev</code>). Chưa báo WP5 / WP6.</td>
         <td><code>WorkOrderService.cs</code>, <code>WorkOrderResponses.cs</code>, <code>WorkOrderConfigurations.cs</code>, migration, <code>WorkOrderPoleGpsTests.cs</code>, drift, <code>POLE-GPS-PHOTOS-FE.md</code>, hai OpenAPI, generator</td>
         <td><code>feat(work-orders): accept pole GPS reports without accuracy</code></td>
