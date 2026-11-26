@@ -1,3 +1,4 @@
+using System.Net;
 using Asp.Versioning;
 using LuxMap.Shared.Authorization;
 using LuxMap.Shared.Contracts.Enums;
@@ -83,6 +84,42 @@ public sealed class StatisticsController(StatisticsService service, ICommuneScop
                 string.IsNullOrWhiteSpace(segmentId) ? null : segmentId.Trim(),
                 WireEnum.ParseCsv<DataSource>(dataSource, "data_source"), from, to), ct);
         return csv ? Csv(body.Rows, "citizen-feedback", body.AsOf) : body;
+    }
+
+    /// <summary>How the ON / OFF model's photo hints screen citizen QR reports (ST-14) — for the Manager's dashboard.</summary>
+    /// <remarks>
+    /// Reads the hints already stored; never runs the model (hints run when a Manager first opens a report, so unopened
+    /// reports are <c>not_analyzed</c>). One block per <c>data_source</c> of the pole, <c>calibration_rig</c> excluded unless
+    /// asked for. Optional inclusive <c>from</c>/<c>to</c> filter <c>night_of</c>, no default window. Verdict per report:
+    /// <c>cv_off</c> = a photo dark and none lit; <c>cv_on</c> = a photo lit and none dark; <c>inconclusive</c> = analyzed
+    /// but neither (or both); <c>not_analyzed</c>; <c>no_photo</c>. <c>contradicted</c> = citizens said the lamp is out
+    /// and the model saw it lit. <c>agreement</c> compares the verdict with the Manager's decision on decided
+    /// <c>lamp_out</c> reports — a match rate, not precision / recall. JSON only: <c>format=csv</c> is 400.
+    /// </remarks>
+    [HttpGet("citizen-screening")]
+    [Authorize(Policy = LuxMapPolicies.ReadStatistics)]
+    [ProducesResponseType<CitizenScreeningStatistics>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
+    public async Task<CitizenScreeningStatistics> CitizenScreeningAsync(
+        [FromQuery(Name = "commune_id")] string[]? communeId,
+        [FromQuery(Name = "segment_id")] string? segmentId,
+        [FromQuery(Name = "data_source")] string? dataSource,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] string? format,
+        CancellationToken ct)
+    {
+        // Nested blocks have no flat CSV form (ST-14 / D-11); citizen-feedback exports the queue counts.
+        if (CsvExport.IsRequested(format))
+            throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "citizen-screening is JSON only; use citizen-feedback for CSV.",
+                new Dictionary<string, object?> { ["field"] = "format" });
+        return await service.CitizenScreeningAsync(
+            new CitizenScreeningQuery(
+                CommuneFilter.Narrow(scopeAccessor.Scope, communeId),
+                string.IsNullOrWhiteSpace(segmentId) ? null : segmentId.Trim(),
+                WireEnum.ParseCsv<DataSource>(dataSource, "data_source"), from, to), ct);
     }
 
     /// <summary>Repair work orders finished in the nights <c>from</c>..<c>to</c>, on time or late, plus those overdue now.</summary>

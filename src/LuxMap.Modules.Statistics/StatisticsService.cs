@@ -29,6 +29,13 @@ public sealed record CitizenFeedbackQuery(
     DateOnly? From,
     DateOnly? To);
 
+public sealed record CitizenScreeningQuery(
+    IReadOnlyList<string>? CommuneIds,
+    string? SegmentId,
+    IReadOnlyList<DataSource>? DataSources,
+    DateOnly? From,
+    DateOnly? To);
+
 public sealed record WarrantyQuery(
     IReadOnlyList<WarrantyStatus>? Statuses,
     IReadOnlyList<string>? CommuneIds,
@@ -170,6 +177,160 @@ public sealed class StatisticsService(LuxMapDbContext db, WorkOrderAgendaOptions
                         4, MidpointRounding.AwayFromZero),
                 }).ToArray(),
         };
+    }
+
+    /// <summary>How many reports ST-14 lists in <c>top_poles</c>.</summary>
+    public const int TopPoleCount = 10;
+
+    /// <summary>
+    /// ST-14: the ON / OFF model's stored hints, rolled up per report and then per <c>data_source</c>. One row per report comes back
+    /// from the DB (the verdict needs every photo of the report first); citizen reports are few, at most one pending item per pole
+    /// and night. Reads <c>ai_hint</c> only — the model is never run here.
+    /// </summary>
+    public async Task<CitizenScreeningStatistics> CitizenScreeningAsync(CitizenScreeningQuery query, CancellationToken ct)
+    {
+        ValidateDateBounds(query.From, query.To);
+        var reports = db.Set<CitizenReport>().AsQueryable();
+        if (query.CommuneIds is { } communes) reports = reports.Where(r => communes.Contains(r.CommuneId));
+        reports = query.DataSources is { Count: > 0 } sources
+            ? reports.Where(r => sources.Contains(r.DataSource))
+            : reports.Where(r => r.DataSource != DataSource.CalibrationRig);
+        if (query.From is { } from) reports = reports.Where(r => r.NightOf >= from);
+        if (query.To is { } to) reports = reports.Where(r => r.NightOf <= to);
+        var poles = db.Set<Pole>().AsQueryable();
+        if (query.SegmentId is { } segmentId) poles = poles.Where(p => p.SegmentId == segmentId);
+        var screened = from r in reports join p in poles on r.PoleId equals p.PoleId select new { Report = r, p.SegmentId };
+
+        var sends = db.Set<CitizenSubmission>();
+        var photos = from s in sends join ph in db.Set<CitizenPhoto>() on s.SubmissionId equals ph.SubmissionId
+                     select new { s.ReportId, ph.AiHint, ph.AiArtifactVersion };
+        var rows = await (
+                from x in screened
+                let r = x.Report
+                select new ScreenedReport(
+                    r.DataSource, r.PoleId, x.SegmentId, r.NightOf, r.Status,
+                    sends.Count(s => s.ReportId == r.ReportId),
+                    sends.Any(s => s.ReportId == r.ReportId && s.Kind == CitizenReportKind.LampOut),
+                    sends.Any(s => s.ReportId == r.ReportId && s.Kind == CitizenReportKind.LampDim),
+                    sends.Any(s => s.ReportId == r.ReportId && s.FarFromPole),
+                    photos.Count(ph => ph.ReportId == r.ReportId),
+                    photos.Count(ph => ph.ReportId == r.ReportId && ph.AiHint != null),
+                    photos.Count(ph => ph.ReportId == r.ReportId && ph.AiHint == CitizenPhotoHint.LampOn),
+                    photos.Count(ph => ph.ReportId == r.ReportId && ph.AiHint == CitizenPhotoHint.LampOff)))
+            .ToListAsync(ct);
+        var versions = await (
+                from x in screened
+                join ph in photos on x.Report.ReportId equals ph.ReportId
+                where ph.AiArtifactVersion != null
+                group ph by new { x.Report.DataSource, ph.AiArtifactVersion } into g
+                select new { g.Key.DataSource, ArtifactVersion = g.Key.AiArtifactVersion!, Photos = g.Count() })
+            .ToListAsync(ct);
+
+        return new CitizenScreeningStatistics
+        {
+            AsOf = clock.GetUtcNow().UtcDateTime,
+            From = query.From,
+            To = query.To,
+            // data_source is stored as text: sorted here so the order is the enum's, not the alphabet's.
+            Sources = rows.GroupBy(r => r.DataSource).OrderBy(g => g.Key).Select(g => new CitizenScreeningSource
+            {
+                DataSource = g.Key,
+                Reports = g.Count(),
+                Submissions = g.Sum(r => r.Submissions),
+                FarFromPole = g.Count(r => r.FarFromPole),
+                ByStatus = new CitizenScreeningStatusCounts
+                {
+                    Pending = g.Count(r => r.Status == CitizenReportStatus.Pending),
+                    Accepted = g.Count(r => r.Status == CitizenReportStatus.Accepted),
+                    Merged = g.Count(r => r.Status == CitizenReportStatus.Merged),
+                    Rejected = g.Count(r => r.Status == CitizenReportStatus.Rejected),
+                },
+                ByVerdict = Verdicts(g),
+                ByClaim = g.GroupBy(r => r.Claim).OrderBy(c => c.Key)
+                    .Select(c => new CitizenScreeningClaim { Claim = c.Key, Reports = c.Count(), ByVerdict = Verdicts(c) })
+                    .ToArray(),
+                Contradicted = g.Count(r => r.Contradicted),
+                Agreement = Agreement(g),
+                ByNight = g.GroupBy(r => r.NightOf).OrderBy(n => n.Key).Select(n =>
+                {
+                    var v = Verdicts(n);
+                    return new CitizenScreeningNight
+                    {
+                        NightOf = n.Key, Reports = n.Count(), CvOff = v.CvOff, CvOn = v.CvOn, Inconclusive = v.Inconclusive,
+                        NotAnalyzed = v.NotAnalyzed, NoPhoto = v.NoPhoto, Contradicted = n.Count(r => r.Contradicted),
+                    };
+                }).ToArray(),
+                TopPoles = g.GroupBy(r => r.PoleId)
+                    .Select(p => new CitizenScreeningPole
+                    {
+                        PoleId = p.Key, SegmentId = p.First().SegmentId, Reports = p.Count(),
+                        Submissions = p.Sum(r => r.Submissions), Contradicted = p.Count(r => r.Contradicted),
+                        LastNightOf = p.Max(r => r.NightOf),
+                    })
+                    // Never the bare ID (POLE-10000 < POLE-9999): length first, then the string.
+                    .OrderByDescending(p => p.Reports).ThenByDescending(p => p.Submissions)
+                    .ThenBy(p => p.PoleId.Length).ThenBy(p => p.PoleId, StringComparer.Ordinal)
+                    .Take(TopPoleCount).ToArray(),
+                ArtifactVersions = versions.Where(v => v.DataSource == g.Key)
+                    .OrderByDescending(v => v.Photos).ThenBy(v => v.ArtifactVersion, StringComparer.Ordinal)
+                    .Select(v => new CitizenScreeningVersion { ArtifactVersion = v.ArtifactVersion, Photos = v.Photos })
+                    .ToArray(),
+            }).ToArray(),
+        };
+    }
+
+    private static CitizenScreeningVerdictCounts Verdicts(IEnumerable<ScreenedReport> reports)
+    {
+        var list = reports.ToList();
+        return new CitizenScreeningVerdictCounts
+        {
+            CvOff = list.Count(r => r.Verdict == ScreeningVerdict.CvOff),
+            CvOn = list.Count(r => r.Verdict == ScreeningVerdict.CvOn),
+            Inconclusive = list.Count(r => r.Verdict == ScreeningVerdict.Inconclusive),
+            NotAnalyzed = list.Count(r => r.Verdict == ScreeningVerdict.NotAnalyzed),
+            NoPhoto = list.Count(r => r.Verdict == ScreeningVerdict.NoPhoto),
+        };
+    }
+
+    private static CitizenScreeningAgreement Agreement(IEnumerable<ScreenedReport> reports)
+    {
+        var decided = reports.Where(r => r.Status != CitizenReportStatus.Pending && r.Claim == CitizenClaim.LampOut
+            && r.Verdict is ScreeningVerdict.CvOff or ScreeningVerdict.CvOn).ToList();
+        int Cell(ScreeningVerdict verdict, bool upheld)
+            => decided.Count(r => r.Verdict == verdict && (r.Status != CitizenReportStatus.Rejected) == upheld);
+        var (offUpheld, offRejected) = (Cell(ScreeningVerdict.CvOff, true), Cell(ScreeningVerdict.CvOff, false));
+        var (onUpheld, onRejected) = (Cell(ScreeningVerdict.CvOn, true), Cell(ScreeningVerdict.CvOn, false));
+        return new CitizenScreeningAgreement
+        {
+            Decided = decided.Count,
+            CvOffUpheld = offUpheld, CvOffRejected = offRejected, CvOnUpheld = onUpheld, CvOnRejected = onRejected,
+            AgreementRate = Rate(offUpheld + onRejected, decided.Count),
+            CvOffUpheldRate = Rate(offUpheld, offUpheld + offRejected),
+            CvOnRejectedRate = Rate(onRejected, onUpheld + onRejected),
+        };
+    }
+
+    private static double? Rate(int part, int whole)
+        => whole == 0 ? null : Math.Round((double)part / whole, 4, MidpointRounding.AwayFromZero);
+
+    private enum ScreeningVerdict { CvOff, CvOn, Inconclusive, NotAnalyzed, NoPhoto }
+
+    /// <summary>One report as ST-14 needs it: counts of its sends and photos, nothing of their content.</summary>
+    private sealed record ScreenedReport(
+        DataSource DataSource, string PoleId, string? SegmentId, DateOnly NightOf, CitizenReportStatus Status,
+        int Submissions, bool SaidOut, bool SaidDim, bool FarFromPole,
+        int Photos, int Hinted, int LampOn, int LampOff)
+    {
+        public CitizenClaim Claim => SaidOut ? CitizenClaim.LampOut : SaidDim ? CitizenClaim.LampDim : CitizenClaim.Other;
+
+        public ScreeningVerdict Verdict => Photos == 0 ? ScreeningVerdict.NoPhoto
+            : Hinted == 0 ? ScreeningVerdict.NotAnalyzed
+            : LampOff > 0 && LampOn == 0 ? ScreeningVerdict.CvOff
+            : LampOn > 0 && LampOff == 0 ? ScreeningVerdict.CvOn
+            : ScreeningVerdict.Inconclusive;
+
+        /// <summary>Said out, seen lit. Dim + lit is not a contradiction: the model sees ON / OFF, not brightness.</summary>
+        public bool Contradicted => Claim == CitizenClaim.LampOut && Verdict == ScreeningVerdict.CvOn;
     }
 
     private static void ValidateDateBounds(DateOnly? from, DateOnly? to)

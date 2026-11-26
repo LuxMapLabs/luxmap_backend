@@ -80,6 +80,9 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
     {
         await Db(async db =>
         {
+            await db.Database.ExecuteSqlRawAsync(
+                "DELETE FROM citizen_photo WHERE submission_id IN (SELECT submission_id FROM citizen_submission WHERE commune_id = {0} OR commune_id = {1})",
+                home, foreign);
             foreach (var table in new[] { "citizen_submission", "citizen_report", "qr_code", "work_order_segment", "work_order", "fault", "pole", "road_segment" })
             {
                 var sql = $"DELETE FROM {table} WHERE commune_id = {{0}} OR commune_id = {{1}}";
@@ -724,6 +727,258 @@ public sealed class StatisticsTests(AssetImportFixture factory) : IAsyncLifetime
                 await db.SaveChangesAsync();
             }
             return 0;
+        });
+
+    // ---- citizen-screening (ST-14) ----------------------------------------------------------------------
+
+    private const string V1 = "stats-hint-v1", V2 = "stats-hint-v2";
+
+    [Fact]
+    public async Task Screening_verdicts_claims_and_contradictions_follow_the_photo_hints()
+    {
+        var night = new DateOnly(2026, 9, 10);
+        await PlantScreened(road, night, CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOff));
+        await PlantScreened(road, night, CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn, null));
+        await PlantScreened(road, night, CitizenReportStatus.Pending, Send(CitizenReportKind.LampDim, CitizenPhotoHint.LampOn));
+        await PlantScreened(road, night, CitizenReportStatus.Pending,
+            Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn), Send(CitizenReportKind.LampOut, (CitizenPhotoHint.LampOff, V2)));
+        await PlantScreened(road, night, CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.Inconclusive));
+        await PlantScreened(road, night, CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, null, null));
+        await PlantScreened(road, night, CitizenReportStatus.Pending, Send(CitizenReportKind.PoleDamaged));
+        await PlantScreened(road, night, CitizenReportStatus.Pending,
+            Send(CitizenReportKind.Other), Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOff) with { Far = true });
+
+        var body = await Get("superior", "citizen-screening");
+
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("from").ValueKind);
+        var source = Assert.Single(body.GetProperty("sources").EnumerateArray());
+        Assert.Equal("field", source.GetProperty("data_source").GetString());
+        Assert.Equal((8, 10, 1, 1), (Int(source, "reports"), Int(source, "submissions"), Int(source, "far_from_pole"), Int(source, "contradicted")));
+        AssertVerdicts(source.GetProperty("by_verdict"), cvOff: 2, cvOn: 2, inconclusive: 2, notAnalyzed: 1, noPhoto: 1);
+        Assert.Equal(8, Int(source.GetProperty("by_status"), "pending"));
+        var claims = source.GetProperty("by_claim").EnumerateArray().ToArray();
+        Assert.Equal(["lamp_out", "lamp_dim", "other"], claims.Select(c => c.GetProperty("claim").GetString()!));
+        Assert.Equal([6, 1, 1], claims.Select(c => Int(c, "reports")));
+        AssertVerdicts(claims[0].GetProperty("by_verdict"), cvOff: 2, cvOn: 1, inconclusive: 2, notAnalyzed: 1, noPhoto: 0);
+        AssertVerdicts(claims[1].GetProperty("by_verdict"), cvOff: 0, cvOn: 1, inconclusive: 0, notAnalyzed: 0, noPhoto: 0);
+        AssertVerdicts(claims[2].GetProperty("by_verdict"), cvOff: 0, cvOn: 0, inconclusive: 0, notAnalyzed: 0, noPhoto: 1);
+        var versions = source.GetProperty("artifact_versions").EnumerateArray().ToArray();
+        Assert.Equal([(V1, 6), (V2, 1)], versions.Select(v => (v.GetProperty("artifact_version").GetString()!, Int(v, "photos"))));
+        var agreement = source.GetProperty("agreement");
+        Assert.Equal(0, Int(agreement, "decided"));
+        Assert.Equal(JsonValueKind.Null, agreement.GetProperty("agreement_rate").ValueKind);
+    }
+
+    [Fact]
+    public async Task Screening_agreement_counts_decided_lamp_out_reports_with_a_verdict_per_class()
+    {
+        var night = new DateOnly(2026, 9, 10);
+        foreach (var (status, hint) in new[]
+                 {
+                     (CitizenReportStatus.Accepted, CitizenPhotoHint.LampOff), (CitizenReportStatus.Merged, CitizenPhotoHint.LampOff),
+                     (CitizenReportStatus.Rejected, CitizenPhotoHint.LampOff), (CitizenReportStatus.Rejected, CitizenPhotoHint.LampOn),
+                     (CitizenReportStatus.Accepted, CitizenPhotoHint.LampOn),
+                     // Left out: still pending, and a verdict that says nothing.
+                     (CitizenReportStatus.Pending, CitizenPhotoHint.LampOff), (CitizenReportStatus.Rejected, CitizenPhotoHint.Inconclusive),
+                 })
+            await PlantScreened(road, night, status, Send(CitizenReportKind.LampOut, hint));
+        // Left out: citizens said dim, so a lit lamp agrees with them whatever the Manager did.
+        await PlantScreened(road, night, CitizenReportStatus.Accepted, Send(CitizenReportKind.LampDim, CitizenPhotoHint.LampOn));
+
+        var agreement = Assert.Single((await Get("manager", "citizen-screening")).GetProperty("sources").EnumerateArray()).GetProperty("agreement");
+
+        Assert.Equal((5, 2, 1, 1, 1),
+            (Int(agreement, "decided"), Int(agreement, "cv_off_upheld"), Int(agreement, "cv_off_rejected"),
+                Int(agreement, "cv_on_upheld"), Int(agreement, "cv_on_rejected")));
+        Assert.Equal(0.6, agreement.GetProperty("agreement_rate").GetDouble());
+        Assert.Equal(0.6667, agreement.GetProperty("cv_off_upheld_rate").GetDouble());
+        Assert.Equal(0.5, agreement.GetProperty("cv_on_rejected_rate").GetDouble());
+    }
+
+    [Fact]
+    public async Task Screening_nights_ascend_and_top_poles_rank_by_reports_then_sends_capped_at_ten()
+    {
+        var busy = await PlantScreened(road, new(2026, 9, 12), CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn));
+        await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending, busy, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOff));
+        await PlantScreened(road, new(2026, 9, 11), CitizenReportStatus.Rejected, busy, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn));
+        var loud = await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending,
+            Send(CitizenReportKind.LampOut), Send(CitizenReportKind.LampOut), Send(CitizenReportKind.LampOut));
+        await PlantScreened(road, new(2026, 9, 11), CitizenReportStatus.Pending, loud, Send(CitizenReportKind.LampOut));
+        var quiet = await PlantScreened(null, new(2026, 9, 10), CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut));
+        await PlantScreened(null, new(2026, 9, 11), CitizenReportStatus.Pending, quiet, Send(CitizenReportKind.LampOut));
+        for (var i = 0; i < 9; i++)
+            await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut));
+
+        var source = Assert.Single((await Get("superior", "citizen-screening")).GetProperty("sources").EnumerateArray());
+
+        var nights = source.GetProperty("by_night").EnumerateArray().ToArray();
+        Assert.Equal(["2026-09-10", "2026-09-11", "2026-09-12"], nights.Select(n => n.GetProperty("night_of").GetString()!));
+        Assert.Equal([12, 3, 1], nights.Select(n => Int(n, "reports")));
+        Assert.Equal([0, 1, 1], nights.Select(n => Int(n, "contradicted")));
+        Assert.Equal((1, 1, 11), (Int(nights[0], "cv_off"), Int(nights[1], "cv_on"), Int(nights[0], "no_photo")));
+        var top = source.GetProperty("top_poles").EnumerateArray().ToArray();
+        Assert.Equal(10, top.Length);
+        Assert.Equal([busy, loud, quiet], top.Take(3).Select(p => p.GetProperty("pole_id").GetString()!));
+        Assert.Equal([(3, 3, 2), (2, 4, 0), (2, 2, 0)], top.Take(3).Select(p => (Int(p, "reports"), Int(p, "submissions"), Int(p, "contradicted"))));
+        Assert.Equal("2026-09-12", top[0].GetProperty("last_night_of").GetString());
+        Assert.Equal(road, top[0].GetProperty("segment_id").GetString());
+        Assert.Equal(JsonValueKind.Null, top[2].GetProperty("segment_id").ValueKind);
+        // Ties (one report, one send) fall back to the ID, length first.
+        var tail = top.Skip(3).Select(p => p.GetProperty("pole_id").GetString()!).ToArray();
+        Assert.Equal(tail.OrderBy(id => id.Length).ThenBy(id => id, StringComparer.Ordinal), tail);
+    }
+
+    [Fact]
+    public async Task Screening_keeps_sources_apart_and_filters_by_source_segment_and_night()
+    {
+        await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOff));
+        await PlantScreened(otherRoad, new(2026, 9, 12), CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn));
+        await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending, DataSource.Simulated, Send(CitizenReportKind.LampOut));
+        await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending, DataSource.CalibrationRig, Send(CitizenReportKind.LampOut));
+
+        string[] Sources(JsonElement body) => body.GetProperty("sources").EnumerateArray().Select(s => s.GetProperty("data_source").GetString()!).ToArray();
+        Assert.Equal(["field", "simulated"], Sources(await Get("superior", "citizen-screening")));
+        Assert.Equal(["calibration_rig"], Sources(await Get("superior", "citizen-screening?data_source=calibration_rig")));
+        var narrowed = await Get("superior", $"citizen-screening?segment_id=%20{otherRoad}%20&from=2026-09-11&to=2026-09-12");
+        Assert.Equal("2026-09-11", narrowed.GetProperty("from").GetString());
+        var only = Assert.Single(narrowed.GetProperty("sources").EnumerateArray());
+        Assert.Equal((1, 1), (Int(only, "reports"), Int(only, "contradicted")));
+        Assert.Empty((await Get("superior", "citizen-screening?to=2026-09-09")).GetProperty("sources").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData("format=csv", "format")]
+    [InlineData("format=xml", "format")]
+    [InlineData("from=2026-09-12&to=2026-09-10", "from")]
+    [InlineData("to=2100-01-01", "to")]
+    public async Task Screening_rejects_csv_and_bad_bounds_naming_the_field(string query, string field)
+    {
+        var response = await clients["superior"].GetAsync("/api/v1/statistics/citizen-screening?" + query);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(ErrorCodes.ValidationFailed, body.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(field, body.GetProperty("error").GetProperty("details").GetProperty("field").GetString());
+    }
+
+    [Fact]
+    public async Task Screening_enforces_commune_scope_and_read_statistics_capability()
+    {
+        await PlantScreened(road, new(2026, 9, 10), CitizenReportStatus.Pending, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn));
+        await PlantScreened(foreignRoad, new(2026, 9, 10), CitizenReportStatus.Pending, home: false, Send(CitizenReportKind.LampOut, CitizenPhotoHint.LampOn));
+        Assert.Equal(1, Int(Assert.Single((await Get("manager", "citizen-screening")).GetProperty("sources").EnumerateArray()), "reports"));
+        Assert.Equal(1, Int(Assert.Single((await Get("foreign_superior", "citizen-screening")).GetProperty("sources").EnumerateArray()), "reports"));
+        Assert.Single((await Get("manager", "citizen-screening?format=json")).GetProperty("sources").EnumerateArray());
+        foreach (var (who, path, code) in new[]
+                 {
+                     ("manager", $"citizen-screening?commune_id={foreign}", ErrorCodes.CommuneForbidden),
+                     ("engineer", "citizen-screening", ErrorCodes.RoleForbidden),
+                 })
+        {
+            var response = await clients[who].GetAsync("/api/v1/statistics/" + path);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            Assert.Equal(code, JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement
+                .GetProperty("error").GetProperty("code").GetString());
+        }
+    }
+
+    private static int Int(JsonElement element, string name) => element.GetProperty(name).GetInt32();
+
+    private static void AssertVerdicts(JsonElement verdicts, int cvOff, int cvOn, int inconclusive, int notAnalyzed, int noPhoto)
+        => Assert.Equal((cvOff, cvOn, inconclusive, notAnalyzed, noPhoto),
+            (Int(verdicts, "cv_off"), Int(verdicts, "cv_on"), Int(verdicts, "inconclusive"), Int(verdicts, "not_analyzed"), Int(verdicts, "no_photo")));
+
+    /// <summary>One send; each photo is a hint (version V1), a (hint, version) pair, or <c>null</c> for a photo not analyzed yet.</summary>
+    private sealed record PlantedSend(CitizenReportKind Kind, IReadOnlyList<(CitizenPhotoHint Hint, string Version)?> Photos)
+    {
+        public bool Far { get; init; }
+    }
+
+    private static PlantedSend Send(CitizenReportKind kind, params object?[] photos)
+        => new(kind, photos.Select(p => p switch
+        {
+            null => ((CitizenPhotoHint, string)?)null,
+            CitizenPhotoHint hint => (hint, V1),
+            ValueTuple<CitizenPhotoHint, string> pair => pair,
+            _ => throw new ArgumentException("photo"),
+        }).ToArray());
+
+    private Task<string> PlantScreened(string? segment, DateOnly night, CitizenReportStatus status, params PlantedSend[] sends)
+        => PlantScreened(segment, night, status, DataSource.Field, null, true, sends);
+
+    private Task<string> PlantScreened(string? segment, DateOnly night, CitizenReportStatus status, string pole, params PlantedSend[] sends)
+        => PlantScreened(segment, night, status, DataSource.Field, pole, true, sends);
+
+    private Task<string> PlantScreened(string? segment, DateOnly night, CitizenReportStatus status, DataSource source, params PlantedSend[] sends)
+        => PlantScreened(segment, night, status, source, null, true, sends);
+
+    private Task<string> PlantScreened(string? segment, DateOnly night, CitizenReportStatus status, bool home, params PlantedSend[] sends)
+        => PlantScreened(segment, night, status, DataSource.Field, null, home, sends);
+
+    /// <summary>A report with its sends and photos — on a new pole, or on <paramref name="poleId"/> again (another night).</summary>
+    private Task<string> PlantScreened(string? segment, DateOnly night, CitizenReportStatus status, DataSource source,
+        string? poleId, bool home, PlantedSend[] sends)
+        => Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            var commune = home ? this.home : foreign;
+            var now = DateTime.UtcNow;
+            if (poleId is null)
+            {
+                var pole = new Pole { CommuneId = commune, SegmentId = segment, DataSource = source, Geom = new Point(108, 16) { SRID = 4326 } };
+                db.Add(pole);
+                await db.SaveChangesAsync();
+                poleId = pole.PoleId;
+            }
+            Fault? fault = null;
+            if (status is CitizenReportStatus.Accepted or CitizenReportStatus.Merged)
+            {
+                fault = new Fault
+                {
+                    PoleId = poleId, CommuneId = commune, SegmentId = segment, DataSource = source,
+                    FaultType = FaultType.LampOut, FaultStatus = FaultStatus.Detected, Severity = Severity.Medium,
+                    SourceChannel = SourceChannel.FieldReport, DetectedAt = now, CreatedAt = now, UpdatedAt = now,
+                };
+                db.Add(fault);
+                await db.SaveChangesAsync();
+            }
+            var report = new CitizenReport
+            {
+                PoleId = poleId, CommuneId = commune, DataSource = source, NightOf = night, Status = status,
+                CreatedAt = now, LastSubmittedAt = now, FaultId = fault?.FaultId,
+                DecidedBy = status == CitizenReportStatus.Pending ? null : users["manager"].UserId,
+                DecidedAt = status == CitizenReportStatus.Pending ? null : now,
+                DecisionNote = status == CitizenReportStatus.Rejected ? "Stats rejection" : null,
+            };
+            db.Add(report);
+            var qr = await db.Set<QrCode>().IgnoreQueryFilters().FirstOrDefaultAsync(q => q.PoleId == poleId && q.RevokedAt == null);
+            if (qr is null)
+            {
+                qr = new QrCode { PoleId = poleId, CommuneId = commune, Code = Guid.NewGuid().ToString("N")[..16], CreatedBy = users["manager"].UserId, CreatedAt = now };
+                db.Add(qr);
+            }
+            await db.SaveChangesAsync();
+            foreach (var send in sends)
+            {
+                var submission = new CitizenSubmission
+                {
+                    ReportId = report.ReportId, PoleId = poleId, CommuneId = commune, QrId = qr.QrId, ClientOpId = Guid.NewGuid(),
+                    RequestHash = new string('a', 64), Kind = send.Kind, ReceivedAt = now, FarFromPole = send.Far,
+                    ReporterLat = send.Far ? 16.5 : null, ReporterLng = send.Far ? 108.5 : null,
+                };
+                db.Add(submission);
+                await db.SaveChangesAsync();
+                var position = 0;
+                foreach (var photo in send.Photos)
+                    db.Add(new CitizenPhoto
+                    {
+                        SubmissionId = submission.SubmissionId, Position = ++position, ObjectKey = "stats/" + Guid.NewGuid(),
+                        ThumbnailKey = "stats/" + Guid.NewGuid(), ByteCount = 1, ThumbnailBytes = 1, ReceivedAt = now,
+                        AiHint = photo?.Hint, AiArtifactVersion = photo?.Version, AiCheckedAt = photo is null ? null : now,
+                        AiConfidence = photo is { Hint: not CitizenPhotoHint.Inconclusive } ? 0.9 : null,
+                    });
+                await db.SaveChangesAsync();
+            }
+            return poleId;
         });
 
     // ---- helpers ------------------------------------------------------------------------------------------
