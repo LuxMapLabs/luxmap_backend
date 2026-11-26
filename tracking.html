@@ -659,7 +659,7 @@
 
   <div class="card" id="stat-citizen-cv">
     <strong>STAT-CITIZEN-CV — CV sàng lọc báo cáo QR cho dashboard Quản lý, 26/11/2026</strong>
-    <p><span class="tag t-next">Phase 2 xong trên nhánh <code>feat/STAT-CITIZEN-AI</code> · chưa push / PR</span>
+    <p><span class="tag t-done">Đã merge · PR #306 (<code>db9bfa8</code>) · deploy VPS 26/11 07:03 UTC</span>
     <code>GET /statistics/citizen-screening</code>: kết luận CV ON/OFF từng báo cáo (từ gợi ý ảnh đã lưu, không chạy model),
     nghi báo nhầm (dân báo tắt, CV thấy sáng), mức khớp CV ↔ Quản lý theo từng lớp, xu hướng theo đêm, 10 cột bị báo nhiều,
     phiên bản model. Drift ST-14 SELF-SIGNED; không migration. Web: khối mới trên <code>/dashboard</code> ở nhánh
@@ -1442,6 +1442,15 @@
         LUX-BASELINE giữ làm số đo đối chứng. Chỉ tài liệu; còn mở O-1 (bộ chấm ảnh cột vẫn ghi <code>dim</code>), O-2 (WP6 ghi phiên sweep), O-3 (firmware D-FS-20).</td>
         <td>drift, <code>CLAUDE.md</code>, <code>traps/survey.md</code>, <code>BE-15-pilot-drive.md</code></td>
         <td><code>docs(drift): record D-R30 vehicle-mounted lux sampling</code></td>
+      </tr>
+      <tr>
+        <td>26/11/2026</td>
+        <td><code>STAT-CITIZEN-CV</code> merged: backend #306 (<code>db9bfa8</code>). VPS deploy 07:03 UTC: backup
+        <code>luxmap-20261126T070249Z</code> (564K DB, 183M objects), không migration; API + iot-bridge restart 0, 0 dòng lỗi;
+        <code>GET /statistics/citizen-screening</code> với phiên Quản lý trả 200, <code>sources: []</code> (prod chưa có báo cáo QR).
+        Web #162 (khối dashboard) mở, chờ review — merge sau deploy này.</td>
+        <td>tracking</td>
+        <td><code>docs(STAT-CITIZEN-CV): merged and deployed to the VPS</code></td>
       </tr>
       <tr>
         <td>26/11/2026</td>
