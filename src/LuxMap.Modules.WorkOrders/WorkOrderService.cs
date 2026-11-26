@@ -129,7 +129,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             FaultIds = members.Select(x => x.Fault.FaultId).ToArray(),
             PoleIds = targets.Select(x => x.PoleId).ToArray(),
             PoleLocations = targets.Where(x => x.ReportedLat is not null).Select(x => new WorkOrderPoleLocation(x.PoleId,
-                x.ReportedLat!.Value, x.ReportedLng!.Value, x.ReportedAccuracyM!.Value, x.ReportedCapturedAt!.Value)).ToArray(),
+                x.ReportedLat!.Value, x.ReportedLng!.Value, x.ReportedAccuracyM, x.ReportedCapturedAt!.Value)).ToArray(),
             Attachments = await WorkOrderAttachmentService.ItemsAsync(db, id, ct),
             PriorityScore = members.Select(x => x.Fault.PriorityScore).DefaultIfEmpty().Max(),
             Note = wo.Note, ReviewNote = wo.ReviewNote, ReportNote = wo.ReportNote, CreatedBy = wo.CreatedBy,
@@ -713,11 +713,12 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     private static WorkOrderPoleLocation[] Reported(IEnumerable<WorkOrderPoleTarget> targets)
         => targets.Where(x => x.ReportedLat is not null).Select(x => new WorkOrderPoleLocation(x.PoleId,
-            x.ReportedLat!.Value, x.ReportedLng!.Value, x.ReportedAccuracyM!.Value, x.ReportedCapturedAt!.Value)).ToArray();
+            x.ReportedLat!.Value, x.ReportedLng!.Value, x.ReportedAccuracyM, x.ReportedCapturedAt!.Value)).ToArray();
 
     /// <summary>
     /// PG-10/PG-11: what the engineer measured, kept on the order — NOT the GIS. At least one pole (a pole not found is left out, never
-    /// invented), each a target of this order, once. Replaces the previous report as a whole.
+    /// invented), each a target of this order, once. Replaces the previous report as a whole. <c>accuracy_m</c> may be absent (PG-14): a
+    /// position read from a gallery photo's EXIF has none, and a made-up number would pass for a measured one.
     /// </summary>
     private static void Report(List<WorkOrderPoleTarget> targets, JsonElement body)
     {
@@ -729,20 +730,20 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             || reports.Select(x => x.PoleId).Distinct(StringComparer.Ordinal).Count() != reports.Length)
             throw OptionalJson.Invalid("pole_locations");
         var latest = UtcMicrosecondClock.UtcNow() + FaultReportService.FutureTolerance;
-        var accepted = new Dictionary<string, (double Lat, double Lng, double Accuracy, DateTime At)>(StringComparer.Ordinal);
+        var accepted = new Dictionary<string, (double Lat, double Lng, double? Accuracy, DateTime At)>(StringComparer.Ordinal);
         foreach (var report in reports)
         {
             if (report.PoleId is null || targets.All(x => x.PoleId != report.PoleId)
                 || report.Lat is not { } lat || !double.IsFinite(lat) || Math.Abs(lat) > 90
                 || report.Lng is not { } lng || !double.IsFinite(lng) || Math.Abs(lng) > 180
-                || report.AccuracyM is not { } accuracy || !double.IsFinite(accuracy) || accuracy < 0
+                || (report.AccuracyM is { } accuracy && (!double.IsFinite(accuracy) || accuracy < 0))
                 || report.CapturedAt is not { } captured)
                 throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "pole_locations"), ("pole_id", report.PoleId));
             var utc = UtcNormalization.ToUtc(captured);
             // timestamptz keeps microseconds; trim so the response equals what is stored.
             var at = new DateTime(utc.Ticks / 10 * 10, DateTimeKind.Utc);
             if (at > latest) throw Error("VALIDATION_FAILED", HttpStatusCode.BadRequest, ("field", "pole_locations"), ("pole_id", report.PoleId));
-            accepted[report.PoleId] = (lat, lng, accuracy, at);
+            accepted[report.PoleId] = (lat, lng, report.AccuracyM, at);
         }
         foreach (var target in targets)
         {

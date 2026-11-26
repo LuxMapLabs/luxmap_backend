@@ -5422,7 +5422,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_pole_target_position", "position >= 0");
 
-                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_accuracy_m IS NOT NULL AND reported_captured_at IS NOT NULL)");
+                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_captured_at IS NOT NULL)");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);

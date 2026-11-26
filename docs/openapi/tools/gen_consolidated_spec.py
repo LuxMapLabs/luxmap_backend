@@ -365,7 +365,7 @@ for method, suffix, summary in [
     ("patch", "/{id}", "Sửa title, due_date, scheduled_date; thiếu giữ nguyên, null xoá ngày"),
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
     ("post", "/{id}/start", "Người được giao bắt đầu việc"),
-    ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10), chưa vào GIS"),
+    ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10; accuracy_m tuỳ chọn, PG-14), chưa vào GIS"),
     ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)"),
     ("post", "/{id}/return", "Quản lý trả việc để làm tiếp"),
     ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),

@@ -30168,7 +30168,8 @@
           },
           "accuracy_m": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "captured_at": {
             "type": "string",

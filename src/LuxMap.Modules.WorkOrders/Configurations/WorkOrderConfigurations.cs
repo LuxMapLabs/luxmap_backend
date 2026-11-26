@@ -116,10 +116,11 @@ public sealed class WorkOrderPoleTargetConfiguration : IEntityTypeConfiguration<
         builder.ToTable("work_order_pole_target", table =>
         {
             table.HasCheckConstraint("ck_work_order_pole_target_position", "position >= 0");
-            // A report is all four values or none — each named, so a NULL operand cannot let a half report through.
+            // A report is position + time together or none — each named, so a NULL operand cannot let a half report through.
+            // Accuracy may be NULL inside a report (PG-14), but never without one.
             table.HasCheckConstraint("ck_work_order_pole_target_report_complete", """
                 (reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)
-                OR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_accuracy_m IS NOT NULL AND reported_captured_at IS NOT NULL)
+                OR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_captured_at IS NOT NULL)
                 """);
             // Measured floats: NaN sorts above every number in Postgres, so each bound is spelled out (migrations.md).
             table.HasCheckConstraint("ck_work_order_pole_target_lat", "reported_lat IS NULL OR (reported_lat >= -90 AND reported_lat <= 90 AND reported_lat <> 'NaN'::float8)");
