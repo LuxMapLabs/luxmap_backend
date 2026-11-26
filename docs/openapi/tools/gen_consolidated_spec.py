@@ -131,8 +131,8 @@ iot_values = {
     ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
     ("IotFeederElectricalResult", "status"): ["online", "offline", "no_data", "unconfigured"],
-    ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data"],
-    ("IotDiagnosticSummaryItem", "diagnostic_status"): ["normal", "anomaly", "stale", "no_data", "unconfigured", "source_unavailable"],
+    ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data", "insufficient_samples"],
+    ("IotDiagnosticSummaryItem", "diagnostic_status"): ["normal", "anomaly", "stale", "no_data", "insufficient_samples", "unconfigured", "source_unavailable"],
     ("IotAnomaly", "code"): [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "current_drop",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",

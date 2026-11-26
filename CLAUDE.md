@@ -10,9 +10,9 @@ Capstone W1–W21: 07/09/2026 – 31/01/2027 · Repo này là **WP2, phụ trác
 báo sự cố qua mã QR trên cột (`/public/…`, không token), Quản lý duyệt ở `/citizen-reports`.
 
 **Phiếu v1.3 hiện hành (31/10/2026) cô đọng hơn v1.4 và không nhắc lại BH1750 / xe khảo sát; phần dưới là chi tiết kênh đo từ v1.4, vẫn là cách repo chạy cho tới khi nhóm chốt khác.**
-**25/11/2026 — D-R29:** nhóm đã chốt đo lux **đứng yên, ngay dưới đèn, từng cột** (sào độ cao cố định), thay đo trên xe.
-**26/11 — LUX-BASELINE:** số lux có `protocol` gắn ảnh cột ở phiếu khảo sát được chấm lúc Quản lý xác nhận ảnh, so với **baseline
-đứng yên** riêng (bảng song song, không trộn với baseline sweep). Pipeline sweep vẫn chạy, không đổi. Bẫy: `docs/agents/traps/survey.md`.
+**26/11/2026 — D-R30 huỷ D-R29:** lux lại **gắn trên xe, lấy mẫu khi chạy** (D-R21, pipeline sweep BE-15) — đó là kênh đo độ sáng chính.
+**LUX-BASELINE** (deploy 26/11, số lux có `protocol` gắn ảnh cột, **baseline đứng yên** ở bảng song song) giữ làm số đo đối chứng; nó vẫn
+đổi trạng thái cột khi Quản lý xác nhận ảnh — chờ quyết (D-R30 O-1). Bẫy: `docs/agents/traps/survey.md`.
 
 **Phiếu v1.4 (27/09/2026) — kênh đo độ sáng.** CV chỉ quyết **ON/OFF**; độ sáng đo bằng **BH1750 gắn trên xe khảo sát**, lấy mẫu
 liên tục suốt sweep; **`dim` = CV nói ON + đỉnh lux lúc ngang cột dưới ngưỡng baseline của chính cột**. Mỗi phiên = video + log lux

@@ -197,6 +197,7 @@ Mẫu điện mới nhất vẫn trả measurement.voltage/current_ma/power_mw, 
 | | `offline` | Mẫu điện gần nhất quá ngưỡng thời gian. |
 | | `no_data` | Chưa có mẫu điện. |
 | `diagnostics.status` | `normal` | Chưa phát hiện bất thường theo cấu hình hiện tại. |
+| | `insufficient_samples` | Chưa đủ 5 mẫu ON hợp lệ để xét lỗi điện. |
 | | `anomaly` | Có ít nhất một bất thường trong `anomalies`. |
 | | `stale` | Mẫu đã cũ và không dùng để chẩn đoán điện hiện tại. |
 | | `no_data` | Chưa có mẫu để chẩn đoán. |
@@ -266,7 +267,7 @@ Phase 2 hợp nhất đường điều khiển sẽ được đặc tả riêng;
 
 Đọc GET /api/v1/iot/diagnostics/summary?page=1&page_size=20 bằng quyền ReadNetwork.
 Mỗi item có node_id, feeder_id, diagnostic_status, anomaly_codes[], estimated_lit, estimated_missing, fault_ids và evaluated_at.
-diagnostic_status nhận normal, anomaly, stale, no_data, unconfigured hoặc source_unavailable.
+diagnostic_status nhận normal, anomaly, stale, no_data, insufficient_samples, unconfigured hoặc source_unavailable.
 Danh sách đầy đủ 17 anomaly_codes và cách xử lý null, stale, nguồn lỗi nằm trong [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
 
 Job đánh giá độc lập với FE, tạo Fault detected sau debounce. Detected tự phục hồi và chưa có WorkOrder chuyển rejected có audit.
@@ -340,7 +341,8 @@ Các lỗi điện/phần cứng không được xóa chỉ vì node trả ACK.
 Dùng GET /api/v1/iot/feeders/{feederId}/diagnostics cho hiện tại và
 GET /api/v1/iot/feeders/{feederId}/diagnostics/history?page=1&page_size=20&from=...&to=... cho lịch sử.
 Bỏ lamp_count/estimated_lit/estimated_missing; current_drop so trung bình 5 mẫu với nominal_current_ma, giảm >5%.
-voltage_loss/voltage_deviation cũng dùng áp trung bình 5 mẫu. electrical_window nêu mẫu/trung bình;
+voltage_loss/voltage_deviation cũng dùng áp trung bình 5 mẫu. electrical_window trả số mẫu và các giá trị trung bình.
+Các mẫu có thể đến từ nhiều gói LoRa với sequence không liền nhau. Nếu thiếu 5 mẫu hợp lệ, API trả insufficient_samples.
 measurement vẫn là mẫu mới nhất. History một dòng/đợt/mã lỗi, cập nhật ended_at mỗi 5 giây,
 status active/resolved/interrupted; lọc khoảng giao và phân trang. Mục này thay hướng dẫn đếm bóng cũ.
 Chi tiết JSON, ngưỡng, thời gian và 17 mã lỗi: [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).

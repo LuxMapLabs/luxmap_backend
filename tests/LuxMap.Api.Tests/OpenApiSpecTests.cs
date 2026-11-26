@@ -162,6 +162,9 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
             Assert.Contains("online", fields.GetProperty(contact).GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
             Assert.Contains("offline", fields.GetProperty(contact).GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
         }
+        foreach (var (schema, field) in new[] { ("IotDiagnosticResult", "status"), ("IotDiagnosticSummaryItem", "diagnostic_status") })
+            Assert.Contains("insufficient_samples", Schema(schema).GetProperty("properties")
+                .GetProperty(field).GetProperty("enum").EnumerateArray().Select(value => value.GetString()));
     }
 
     [Fact]

@@ -27776,13 +27776,15 @@
             "type": "string"
           },
           "status": {
-            "type": "string",
             "enum": [
               "normal",
               "anomaly",
               "stale",
-              "no_data"
-            ]
+              "no_data",
+              "insufficient_samples"
+            ],
+            "type": "string",
+            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
@@ -27870,15 +27872,17 @@
             "nullable": true
           },
           "diagnostic_status": {
-            "type": "string",
             "enum": [
               "normal",
               "anomaly",
               "stale",
               "no_data",
+              "insufficient_samples",
               "unconfigured",
               "source_unavailable"
-            ]
+            ],
+            "type": "string",
+            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
           },
           "anomaly_codes": {
             "type": "array",
