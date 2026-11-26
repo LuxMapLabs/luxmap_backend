@@ -163,10 +163,24 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
             await IotDiagnosticJob.SaveAsync(db, new Assignments(false), rig.Node, profile,
                 result, result.Status, now, "job:current-drop-test", default);
         }
+        foreach (var seconds in new[] { 5, 120 }) {
+            var observedAt = now.AddSeconds(seconds);
+            var incomplete = result with {
+                Status = "insufficient_samples", Anomalies = [],
+                Measurement = new(observedAt, "ON", 5, 100, 500), MeasuredAt = observedAt,
+                MeasurementKey = $"s/{seconds}", MeasurementSequence = seconds,
+                ElectricalWindow = new("insufficient_samples", 4, 5, null, null, null),
+            };
+            await using var db = contexts.Open(fixture.CommuneId);
+            await IotDiagnosticJob.SaveAsync(db, new Assignments(false), rig.Node, profile,
+                incomplete, incomplete.Status, observedAt, "job:incomplete-window-test", default);
+        }
         await using var check = contexts.Open(fixture.CommuneId);
         var fault = Assert.Single(await check.Set<Fault>().Where(f => f.OriginNodeId == rig.Node).ToListAsync());
         Assert.Equal(FaultType.CurrentAnomaly, fault.FaultType);
         Assert.Equal("current_drop", fault.IotAnomalyCode);
+        Assert.Equal(FaultStatus.Detected, fault.FaultStatus);
+        Assert.Null(fault.RecoveredAt);
         Assert.Contains("electrical_window", fault.IotEvidence);
         Assert.DoesNotContain("lamp_count", fault.IotEvidence);
         var episode = await check.Set<LuxMap.Modules.IOT.Entities.IotDiagnosticEpisode>()

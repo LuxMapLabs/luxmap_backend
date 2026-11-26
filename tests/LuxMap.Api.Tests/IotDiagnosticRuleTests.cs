@@ -122,4 +122,23 @@ public sealed class IotDiagnosticRuleTests
         Assert.False(IotDiagnosticRules.TryObservation(reading, "voltage_loss", new(), now, out _));
         Assert.Equal(FaultType.IotHardwareFault, IotDiagnosticRules.TypeOf("bh1750_unavailable"));
     }
+
+    [Theory]
+    [InlineData("current_drop")]
+    [InlineData("voltage_loss")]
+    [InlineData("voltage_deviation")]
+    public void Missing_samples_are_not_evidence_of_electrical_recovery(string code)
+    {
+        var now = DateTime.UtcNow;
+        var result = new IotDiagnosticResult("NODE-test", "FDR-test", "insufficient_samples",
+            new(now, "ON", 5, 100, 500), []) {
+            MeasuredAt = now, MeasurementKey = "session/2750", MeasurementSequence = 2750,
+            ConnectionStatus = "online", ElectricalStatus = "fresh",
+            ElectricalWindow = new("insufficient_samples", 4, 5, null, null, null),
+        };
+        Assert.False(IotDiagnosticRules.TryObservation(result, code, new(), now, out _));
+        var evidence = new DiagnosticCodeEvidence();
+        evidence.Observe("session/2740", true, 2740, now, code);
+        Assert.Null(evidence.HealthySince);
+    }
 }

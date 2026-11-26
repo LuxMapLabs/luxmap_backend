@@ -712,13 +712,45 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d], voltage: 5);
             await Insufficient(4);
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 5, skipSequence: 3);
-            await Insufficient(2);
+            await Insufficient(4);
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d], voltage: 5, skipSequence: 2);
-            await Insufficient();
+            await Insufficient(2);
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 5, duplicatePrevious: true);
-            await Insufficient();
+            await SingleAlert("current_drop");
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d], voltage: 5, duplicatePrevious: true);
+            await Insufficient(4); // Five rows containing a retry are only four distinct readings.
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 5, foreignPrevious: true);
             await Insufficient();
+            // Actual radio groups have four rows each, equal receipt times inside a
+            // group, and gaps in sequence between groups. Five fresh readings suffice.
+            long[] batchedSequences = [2739, 2740, 2741, 2742, 2747, 2748, 2749, 2750];
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60, 60, 60, 60],
+                sequences: batchedSequences, sampleIntervalSeconds: 1, batchDelivery: true);
+            var batched = await client.GetFromJsonAsync<JsonElement>(path);
+            Assert.Equal("anomaly", batched.GetProperty("status").GetString());
+            Assert.Equal("electrical-mean5-batched-v2", batched.GetProperty("calibration_version").GetString());
+            Assert.Equal(5, batched.GetProperty("electrical_window").GetProperty("samples").GetInt32());
+            Assert.Equal(60, batched.GetProperty("electrical_window").GetProperty("current_ma_avg").GetDouble());
+            var drop = Assert.Single(batched.GetProperty("anomalies").EnumerateArray());
+            Assert.Equal("current_drop", drop.GetProperty("code").GetString());
+            Assert.Equal(93.5546875, drop.GetProperty("reference").GetDouble());
+            bridge.DiagnosticDevice = DiagnosticTelemetry([100d, 100, 100, 100, 100, 100, 100, 100],
+                sequences: batchedSequences, sampleIntervalSeconds: 1, batchDelivery: true);
+            var healthy = await client.GetFromJsonAsync<JsonElement>(path);
+            Assert.Equal("normal", healthy.GetProperty("status").GetString());
+            Assert.Empty(healthy.GetProperty("anomalies").EnumerateArray());
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60, 60, 60, 60],
+                sequences: batchedSequences, offSequence: 2748, sampleIntervalSeconds: 1);
+            await Insufficient(2); // Do not reach past a recorded OFF to find older ONs.
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60, 60, 60, 60],
+                sequences: batchedSequences, invalidSequence: 2748, sampleIntervalSeconds: 1);
+            await Insufficient(2);
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60], backfillSequence: 5);
+            await Insufficient(0); // A fresh receipt of SD replay is not live evidence.
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60], backfillSequence: 3);
+            await Insufficient(4);
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60], staleDelivery: true);
+            await SingleAlert("telemetry_stale");
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 0.04);
             await SingleAlert("voltage_loss");
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 4.4);
@@ -738,6 +770,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
             async Task Insufficient(int expectedSamples = 1) {
                 var payload = await client.GetFromJsonAsync<JsonElement>(path);
+                Assert.Equal("insufficient_samples", payload.GetProperty("status").GetString());
                 Assert.Equal("insufficient_samples", payload.GetProperty("electrical_window").GetProperty("status").GetString());
                 Assert.Equal(expectedSamples, payload.GetProperty("electrical_window").GetProperty("samples").GetInt32());
                 Assert.Empty(payload.GetProperty("anomalies").EnumerateArray());
@@ -809,19 +842,26 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
     private static object DiagnosticTelemetry(double[] currents, double voltage = 5, string lampCommand = "ON",
         int? skipSequence = null, bool oldRtc = false, bool staleDelivery = false,
-        bool duplicatePrevious = false, bool foreignPrevious = false)
+        bool duplicatePrevious = false, bool foreignPrevious = false, long[]? sequences = null,
+        long? offSequence = null, long? invalidSequence = null, long? backfillSequence = null,
+        int sampleIntervalSeconds = 10, bool batchDelivery = false)
     {
         var now = DateTimeOffset.UtcNow;
         var measured = now.AddSeconds(oldRtc ? -120 : -5);
         var received = now.AddSeconds(staleDelivery ? -120 : -1);
         var rows = currents.Select((current, index) =>
         {
-            var offset = (currents.Length - 1 - index) * 10;
+            var sequence = sequences?[index] ?? index + 1;
+            var offset = ((sequences?[^1] ?? currents.Length) - sequence) * sampleIntervalSeconds;
+            var receiptOffset = batchDelivery ? (currents.Length - 1 - index) / 4 * 5 : offset;
             return new
             {
-                receivedAt = index == currents.Length - 1 ? received : received.AddSeconds(-offset),
-                data = new { lampCommand, voltage, current, power = voltage * current, sessionId = foreignPrevious && index < currents.Length - 1 ? "foreign" : "calibration",
-                    sequenceNumber = index + 1, timestamp = measured.AddSeconds(-offset).ToOffset(TimeSpan.FromHours(7))
+                receivedAt = received.AddSeconds(-receiptOffset),
+                data = new { lampCommand = offSequence == sequence ? "OFF" : lampCommand, voltage,
+                    current = invalidSequence == sequence ? (double?)null : current, power = voltage * current,
+                    receptionType = backfillSequence == sequence ? "backfill" : "live",
+                    sessionId = foreignPrevious && index < currents.Length - 1 ? "foreign" : "calibration",
+                    sequenceNumber = sequence, timestamp = measured.AddSeconds(-offset).ToOffset(TimeSpan.FromHours(7))
                         .ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) },
             };
         }).ToArray();
