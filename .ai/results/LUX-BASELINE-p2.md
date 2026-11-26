@@ -62,10 +62,53 @@ after Up:    lux_evaluation present = t | 20261125173021_AddStationaryLuxBaselin
 
 OpenAPI: xuất → generator (`info.version` 1.24) → redocly lint `valid`, 9 cảnh báo, **cùng 9 cảnh báo** như spec của `origin/dev`.
 
+## Bộ test toàn phần sau bản sửa cuối (`eb01f75`)
+
+```text
+Passed!  - Failed:     0, Passed:    21 - LuxMap.IotBridge.Tests.dll
+Passed!  - Failed:     0, Passed:   449 - LuxMap.Shared.Tests.dll
+Passed!  - Failed:     0, Passed:    47 - LuxMap.Persistence.Tests.dll
+Passed!  - Failed:     0, Passed:    90 - LuxMap.Infrastructure.Storage.Tests.dll
+Passed!  - Failed:     0, Passed:  2038, Skipped:     7, Total:  2045 - LuxMap.Api.Tests.dll
+exit=0
+```
+
+Web sau chỉnh giao diện cuối: `tsc` sạch, eslint 0 lỗi, vitest 933/933, build xanh. Mobile: 736 unit test, ktlint sạch.
+
+## Test cả luồng (26/11, trên bản sao `luxmap_dev`)
+
+DB `luxmap_e2e` khôi phục từ backup `luxmap_dev-20261126T005039-before-LUX-BASELINE.dump`, migrate, API chạy local cổng 5241.
+Kịch bản qua HTTP: Quản lý (`engineer`) tạo phiếu khảo sát SEG-002 → kỹ sư (`crew`) bắt đầu → 4 đêm: upload ảnh thật, review nhãn ON,
+`POST /lux-readings` kèm `protocol` 12 mẫu → Quản lý quyết định ảnh.
+
+**Lần 1 (POLE-0048) lộ lỗi:** cột có `data_source = public_imagery` (kiểm kê từ ảnh), số đo là `field`; luật D-9 đòi số đo cùng nguồn với
+**cột** nên không số nào vào baseline, đêm 4 không chấm được. Sửa: bỏ điều kiện đó — nguồn vẫn tách vì baseline có khoá theo `data_source`
+của **số đo** (`eb01f75`, test `Field_readings_on_a_pole_inventoried_from_public_imagery_still_build_its_baseline`).
+
+**Lần 2 (POLE-0049, WO-0022), sau khi sửa:**
+
+```text
+night 1: lux=20.00 -> normal ratio=None reasons=['baseline_missing']
+night 2: lux=20.60 -> normal ratio=None reasons=['baseline_missing']
+night 3: lux=19.60 -> normal ratio=None reasons=['baseline_missing']
+night 4: lux=13.50 -> dim ratio=0.675 reasons=['brightness_evaluated'] status_reason=applied
+baseline {'value': 20, 'member_count': 3, 'member_cv': 0.0205, 'stable': True}
+status dim open faults [('lamp_dim', 'confirmed')]
+lux on decided photo -> 409 POLE_PHOTO_ALREADY_DECIDED
+unstable window -> 400 LUX_WINDOW_UNSTABLE
+```
+
+Web (`feat/LUX-BASELINE-ui`, dev server trỏ API local) mở WO-0022 trên trình duyệt: tiêu đề "Không phát hiện cột mất sáng · 1 cột mờ";
+thẻ đêm 1–3 "Chưa đủ baseline (cần 3 đêm)"; thẻ đêm 4 "MỜ · 68% baseline" nền cam; "Kỹ sư: Đèn bật"; dòng tổng hợp "4/4 ảnh có số đo ·
+3 số đo chưa đánh giá được độ sáng"; lưới ảnh ở báo cáo hiện trường có "Độ sáng: …", nhãn góc ảnh ON đổi "ĐẠT CHUẨN" → "ĐÈN BẬT".
+
+Mobile: migration Room 26→27→28 chạy trên giả lập Pixel 9 (`Migration26To27Test`, `Migration27To28Test`, 2/2). Không test đo BLE
+được trên giả lập (cần máy đo thật).
+
 ## Chưa làm / chưa kiểm
 
-- **Chưa apply migration lên `luxmap_dev` và VPS.** Deploy cần backup trước. Down có preflight từ chối khi đã có dữ liệu đứng yên.
-- **Chưa chạy lại bộ test toàn phần** sau khi sửa danh sách khoá (chỉ chạy 3 class bị ảnh hưởng).
+- **Chưa apply migration lên VPS** (deploy cần backup trước). `luxmap_dev` đã migrate 26/11 (backup ở trên). Down có preflight từ chối khi đã
+  có dữ liệu đứng yên.
 - Preflight của `Down()` khi **có** dữ liệu chưa thử (chỉ thử trên DB trống).
 - Con số `LuxProtocol` (1,0 m ± 0,05; ≥ 5 mẫu; dao động ≤ 0,05; CV ≤ 0,10) là đề xuất — D-R29 O-3 còn mở.
 - Màn thử tấm lọc ND trên mobile chưa có (backend nhận `optical_filter_transmittance`; app chưa gửi).
