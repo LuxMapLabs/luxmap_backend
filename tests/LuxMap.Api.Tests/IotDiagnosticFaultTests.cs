@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using LuxMap.Modules.Faults;
 using LuxMap.Modules.Faults.Entities;
 using LuxMap.Modules.IOT;
@@ -60,12 +61,37 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
         await using (var db = contexts.Open(fixture.CommuneId))
         {
             var fault = await db.Set<Fault>().SingleAsync(f => f.FaultId == faultId);
-            Assert.Equal(assigned ? FaultStatus.Detected : FaultStatus.Rejected, fault.FaultStatus);
+            Assert.Equal(FaultStatus.Detected, fault.FaultStatus);
             Assert.NotNull(fault.RecoveredAt);
             Assert.Null(fault.ConfirmedBy);
             var audit = await db.Set<AuditEvent>().Where(a => a.EntityId == faultId).ToListAsync();
             Assert.Equal(2, audit.Count);
-            Assert.Contains(audit, a => a.Action == (assigned ? AuditAction.Reported : AuditAction.Rejected));
+            Assert.Contains(audit, a => a.Action == AuditAction.Reported);
+            Assert.Null(fault.ConfirmedAt);
+            Assert.Null(fault.ReviewNote);
+        }
+        using (var manager = await fixture.ManagerClientAsync())
+        {
+            var response = await manager.PostAsJsonAsync("/api/v1/work-orders", new {
+                task_kind = "inspection", title = "Inspect a recovered IoT fault", fault_ids = new[] { faultId }
+            });
+            Assert.Equal(System.Net.HttpStatusCode.Created, response.StatusCode);
+            var page = await manager.GetFromJsonAsync<System.Text.Json.JsonElement>(
+                $"/api/v1/iot/feeders/{profile.FeederId}/diagnostics/history?page_size=200");
+            var history = page.GetProperty("items").EnumerateArray().Where(e => e.GetProperty("fault_id").GetString() == faultId).ToArray();
+            Assert.NotEmpty(history);
+            Assert.All(history, e => Assert.Equal("detected", e.GetProperty("fault_status").GetString()));
+        }
+        await Pass(12, true);
+        await Pass(13, true);
+        await using (var db = contexts.Open(fixture.CommuneId))
+        {
+            var fault = Assert.Single(await db.Set<Fault>().Where(f => f.OriginNodeId == rig.Node).ToListAsync());
+            Assert.Equal(faultId, fault.FaultId);
+            Assert.Equal(FaultStatus.Detected, fault.FaultStatus);
+            Assert.Null(fault.RecoveredAt);
+            Assert.Contains("Tái phát", fault.Note);
+            Assert.Equal(3, await db.Set<AuditEvent>().CountAsync(a => a.EntityId == faultId));
         }
     }
 
@@ -109,10 +135,10 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
         await using (var db = contexts.Open(fixture.CommuneId))
         {
             var fault = await db.Set<Fault>().SingleAsync(f => f.FaultId == faultId);
-            Assert.Equal(FaultStatus.Rejected, fault.FaultStatus);
+            Assert.Equal(FaultStatus.Detected, fault.FaultStatus);
             Assert.NotNull(fault.RecoveredAt);
             Assert.Contains(await db.Set<AuditEvent>().Where(a => a.EntityId == faultId).ToListAsync(),
-                audit => audit.Action == AuditAction.Rejected);
+                audit => audit.Action == AuditAction.Reported);
         }
     }
 
@@ -143,6 +169,9 @@ public sealed class IotDiagnosticFaultTests(AssetImportFixture fixture)
         Assert.Equal("current_drop", fault.IotAnomalyCode);
         Assert.Contains("electrical_window", fault.IotEvidence);
         Assert.DoesNotContain("lamp_count", fault.IotEvidence);
+        var episode = await check.Set<LuxMap.Modules.IOT.Entities.IotDiagnosticEpisode>()
+            .SingleAsync(e => e.NodeId == rig.Node);
+        Assert.Equal(fault.FaultId, episode.FaultId);
         Assert.Single(await check.Set<AuditEvent>().Where(a => a.EntityId == fault.FaultId).ToListAsync());
     }
 

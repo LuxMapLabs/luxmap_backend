@@ -899,13 +899,14 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         {
             Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+            var feederPage = await FindFeederPageAsync(client, rig.Feeder);
             services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IotOptions>>().Value.Nodes[rig.Second] = new NodeProfile
             {
                 ServerId = rig.Server, DeviceId = "configured-probe", FeederId = rig.Feeder,
                 NominalVoltage = 5, NominalCurrentMa = 100, NominalPowerMw = 500,
             };
 
-            await AssertBindingConflictAsync(await client.GetAsync("/api/v1/assets/feeders?page_size=200"), rig.Feeder);
+            await AssertBindingConflictAsync(await client.GetAsync(feederPage), rig.Feeder);
             await AssertBindingConflictAsync(await client.GetAsync($"/api/v1/map/poles/{rig.Pole}"), rig.Feeder);
             await AssertBindingConflictAsync(await client.GetAsync($"/api/v1/iot/poles/{rig.Pole}/control"), rig.Feeder);
             await AssertBindingConflictAsync(await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/command",
@@ -927,12 +928,13 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         {
             Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+            var feederPage = await FindFeederPageAsync(client, rig.Feeder);
             // Simulate a conflicting mapping imported before the guard existed.
             await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync(
                 $"INSERT INTO feeder_control (feeder_id,node_id,commune_id,cabinet_id,relay_no) VALUES ({rig.Feeder},{rig.Second},{fixture.CommuneId},{rig.Cabinet},1)"));
             try
             {
-                await AssertBindingConflictAsync(await client.GetAsync("/api/v1/assets/feeders?page_size=200"), rig.Feeder);
+                await AssertBindingConflictAsync(await client.GetAsync(feederPage), rig.Feeder);
                 await AssertBindingConflictAsync(await client.PostAsJsonAsync($"/api/v1/iot/nodes/{rig.First}/command",
                     new { mode = "MANUAL", command = "OFF" }), rig.Feeder);
                 await AssertLightingBindingConflictAsync(rig.Feeder, services);
@@ -1391,6 +1393,22 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         server_id = rig.Server, device_id = device, feeder_id = feeder ?? rig.Feeder,
         nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
     };
+
+    private static async Task<string> FindFeederPageAsync(HttpClient client, string feeder)
+    {
+        const int pageSize = 200;
+        for (var page = 1; ; page++)
+        {
+            var path = $"/api/v1/assets/feeders?page={page}&page_size={pageSize}";
+            using var response = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            if (body.GetProperty("items").EnumerateArray().Any(item => item.GetProperty("feeder_id").GetString() == feeder))
+                return path;
+            Assert.True((long)page * pageSize < body.GetProperty("total").GetInt64(),
+                $"Feeder {feeder} was not found in the scoped inventory before creating a conflict.");
+        }
+    }
 
     private static async Task AssertBindingConflictAsync(HttpResponseMessage response, string feeder)
     {

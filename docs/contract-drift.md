@@ -3105,3 +3105,16 @@ Decision maker: Đạt yêu cầu5 nhãn sức khỏe cho power_state của GET 
 - Incident: voltage_loss, ba mã ina226_*; current_drop giảm>=20%; voltage_deviation lệch>=20% và đã vượt dung sai. Các mức dòng>5%/<20%, áp vượt dung sai/<20% và mã phần cứng còn lại là warning. Dùng tỷ lệ gốc trước làm tròn.
 - Đọc DB theo trang, HTTP tối đa12 luồng/ngân sách5 giây; tái dùng cùng đánh giá diagnostics, không N+1 DB.
 Bảng mã, JSON và tương thích FE: [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
+
+
+## IOT-FAULT-RECOVERY-1 — giữ detected khi tự phục hồi (2026-11-26)
+
+Decision: theo yêu cầu người dùng/FE trong phiên 26/11, SELF-SIGNED, chờ maintainer review.
+Tự phục hồi liên tục đủ 90 giây chỉ cập nhật recovered_at, note, audit Reported;
+không tự rejected/confirmed hay ghi đè quyết định Manager. Tái phát dùng lại Fault
+đang mở cùng node/feeder/code, xóa recovered_at và ghi audit một lần.
+Inspection giữ detected khi tạo; nghiệm thu fault_present -> confirmed;
+fault_absent -> rejected do Manager; inconclusive giữ nguyên chờ quyết định.
+Lịch sử feeder thêm fault_id và fault_status nullable, liên kết lưu bền từng episode;
+status active/resolved/interrupted vẫn độc lập. Không có iot_review_status.
+Dữ liệu rejected cũ không tự mở hàng loạt; script riêng chỉ xử lý các dòng đã xác minh audit.

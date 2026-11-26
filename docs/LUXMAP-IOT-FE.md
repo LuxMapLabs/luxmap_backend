@@ -441,3 +441,13 @@ API kiểm kê feeder dùng `power_state` cho sức khỏe5 mức; lấy bật/t
 Mẫu mới và ACK kết nối được đánh giá độc lập. Node có ACK mới, điện cũ là warning. Chưa gán nguồn/relay là unknown; đã gán nhưng chưa đủ dữ liệu là warning. Xem bảng lỗi nhẹ/nặng và ưu tiên trong [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
 
 Hướng dẫn riêng về sức khỏe feeder, JSON và bảng lỗi: [FEEDER-HEALTH.md](FEEDER-HEALTH.md).
+
+
+## IOT-FAULT-RECOVERY-1 (26/11/2026)
+
+Sự cố IoT mới/tự phục hồi/tạo Inspection vẫn `detected`; tự phục hồi ghi recovered_at,
+không tự rejected. Rejected chỉ do Manager quyết định trực tiếp hoặc nghiệm thu
+Inspection IoT với fault_absent; fault_present -> confirmed, inconclusive giữ nguyên.
+GET lịch sử diagnostics theo feeder thêm fault_id/fault_status nullable; status vẫn
+active/resolved/interrupted, độc lập tiến độ công việc. FE không cần mở lại lỗi đã
+phục hồi để tạo Inspection. Xem docs/IOT-DIAGNOSTICS.md phần vòng đời và dữ liệu cũ.

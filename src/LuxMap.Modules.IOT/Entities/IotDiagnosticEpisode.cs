@@ -1,3 +1,4 @@
+using LuxMap.Modules.Faults.Entities;
 using LuxMap.Persistence.Conventions;
 using LuxMap.Shared.Authorization;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ namespace LuxMap.Modules.IOT.Entities;
 public sealed class IotDiagnosticEpisode : ICommuneScoped
 {
     public long Id { get; set; }
+    public string? FaultId { get; set; }
     public required string CommuneId { get; set; }
     public required string FeederId { get; set; }
     public required string NodeId { get; set; }
@@ -29,6 +31,8 @@ public sealed class IotDiagnosticEpisodeConfiguration : IEntityTypeConfiguration
             t.HasCheckConstraint("ck_iot_diagnostic_episode_status", "status IN ('active', 'resolved', 'interrupted') AND ((status = 'active') = (closed_at IS NULL))");
         });
         b.HasKey(x => x.Id);
+        b.HasOne<Fault>().WithMany().HasForeignKey(x => new { x.FaultId, x.CommuneId })
+            .HasPrincipalKey(x => new { x.FaultId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
         b.Property(x => x.Id).ValueGeneratedOnAdd();
         b.Property(x => x.Anomaly).HasColumnType("jsonb");
         b.HasCommuneScope();
