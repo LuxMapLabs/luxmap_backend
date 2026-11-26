@@ -24,6 +24,10 @@ public interface IActiveWorkOrderLookup
 {
     IActiveWorkOrderLookup InContext(LuxMap.Persistence.LuxMapDbContext context) => this;
     /// <summary>fault_id → work_order_id for those of <paramref name="faultIds"/> held by a work order.</summary>
+    /// <summary>Attach a new IoT fault to one unambiguous open/assigned inspection in the caller's transaction.</summary>
+    Task<string?> AttachToInspectionAsync(Entities.Fault fault, DateTime now, string correlationId, CancellationToken ct)
+        => Task.FromResult<string?>(null);
+
     Task<IReadOnlyDictionary<string, string>> ActiveWorkOrdersAsync(
         IReadOnlyCollection<string> faultIds, CancellationToken ct);
 

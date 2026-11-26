@@ -185,6 +185,9 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 // the run. They then sit in the table holding ids that pole_id_seq will hand out
                 // again on a later run, and the next suite dies on pk_pole looking like flake.
                 // Every test that writes a fault was quietly leaking poles this way.
+                "DELETE FROM iot_diagnostic_episode WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM work_order_fault WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM work_order WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM fault WHERE commune_id = @c OR commune_id = @f;",
                 // Same RESTRICT edge, same trap. Currently no test here leaves one behind, but a net
                 // with a known hole in it is not much of a net — and the hole is invisible until a
@@ -215,7 +218,6 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 "DELETE FROM refresh_token WHERE user_id = @u OR user_id = @w OR user_id = @e OR token_hash = ANY(@h);",
                 "DELETE FROM app_user_commune WHERE user_id = @u OR user_id = @w OR user_id = @e;",
                 "DELETE FROM app_user WHERE user_id = @u OR user_id = @w OR user_id = @e;",
-                "DELETE FROM iot_diagnostic_episode WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM iot_server_registration WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM administrative_unit WHERE commune_id = @c OR commune_id = @f;",
             })

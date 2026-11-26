@@ -497,7 +497,7 @@ SUMMARY.update({
     ("get", "/api/v1/iot/diagnostics/summary"): "Chẩn đoán tổng hợp theo trang, job lưu DB và phạm vi xã",
     ("get", "/api/v1/iot/nodes/{nodeId}/diagnostics"): "Chẩn đoán điện trung bình năm mẫu, tương thích route node cũ",
     ("get", "/api/v1/iot/feeders/{feederId}/diagnostics"): "Lỗi hiện tại theo feeder: dòng giảm >5% và điện áp trung bình năm mẫu",
-    ("get", "/api/v1/iot/feeders/{feederId}/diagnostics/history"): "Lịch sử đợt lỗi feeder cập nhật mỗi 5 giây, lọc khoảng thời gian và phân trang",
+    ("get", "/api/v1/iot/feeders/{feederId}/diagnostics/history"): "Lịch sử đợt lỗi feeder mỗi 5 giây; fault_id liên kết lưu bền và fault_status hiện tại nullable; lọc thời gian, phân trang",
 })
 
 for kind, parent in [("poles", "pole_id"), ("cabinets", "cabinet_id")]:

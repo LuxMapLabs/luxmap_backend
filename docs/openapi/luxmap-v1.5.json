@@ -12010,7 +12010,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Lịch sử đợt lỗi feeder cập nhật mỗi 5 giây, lọc khoảng thời gian và phân trang",
+        "summary": "Lịch sử đợt lỗi feeder mỗi 5 giây; fault_id liên kết lưu bền và fault_status hiện tại nullable; lọc thời gian, phân trang",
         "operationId": "getIotFeedersFeederidDiagnosticsHistory",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)"
@@ -27720,6 +27720,24 @@
           },
           "anomaly": {
             "$ref": "#/components/schemas/IotAnomaly"
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_status": {
+            "enum": [
+              "detected",
+              "confirmed",
+              "rejected",
+              "in_progress",
+              "resolved",
+              "verified",
+              null
+            ],
+            "type": "string",
+            "description": "Trạng thái nghiệp vụ hiện tại của Fault được liên kết; null khi chưa có Fault. Độc lập status của episode.",
+            "nullable": true
           }
         },
         "additionalProperties": false

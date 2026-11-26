@@ -142,6 +142,21 @@ public sealed class IotDiagnosticJob(
                     await NotifyAsync(db, fault, "Phát hiện sự cố IoT", now, ct);
                     await db.SaveChangesAsync(ct);
                     faults.Add(fault);
+                    await assignments.AttachToInspectionAsync(fault, now, correlationId, ct);
+                    tracked.Raised = true;
+                }
+                else if (active && tracked.Ready(code, now) && fault is not null && fault.RecoveredAt is not null)
+                {
+                    var before = new { fault.FaultStatus, fault.RecoveredAt, fault.IotEvidence, fault.Note };
+                    fault.RecoveredAt = null;
+                    fault.UpdatedAt = now;
+                    fault.IotEvidence = JsonSerializer.Serialize(new { result, algorithm_version = IotDiagnosticRules.Version,
+                        evidence_key = key, electrical_window = result.ElectricalWindow }, LuxMapJsonOptions.Default);
+                    var note = $"Tái phát lỗi {code} lúc {now:yyyy-MM-ddTHH:mm:ss}Z.";
+                    fault.Note = string.IsNullOrEmpty(fault.Note) ? note : fault.Note + "\n" + note;
+                    StageAudit(db, fault, before, now, correlationId, AuditAction.Reported);
+                    await NotifyAsync(db, fault, "Sự cố IoT tái phát", now, ct);
+                    await db.SaveChangesAsync(ct);
                     tracked.Raised = true;
                 }
                 else if (!active && tracked.HealthySince is { } healthy && now - healthy >= TimeSpan.FromSeconds(90) &&
@@ -151,19 +166,20 @@ public sealed class IotDiagnosticJob(
                     fault.RecoveredAt = now;
                     fault.UpdatedAt = now;
                     var note = $"Thiết bị đã tự phục hồi lúc {now:yyyy-MM-ddTHH:mm:ss}Z.";
-                    // Keep human decisions and work orders intact.
-                    var assigned = (await assignments.ActiveWorkOrdersAsync([fault.FaultId], ct)).ContainsKey(fault.FaultId);
-                    if (fault.FaultStatus == FaultStatus.Detected && !assigned)
-                    {
-                        fault.FaultStatus = FaultStatus.Rejected;
-                        fault.ConfirmedAt = now;
-                        fault.ReviewNote = note;
-                    }
-                    else fault.Note = string.IsNullOrEmpty(fault.Note) ? note : fault.Note + "\n" + note;
-                    StageAudit(db, fault, before, now, correlationId,
-                        fault.FaultStatus == FaultStatus.Rejected ? AuditAction.Rejected : AuditAction.Reported);
+                    // Recovery is an observation, never a human rejection or verification.
+                    fault.Note = string.IsNullOrEmpty(fault.Note) ? note : fault.Note + "\n" + note;
+                    StageAudit(db, fault, before, now, correlationId, AuditAction.Reported);
                     await NotifyAsync(db, fault, "Thiết bị IoT đã phục hồi", now, ct);
                     await db.SaveChangesAsync(ct);
+                }
+                if (fault is not null)
+                {
+                    // Bind only this episode, not all historical rows with the same code.
+                    await db.Set<IotDiagnosticEpisode>().Where(e => e.NodeId == nodeId &&
+                        e.FeederId == profile.FeederId && e.Code == code && e.ClosedAt == null && e.FaultId == null).LoadAsync(ct);
+                    foreach (var episode in db.Set<IotDiagnosticEpisode>().Local.Where(e => e.NodeId == nodeId &&
+                        e.FeederId == profile.FeederId && e.Code == code && e.ClosedAt == null && e.FaultId == null))
+                        episode.FaultId = fault.FaultId;
                 }
             }
         }
@@ -228,7 +244,7 @@ public sealed class DiagnosticCodeEvidence
 
 public static class IotDiagnosticRules
 {
-    public const string Version = "iot-faults-v4-mean5";
+    public const string Version = "iot-faults-v5-recovery-review";
     public static readonly string[] Codes = [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "current_drop",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",

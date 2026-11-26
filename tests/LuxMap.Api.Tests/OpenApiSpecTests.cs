@@ -28,6 +28,20 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         }
     }
 
+    [Fact]
+    public void Iot_episode_history_links_a_nullable_fault_without_changing_episode_statuses()
+    {
+        var properties = Schema("IotDiagnosticHistoryItem").GetProperty("properties");
+        Assert.True(properties.GetProperty("fault_id").GetProperty("nullable").GetBoolean());
+        var status = properties.GetProperty("fault_status");
+        Assert.Equal("string", status.GetProperty("type").GetString());
+        Assert.True(status.GetProperty("nullable").GetBoolean());
+        var values = status.GetProperty("enum").EnumerateArray().ToArray();
+        Assert.Contains(values, v => v.ValueKind == JsonValueKind.Null);
+        Assert.Equal(new[] { "confirmed", "detected", "in_progress", "rejected", "resolved", "verified" },
+            values.Where(v => v.ValueKind == JsonValueKind.String).Select(v => v.GetString()).Order().ToArray());
+    }
+
     private JsonElement Schema(string name)
         => Spec.GetProperty("components").GetProperty("schemas").GetProperty(name);
 

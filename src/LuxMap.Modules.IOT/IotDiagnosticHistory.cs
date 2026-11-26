@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.Json;
 using LuxMap.Modules.Assets.Entities;
 using LuxMap.Modules.IOT.Entities;
+using LuxMap.Modules.Faults.Entities;
+using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
@@ -13,7 +15,8 @@ namespace LuxMap.Modules.IOT;
 
 public sealed record IotDiagnosticHistoryItem(
     long HistoryId, string FeederId, string NodeId, string Code, string Status,
-    DateTime StartedAt, DateTime EndedAt, DateTime? ClosedAt, IotAnomaly Anomaly);
+    DateTime StartedAt, DateTime EndedAt, DateTime? ClosedAt, IotAnomaly Anomaly,
+    string? FaultId, FaultStatus? FaultStatus);
 
 public sealed partial class IotDiagnosticsService
 {
@@ -53,9 +56,13 @@ public sealed partial class IotDiagnosticsService
         var offset = ((long)page.Page - 1) * page.PageSize;
         var rows = offset >= total ? [] : await query.OrderByDescending(e => e.StartedAt).ThenByDescending(e => e.Id)
             .Skip((int)offset).Take(page.PageSize).ToListAsync(ct);
+        var faultIds = rows.Where(e => e.FaultId != null).Select(e => e.FaultId!).Distinct().ToArray();
+        var statuses = await db.Set<Fault>().AsNoTracking().Where(f => faultIds.Contains(f.FaultId))
+            .ToDictionaryAsync(f => f.FaultId, f => (FaultStatus?)f.FaultStatus, ct);
         var items = rows.Select(e => new IotDiagnosticHistoryItem(e.Id, e.FeederId, e.NodeId, e.Code,
             e.Status, e.StartedAt, e.EndedAt, e.ClosedAt,
-            JsonSerializer.Deserialize<IotAnomaly>(e.Anomaly, LuxMapJsonOptions.Default)!)).ToArray();
+            JsonSerializer.Deserialize<IotAnomaly>(e.Anomaly, LuxMapJsonOptions.Default)!,
+            e.FaultId, e.FaultId is { } id ? statuses.GetValueOrDefault(id) : null)).ToArray();
         await transaction.CommitAsync(ct);
         return PagedResult<IotDiagnosticHistoryItem>.From(page, total, items);
     }

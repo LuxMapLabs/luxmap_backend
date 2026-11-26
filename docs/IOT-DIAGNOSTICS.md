@@ -133,6 +133,8 @@ total là số đợt sau lọc, không phải số mẫu hay số phút.
   "items": [
     {
       "history_id": 1,
+      "fault_id": "FAULT-0034",
+      "fault_status": "detected",
       "feeder_id": "FDR-009",
       "node_id": "NODE-004",
       "code": "current_drop",
@@ -168,8 +170,8 @@ total là số đợt sau lọc, không phải số mẫu hay số phút.
 current_drop -> current_anomaly; voltage_loss -> segment_outage; voltage_deviation -> voltage_anomaly;
 hardware -> iot_hardware_fault. telemetry_stale chỉ tạo node_offline khi node thực sự offline (không chỉ replay/điện cũ).
 Lỗi điện đủ 5 mẫu tạo Fault, hardware giữ debounce 5 phút, chống trùng Fault chưa đóng giữ nguyên.
-Phục hồi đủ chứng cứ mới 90 giây: detected chưa có WorkOrder -> rejected + audit;
-đã giao việc thì chỉ ghi chú phục hồi, không tự bỏ công việc. Lịch sử lỗi khác với vòng đời Fault/WorkOrder.
+Phục hồi đủ chứng cứ mới 90 giây: giữ nguyên fault_status (kể cả detected), ghi recovered_at + audit Reported;
+tái phát xóa recovered_at, cập nhật bằng chứng và ghi audit một lần trên cùng Fault đang mở. Lịch sử lỗi khác với vòng đời Fault/WorkOrder.
 Fault cũ không bị xóa khi bỏ đếm bóng.
 
 ## 6. Cấu hình baseline bộ thử
@@ -235,3 +237,56 @@ Lookup giữ một lượt đọc Bridge cho mỗi feeder được cấu hình, 
 Phạm vi thay đổi là API kiểm kê feeder. `power_state` trên API command/electrical, bản đồ trụ/fixture/tủ vẫn giữ on/off/unknown, vì đó là đầu ra quan sát; không dùng chúng để suy nhãn sức khỏe mới. Không đổi firmware, không migration và không sửa FE. FE kiểm kê muốn hiển thị Bật/Tắt cần dùng lamp_state sau khi BE mới được deploy.
 
 Hướng dẫn riêng về sức khỏe feeder, JSON và bảng lỗi: [FEEDER-HEALTH.md](FEEDER-HEALTH.md).
+
+
+## Vòng đời Fault IoT và lịch kiểm tra — 26/11/2026
+
+`status` của episode (`active`, `resolved`, `interrupted`) chỉ mô tả quan sát phần cứng.
+`fault_id` là liên kết lưu bền của episode; `fault_status` là trạng thái hiện tại của
+Fault đó, không phải snapshot trạng thái khi episode được tạo. Cả hai nullable khi
+chưa đủ điều kiện tạo Fault; dữ liệu cũ chưa có liên kết vẫn null, không đoán theo mã.
+Gỡ/thay node không xóa liên kết lịch sử. FK ghép bảo đảm Fault cùng xã.
+
+1. Phát hiện -> `detected`. Phục hồi đủ bằng chứng mới liên tục 90 giây chỉ ghi
+   `recovered_at`, note, audit Reported và thông báo. Không tự rejected/confirmed.
+2. Manager tạo Inspection -> vẫn `detected`, có work_order_id. Lỗi đã phục hồi vẫn
+   tạo Inspection được; không cần mở lại qua PATCH.
+3. Manager nghiệm thu `fault_present` -> `confirmed`; riêng Fault source_channel=iot,
+   `fault_absent` -> `rejected`; `inconclusive` giữ nguyên. Người thao tác ghi confirmed_by.
+   Các kênh khác giữ FR-2a: fault_absent vẫn chờ quyết định riêng.
+4. Manager cũng có thể PATCH Fault detected -> rejected. Hủy phiếu hoặc trả báo cáo
+   không tự reject Fault. Không thêm iot_review_status, không đổi nghĩa rejected.
+5. Sửa chữa theo luồng có sẵn: confirmed -> in_progress -> resolved -> verified.
+   Nghiệm thu Repair hiện chuyển resolved rồi verified trong cùng giao dịch.
+
+Fault tái phát cùng node/feeder/code dùng lại bản ghi đang mở; không đổi quyết định
+Manager hoặc WorkOrder. Notification/audit phục hồi và tái phát chỉ ghi khi đổi đợt,
+không spam mỗi lượt job. Debounce phần cứng vẫn 5 phút; điện vẫn cửa sổ 5 mẫu.
+
+Mã lỗi mới vẫn tạo Fault riêng. Chỉ tự gom vào đúng một Inspection cùng xã, node và
+feeder, còn open/assigned và đang giữ Fault của node đó. Có nhiều phiếu phù hợp,
+phiếu đang bị khóa, in_progress/done/verified/cancelled, hoặc Repair: giữ Fault mới
+detected để Manager chọn. Không gom chỉ vì cùng tủ. Ghi audit và thông báo bổ sung.
+Các thao tác vòng đời WorkOrder và việc thêm Fault được khóa theo phiếu; job không
+đợi khóa WO khi đang giữ khóa Fault, tránh deadlock với nghiệm thu.
+
+### Khắc phục dữ liệu cũ
+
+Script `scripts/maintenance/repair-node-004-iot-faults.sql` mặc định dry-run rồi
+ROLLBACK. Chạy bằng psql sau khi deploy code mới/migration; không chạy như migration
+tự động cho mọi môi trường. Chỉ xét COM-070/NODE-004/FDR-009/CAB-011 và ba mã được
+báo cáo; phải có audit Iot Rejected, không có quyết định User, không có WorkOrder
+liên quan. Dùng Fault mở hiện có hoặc khôi phục một bản mới nhất mỗi mã về detected.
+Các bản trùng không có FK tham chiếu được lưu bản gốc vào bảng backup bảo trì rồi
+gộp/xóa; mọi audit cũ được giữ nguyên, thêm audit System. Dòng có FK được giữ và báo
+để kiểm tra thủ công. Không khẳng định số lượng là 44 trước khi kiểm tra DB thực tế.
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/maintenance/repair-node-004-iot-faults.sql
+# Sau khi đọc kết quả dry-run và sao lưu DB, áp dụng cùng script:
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v apply=true -f scripts/maintenance/repair-node-004-iot-faults.sql
+```
+
+Script chạy lại không mở Fault Manager đã từ chối và không tạo bản ghi mới.
+Sau xử lý kiểm tra GET /api/v1/faults?data_source=calibration_rig và thử tạo Inspection.
+API JSON không có confirmed_by; kiểm chứng ứng viên dùng DB/audit phía vận hành.
