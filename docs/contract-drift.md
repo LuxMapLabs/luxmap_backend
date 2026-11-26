@@ -3094,3 +3094,14 @@ Decision maker: Đạt yêu cầu gộp hai API, bỏ API cũ, nhận từng m�
 - Node tạo mẫu mục tiêu 1 giây, giữ R002/trung bình16; gateway forward ngay. Giữ SD/ACK; nhịp nhận cần kiểm tra phần cứng, không bảo đảm 1Hz qua E32.
 - Không migration/xóa mẫu cũ, không sửa FE. Deploy đồng bộ BE/Bridge, nạp firmware node/gateway để có metadata/nhịp mới.
 Chi tiết: [IOT-ELECTRICAL-HISTORY.md](IOT-ELECTRICAL-HISTORY.md).
+
+
+## FEEDER-HEALTH-1 — 26/11/2026 (SELF-SIGNED)
+
+Decision maker: Đạt yêu cầu5 nhãn sức khỏe cho power_state của GET /assets/feeders/{id}, đã chốt bảng nhẹ/nặng và mốc20% trong chat. Nền tạm chờ maintainer review.
+- FeederListItem.power_state đổi enum thành FeederHealthState: unknown, normal, warning, incident, offline; áp cho danh sách/chi tiết kiểm kê feeder. Thêm lamp_state kiểu FeederPowerState on/off/unknown, giữ control.
+- Không đổi FeederPowerState của command/electrical/map. Không đổi Fault/lifecycle hay firmware. Không migration vì trạng thái tính lúc đọc.
+- Offline theo liên lạc node/ACK/health, ưu tiên hơn incident; dữ liệu điện cũ khi ACK mới chỉ warning. Chưa gán IoT unknown; đã gán nhưng chưa có nguồn/mẫu/Bridge không xác minh được warning. Normal cần dữ liệu điện mới, ON đủ5 mẫu; OFF chủ động vẫn normal nếu không lỗi.
+- Incident: voltage_loss, ba mã ina226_*; current_drop giảm>=20%; voltage_deviation lệch>=20% và đã vượt dung sai. Các mức dòng>5%/<20%, áp vượt dung sai/<20% và mã phần cứng còn lại là warning. Dùng tỷ lệ gốc trước làm tròn.
+- Đọc DB theo trang, HTTP tối đa12 luồng/ngân sách5 giây; tái dùng cùng đánh giá diagnostics, không N+1 DB.
+Bảng mã, JSON và tương thích FE: [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).

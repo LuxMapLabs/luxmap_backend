@@ -75,7 +75,7 @@ API trả `201` khi tạo và `200` khi gửi lại cùng cấu hình. Response 
 | `GET /api/v1/iot/poles/{poleId}/control` | Khi bấm trụ, lấy `feeder_id`, `node_id` và `can_control_feeder`. |
 | `GET /api/v1/map/poles` | `features[].properties.power_state` là trạng thái cấp điện của mạch chứa trụ. |
 | `GET /api/v1/map/poles/{poleId}` | `power_state` của trụ và của các bóng trong `fixtures[]`. |
-| `GET /api/v1/assets/feeders`, `GET /api/v1/assets/feeders/{feederId}` | `power_state` của feeder trong danh sách và chi tiết. |
+| `GET /api/v1/assets/feeders`, `GET /api/v1/assets/feeders/{feederId}` | `power_state`: normal/warning/incident/offline/unknown; `lamp_state`: on/off/unknown. |
 | `GET /api/v1/map/cabinets` | `feeders[].power_state` của các mạch trong tủ. |
 
 Danh sách node trả `page`, `page_size`, `total` và `items`. Trang bắt đầu từ 1. Mặc định 50 mục, tối đa 200. Trang vượt quá tổng số trả `items: []`.
@@ -433,3 +433,11 @@ Các mã node trong ví dụ là minh họa; BE tự cấp mã thực tế. `row
 Mỗi dòng có transaction riêng: dòng lỗi không xóa những node đã tạo ở dòng trước. Gửi lại cùng file/cấu hình trả existing và đúng node_id cũ; không tạo thêm node. Cấu hình đã có mà khác ngưỡng/thiết bị trả conflict; dùng API PUT để sửa. Dòng trùng feeder hoặc cặp server_id/device_id trong cùng file bị báo failed ở lần xuất hiện sau. Sau khi sửa lỗi có thể gửi lại toàn bộ file.
 
 Import tự đồng bộ quyền MQTT như POST /iot/nodes; không có bước gán relay/pole/cabinet trong Excel. Không tự cấp lại secret gateway hoặc đổi firmware. Có thể có dòng failed nếu Bridge không truy cập được, tuyến MQTT không hợp lệ hoặc feeder/server không cùng xã. API này tạo thiết bị thật; không phải preview hay dry-run.
+
+
+## Phân biệt sức khỏe feeder và bật/tắt (26/11/2026)
+
+API kiểm kê feeder dùng `power_state` cho sức khỏe5 mức; lấy bật/tắt từ `lamp_state`. Trường `power_state` của command/electrical/map vẫn là on/off/unknown. Không dùng chung bộ nhãn giữa hai nhóm API.
+Mẫu mới và ACK kết nối được đánh giá độc lập. Node có ACK mới, điện cũ là warning. Chưa gán nguồn/relay là unknown; đã gán nhưng chưa đủ dữ liệu là warning. Xem bảng lỗi nhẹ/nặng và ưu tiên trong [IOT-DIAGNOSTICS.md](IOT-DIAGNOSTICS.md).
+
+Hướng dẫn riêng về sức khỏe feeder, JSON và bảng lỗi: [FEEDER-HEALTH.md](FEEDER-HEALTH.md).

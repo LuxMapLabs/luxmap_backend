@@ -145,7 +145,7 @@ public enum IotCommandHistoryStatus { Success, Pending, Expired }
 
 public sealed partial class IotDiagnosticsService(
     LuxMapDbContext db, HttpClient client, IotRegistrationStore registry, IotFeederSourceLookup sources,
-    TimeProvider clock) : IFeederPowerLookup
+    TimeProvider clock) : IFeederPowerLookup, IFeederHealthLookup
 {
     internal IotDiagnosticsService ForContext(LuxMapDbContext context) =>
         new(context, client, registry.ForContext(context), sources, clock);
@@ -161,7 +161,11 @@ public sealed partial class IotDiagnosticsService(
         if (!await CompatibleFeederAsync(nodeId, profile.FeederId, false, ct))
             throw Unavailable("Feeder phải thuộc cùng tủ điện và xã với node IoT.");
         var device = await ReadDeviceAsync(baseUri, profile.DeviceId, ct);
-        var now = clock.GetUtcNow();
+        return Diagnose(nodeId, profile, device, clock.GetUtcNow());
+    }
+
+    private static IotDiagnosticResult Diagnose(string nodeId, NodeProfile profile, PrototypeDevice? device, DateTimeOffset now)
+    {
         var report = device?.SensorHealth;
         var sensorHealth = report is null || report.ReceivedAt == default || report.Data?.IsValidFor(profile.DeviceId) != true
             ? new IotSensorHealth("unknown", null)

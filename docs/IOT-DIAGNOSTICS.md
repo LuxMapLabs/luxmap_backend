@@ -195,3 +195,43 @@ Các trường cấu hình đếm bóng cũ còn được nhận để tương t
 Cần deploy BE và apply migration AddIotDiagnosticEpisodes. Không cần nạp lại firmware cho thay đổi thuật toán BE này.
 
 Cập nhật 24/11/2026: dùng cửa sổ trượt 5 mẫu ON mới nhất, cùng session và sequence liên tiếp; không phải mỗi 5 lượt GET. Mỗi mẫu V/mA/mW có trọng số bằng nhau. Lịch sử kiểm tra mỗi 5 giây, tối đa khoảng 12 lượt/phút; chưa có mẫu mới có thể vẫn dùng cửa sổ còn fresh. Không tự tạo mẫu đo. Firmware vẫn tạo telemetry khoảng 10 giây/lần, nên 5 mẫu mới cần khoảng 50 giây. Khoảng trống hơn một phút vẫn ngắt đợt lỗi như trước. Poll runner được giới hạn bởi chu kỳ job nhanh nhất; chu kỳ thực tế còn phụ thuộc thời gian xử lý và tải hệ thống. Không sửa FE, không đổi trung bình lịch sử điện 30 giây.
+
+
+## Sức khỏe feeder trong kiểm kê (FEEDER-HEALTH-1, 26/11/2026)
+
+GET `/api/v1/assets/feeders/{feederId}` trả `feeder.power_state`; GET `/api/v1/assets/feeders` trả `items[].power_state`.
+Trường này đổi từ on/off/unknown sang **unknown/normal/warning/incident/offline**. Đầu ra bật/tắt nằm ở trường mới `lamp_state` (on/off/unknown). `control` vẫn giữ chế độ báo cáo của node.
+
+Ví dụ các trường liên quan (không phải toàn response):
+```json
+{
+  "feeder_id": "FDR-009",
+  "power_state": "warning",
+  "lamp_state": "on"
+}
+```
+
+| Giá trị | Ý nghĩa |
+|---|---|
+| unknown | Không có nguồn IoT và không có relay/node được gán cho feeder |
+| normal | Node online, mẫu điện mới, không có lỗi; ON đủ cửa sổ 5 mẫu, OFF chủ động không cần cửa sổ ON |
+| warning | Có lỗi nhẹ, dữ liệu điện cũ, chưa đủ mẫu hoặc đã gán nhưng nguồn chưa kiểm chứng/Bridge không dùng được |
+| incident | Có ít nhất một lỗi nặng khi node chưa được xác định offline |
+| offline | Có bằng chứng liên lạc node trước đây nhưng đã quá max_silence_seconds; ACK/health mới vẫn chứng minh online |
+
+### Phân loại mã lỗi
+
+- **incident**: voltage_loss; ina226_unavailable; ina226_read_failed; ina226_shunt_out_of_range.
+- **current_drop**: giảm trên 5% đến dưới20% là warning; từ20% trở lên là incident, chỉ khi API chẩn đoán đã xác nhận lỗi và điện áp hợp lệ.
+- **voltage_deviation**: đã vượt dung sai cấu hình, lệch dưới20% là warning; từ20% trở lên là incident (cả tăng và giảm).
+- **warning**: telemetry_stale; ds3231_unavailable/read_failed/time_invalid; bh1750_unavailable/read_failed; microsd_unavailable/read_failed/write_failed; lora_tx_blocked; lora_rx_frame_error.
+- Ngưỡng20% dùng observed/reference gốc, không dùng deviation_percent đã làm tròn để tránh nâng 19,999% thành sự cố20%.
+
+Ưu tiên: chưa gán → unknown; đã mất liên lạc → offline; còn liên lạc thì incident > warning > normal. Mẫu điện cũ nhưng ACK mới → warning, không offline. Thiếu dữ liệu không báo normal. Có IoT nhưng Bridge lỗi → warning, không giả kết luận node offline hoặc chưa có IoT.
+Các lỗi đồng thời vẫn giữ riêng trong diagnostics/history; power_state là nhãn ưu tiên cao nhất. Không thay đổi Fault severity/lifecycle, chế độ điều khiển hay lịch sử lỗi.
+
+Lookup giữ một lượt đọc Bridge cho mỗi feeder được cấu hình, DB đọc theo trang trước phần HTTP; không gọi chẩn đoán HTTP vòng lại vào BE. Có ngân sách5 giây; phần chưa xác định giữ warning.
+
+Phạm vi thay đổi là API kiểm kê feeder. `power_state` trên API command/electrical, bản đồ trụ/fixture/tủ vẫn giữ on/off/unknown, vì đó là đầu ra quan sát; không dùng chúng để suy nhãn sức khỏe mới. Không đổi firmware, không migration và không sửa FE. FE kiểm kê muốn hiển thị Bật/Tắt cần dùng lamp_state sau khi BE mới được deploy.
+
+Hướng dẫn riêng về sức khỏe feeder, JSON và bảng lỗi: [FEEDER-HEALTH.md](FEEDER-HEALTH.md).

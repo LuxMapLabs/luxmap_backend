@@ -28,7 +28,8 @@ public sealed class FeederStateTests(AssetImportFixture fixture)
         var detail = (await Json(client, $"/api/v1/assets/feeders/{rig.Feeders[0]}")).GetProperty("feeder");
         foreach (var row in new[] { item, detail })
         {
-            Assert.Equal("unknown", row.GetProperty("power_state").GetString());
+            Assert.Equal(connected ? "warning" : "unknown", row.GetProperty("power_state").GetString());
+            Assert.Equal("unknown", row.GetProperty("lamp_state").GetString());
             var control = row.GetProperty("control");
             if (!connected) Assert.Equal(JsonValueKind.Null, control.ValueKind);
             else
@@ -72,7 +73,8 @@ public sealed class FeederStateTests(AssetImportFixture fixture)
         var client = await fixture.ManagerClientAsync();
         var detail = (await Json(client, $"/api/v1/assets/feeders/{rig.Feeders[0]}")).GetProperty("feeder");
         Assert.Equal("on", detail.GetProperty("control").GetProperty("control_mode").GetString());
-        Assert.Equal("unknown", detail.GetProperty("power_state").GetString());
+        Assert.Equal("warning", detail.GetProperty("power_state").GetString());
+        Assert.Equal("unknown", detail.GetProperty("lamp_state").GetString());
         var map = await Json(client, MapUrl);
         Assert.Equal("on", Cabinet(map, rig.Cabinet).GetProperty("feeders")[0].GetProperty("control_mode").GetString());
         Assert.Empty(Cabinet(map, empty.Cabinet).GetProperty("feeders").EnumerateArray());

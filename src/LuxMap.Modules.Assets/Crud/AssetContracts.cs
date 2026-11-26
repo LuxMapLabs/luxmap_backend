@@ -816,7 +816,11 @@ public sealed record FeederListItem
 {
     public FeederControlSnapshot? Control { get; init; }
 
-    public FeederPowerState PowerState { get; init; }
+    /// <summary>Inventory health: unknown/normal/warning/incident/offline. Not the ON/OFF output.</summary>
+    public FeederHealthState PowerState { get; init; }
+
+    /// <summary>Observed lamp output: on/off/unknown; independent of inventory health.</summary>
+    public FeederPowerState LampState { get; init; }
 
     public required string FeederId { get; init; }
 
