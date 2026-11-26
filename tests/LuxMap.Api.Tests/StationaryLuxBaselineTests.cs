@@ -382,10 +382,14 @@ public sealed class StationaryLuxBaselineTests(AssetImportFixture factory) : IAs
         await Night(order, pole, 1, 10.0);
 
         await using var db = Db();
-        foreach (var table in new[] { "lux_evaluation", "lux_reading_sample" })
+        string[] deletes =
+        [
+            "DELETE FROM lux_evaluation WHERE lux_id IN (SELECT lux_id FROM lux_reading WHERE pole_id = {0})",
+            "DELETE FROM lux_reading_sample WHERE lux_id IN (SELECT lux_id FROM lux_reading WHERE pole_id = {0})",
+        ];
+        foreach (var sql in deletes)
         {
-            var error = await Assert.ThrowsAsync<PostgresException>(() =>
-                db.Database.ExecuteSqlRawAsync($"DELETE FROM {table} WHERE lux_id IN (SELECT lux_id FROM lux_reading WHERE pole_id = {{0}})", pole));
+            var error = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync(sql, pole));
             Assert.Contains("immutable", error.MessageText, StringComparison.OrdinalIgnoreCase);
         }
     }
