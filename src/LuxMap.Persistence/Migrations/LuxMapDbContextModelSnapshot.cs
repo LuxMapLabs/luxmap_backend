@@ -1545,7 +1545,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_fault_pole_or_location", "pole_id IS NOT NULL OR (lat IS NOT NULL AND lng IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_fault_pole_photo_source", "origin_pole_photo_id IS NULL OR (source_channel IN ('cv','field_report') AND fault_type = 'lamp_out' AND pole_id IS NOT NULL AND origin_observation_id IS NULL AND origin_node_id IS NULL AND (source_channel <> 'field_report' OR (reported_by IS NOT NULL AND status_confidence IS NULL AND detection_model_version IS NULL)))");
+                            t.HasCheckConstraint("ck_fault_pole_photo_source", "origin_pole_photo_id IS NULL OR (source_channel IN ('cv','field_report') AND fault_type IN ('lamp_out','lamp_dim') AND pole_id IS NOT NULL AND origin_observation_id IS NULL AND origin_node_id IS NULL AND (source_channel <> 'field_report' OR (reported_by IS NOT NULL AND status_confidence IS NULL AND detection_model_version IS NULL)))");
 
                             t.HasCheckConstraint("ck_fault_priority_score_finite", "priority_score IS NULL OR (priority_score <> 'NaN'::float8 AND priority_score <> 'Infinity'::float8 AND priority_score <> '-Infinity'::float8)");
 
@@ -3001,6 +3001,159 @@ namespace LuxMap.Persistence.Migrations
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxEvaluation", b =>
+                {
+                    b.Property<string>("LuxId")
+                        .HasColumnType("text")
+                        .HasColumnName("lux_id");
+
+                    b.Property<long>("AlgorithmVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("algorithm_version_id");
+
+                    b.Property<bool>("BaselineEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("baseline_eligible");
+
+                    b.Property<long?>("BaselineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("baseline_id");
+
+                    b.Property<double?>("BaselineRatio")
+                        .HasColumnType("double precision")
+                        .HasColumnName("baseline_ratio");
+
+                    b.Property<double?>("BaselineValue")
+                        .HasColumnType("double precision")
+                        .HasColumnName("baseline_value");
+
+                    b.Property<string>("ClassifiedAs")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("classified_as");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<string>("CvState")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cv_state");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<bool>("DimEvaluationEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dim_evaluation_eligible");
+
+                    b.Property<double>("DimThresholdRatio")
+                        .HasColumnType("double precision")
+                        .HasColumnName("dim_threshold_ratio");
+
+                    b.Property<DateTime>("EvaluatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("evaluated_at");
+
+                    b.Property<string>("EvaluatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("evaluated_by");
+
+                    b.Property<double?>("ExpectedRatio")
+                        .HasColumnType("double precision")
+                        .HasColumnName("expected_ratio");
+
+                    b.Property<string>("FixtureId")
+                        .HasColumnType("text")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<double>("LuxValue")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lux_value");
+
+                    b.Property<DateTime>("MeasuredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("measured_at");
+
+                    b.Property<string>("PhotoId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("photo_id");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("ProtocolFingerprint")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("protocol_fingerprint");
+
+                    b.Property<string>("ReasonCodes")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("reason_codes");
+
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("LuxId")
+                        .HasName("pk_lux_evaluation");
+
+                    b.HasIndex("AlgorithmVersionId")
+                        .HasDatabaseName("ix_lux_evaluation_algorithm_version_id");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_lux_evaluation_commune_id");
+
+                    b.HasIndex("EvaluatedBy")
+                        .HasDatabaseName("ix_lux_evaluation_evaluated_by");
+
+                    b.HasIndex("FixtureId")
+                        .HasDatabaseName("ix_lux_evaluation_fixture_id");
+
+                    b.HasIndex("PhotoId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_lux_evaluation_photo_id");
+
+                    b.HasIndex("WorkOrderId")
+                        .HasDatabaseName("ix_lux_evaluation_work_order_id");
+
+                    b.HasIndex("PoleId", "MeasuredAt")
+                        .HasDatabaseName("ix_lux_evaluation_pole_id_measured_at");
+
+                    b.HasIndex("PoleId", "ProtocolFingerprint")
+                        .HasDatabaseName("ix_lux_evaluation_pole_id_protocol_fingerprint")
+                        .HasFilter("baseline_eligible");
+
+                    b.HasIndex("BaselineId", "PoleId", "CommuneId")
+                        .HasDatabaseName("ix_lux_evaluation_baseline_id_pole_id_commune_id");
+
+                    b.HasIndex("PhotoId", "PoleId", "CommuneId")
+                        .HasDatabaseName("ix_lux_evaluation_photo_id_pole_id_commune_id");
+
+                    b.ToTable("lux_evaluation", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_lux_evaluation_classification", "cv_state IN ('on','off') AND classified_as IN ('normal','dim','out') AND (classified_as <> 'out' OR cv_state = 'off') AND (classified_as NOT IN ('normal','dim') OR cv_state = 'on') AND (NOT dim_evaluation_eligible OR (baseline_id IS NOT NULL AND baseline_ratio IS NOT NULL AND cv_state = 'on')) AND (classified_as <> 'dim' OR dim_evaluation_eligible) AND (baseline_id IS NULL) = (baseline_value IS NULL) AND (NOT baseline_eligible OR (cv_state = 'on' AND classified_as = 'normal' AND expected_ratio IS NULL)) AND jsonb_typeof(reason_codes) = 'array'");
+
+                            t.HasCheckConstraint("ck_lux_evaluation_classified_as", "\"classified_as\" IN ('normal', 'dim', 'out', 'unknown')");
+
+                            t.HasCheckConstraint("ck_lux_evaluation_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_lux_evaluation_finite", "lux_value >= 0 AND lux_value < 'Infinity'::float8 AND (baseline_value IS NULL OR (baseline_value > 0 AND baseline_value < 'Infinity'::float8)) AND (baseline_ratio IS NULL OR (baseline_ratio >= 0 AND baseline_ratio < 'Infinity'::float8)) AND dim_threshold_ratio > 0 AND dim_threshold_ratio <= 1 AND (expected_ratio IS NULL OR (expected_ratio > 0 AND expected_ratio <= 1))");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxReading", b =>
                 {
                     b.Property<string>("LuxId")
@@ -3048,9 +3201,21 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("meter_model");
 
+                    b.Property<long?>("ModuleFirmwareVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("module_firmware_version_id");
+
+                    b.Property<string>("ModuleId")
+                        .HasColumnType("text")
+                        .HasColumnName("module_id");
+
                     b.Property<string>("Note")
                         .HasColumnType("text")
                         .HasColumnName("note");
+
+                    b.Property<double?>("OpticalFilterTransmittance")
+                        .HasColumnType("double precision")
+                        .HasColumnName("optical_filter_transmittance");
 
                     b.Property<string>("PhotoId")
                         .HasColumnType("text")
@@ -3060,6 +3225,14 @@ namespace LuxMap.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("pole_id");
+
+                    b.Property<double?>("SensorHeightM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("sensor_height_m");
+
+                    b.Property<double?>("WindowSpread")
+                        .HasColumnType("double precision")
+                        .HasColumnName("window_spread");
 
                     b.HasKey("LuxId")
                         .HasName("pk_lux_reading");
@@ -3089,10 +3262,35 @@ namespace LuxMap.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_lux_reading_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
 
+                            t.HasCheckConstraint("ck_lux_reading_protocol", "(sensor_height_m IS NULL) = (module_id IS NULL) AND (sensor_height_m IS NULL) = (window_spread IS NULL) AND (sensor_height_m IS NOT NULL OR (optical_filter_transmittance IS NULL AND module_firmware_version_id IS NULL)) AND (sensor_height_m IS NULL OR (sensor_height_m > 0 AND sensor_height_m < 'Infinity'::float8)) AND (window_spread IS NULL OR (window_spread >= 0 AND window_spread < 'Infinity'::float8)) AND (optical_filter_transmittance IS NULL OR (optical_filter_transmittance > 0 AND optical_filter_transmittance <= 1)) AND (module_id IS NULL OR length(btrim(module_id)) > 0)");
+
                             t.HasCheckConstraint("ck_lux_reading_value_non_negative", "lux_value >= 0 AND lux_value <> 'NaN'::float8 AND lux_value <> 'Infinity'::float8");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxReadingSample", b =>
+                {
+                    b.Property<string>("LuxId")
+                        .HasColumnType("text")
+                        .HasColumnName("lux_id");
+
+                    b.Property<int>("Seq")
+                        .HasColumnType("integer")
+                        .HasColumnName("seq");
+
+                    b.Property<double>("Lux")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lux");
+
+                    b.HasKey("LuxId", "Seq")
+                        .HasName("pk_lux_reading_sample");
+
+                    b.ToTable("lux_reading_sample", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_lux_reading_sample_value", "seq >= 0 AND lux >= 0 AND lux <> 'NaN'::float8 AND lux <> 'Infinity'::float8");
+                        });
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.PoleObservation", b =>
@@ -3253,6 +3451,119 @@ namespace LuxMap.Persistence.Migrations
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.StationaryBaseline", b =>
+                {
+                    b.Property<long>("BaselineId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("baseline_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("BaselineId"));
+
+                    b.Property<long>("AlgorithmVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("algorithm_version_id");
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DataSource")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("data_source");
+
+                    b.Property<string>("FixtureId")
+                        .HasColumnType("text")
+                        .HasColumnName("fixture_id");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("member_count");
+
+                    b.Property<double>("MemberCv")
+                        .HasColumnType("double precision")
+                        .HasColumnName("member_cv");
+
+                    b.Property<string>("PoleId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pole_id");
+
+                    b.Property<string>("ProtocolFingerprint")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("protocol_fingerprint");
+
+                    b.Property<double>("Value")
+                        .HasColumnType("double precision")
+                        .HasColumnName("value");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("BaselineId")
+                        .HasName("pk_stationary_baseline");
+
+                    b.HasAlternateKey("BaselineId", "PoleId", "CommuneId")
+                        .HasName("ak_stationary_baseline_baseline_id_pole_id_commune_id");
+
+                    b.HasIndex("AlgorithmVersionId")
+                        .HasDatabaseName("ix_stationary_baseline_algorithm_version_id");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_stationary_baseline_commune_id");
+
+                    b.HasIndex("CreatedBy")
+                        .HasDatabaseName("ix_stationary_baseline_created_by");
+
+                    b.HasIndex("FixtureId")
+                        .HasDatabaseName("ix_stationary_baseline_fixture_id");
+
+                    b.HasIndex("PoleId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stationary_baseline_pole_id_version");
+
+                    b.ToTable("stationary_baseline", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stationary_baseline_data_source", "\"data_source\" IN ('field', 'public_imagery', 'calibration_rig', 'simulated')");
+
+                            t.HasCheckConstraint("ck_stationary_baseline_value", "value > 0 AND value < 'Infinity'::float8 AND version > 0 AND member_count > 0 AND member_cv >= 0 AND member_cv < 'Infinity'::float8 AND length(btrim(protocol_fingerprint)) > 0");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.StationaryBaselineMember", b =>
+                {
+                    b.Property<long>("BaselineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("baseline_id");
+
+                    b.Property<string>("LuxId")
+                        .HasColumnType("text")
+                        .HasColumnName("lux_id");
+
+                    b.HasKey("BaselineId", "LuxId")
+                        .HasName("pk_stationary_baseline_member");
+
+                    b.HasIndex("LuxId")
+                        .HasDatabaseName("ix_stationary_baseline_member_lux_id");
+
+                    b.ToTable("stationary_baseline_member", (string)null);
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.SurveyFrame", b =>
@@ -4474,7 +4785,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
 
-                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\r\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\r\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\r\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\r\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\r\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
+                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
 
                             t.HasCheckConstraint("ck_work_order_cancellation_request_status", "\"cancellation_request_status\" IN ('none', 'pending', 'rejected')");
 
@@ -5111,7 +5422,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_pole_target_position", "position >= 0");
 
-                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\r\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_accuracy_m IS NOT NULL AND reported_captured_at IS NOT NULL)");
+                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_accuracy_m IS NOT NULL AND reported_captured_at IS NOT NULL)");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -6318,6 +6629,72 @@ namespace LuxMap.Persistence.Migrations
                         .HasConstraintName("fk_luminance_history_pole_observation_observation_id_pole_id_c");
                 });
 
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxEvaluation", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("AlgorithmVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_artifact_version_algorithm_version_id");
+
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("EvaluatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_app_user_evaluated_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Fixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_lux_evaluation_fixture_fixture_id");
+
+                    b.HasOne("LuxMap.Modules.Survey.Entities.LuxReading", null)
+                        .WithMany()
+                        .HasForeignKey("LuxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_lux_reading_lux_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_pole_pole_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_work_order_work_order_id");
+
+                    b.HasOne("LuxMap.Modules.Survey.Entities.StationaryBaseline", null)
+                        .WithMany()
+                        .HasForeignKey("BaselineId", "PoleId", "CommuneId")
+                        .HasPrincipalKey("BaselineId", "PoleId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_lux_evaluation_stationary_baseline");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrderPolePhoto", null)
+                        .WithMany()
+                        .HasForeignKey("PhotoId", "PoleId", "CommuneId")
+                        .HasPrincipalKey("PhotoId", "PoleId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_evaluation_pole_photo");
+                });
+
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxReading", b =>
                 {
                     b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
@@ -6347,6 +6724,16 @@ namespace LuxMap.Persistence.Migrations
                         .HasPrincipalKey("PhotoId", "PoleId", "CommuneId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_lux_reading_pole_photo");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxReadingSample", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Survey.Entities.LuxReading", null)
+                        .WithMany("Samples")
+                        .HasForeignKey("LuxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lux_reading_sample_lux_reading_lux_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.PoleObservation", b =>
@@ -6396,6 +6783,62 @@ namespace LuxMap.Persistence.Migrations
                     b.Navigation("Pass");
 
                     b.Navigation("Run");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.StationaryBaseline", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.Versions.ArtifactVersion", null)
+                        .WithMany()
+                        .HasForeignKey("AlgorithmVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stationary_baseline_artifact_version_algorithm_version_id");
+
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stationary_baseline_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Identity.Entities.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stationary_baseline_app_user_created_by");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Fixture", null)
+                        .WithMany()
+                        .HasForeignKey("FixtureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stationary_baseline_fixture_fixture_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Pole", null)
+                        .WithMany()
+                        .HasForeignKey("PoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stationary_baseline_pole_pole_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.StationaryBaselineMember", b =>
+                {
+                    b.HasOne("LuxMap.Modules.Survey.Entities.StationaryBaseline", "Baseline")
+                        .WithMany()
+                        .HasForeignKey("BaselineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stationary_baseline_member_stationary_baseline_baseline_id");
+
+                    b.HasOne("LuxMap.Modules.Survey.Entities.LuxReading", null)
+                        .WithMany()
+                        .HasForeignKey("LuxId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stationary_baseline_member_lux_reading_lux_id");
+
+                    b.Navigation("Baseline");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.Survey.Entities.SurveyFrame", b =>
@@ -7016,6 +7459,11 @@ namespace LuxMap.Persistence.Migrations
                     b.Navigation("CommuneAssignments");
 
                     b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("LuxMap.Modules.Survey.Entities.LuxReading", b =>
+                {
+                    b.Navigation("Samples");
                 });
 #pragma warning restore 612, 618
         }

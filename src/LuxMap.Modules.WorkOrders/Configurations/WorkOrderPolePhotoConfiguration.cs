@@ -70,7 +70,8 @@ public sealed class FaultOriginPolePhotoConfiguration : IEntityTypeConfiguration
     {
         b.HasOne<WorkOrderPolePhoto>().WithMany().HasForeignKey(x => new { x.OriginPolePhotoId, x.PoleId, x.CommuneId })
             .HasPrincipalKey(x => new { x.PhotoId, x.PoleId, x.CommuneId }).OnDelete(DeleteBehavior.Restrict);
+        // LUX-BASELINE D-8: a confirmed ON photo with a protocol lux reading below its pole's baseline raises lamp_dim the same way.
         b.ToTable("fault", t => t.HasCheckConstraint("ck_fault_pole_photo_source",
-            "origin_pole_photo_id IS NULL OR (source_channel IN ('cv','field_report') AND fault_type = 'lamp_out' AND pole_id IS NOT NULL AND origin_observation_id IS NULL AND origin_node_id IS NULL AND (source_channel <> 'field_report' OR (reported_by IS NOT NULL AND status_confidence IS NULL AND detection_model_version IS NULL)))"));
+            "origin_pole_photo_id IS NULL OR (source_channel IN ('cv','field_report') AND fault_type IN ('lamp_out','lamp_dim') AND pole_id IS NOT NULL AND origin_observation_id IS NULL AND origin_node_id IS NULL AND (source_channel <> 'field_report' OR (reported_by IS NOT NULL AND status_confidence IS NULL AND detection_model_version IS NULL)))"));
     }
 }

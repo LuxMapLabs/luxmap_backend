@@ -154,6 +154,18 @@ public static class ErrorCodes
     /// </summary>
     public const string PhotoLuxAlreadyLinked = "PHOTO_LUX_ALREADY_LINKED";
 
+    /// <summary>409 — the pole photo already has a Manager's decision; a lux reading can no longer be linked to it (LUX-BASELINE D-10).</summary>
+    public const string PolePhotoAlreadyDecided = "POLE_PHOTO_ALREADY_DECIDED";
+
+    /// <summary>400 — a protocol reading was taken off the configured setup (sensor height), LUX-BASELINE D-5. Measure again.</summary>
+    public const string LuxProtocolMismatch = "LUX_PROTOCOL_MISMATCH";
+
+    /// <summary>400 — a protocol reading's window had too few samples or swung too much, LUX-BASELINE D-5. Measure again on the spot.</summary>
+    public const string LuxWindowUnstable = "LUX_WINDOW_UNSTABLE";
+
+    /// <summary>400 — <c>lux_value</c> is not the median of the protocol's samples, LUX-BASELINE D-4.</summary>
+    public const string LuxSamplesMismatch = "LUX_SAMPLES_MISMATCH";
+
     // ── Authentication — Contract v1.2 section 2.10.6, except UNAUTHENTICATED (BE-08) ───
 
     /// <summary>

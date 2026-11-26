@@ -11,8 +11,12 @@ public sealed class PhotoLuxLookup(LuxMapDbContext db) : IPhotoLuxLookup
     public async Task<IReadOnlyDictionary<string, PhotoLux>> ForPhotosAsync(IReadOnlyCollection<string> photoIds, CancellationToken ct)
     {
         if (photoIds.Count == 0) return new Dictionary<string, PhotoLux>();
-        return await db.Set<LuxReading>().AsNoTracking()
+        var readings = await db.Set<LuxReading>().AsNoTracking()
             .Where(reading => reading.PhotoId != null && photoIds.Contains(reading.PhotoId))
-            .ToDictionaryAsync(reading => reading.PhotoId!, reading => new PhotoLux(reading.LuxId, reading.LuxValue, reading.MeasuredAt), ct);
+            .ToListAsync(ct);
+        var verdicts = await Review.LuxEvaluationReads.ForReadingsAsync(db, readings.Select(r => r.LuxId).ToArray(), ct);
+        return readings.ToDictionary(reading => reading.PhotoId!, reading => verdicts.TryGetValue(reading.LuxId, out var v)
+            ? new PhotoLux(reading.LuxId, reading.LuxValue, reading.MeasuredAt, v.ClassifiedAs, v.BaselineRatio, v.ReasonCodes)
+            : new PhotoLux(reading.LuxId, reading.LuxValue, reading.MeasuredAt));
     }
 }

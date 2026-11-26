@@ -21466,6 +21466,9 @@
           "commune_id": {
             "type": "string",
             "nullable": true
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/LuxProtocolRequest"
           }
         },
         "additionalProperties": false
@@ -24249,6 +24252,122 @@
         },
         "additionalProperties": false
       },
+      "LuxEvaluationResponse": {
+        "type": "object",
+        "properties": {
+          "classified_as": {
+            "type": "string"
+          },
+          "baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_value": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "baseline_member_count": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "dim_threshold_ratio": {
+            "type": "number",
+            "format": "double"
+          },
+          "dim_evaluation_eligible": {
+            "type": "boolean"
+          },
+          "expected_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evaluated_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "LuxProtocolRequest": {
+        "required": [
+          "module_id",
+          "samples",
+          "sensor_height_m"
+        ],
+        "type": "object",
+        "properties": {
+          "samples": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "sensor_height_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "module_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "module_firmware_version_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "optical_filter_transmittance": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "LuxProtocolResponse": {
+        "type": "object",
+        "properties": {
+          "sensor_height_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "module_id": {
+            "type": "string"
+          },
+          "module_firmware_version_id": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "optical_filter_transmittance": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "window_spread": {
+            "type": "number",
+            "format": "double"
+          },
+          "sample_count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
       "LuxReadingResponse": {
         "type": "object",
         "properties": {
@@ -24284,6 +24403,12 @@
           "note": {
             "type": "string",
             "nullable": true
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/LuxProtocolResponse"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/LuxEvaluationResponse"
           }
         },
         "additionalProperties": false
@@ -24350,6 +24475,12 @@
           },
           "nearest_luminance": {
             "$ref": "#/components/schemas/NearestLuminance"
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/LuxProtocolResponse"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/LuxEvaluationResponse"
           }
         },
         "additionalProperties": false
@@ -25036,6 +25167,15 @@
               "$ref": "#/components/schemas/PoleMapHistoryPoint"
             }
           },
+          "stationary_luminance_baseline": {
+            "$ref": "#/components/schemas/PoleMapStationaryBaseline"
+          },
+          "stationary_luminance_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PoleMapStationaryPoint"
+            }
+          },
           "runtime_history": {
             "type": "array",
             "items": {
@@ -25280,6 +25420,81 @@
         },
         "additionalProperties": false
       },
+      "PoleMapStationaryBaseline": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "member_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "member_cv": {
+            "type": "number",
+            "format": "double"
+          },
+          "stable": {
+            "type": "boolean"
+          },
+          "computed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "PoleMapStationaryPoint": {
+        "required": [
+          "lux_id",
+          "photo_id",
+          "reason_codes"
+        ],
+        "type": "object",
+        "properties": {
+          "lux_id": {
+            "type": "string"
+          },
+          "photo_id": {
+            "type": "string"
+          },
+          "measured_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "lux_value": {
+            "type": "number",
+            "format": "double"
+          },
+          "baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "classified_as": {
+            "$ref": "#/components/schemas/FixtureStatus"
+          },
+          "dim_threshold_ratio": {
+            "type": "number",
+            "format": "double"
+          },
+          "expected_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "PoleMapStatus": {
         "type": "object",
         "properties": {
@@ -25500,6 +25715,22 @@
             "type": "string",
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time",
+            "nullable": true
+          },
+          "lux_classified_as": {
+            "type": "string",
+            "nullable": true
+          },
+          "lux_baseline_ratio": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lux_reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
             "nullable": true
           }
         },

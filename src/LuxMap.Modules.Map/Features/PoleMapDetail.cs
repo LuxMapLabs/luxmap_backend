@@ -52,6 +52,15 @@ public sealed record PoleMapDetail
     public required IReadOnlyList<PoleMapHistoryPoint> LuminanceHistory { get; init; }
 
     /// <summary>
+    /// ADDITIVE (LUX-BASELINE D-13): the newest STATIONARY baseline of the current lamp (lux measured standing under the lamp),
+    /// or null before enough survey nights. Kept apart from <see cref="LuminanceBaselines"/>: the two methods never share a median.
+    /// </summary>
+    public PoleMapStationaryBaseline? StationaryLuminanceBaseline { get; init; }
+
+    /// <summary>ADDITIVE (LUX-BASELINE D-13): newest 30 verdicts on stationary readings, oldest first.</summary>
+    public IReadOnlyList<PoleMapStationaryPoint> StationaryLuminanceHistory { get; init; } = [];
+
+    /// <summary>
     /// Always empty: runtime is measured per feeder, not per pole (drift I-9), and no per-pole series
     /// exists. Kept as an array so the key the front end reads is still a list.
     /// </summary>
@@ -198,4 +207,28 @@ public sealed record PoleMapRuntimePoint
     public string? OnAt { get; init; }
     public string? OffAt { get; init; }
     public required string Source { get; init; }
+}
+
+/// <summary>A pole's stationary baseline (LUX-BASELINE D-9). <c>Stable</c> is false when its members vary more than the NFR allows.</summary>
+public sealed record PoleMapStationaryBaseline
+{
+    public double Value { get; init; }
+    public int MemberCount { get; init; }
+    public double MemberCv { get; init; }
+    public bool Stable { get; init; }
+    public DateTime ComputedAt { get; init; }
+}
+
+/// <summary>One verdict on a stationary reading, computed on the backend (Contract: clients never derive a ratio).</summary>
+public sealed record PoleMapStationaryPoint
+{
+    public required string LuxId { get; init; }
+    public required string PhotoId { get; init; }
+    public DateTime MeasuredAt { get; init; }
+    public double LuxValue { get; init; }
+    public double? BaselineRatio { get; init; }
+    public FixtureStatus ClassifiedAs { get; init; }
+    public double DimThresholdRatio { get; init; }
+    public double? ExpectedRatio { get; init; }
+    public required IReadOnlyList<string> ReasonCodes { get; init; }
 }

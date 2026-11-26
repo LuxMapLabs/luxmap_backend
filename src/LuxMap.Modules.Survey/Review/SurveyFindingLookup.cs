@@ -24,16 +24,26 @@ public sealed class SurveyFindingLookup(LuxMapDbContext db) : ISurveyFindingLook
         var photos = await db.Set<WorkOrderPolePhoto>().AsNoTracking()
             .Where(p => p.WorkOrderId == workOrderId && p.CommuneId == communeId && p.Decision == "confirm")
             .ToArrayAsync(ct);
-        return Merge(history, photos);
+        // LUX-BASELINE D-13: a photo whose protocol reading was judged against a stable baseline carries that verdict.
+        var photoIds = photos.Select(p => p.PhotoId).ToArray();
+        var judged = await db.Set<LuxEvaluation>().AsNoTracking()
+            .Where(e => photoIds.Contains(e.PhotoId) && e.CvState == "on" && e.DimEvaluationEligible && e.ExpectedRatio == null)
+            .ToDictionaryAsync(e => e.PhotoId, e => e.ClassifiedAs, ct);
+        return Merge(history, photos, judged);
     }
 
-    /// <summary>Fold observations oldest first; ON preserves a preceding dim classification (WSC-6).</summary>
-    public static SurveyFinding[] Merge(IEnumerable<LuminanceHistory> history, IEnumerable<WorkOrderPolePhoto> confirmedPhotos)
+    /// <summary>
+    /// Fold observations oldest first; a bare ON preserves a preceding dim classification (WSC-6), but a photo whose lux reading
+    /// was judged against its pole's baseline (<paramref name="judgedPhotos"/>, LUX-BASELINE D-13) counts as that verdict.
+    /// </summary>
+    public static SurveyFinding[] Merge(IEnumerable<LuminanceHistory> history, IEnumerable<WorkOrderPolePhoto> confirmedPhotos,
+        IReadOnlyDictionary<string, FixtureStatus>? judgedPhotos = null)
     {
         var observations = history.Select(h => new Observation(h.PoleId, h.DataSource, h.EvaluatedAt,
-                h.PublishedAt, h.SweepId, h.ClassifiedAs, null))
+                h.PublishedAt, h.SweepId, h.ClassifiedAs, null, null))
             .Concat(confirmedPhotos.Select(p => new Observation(p.PoleId, p.DataSource, p.CapturedAt,
-                p.DecidedAt!.Value, p.PhotoId, null, p.FinalCvState ?? p.CvState)));
+                p.DecidedAt!.Value, p.PhotoId, null, p.FinalCvState ?? p.CvState,
+                judgedPhotos?.TryGetValue(p.PhotoId, out var judged) == true ? judged : null)));
         var findings = new List<SurveyFinding>();
         foreach (var pole in observations.GroupBy(o => o.PoleId))
         {
@@ -43,10 +53,11 @@ public sealed class SurveyFindingLookup(LuxMapDbContext db) : ISurveyFindingLook
             foreach (var observation in pole.OrderBy(o => o.At).ThenBy(o => o.SweepStatus.HasValue)
                 .ThenBy(o => o.PublishedAt).ThenBy(o => o.Id.Length).ThenBy(o => o.Id, StringComparer.Ordinal))
             {
-                var next = observation.SweepStatus ?? SurveyPublicationRules.PhotoStatus(observation.CvState!, status);
+                var next = observation.SweepStatus ?? observation.Judged
+                    ?? SurveyPublicationRules.PhotoStatus(observation.CvState!, status);
                 // A photo that leaves the status as it was (ON on dim, OFF on out) raised no fault of its own: the open
                 // fault to carry is the one the earlier observation raised, so keep that observation's data source.
-                if (observation.SweepStatus is not null || next != status) source = observation.DataSource;
+                if (observation.SweepStatus is not null || observation.Judged is not null || next != status) source = observation.DataSource;
                 status = next;
             }
             if (SurveyPublicationRules.FaultFor(status) is { } type)
@@ -56,5 +67,5 @@ public sealed class SurveyFindingLookup(LuxMapDbContext db) : ISurveyFindingLook
     }
 
     private sealed record Observation(string PoleId, DataSource DataSource, DateTime At, DateTime PublishedAt,
-        string Id, FixtureStatus? SweepStatus, string? CvState);
+        string Id, FixtureStatus? SweepStatus, string? CvState, FixtureStatus? Judged);
 }

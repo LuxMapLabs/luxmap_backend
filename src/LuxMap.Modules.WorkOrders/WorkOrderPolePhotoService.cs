@@ -315,7 +315,8 @@ public sealed partial class WorkOrderPolePhotoService(LuxMapDbContext db, ICurre
     {
         var linked = await lux.ForPhotosAsync(rows.Select(p => p.PhotoId).ToArray(), ct);
         return rows.Select(p => linked.TryGetValue(p.PhotoId, out var reading)
-            ? Snapshot(p) with { LuxId = reading.LuxId, LuxValue = reading.LuxValue, LuxMeasuredAt = reading.MeasuredAt }
+            ? Snapshot(p) with { LuxId = reading.LuxId, LuxValue = reading.LuxValue, LuxMeasuredAt = reading.MeasuredAt,
+                LuxClassifiedAs = reading.ClassifiedAs, LuxBaselineRatio = reading.BaselineRatio, LuxReasonCodes = reading.ReasonCodes }
             : Snapshot(p)).ToArray();
     }
 

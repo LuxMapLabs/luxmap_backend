@@ -42,6 +42,24 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
     }
 
     [Fact]
+    public void Lux_readings_pole_photos_and_pole_detail_carry_the_LUX_BASELINE_verdict()
+    {
+        Assert.True(Schema("CreateLuxReadingRequest").GetProperty("properties").TryGetProperty("protocol", out _));
+        foreach (var field in new[] { "samples", "sensor_height_m", "module_id", "module_firmware_version_id", "optical_filter_transmittance" })
+            Assert.True(Schema("LuxProtocolRequest").GetProperty("properties").TryGetProperty(field, out _), field);
+        foreach (var name in new[] { "LuxReadingResponse", "LuxReadingWithLuminanceResponse" })
+            foreach (var field in new[] { "protocol", "evaluation" })
+                Assert.True(Schema(name).GetProperty("properties").TryGetProperty(field, out _), $"{name}.{field}");
+        foreach (var field in new[] { "classified_as", "baseline_ratio", "baseline_value", "baseline_member_count", "dim_threshold_ratio",
+                     "dim_evaluation_eligible", "expected_ratio", "reason_codes", "evaluated_at" })
+            Assert.True(Schema("LuxEvaluationResponse").GetProperty("properties").TryGetProperty(field, out _), field);
+        foreach (var field in new[] { "lux_classified_as", "lux_baseline_ratio", "lux_reason_codes" })
+            Assert.True(Schema("PolePhotoItem").GetProperty("properties").TryGetProperty(field, out _), field);
+        foreach (var field in new[] { "stationary_luminance_baseline", "stationary_luminance_history" })
+            Assert.True(Schema("PoleMapDetail").GetProperty("properties").TryGetProperty(field, out _), field);
+    }
+
+    [Fact]
     public void Scheduling_suggestions_publish_manager_policy_wire_kinds_and_real_pagination()
     {
         foreach (var path in new[] { "/api/v1/work-orders/suggestions", "/api/v1/work-orders/suggestions/items" })

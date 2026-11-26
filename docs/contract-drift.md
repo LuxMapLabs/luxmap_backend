@@ -1,5 +1,29 @@
 # Chỗ lệch giữa code và Contract — log mới từ v1.4 (18/09/2026)
 
+## LUX-BASELINE — số lux đo đứng yên được chấm so với baseline của chính cột (26/11/2026)
+
+| | |
+|---|---|
+| **Decision** | Hiện thực D-R29: số đo lux **có `protocol`** gắn ảnh cột ở phiếu **khảo sát** được chấm lúc Quản lý **xác nhận** ảnh, so với **baseline đứng yên** của chính cột (trung vị các đêm trước). Ticket `.ai/tasks/LUX-BASELINE.md`, D-1…D-16 chốt theo khuyến nghị (Phase 1: `.ai/results/LUX-BASELINE-p1.md`) |
+| **Decision maker** | **Mỹ (Dylan)** — "chốt theo khuyến nghị hết", 26/11/2026. D-15 Claude chọn khi hiện thực, chờ Mỹ xác nhận ở review · `SELF-SIGNED` vì chạm bề mặt API |
+| **Date** | 26/11/2026 |
+| **Scope** | Contract **v1.24** (§5.7, bảng mã lỗi, `PolePhotoItem`, chi tiết cột); migration `AddStationaryLuxBaseline`; module Survey, WorkOrders (`IPhotoLuxLookup`, CHECK `fault`), Map; WP5 / WP6 hiện thị và gửi `protocol` |
+
+| Mã | Nội dung | Ai bị ảnh hưởng |
+|---|---|---|
+| LUX-BASELINE-1 | Baseline đứng yên ở **bảng song song** (`stationary_baseline`, `stationary_baseline_member`, `lux_evaluation`, mẫu thô `lux_reading_sample`), đều bất biến. Không trộn với `luminance_baseline` của sweep | Nội bộ BE; báo cáo thống kê sau này phải đọc cả hai nguồn |
+| LUX-BASELINE-2 | **Luật "ảnh ON giữ nguyên dim / normal" (PP, WSC-6) có ngoại lệ:** ảnh ON có số đo `protocol` chấm được so với baseline ổn định thì **đổi trạng thái** (kể cả `dim` → `normal`) và `SurveyFindingLookup` lấy kết luận đó. Ảnh ON không có số đo / chưa đủ baseline vẫn giữ luật cũ | WP5 (màn ảnh cột, phiếu), phiếu nối tiếp |
+| LUX-BASELINE-3 | **Đổi hành vi:** `POST /lux-readings` gắn vào ảnh **đã được quyết định** → `409 POLE_PHOTO_ALREADY_DECIDED` (trước đây nhận). Tạo lux khoá `work_order → pole → photo` như bước quyết định | **WP6** phải gửi lux ngay sau khi upload ảnh |
+| LUX-BASELINE-4 | CHECK `ck_fault_pole_photo_source` nới từ `lamp_out` thành `lamp_out | lamp_dim`: ảnh cột có số đo dưới ngưỡng sinh `lamp_dim` **`confirmed`** | WP5 (danh sách sự cố có `lamp_dim` nguồn ảnh) |
+| LUX-BASELINE-5 | **D-15:** Contract bỏ giá trị cố định `meter_model = "LuxMap_ESP32"` (LUX-PHOTO D-9); `meter_model` là chuỗi app đọc từ thiết bị. Dữ liệu VPS 26/11: 12 số `ESP32C3_LUX`, 1 số `LuxMap_ESP32`. Nhận ra số đo theo quy trình bằng `protocol`, không bằng `meter_model` | WP6 (giữ nguyên chuỗi đang gửi) |
+| LUX-BASELINE-6 | Con số quy trình trong `LuxProtocol` (appsettings): cao 1,0 m ± 0,05; ≥ 5 mẫu; dao động ≤ 0,05; CV baseline ≤ 0,10; `lux_value` = trung vị ± 1%. **Là đề xuất** cho tới buổi đo thử (D-R29 O-3 vẫn mở); đổi số = đổi phiên bản thuật toán và làm lại baseline | FO, WP6 (độ cao sào) |
+
+**D-R29 sau ticket này:** O-1 **đóng** (ON/OFF từ ảnh cột); O-2 **đóng** (quyết định ảnh là bước duyệt số đo); O-4 **đóng**
+(`baseline_unstable`); O-3 còn mở (con số thật); O-5 còn mở (pipeline sweep vẫn chạy, không đụng).
+
+**Không đổi:** baseline của **sweep** vẫn đếm theo run và chia theo chiều (`SurveyPublicationRules.Members`); luật "mỗi đêm một lần"
+chỉ hiện thực cho baseline đứng yên. `nearest_luminance` vẫn `null` (đối chứng A là việc khác).
+
 ## D-R29 — đo lux đứng yên, ngay dưới đèn (25/11/2026)
 
 | | |
@@ -7,7 +31,7 @@
 | **Decision** | Kênh đo độ sáng chuyển từ module BH1750 **gắn xe, lấy mẫu liên tục suốt sweep** (phần lux của D-R21) sang **thiết bị đo đứng yên, đặt ngay dưới đầu đèn, đo từng cột**. Phân loại giữ D-R20; baseline giữ trung vị tối thiểu 3 (D-05). Việc đo nằm trong **phiếu khảo sát**, không thêm `task_kind` |
 | **Decision maker** | **Mỹ (Dylan)**, trực tiếp. Chạm bề mặt API và việc của WP6 / IoT / WP4 → xác nhận với nhóm ở FW kế tiếp (FW-00 mục 3: không im lặng thành approve) |
 | **Date** | 25/11/2026 |
-| **Scope** | Chỉ tầng tài liệu: mục này, banner đầu file, ghi chú ở D-R21 và mục *Registration v1.3 hiện hành*, con trỏ ở `CLAUDE.md`, `docs/agents/traps/survey.md`, `docs/field/BE-15-pilot-drive.md`. **Không** đổi Contract, `docs/openapi/*`, migration, `src/` |
+| **Scope** | Chỉ tầng tài liệu: mục này, banner đầu file, ghi chú ở D-R21 và mục *Registration v1.3 hiện hành*, con trỏ ở `CLAUDE.md`, `docs/agents/traps/survey.md`, `docs/field/BE-15-pilot-drive.md`. **Không** đổi Contract, `docs/openapi/*`, migration, `src/`. **26/11: hiện thực ở LUX-BASELINE** (mục đầu file) — O-1, O-2, O-4 đóng |
 
 Lý do: Phiếu v1.3 viết "capture each pole's fixture and collect its light reading through the paired light-sensing module". Đo
 đứng yên gắn số đo với đúng cột (NFR ≥ 95%) và cho độ lặp lại tốt hơn (NFR CV ≤ 10%). Nó cũng bỏ được bước đồng bộ đồng hồ,

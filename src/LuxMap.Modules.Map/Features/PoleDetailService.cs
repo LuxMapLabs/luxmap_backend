@@ -34,7 +34,8 @@ namespace LuxMap.Modules.Map.Features;
 /// </para>
 /// </remarks>
 public sealed class PoleDetailService(
-    LuxMapDbContext db, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty, LuxMap.Modules.Assets.IFeederPowerLookup? feederPower = null)
+    LuxMapDbContext db, SurveyMediaAccess mediaAccess, WarrantyCalendar warranty,
+    Microsoft.Extensions.Options.IOptions<LuxProtocolOptions> stationaryProtocol, LuxMap.Modules.Assets.IFeederPowerLookup? feederPower = null)
 {
     public const int HistoryPoints = 30;
     public const int RecentFrameCount = 10;
@@ -111,6 +112,8 @@ public sealed class PoleDetailService(
             LuminanceBaseline = baselines.OrderByDescending(b => b.ComputedAt).FirstOrDefault(),
             LuminanceBaselines = baselines,
             LuminanceHistory = await HistoryAsync(poleId, ct),
+            StationaryLuminanceBaseline = await StationaryBaselineAsync(poleId, anchorId, ct),
+            StationaryLuminanceHistory = await StationaryHistoryAsync(poleId, ct),
             RuntimeHistory = [],
             OpenFaults = await OpenFaultsAsync(poleId, ct),
             RecentFrames = await RecentFramesAsync(poleId, ct),
@@ -145,6 +148,34 @@ public sealed class PoleDetailService(
                 ComputedAt = b.CreatedAt,
                 Direction = b.Direction,
             })];
+    }
+
+    private async Task<PoleMapStationaryBaseline?> StationaryBaselineAsync(string poleId, string? fixtureId, CancellationToken ct)
+    {
+        var row = await db.Set<StationaryBaseline>().AsNoTracking()
+            .Where(b => b.PoleId == poleId && b.FixtureId == fixtureId)
+            .OrderByDescending(b => b.Version).FirstOrDefaultAsync(ct);
+        return row is null ? null : new PoleMapStationaryBaseline
+        {
+            Value = row.Value, MemberCount = row.MemberCount, MemberCv = row.MemberCv,
+            Stable = row.MemberCv <= stationaryProtocol.Value.MaxBaselineCv, ComputedAt = row.CreatedAt,
+        };
+    }
+
+    private async Task<IReadOnlyList<PoleMapStationaryPoint>> StationaryHistoryAsync(string poleId, CancellationToken ct)
+    {
+        var rows = await db.Set<LuxEvaluation>().AsNoTracking()
+            .Where(e => e.PoleId == poleId)
+            .OrderByDescending(e => e.MeasuredAt).ThenByDescending(e => e.LuxId.Length).ThenByDescending(e => e.LuxId)
+            .Take(HistoryPoints)
+            .ToListAsync(ct);
+        rows.Reverse();
+        return [.. rows.Select(e => new PoleMapStationaryPoint
+        {
+            LuxId = e.LuxId, PhotoId = e.PhotoId, MeasuredAt = e.MeasuredAt, LuxValue = e.LuxValue, BaselineRatio = e.BaselineRatio,
+            ClassifiedAs = e.ClassifiedAs, DimThresholdRatio = e.DimThresholdRatio, ExpectedRatio = e.ExpectedRatio,
+            ReasonCodes = LuxEvaluationReads.Reasons(e.ReasonCodes),
+        })];
     }
 
     private async Task<IReadOnlyList<PoleMapHistoryPoint>> HistoryAsync(string poleId, CancellationToken ct)

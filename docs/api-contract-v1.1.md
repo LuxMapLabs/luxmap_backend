@@ -1,4 +1,4 @@
-# LuxMap — API Contract v1.23 (BẢN HỢP NHẤT, SELF-SIGNED)
+# LuxMap — API Contract v1.24 (BẢN HỢP NHẤT, SELF-SIGNED)
 
 **Trạng thái:** Bản hợp nhất, **thay thế** v1.0 → v1.3 và toàn bộ `docs/contract-drift.md` cũ (nay ở
 `docs/archive/contract-drift-v1.md`). Đây là tài liệu duy nhất cần đọc. **Tên file giữ
@@ -22,7 +22,8 @@
 **v1.20:** 26/10/2026 (WO-REASSIGN-DATE — giao lại kèm ngày khác, SELF-SIGNED) ·
 **v1.21:** 28/10/2026 (ASSET-PHOTOS — trạng thái mạch và ảnh tài sản, SELF-SIGNED; phần A hiện thực 12/11/2026) ·
 **v1.22:** 29/10/2026 (ACCOUNT-ONE-COMMUNE — mỗi tài khoản đúng một xã, trừ Quản trị hệ thống; ACCT-1) ·
-**v1.23:** 24/11/2026 (LUX-PHOTO — số đo lux gắn với ảnh cột qua `photo_id`, máy đo cầm tay, SELF-SIGNED).
+**v1.23:** 24/11/2026 (LUX-PHOTO — số đo lux gắn với ảnh cột qua `photo_id`, máy đo cầm tay, SELF-SIGNED) ·
+**v1.24:** 26/11/2026 (LUX-BASELINE — số lux đo đứng yên theo quy trình được chấm so với baseline của chính cột, SELF-SIGNED).
 **Nguyên tắc:** Bản này là **hợp đồng**. Muốn đổi field/enum → mở issue, cả BE và FE cùng duyệt, tăng
 version. Không đổi ngầm. Chỗ lệch mới ghi vào `docs/contract-drift.md` (log mới, mở từ 18/09/2026).
 
@@ -161,6 +162,10 @@ client **không** parse.
 | `LAST_SYSTEM_ADMIN` | 409 | Thao tác sẽ không còn Quản trị hệ thống nào đăng nhập được (hạ vai trò, khoá; v1.8) |
 | `CANNOT_LOCK_SELF` | 409 | Quản trị tự khoá tài khoản của chính mình (v1.8) |
 | `PHOTO_LUX_ALREADY_LINKED` | 409 | `POST /lux-readings`: ảnh đã có một số đo lux khác (mỗi ảnh tối đa một; gửi lại cùng `client_op_id` vẫn `200`) (v1.23) |
+| `POLE_PHOTO_ALREADY_DECIDED` | 409 | Ảnh cột đã được Quản lý quyết định: không review / quyết định lại được, và (v1.24) `POST /lux-readings` không gắn số đo vào nó được nữa |
+| `LUX_PROTOCOL_MISMATCH` | 400 | `POST /lux-readings` có `protocol`: độ cao cảm biến lệch cấu hình quá dung sai — đo lại (v1.24) |
+| `LUX_WINDOW_UNSTABLE` | 400 | `POST /lux-readings` có `protocol`: cửa sổ đo thiếu mẫu hoặc dao động quá ngưỡng — đo lại tại cột (v1.24) |
+| `LUX_SAMPLES_MISMATCH` | 400 | `POST /lux-readings` có `protocol`: `lux_value` không phải trung vị của `protocol.samples` (v1.24) |
 | `ACCOUNT_ALREADY_ACTIVE` | 409 | Gửi lại lời mời cho tài khoản đã đặt mật khẩu (v1.8) |
 | `RATE_LIMITED` | 429 | Quá số lần cho phép từ một địa chỉ (`POST /auth/password/forgot`); header `Retry-After` (v1.8) |
 | `EXTERNAL_REF_TAKEN` | 409 | `(commune_id, external_ref)` đã có |
@@ -1053,8 +1058,12 @@ Một trong các nguồn ground truth cho RQ1; CV-12 đối chiếu với phân 
 tay** (module ESP32 của nhóm, qua Bluetooth, `meter_model = "LuxMap_ESP32"`), theo quy trình cố định — cùng
 thiết bị, cùng app, cùng tư thế đo. **Chỉ so số đo cùng `meter_model`**: số điện thoại và số máy đo cầm tay
 không so với nhau được. Chỉ dùng để so giữa các cột và giữa các đêm; **không** phải giá trị
-lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chuẩn chiếu sáng. Server **không** dùng số đo này
-để phân loại `dim` (`dim` đến từ sweep, D-R20).
+lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chuẩn chiếu sáng.
+
+**Hai loại số đo (v1.24, D-R29, LUX-BASELINE).** Số đo **có `protocol`** là số đo **đứng yên, ngay dưới đầu đèn,
+trên sào độ cao cố định**: server kiểm quy trình lúc nhận và **chấm** nó khi Quản lý quyết định ảnh cột đi kèm (chỉ
+ở phiếu **khảo sát**). Số đo **không có `protocol`** (máy đo cầm tay đối chứng, số đo cũ) là **đối chứng**: lưu như
+trước, **không** bao giờ được chấm hay vào baseline.
 
 **`POST /api/v1/lux-readings`**
 
@@ -1071,19 +1080,52 @@ lux tuyệt đối, **không** dùng để đánh giá đạt/không đạt chu�
 | `photo_id` | Không | (v1.23) Ảnh hoặc clip cột (`PPH-…`) mà số đo đi kèm. Phải là ảnh **còn hiệu lực** (chưa rút), **trong phạm vi**, **cùng `pole_id`**, chưa gắn số đo nào: không thấy → `404 POLE_PHOTO_NOT_FOUND`; khác cột → `400 PHOTO_POLE_MISMATCH`; đã gắn → `409 PHOTO_LUX_ALREADY_LINKED`. Mỗi ảnh tối đa **một** số đo. Không gửi → như trước v1.23. Rút ảnh sau đó **không** xoá số đo và giữ nguyên liên kết |
 | `lux_value` | Có | Số đọc tương đối, số thực, không âm, **hữu hạn** (NaN/Infinity → `400`); không có trần. Trên 200 server chỉ log cảnh báo và vẫn lưu — đó là **kiểm tra hợp lệ dữ liệu thô**, không mang nghĩa trắc quang |
 | `data_source` | Có | Đo ngoài thực địa → `field`; đo trên testbed → `calibration_rig` (mục 1.6) |
-| `meter_model` | Không | Model **thiết bị đo** (điện thoại, hoặc `LuxMap_ESP32` cho máy đo cầm tay). Không bắt buộc nhưng client **nên luôn gửi** — thiếu nó thì không tách được số đo theo thiết bị |
+| `meter_model` | Không | Model **thiết bị đo** như app đọc được từ thiết bị (điện thoại, hoặc module ESP32 của nhóm — dữ liệu thật mang `ESP32C3_LUX`; v1.24 bỏ giá trị cố định `LuxMap_ESP32`, drift LUX-BASELINE-5). Không bắt buộc nhưng client **nên luôn gửi** — thiếu nó thì không tách được số đo theo thiết bị |
+| `protocol` | Không | (v1.24) Quy trình đo đứng yên: `samples[]` (mẫu thô của cửa sổ đo, theo thứ tự đo), `sensor_height_m`, `module_id` (nhãn dán trên module), `module_firmware_version_id` (tuỳ chọn, id registry BE-34, không kiểm), `optical_filter_transmittance` (tuỳ chọn, chỉ khi thử tấm lọc ND, 0 < x ≤ 1). Server tính trung vị và độ dao động `(max − min) / trung vị`. Kiểm theo cấu hình `LuxProtocol` (mặc định: cao 1,0 m ± 0,05 m; ≥ 5 mẫu; dao động ≤ 0,05; `lux_value` = trung vị ± 1%): lệch độ cao → `400 LUX_PROTOCOL_MISMATCH`; thiếu mẫu / dao động quá → `400 LUX_WINDOW_UNSTABLE`; `lux_value` ≠ trung vị → `400 LUX_SAMPLES_MISMATCH`. App báo kỹ sư **đo lại tại cột** |
 | `note` | Không | |
 | `lux_id`, `commune_id` | **Cấm** | Server sở hữu → `400 SERVER_OWNED_FIELD`; `commune_id` tra từ cột |
 
 `measured_by` = user trong JWT, lưu FK, **không emit**. `201` kèm `lux_id`; trùng `client_op_id` →
 **`200`** bản ghi đã có; `404 POLE_NOT_FOUND` (cả khi ngoài phạm vi). Thứ tự kiểm: `client_op_id` trùng → cột →
-ảnh. Response: `lux_id, client_op_id, pole_id, photo_id, measured_at, lux_value, meter_model, data_source, note`
-(`photo_id` luôn có mặt, `null` khi không gắn ảnh); hai `GET` bên dưới cũng trả `photo_id`. `POST /sync/push`
-loại `lux_reading` kiểm `photo_id` y hệt.
+`protocol` → ảnh. Ảnh **đã được Quản lý quyết định** → `409 POLE_PHOTO_ALREADY_DECIDED` (v1.24): gửi lux **ngay khi
+upload ảnh xong**, trước khi Quản lý duyệt. Response: `lux_id, client_op_id, pole_id, photo_id, measured_at, lux_value,
+meter_model, data_source, note, protocol, evaluation` (`photo_id`, `protocol`, `evaluation` luôn có mặt, `null` khi
+không có); hai `GET` bên dưới trả cùng các khoá. `POST /sync/push` loại `lux_reading` kiểm y hệt.
+
+- `protocol` (response) = `{sensor_height_m, module_id, module_firmware_version_id, optical_filter_transmittance,
+  window_spread, sample_count}`; mẫu thô giữ ở server.
+- `evaluation` = `{classified_as, baseline_ratio, baseline_value, baseline_member_count, dim_threshold_ratio,
+  dim_evaluation_eligible, expected_ratio, reason_codes[], evaluated_at}` — **tính ở backend**, client không tự tính.
+  `null` cho tới khi Quản lý quyết định ảnh, và luôn `null` với số đo đối chứng.
+
+**Chấm số đo đứng yên (v1.24).** Lúc Quản lý **xác nhận** ảnh cột ở phiếu khảo sát mà ảnh có số đo `protocol`:
+
+| Nhãn ảnh | Baseline của cột (chỉ gồm các **đêm trước**) | `classified_as` | `reason_codes` |
+|---|---|---|---|
+| OFF | — | `out` | `cv_off` |
+| ON | chưa có | `normal` | `baseline_missing` — **không** phản bác được `dim` đang có |
+| ON | có nhưng không ổn định (CV thành viên > 0,10) | `normal` | `baseline_unstable` |
+| ON | có, ổn định | `dim` nếu tỉ lệ < `dim_threshold_ratio`, ngược lại `normal` | `brightness_evaluated` |
+
+Thêm `optical_filter` khi thử tấm lọc ND: có `expected_ratio` = độ truyền, nhưng **không** đổi trạng thái cột,
+**không** sinh sự cố, **không** vào baseline. Kết luận `brightness_evaluated` **đổi trạng thái cột** (kể cả `dim` →
+`normal`) theo luật "chỉ quan sát mới hơn mới áp"; `dim` sinh sự cố `lamp_dim` **`confirmed`** (`cv`, hoặc
+`field_report` khi kỹ sư đổi nhãn AI), không trùng sự cố `lamp_dim` đang mở; sự cố **không** tự đóng khi đèn sáng lại.
+
+**Baseline đứng yên.** Trung vị **cộng dồn** các số đo `normal`, không tấm lọc, cùng `data_source` với cột, đo sau
+ngày lắp bóng hiện tại; **mỗi cột mỗi đêm khảo sát tối đa một** (đêm = ngày giờ VN của thời điểm lùi 12 giờ; lấy số đo
+được quyết định trước). Đủ 3 đêm mới có baseline; nên từ đêm thứ 4 mới chấm được `dim`. Làm lại từ đầu khi thay bóng
+hoặc đổi `module_id` / độ cao cấu hình. Baseline đứng yên **tách hẳn** khỏi baseline của sweep (§5.2).
 
 **Ảnh cột hiện số đo (v1.23).** Mọi response `PolePhotoItem` (`/work-orders/{id}/pole-photos…`, kể cả clip) có
 thêm `lux_id`, `lux_value`, `lux_measured_at` — số đo gắn **bằng `photo_id`**, đọc lúc trả (không phải bản chụp
-lúc upload); `null` khi chưa gắn. Server **không** ghép theo thời gian.
+lúc upload); `null` khi chưa gắn. Server **không** ghép theo thời gian. **v1.24** thêm `lux_classified_as`,
+`lux_baseline_ratio`, `lux_reason_codes` — kết luận ở trên, `null` khi chưa chấm.
+
+**Chi tiết cột (v1.24).** `GET /map/poles/{id}` thêm `stationary_luminance_baseline{value, member_count, member_cv,
+stable, computed_at}|null` (baseline đứng yên mới nhất của bóng hiện tại) và `stationary_luminance_history[]` (30 kết
+luận gần nhất, cũ trước: `lux_id, photo_id, measured_at, lux_value, baseline_ratio, classified_as, dim_threshold_ratio,
+expected_ratio, reason_codes`). `luminance_history` / `luminance_baselines` của sweep **không đổi**.
 
 **`GET /api/v1/lux-readings/poles/{poleId}`** — chuỗi của một cột, sắp `measured_at` tăng dần, **có phân
 trang** (một cột rig tích hàng trăm điểm). **Đổi đường dẫn ở v1.3 (BREAKING)** — đường cũ
@@ -1273,6 +1315,7 @@ highlight `SEG-003`.
 
 | Phiên bản | Ngày | Người quyết | Thay đổi |
 |---|---|---|---|
+| v1.24 | 26/11/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **LUX-BASELINE** (D-R29; drift LUX-BASELINE-1…6). **Thêm** `protocol` tuỳ chọn ở `POST /lux-readings`, `protocol` + `evaluation` ở response của ba endpoint lux; `lux_classified_as` / `lux_baseline_ratio` / `lux_reason_codes` trên `PolePhotoItem`; `stationary_luminance_baseline` / `stationary_luminance_history` ở `GET /map/poles/{id}`; mã `LUX_PROTOCOL_MISMATCH`, `LUX_WINDOW_UNSTABLE`, `LUX_SAMPLES_MISMATCH` (400), ghi `POLE_PHOTO_ALREADY_DECIDED` (409) vào bảng. **Đổi hành vi:** gắn lux vào ảnh đã quyết → 409; quyết định ảnh ON có số đo `protocol` chấm được `normal`/`dim` và sinh `lamp_dim`. **Diễn đạt lại** `meter_model` (bỏ giá trị cố định `LuxMap_ESP32`). Một migration (4 bảng mới bất biến, 5 cột mới ở `lux_reading`, nới CHECK `fault`). Chỉ thêm khoá — client cũ không đổi. Chạm bề mặt API, ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.23 | 24/11/2026 | **Mỹ (Dylan)** · `SELF-SIGNED` | **LUX-PHOTO** (drift LUX-PHOTO-1…5; yêu cầu WP6 24/11). **Thêm** `photo_id` tuỳ chọn ở `POST /lux-readings` và trong response của cả ba endpoint lux; `lux_id` / `lux_value` / `lux_measured_at` trên `PolePhotoItem`; mã `PHOTO_POLE_MISMATCH` (400), `PHOTO_LUX_ALREADY_LINKED` (409), ghi `POLE_PHOTO_NOT_FOUND` (404, đã dùng ở ảnh cột) vào bảng. **Diễn đạt lại** §5.7: `lux_value` từ điện thoại **hoặc máy đo cầm tay** (`LuxMap_ESP32`), chỉ so cùng `meter_model`; server không dùng lux thủ công để phân loại `dim`. Một migration (cột `lux_reading.photo_id`, FK ghép, unique). Chỉ thêm — client cũ không đổi. Chạm bề mặt API và ký một mình → **chưa ổn định cho tới FW kế tiếp xác nhận** |
 | v1.22 | 29/10/2026 | **Mỹ (Dylan), quyết định 29/10** | **ACCOUNT-ONE-COMMUNE (ACCT-1)**: mỗi tài khoản superior/manager/field_engineer đúng một xã; system_admin không gán xã. Giữ commune_ids[] trên request/response/JWT; siết số phần tử. UNIQUE user_id, migration giữ xã gán sớm nhất (hòa → ordinal commune_id), Down không khôi phục dòng bị xóa. Thay D-R3 nhiều xã; không đổi capability/endpoint |
 | v1.21 | 28/10/2026 | **Mỹ (Dylan), ủy quyền Claude** · `SELF-SIGNED` | **ASSET-PHOTOS A + B** (APH-1, FPS-1): `control` + `power_state` trên feeder inventory, `feeders[]` trên map cabinets giữ `feeder_ids[]`; power luôn unknown đến khi có telemetry đo điện. Phần A hiện thực 12/11/2026: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa/gallery, ẩn giữ bytes, UploadAssetPhotos; một migration. Additive, không đổi sync. Baseline hiện tại 169 →179 operation (dev thêm 3 operation IoT: electrical history, vị trí gateway, điều khiển theo trụ); giữ v1.22 (D-14). Evidence không thêm bucket; §4.10 sửa thành năm bucket theo ACCT-5 (D-13). Đồng bộ heading/info.version đang sót v1.19 dù đã có changelog v1.20 (#190). Nền tạm tới FW; WP5/WP6/BE2 chưa xác nhận |

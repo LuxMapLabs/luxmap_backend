@@ -58,6 +58,20 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
             "ck_lux_reading_value_non_negative",
             "lux_value >= 0 AND lux_value <> 'NaN'::float8 AND lux_value <> 'Infinity'::float8"));
 
+        // LUX-BASELINE D-4: a protocol is all-or-nothing (firmware id stays optional: the app may not know it), its numbers finite.
+        builder.Property(reading => reading.SensorHeightM).HasColumnType("double precision");
+        builder.Property(reading => reading.ModuleId).HasColumnType("text");
+        builder.Property(reading => reading.OpticalFilterTransmittance).HasColumnType("double precision");
+        builder.Property(reading => reading.WindowSpread).HasColumnType("double precision");
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_lux_reading_protocol",
+            "(sensor_height_m IS NULL) = (module_id IS NULL) AND (sensor_height_m IS NULL) = (window_spread IS NULL)"
+            + " AND (sensor_height_m IS NOT NULL OR (optical_filter_transmittance IS NULL AND module_firmware_version_id IS NULL))"
+            + " AND (sensor_height_m IS NULL OR (sensor_height_m > 0 AND sensor_height_m < 'Infinity'::float8))"
+            + " AND (window_spread IS NULL OR (window_spread >= 0 AND window_spread < 'Infinity'::float8))"
+            + " AND (optical_filter_transmittance IS NULL OR (optical_filter_transmittance > 0 AND optical_filter_transmittance <= 1))"
+            + " AND (module_id IS NULL OR length(btrim(module_id)) > 0)"));
+
         // The real de-duplication guard. A read-then-write check would let two simultaneous retries
         // both pass and both insert; the index cannot.
         builder.HasIndex(reading => reading.ClientOpId)
@@ -111,5 +125,21 @@ public sealed class LuxReadingConfiguration : IEntityTypeConfiguration<LuxReadin
             .WithMany()
             .HasForeignKey(reading => reading.MeasuredBy)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // LUX-BASELINE D-4: the raw window rides on the reading so one SaveChanges writes both; RESTRICT like every FK here.
+        builder.HasMany(reading => reading.Samples).WithOne().HasForeignKey(sample => sample.LuxId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class LuxReadingSampleConfiguration : IEntityTypeConfiguration<LuxReadingSample>
+{
+    public void Configure(EntityTypeBuilder<LuxReadingSample> builder)
+    {
+        // Same NaN / Infinity guard as lux_value: one NaN sample would turn the window's median into nonsense.
+        builder.ToTable("lux_reading_sample", table => table.HasCheckConstraint("ck_lux_reading_sample_value",
+            "seq >= 0 AND lux >= 0 AND lux <> 'NaN'::float8 AND lux <> 'Infinity'::float8"));
+        builder.HasKey(sample => new { sample.LuxId, sample.Seq });
+        builder.Property(sample => sample.LuxId).HasColumnType("text");
+        builder.Property(sample => sample.Lux).HasColumnType("double precision");
     }
 }

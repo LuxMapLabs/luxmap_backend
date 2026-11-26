@@ -533,7 +533,7 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
 
     private PoleDetailService Detail(LuxMapDbContext db, string[]? ids = null)
         => new(db, new SurveyMediaAccess(db, new Scope(ids ?? [a, b])),
-            new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System));
+            new LuxMap.Modules.Assets.Warranty.WarrantyCalendar(new(), TimeProvider.System), Options.Create(new LuxProtocolOptions()));
 
     /// <summary>
     /// BE-33 D-4: a point keeps the threshold its run classified it with; the baseline carries the one in force now. A ratio of 0.7
@@ -874,7 +874,8 @@ public sealed class SurveyPublicationTests(AssetImportFixture factory) : IAsyncL
         {
             await using var db = Db();
             var audit = new AuditTrail(db, new Correlation());
-            var publisher = new ReviewedPolePhotoPublisher(db, audit, new Actor(user), Options.Create(new SurveyReviewOptions()));
+            var publisher = new ReviewedPolePhotoPublisher(db, audit, new Actor(user), Options.Create(new SurveyReviewOptions()),
+                new StationaryLuxEvaluator(db, Options.Create(new LuxProtocolOptions()), Options.Create(new SurveyReviewOptions())));
             var service = new WorkOrderPolePhotoService(db, new Actor(user), objects, null!, null!, audit, null!, publisher, null!, null!, TimeProvider.System,
                 new LuxMap.Modules.Survey.LuxReadings.PhotoLuxLookup(db));
             await service.DecideAsync(workOrder ?? order, photoId, new() { Decision = decision }, default);

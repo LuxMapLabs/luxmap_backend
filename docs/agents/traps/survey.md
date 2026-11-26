@@ -223,3 +223,22 @@ hề được kiểm (`A_pole_with_only_not_observed_history_cannot_be_deleted`)
   `route_distance_m` null, chainage 0, length 0. Đứng cạnh tuyến có hình thì NULL xếp cuối (`ORDER BY distance_m`) nên tuyến có hình thắng. `SurveyReviewService.GapGeometriesAsync` (`ST_LineSubstring(NULL)` ⇒ `JsonDocument.Parse("")`)
   cũng chỉ tới được khi chốt hổng. Test `A_road_with_no_geometry_measures_nothing_in_both_survey_queries` ghim cả hai.
 - Hai cách hỏng của một tuyến null ở tầng khảo sát khác nhau về mặt người thấy: **500** (C# / `double`) thì ồn ào và được sửa; **rơi hoặc lọt** (SQL) thì im lặng và làm sai số liệu nghiên cứu. Chốt chặn đặt ở biên để cả hai đều không tới được.
+
+## LUX-BASELINE — số lux đo đứng yên (26/11/2026)
+
+- **Hai baseline, không bao giờ trộn.** Đỉnh lux khi chạy xe ở `luminance_baseline`; số đo đứng yên ở `stationary_baseline`. Quy tắc
+  dùng chung (trung vị, CV, đêm, dấu vân tay) chỉ ở `StationaryLuxRules`; đêm = ngày giờ VN của thời điểm **lùi 12 giờ**.
+- **Chỉ số đo có `protocol` mới được chấm** (`LuxReading.HasProtocol`); số đo đối chứng (máy cầm tay, số cũ) không bao giờ vào baseline.
+- **Chấm trước nhánh `not_newer`** trong `ReviewedPolePhotoPublisher`: ảnh quyết định muộn vẫn là số đo hợp lệ của đêm đó. Đánh giá được
+  save với **một** audit `Analyzed` riêng, trước save công bố trạng thái (`Applied`).
+- **Baseline chỉ dùng các đêm TRƯỚC** số đo đang chấm (`StationaryLuxEvaluator`): kiểm từng thành viên, không chỉ số đếm.
+- **Ảnh ON trần không phản bác `dim`; số đo chấm được thì có** — chỉ khi `dim_evaluation_eligible` và không tấm lọc. `baseline_missing` /
+  `baseline_unstable` ra `normal` nhưng **không** được dùng để đổi trạng thái cột.
+- **Tạo lux có `photo_id` khoá `work_order → pole → work_order_pole_photo`** (cùng thứ tự `DecideAsync`) rồi đọc lại `decision`; không
+  khoá thì lux và quyết định cùng qua kiểm tra, số đo nằm ngoài baseline mà không ai biết.
+- **Mẫu thô đi theo navigation `LuxReading.Samples`** để một `SaveChanges` ghi cả hai (khoá `LUX-…` do DB sinh). Thành viên baseline cũng
+  đi theo navigation `Baseline` — save giữa chừng sẽ ghi bảng `IAudited` mà chưa có audit (`AuditWriteGuard` ném).
+- **Bốn bảng mới bất biến (trigger statement-level).** Test của chúng ở class riêng (`StationaryLuxBaselineTests`) với xã + tài khoản
+  riêng, **không** teardown — đừng thêm chúng vào `WorkOrderTests` (teardown ở đó xoá cột, lux và tài khoản).
+- **Phiên bản:** `classification_algorithm` băm assembly **và** `LuxProtocolOptions.Describe()`; đổi ngưỡng là đổi phiên bản (BE-34).
+
