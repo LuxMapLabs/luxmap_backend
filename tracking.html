@@ -657,6 +657,18 @@
     Commit: <code>feat(statistics): filter repair timeliness by segment</code>. Đã merge vào <code>dev</code>.</p>
   </div>
 
+  <div class="card" id="stat-citizen-cv">
+    <strong>STAT-CITIZEN-CV — CV sàng lọc báo cáo QR cho dashboard Quản lý, 26/11/2026</strong>
+    <p><span class="tag t-next">Phase 2 xong trên nhánh <code>feat/STAT-CITIZEN-AI</code> · chưa push / PR</span>
+    <code>GET /statistics/citizen-screening</code>: kết luận CV ON/OFF từng báo cáo (từ gợi ý ảnh đã lưu, không chạy model),
+    nghi báo nhầm (dân báo tắt, CV thấy sáng), mức khớp CV ↔ Quản lý theo từng lớp, xu hướng theo đêm, 10 cột bị báo nhiều,
+    phiên bản model. Drift ST-14 SELF-SIGNED; không migration. Web: khối mới trên <code>/dashboard</code> ở nhánh
+    <code>feat/DASHBOARD-citizen-ai</code> của <code>luxmap-web</code>.</p>
+    <p class="muted">Test: StatisticsTests 64 xanh (8 test mới gồm theory 400); Statistics + Capability + OpenApi + Anonymous 245 xanh, exit 0;
+    ba phá thử (bỏ vế "không ảnh sáng" của <code>cv_off</code>, tính đèn mờ + sáng là báo nhầm, bỏ lọc <code>calibration_rig</code>) đỏ đúng test, khôi phục bằng cp.
+    Còn: gợi ý chỉ chạy khi Quản lý mở báo cáo (<code>not_analyzed</code>) — chạy lúc nhận là ticket riêng; prod 0 báo cáo QR (26/11) nên dashboard hiện 0.</p>
+  </div>
+
   <div class="card" id="stat-citizen">
     <strong>STAT-CITIZEN — thống kê phản ánh QR, 06/11/2026</strong>
     <p><span class="tag t-done">Đã merge · PR #212 (06/11) · toàn suite exit 0</span>
@@ -1424,6 +1436,13 @@
   <div class="card">
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
+      <tr>
+        <td>26/11/2026</td>
+        <td><code>STAT-CITIZEN-CV</code> Phase 1 + 2: <code>GET /statistics/citizen-screening</code> (ST-14) — CV ON/OFF sàng lọc báo cáo QR,
+        mức khớp với Quản lý, theo đêm, cột bị báo nhiều. 8 test mới, 3 phá thử, spec v1.5 sinh lại (lint 10 cảnh báo như <code>dev</code>).</td>
+        <td><code>StatisticsContracts.cs</code>, <code>StatisticsService.cs</code>, <code>StatisticsController.cs</code>, <code>StatisticsTests.cs</code>, drift, hai OpenAPI, generator</td>
+        <td><code>feat(statistics): screen citizen QR reports with the CV photo hints</code></td>
+      </tr>
       <tr>
         <td>26/11/2026</td>
         <td><code>LUX-BASELINE</code> Phase 2: số lux có <code>protocol</code> gắn ảnh cột ở phiếu khảo sát được chấm khi Quản lý xác nhận ảnh, so với

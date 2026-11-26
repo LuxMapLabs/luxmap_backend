@@ -1,13 +1,13 @@
 ---
 ticket: STAT-CITIZEN-CV
 title: GET /statistics/citizen-screening — CV ON/OFF sàng lọc báo cáo QR của người dân, cho dashboard Quản lý
-status: blocked
-phase: 1
+status: done
+phase: 2
 owner: claude
 branch: feat/STAT-CITIZEN-AI
 contract_refs:
   - "Chưa lên Contract — họ ST-* trong docs/contract-drift.md (SELF-SIGNED). Mã đề xuất: ST-14"
-depends_on: [D-1…D-12 của .ai/results/STAT-CITIZEN-CV-p1.md]
+depends_on: []  # D-1…D-12 Mỹ duyệt 26/11/2026
 ---
 
 ## Bối cảnh

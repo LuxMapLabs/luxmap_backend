@@ -14777,6 +14777,125 @@
         "x-luxmap-client": "shared"
       }
     },
+    "/api/v1/statistics/citizen-screening": {
+      "get": {
+        "tags": [
+          "Statistics"
+        ],
+        "parameters": [
+          {
+            "name": "commune_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "data_source",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "schema": {
+              "type": "string",
+              "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+              "format": "date"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenScreeningStatistics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:read_statistics",
+        "x-luxmap-roles": [
+          "superior",
+          "manager",
+          "system_admin"
+        ],
+        "x-luxmap-client": "shared"
+      }
+    },
     "/api/v1/statistics/repair-timeliness": {
       "get": {
         "tags": [
@@ -20507,6 +20626,14 @@
         },
         "additionalProperties": false
       },
+      "CitizenClaim": {
+        "enum": [
+          "lamp_out",
+          "lamp_dim",
+          "other"
+        ],
+        "type": "string"
+      },
       "CitizenFeedbackRow": {
         "required": [
           "accepted",
@@ -20969,6 +21096,350 @@
           "rejected"
         ],
         "type": "string"
+      },
+      "CitizenScreeningAgreement": {
+        "required": [
+          "agreement_rate",
+          "cv_off_rejected",
+          "cv_off_upheld",
+          "cv_off_upheld_rate",
+          "cv_on_rejected",
+          "cv_on_rejected_rate",
+          "cv_on_upheld",
+          "decided"
+        ],
+        "type": "object",
+        "properties": {
+          "decided": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_off_upheld": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_off_rejected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_on_upheld": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_on_rejected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "agreement_rate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "cv_off_upheld_rate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "cv_on_rejected_rate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningClaim": {
+        "required": [
+          "by_verdict",
+          "claim",
+          "reports"
+        ],
+        "type": "object",
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/CitizenClaim"
+          },
+          "reports": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "by_verdict": {
+            "$ref": "#/components/schemas/CitizenScreeningVerdictCounts"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningNight": {
+        "required": [
+          "contradicted",
+          "cv_off",
+          "cv_on",
+          "inconclusive",
+          "night_of",
+          "no_photo",
+          "not_analyzed",
+          "reports"
+        ],
+        "type": "object",
+        "properties": {
+          "night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          },
+          "reports": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_off": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_on": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inconclusive": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "not_analyzed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "no_photo": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contradicted": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningPole": {
+        "required": [
+          "contradicted",
+          "last_night_of",
+          "pole_id",
+          "reports",
+          "segment_id",
+          "submissions"
+        ],
+        "type": "object",
+        "properties": {
+          "pole_id": {
+            "type": "string"
+          },
+          "segment_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "reports": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "submissions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "contradicted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "last_night_of": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningSource": {
+        "required": [
+          "agreement",
+          "artifact_versions",
+          "by_claim",
+          "by_night",
+          "by_status",
+          "by_verdict",
+          "contradicted",
+          "data_source",
+          "far_from_pole",
+          "reports",
+          "submissions",
+          "top_poles"
+        ],
+        "type": "object",
+        "properties": {
+          "data_source": {
+            "$ref": "#/components/schemas/DataSource"
+          },
+          "reports": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "submissions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "far_from_pole": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "by_status": {
+            "$ref": "#/components/schemas/CitizenScreeningStatusCounts"
+          },
+          "by_verdict": {
+            "$ref": "#/components/schemas/CitizenScreeningVerdictCounts"
+          },
+          "by_claim": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenScreeningClaim"
+            }
+          },
+          "contradicted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "agreement": {
+            "$ref": "#/components/schemas/CitizenScreeningAgreement"
+          },
+          "by_night": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenScreeningNight"
+            }
+          },
+          "top_poles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenScreeningPole"
+            }
+          },
+          "artifact_versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenScreeningVersion"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningStatistics": {
+        "required": [
+          "as_of",
+          "from",
+          "sources",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "from": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "to": {
+            "type": "string",
+            "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
+            "format": "date",
+            "nullable": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CitizenScreeningSource"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningStatusCounts": {
+        "required": [
+          "accepted",
+          "merged",
+          "pending",
+          "rejected"
+        ],
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "merged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningVerdictCounts": {
+        "required": [
+          "cv_off",
+          "cv_on",
+          "inconclusive",
+          "no_photo",
+          "not_analyzed"
+        ],
+        "type": "object",
+        "properties": {
+          "cv_off": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cv_on": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "inconclusive": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "not_analyzed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "no_photo": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CitizenScreeningVersion": {
+        "required": [
+          "artifact_version",
+          "photos"
+        ],
+        "type": "object",
+        "properties": {
+          "artifact_version": {
+            "type": "string"
+          },
+          "photos": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
       },
       "CitizenSubmissionItem": {
         "required": [
