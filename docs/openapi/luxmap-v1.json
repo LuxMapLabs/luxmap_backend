@@ -23677,7 +23677,7 @@
               "insufficient_samples"
             ],
             "type": "string",
-            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
+            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ bốn mẫu điện hợp lệ."
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
@@ -23775,7 +23775,7 @@
               "source_unavailable"
             ],
             "type": "string",
-            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
+            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ bốn mẫu điện hợp lệ."
           },
           "anomaly_codes": {
             "type": "array",

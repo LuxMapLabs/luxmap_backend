@@ -36,8 +36,8 @@ public sealed class IotDiagnosticHistoryTests(AssetImportFixture fixture)
                 current < 95 ? [new("current_drop", current, 100, current - 100, 5)] : []) {
                     ConnectionStatus = "online", ElectricalStatus = "fresh",
                     ElectricalWindow = complete
-                        ? new("evaluated", 5, 5, 5, current, current * 5) { CurrentEvaluationAvailable = true }
-                        : new("insufficient_samples", 4, 5, null, null, null),
+                        ? new("evaluated", 4, 4, 5, current, current * 5) { CurrentEvaluationAvailable = true }
+                        : new("insufficient_samples", 3, 4, null, null, null),
                 };
             await IotDiagnosticHistory.ObserveAsync(db, state, profile, result, now, default);
             await db.SaveChangesAsync();

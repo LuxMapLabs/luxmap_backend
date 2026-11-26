@@ -11863,7 +11863,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Lỗi hiện tại theo feeder: dòng giảm >5% và điện áp trung bình năm mẫu",
+        "summary": "Lỗi hiện tại theo feeder: dòng giảm >5% và điện áp trung bình bốn mẫu",
         "operationId": "getIotFeedersFeederidDiagnostics",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-HISTORY-30S + IOT-CURRENT-DROP-HISTORY-1 (19/11/2026)"
@@ -12121,7 +12121,7 @@
           "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Chẩn đoán điện trung bình năm mẫu, tương thích route node cũ",
+        "summary": "Chẩn đoán điện trung bình bốn mẫu, tương thích route node cũ",
         "operationId": "getIotNodesNodeidDiagnostics",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"
@@ -26590,7 +26590,7 @@
             "type": "integer",
             "format": "int32",
             "enum": [
-              5
+              4
             ]
           },
           "voltage_avg": {
@@ -27784,7 +27784,7 @@
               "insufficient_samples"
             ],
             "type": "string",
-            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
+            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ bốn mẫu điện hợp lệ."
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
@@ -27882,7 +27882,7 @@
               "source_unavailable"
             ],
             "type": "string",
-            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
+            "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ bốn mẫu điện hợp lệ."
           },
           "anomaly_codes": {
             "type": "array",

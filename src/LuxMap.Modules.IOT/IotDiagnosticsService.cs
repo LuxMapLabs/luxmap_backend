@@ -933,7 +933,7 @@ public sealed partial class IotDiagnosticsService(
         if (measured is null || measured > now || now - measured > maximumGap) return [];
         var samples = new List<IotMeasurement> { new(latest.ReceivedAt.UtcDateTime, "ON", voltage, current, power) };
         // A radio batch retains each sample's identity, but may skip sequence numbers.
-        // Select five unique fresh readings across packets, not five adjacent numbers.
+        // Select unique fresh readings across packets even when sequences have gaps.
         // OFF/invalid readings are barriers: never stitch two ON periods together.
         var history = device.History ?? [];
         if (history.Any(r => r.Data?.SessionId == session && r.Data.SequenceNumber == data.SequenceNumber && r.Data != data))
@@ -976,7 +976,7 @@ public sealed partial class IotDiagnosticsService(
                 Status = "stale", Measurement = reading,
                 Anomalies = [new("telemetry_stale", silence, null, null, profile.MaxSilenceSeconds)],
             };
-        // Electrical anomalies are decided together by the five-sample window.
+        // Electrical anomalies are decided together by the four-sample window.
         return result with { Status = "normal", Measurement = reading, Anomalies = [] };
     }
 

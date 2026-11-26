@@ -11,23 +11,22 @@ public sealed class IotDiagnosticRuleTests
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
-    [InlineData(4)]
-    public void Electrical_alerts_require_all_five_samples(int count)
+    public void Electrical_alerts_require_all_four_samples(int count)
     {
         var profile = new NodeProfile { NominalVoltage = 5, NominalCurrentMa = 100 };
         var samples = Enumerable.Range(0, count).Select(_ => new IotMeasurement(DateTime.UtcNow, "ON", 0, 0, 0)).ToArray();
         var (window, anomalies) = ElectricalWindowEvaluator.Evaluate(samples, profile);
         Assert.Equal("insufficient_samples", window.Status);
         Assert.Equal(count, window.Samples);
-        Assert.Equal(5, window.RequiredSamples);
+        Assert.Equal(4, window.RequiredSamples);
         Assert.Null(window.CurrentMaAvg);
         Assert.Empty(anomalies);
     }
 
     [Fact]
-    public void Five_serial_currents_are_summed_and_equally_averaged()
+    public void Four_serial_currents_are_summed_and_equally_averaged()
     {
-        var currents = new[] { 105d, 105d, 107.5, 108.75, 106.25 };
+        var currents = new[] { 105d, 105d, 107.5, 108.5 };
         var samples = currents.Select(i => new IotMeasurement(DateTime.UtcNow, "ON", 5, i, 5 * i)).ToArray();
         var (window, _) = ElectricalWindowEvaluator.Evaluate(samples, new NodeProfile { NominalVoltage = 5, NominalCurrentMa = 100 });
         Assert.Equal(106.5, window.CurrentMaAvg);
@@ -68,20 +67,20 @@ public sealed class IotDiagnosticRuleTests
     [InlineData(95, 94.9, true)]
     [InlineData(86.6, 86.6, true)]
     [InlineData(110, 110, false)]
-    public void Mean_five_current_has_a_strict_five_percent_threshold(double first, double second, bool alert)
+    public void Mean_four_current_has_a_strict_five_percent_threshold(double first, double second, bool alert)
     {
         var now = DateTime.UtcNow;
         var profile = new NodeProfile { NominalVoltage = 5, NominalCurrentMa = 100, VoltageTolerancePercent = 10 };
         var (window, anomalies) = ElectricalWindowEvaluator.Evaluate(
-            [new(now, "ON", 5, first, first * 5), new(now, "ON", 5, first, first * 5), new(now, "ON", 5, first, first * 5), new(now, "ON", 5, first, first * 5), new(now, "ON", 5, second, second * 5)], profile);
-        Assert.Equal(5, window.RequiredSamples);
-        Assert.Equal((4 * first + second) / 5, window.CurrentMaAvg);
+            [new(now, "ON", 5, first, first * 5), new(now, "ON", 5, first, first * 5), new(now, "ON", 5, first, first * 5), new(now, "ON", 5, second, second * 5)], profile);
+        Assert.Equal(4, window.RequiredSamples);
+        Assert.Equal((3 * first + second) / 4, window.CurrentMaAvg);
         Assert.Equal(alert, anomalies.Any(a => a.Code == "current_drop"));
         if (alert) Assert.Equal(5, Assert.Single(anomalies).Limit);
     }
 
     [Fact]
-    public void Voltage_uses_five_sample_mean_and_suppresses_current_drop_during_bad_supply()
+    public void Voltage_uses_four_sample_mean_and_suppresses_current_drop_during_bad_supply()
     {
         var now = DateTime.UtcNow;
         var profile = new NodeProfile { NominalVoltage = 5, NominalCurrentMa = 100, VoltageTolerancePercent = 10 };
@@ -89,12 +88,12 @@ public sealed class IotDiagnosticRuleTests
         var missing = ElectricalWindowEvaluator.Evaluate([Sample(0)], profile);
         Assert.Equal("insufficient_samples", missing.Window.Status);
         Assert.Empty(missing.Anomalies);
-        var loss = ElectricalWindowEvaluator.Evaluate([Sample(0.04), Sample(0.06), Sample(0.05), Sample(0.05), Sample(0.05)], profile);
+        var loss = ElectricalWindowEvaluator.Evaluate([Sample(0.04), Sample(0.06), Sample(0.05), Sample(0.05)], profile);
         Assert.Equal("voltage_loss", Assert.Single(loss.Anomalies).Code);
-        var deviation = ElectricalWindowEvaluator.Evaluate([Sample(4), Sample(4.4), Sample(4.2), Sample(4.2), Sample(4.2)], profile);
+        var deviation = ElectricalWindowEvaluator.Evaluate([Sample(4), Sample(4.4), Sample(4.2), Sample(4.2)], profile);
         Assert.Equal("voltage_deviation", Assert.Single(deviation.Anomalies).Code);
         Assert.Equal(4.2, deviation.Window.VoltageAvg);
-        var mixed = ElectricalWindowEvaluator.Evaluate([Sample(4), Sample(6), Sample(5), Sample(5), Sample(5)], profile);
+        var mixed = ElectricalWindowEvaluator.Evaluate([Sample(4), Sample(6), Sample(5), Sample(5)], profile);
         Assert.Empty(mixed.Anomalies); // Mean 5 V, but neither individual voltage proves a valid load.
     }
 
@@ -134,7 +133,7 @@ public sealed class IotDiagnosticRuleTests
             new(now, "ON", 5, 100, 500), []) {
             MeasuredAt = now, MeasurementKey = "session/2750", MeasurementSequence = 2750,
             ConnectionStatus = "online", ElectricalStatus = "fresh",
-            ElectricalWindow = new("insufficient_samples", 4, 5, null, null, null),
+            ElectricalWindow = new("insufficient_samples", 3, 4, null, null, null),
         };
         Assert.False(IotDiagnosticRules.TryObservation(result, code, new(), now, out _));
         var evidence = new DiagnosticCodeEvidence();

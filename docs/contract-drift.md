@@ -2,6 +2,8 @@
 
 ## IOT-DIAG-5 — cửa sổ năm mẫu qua nhiều gói LoRa (26/11/2026)
 
+**Cập nhật 26/11/2026 (SELF-SIGNED):** Người dùng yêu cầu giảm cửa sổ xuống 4 mẫu ON hợp lệ để một gói LoRa đủ mẫu có thể được đánh giá. API công bố `required_samples: 4` và `calibration_version: electrical-mean4-batched-v3`. Ngưỡng dòng, điều kiện điện áp và quy tắc phục hồi giữ theo quyết định bên dưới.
+
 | | |
 |---|---|
 | **Decision** | Giữ trung bình **5 mẫu** và ngưỡng `current_drop` **giảm >5%**. Chọn 5 mẫu ON mới nhất cùng session, không trùng identity; không bắt sequence liền nhau vì firmware gửi tối đa 4 mẫu/gói. Vẫn kiểm giờ đo/giờ nhận, dung sai áp, và không ghép qua lần OFF hoặc dữ liệu hỏng. Loại `reception_type=backfill`; client cũ chưa gửi loại nhận vẫn phải qua kiểm tra thời gian. |

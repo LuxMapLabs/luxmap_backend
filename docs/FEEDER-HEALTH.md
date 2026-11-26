@@ -121,7 +121,7 @@ Hai API yêu cầu quyền `ReadNetwork`, giới hạn theo xã được phép c
 | `power_state` | Nhãn hiển thị | Điều kiện |
 |---|---|---|
 | `unknown` | Chưa có IoT | Không có nguồn IoT phù hợp và không có liên kết node/relay cho feeder |
-| `normal` | Bình thường | Node online, điện mới, không lỗi; khi ON đã đủ cửa sổ 5 mẫu hợp lệ; khi OFF chủ động không cần cửa sổ ON |
+| `normal` | Bình thường | Node online, điện mới, không lỗi; khi ON đã đủ cửa sổ 4 mẫu hợp lệ; khi OFF chủ động không cần cửa sổ ON |
 | `warning` | Cảnh báo | Có lỗi nhẹ, điện cũ, thiếu mẫu, đã gán nhưng chưa có dữ liệu hoặc chưa xác minh được nguồn Bridge |
 | `incident` | Sự cố | Có ít nhất một lỗi nặng, trong khi node chưa được xác định offline |
 | `offline` | Mất kết nối IoT | Có thời điểm liên lạc hợp lệ trước đó và đã quá thời gian chờ kết nối |
@@ -141,7 +141,7 @@ Bridge lỗi/không truy cập được thì nguồn đã gán giữ `warning`; 
 | `voltage_loss` | Không áp dụng | Lệnh ON nhưng áp trung bình gần 0, ngưỡng hiện tại `abs(V_avg) <= 0.1 V` |
 | `telemetry_stale` | Dữ liệu điện cũ khi node vẫn còn liên lạc | Không tự nâng thành sự cố chỉ vì điện cũ |
 
-Các mã điện được đánh giá từ **5 mẫu ON hợp lệ** theo quy tắc chẩn đoán hiện tại. Chỉ xét giảm dòng khi điện áp của các mẫu hợp lệ trong dung sai; không biến mất áp thành lỗi giảm dòng.
+Các mã điện được đánh giá từ **4 mẫu ON hợp lệ** theo quy tắc chẩn đoán hiện tại. Chỉ xét giảm dòng khi điện áp của các mẫu hợp lệ trong dung sai; không biến mất áp thành lỗi giảm dòng.
 Dòng giảm đúng 5% không phát sinh `current_drop`. Các nhãn chỉ phân loại lỗi đã được chẩn đoán, không tự tạo lỗi mới khi chưa đủ dữ liệu.
 
 Công thức đối chiếu:
@@ -191,7 +191,7 @@ Ví dụ:
 | Giảm dòng 25% và lỗi microSD | `incident` |
 | Có lỗi INA226 nhưng node đã offline | `offline` |
 | Điện cũ nhưng node vừa trả ACK | `warning` |
-| Node ON, điện mới nhưng chỉ có 1–4 mẫu | `warning` |
+| Node ON, điện mới nhưng chỉ có 1–3 mẫu | `warning` |
 | Node báo OFF chủ động, dữ liệu mới, không lỗi khác | `normal` |
 
 `offline` căn cứ vào liên lạc đã xác thực của **node**: mẫu đo, ACK hoặc health. Gateway online không đủ chứng minh node online.

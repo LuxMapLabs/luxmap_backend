@@ -9,10 +9,10 @@ public sealed record ElectricalWindowAssessment(
 
 internal static class ElectricalWindowEvaluator
 {
-    internal const int WindowSize = 5;
+    internal const int WindowSize = 4;
     internal const double CurrentDropLimit = 5;
     internal const double VoltageLossLimit = 0.1;
-    internal const string Version = "electrical-mean5-batched-v2";
+    internal const string Version = "electrical-mean4-batched-v3";
 
     internal static bool ValidCurrentVoltage(double voltage, NodeProfile profile) =>
         double.IsFinite(voltage) && voltage > VoltageLossLimit &&

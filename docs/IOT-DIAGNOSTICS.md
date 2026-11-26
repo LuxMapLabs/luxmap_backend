@@ -25,8 +25,8 @@ Ví dụ các trường chính:
   },
   "electrical_window": {
     "status": "evaluated",
-    "samples": 5,
-    "required_samples": 5,
+    "samples": 4,
+    "required_samples": 4,
     "voltage_avg": 5.08,
     "current_ma_avg": 86.6,
     "power_mw_avg": 439.928,
@@ -50,25 +50,25 @@ Ví dụ các trường chính:
 
 Response còn có connection_status, electrical_status, last_seen_at, last_command_ack_at, measured_at,
 measurement_key/sequence, sensor_health_key, firmware_version và calibration_version.
-measurement là mẫu mới nhất; observed của lỗi điện là trung bình NĂM mẫu, không nhất thiết bằng measurement.
+measurement là mẫu mới nhất; observed của lỗi điện là trung bình BỐN mẫu, không nhất thiết bằng measurement.
 Không còn lamp_count, estimated_lit, estimated_missing, votes hoặc threshold_counts.
 
-## 2. Trung bình NĂM mẫu
+## 2. Trung bình BỐN mẫu
 
-Năm mẫu phải ON, V/mA/mW hữu hạn, cùng session và có sequence khác nhau. Các mẫu có thể đến từ nhiều gói LoRa và sequence có thể có khoảng trống.
-Giờ đo DS3231 tăng theo sequence, giờ đo/giờ nhận CẢ NĂM mẫu còn trong max_silence_seconds.
+Bốn mẫu phải ON, V/mA/mW hữu hạn, cùng session và có sequence khác nhau. Các mẫu có thể đến từ nhiều gói LoRa và sequence có thể có khoảng trống.
+Giờ đo DS3231 tăng theo sequence, giờ đo/giờ nhận CẢ BỐN mẫu còn trong max_silence_seconds.
 Mẫu gửi bù không được tính và bản tin lặp chỉ tính một lần. Cửa sổ dừng khi gặp mẫu OFF hoặc dữ liệu không hợp lệ. Không đánh giá lỗi điện khi INA226/DS3231 báo lỗi.
-Chưa đủ 5 mẫu: status=insufficient_samples và electrical_window.status=insufficient_samples, required_samples=5, các trung bình null. Đây là chưa đủ bằng chứng, không phải điện bình thường và không phải một mã anomaly mới.
-Đủ năm mẫu: status=evaluated. OFF/stale/hardware lỗi: electrical_window=null.
-Đây là năm bản tin đo độc lập, không phải số lần INA226 lấy trung bình nội bộ.
+Chưa đủ 4 mẫu: status=insufficient_samples và electrical_window.status=insufficient_samples, required_samples=4, các trung bình null. Đây là chưa đủ bằng chứng, không phải điện bình thường và không phải một mã anomaly mới.
+Đủ bốn mẫu: status=evaluated. OFF/stale/hardware lỗi: electrical_window=null.
+Đây là bốn bản tin đo độc lập, không phải số lần INA226 lấy trung bình nội bộ.
 
 ### current_drop
 
-current_avg = (I1 + I2 + I3 + I4 + I5) / 5.
+current_avg = (I1 + I2 + I3 + I4) / 4.
 deviation_percent = (current_avg - nominal_current_ma) / nominal_current_ma * 100.
 
 Chỉ báo khi current_avg < nominal_current_ma * 0.95; đúng 5% không báo, tăng dòng không thuộc lỗi này.
-CẢ NĂM điện áp phải >0.1 V và trong dung sai nominal_voltage. current_evaluation_available cho biết điều kiện xét dòng.
+CẢ BỐN điện áp phải >0.1 V và trong dung sai nominal_voltage. current_evaluation_available cho biết điều kiện xét dòng.
 Mất áp/sai áp không được coi dòng tải giảm. Ngưỡng 5% cố định, không dùng current_tolerance_percent cũ.
 Baseline là nominal_current_ma của từng feeder; không tự học từ mẫu đang lỗi, không gán 93.55 mA cho mọi feeder.
 93.5546875 mA (~93.55) là ví dụ hiệu chuẩn trước đây, không phải baseline chung. Lượt đo thực tế 5 log của bộ đủ 10 đèn ngày 24/11/2026 có dòng trung bình 106.5 mA tại áp trung bình 5.3996 V. Người quản trị chọn baseline đúng điều kiện nguồn và cập nhật bằng PUT trong mục 6; thay đổi này không tự sửa nominal_current_ma trong DB.
@@ -76,19 +76,19 @@ Giữ INA226 R002 và AVG16; cách đo/truyền LoRa theo firmware đã nạp. V
 
 ### voltage_loss / voltage_deviation
 
-Áp trung bình = (V1+V2+V3+V4+V5)/5.
+Áp trung bình = (V1 + V2 + V3 + V4) / 4.
 - |áp trung bình| <=0.1 V: voltage_loss; observed=áp trung bình, reference/deviation_percent=null, limit=0.1 V.
 - Còn lại lệch quá voltage_tolerance_percent so với nominal_voltage: voltage_deviation.
   observed=áp trung bình, reference=nominal_voltage, deviation_percent có dấu, limit là % (mặc định 10).
 - Đúng dung sai không báo. Hai lỗi áp loại trừ nhau.
-- Job khoảng 5 giây: đủ năm mẫu có thể tạo Fault ở lần đánh giá tiếp theo, không còn chờ 25 mẫu/3 phút.
+- Job khoảng 5 giây: đủ bốn mẫu có thể tạo Fault ở lần đánh giá tiếp theo, không còn chờ 25 mẫu/3 phút.
   API hiện tại không đợi job.
 
 ## 3. Danh sách 17 mã lỗi — DTO chung
 
 | code | Ý nghĩa |
 |---|---|
-| current_drop | Dòng trung bình 5 mẫu giảm quá 5% |
+| current_drop | Dòng trung bình 4 mẫu giảm quá 5% |
 | telemetry_stale | Điện cũ, không đồng nghĩa node mất kết nối |
 | voltage_loss | Áp trung bình gần 0 khi ON |
 | voltage_deviation | Áp trung bình lệch quá dung sai |
@@ -169,7 +169,7 @@ total là số đợt sau lọc, không phải số mẫu hay số phút.
 
 current_drop -> current_anomaly; voltage_loss -> segment_outage; voltage_deviation -> voltage_anomaly;
 hardware -> iot_hardware_fault. telemetry_stale chỉ tạo node_offline khi node thực sự offline (không chỉ replay/điện cũ).
-Lỗi điện đủ 5 mẫu tạo Fault, hardware giữ debounce 5 phút, chống trùng Fault chưa đóng giữ nguyên.
+Lỗi điện đủ 4 mẫu tạo Fault, hardware giữ debounce 5 phút, chống trùng Fault chưa đóng giữ nguyên.
 Phục hồi đủ chứng cứ mới 90 giây: giữ nguyên fault_status (kể cả detected), ghi recovered_at + audit Reported;
 tái phát xóa recovered_at, cập nhật bằng chứng và ghi audit một lần trên cùng Fault đang mở. Lịch sử lỗi khác với vòng đời Fault/WorkOrder.
 Fault cũ không bị xóa khi bỏ đếm bóng.
@@ -196,7 +196,7 @@ PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
 Các trường cấu hình đếm bóng cũ còn được nhận để tương thích nhưng không ảnh hưởng chẩn đoán.
 Cần deploy BE và apply migration AddIotDiagnosticEpisodes. Không cần nạp lại firmware cho thay đổi thuật toán BE này.
 
-Cập nhật 26/11/2026 (IOT-DIAG-5): dùng 5 mẫu ON mới nhất, cùng session, định danh không trùng; không bắt sequence sát nhau. Sắp theo sequence và kiểm tra giờ đo giảm dần, không theo thứ tự nhận HTTP. Hai gói LoRa 4 mẫu có thể ghép đủ cửa sổ dù mất một số sequence ở giữa. Không lấy qua lần OFF, dữ liệu hỏng, timestamp đảo chiều; mẫu gửi bù có reception_type=backfill không được dùng. Mỗi mẫu phải còn mới theo max_silence_seconds ở cả measured_at và received_at. Bản ghi trùng cùng nội dung chỉ tính một lần. Với các mẫu trong lịch sử, dùng giờ nhận sớm nhất trong nhóm trùng; nội dung mâu thuẫn cùng identity ngắt cửa sổ. Client cũ thiếu reception_type vẫn phải qua các kiểm tra thời gian. Thuật toán: electrical-mean5-batched-v2. Node hiện đo khoảng 1 giây/mẫu, gửi theo đợt tối đa 4 mẫu; không cam kết đủ cửa sổ sau đúng 5 giây. Job/lịch sử giữ chu kỳ khoảng 5 giây. Thiếu mẫu không đóng Fault hoặc đánh dấu đợt lỗi đã phục hồi. Chỉ sửa BE, không cần nạp lại thiết bị.
+Cập nhật 26/11/2026 (IOT-DIAG-5): dùng 4 mẫu ON mới nhất, cùng session, định danh không trùng; không bắt sequence sát nhau. Sắp theo sequence và kiểm tra giờ đo giảm dần, không theo thứ tự nhận HTTP. Một gói LoRa có đủ 4 mẫu hợp lệ có thể đánh giá ngay. Mẫu cũng có thể đến từ nhiều gói. Không lấy qua lần OFF, dữ liệu hỏng, timestamp đảo chiều; mẫu gửi bù có reception_type=backfill không được dùng. Mỗi mẫu phải còn mới theo max_silence_seconds ở cả measured_at và received_at. Bản ghi trùng cùng nội dung chỉ tính một lần. Với các mẫu trong lịch sử, dùng giờ nhận sớm nhất trong nhóm trùng; nội dung mâu thuẫn cùng identity ngắt cửa sổ. Client cũ thiếu reception_type vẫn phải qua các kiểm tra thời gian. Thuật toán: electrical-mean4-batched-v3. Node hiện đo khoảng 1 giây/mẫu, gửi theo đợt tối đa 4 mẫu; không cam kết đủ cửa sổ sau đúng 5 giây. Job/lịch sử giữ chu kỳ khoảng 5 giây. Thiếu mẫu không đóng Fault hoặc đánh dấu đợt lỗi đã phục hồi. Chỉ sửa BE, không cần nạp lại thiết bị.
 
 
 ## Sức khỏe feeder trong kiểm kê (FEEDER-HEALTH-1, 26/11/2026)
@@ -216,7 +216,7 @@ Ví dụ các trường liên quan (không phải toàn response):
 | Giá trị | Ý nghĩa |
 |---|---|
 | unknown | Không có nguồn IoT và không có relay/node được gán cho feeder |
-| normal | Node online, mẫu điện mới, không có lỗi; ON đủ cửa sổ 5 mẫu, OFF chủ động không cần cửa sổ ON |
+| normal | Node online, mẫu điện mới, không có lỗi; ON đủ cửa sổ 4 mẫu, OFF chủ động không cần cửa sổ ON |
 | warning | Có lỗi nhẹ, dữ liệu điện cũ, chưa đủ mẫu hoặc đã gán nhưng nguồn chưa kiểm chứng/Bridge không dùng được |
 | incident | Có ít nhất một lỗi nặng khi node chưa được xác định offline |
 | offline | Có bằng chứng liên lạc node trước đây nhưng đã quá max_silence_seconds; ACK/health mới vẫn chứng minh online |
@@ -261,7 +261,7 @@ Gỡ/thay node không xóa liên kết lịch sử. FK ghép bảo đảm Fault 
 
 Fault tái phát cùng node/feeder/code dùng lại bản ghi đang mở; không đổi quyết định
 Manager hoặc WorkOrder. Notification/audit phục hồi và tái phát chỉ ghi khi đổi đợt,
-không spam mỗi lượt job. Debounce phần cứng vẫn 5 phút; điện vẫn cửa sổ 5 mẫu.
+không spam mỗi lượt job. Debounce phần cứng vẫn 5 phút; điện vẫn cửa sổ 4 mẫu.
 
 Mã lỗi mới vẫn tạo Fault riêng. Chỉ tự gom vào đúng một Inspection cùng xã, node và
 feeder, còn open/assigned và đang giữ Fault của node đó. Có nhiều phiếu phù hợp,

@@ -43,7 +43,7 @@ public sealed class IotConnectivitySchemaFilter : ISchemaFilter
             Describe("connection_status", "Trạng thái liên lạc node, độc lập diagnostic status và electrical_status.",
                 unavailable ? ["online", "offline", "no_data", "unconfigured", "source_unavailable"] : ["online", "offline", "no_data"]);
 
-        const string diagnosticDescription = "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ.";
+        const string diagnosticDescription = "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ bốn mẫu điện hợp lệ.";
         if (context.Type == typeof(IotDiagnosticResult))
             Describe("status", diagnosticDescription, "normal", "anomaly", "stale", "no_data", "insufficient_samples");
         else if (context.Type == typeof(IotDiagnosticSummaryItem))

@@ -28,7 +28,7 @@ public sealed class IotInspectionLifecycleTests(AssetImportFixture fixture)
             codes.Select(c => new IotAnomaly(c, 85, 100, -15, 5)).ToArray()) {
             MeasuredAt = now, MeasurementKey = $"s/{step}", MeasurementSequence = step,
             ConnectionStatus = "online", ElectricalStatus = "fresh", LastSeenAt = now,
-            ElectricalWindow = new("evaluated", 5, 5, 5, 85, 425) { CurrentEvaluationAvailable = true },
+            ElectricalWindow = new("evaluated", 4, 4, 5, 85, 425) { CurrentEvaluationAvailable = true },
         };
         await using var db = Contexts.Open(fixture.CommuneId);
         await IotDiagnosticJob.SaveAsync(db, new ActiveWorkOrderLookup(db), rig.Node, profile, result, result.Status,

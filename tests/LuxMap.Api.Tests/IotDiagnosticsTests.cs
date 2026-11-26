@@ -676,7 +676,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     [Fact]
-    public Task Feeder_diagnostics_uses_five_live_samples_for_current_and_voltage_without_lamp_counts()
+    public Task Feeder_diagnostics_uses_four_live_samples_for_current_and_voltage_without_lamp_counts()
     {
         var bridge = new ReportedPowerBridge();
         return WithSharedCabinetAsync(async (client, rig, services) =>
@@ -690,14 +690,14 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             foreach (var (current, expected) in new[] {
                 (93.5546875, false), (86.6015625, true), (77.8515625, true), (68.515625, true) })
             {
-                bridge.DiagnosticDevice = DiagnosticTelemetry([current, current, current, current, current], voltage: 5);
+                bridge.DiagnosticDevice = DiagnosticTelemetry([current, current, current, current], voltage: 5);
                 var result = await client.GetFromJsonAsync<JsonElement>(path);
                 Assert.Equal(rig.Feeder, result.GetProperty("feeder_id").GetString());
                 Assert.False(result.TryGetProperty("lamp_count", out _));
                 var window = result.GetProperty("electrical_window");
                 Assert.Equal("evaluated", window.GetProperty("status").GetString());
-                Assert.Equal(5, window.GetProperty("samples").GetInt32());
-                Assert.Equal(5, window.GetProperty("required_samples").GetInt32());
+                Assert.Equal(4, window.GetProperty("samples").GetInt32());
+                Assert.Equal(4, window.GetProperty("required_samples").GetInt32());
                 var anomalies = result.GetProperty("anomalies").EnumerateArray().ToArray();
                 if (expected) {
                     var alert = Assert.Single(anomalies);
@@ -709,27 +709,28 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             }
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d], voltage: 5);
             await Insufficient();
-            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d], voltage: 5);
-            await Insufficient(4);
-            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 5, skipSequence: 3);
-            await Insufficient(4);
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d], voltage: 5);
+            await Insufficient(3);
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d], voltage: 5, skipSequence: 3);
+            await Insufficient(3);
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60d, 60d, 60d, 60d], voltage: 5.194, skipSequence: 3);
+            await SingleAlert("current_drop");
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d], voltage: 5, skipSequence: 2);
             await Insufficient(2);
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 5, duplicatePrevious: true);
             await SingleAlert("current_drop");
-            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d], voltage: 5, duplicatePrevious: true);
-            await Insufficient(4); // Five rows containing a retry are only four distinct readings.
+            bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d], voltage: 5, duplicatePrevious: true);
+            await Insufficient(3); // Four rows containing a retry are only three distinct readings.
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 5, foreignPrevious: true);
             await Insufficient();
-            // Actual radio groups have four rows each, equal receipt times inside a
-            // group, and gaps in sequence between groups. Five fresh readings suffice.
+            // The newest batch alone suffices and must not include prior higher readings.
             long[] batchedSequences = [2739, 2740, 2741, 2742, 2747, 2748, 2749, 2750];
-            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60, 60, 60, 60],
+            bridge.DiagnosticDevice = DiagnosticTelemetry([100d, 100, 100, 100, 57.5, 60, 60, 62.5], voltage: 5.194,
                 sequences: batchedSequences, sampleIntervalSeconds: 1, batchDelivery: true);
             var batched = await client.GetFromJsonAsync<JsonElement>(path);
             Assert.Equal("anomaly", batched.GetProperty("status").GetString());
-            Assert.Equal("electrical-mean5-batched-v2", batched.GetProperty("calibration_version").GetString());
-            Assert.Equal(5, batched.GetProperty("electrical_window").GetProperty("samples").GetInt32());
+            Assert.Equal("electrical-mean4-batched-v3", batched.GetProperty("calibration_version").GetString());
+            Assert.Equal(4, batched.GetProperty("electrical_window").GetProperty("samples").GetInt32());
             Assert.Equal(60, batched.GetProperty("electrical_window").GetProperty("current_ma_avg").GetDouble());
             var drop = Assert.Single(batched.GetProperty("anomalies").EnumerateArray());
             Assert.Equal("current_drop", drop.GetProperty("code").GetString());
@@ -747,8 +748,8 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             await Insufficient(2);
             bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60], backfillSequence: 5);
             await Insufficient(0); // A fresh receipt of SD replay is not live evidence.
-            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60], backfillSequence: 3);
-            await Insufficient(4);
+            bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60], backfillSequence: 3);
+            await Insufficient(3);
             bridge.DiagnosticDevice = DiagnosticTelemetry([60d, 60, 60, 60, 60], staleDelivery: true);
             await SingleAlert("telemetry_stale");
             bridge.DiagnosticDevice = DiagnosticTelemetry([0d, 0d, 0d, 0d, 0d], voltage: 0.04);
