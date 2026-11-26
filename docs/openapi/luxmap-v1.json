@@ -22965,6 +22965,16 @@
         },
         "additionalProperties": false
       },
+      "FeederHealthState": {
+        "enum": [
+          "unknown",
+          "normal",
+          "warning",
+          "incident",
+          "offline"
+        ],
+        "type": "string"
+      },
       "FeederListItem": {
         "required": [
           "commune_id",
@@ -22981,6 +22991,9 @@
             "$ref": "#/components/schemas/FeederControlSnapshot"
           },
           "power_state": {
+            "$ref": "#/components/schemas/FeederHealthState"
+          },
+          "lamp_state": {
             "$ref": "#/components/schemas/FeederPowerState"
           },
           "feeder_id": {

@@ -30,8 +30,12 @@ namespace LuxMap.Modules.Assets.Crud;
 public sealed class AssetCrudService(
     LuxMapDbContext dbContext, ICommuneScopeAccessor scopeAccessor, ICurrentActorAccessor actor, ICabinetDeviceLookup devices,
     WarrantyCalendar warranty, ISurveyCorridor corridor, IFeederControlLookup controls, PoleRelocation relocation, AssetPhotoReader photos,
-    IFeederPowerLookup feederPower, IPoleQrCodes qrCodes, AssetPhotoService assetPhotos)
+    IFeederHealthLookup feederHealth, IPoleQrCodes qrCodes, AssetPhotoService assetPhotos)
 {
+    private static FeederHealthState InventoryHealth(FeederHealthSnapshot? snapshot, FeederControlSnapshot? control)
+        => snapshot is { PowerState: not FeederHealthState.Unknown } ? snapshot.PowerState
+            : control is not null ? FeederHealthState.Warning : FeederHealthState.Unknown;
+
     // ── BE-12b reads ──────────────────────────────────────────────────────────────────────────
     //
     // These replace the PagedResult<string> placeholder BE-12a shipped. The three questions the
@@ -55,13 +59,14 @@ public sealed class AssetCrudService(
         var result = await ListAsync(communes, page, (Feeder feeder) => feeder.FeederId, FeederRow, null, ct);
         var feederIds = result.Items.Select(item => item.FeederId).ToArray();
         var reports = await controls.ControlsAsync(feederIds, ct);
-        var power = await feederPower.ReadAsync(feederIds, ct);
+        var health = await feederHealth.ReadHealthAsync(feederIds, ct);
         return result with
         {
             Items = [.. result.Items.Select(item => item with
             {
                 Control = reports.GetValueOrDefault(item.FeederId),
-                PowerState = power.GetValueOrDefault(item.FeederId),
+                PowerState = InventoryHealth(health.GetValueOrDefault(item.FeederId), reports.GetValueOrDefault(item.FeederId)),
+                LampState = health.GetValueOrDefault(item.FeederId)?.LampState ?? FeederPowerState.Unknown,
             })],
         };
     }
@@ -192,13 +197,15 @@ public sealed class AssetCrudService(
             .Select(feeder => new { feeder.Geom, feeder.CreatedAt })
             .FirstAsync(ct);
 
-        var power = await feederPower.ReadAsync([feederId], ct);
+        var health = await feederHealth.ReadHealthAsync([feederId], ct);
+        var control = (await controls.ControlsAsync([feederId], ct)).GetValueOrDefault(feederId);
         return new FeederDetail
         {
             Feeder = item with
             {
-                Control = (await controls.ControlsAsync([feederId], ct)).GetValueOrDefault(feederId),
-                PowerState = power.GetValueOrDefault(item.FeederId),
+                Control = control,
+                PowerState = InventoryHealth(health.GetValueOrDefault(item.FeederId), control),
+                LampState = health.GetValueOrDefault(item.FeederId)?.LampState ?? FeederPowerState.Unknown,
             },
 
             // Null, not an empty string. Branch C surveyed no cable routes, so "no route recorded"

@@ -351,7 +351,10 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         var item = Schema("FeederListItem").GetProperty("properties");
         Assert.True(item.TryGetProperty("control", out var control));
         Assert.EndsWith("/FeederControlSnapshot", control.GetProperty("$ref").GetString()); // SPEC-NULLABLE baseline
-        Assert.True(item.TryGetProperty("power_state", out _));
+        Assert.EndsWith("/FeederHealthState", item.GetProperty("power_state").GetProperty("$ref").GetString());
+        Assert.EndsWith("/FeederPowerState", item.GetProperty("lamp_state").GetProperty("$ref").GetString());
+        Assert.Equal(new[] { "unknown", "normal", "warning", "incident", "offline" },
+            Schema("FeederHealthState").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
         var report = Schema("FeederControlSnapshot").GetProperty("properties");
         Assert.True(report.GetProperty("mode_reported_at").GetProperty("nullable").GetBoolean());
         var cabinet = Schema("CabinetProperties").GetProperty("properties");

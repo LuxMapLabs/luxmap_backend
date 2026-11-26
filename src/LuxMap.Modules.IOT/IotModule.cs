@@ -56,6 +56,7 @@ public sealed class IotModule : ILuxMapModule
         services.AddScoped<IotRegistrationStore>();
         services.AddSingleton<IotFeederSourceLookup>();
         services.AddSingleton<IFeederSourceLookup>(provider => provider.GetRequiredService<IotFeederSourceLookup>());
+        services.AddScoped<IFeederHealthLookup>(provider => provider.GetRequiredService<IotDiagnosticsService>());
         services.AddScoped<IFeederPowerLookup>(provider => provider.GetRequiredService<IotDiagnosticsService>());
         services.AddHttpClient<IotDiagnosticsService>(client =>
         {

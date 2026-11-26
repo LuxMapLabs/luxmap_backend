@@ -433,6 +433,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/assets/feeders": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)",
     "/api/v1/iot/feeders/{feederId}/electrical/history": "drift IOT-HISTORY-RAW-1 (25/11/2026, SELF-SIGNED)",
     "/api/v1/auth/password/change": "drift ACCT-PASSWORD-CHANGE (24/11/2026, SELF-SIGNED)",
     "/api/v1/admin/users/{id}/email": "drift ACCT-EMAIL (24/11/2026, SELF-SIGNED)",

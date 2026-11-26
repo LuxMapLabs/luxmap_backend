@@ -2901,7 +2901,7 @@
         "summary": "Danh sách mạch điện — has_geometry (lộ trình chỉ lưu, FEEDER-GEOM-1) + pole_count + cabinet{cabinet_id, cabinet_name, location} | null (CAB-6); KHÔNG có data_source (§1.6)",
         "operationId": "getAssetsFeeders",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       },
       "post": {
         "tags": [
@@ -3029,7 +3029,7 @@
         "summary": "Tạo mạch điện; 201 + Location, không body",
         "operationId": "postAssetsFeeders",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       }
     },
     "/api/v1/assets/feeders/{feederId}": {
@@ -3140,7 +3140,7 @@
         "summary": "Một mạch điện; geom_wkt null khi chưa khảo sát tuyến cáp, và chỉ lưu — bản đồ không vẽ (FEEDER-GEOM-1)",
         "operationId": "getAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       },
       "put": {
         "tags": [
@@ -3278,7 +3278,7 @@
         "summary": "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được; cabinet_id VẮNG = GIỮ, null = tháo (CAB-6)",
         "operationId": "putAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       },
       "delete": {
         "tags": [
@@ -3377,7 +3377,7 @@
         "summary": "Xoá mạch điện; còn cột đang đấu vào thì 409 ASSET_IN_USE",
         "operationId": "deleteAssetsFeedersFeederid",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       }
     },
     "/api/v1/assets/cabinets": {
@@ -5117,7 +5117,7 @@
         "summary": "[TẠM — drift 46] Cột trên một mạch điện; đầu vào CV-15. Mạch ngoài phạm vi xã → 404",
         "operationId": "getAssetsFeedersFeederidPoles",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       }
     },
     "/api/v1/assets/segments/{segmentId}/poles": {
@@ -5332,7 +5332,7 @@
         "summary": "[TẠM — drift 46] Cột CHƯA có mạch; bắt buộc unassigned=true; chỉ listing này trả power_source",
         "operationId": "getAssetsFeedersPoles",
         "x-luxmap-status": "implemented",
-        "x-luxmap-contract": "§5.3"
+        "x-luxmap-contract": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)"
       }
     },
     "/api/v1/assets/fixtures/{fixtureId}": {
@@ -26966,6 +26966,16 @@
         },
         "additionalProperties": false
       },
+      "FeederHealthState": {
+        "enum": [
+          "unknown",
+          "normal",
+          "warning",
+          "incident",
+          "offline"
+        ],
+        "type": "string"
+      },
       "FeederListItem": {
         "required": [
           "commune_id",
@@ -26982,6 +26992,9 @@
             "$ref": "#/components/schemas/FeederControlSnapshot"
           },
           "power_state": {
+            "$ref": "#/components/schemas/FeederHealthState"
+          },
+          "lamp_state": {
             "$ref": "#/components/schemas/FeederPowerState"
           },
           "feeder_id": {
