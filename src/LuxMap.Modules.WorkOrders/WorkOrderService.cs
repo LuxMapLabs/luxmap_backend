@@ -577,6 +577,10 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             || ((action is "return" or "cancel") && string.IsNullOrEmpty(note))) throw OptionalJson.Invalid("note");
         var claimed = Performed(performedAt);
         var wo = await Find(id, ct);
+        await using var verification = await db.Database.BeginTransactionAsync(ct);
+        // Only waiting inspections can gain members. Preserve xmin for competing review decisions.
+        if (action is "start" or "cancel" || (action == "verify" && wo.TaskKind == TaskKind.Repair))
+            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
         RequireAction(wo, action);
         if (action == "verify" && wo.TaskKind == TaskKind.Survey)
         {
@@ -600,11 +604,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var before = Snapshot(wo, ids, links: links);
         // PG-12 / RS-5: pole changes and verification commit together, or neither happens.
         var repairVerify = wo.TaskKind == TaskKind.Repair && action == "verify";
-        await using var verification = action == "verify" && wo.TaskKind is TaskKind.PoleGpsUpdate or TaskKind.Repair
-            ? await db.Database.BeginTransactionAsync(ct) : null;
-        if (repairVerify)
-            await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
-        if (verification is not null && wo.TaskKind == TaskKind.PoleGpsUpdate) await MovePolesAsync(wo, targets, ct);
+        if (action == "verify" && wo.TaskKind == TaskKind.PoleGpsUpdate) await MovePolesAsync(wo, targets, ct);
         if (action == "complete")
         {
             if (wo.TaskKind == TaskKind.Inspection && links.Count > 0)
@@ -660,16 +660,21 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             }
         }
         // Drift FR-2a (C): verifying an inspection IS the Manager confirming what the engineer saw.
-        // Only fault_present moves; fault_absent and inconclusive stay for a separate decision (BE-19).
+        // IoT fault_absent is a Manager rejection; inconclusive remains pending. Other channels keep FR-2a.
         if (wo.TaskKind == TaskKind.Inspection && action == "verify")
         {
-            var present = links.Where(x => x.InspectionOutcome == InspectionOutcome.FaultPresent).Select(x => x.FaultId).ToArray();
-            var faults = await db.Set<Fault>().Where(x => present.Contains(x.FaultId)).ToListAsync(ct);
+            var decided = links.Where(x => x.InspectionOutcome is InspectionOutcome.FaultPresent or InspectionOutcome.FaultAbsent)
+                .ToDictionary(x => x.FaultId, x => x.InspectionOutcome);
+            var decidedIds = decided.Keys.ToArray();
+            var faults = await db.Set<Fault>().Where(x => decidedIds.Contains(x.FaultId)).ToListAsync(ct);
             foreach (var fault in faults)
             {
                 if (fault.FaultStatus != FaultStatus.Detected) { skipped.Add(fault.FaultId); continue; }
-                transitions.Apply(fault, FaultStatus.Confirmed, now, ActorId);
-                changes.Add(new(fault.FaultId, FaultStatus.Detected, FaultStatus.Confirmed));
+                var absent = decided[fault.FaultId] == InspectionOutcome.FaultAbsent;
+                if (absent && fault.SourceChannel != SourceChannel.Iot) continue;
+                var target = absent ? FaultStatus.Rejected : FaultStatus.Confirmed;
+                transitions.Apply(fault, target, now, ActorId);
+                changes.Add(new(fault.FaultId, FaultStatus.Detected, target));
             }
         }
         switch (action)

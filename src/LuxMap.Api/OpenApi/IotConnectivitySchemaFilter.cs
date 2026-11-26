@@ -1,5 +1,7 @@
 using System.Text.Json.Nodes;
 using LuxMap.Modules.IOT;
+using LuxMap.Shared.Contracts.Enums;
+using LuxMap.Shared.Http;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -9,6 +11,15 @@ public sealed class IotConnectivitySchemaFilter : ISchemaFilter
 {
     public void Apply(IOpenApiSchema schema, SchemaFilterContext context)
     {
+        if (context.Type == typeof(IotDiagnosticHistoryItem) && schema is OpenApiSchema history && history.Properties is { } properties)
+        {
+            properties["fault_status"] = new OpenApiSchema {
+                Type = JsonSchemaType.String | JsonSchemaType.Null,
+                Enum = [.. Enum.GetValues<FaultStatus>().Select(value => (JsonNode)JsonValue.Create(WireEnum.Name(value))!), null!],
+                Description = "Trạng thái nghiệp vụ hiện tại của Fault được liên kết; null khi chưa có Fault. Độc lập status của episode.",
+            };
+            return;
+        }
         if (context.Type != typeof(IotNodeStatus) && context.Type != typeof(IotElectricalResult) &&
             context.Type != typeof(IotDiagnosticResult) && context.Type != typeof(IotDiagnosticSummaryItem)) return;
 

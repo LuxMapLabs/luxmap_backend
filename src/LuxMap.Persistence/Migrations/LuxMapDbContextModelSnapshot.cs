@@ -1707,6 +1707,10 @@ namespace LuxMap.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_at");
 
+                    b.Property<string>("FaultId")
+                        .HasColumnType("text")
+                        .HasColumnName("fault_id");
+
                     b.Property<string>("FeederId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1736,6 +1740,9 @@ namespace LuxMap.Persistence.Migrations
 
                     b.HasIndex("CommuneId")
                         .HasDatabaseName("ix_iot_diagnostic_episode_commune_id");
+
+                    b.HasIndex("FaultId", "CommuneId")
+                        .HasDatabaseName("ix_iot_diagnostic_episode_fault_id_commune_id");
 
                     b.HasIndex("NodeId", "Code")
                         .IsUnique()
@@ -4785,7 +4792,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_assignee_matches_status", "(wo_status = 'open' AND assigned_to IS NULL) OR (wo_status IN ('assigned','in_progress','done','verified') AND assigned_to IS NOT NULL) OR wo_status = 'cancelled'");
 
-                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
+                            t.HasCheckConstraint("ck_work_order_cancellation_request_state", "(cancellation_request_status = 'none' AND cancellation_request_note IS NULL AND cancellation_requested_at IS NULL\r\n    AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\nOR (wo_status = 'assigned' AND cancellation_request_note IS NOT NULL\r\n    AND char_length(btrim(cancellation_request_note)) BETWEEN 1 AND 500 AND cancellation_requested_at IS NOT NULL\r\n    AND ((cancellation_request_status = 'pending' AND cancellation_reject_note IS NULL AND cancellation_rejected_at IS NULL)\r\n        OR (cancellation_request_status = 'rejected' AND cancellation_reject_note IS NOT NULL\r\n            AND char_length(btrim(cancellation_reject_note)) BETWEEN 1 AND 500\r\n            AND cancellation_rejected_at IS NOT NULL AND cancellation_rejected_at >= cancellation_requested_at)))");
 
                             t.HasCheckConstraint("ck_work_order_cancellation_request_status", "\"cancellation_request_status\" IN ('none', 'pending', 'rejected')");
 
@@ -6292,6 +6299,13 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_iot_diagnostic_episode_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Faults.Entities.Fault", null)
+                        .WithMany()
+                        .HasForeignKey("FaultId", "CommuneId")
+                        .HasPrincipalKey("FaultId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_iot_diagnostic_episode_fault_fault_id_commune_id");
                 });
 
             modelBuilder.Entity("LuxMap.Modules.IOT.Entities.IotDiagnosticState", b =>

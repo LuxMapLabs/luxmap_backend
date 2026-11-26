@@ -23613,6 +23613,24 @@
           },
           "anomaly": {
             "$ref": "#/components/schemas/IotAnomaly"
+          },
+          "fault_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fault_status": {
+            "enum": [
+              "detected",
+              "confirmed",
+              "rejected",
+              "in_progress",
+              "resolved",
+              "verified",
+              null
+            ],
+            "type": "string",
+            "description": "Trạng thái nghiệp vụ hiện tại của Fault được liên kết; null khi chưa có Fault. Độc lập status của episode.",
+            "nullable": true
           }
         },
         "additionalProperties": false
