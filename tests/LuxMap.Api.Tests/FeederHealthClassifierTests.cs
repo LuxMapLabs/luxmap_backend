@@ -5,6 +5,16 @@ namespace LuxMap.Api.Tests;
 
 public class FeederHealthClassifierTests
 {
+    [Fact]
+    public void An_online_node_with_only_four_samples_is_warning_not_healthy_or_offline()
+    {
+        var result = Diagnosis() with {
+            Status = "insufficient_samples",
+            ElectricalWindow = new("insufficient_samples", 4, 5, null, null, null),
+        };
+        Assert.Equal(FeederHealthState.Warning, FeederHealthClassifier.Classify(result));
+    }
+
     private static IotDiagnosticResult Diagnosis(params IotAnomaly[] anomalies) => new("NODE-test", "FDR-test",
         anomalies.Length == 0 ? "normal" : "anomaly", new(DateTime.UtcNow, "ON", 5, 100, 500), anomalies)
     {

@@ -194,7 +194,8 @@ public sealed partial class IotDiagnosticsService(
                 var (window, alerts) = ElectricalWindowEvaluator.Evaluate(RecentOnMeasurements(device!, profile, now), profile);
                 diagnosis = diagnosis with {
                     ElectricalWindow = window,
-                    Status = alerts.Count == 0 ? diagnosis.Status : "anomaly",
+                    Status = alerts.Count > 0 ? "anomaly"
+                        : window.Status == "insufficient_samples" ? "insufficient_samples" : diagnosis.Status,
                     Anomalies = [.. diagnosis.Anomalies, .. alerts],
                 };
             }
@@ -924,28 +925,41 @@ public sealed partial class IotDiagnosticsService(
         var latest = device.LatestTelemetry;
         if (latest?.Data is not { SessionId: { Length: > 0 } session, SequenceNumber: > 0,
                 LampCommand: "ON", Voltage: double voltage, Current: double current, Power: double power } data ||
+            data.ReceptionType == "backfill" ||
             !Valid(voltage) || !Valid(current) || !Valid(power) || latest.ReceivedAt > now ||
             now - latest.ReceivedAt > maximumGap)
             return [];
         var measured = MeasuredAt(data.Timestamp);
         if (measured is null || measured > now || now - measured > maximumGap) return [];
         var samples = new List<IotMeasurement> { new(latest.ReceivedAt.UtcDateTime, "ON", voltage, current, power) };
-        // Sorting by receipt time would mix SD replay with live samples. Require adjacent sequences.
-        for (var offset = 1; offset < ElectricalWindowEvaluator.WindowSize; offset++)
+        // A radio batch retains each sample's identity, but may skip sequence numbers.
+        // Select five unique fresh readings across packets, not five adjacent numbers.
+        // OFF/invalid readings are barriers: never stitch two ON periods together.
+        var history = device.History ?? [];
+        if (history.Any(r => r.Data?.SessionId == session && r.Data.SequenceNumber == data.SequenceNumber && r.Data != data))
+            return [];
+        var olderGroups = history.Where(r => r.Data?.SessionId == session &&
+                r.Data.SequenceNumber is > 0 && r.Data.SequenceNumber < data.SequenceNumber)
+            .GroupBy(r => r.Data!.SequenceNumber).OrderByDescending(g => g.Key);
+        foreach (var group in olderGroups)
         {
-            var older = (device.History ?? []).Where(r => r.Data?.SessionId == session &&
-                r.Data.SequenceNumber == data.SequenceNumber - offset).ToArray();
-            if (older.Length != 1 || older[0].Data is not {
+            if (samples.Count == ElectricalWindowEvaluator.WindowSize) break;
+            // Identical retries count once. Conflicting values for one identity cannot
+            // establish a healthy window. Use first receipt so a retry cannot refresh age.
+            if (group.Select(r => r.Data).Distinct().Skip(1).Any()) break;
+            var older = group.MinBy(r => r.ReceivedAt)!;
+            if (older.Data is not {
                     LampCommand: "ON", Voltage: double oldV, Current: double oldI, Power: double oldP } previous ||
                 !Valid(oldV) || !Valid(oldI) || !Valid(oldP) ||
-                older[0].ReceivedAt > now || now - older[0].ReceivedAt > maximumGap)
-                return samples;
+                older.ReceivedAt > now || now - older.ReceivedAt > maximumGap)
+                break;
             var oldTime = MeasuredAt(previous.Timestamp);
             if (oldTime is null || oldTime >= measured || measured - oldTime > maximumGap ||
                 now - oldTime > maximumGap)
-                return samples;
-            samples.Add(new(older[0].ReceivedAt.UtcDateTime, "ON", oldV, oldI, oldP));
+                break;
             measured = oldTime;
+            if (previous.ReceptionType == "backfill") continue;
+            samples.Add(new(older.ReceivedAt.UtcDateTime, "ON", oldV, oldI, oldP));
         }
         return samples;
     }
@@ -1009,5 +1023,5 @@ public sealed partial class IotDiagnosticsService(
     private sealed record PrototypeReading(DateTimeOffset ReceivedAt, PrototypeSample? Data);
     private sealed record PrototypeSample(
         string? LampCommand, double? Voltage, double? Current, double? Power, string? SessionId, long? SequenceNumber,
-        string? Timestamp);
+        string? Timestamp, string? ReceptionType = null);
 }

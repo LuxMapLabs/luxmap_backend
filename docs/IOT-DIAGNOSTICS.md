@@ -55,10 +55,10 @@ Không còn lamp_count, estimated_lit, estimated_missing, votes hoặc threshold
 
 ## 2. Trung bình NĂM mẫu
 
-Năm mẫu phải ON, V/mA/mW hữu hạn, cùng session, sequence kề nhau, không trùng.
+Năm mẫu phải ON, V/mA/mW hữu hạn, cùng session và có sequence khác nhau. Các mẫu có thể đến từ nhiều gói LoRa và sequence có thể có khoảng trống.
 Giờ đo DS3231 tăng theo sequence, giờ đo/giờ nhận CẢ NĂM mẫu còn trong max_silence_seconds.
-Không nhận SD replay cũ, đứt sequence hoặc lặp bản tin làm năm mẫu. Không đánh giá lỗi điện khi INA226/DS3231 báo lỗi.
-Chưa đủ 5 mẫu: electrical_window.status=insufficient_samples, required_samples=5, các trung bình null.
+Mẫu gửi bù không được tính và bản tin lặp chỉ tính một lần. Cửa sổ dừng khi gặp mẫu OFF hoặc dữ liệu không hợp lệ. Không đánh giá lỗi điện khi INA226/DS3231 báo lỗi.
+Chưa đủ 5 mẫu: status=insufficient_samples và electrical_window.status=insufficient_samples, required_samples=5, các trung bình null. Đây là chưa đủ bằng chứng, không phải điện bình thường và không phải một mã anomaly mới.
 Đủ năm mẫu: status=evaluated. OFF/stale/hardware lỗi: electrical_window=null.
 Đây là năm bản tin đo độc lập, không phải số lần INA226 lấy trung bình nội bộ.
 
@@ -110,7 +110,7 @@ Mọi anomalies[] dùng chung {code, observed, reference, deviation_percent, lim
 Lỗi hardware không có trị số: bốn trường số là null.
 Bỏ current_deviation/power_deviation/current_when_off/lamp_count_shortfall.
 
-status chẩn đoán: normal | anomaly | stale | no_data.
+status chẩn đoán: normal | anomaly | stale | no_data | insufficient_samples.
 electrical_window.status: evaluated | insufficient_samples.
 sensor_health.status: fresh | stale | unknown.
 Summary diagnostic_status thêm unconfigured | source_unavailable; anomaly_codes[] chỉ chứa 17 mã trên.
@@ -196,7 +196,7 @@ PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
 Các trường cấu hình đếm bóng cũ còn được nhận để tương thích nhưng không ảnh hưởng chẩn đoán.
 Cần deploy BE và apply migration AddIotDiagnosticEpisodes. Không cần nạp lại firmware cho thay đổi thuật toán BE này.
 
-Cập nhật 24/11/2026: dùng cửa sổ trượt 5 mẫu ON mới nhất, cùng session và sequence liên tiếp; không phải mỗi 5 lượt GET. Mỗi mẫu V/mA/mW có trọng số bằng nhau. Lịch sử kiểm tra mỗi 5 giây, tối đa khoảng 12 lượt/phút; chưa có mẫu mới có thể vẫn dùng cửa sổ còn fresh. Không tự tạo mẫu đo. Firmware vẫn tạo telemetry khoảng 10 giây/lần, nên 5 mẫu mới cần khoảng 50 giây. Khoảng trống hơn một phút vẫn ngắt đợt lỗi như trước. Poll runner được giới hạn bởi chu kỳ job nhanh nhất; chu kỳ thực tế còn phụ thuộc thời gian xử lý và tải hệ thống. Không sửa FE, không đổi trung bình lịch sử điện 30 giây.
+Cập nhật 26/11/2026 (IOT-DIAG-5): dùng 5 mẫu ON mới nhất, cùng session, định danh không trùng; không bắt sequence sát nhau. Sắp theo sequence và kiểm tra giờ đo giảm dần, không theo thứ tự nhận HTTP. Hai gói LoRa 4 mẫu có thể ghép đủ cửa sổ dù mất một số sequence ở giữa. Không lấy qua lần OFF, dữ liệu hỏng, timestamp đảo chiều; mẫu gửi bù có reception_type=backfill không được dùng. Mỗi mẫu phải còn mới theo max_silence_seconds ở cả measured_at và received_at. Bản ghi trùng cùng nội dung chỉ tính một lần. Với các mẫu trong lịch sử, dùng giờ nhận sớm nhất trong nhóm trùng; nội dung mâu thuẫn cùng identity ngắt cửa sổ. Client cũ thiếu reception_type vẫn phải qua các kiểm tra thời gian. Thuật toán: electrical-mean5-batched-v2. Node hiện đo khoảng 1 giây/mẫu, gửi theo đợt tối đa 4 mẫu; không cam kết đủ cửa sổ sau đúng 5 giây. Job/lịch sử giữ chu kỳ khoảng 5 giây. Thiếu mẫu không đóng Fault hoặc đánh dấu đợt lỗi đã phục hồi. Chỉ sửa BE, không cần nạp lại thiết bị.
 
 
 ## Sức khỏe feeder trong kiểm kê (FEEDER-HEALTH-1, 26/11/2026)
