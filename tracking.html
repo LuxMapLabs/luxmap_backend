@@ -1438,6 +1438,13 @@
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
         <td>26/11/2026</td>
+        <td><code>D-R30</code> (Mỹ): huỷ D-R29 — lux lại <strong>gắn trên xe, lấy mẫu khi chạy</strong> (D-R21, pipeline sweep BE-15 chưa từng gỡ).
+        LUX-BASELINE giữ làm số đo đối chứng. Chỉ tài liệu; còn mở O-1 (bộ chấm ảnh cột vẫn ghi <code>dim</code>), O-2 (WP6 ghi phiên sweep), O-3 (firmware D-FS-20).</td>
+        <td>drift, <code>CLAUDE.md</code>, <code>traps/survey.md</code>, <code>BE-15-pilot-drive.md</code></td>
+        <td><code>docs(drift): record D-R30 vehicle-mounted lux sampling</code></td>
+      </tr>
+      <tr>
+        <td>26/11/2026</td>
         <td><code>POLE-GPS-ACCURACY</code> (drift PG-14…PG-16, SELF-SIGNED): <code>accuracy_m</code> trong <code>pole_locations[]</code> thành tuỳ chọn —
         thiếu / <code>null</code> = không rõ, để demo lấy toạ độ cột từ ảnh trong album mà không điền số giả. BE vẫn không đọc EXIF.
         Migration <code>AllowUnknownPoleReportAccuracy</code> (chỉ nới một CHECK; chưa áp <code>luxmap_dev</code> / VPS). 1 test mới, phá thử 2 chốt đỏ,
@@ -1829,6 +1836,7 @@
       <tr><td>Profile cấu hình quay cố định (ISO, shutter, lấy nét vô cực, WB, độ phân giải/fps; tắt EIS/HDR/night mode) — chốt số sau buổi quay thử; server từ chối phiên lệch profile, thay kiểm từng JPEG của BE-16</td><td>D-R24 · SELF-SIGNED 27/09</td><td><span class="tag t-todo">Chờ quay thử</span></td></tr>
       <tr><td>Controlled Reference Capture Set rời deliverable — xác nhận; <code>calibration_rig</code> giữ trong enum. Gộp với follow-up v1.2 về <code>data_source</code> telemetry testbed</td><td>D-R25 · Contract O-9</td><td><span class="tag t-todo">Chờ quyết</span></td></tr>
       <tr><td><strong>LUX-BASELINE</strong> — nối số lux đo đứng yên (gắn ảnh cột trong phiếu khảo sát) vào baseline, chấm <code>dim</code> lúc Quản lý quyết định ảnh. Ticket <code>.ai/tasks/LUX-BASELINE.md</code>, D-1…D-14 đề xuất (khuyến nghị bảng baseline song song, D-7 B). <strong>26/11: Phase 1 xong</strong> (<code>.ai/results/LUX-BASELINE-p1.md</code>): sửa D-2 / D-3 / D-10, D-7 (B) có bằng chứng schema, thêm D-15 (<code>meter_model</code> trên VPS <code>ESP32C3_LUX</code> ≠ Contract <code>LuxMap_ESP32</code>) và D-16. <strong>26/11: Mỹ chốt theo khuyến nghị; Phase 2 xong</strong> (<code>.ai/results/LUX-BASELINE-p2.md</code>), Contract v1.24, migration <code>AddStationaryLuxBaseline</code>; kèm web (<code>feat/LUX-BASELINE-ui</code>, chưa commit) và mobile (<code>feat/LUX-BASELINE-protocol</code>)</td><td>D-R29 · chạm API + migration</td><td><span class="tag t-done">Đã merge (#304, web #161, mobile #206) · VPS deploy 26/11</span></td></tr>
+      <tr><td>🔴 <strong>D-R30 O-1</strong> — sau khi lux quay lại trên xe, bộ chấm ảnh cột của LUX-BASELINE vẫn đổi trạng thái cột và sinh <code>lamp_dim</code>: hai nguồn ghi <code>dim</code>. Khuyến nghị chỉ giữ làm đối chứng (ticket, chạm Contract v1.24). Kèm O-2 WP6 ghi phiên sweep, O-3 firmware D-FS-20</td><td>D-R30 · chạm API</td><td><span class="tag t-todo">Chờ quyết</span></td></tr>
       <tr><td>Phase 2 (sau khi chốt): Contract §5.7 / §5.2, XML doc <code>LuxReading.cs</code> (còn ghi "ABSOLUTE <code>lux_value</code>"), mô tả BE-42 trong <code>tasks-backend.csv</code>, mốc FO-14</td><td>D-R21…D-R28</td><td><span class="tag t-todo">Chưa làm</span></td></tr>
     </table>
   </div>
