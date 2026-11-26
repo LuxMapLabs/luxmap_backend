@@ -1,5 +1,40 @@
 # Chỗ lệch giữa code và Contract — log mới từ v1.4 (18/09/2026)
 
+## D-R30 — đo lux lại gắn trên xe, lấy mẫu khi xe chạy (26/11/2026)
+
+| | |
+|---|---|
+| **Decision** | **Huỷ D-R29.** Cảm biến ánh sáng (BH1750) **gắn trên xe khảo sát, lấy mẫu liên tục khi xe chạy** — quay về phần lux của D-R21: log lux BLE theo phiên, chung đồng hồ `elapsedRealtimeNanos` với video / GPS, server khớp đồng hồ, lấy **đỉnh lux lúc ngang cột**, ghép cột bằng GPS, so với `luminance_baseline` của sweep. Phân loại giữ D-R20 (CV `OFF` → `out`; CV `ON` + `baseline_ratio` < `dim_threshold_ratio` → `dim`) |
+| **Decision maker** | **Mỹ (Dylan)**, trực tiếp ("cảm biến ánh sáng đo lux sẽ được gắn trên xe", chọn "đo khi xe chạy"). Chạm việc của WP6 / IoT / WP4 / FO → xác nhận với nhóm ở FW kế tiếp (FW-00 mục 3) · `SELF-SIGNED` |
+| **Date** | 26/11/2026 |
+| **Scope** | Chỉ tầng tài liệu: mục này, banner, ghi chú ở D-R29 / D-R21, con trỏ ở `CLAUDE.md`, `docs/agents/traps/survey.md`, `docs/field/BE-15-pilot-drive.md`. **Không** đổi Contract, `docs/openapi/*`, migration, `src/` |
+
+**Hiệu lực lại** (như trước 25/11): phần lux của D-R21; D-FS-20 (~8 mẫu/giây, `seq` + `module_ms` từng mẫu); D-05 / D-7 / P2 /
+D-FS-01 (baseline sweep đếm theo run, chia theo chiều, đi–về một phiên); Q3, Q4, Q5, Q7, Q8 của `docs/field/BE-15-pilot-drive.md`.
+D-R27 về trạng thái trước D-R29 (còn chờ quyết). ON/OFF lấy từ video sweep (D-R29 O-1 không còn áp).
+
+**Backend không phải sửa cho đường chính:** pipeline sweep của BE-15 chưa từng bị gỡ — `PUT /sweeps/{id}/raw/lux_log`,
+`SurveyRawParser`, khớp đồng hồ và căn lux (`SurveyAlgorithms.FitClocks` / `AlignLux`), `peak_lux` ở `pole_observation`,
+`luminance_baseline`, `luminance_history` vẫn chạy trên `dev`.
+
+**LUX-BASELINE (đã deploy 26/11) giữ nguyên** — không xoá code, migration hay dữ liệu (cửa hai chiều; `Down()` có preflight). Số đo
+có `protocol` trở thành **số đo đối chứng đứng yên** (ứng viên ground truth bước A của D-R23), baseline đứng yên vẫn tách khỏi baseline
+sweep (LUX-BASELINE-1).
+
+**Còn mở** (owner: Mỹ; hạn: FW kế tiếp):
+
+- **O-1** Bộ chấm ảnh cột của LUX-BASELINE (`StationaryLuxEvaluator`) vẫn **đổi trạng thái cột và sinh `lamp_dim`** khi Quản lý xác nhận
+  ảnh có số đo `protocol`. Sau D-R30 đó là **người ghi `dim` thứ hai** bên cạnh sweep. Khuyến nghị: tắt quyền đổi trạng thái của nó
+  (chỉ ghi `lux_evaluation` làm đối chứng) để `dim` khảo sát chỉ có một nguồn và precision / recall đo được tách bạch — cần ticket,
+  chạm hành vi đã publish ở Contract v1.24 (LUX-BASELINE-2, -4).
+- **O-2** WP6: **app chưa có phần ghi phiên sweep** (video + GPS + log lux BLE trên cùng đồng hồ + `capture_config`, upload theo
+  `/sweeps`); `SweepsApi` mới có lớp mạng. Thẻ đo đứng yên hiện tại (gửi `protocol`, sào 1,0 m) giữ hay ẩn tuỳ O-1.
+- **O-3** IoT / Member 2: firmware hiện tại có gửi `seq` + `module_ms` từng mẫu ~8 Hz như D-FS-20 không (D-R29 đã nới yêu cầu này;
+  chưa kiểm firmware đang nạp).
+
+**Phải báo:** WP6 (ghi phiên sweep), IoT / Member 2 (D-FS-20), WP4 (ON/OFF lại từ video sweep), FO (gắn module ở đầu xe theo
+`BE-15-pilot-drive.md`). **Chưa báo.**
+
 ## LUX-BASELINE — số lux đo đứng yên được chấm so với baseline của chính cột (26/11/2026)
 
 | | |
@@ -25,6 +60,8 @@
 chỉ hiện thực cho baseline đứng yên. `nearest_luminance` vẫn `null` (đối chứng A là việc khác).
 
 ## D-R29 — đo lux đứng yên, ngay dưới đèn (25/11/2026)
+
+> ⛔ **Bị huỷ bởi D-R30 (26/11/2026)** — lux lại gắn trên xe, lấy mẫu khi chạy. Giữ mục này làm lịch sử.
 
 | | |
 |---|---|
@@ -117,6 +154,7 @@ thành Open item ở mục 9 của Contract. **Không sửa file archive.**
 > 📄 **Nguồn phiếu hiện hành: v1.3 (ngày phiếu 20/08/2026, áp dụng vào repo 31/10/2026)** — mục *Registration v1.3 hiện hành* bên dưới; v1.4 (27/09/2026) là lịch sử nhưng các D-R20…D-R28 của nó còn hiệu lực. Vai trò không đổi so
 > với v1.2; D-R21, D-R24 **đã chốt hướng (SELF-SIGNED)**; D-R20, D-R22, D-R23 **chốt 07/10/2026**; D-R28 = A **chốt 02/10** (BE-15 Phase 1); D-R26 ghi nhận; D-R25, D-R27 **còn chờ quyết**.
 > **25/11/2026 — D-R29** (đầu file): lux đo **đứng yên ngay dưới đèn**, thay phần lux của D-R21 và giải D-R27; code chưa đổi.
+> **26/11/2026 — D-R30** (đầu file): **huỷ D-R29**, lux lại **gắn trên xe, lấy mẫu khi chạy** (D-R21); LUX-BASELINE giữ làm số đo đối chứng.
 
 **Nguyên tắc vận hành quyết định (FW-00, 07/09/2026)** giữ nguyên hiệu lực — năm mục ở đầu file
 archive: (1) ghi ngay, bốn trường Decision / Decision maker / Date / Scope; (2) policy là một vai trò
@@ -673,7 +711,7 @@ thẳng v1.2 → v1.4. Enum Contract mục 1 **không phải lật** — đó l�
 |---|---|---|---|
 | **D-R19** | Phiếu v1.4 thay v1.2 làm nguồn chuẩn. Vai trò, ma trận capability, Citizen/QR, điều khiển testbed, audit trail (D-R1…D-R18) **giữ nguyên** — v1.4 không đổi actor | Không | ✅ Tầng tài liệu, 27/09 |
 | **D-R20** | `fixture_status` **giữ** `normal \| dim \| out \| unknown`. Quy tắc: CV `OFF` → `out`; CV `ON` + `baseline_ratio` < `dim_threshold_ratio` → `dim`; còn lại `normal`; không có quan sát → `unknown`. `lamp_out` / `lamp_dim` vẫn `source_channel = cv` (kênh = sweep khảo sát) — **cần xác nhận**, vì `lamp_dim` nay do CV **và** cảm biến cùng quyết | Có (ngữ nghĩa, không đổi hình dạng) | **Chốt 07/10 (Mỹ): giữ `cv`**, không thêm giá trị enum — kênh là phiên khảo sát, cảm biến lux là một phần của phiên. Không đổi Contract, mock, FE |
-| **D-R21** | **Mô hình dữ liệu một phiên khảo sát — hướng (B), chốt 27/09.** App quay riêng (WP6) sinh **bốn file thô, không ai nhập tay**: (1) **video**; (2) **log lux** — module ESP32 + BH1750 gửi **từng mẫu** qua **BLE notify** (`seq`, `module_ms`, `lux`), app gắn `phone_elapsed_ns` lúc nhận; (3) **GPS track** theo thời gian (không phải một toạ độ cho cả file); (4) **cấu hình quay** thực tế. **Cả ba luồng video / GPS / lux dùng CHUNG một đồng hồ** `SystemClock.elapsedRealtimeNanos()` — Camera2 gắn `SENSOR_TIMESTAMP` cùng hệ thời gian khi `SENSOR_INFO_TIMESTAMP_SOURCE = REALTIME` (**phải kiểm trên máy quay thật**); quy đổi UTC **một lần** mỗi phiên, nên **không cần mốc flash**. Jitter BLE ~10–50 ms (≈0,4 m ở 30 km/h) — server khớp tuyến tính `(module_ms, phone_elapsed_ns)` trên cả phiên để khử. **Điện thoại không xử lý gì**: server lưu nguyên byte bốn file, parse log lux thành bảng mẫu theo sweep (không gắn cột), tìm đỉnh, ghép cột bằng GPS track + vị trí cột GIS, lấy ON/OFF của CV, rồi ghi **một dòng cho mỗi cột mỗi sweep** (`peak_at, peak_lux, cv_state, baseline_ratio, classified_as, association_confidence`) vào chuỗi luminance. Khoảng `seq` bị hổng trùng lúc ngang cột → `unknown`, không đoán. `LuxReading` (BE-42) **giữ** cho số đo **thủ công** lúc kiểm tra thực địa — ứng viên ground truth của D-R23. Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15 mới, §5.7 diễn đạt lại | **Chốt hướng, SELF-SIGNED** — nền tạm tới FW kế tiếp; **đặc tả BE-15 chưa viết**. ⚠️ **Phần lux thay bởi D-R29 (25/11)** |
+| **D-R21** | **Mô hình dữ liệu một phiên khảo sát — hướng (B), chốt 27/09.** App quay riêng (WP6) sinh **bốn file thô, không ai nhập tay**: (1) **video**; (2) **log lux** — module ESP32 + BH1750 gửi **từng mẫu** qua **BLE notify** (`seq`, `module_ms`, `lux`), app gắn `phone_elapsed_ns` lúc nhận; (3) **GPS track** theo thời gian (không phải một toạ độ cho cả file); (4) **cấu hình quay** thực tế. **Cả ba luồng video / GPS / lux dùng CHUNG một đồng hồ** `SystemClock.elapsedRealtimeNanos()` — Camera2 gắn `SENSOR_TIMESTAMP` cùng hệ thời gian khi `SENSOR_INFO_TIMESTAMP_SOURCE = REALTIME` (**phải kiểm trên máy quay thật**); quy đổi UTC **một lần** mỗi phiên, nên **không cần mốc flash**. Jitter BLE ~10–50 ms (≈0,4 m ở 30 km/h) — server khớp tuyến tính `(module_ms, phone_elapsed_ns)` trên cả phiên để khử. **Điện thoại không xử lý gì**: server lưu nguyên byte bốn file, parse log lux thành bảng mẫu theo sweep (không gắn cột), tìm đỉnh, ghép cột bằng GPS track + vị trí cột GIS, lấy ON/OFF của CV, rồi ghi **một dòng cho mỗi cột mỗi sweep** (`peak_at, peak_lux, cv_state, baseline_ratio, classified_as, association_confidence`) vào chuỗi luminance. Khoảng `seq` bị hổng trùng lúc ngang cột → `unknown`, không đoán. `LuxReading` (BE-42) **giữ** cho số đo **thủ công** lúc kiểm tra thực địa — ứng viên ground truth của D-R23. Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15 mới, §5.7 diễn đạt lại | **Chốt hướng, SELF-SIGNED** — nền tạm tới FW kế tiếp; **đặc tả BE-15 chưa viết**. ⚠️ Phần lux thay bởi D-R29 (25/11), **hiệu lực lại từ D-R30 (26/11)** |
 | **D-R22** | `luminance_history` / `luminance_baseline` **giữ hình dạng** (`baseline_ratio`, `classified_as`, `dim_threshold_ratio` 0.80) nhưng **nguồn đổi**: đỉnh lux theo cột, không phải độ sáng ảnh. `out_threshold_ratio` (0.15) **mất vai trò phân loại** vì Out nay do CV quyết — giữ làm kiểm tra nhất quán (CV nói ON mà lux gần 0), hay bỏ? Tên `luminance_*` giữ dù đại lượng là độ rọi (đổi tên = BREAKING không mua được gì) | **Có** — §5.2 detail, BE-33 | **Chốt 07/10 (Mỹ): giữ trường, luôn `null`, ghi Contract "không còn dùng phân loại"** (hướng b) — xem mục *Quyết định khảo sát 07/10/2026* |
 | **D-R23** | **Lux không còn là ground truth của `dim`** — nó là đầu vào. Quy tắc BE-42 số 1 trong `CLAUDE.md` (*"ghi lux vào chuỗi luminance là để CV tự chấm chính mình"*) **đảo nghĩa**: ở v1.4 chuỗi luminance **chính là** lux. Cần chốt ground truth mới cho `dim` (kiểm tra thực địa bằng gì, ai làm, trên tập con nào) và cho độ lặp lại của phép đo (nhiều lượt qua cùng cột). `out` vẫn = kiểm tra bằng mắt ban đêm | Không (nghiên cứu) — nhưng đổi tiêu chí CV-12 | **Chốt 07/10 (Mỹ): B (tấm lọc ND) trước, A (lux kế tay) sau** — xem mục *Quyết định khảo sát 07/10/2026* |
 | **D-R24** | **Cấu hình quay CỐ ĐỊNH, kiểm ở cấp PHIÊN thay cho kiểm từng JPEG (BE-16).** Camera2 (hoặc CameraX + Camera2Interop): tắt AE, cố định ISO + shutter; lấy nét cố định vô cực; WB cố định; độ phân giải + fps cố định; **tắt EIS / HDR / night mode** (crop, bóp méo, ghép frame). App ghi cấu hình **thực tế** vào file cấu hình phiên; server so với **một profile đã chốt** và **từ chối** phiên lệch, kèm lý do — cùng tinh thần "không nhận, không suy đoán" của BE-16. Con số ISO / shutter chốt sau buổi quay thử. Metadata phiên thêm: làn, chiều đi, tần số lấy mẫu module, phiên bản firmware module (BE-34). Người quyết: **Mỹ (Dylan)** · `SELF-SIGNED` | **Có** — BE-15/16 chưa đặc tả | **Chốt hướng, SELF-SIGNED**; chờ profile từ buổi quay thử |

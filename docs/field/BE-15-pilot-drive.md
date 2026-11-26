@@ -1,7 +1,7 @@
 # Kịch bản quay thử — khảo sát video đêm (BE-15)
 
-> ⚠️ **Phần đo lux trên xe hết hiệu lực từ 25/11/2026 (D-R29):** lux đo **đứng yên ngay dưới đèn**, từng cột, không gắn module lên
-> xe. Q3, Q4, Q5, Q7, Q8 không còn áp cho lux. Phần video / GPS cho ON/OFF chờ quyết (D-R29 O-1, `docs/contract-drift.md`).
+> ✅ **Phần đo lux trên xe hiệu lực lại từ 26/11/2026 (D-R30, huỷ D-R29):** module BH1750 gắn ở đầu xe, lấy mẫu khi chạy; Q3, Q4,
+> Q5, Q7, Q8 áp lại cho lux (`docs/contract-drift.md`, mục D-R30).
 
 Dành cho **FO** (thực địa) và **WP6** (mobile). Soạn 02/10/2026 bởi WP2. Phiên bản 2 (03/10/2026): phương tiện là
 **xe máy**, điện thoại và module BH1750 gắn ở **đầu xe** — không phải ô tô. Phiên bản 3 (07/10/2026): **đi–về trong một

@@ -5,7 +5,7 @@ Tra cứu tách từ `CLAUDE.md` (20/10/2026). Đọc trước khi pipeline kh�
 ## Bốn quy tắc chốt ở BE-42 — số đo lux
 
 **BH1750FVI gắn ở đầu xe máy khảo sát**; vị trí/cách gắn theo `docs/field/BE-15-pilot-drive.md`, không tự đổi bố trí giữa các lượt.
-⚠️ **D-R29 (25/11/2026):** hướng mới là đo **đứng yên ngay dưới đèn**; code dưới đây vẫn là đường trên xe cho tới ticket hiện thực.
+**D-R30 (26/11/2026) huỷ D-R29:** lux lại đo **trên xe, khi chạy** — đường dưới đây là kênh chính. Số đo đứng yên (LUX-BASELINE, cuối file) là đối chứng.
 
 Nền BH1750/v1.4: xem `CLAUDE.md`, phần mở đầu; D-R22/D-R23 chốt 07/10, D-R21/D-R24 là nền SELF-SIGNED.
 
