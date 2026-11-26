@@ -63,7 +63,8 @@ public sealed record WorkOrderDetail : WorkOrderItem
     public WorkOrderAttachmentItem[] Attachments { get; init; } = [];
 }
 
-public sealed record WorkOrderPoleLocation(string PoleId, double Lat, double Lng, double AccuracyM, DateTime CapturedAt);
+/// <param name="AccuracyM">Null when the phone's source gave none, e.g. a gallery photo's EXIF (PG-14) — "unknown", not "exact".</param>
+public sealed record WorkOrderPoleLocation(string PoleId, double Lat, double Lng, double? AccuracyM, DateTime CapturedAt);
 
 /// <param name="DownloadUrl">Relative path through the API, never presigned (BE-11 rule 1).</param>
 public sealed record WorkOrderAttachmentItem(string AttachmentId, string FileName, long ByteCount, DateTime UploadedAt, string DownloadUrl);

@@ -163,6 +163,34 @@ public partial class WorkOrderTests
     }
 
     [Fact]
+    public async Task A_position_without_accuracy_is_kept_as_unknown_and_verify_still_writes_it()
+    {
+        // PG-14: a gallery photo's EXIF gives a position but no accuracy. It stays null — never a number that looks measured.
+        var located = await PlantPole(.2);
+        var unlocated = await UnlocatedPole();
+        var id = await CreateGps([unlocated, located]);
+        await Send("a", "POST", $"/{id}/start", null, 200);
+        await Photograph(id, unlocated, located);
+
+        var done = await Send("a", "POST", $"/{id}/complete", new
+        {
+            report_note = "Toạ độ lấy từ ảnh trong album.",
+            pole_locations = new object[]
+            {
+                new { pole_id = unlocated, lat = 16.006, lng = 108.006, captured_at = Captured },
+                new { pole_id = located, lat = 16.0021, lng = 108.0021, accuracy_m = (double?)null, captured_at = Captured },
+            },
+        }, 200);
+        var reported = done.GetProperty("pole_locations").EnumerateArray().ToArray();
+        Assert.Equal(2, reported.Length);
+        Assert.All(reported, x => Assert.Equal(JsonValueKind.Null, x.GetProperty("accuracy_m").ValueKind));
+
+        await Send("manager", "POST", $"/{id}/verify", new { note = "Duyệt, độ chính xác không rõ." }, 200, auditExpected: 3);
+        Assert.Equal(108.006, (await GeomOf(unlocated))!.X, 9);
+        Assert.Equal(108.0021, (await GeomOf(located))!.X, 9);
+    }
+
+    [Fact]
     public async Task A_report_outside_the_road_corridor_moves_no_pole_and_leaves_the_order_done()
     {
         var near = await PlantPole(.2);
