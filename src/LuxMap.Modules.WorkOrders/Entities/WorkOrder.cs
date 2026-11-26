@@ -101,6 +101,8 @@ public class WorkOrderPoleTarget : ICommuneScoped, IAudited
     public required string CommuneId { get; set; }
     public double? ReportedLat { get; set; }
     public double? ReportedLng { get; set; }
+
+    /// <summary>NULL inside a report means the source gave no accuracy (PG-14); the report itself is marked by <c>ReportedLat</c>.</summary>
     public double? ReportedAccuracyM { get; set; }
 
     /// <summary>When the phone took the fix, as the client says (UTC, microseconds).</summary>

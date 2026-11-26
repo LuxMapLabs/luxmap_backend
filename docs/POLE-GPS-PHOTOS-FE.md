@@ -21,8 +21,10 @@ trường riêng của cùng một thao tác:
 - App dùng **một lần đo GPS lúc bấm chụp** cho cả hai: cùng `lat`, `lng`; `accuracy_m` và `captured_at` của lần đo đó.
 - Mobile **được** ghi thêm GPS vào EXIF nếu muốn (ảnh gốc giữ nguyên byte nên EXIF còn trong bản gốc; thumbnail luôn bỏ metadata). Đó chỉ
   là bản sao, BE không dùng.
-- Vì sao không dùng EXIF: ảnh chọn từ thư viện trên Android 10+ bị xoá GPS khi app thiếu quyền `ACCESS_MEDIA_LOCATION`; EXIF hiếm khi có
-  độ chính xác, mà `pole_locations` cần `accuracy_m`.
+- Vì sao BE không đọc EXIF: ảnh chọn từ thư viện trên Android 10+ bị xoá GPS khi app thiếu quyền `ACCESS_MEDIA_LOCATION`; EXIF hiếm khi
+  có độ chính xác.
+- 🆕 **Ảnh từ album (PG-14, PG-15, 26/11):** được dùng. **App** đọc GPS trong EXIF rồi gửi vào các trường riêng như trên; `accuracy_m` để
+  trống (hoặc lấy tag `GPSHPositioningError` nếu có) — **không điền số mặc định**. BE lưu `null` = "không rõ độ chính xác".
 
 ## 2. Ba kênh ảnh dễ nhầm — trong lịch GPS chỉ dùng kênh A
 
@@ -124,7 +126,7 @@ không truyền thì ra mọi ảnh của phiếu, kể cả ảnh không gắn 
 |---|---|
 | Danh sách cột của lịch, đúng thứ tự | `GET /work-orders/{id}` → `pole_ids[]` |
 | **GPS cũ** (đang lưu trong GIS; `null` nếu cột chưa từng có GPS) | `GET /work-orders/{id}/poles` → `location` |
-| **GPS mới** kỹ sư báo | `GET /work-orders/{id}` → `pole_locations[]` `{pole_id, lat, lng, accuracy_m, captured_at}`; cột kỹ sư không tìm được thì **không có** trong mảng |
+| **GPS mới** kỹ sư báo | `GET /work-orders/{id}` → `pole_locations[]` `{pole_id, lat, lng, accuracy_m, captured_at}`; cột kỹ sư không tìm được thì **không có** trong mảng; 🆕 `accuracy_m` có thể `null` (không rõ — PG-14) |
 | Ảnh của từng cột | `GET /work-orders/{id}/evidence?pole_id=…` |
 | Ảnh chung (không gắn cột) | `GET /work-orders/{id}/evidence`, lọc `pole_id == null` ở FE |
 
@@ -153,7 +155,10 @@ Và ở `complete`:
 - **Màn từng cột** trong lịch GPS: một nút chính **"Chụp ảnh cột"** — mở camera, lúc bấm chụp lấy một lần đo GPS (nên chờ tới khi
   `accuracy` đủ tốt), lưu `lat, lng, accuracy_m, captured_at` làm toạ độ cột **và** dùng chính số đó cho `lat`, `lng`, `captured_at`
   của ảnh. Chụp thêm ảnh được; chụp lại thì hỏi có thay toạ độ cột bằng lần đo mới không. Ảnh luôn kèm `pole_id` của cột đang mở.
-- Không lấy ảnh từ thư viện máy cho lịch này (GPS trong file có thể đã bị Android xoá; BE cũng không đọc).
+- 🆕 **Chọn ảnh từ album** (PG-15, 26/11): xin quyền `ACCESS_MEDIA_LOCATION`; đọc GPS trong EXIF, gửi vào `lat` / `lng` của ảnh và
+  `pole_locations`. `accuracy_m` = tag `GPSHPositioningError` nếu có, không thì **bỏ trống** — không điền số mặc định. `captured_at` lấy
+  `DateTimeOriginal` (giờ địa phương) đổi sang UTC bằng `OffsetTimeOriginal`, thiếu thì +07:00. Ảnh không có GPS thì không dùng làm toạ
+  độ cột. BE không đọc EXIF.
 - 🆕 Nút "Hoàn thành" chỉ bật khi mọi cột đã có toạ độ đều có ít nhất một ảnh (đã lên server hoặc đang trong hàng chờ).
 - **Offline:** ảnh **không** đi qua `/sync/push`. Giữ một **hàng chờ multipart riêng**: mỗi ảnh lưu file + `pole_id` + `client_op_id`
   (sinh một lần lúc chụp, không đổi khi gửi lại). Có mạng thì đẩy.
@@ -170,7 +175,7 @@ Bảng, mỗi dòng một cột theo thứ tự `pole_ids`:
 
 | Cột | GPS cũ | GPS mới | Độ chính xác | Lúc lấy | Ảnh |
 |---|---|---|---|---|---|
-| `POLE-0007` | `location` hoặc "Chưa có" | `pole_locations[i]` hoặc "Kỹ sư không báo" | `accuracy_m` m | `captured_at` | thumbnail của `evidence?pole_id=` ; "Không có ảnh" nếu rỗng |
+| `POLE-0007` | `location` hoặc "Chưa có" | `pole_locations[i]` hoặc "Kỹ sư không báo" | `accuracy_m` m, hoặc 🆕 "Không rõ" khi `null` (PG-16) | `captured_at` | thumbnail của `evidence?pole_id=` ; "Không có ảnh" nếu rỗng |
 
 - Nút "Xem GIS": bản đồ vẽ **GPS mới** (điểm chính), **GPS cũ** (nếu có, nét mờ) và **vị trí chụp ảnh** `lat/lng` của từng ảnh — ba
   điểm gần nhau là dấu hiệu tốt. Vị trí chụp ảnh chỉ để tham khảo, không bao giờ là toạ độ cột.

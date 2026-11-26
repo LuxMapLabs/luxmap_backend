@@ -23161,7 +23161,7 @@
           "field_engineer"
         ],
         "x-luxmap-client": "shared",
-        "summary": "[TẠM — WO-1…WO-12] Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10), chưa vào GIS",
+        "summary": "[TẠM — WO-1…WO-12] Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10; accuracy_m tuỳ chọn, PG-14), chưa vào GIS",
         "operationId": "postWorkOrdersIdComplete",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
@@ -34404,7 +34404,8 @@
           },
           "accuracy_m": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "nullable": true
           },
           "captured_at": {
             "type": "string",
