@@ -655,6 +655,60 @@ public partial class WorkOrderTests(AssetImportFixture factory, ITestOutputHelpe
     }
 
     [Fact]
+    public async Task Listing_carries_completed_and_closed_times_and_sorts_by_them_with_nulls_last()
+    {
+        var t0 = DateTime.UtcNow.Date.AddDays(-1);
+        var ids = await Db(async db =>
+        {
+            using var system = db.EnterUnscopedSystemWriteBackdoor();
+            WorkOrder Order(WorkOrderStatus status, int createdMin, int? completedH, int? closedH) => new()
+            {
+                CommuneId = home, Title = "Sort " + status, CreatedBy = users["manager"].UserId, TaskKind = TaskKind.Inspection,
+                SegmentId = segment, WoStatus = status, CreatedAt = t0.AddMinutes(createdMin), UpdatedAt = t0.AddMinutes(createdMin),
+                AssignedTo = status == WorkOrderStatus.Open ? null : users["a"].UserId,
+                AssignedAt = status == WorkOrderStatus.Open ? null : t0.AddMinutes(createdMin),
+                StartedAt = completedH is null ? null : t0.AddMinutes(createdMin),
+                ReportNote = completedH is null ? null : "Planted report",
+                CompletedAt = completedH is null ? null : t0.AddHours(completedH.Value),
+                ClosedAt = closedH is null ? null : t0.AddHours(closedH.Value),
+            };
+            // Closed order is NOT creation order, and nulls sit on the newest and on a middle order.
+            var orders = new[]
+            {
+                Order(WorkOrderStatus.Verified, 0, completedH: 1, closedH: 5),
+                Order(WorkOrderStatus.Cancelled, 1, completedH: null, closedH: 3),
+                Order(WorkOrderStatus.Verified, 2, completedH: 4, closedH: 4),
+                Order(WorkOrderStatus.Open, 3, completedH: null, closedH: null),
+            };
+            foreach (var order in orders) { db.Add(order); await db.SaveChangesAsync(); }
+            return orders.Select(x => x.WorkOrderId).ToArray();
+        });
+        var (a, b, c, d) = (ids[0], ids[1], ids[2], ids[3]);
+        async Task<JsonElement[]> Items(string query) => (await Send("manager", "GET", "?commune_id=" + home + query, null, 200))
+            .GetProperty("items").EnumerateArray().ToArray();
+        async Task<string[]> Ids(string query) => (await Items(query)).Select(x => x.GetProperty("work_order_id").GetString()!).ToArray();
+
+        var items = (await Items("")).ToDictionary(x => x.GetProperty("work_order_id").GetString()!);
+        Assert.Equal(t0.AddHours(1), items[a].GetProperty("completed_at").GetDateTime().ToUniversalTime());
+        Assert.Equal(t0.AddHours(5), items[a].GetProperty("closed_at").GetDateTime().ToUniversalTime());
+        Assert.EndsWith("Z", items[a].GetProperty("closed_at").GetString());
+        Assert.Equal(JsonValueKind.Null, items[b].GetProperty("completed_at").ValueKind);
+        Assert.Equal(JsonValueKind.Null, items[d].GetProperty("closed_at").ValueKind);
+
+        Assert.Equal([d, c, b, a], await Ids(""));
+        Assert.Equal([d, c, b, a], await Ids("&sort=-created_at"));
+        Assert.Equal([a, b, c, d], await Ids("&sort=created_at"));
+        Assert.Equal([a, c, b, d], await Ids("&sort=-closed_at"));
+        Assert.Equal([b, c, a, d], await Ids("&sort=closed_at"));
+        Assert.Equal([c, a, d, b], await Ids("&sort=-completed_at"));
+        Assert.Equal([a, c, b, d], await Ids("&sort=completed_at"));
+        Assert.Equal([a, c, b], await Ids("&wo_status=verified,cancelled&sort=-closed_at"));
+
+        foreach (var bad in new[] { "closed", "-", "-closed_at,created_at", "-CLOSED_AT_X" })
+            await Send("manager", "GET", "?sort=" + Uri.EscapeDataString(bad), null, 400, "VALIDATION_FAILED");
+    }
+
+    [Fact]
     public async Task Derived_fields_use_highest_priority_and_live_max()
     {
         var first = await Fault(priority: 1); var second = await Fault(road: foreignSegment, priority: 9);

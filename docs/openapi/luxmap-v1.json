@@ -17998,6 +17998,13 @@
             }
           },
           {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "schema": {
@@ -19870,6 +19877,18 @@
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             "format": "date",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
             "nullable": true
           },
           "segment_ids": {
@@ -30053,6 +30072,18 @@
             "format": "date",
             "nullable": true
           },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
           "segment_ids": {
             "type": "array",
             "items": {
@@ -30089,18 +30120,6 @@
             "nullable": true
           },
           "started_at": {
-            "type": "string",
-            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-            "format": "date-time",
-            "nullable": true
-          },
-          "completed_at": {
-            "type": "string",
-            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
-            "format": "date-time",
-            "nullable": true
-          },
-          "closed_at": {
             "type": "string",
             "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
             "format": "date-time",
@@ -30296,6 +30315,18 @@
             "type": "string",
             "description": "Date without a time component, YYYY-MM-DD. Example: 2023-01-04.",
             "format": "date",
+            "nullable": true
+          },
+          "completed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closed_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
             "nullable": true
           }
         },
