@@ -1,15 +1,20 @@
 using System.Net;
+using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Errors;
 using LuxMap.Shared.Contracts.Paging;
 using LuxMap.Shared.Http;
 using LuxMap.Shared.Serialization;
+using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.IOT;
 
 public sealed record IotFeederHistorySample(string NodeId, DateTime? MeasuredAt, DateTime ReceivedAt,
     string? ReceptionType, double Voltage, double CurrentMa, double PowerMw, string LampCommand);
 public sealed record IotFeederHistoryResult(string FeederId, string SortBy, int Page, int PageSize, int Total,
-    IReadOnlyList<IotFeederHistorySample> Items);
+    IReadOnlyList<IotFeederHistorySample> Items)
+{
+    public IReadOnlyList<IotFeederRepairPeriod> RepairPeriods { get; init; } = [];
+}
 
 public sealed partial class IotDiagnosticsService
 {
@@ -32,6 +37,13 @@ public sealed partial class IotDiagnosticsService
                 sample.Reading.ReceivedAt.UtcDateTime, data.ReceptionType, data.Voltage!.Value,
                 data.Current!.Value, data.Power!.Value, data.LampCommand);
         }).ToArray();
-        return new(feederId, sortBy, page.Page, page.PageSize, history.Total, items);
+        var startUtc = start?.UtcDateTime;
+        var endUtc = end?.UtcDateTime;
+        var periods = await db.Set<FeederRepairPeriod>().AsNoTracking().Where(x => x.FeederId == feederId
+            && (!startUtc.HasValue || x.EndedAt == null || x.EndedAt > startUtc)
+            && (!endUtc.HasValue || x.StartedAt < endUtc))
+            .OrderBy(x => x.StartedAt).ThenBy(x => x.Id)
+            .Select(x => new IotFeederRepairPeriod(x.WorkOrderId, x.StartedAt, x.EndedAt)).ToArrayAsync(ct);
+        return new(feederId, sortBy, page.Page, page.PageSize, history.Total, items) { RepairPeriods = periods };
     }
 }

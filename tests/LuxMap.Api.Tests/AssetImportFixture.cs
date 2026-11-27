@@ -218,6 +218,7 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
                 // again on a later run, and the next suite dies on pk_pole looking like flake.
                 // Every test that writes a fault was quietly leaking poles this way.
                 "DELETE FROM iot_diagnostic_episode WHERE commune_id = @c OR commune_id = @f;",
+                "DELETE FROM feeder_repair_period WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM work_order_fault WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM work_order WHERE commune_id = @c OR commune_id = @f;",
                 "DELETE FROM fault WHERE commune_id = @c OR commune_id = @f;",

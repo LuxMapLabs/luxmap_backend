@@ -121,18 +121,18 @@ iot_values = {
     ("IotServerNode", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotNodeStatus", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "electrical_status"): ["fresh", "stale", "no_data"],
-    ("IotDiagnosticResult", "electrical_status"): ["fresh", "stale", "no_data"],
+    ("IotDiagnosticResult", "electrical_status"): ["fresh", "stale", "no_data", "repairing"],
     ("IotDiagnosticResult", "connection_status"): ["online", "offline", "no_data"],
-    ("IotDiagnosticSummaryItem", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable"],
+    ("IotDiagnosticSummaryItem", "electrical_status"): ["fresh", "stale", "no_data", "unconfigured", "source_unavailable", "repairing"],
     ("IotDiagnosticSummaryItem", "connection_status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotFeederHistoryResult", "sort_by"): ["measured_at", "received_at"],
     ("IotFeederHistorySample", "reception_type"): ["live", "backfill", None],
     ("IotServerStatus", "status"): ["online", "offline", "unconfigured", "broker_down", "unreachable"],
     ("IotNodeStatus", "status"): ["online", "offline", "no_data", "unconfigured", "source_unavailable"],
     ("IotElectricalResult", "status"): ["online", "offline", "no_data"],
-    ("IotFeederElectricalResult", "status"): ["online", "offline", "no_data", "unconfigured"],
-    ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data", "insufficient_samples"],
-    ("IotDiagnosticSummaryItem", "diagnostic_status"): ["normal", "anomaly", "stale", "no_data", "insufficient_samples", "unconfigured", "source_unavailable"],
+    ("IotFeederElectricalResult", "status"): ["online", "offline", "no_data", "unconfigured", "repairing"],
+    ("IotDiagnosticResult", "status"): ["normal", "anomaly", "stale", "no_data", "insufficient_samples", "repairing"],
+    ("IotDiagnosticSummaryItem", "diagnostic_status"): ["normal", "anomaly", "stale", "no_data", "insufficient_samples", "unconfigured", "source_unavailable", "repairing"],
     ("IotAnomaly", "code"): [
         "telemetry_stale", "voltage_loss", "voltage_deviation", "current_drop",
         "ds3231_unavailable", "ds3231_read_failed", "ds3231_time_invalid",
@@ -160,6 +160,12 @@ iot_property("IotDiagnosticHistoryItem", "code")["enum"] = iot_values[("IotAnoma
 iot_property("IotDiagnosticSummaryItem", "anomaly_codes")["items"]["enum"] = iot_values[("IotAnomaly", "code")]
 
 iot_property("ElectricalWindowAssessment", "required_samples")["enum"] = [5]
+
+repair_request = S["FeederRepairRequest"]
+repair_request["required"] = ["action"]
+repair_request["properties"]["action"] = {"type": "string", "enum": ["start", "finish"]}
+repair_request["properties"]["feeder_id"]["description"] = "Chọn một feeder khi phiếu có nhiều feeder hợp lệ."
+S["FeederRepairResult"]["properties"]["status"]["enum"] = ["repairing", "finished"]
 
 S["IotCommandHistoryStatus"]["enum"] = ["success", "pending", "expired"]
 iot_property("IotNodeImportItem", "status")["enum"] = ["created", "existing", "failed"]
@@ -433,6 +439,7 @@ SUMMARY[("get", "/api/v1/statistics/warranty")] = (
     "[TẠM — BE-31] Cột kèm bảo hành của bóng đang dùng, hết hạn sớm nhất trước, unknown cuối; lọc status/xã/tuyến/data_source, within_days; format=csv")
 
 SECTION = {
+    "/api/v1/work-orders/{id}/repair": "drift IOT-FEEDER-REPAIR-1 (27/11/2026, SELF-SIGNED)",
     "/api/v1/assets/feeders": "§5.3 + drift FEEDER-HEALTH-1 (26/11/2026, SELF-SIGNED)",
     "/api/v1/iot/feeders/{feederId}/electrical/history": "drift IOT-HISTORY-RAW-1 (25/11/2026, SELF-SIGNED)",
     "/api/v1/auth/password/change": "drift ACCT-PASSWORD-CHANGE (24/11/2026, SELF-SIGNED)",
@@ -468,6 +475,7 @@ SECTION = {
 }
 
 SUMMARY.update({
+    ("post", "/api/v1/work-orders/{id}/repair"): "Kỹ sư được giao phiếu sửa chữa đang in_progress bắt đầu hoặc kết thúc sửa feeder",
     ("post", "/api/v1/iot/nodes/import"): "Admin thêm nhiều node từ Excel .xlsx; kết quả theo dòng, gửi lại cùng cấu hình không tạo trùng",
     ("post", "/api/v1/iot/servers/{serverId}/credential"): "Admin cấp MQTT key; Client ID và username bằng server_id",
     ("get", "/api/v1/iot/servers/{serverId}/credential"): "Admin xem lại key của đúng server_id; no-store",
@@ -698,6 +706,14 @@ for parameter in d["paths"]["/api/v1/work-orders"]["get"].get("parameters", []):
     if parameter["name"] == "cancellation_request_status":
         parameter["schema"] = {"$ref": "#/components/schemas/CancellationRequestStatus"}
         parameter["description"] = "Một trạng thái phụ none/pending/rejected; AND với filter khác. Badge dùng total pending."
+
+repair = d["paths"]["/api/v1/work-orders/{id}/repair"]["post"]
+repair["requestBody"]["required"] = True
+repair["responses"]["409"] = err(
+    "INVALID_STATE_TRANSITION / WORK_ORDER_FEEDER_NOT_FOUND / WORK_ORDER_FEEDER_SELECTION_REQUIRED / "
+    "FEEDER_ALREADY_REPAIRING / FEEDER_REPAIR_NOT_STARTED / CONCURRENT_MODIFICATION. "
+    "Khi cần chọn feeder, details.feeder_ids liệt kê các mã được phép."
+)
 
 # SURVEY-VERIFY-PHOTOS: Mỹ + WP5 chốt 17/11/2026, SELF-SIGNED, nền tạm.
 verify = d["paths"]["/api/v1/work-orders/{id}/verify"]["post"]

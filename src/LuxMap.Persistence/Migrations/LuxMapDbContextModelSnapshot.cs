@@ -5429,7 +5429,7 @@ namespace LuxMap.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_work_order_pole_target_position", "position >= 0");
 
-                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_captured_at IS NOT NULL)");
+                            t.HasCheckConstraint("ck_work_order_pole_target_report_complete", "(reported_lat IS NULL AND reported_lng IS NULL AND reported_accuracy_m IS NULL AND reported_captured_at IS NULL)\r\nOR (reported_lat IS NOT NULL AND reported_lng IS NOT NULL AND reported_captured_at IS NOT NULL)");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -5644,6 +5644,69 @@ namespace LuxMap.Persistence.Migrations
                             t.HasCheckConstraint("ck_audit_event_entity_type", "\"entity_type\" IN ('pole_asset_photo', 'cabinet_asset_photo', 'work_order', 'fault', 'survey_sweep', 'lighting_request', 'lighting_command', 'qr_code', 'citizen_report', 'pole', 'survey_recurring_schedule')");
 
                             t.HasCheckConstraint("ck_audit_event_has_state", "before_state IS NOT NULL OR after_state IS NOT NULL");
+                        });
+
+                    b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.FeederRepairPeriod", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CommuneId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("commune_id");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_at");
+
+                    b.Property<string>("FeederId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("feeder_id");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("WorkOrderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("work_order_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_feeder_repair_period");
+
+                    b.HasIndex("CommuneId")
+                        .HasDatabaseName("ix_feeder_repair_period_commune_id");
+
+                    b.HasIndex("FeederId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_feeder_repair_period_feeder_id")
+                        .HasFilter("ended_at IS NULL");
+
+                    b.HasIndex("FeederId", "CommuneId")
+                        .HasDatabaseName("ix_feeder_repair_period_feeder_id_commune_id");
+
+                    b.HasIndex("FeederId", "StartedAt")
+                        .HasDatabaseName("ix_feeder_repair_period_feeder_id_started_at");
+
+                    b.HasIndex("WorkOrderId", "CommuneId")
+                        .HasDatabaseName("ix_feeder_repair_period_work_order_id_commune_id");
+
+                    b.HasIndex("WorkOrderId", "StartedAt")
+                        .HasDatabaseName("ix_feeder_repair_period_work_order_id_started_at");
+
+                    b.ToTable("feeder_repair_period", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_feeder_repair_period_time", "ended_at IS NULL OR ended_at >= started_at");
                         });
 
                     b.HasAnnotation("LuxMap:CommuneScopeApplied", true);
@@ -7412,6 +7475,32 @@ namespace LuxMap.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_audit_event_administrative_unit_commune_id");
+                });
+
+            modelBuilder.Entity("LuxMap.Persistence.FeederRepairPeriod", b =>
+                {
+                    b.HasOne("LuxMap.Persistence.AdministrativeUnit", null)
+                        .WithMany()
+                        .HasForeignKey("CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_feeder_repair_period_administrative_unit_commune_id");
+
+                    b.HasOne("LuxMap.Modules.Assets.Entities.Feeder", null)
+                        .WithMany()
+                        .HasForeignKey("FeederId", "CommuneId")
+                        .HasPrincipalKey("FeederId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_feeder_repair_period_feeder_feeder_id_commune_id");
+
+                    b.HasOne("LuxMap.Modules.WorkOrders.Entities.WorkOrder", null)
+                        .WithMany()
+                        .HasForeignKey("WorkOrderId", "CommuneId")
+                        .HasPrincipalKey("WorkOrderId", "CommuneId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_feeder_repair_period_work_order_work_order_id_commune_id");
                 });
 
             modelBuilder.Entity("LuxMap.Persistence.Settings.SystemSetting", b =>

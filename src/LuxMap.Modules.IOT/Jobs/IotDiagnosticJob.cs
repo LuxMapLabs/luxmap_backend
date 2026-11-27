@@ -84,6 +84,22 @@ public sealed class IotDiagnosticJob(
             return;
         if (await db.Set<IotSourceRegistration>().AnyAsync(s => s.NodeId == nodeId && s.DetachedAt != null, ct))
             return;
+        FeederRepairPeriod? repair = null;
+        if (profile is not null)
+        {
+            // Serialize Fault writes with repair start/finish. The Bridge call already ran outside this lock.
+            await db.Database.ExecuteSqlAsync(
+                $"SELECT 1 FROM feeder WHERE feeder_id = {profile.FeederId} AND commune_id = {node.CommuneId} FOR UPDATE", ct);
+            repair = await db.Set<FeederRepairPeriod>().AsNoTracking().Where(x => x.FeederId == profile.FeederId)
+                .OrderByDescending(x => x.StartedAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+            if (repair is { EndedAt: null })
+            {
+                result = IotDiagnosticsService.RepairingDiagnosis(nodeId, profile.FeederId);
+                status = result.Status;
+            }
+            else if (status == "repairing" || repair?.EndedAt >= now)
+                return; // The repair changed after this observation began.
+        }
         var state = await db.Set<IotDiagnosticState>().SingleOrDefaultAsync(s => s.NodeId == nodeId, ct);
         if (state is null)
         {
@@ -92,13 +108,15 @@ public sealed class IotDiagnosticJob(
         }
         var identity = JsonSerializer.Serialize(profile, LuxMapJsonOptions.Default);
         var evidence = JsonSerializer.Deserialize<DiagnosticEvidence>(state.Evidence, LuxMapJsonOptions.Default) ?? new();
-        if (evidence.Source != identity) evidence = new() { Source = identity };
-        await IotDiagnosticHistory.ObserveAsync(db, state, profile, result, now, ct);
+        if (evidence.Source != identity || status == "repairing" || repair?.EndedAt >= state.EvaluatedAt)
+            evidence = new() { Source = identity };
+        if (status != "repairing")
+            await IotDiagnosticHistory.ObserveAsync(db, state, profile, result, now, ct);
         state.FeederId = profile?.FeederId;
         state.DiagnosticStatus = status;
         state.EvaluatedAt = now;
         state.Result = JsonSerializer.Serialize(result, LuxMapJsonOptions.Default);
-        if (result is not null && profile is not null)
+        if (result is not null && profile is not null && status != "repairing")
         {
             var faults = await db.Set<Fault>().Where(f => f.OriginNodeId == nodeId &&
                 f.FeederId == profile.FeederId && f.IotAnomalyCode != null &&

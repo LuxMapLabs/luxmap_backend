@@ -1,6 +1,8 @@
 using LuxMap.Modules.Assets;
+using LuxMap.Persistence;
 using LuxMap.Shared.Contracts.Enums;
 using LuxMap.Shared.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace LuxMap.Modules.IOT;
 
@@ -37,7 +39,15 @@ public sealed partial class IotDiagnosticsService
         var result = new System.Collections.Concurrent.ConcurrentDictionary<string, FeederHealthSnapshot>(
             feederIds.Distinct().ToDictionary(id => id, _ => new FeederHealthSnapshot(FeederHealthState.Unknown, FeederPowerState.Unknown)));
         if (feederIds.Count == 0) return result;
-        var (settings, links) = await sources.LinksAsync(db, feederIds, ct);
+        var repairs = await db.Set<FeederRepairPeriod>().AsNoTracking()
+            .Where(x => feederIds.Contains(x.FeederId)).GroupBy(x => x.FeederId)
+            .Select(group => new { FeederId = group.Key, Active = group.Any(x => x.EndedAt == null), EndedAt = group.Max(x => x.EndedAt) })
+            .ToDictionaryAsync(x => x.FeederId, ct);
+        foreach (var repair in repairs.Values.Where(x => x.Active))
+            result[repair.FeederId] = new(FeederHealthState.Repairing, FeederPowerState.Unknown);
+        var monitoredIds = feederIds.Where(id => !repairs.TryGetValue(id, out var repair) || !repair.Active).ToArray();
+        if (monitoredIds.Length == 0) return result;
+        var (settings, links) = await sources.LinksAsync(db, monitoredIds, ct);
         foreach (var id in links.Keys) result[id] = new(FeederHealthState.Warning, FeederPowerState.Unknown);
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(TimeSpan.FromSeconds(5));
@@ -51,7 +61,8 @@ public sealed partial class IotDiagnosticsService
                     if (!profile.IsValid() || !TryServer(settings, profile, out _, out var uri)) return;
                     try
                     {
-                        var device = await ReadDeviceAsync(uri, profile.DeviceId, token);
+                        var device = AfterFeederRepair(await ReadDeviceAsync(uri, profile.DeviceId, token),
+                            repairs.GetValueOrDefault(entry.Key)?.EndedAt);
                         var now = clock.GetUtcNow();
                         var diagnosis = Diagnose(entry.Value.NodeId, profile, device, now);
                         result[entry.Key] = new(FeederHealthClassifier.Classify(diagnosis), PowerStateOf(device, profile.MaxSilenceSeconds, now));

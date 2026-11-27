@@ -21,6 +21,7 @@ public sealed class IotConnectivitySchemaFilter : ISchemaFilter
             return;
         }
         if (context.Type != typeof(IotNodeStatus) && context.Type != typeof(IotElectricalResult) &&
+            context.Type != typeof(IotFeederElectricalResult) &&
             context.Type != typeof(IotDiagnosticResult) && context.Type != typeof(IotDiagnosticSummaryItem)) return;
 
         void Describe(string name, string description, params string[] values)
@@ -29,6 +30,11 @@ public sealed class IotConnectivitySchemaFilter : ISchemaFilter
                 fieldSchema is not OpenApiSchema property) return;
             property.Description = description;
             if (values.Length > 0) property.Enum = values.Select(value => (JsonNode)JsonValue.Create(value)!).ToList();
+        }
+        if (context.Type == typeof(IotFeederElectricalResult))
+        {
+            Describe("status", "Trạng thái dữ liệu điện của feeder.", "online", "offline", "no_data", "unconfigured", "repairing");
+            return;
         }
         var unavailable = context.Type == typeof(IotNodeStatus) || context.Type == typeof(IotDiagnosticSummaryItem);
         Describe("electrical_status", "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo.",
@@ -45,9 +51,16 @@ public sealed class IotConnectivitySchemaFilter : ISchemaFilter
 
         const string diagnosticDescription = "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ.";
         if (context.Type == typeof(IotDiagnosticResult))
-            Describe("status", diagnosticDescription, "normal", "anomaly", "stale", "no_data", "insufficient_samples");
+        {
+            Describe("status", diagnosticDescription, "normal", "anomaly", "stale", "no_data", "insufficient_samples", "repairing");
+            Describe("electrical_status", "Độ mới mẫu điện hoặc trạng thái đang sửa feeder.", "fresh", "stale", "no_data", "repairing");
+        }
         else if (context.Type == typeof(IotDiagnosticSummaryItem))
+        {
             Describe("diagnostic_status", diagnosticDescription, "normal", "anomaly", "stale", "no_data",
-                "insufficient_samples", "unconfigured", "source_unavailable");
+                "insufficient_samples", "unconfigured", "source_unavailable", "repairing");
+            Describe("electrical_status", "Độ mới mẫu điện hoặc trạng thái đang sửa feeder.",
+                "fresh", "stale", "no_data", "unconfigured", "source_unavailable", "repairing");
+        }
     }
 }

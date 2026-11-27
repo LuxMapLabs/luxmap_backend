@@ -154,14 +154,17 @@ public sealed partial class IotDiagnosticsService(
     {
         await RequireNodeAsync(nodeId, ct);
         var settings = await registry.ReadAsync([nodeId], ct);
-        if (!settings.Nodes.TryGetValue(nodeId, out var profile) || !profile.IsValid() ||
-            !TryServer(settings, profile, out _, out var baseUri))
+        if (!settings.Nodes.TryGetValue(nodeId, out var profile))
+            throw Unavailable("Chưa cấu hình nguồn đo hoặc ngưỡng hợp lệ cho thiết bị IoT.");
+        var repair = await LatestFeederRepairAsync(profile.FeederId, ct);
+        if (repair is { EndedAt: null }) return RepairingDiagnosis(nodeId, profile.FeederId);
+        if (!profile.IsValid() || !TryServer(settings, profile, out _, out var baseUri))
             throw Unavailable("Chưa cấu hình nguồn đo hoặc ngưỡng hợp lệ cho thiết bị IoT.");
 
         if (!await CompatibleFeederAsync(nodeId, profile.FeederId, false, ct))
             throw Unavailable("Feeder phải thuộc cùng tủ điện và xã với node IoT.");
         var device = await ReadDeviceAsync(baseUri, profile.DeviceId, ct);
-        return Diagnose(nodeId, profile, device, clock.GetUtcNow());
+        return Diagnose(nodeId, profile, AfterFeederRepair(device, repair?.EndedAt), clock.GetUtcNow());
     }
 
     private static IotDiagnosticResult Diagnose(string nodeId, NodeProfile profile, PrototypeDevice? device, DateTimeOffset now)

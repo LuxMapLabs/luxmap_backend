@@ -18,6 +18,7 @@ public class FeederPowerTests
     [InlineData(FeederHealthState.Warning, "warning")]
     [InlineData(FeederHealthState.Incident, "incident")]
     [InlineData(FeederHealthState.Offline, "offline")]
+    [InlineData(FeederHealthState.Repairing, "repairing")]
     public void Health_state_serializes_as_a_separate_string_enum(FeederHealthState state, string expected)
     {
         var options = new System.Text.Json.JsonSerializerOptions();
