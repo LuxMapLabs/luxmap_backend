@@ -9584,6 +9584,26 @@
           "204": {
             "description": "No Content"
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -9665,9 +9685,9 @@
             }
           }
         },
-        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-capability": "cap:manage_settings",
         "x-luxmap-roles": [
-          "manager"
+          "system_admin"
         ],
         "x-luxmap-client": "shared"
       },

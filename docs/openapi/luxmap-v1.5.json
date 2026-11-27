@@ -11347,6 +11347,26 @@
           "204": {
             "description": "No Content"
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -11436,24 +11456,14 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
           }
         },
-        "x-luxmap-capability": "cap:manage_assets",
+        "x-luxmap-capability": "cap:manage_settings",
         "x-luxmap-roles": [
-          "manager"
+          "system_admin"
         ],
         "x-luxmap-client": "shared",
-        "summary": "Manager cập nhật nguồn đo và radius_km, kiểm phạm vi xã",
+        "summary": "Admin hệ thống cập nhật nguồn đo và radius_km, kiểm tra liên kết cùng xã",
         "operationId": "putIotNodesNodeid",
         "x-luxmap-status": "implemented",
         "x-luxmap-contract": "drift IOT-DIAGNOSTICS + IOT-CONTACT-1 + IOT-SERVER-IDENTITY-1 + IOT-NODE-REGISTER-COMPACT-1 + IOT-NODE-FEEDER-DETACH-1 + IOT-COVERAGE-RADIUS-1 (23/11/2026)"

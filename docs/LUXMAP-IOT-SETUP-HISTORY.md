@@ -100,7 +100,7 @@ Thành công lần đầu trả `201 Created`. Gửi lại cùng cấu hình tr�
 
 Sau khi đăng ký, kiểm tra gateway qua [GET /api/v1/iot/servers](https://luxmap.com.vn/api/v1/iot/servers), node qua [GET /api/v1/iot/nodes?page=1&page_size=20](https://luxmap.com.vn/api/v1/iot/nodes?page=1&page_size=20) và mẫu mới nhất qua [GET /api/v1/iot/nodes/NODE-004/electrical](https://luxmap.com.vn/api/v1/iot/nodes/NODE-004/electrical). Gateway online theo heartbeat MQTT. Node online khi có mẫu điện đủ mới. Dùng token có quyền đọc và phạm vi xã/phường của node.
 
-Với node đã có ID, Manager dùng `PUT /api/v1/iot/nodes/{nodeId}` để gắn hoặc đổi nguồn đo. PUT chỉ gửi server_id, device_id, feeder_id và 3 nominal_*. Manager dùng `DELETE /api/v1/iot/nodes/{nodeId}/feeder` để chỉ gỡ feeder, giữ tủ. `DELETE /api/v1/iot/nodes/{nodeId}` gỡ cả khỏi tủ và feeder. Backend lưu bản ghi node, liên kết nguồn đã gỡ và dữ liệu lịch sử. Có thể gắn lại cùng `node_id` bằng PUT, chọn feeder có tủ trong cùng xã.
+Với node đã có ID, Admin hệ thống dùng `PUT /api/v1/iot/nodes/{nodeId}` để gắn hoặc đổi nguồn đo. PUT chỉ gửi server_id, device_id, feeder_id và 3 nominal_*. Manager dùng `DELETE /api/v1/iot/nodes/{nodeId}/feeder` để chỉ gỡ feeder, giữ tủ. `DELETE /api/v1/iot/nodes/{nodeId}` gỡ cả khỏi tủ và feeder. Backend lưu bản ghi node, liên kết nguồn đã gỡ và dữ liệu lịch sử. Có thể gắn lại cùng `node_id` bằng PUT, chọn feeder có tủ trong cùng xã.
 
 BE tự đặt data_source=calibration_rig và supports_remote_control=true khi thêm node. JSON tạo node chỉ có server_id, cabinet_id, feeder_id, device_id và 3 giá trị nominal_*.
 

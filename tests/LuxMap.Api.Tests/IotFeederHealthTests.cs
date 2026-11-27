@@ -11,11 +11,11 @@ public sealed partial class IotDiagnosticsTests
     public Task Asset_feeders_report_health_separately_from_lamp_state_in_detail_and_list()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             var path = $"/api/v1/assets/feeders/{rig.Feeder}";
             await Check("unknown", "unknown");
-            Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             foreach (var (current, voltage, expected) in new[] {
                 (100.0, 5.0, "normal"), (94.0, 5.0, "warning"), (80.0, 5.0, "incident"),
                 (100.0, 5.6, "warning"), (100.0, 6.0, "incident"), (0.0, 0.0, "incident") })
