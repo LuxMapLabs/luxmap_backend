@@ -40,6 +40,11 @@ public sealed class TestEndpointsController : ControllerBase
     [HttpPost("validated")]
     public IActionResult Validated([FromBody] ValidatedBody body) => Ok(body);
 
+    /// <summary>Echoes a multipart number as the form value provider read it (<see cref="InvariantRequestCultureTests"/>).</summary>
+    [HttpPost("form-number")]
+    [Consumes("multipart/form-data")]
+    public IActionResult FormNumber([FromForm] double? value) => Ok(new { value });
+
     [HttpGet("ok")]
     public IActionResult Fine() => Ok(new { pole_id = "POLE-0001" });
 

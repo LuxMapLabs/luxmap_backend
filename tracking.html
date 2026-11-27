@@ -1461,6 +1461,14 @@
       </tr>
       <tr>
         <td>26/11/2026</td>
+        <td><code>FORM-INVARIANT-CULTURE</code>: báo cáo QR công dân có vị trí đều 400 trên VPS — web gửi <code>lat=10,82</code> (đổi dấu cho máy Windows vi-VN),
+        VPS (invariant) đọc phẩy là phân cách hàng nghìn → 108231234. BE ghim culture invariant cho mọi request (<code>UseLuxMapInvariantCulture</code>,
+        không theo <code>Accept-Language</code>) để máy dev đọc số như VPS; web bỏ đổi dấu (repo web). Không chạm bề mặt API. 3 test với host vi-VN, phá thử đỏ.</td>
+        <td><code>InvariantRequestCulture.cs</code>, <code>Program.cs</code>, <code>InvariantRequestCultureTests.cs</code>, <code>TestEndpointsController.cs</code>, <code>CLAUDE.md</code></td>
+        <td><code>fix(api): read form numbers with the invariant culture</code></td>
+      </tr>
+      <tr>
+        <td>26/11/2026</td>
         <td><code>D-R30</code> (Mỹ): huỷ D-R29 — lux lại <strong>gắn trên xe, lấy mẫu khi chạy</strong> (D-R21, pipeline sweep BE-15 chưa từng gỡ).
         LUX-BASELINE giữ làm số đo đối chứng. Chỉ tài liệu; còn mở O-1 (bộ chấm ảnh cột vẫn ghi <code>dim</code>), O-2 (WP6 ghi phiên sweep), O-3 (firmware D-FS-20).</td>
         <td>drift, <code>CLAUDE.md</code>, <code>traps/survey.md</code>, <code>BE-15-pilot-drive.md</code></td>
