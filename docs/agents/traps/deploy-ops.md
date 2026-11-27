@@ -41,3 +41,16 @@ thầm. **Ticket tạo bảng thì thêm bảng vào `PLAN` trong cùng PR**: b�
   đĩa của volume Docker và `/var/backups/luxmap`. Tách volume / backup sang đĩa khác thì trỏ `Monitoring__DiskPath` vào một volume
   trên đĩa cần canh (vd. `/app/logs`), nếu không cảnh báo đo nhầm đĩa. Thư cảnh báo đĩa đi qua SMTP của thư mời — `SMTP_*` sai thì
   job `storage_capacity` hiện `failing` trên `GET /admin/system/status`.
+
+## OPS-AUTO-DEPLOY — merge vào `dev` là deploy (27/11/2026, `.github/workflows/deploy.yml`, `deploy/ci-deploy.sh`)
+
+- 🔴 **`dev` không có status check bắt buộc** (ruleset chỉ đòi PR), nên deploy **không** tin CI của PR: `deploy.yml` gọi lại
+  `ci.yml` (`workflow_call`) trên đúng commit vừa push và deploy chỉ khi nó xanh. Bỏ `needs: ci` là deploy cả bản CI đỏ.
+- `ci.yml` được gọi **không kèm secret** — giữ vậy: job đó chạy cả code fork của PR. Secret deploy chỉ ở job `deploy`.
+- 🔴 **Không huỷ deploy đang chạy:** `concurrency: deploy-backend`, `cancel-in-progress: false`. Phía VPS chạy **tách khỏi SSH**
+  (`setsid -w`, log ra file) để runner bị huỷ / mất mạng không giết `deploy.sh` giữa backup và migration. Đổi `ci-deploy.sh` mà
+  để `deploy.sh` ghi thẳng vào pipe SSH là mất bảo đảm đó.
+- **Khoá deploy là forced command**: client chỉ gửi một SHA 40 ký tự; `ci-deploy.sh` kiểm SHA nằm trên `origin/dev` và chỉ
+  fast-forward (không lùi). Thêm tham số / nhánh mới cho khoá này là mở rộng thứ người giữ khoá làm được — cân nhắc như đổi quyền.
+- `paths-ignore` của `deploy.yml` khớp với `.dockerignore`: chỉ bỏ những gì không vào image. Thêm file build mới ở gốc repo
+  (vd. `Directory.Packages.props`) thì kiểm nó **không** nằm trong `paths-ignore`.

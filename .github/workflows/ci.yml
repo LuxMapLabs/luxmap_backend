@@ -20,6 +20,9 @@ on:
   merge_group:
     types: [checks_requested]
     branches: [dev]
+  # OPS-AUTO-DEPLOY: deploy.yml calls this same job on the pushed dev commit and deploys only when it passes.
+  # A caller hands over no secrets, so the job still runs without any.
+  workflow_call:
 
 # PR code executes here, including fork code. It needs neither repository secrets nor write access.
 permissions:
