@@ -21,6 +21,9 @@ public sealed partial class IotDiagnosticsService
 {
     public async Task<IotFeederElectricalResult> FeederElectricalAsync(string feederId, CancellationToken ct)
     {
+        await RequireDiagnosticFeederAsync(feederId, ct);
+        var repair = await LatestFeederRepairAsync(feederId, ct);
+        if (repair is { EndedAt: null }) return new(feederId, null, null, "repairing", null);
         var history = await FeederTelemetryHistoryAsync(feederId, PageRequest.Create(1, 1), "measured_at", ct);
         var (_, links) = await sources.LinksAsync(db, [feederId], ct);
         links.TryGetValue(feederId, out var link);
@@ -30,6 +33,9 @@ public sealed partial class IotDiagnosticsService
 
         var reading = sample.Reading;
         var data = reading.Data;
+        if (repair?.EndedAt is { } endedAt &&
+            (MeasuredAt(data.Timestamp) is not { } measured || measured <= endedAt))
+            return new(feederId, link?.NodeId, link?.Profile.ServerId, "no_data", null);
         if (data.LampCommand is not ("ON" or "OFF") ||
             !Valid(data.Voltage) || !Valid(data.Current) || !Valid(data.Power))
             throw Unavailable("Mẫu điện của mạch không hợp lệ.");

@@ -21,7 +21,7 @@ using Npgsql;
 
 namespace LuxMap.Modules.WorkOrders;
 
-public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor actor,
+public sealed partial class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor actor,
     IAuditTrail audit, FaultTransitions transitions, ISurveyFindingLookup surveys, PoleRelocation relocation,
     IRepairStatusPublication repairStatus)
 {
@@ -579,7 +579,9 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         var wo = await Find(id, ct);
         await using var verification = await db.Database.BeginTransactionAsync(ct);
         // Only waiting inspections can gain members. Preserve xmin for competing review decisions.
-        if (action is "start" or "cancel" || (action == "verify" && wo.TaskKind == TaskKind.Repair))
+        if (wo.TaskKind == TaskKind.Repair && action is "complete" or "cancel")
+            await LockRepairOrderAsync(wo, ct);
+        else if (action is "start" or "cancel" || (action == "verify" && wo.TaskKind == TaskKind.Repair))
             await db.Database.ExecuteSqlAsync($"SELECT 1 FROM work_order WHERE work_order_id = {id} FOR UPDATE", ct);
         RequireAction(wo, action);
         if (action == "verify" && wo.TaskKind == TaskKind.Survey)
@@ -626,6 +628,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             else if (OptionalJson.Present(poleLocations)) throw OptionalJson.Invalid("pole_locations");
         }
         var now = UtcMicrosecondClock.UtcNow();
+        var closedRepairs = wo.TaskKind == TaskKind.Repair && action is "complete" or "cancel"
+            ? await CloseFeederRepairsAsync(id, now, ct) : [];
         var changes = new List<FaultChange>();
         var skipped = new List<string>();
         IReadOnlyList<RepairStatusOutcome> statusOutcomes = [];
@@ -703,6 +707,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             Record(wo, auditAction, before, new { work_order = after, pole_locations = Reported(targets) }, now, note);
         else if (repairVerify)
             Record(wo, auditAction, before, new { work_order = after, pole_status = statusOutcomes }, now, note);
+        else if (closedRepairs.Length > 0)
+            Record(wo, auditAction, before, new { work_order = after, closed_feeder_repairs = closedRepairs }, now, note);
         else Record(wo, auditAction, before, after, now, note);
         switch (action)
         {

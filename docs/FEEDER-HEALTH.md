@@ -9,7 +9,7 @@ Trong API **kiểm kê feeder**:
 
 | Trường | Mục đích | Giá trị |
 |---|---|---|
-| `power_state` | Sức khỏe tổng hợp của feeder | `normal`, `warning`, `incident`, `offline`, `unknown` |
+| `power_state` | Sức khỏe tổng hợp của feeder | `normal`, `warning`, `incident`, `offline`, `unknown`, `repairing` |
 | `lamp_state` | Đầu ra bật/tắt quan sát được từ node | `on`, `off`, `unknown` |
 | `control` | Thông tin node/relay và chế độ báo cáo, nếu có | Object hoặc `null` |
 
@@ -121,6 +121,7 @@ Hai API yêu cầu quyền `ReadNetwork`, giới hạn theo xã được phép c
 | `power_state` | Nhãn hiển thị | Điều kiện |
 |---|---|---|
 | `unknown` | Chưa có IoT | Không có nguồn IoT phù hợp và không có liên kết node/relay cho feeder |
+| `repairing` | Đang sửa | Có khoảng sửa đang mở từ phiếu sửa chữa. Xem [hướng dẫn bắt đầu và kết thúc sửa feeder](IOT-FEEDER-REPAIR.md). |
 | `normal` | Bình thường | Node online, điện mới, không lỗi; khi ON đã đủ cửa sổ 5 mẫu hợp lệ; khi OFF chủ động không cần cửa sổ ON |
 | `warning` | Cảnh báo | Có lỗi nhẹ, điện cũ, thiếu mẫu, đã gán nhưng chưa có dữ liệu hoặc chưa xác minh được nguồn Bridge |
 | `incident` | Sự cố | Có ít nhất một lỗi nặng, trong khi node chưa được xác định offline |
@@ -176,6 +177,8 @@ Ba lỗi INA226 là sự cố **khả năng giám sát điện**, không tự ch
 Chỉ dùng mã phần cứng từ bản tin health còn mới; không duy trì kết luận lỗi hiện tại chỉ dựa trên bản tin cũ.
 
 ## 5. Ưu tiên khi có nhiều lỗi
+
+Nếu feeder có khoảng sửa đang mở, API ưu tiên `repairing` trước các quy tắc bên dưới.
 
 1. Chưa có IoT phù hợp: `unknown`.
 2. Đã xác nhận node mất liên lạc quá thời gian chờ: `offline`.

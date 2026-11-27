@@ -118,6 +118,7 @@ PLAN = [
     ("fault_cluster", IN_COMMUNES, "cluster_id"),
     # A follow-up work order points at its parent and root: roots first, then by creation time.
     ("work_order", IN_COMMUNES, "root_work_order_id IS NOT NULL, created_at, work_order_id"),
+    ("feeder_repair_period", IN_COMMUNES, "id"),
     ("survey_recurring_schedule", IN_COMMUNES, "created_at, length(schedule_id), schedule_id"),
     ("survey_recurring_occurrence", IN_COMMUNES, "schedule_id, scheduled_date"),
     ("work_order_segment", IN_COMMUNES, "work_order_id, position"),

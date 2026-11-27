@@ -192,10 +192,12 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
             Assert.True(get.GetProperty("responses").TryGetProperty(code, out _));
 
         var result = Schema("IotFeederHistoryResult").GetProperty("properties");
-        Assert.Equal(new[] { "feeder_id", "items", "page", "page_size", "sort_by", "total" },
+        Assert.Equal(new[] { "feeder_id", "items", "page", "page_size", "repair_periods", "sort_by", "total" },
             result.EnumerateObject().Select(field => field.Name).Order(StringComparer.Ordinal));
         Assert.Equal("#/components/schemas/IotFeederHistorySample",
             result.GetProperty("items").GetProperty("items").GetProperty("$ref").GetString());
+        Assert.Equal("#/components/schemas/IotFeederRepairPeriod",
+            result.GetProperty("repair_periods").GetProperty("items").GetProperty("$ref").GetString());
         var fields = Schema("IotFeederHistorySample").GetProperty("properties");
         foreach (var name in new[] { "node_id", "measured_at", "received_at", "reception_type", "voltage", "current_ma", "power_mw", "lamp_command" })
             Assert.True(fields.TryGetProperty(name, out _));
@@ -370,7 +372,7 @@ public class OpenApiSpecTests(LuxMapSwaggerFactory factory) : IClassFixture<LuxM
         Assert.EndsWith("/FeederControlSnapshot", control.GetProperty("$ref").GetString()); // SPEC-NULLABLE baseline
         Assert.EndsWith("/FeederHealthState", item.GetProperty("power_state").GetProperty("$ref").GetString());
         Assert.EndsWith("/FeederPowerState", item.GetProperty("lamp_state").GetProperty("$ref").GetString());
-        Assert.Equal(new[] { "unknown", "normal", "warning", "incident", "offline" },
+        Assert.Equal(new[] { "unknown", "normal", "warning", "incident", "offline", "repairing" },
             Schema("FeederHealthState").GetProperty("enum").EnumerateArray().Select(v => v.GetString()));
         var report = Schema("FeederControlSnapshot").GetProperty("properties");
         Assert.True(report.GetProperty("mode_reported_at").GetProperty("nullable").GetBoolean());

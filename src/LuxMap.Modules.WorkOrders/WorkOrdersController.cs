@@ -197,6 +197,16 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] StartWorkOrderRequest? request, CancellationToken ct)
         => service.Act(id, "start", null, default, ct, performedAt: request?.PerformedAt);
 
+    /// <summary>Bắt đầu hoặc kết thúc sửa feeder từ lỗi liên kết với phiếu sửa chữa đang thực hiện.</summary>
+    [HttpPost("{id}/repair")]
+    [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
+    [ProducesResponseType<FeederRepairResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]
+    public Task<FeederRepairResult> RepairFeeder(string id, FeederRepairRequest request, CancellationToken ct)
+        => service.RepairFeederAsync(id, request, ct);
+
     [HttpPost("{id}/complete")]
     [Authorize(Policy = LuxMapPolicies.ExecuteWorkOrders)]
     [ProducesResponseType(typeof(WorkOrderDetail), 200)]

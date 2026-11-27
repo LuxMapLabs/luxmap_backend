@@ -8,4 +8,5 @@ public enum FeederHealthState
     Warning,
     Incident,
     Offline,
+    Repairing,
 }

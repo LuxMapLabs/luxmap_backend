@@ -80,6 +80,10 @@ public sealed class NodeOfflineJob(JobContextFactory contexts, ILogger<NodeOffli
         // Re-read in the commune's own context: the device may have reported since the scan.
         var node = await db.Set<IotNode>().AsNoTracking().SingleOrDefaultAsync(n => n.NodeId == candidate.NodeId, ct);
         if (node?.CabinetId is null || node.LastReportAt != candidate.LastReportAt) return false;
+        var controlled = db.Set<FeederControl>().Where(x => x.NodeId == node.NodeId);
+        var repairs = db.Set<FeederRepairPeriod>().Where(x => x.EndedAt == null);
+        if (await controlled.AnyAsync(ct) &&
+            !await controlled.AnyAsync(x => !repairs.Any(r => r.FeederId == x.FeederId), ct)) return false;
 
         var detected = candidate.LastReportAt + offlineAfter;
         if (await db.Set<Fault>().AnyAsync(f => f.OriginNodeId == node.NodeId && f.FaultType == FaultType.NodeOffline

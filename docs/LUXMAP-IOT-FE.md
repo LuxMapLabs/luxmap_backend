@@ -444,6 +444,8 @@ Mẫu mới và ACK kết nối được đánh giá độc lập. Node có ACK 
 
 Hướng dẫn riêng về sức khỏe feeder, JSON và bảng lỗi: [FEEDER-HEALTH.md](FEEDER-HEALTH.md).
 
+Xem [hướng dẫn sửa feeder theo phiếu](IOT-FEEDER-REPAIR.md) để xử lý `power_state: "repairing"` và các khoảng sửa trong lịch sử điện.
+
 
 ## IOT-FAULT-RECOVERY-1 (26/11/2026)
 

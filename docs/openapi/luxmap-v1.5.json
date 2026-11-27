@@ -2,7 +2,7 @@
   "openapi": "3.0.4",
   "info": {
     "title": "LuxMap API",
-    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6, COMMUNE-BOUNDARY-GUARD CBG-1…CBG-11): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Từ COMMUNE-BOUNDARY-GUARD ranh giới là LUẬT GHI cho tài sản dạng điểm (pole, electrical_cabinet): ngoài ranh giới → 400 OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → 400 COMMUNE_BOUNDARY_MISSING; không lọc, không ẩn tài sản và không suy commune_id. POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5, D-3 của COMMUNE-BOUNDARY-GUARD): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit; ngoài hành lang → 409 POLE_OFF_SEGMENT trước, rồi mới kiểm ranh giới xã → 400. v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. v1.24 (LUX-BASELINE, SELF-SIGNED — LUX-BASELINE-1…6): protocol tuỳ chọn trên số đo lux (đo đứng yên dưới đèn), evaluation do backend chấm khi Quản lý xác nhận ảnh cột, lux_classified_as/lux_baseline_ratio/lux_reason_codes trên PolePhotoItem, stationary_luminance_* ở chi tiết cột; lux vào ảnh đã quyết → 409. v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13, D-3 của COMMUNE-BOUNDARY-GUARD): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm /work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không); verify kiểm hành lang trước (409 POLE_OFF_SEGMENT), ranh giới xã sau (400). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 209 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
+    "description": "Contract v1.8 cộng các drift đã hiện thực (BE-23: WO-1…WO-11, FR-2, FR-2a, FR-3; BE-40: F-1…F-6; BE-19: R-1…R-9, P-2, P-3 — nền tạm tới FW). v1.8 (BE-33a): Quản trị hệ thống tạo tài khoản và mời qua email; POST /auth/register đã gỡ. v1.9 (POLE-NOTE): ghi chú của kỹ sư trên cột, PUT /assets/poles/{poleId}/note. v1.10 (BE-27): thông báo trong ứng dụng, đọc bằng polling — /notifications. v1.11 (N-6): GET /faults/{id} — một sự cố, cùng hình dạng item danh sách. v1.12 (POLE-NOTE N-4, BREAKING): note thành chuỗi; updated_by/updated_by_name trên tài sản kiểm kê; import nạp ghi chú, kết quả thêm unchanged + warnings[]. v1.13 (BE-43): GET /sync/bundle + POST /sync/push (offline cho Kỹ sư hiện trường, capability SyncOffline); performed_at? cho bắt đầu / báo xong phiếu. v1.14 (BE-25): GET /work-orders/agenda — việc đêm nay của một kỹ sư, gom theo tuyến, gần nhất trước khi có near. BE-28 (SELF-SIGNED, chưa lên Contract — drift ST-1…ST-10): GET /statistics/fixture-status và /statistics/repair-timeliness, capability ReadStatistics. BE-31 (SELF-SIGNED — drift W-1…W-8): warranty_status tính lúc đọc trên bản đồ và kiểm kê, GET /statistics/warranty, format=csv cho mọi báo cáo thống kê. CITIZEN-QR P2a (SELF-SIGNED — drift CITIZEN-QR): /qr-codes — Quản lý tạo / thu hồi / liệt kê mã QR trên cột, capability ManageQrCodes. CITIZEN-QR P2b (SELF-SIGNED): /public/qr/lookup và /public/reports — công dân KHÔNG tài khoản báo sự cố qua mã QR; vào hàng chờ, không thành fault. CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6, COMMUNE-BOUNDARY-GUARD CBG-1…CBG-11): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Từ COMMUNE-BOUNDARY-GUARD ranh giới là LUẬT GHI cho tài sản dạng điểm (pole, electrical_cabinet): ngoài ranh giới → 400 OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → 400 COMMUNE_BOUNDARY_MISSING; không lọc, không ẩn tài sản và không suy commune_id. POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5, D-3 của COMMUNE-BOUNDARY-GUARD): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit; ngoài hành lang → 409 POLE_OFF_SEGMENT trước, rồi mới kiểm ranh giới xã → 400. v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. v1.18 (BE-34, SELF-SIGNED — drift VR-1…VR-9): /admin/artifact-versions — registry phiên bản (model, thuật toán, firmware), đăng ký firmware, đếm kết quả theo phiên bản; capability ManageSettings. v1.19 (WO-CANCEL-REQUEST, SELF-SIGNED — CR-1…CR-6): xin/bác hủy lịch assigned, năm trường trạng thái phụ, online-only; polling 30–60 s. v1.20 (WO-REASSIGN-DATE, SELF-SIGNED — CR-7): giao lại kèm ngày khác. v1.21 (ASSET-PHOTOS A+B, SELF-SIGNED — FPS-1 / APH-1): control/power_state trên feeders, feeders[] trên map cabinets giữ feeder_ids[]; power luôn unknown. Phần A: gallery cột/tủ PAP/CAP, 10 endpoint, summary/bìa, ẩn giữ bytes; online-only. v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. v1.24 (LUX-BASELINE, SELF-SIGNED — LUX-BASELINE-1…6): protocol tuỳ chọn trên số đo lux (đo đứng yên dưới đèn), evaluation do backend chấm khi Quản lý xác nhận ảnh cột, lux_classified_as/lux_baseline_ratio/lux_reason_codes trên PolePhotoItem, stationary_luminance_* ở chi tiết cột; lux vào ảnh đã quyết → 409. v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13, D-3 của COMMUNE-BOUNDARY-GUARD): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm /work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không); verify kiểm hành lang trước (409 POLE_OFF_SEGMENT), ranh giới xã sau (400). Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ code, 210 operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, base path /api/v1. Endpoint không ghi [Mobile]/[Web] là dùng chung, xác thực bằng Bearer access token.",
     "version": "1.24"
   },
   "paths": {
@@ -23070,6 +23070,144 @@
         "x-luxmap-contract": "§5.5 + drift WO-1…WO-11"
       }
     },
+    "/api/v1/work-orders/{id}/repair": {
+      "post": {
+        "tags": [
+          "WorkOrders"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeederRepairRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeederRepairRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeederRepairRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederRepairResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederRepairResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeederRepairResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "INVALID_STATE_TRANSITION / WORK_ORDER_FEEDER_NOT_FOUND / WORK_ORDER_FEEDER_SELECTION_REQUIRED / FEEDER_ALREADY_REPAIRING / FEEDER_REPAIR_NOT_STARTED / CONCURRENT_MODIFICATION. Khi cần chọn feeder, details.feeder_ids liệt kê các mã được phép.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED — thiếu / sai / hết hạn access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ROLE_FORBIDDEN — vai trò không nằm trong x-luxmap-roles; COMMUNE_FORBIDDEN — commune_id ngoài phạm vi claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-luxmap-capability": "cap:execute_work_orders",
+        "x-luxmap-roles": [
+          "field_engineer"
+        ],
+        "x-luxmap-client": "shared",
+        "summary": "Kỹ sư được giao phiếu sửa chữa đang in_progress bắt đầu hoặc kết thúc sửa feeder",
+        "operationId": "postWorkOrdersIdRepair",
+        "x-luxmap-status": "implemented",
+        "x-luxmap-contract": "drift IOT-FEEDER-REPAIR-1 (27/11/2026, SELF-SIGNED)"
+      }
+    },
     "/api/v1/work-orders/{id}/complete": {
       "post": {
         "tags": [
@@ -26982,7 +27120,8 @@
           "normal",
           "warning",
           "incident",
-          "offline"
+          "offline",
+          "repairing"
         ],
         "type": "string"
       },
@@ -27081,6 +27220,61 @@
           "off"
         ],
         "type": "string"
+      },
+      "FeederRepairRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "finish"
+            ]
+          },
+          "feeder_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Chọn một feeder khi phiếu có nhiều feeder hợp lệ."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "action"
+        ]
+      },
+      "FeederRepairResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "work_order_id": {
+            "type": "string"
+          },
+          "feeder_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "repairing",
+              "finished"
+            ]
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
       },
       "FixtureStatus": {
         "enum": [
@@ -27791,7 +27985,8 @@
               "anomaly",
               "stale",
               "no_data",
-              "insufficient_samples"
+              "insufficient_samples",
+              "repairing"
             ],
             "type": "string",
             "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
@@ -27818,10 +28013,11 @@
             "enum": [
               "fresh",
               "stale",
-              "no_data"
+              "no_data",
+              "repairing"
             ],
             "type": "string",
-            "description": "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo."
+            "description": "Độ mới mẫu điện hoặc trạng thái đang sửa feeder."
           },
           "last_seen_at": {
             "type": "string",
@@ -27889,7 +28085,8 @@
               "no_data",
               "insufficient_samples",
               "unconfigured",
-              "source_unavailable"
+              "source_unavailable",
+              "repairing"
             ],
             "type": "string",
             "description": "Kết quả chẩn đoán. insufficient_samples nghĩa là chưa đủ năm mẫu điện hợp lệ."
@@ -27948,10 +28145,11 @@
               "stale",
               "no_data",
               "unconfigured",
-              "source_unavailable"
+              "source_unavailable",
+              "repairing"
             ],
             "type": "string",
-            "description": "Độ mới mẫu điện độc lập với kết nối node. ACK không làm mới mẫu đo."
+            "description": "Độ mới mẫu điện hoặc trạng thái đang sửa feeder."
           },
           "last_seen_at": {
             "type": "string",
@@ -28055,13 +28253,15 @@
             "nullable": true
           },
           "status": {
-            "type": "string",
             "enum": [
               "online",
               "offline",
               "no_data",
-              "unconfigured"
-            ]
+              "unconfigured",
+              "repairing"
+            ],
+            "type": "string",
+            "description": "Trạng thái dữ liệu điện của feeder."
           },
           "measurement": {
             "$ref": "#/components/schemas/IotMeasurement"
@@ -28101,6 +28301,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/IotFeederHistorySample"
+            }
+          },
+          "repair_periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IotFeederRepairPeriod"
             }
           }
         },
@@ -28147,6 +28353,26 @@
           },
           "lamp_command": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "IotFeederRepairPeriod": {
+        "type": "object",
+        "properties": {
+          "work_order_id": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time"
+          },
+          "ended_at": {
+            "type": "string",
+            "description": "ISO 8601 UTC with a Z suffix. Example: 2026-08-20T04:00:00Z.",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false
