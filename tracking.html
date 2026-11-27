@@ -42,7 +42,7 @@
 
   <div class="card" id="ops-auto-deploy">
     <strong>OPS-AUTO-DEPLOY — merge vào dev thì backend tự deploy lên VPS · 27/11/2026</strong>
-    <p><span class="tag t-next">Nhánh <code>ci/OPS-AUTO-DEPLOY-backend</code>, commit local · chưa push / PR · chưa dựng khoá deploy</span>
+    <p><span class="tag t-next"><a href="https://github.com/LuxMapLabs/luxmap_backend/pull/319">PR #319 → dev</a> · khoá deploy đã dựng · chưa merge</span>
     <p>Workflow mới <code>.github/workflows/deploy.yml</code> (push vào <code>dev</code> + Run workflow): gọi lại <code>ci.yml</code>
     (<code>workflow_call</code>, không secret) trên đúng commit dev — <code>dev</code> không có check bắt buộc nên CI của PR không đủ —
     xanh thì ssh bằng khoá forced command tới <code>deploy/ci-deploy.sh</code>: khoá một deploy một lúc, checkout sạch và ở dev,
@@ -54,8 +54,11 @@
     <p>Kiểm: 9 kịch bản của <code>ci-deploy.sh</code> trong container Ubuntu 24.04 (input sai → 64; ff tới SHA; chạy lại cùng SHA; từ chối lùi;
     SHA ngoài dev; checkout bẩn; <code>deploy.sh</code> lỗi → mã lỗi truyền ra; giết phía SSH giữa chừng → deploy vẫn xong, status 0).
     VPS có <code>flock</code>, <code>setsid</code> 2.39, GNU <code>tail</code>. Workflow chỉ kiểm cú pháp YAML (không có actionlint) — chưa chạy thật.</p>
-    <p class="muted"><b>Còn:</b> push + PR; tạo khoá <code>luxmap-backend-ci-deploy</code> + dòng <code>authorized_keys</code> trên VPS + secret
-    <code>VPS_DEPLOY_KEY</code>; sau merge <code>git pull --ff-only</code> trên VPS để có <code>ci-deploy.sh</code>. Lượt đầu sẽ deploy luôn #314, #315
+    <p>Khoá <code>luxmap-backend-ci-deploy</code> (27/11): dòng <code>restrict,command="/opt/luxmap/deploy/ci-deploy.sh"</code> trong
+    <code>~ubuntu/.ssh/authorized_keys</code> (bản trước khi sửa: <code>authorized_keys.bak-20261127</code>) + secret <code>VPS_DEPLOY_KEY</code>; bản riêng
+    đã xoá khỏi máy. Thử chỉ bằng khoá này: lệnh <code>id</code> không chạy (forced command), forward cổng bị từ chối
+    (<code>administratively prohibited</code>).</p>
+    <p class="muted"><b>Còn:</b> merge; sau merge <code>git pull --ff-only</code> trên VPS để có <code>ci-deploy.sh</code>. Lượt đầu sẽ deploy luôn #314, #315
     (COMMUNE-BOUNDARY guard — kiểm ranh giới xã trên VPS trước) và #317 (migration <code>AddFeederRepairPeriods</code>).</p>
   </div>
 
