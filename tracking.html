@@ -51,8 +51,8 @@
     <p>Codex hiện thực (phase 1 + 2), Claude review: bỏ khoá <code>FOR UPDATE</code> thừa ở <code>PUT boundary</code> (phá đi test vẫn xanh —
     chính câu <code>UPDATE</code> đã xung đột với <code>FOR SHARE</code>). 2095 + 454 + 90 + 47 + 21 test xanh (7 skip có sẵn), mã thoát 0;
     phá thử luật ranh giới (5 đỏ) và khoá import (1 đỏ). Spec v1.5 sinh lại, lint 10 cảnh báo như cũ.
-    <b>Còn:</b> nạp ranh giới trên <code>luxmap_dev</code> / VPS bằng <code>scripts/load_commune_boundaries.py --apply</code> (COM-001, COM-002,
-    COM-070 mock) <b>trước khi</b> deploy — nếu không, mọi lần ghi cột / tủ có toạ độ ở xã đó bị từ chối; báo WP5 (form + import) và WP6 (GPS verify / sync <code>rejected[]</code>).
+    <b>Đã nạp</b> ranh giới lên <code>luxmap_dev</code> 27/11 (COM-001, COM-002, COM-070 mock; 276 cột + 3 tủ có toạ độ đều nằm trong).
+    <b>Còn:</b> nạp trên VPS bằng <code>scripts/load_commune_boundaries.py --apply</code> <b>trước khi</b> deploy — nếu không, mọi lần ghi cột / tủ có toạ độ ở xã đó bị từ chối; báo WP5 (form + import) và WP6 (GPS verify / sync <code>rejected[]</code>).
     <a href=".ai/results/COMMUNE-BOUNDARY-GUARD-p2.md">Kết quả</a> · <a href=".ai/results/COMMUNE-BOUNDARY-GUARD-p1.md">Khảo sát</a>.</p>
   </div>
 
