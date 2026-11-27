@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# OPS-DEPLOY-VPS — build, back up, migrate, start. Run from the checkout on the server, after `git pull`:
-#   cd /opt/luxmap && git pull && deploy/deploy.sh
+# OPS-DEPLOY-VPS — build, back up, migrate, start. Every push to dev runs it through ci-deploy.sh (OPS-AUTO-DEPLOY);
+# by hand only when GitHub Actions cannot: cd /opt/luxmap && git pull --ff-only && deploy/deploy.sh
 # The order is the point: the migration runs only after a backup succeeded, and the new API starts only after the
 # migration succeeded (`set -e` stops at the first failure, leaving the running API untouched).
 set -euo pipefail

@@ -1,0 +1,68 @@
+# OPS-AUTO-DEPLOY — every push to dev (a merged PR) is tested again as the exact dev commit, then deployed to the VPS.
+# dev has no required status check, so the PR's green CI alone does not prove this commit passes: the CI job runs here
+# again and the deploy waits for it. The deploy key can only run deploy/ci-deploy.sh with a commit SHA (forced command):
+# no shell, no other path. Roll back by reverting on dev; this workflow deploys the revert. docs/deploy/update.md, mục A.
+name: Deploy backend to VPS
+
+on:
+  push:
+    branches: [dev]
+    # Nothing here reaches the image (.dockerignore keeps only src/ and the root build settings) — no rebuild, no backup.
+    paths-ignore:
+      - 'docs/**'
+      - '.ai/**'
+      - '**/*.md'
+      - 'tracking.html'
+  workflow_dispatch:
+
+# One run at a time, never cancelled: cancelling mid-deploy would leave the server half-way. A newer push waiting here
+# replaces an older one still waiting, so a burst of merges deploys only the newest.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  VPS_HOST: 15.235.242.213
+  # Pinned host key (ED25519 SHA256:L96QDJR3RutyOSv9uhlJGwOtCFUOZlMWIqQY5im55gM), same as luxmap-web: a different key fails the deploy.
+  VPS_KNOWN_HOSTS: "15.235.242.213 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHWdkDYmN54A8cpy2EvuOHtPkhx60hwAuwZxujNSy8TI"
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Install the deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+        run: |
+          test -n "$DEPLOY_KEY" || { echo "::error::repository secret VPS_DEPLOY_KEY is not set"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Build, back up, migrate, start on the VPS
+        # The server side runs detached: if this connection drops, the deploy still finishes there (log in ~ubuntu/deploy-*.log).
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ServerAliveInterval=30 \
+              "ubuntu@$VPS_HOST" "$GITHUB_SHA"
+
+      - name: Check the API answers
+        # compose does not wait for the API to be ready; give it up to two minutes to answer as the API (not Caddy's 502).
+        run: |
+          for i in $(seq 24); do
+            if curl -sS https://luxmap.com.vn/api/v1/auth/me | grep -q '"UNAUTHENTICATED"'; then
+              echo "API answers"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::https://luxmap.com.vn/api/v1/auth/me did not answer UNAUTHENTICATED within 2 minutes"
+          exit 1

@@ -218,11 +218,14 @@ một lần sau khi cài, đừng đợi đến lúc mất đĩa mới biết b�
 
 Quy trình từng bước cho cả backend và web, kèm kiểm tra và sự cố thường gặp: **[update.md](update.md)**.
 
+Từ 27/11/2026 backend **tự deploy** khi merge vào `dev` (GitHub Actions, update.md mục A); cách tay chỉ còn khi khẩn cấp
+(update.md mục A2):
+
 ```bash
-cd /opt/luxmap && git pull && deploy/deploy.sh
+cd /opt/luxmap && git pull --ff-only && deploy/deploy.sh
 ```
 
-Quay lui mã: `git checkout <commit cũ> && deploy/deploy.sh`. Migration **không** tự lùi; một migration đã áp mà cần bỏ thì
+Quay lui mã: revert trên `dev` (update.md mục *Quay lui*). Migration **không** tự lùi; một migration đã áp mà cần bỏ thì
 khôi phục từ dump `deploy.sh` vừa tạo (bước 8) — đó là lý do backup đứng trước migration.
 
 ## 10. IoT bridge — MQTT TLS cho testbed (IOT-BRIDGE-VPS, 14/11/2026)
