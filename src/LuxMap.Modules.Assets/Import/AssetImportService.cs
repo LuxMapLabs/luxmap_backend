@@ -230,6 +230,13 @@ public sealed partial class AssetImportService(
     private async Task<WritePlan> PlanCabinetsAsync(List<ImportRowReader> readers, CancellationToken cancellationToken)
     {
         var existing = await ExistingByRefAsync<ElectricalCabinet>(readers, cabinet => cabinet.ExternalRef, cancellationToken);
+        // COMMUNE-BOUNDARY-GUARD D-5: one SHARE lock and one read of every outline this file touches, not one per row. Rows
+        // naming a commune outside the caller's scope are already row errors, so they are not worth locking.
+        var outlines = await CommuneBoundaryGuard.LockAndReadAsync(
+            dbContext,
+            readers.Select(reader => reader.Optional("commune_id"))
+                .Where(id => id is not null && scopeAccessor.Scope.Allows(id)),
+            cancellationToken);
         int inserted = 0, updated = 0, unchanged = 0;
 
         foreach (var reader in readers)
@@ -249,6 +256,17 @@ public sealed partial class AssetImportService(
             if (!reader.IsValid)
             {
                 continue;
+            }
+
+            // D-1/D-4: a cabinet always has a point, so every create is checked; an existing one is checked only when its
+            // position really moves (X or Y), leaving an old off-boundary row editable.
+            if (geometry is not null && communeId is not null && (cabinet is null || CommuneBoundary.Moved(cabinet.Geom, geometry)))
+            {
+                RequireInsideBoundary(reader, outlines, communeId, geometry);
+                if (!reader.IsValid)
+                {
+                    continue;
+                }
             }
 
             if (cabinet is not null)
@@ -389,6 +407,12 @@ public sealed partial class AssetImportService(
         var existing = await ExistingByRefAsync<Pole>(readers, pole => pole.ExternalRef, cancellationToken);
         var segments = await ReferenceIndexAsync<RoadSegment>(readers, "segment_external_ref", cancellationToken);
         var feeders = await ReferenceIndexAsync<Feeder>(readers, "feeder_external_ref", cancellationToken);
+        // COMMUNE-BOUNDARY-GUARD D-5: one SHARE lock and one read of every outline this file touches, not one per row.
+        var outlines = await CommuneBoundaryGuard.LockAndReadAsync(
+            dbContext,
+            readers.Select(reader => reader.Optional("commune_id"))
+                .Where(id => id is not null && scopeAccessor.Scope.Allows(id)),
+            cancellationToken);
 
         int inserted = 0, updated = 0, unchanged = 0;
 
@@ -451,6 +475,17 @@ public sealed partial class AssetImportService(
             if (!reader.IsValid)
             {
                 continue;
+            }
+
+            // D-12: after the feeder-in-commune row error, so a wrong circuit keeps its more specific message. D-1/D-4:
+            // a pole created without a position is allowed anywhere; a move (X or Y) is checked, not a no-op PUT.
+            if (geometry is not null && communeId is not null && (pole is null || CommuneBoundary.Moved(pole.Geom, geometry)))
+            {
+                RequireInsideBoundary(reader, outlines, communeId, geometry);
+                if (!reader.IsValid)
+                {
+                    continue;
+                }
             }
 
             if (pole is not null)
@@ -745,6 +780,28 @@ public sealed partial class AssetImportService(
         }
 
         return communeId;
+    }
+
+    /// <summary>
+    /// COMMUNE-BOUNDARY-GUARD D-2: a row whose point leaves its commune is a <c>geom_wkt</c> error; a row in a commune
+    /// nobody has drawn yet is a <c>commune_id</c> error. Same rule and sentence as the CRUD refusal, so the file and the
+    /// form cannot disagree. <paramref name="outlines"/> is the one read taken under the file's SHARE lock.
+    /// </summary>
+    private static void RequireInsideBoundary(
+        ImportRowReader reader, IReadOnlyDictionary<string, CommuneBoundaryGuard.Outline> outlines,
+        string communeId, Point point)
+    {
+        if (!outlines.TryGetValue(communeId, out var outline))
+        {
+            return; // unknown or out-of-scope commune: CommuneAsync already reported that row
+        }
+
+        var verdict = CommuneBoundary.Verdict(outline.Boundary, point);
+        if (verdict != BoundaryVerdict.Inside)
+        {
+            reader.Fail(verdict == BoundaryVerdict.Missing ? "commune_id" : CsvImportRow.GeometryColumn,
+                CommuneBoundaryGuard.Explain(outline, verdict));
+        }
     }
 
     /// <summary>Rows already in the database for the <c>external_ref</c> values this file mentions.</summary>

@@ -416,10 +416,26 @@ nhãn **null đúng khi quan hệ null** (`ck_pole_feeder_source_matches_feeder`
   `40P01 deadlock` ở teardown (chạy riêng từng class có thể che race). Class mới: **tiền tố riêng** (`cbx-`)
   và chỉ xoá tiền tố đó. Cũng đừng assert **tổng số** xã / tài khoản — class khác tạo cùng lúc; kiểm theo id hoặc tên.
 
-## COMMUNE-BOUNDARY — ranh giới xã (13/11/2026, drift CBD-1…CBD-6)
+## COMMUNE-BOUNDARY — ranh giới xã (13/11/2026, drift CBD-1…CBD-6; thành chốt chặn 26/11/2026, CBG-1…CBG-11)
 
-- **Ranh giới cũng chỉ để VẼ**, như bbox: không lọc, không ẩn, không từ chối tài sản theo nó, không suy `commune_id` từ nó. Muốn
-  suy xã cho sự cố không cột (phần còn lại của Q17) là quyết định riêng — đổi BE-18 quy tắc 2.
+- **Ranh giới LÀ chốt chặn khi ghi tài sản dạng điểm** (COMMUNE-BOUNDARY-GUARD, sửa CBD-1): `pole` và `electrical_cabinet` phải
+  nằm trong ranh giới xã của **chính nó**. Xã chưa có ranh giới → 400 `VALIDATION_FAILED`, `reason = COMMUNE_BOUNDARY_MISSING`;
+  ngoài biên → `OUTSIDE_COMMUNE_BOUNDARY`. Dung sai 0 m, điểm trên biên là trong (`Covers`, không `Contains`). Tuyến và feeder
+  **không** kiểm (`inter_commune` được băng qua nhiều xã) và **không** suy `commune_id` từ ranh giới. Muốn suy xã cho sự cố không
+  cột (phần còn lại của Q17) vẫn là quyết định riêng — đổi BE-18 quy tắc 2.
+- **Một luật duy nhất:** `CommuneBoundary.Verdict` (`LuxMap.Persistence`). CRUD đọc ranh giới theo PK rồi gọi hàm thuần; import
+  đọc **một truy vấn** cho cả file (dưới `FOR SHARE`) rồi gọi cùng hàm. Không `HasDbFunction`, không `ST_Covers` trong SQL,
+  không GIST index — predicate chỉ chạy trên hàng đã lấy theo khoá chính, không quét không gian.
+- **Chỉ kiểm khi toạ độ đổi**: tạo mới luôn kiểm; `PUT` chỉ kiểm khi `X` hoặc `Y` khác (khuôn `PoleRelocation.Measured.Unchanged`,
+  không `Equals`). Cột `geom = null` không kiểm, kể cả ở xã chưa có ranh giới. Sửa ghi chú / bóng / mạch của cột cũ đang lệch mà
+  gửi lại đúng toạ độ vẫn được.
+- **Thứ tự:** các 409 hiện có trước (`POLE_OFF_SEGMENT` khi dời cột / GPS verify, `CROSS_COMMUNE_REFERENCE` khi feeder khác xã),
+  ranh giới 400 sau. Import: lỗi theo dòng — cột `geom_wkt` khi ngoài, `commune_id` khi xã thiếu ranh giới; dòng trong vẫn ghi.
+- **Khoá:** import và dời cột lấy `FOR SHARE` trên `administrative_unit` (import một lần cho mỗi loại tài sản trong file — workbook
+  dùng lại planner nên mỗi sheet một lần; id sắp xếp);
+  `PUT /admin/communes/{id}/boundary` **không** khoá tường minh: câu `UPDATE` tự giữ `FOR NO KEY UPDATE` tới commit, xung đột với `FOR SHARE` — thêm `SELECT … FOR UPDATE` là chốt thừa, phá đi test vẫn xanh. Không giữ khoá qua stream upload hay chạy model.
+- Fixture dùng chung phải đặt ranh giới (`AssetImportFixture.TestArea`); test cần "ngoài" / "thiếu ranh giới" **tự tạo xã riêng**
+  (`docs/agents/traps/testing.md`).
 - 🔴 **`GET /map/communes` tự áp phạm vi.** `AdministrativeUnit` không có query filter, mà `CommuneFilter.Narrow` trả `null` nghĩa là
   "để query filter lo" — trên bảng này `null` thành **mọi xã**. `CommuneLayerService` luôn giới hạn caller không system-wide vào id
   trong claim (claim rỗng → không gì). Canh bằng `A_manager_gets_only_the_outlines_of_their_own_communes` và

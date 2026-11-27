@@ -55,7 +55,8 @@ public sealed class AdminCommunesController(CommuneAdminService service) : Contr
     /// <summary>
     /// Sets the commune's outline (COMMUNE-BOUNDARY) from a GeoJSON <c>Polygon</c> or <c>MultiPolygon</c>, EPSG:4326,
     /// <c>[lng, lat]</c>; <c>"boundary": null</c> clears it. A separate call from <c>PUT /{id}</c> so the name-and-frame form
-    /// never has to carry the polygon. Drawing only — assets outside the outline are neither hidden nor refused.
+    /// never has to carry the polygon. The outline is the rule that refuses new or moved point assets outside it
+    /// (COMMUNE-BOUNDARY-GUARD); it never hides an existing asset and never decides a commune.
     /// </summary>
     [HttpPut("{id}/boundary")]
     [Authorize(Policy = LuxMapPolicies.ManageCommunes)]

@@ -79,8 +79,11 @@ public sealed class CommuneAdminService(LuxMapDbContext db, ICurrentActorAccesso
     }
 
     /// <summary>
-    /// Sets or clears the outline (COMMUNE-BOUNDARY). Drawing only: nothing is filtered, hidden or refused for lying outside it,
-    /// and the frame (<c>bbox</c>) is left as it is.
+    /// Sets or clears the outline (COMMUNE-BOUNDARY). Nothing is filtered or hidden for lying outside it, and the frame
+    /// (<c>bbox</c>) is left as it is; since COMMUNE-BOUNDARY-GUARD the outline IS the rule that refuses new or moved point
+    /// assets outside it. No explicit lock is needed for that: the <c>UPDATE</c> itself holds the row <c>FOR NO KEY UPDATE</c>
+    /// until commit, which conflicts with the <c>FOR SHARE</c> an import or relocation takes before checking, so the two
+    /// serialize on the commune row (COMMUNE-BOUNDARY-GUARD D-5).
     /// </summary>
     public async Task<CommuneItem> UpdateBoundaryAsync(string communeId, UpdateCommuneBoundaryRequest request, CancellationToken ct)
     {

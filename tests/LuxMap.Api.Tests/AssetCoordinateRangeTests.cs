@@ -40,14 +40,29 @@ public sealed class AssetCoordinateRangeTests(AssetImportFixture fixture)
     }
 
     [Theory]
-    [InlineData("POINT(180 90)")]
-    [InlineData("POINT(-180 -90)")]
     [InlineData("POINT(106.49 10.97)")]
-    public async Task Create_accepts_the_edges_and_an_ordinary_position(string wkt)
+    public async Task Create_accepts_an_ordinary_position_inside_the_outline(string wkt)
     {
         var client = await fixture.ManagerClientAsync();
         var response = await client.PostAsJsonAsync(Poles, Create(wkt));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    /// <summary>
+    /// COMMUNE-BOUNDARY-GUARD D-1: a coordinate can be a valid world position and still be outside the commune. 180/90 was
+    /// accepted before the outline became a rule; it is now answered by the boundary, not by the EPSG range check.
+    /// </summary>
+    [Theory]
+    [InlineData("POINT(180 90)")]
+    [InlineData("POINT(-180 -90)")]
+    public async Task Create_refuses_a_world_coordinate_outside_the_commune(string wkt)
+    {
+        var client = await fixture.ManagerClientAsync();
+        var response = await client.PostAsJsonAsync(Poles, Create(wkt));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("OUTSIDE_COMMUNE_BOUNDARY", body);
     }
 
     [Fact]

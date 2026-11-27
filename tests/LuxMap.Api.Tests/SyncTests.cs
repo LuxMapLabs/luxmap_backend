@@ -42,6 +42,10 @@ public sealed class SyncTests(AssetImportFixture factory) : IAsyncLifetime
         {
             using var system = db.EnterUnscopedSystemWriteBackdoor();
             var communes = new[] { new AdministrativeUnit { Name = "Sync home " + Guid.NewGuid() }, new AdministrativeUnit { Name = "Sync foreign " + Guid.NewGuid() } };
+            // COMMUNE-BOUNDARY-GUARD D-7: the home roads and poles sit at 108.x/16, and a push may write a pole position
+            // through WorkOrderService, so both test-owned communes carry an outline that covers them.
+            foreach (var commune in communes)
+                commune.Boundary = AssetImportFixture.Rectangles((107.95, 15.90, 108.55, 16.10));
             db.AddRange(communes);
             await db.SaveChangesAsync();
             (home, foreign) = (communes[0].CommuneId, communes[1].CommuneId);

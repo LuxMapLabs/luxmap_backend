@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using NetTopologySuite.Geometries;
 
 namespace LuxMap.Api.Tests;
 
@@ -49,6 +50,35 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
     private string fieldEngineerUserId = null!;
 
     /// <summary>
+    /// One rectangle per coordinate cluster the asset suite writes point assets to (COMMUNE-BOUNDARY-GUARD D-7). The
+    /// shared communes get this outline so the guard sees the same positions the tests already use; a test that needs a
+    /// position OUTSIDE, or a commune with no outline, makes its own commune instead of editing this one.
+    /// </summary>
+    public static readonly (double MinLng, double MinLat, double MaxLng, double MaxLat)[] TestArea =
+    [
+        (106.45, 10.93, 106.70, 11.02), // FO-26 mock set, the study-site CSV rows, and the "far" probe road
+        (107.15, 10.40, 107.85, 11.85), // 107.2/10.5, 107.5/11.5, 107.7/11.7, 107.71/11.71, 107.72/11.72
+        (107.95, 15.90, 108.40, 16.40), // work-order / sync homes at 108/16, and the 108.31/16.31 fault probe
+        (108.45, 12.40, 108.55, 12.55), // 108.5/12.5
+        (108.60, 12.60, 108.92, 12.92), // 108.71/12.71, 108.8/12.8, 108.85/12.85
+        (109.10, 13.10, 109.80, 13.80), // 109.2/13.2, 109.4/13.4, 109.5/13.5-13.6, 109.7/13.7
+        (110.20, 14.20, 110.60, 14.60), // 110.31/14.31, 110.51/14.51
+        (106.65, 10.73, 106.75, 10.83), // 106.7/10.78
+    ];
+
+    /// <summary>A MultiPolygon of axis-aligned rectangles, EPSG:4326, for a fixture or a test-owned commune.</summary>
+    public static MultiPolygon Rectangles(params (double MinLng, double MinLat, double MaxLng, double MaxLat)[] rectangles)
+    {
+        var factory = new GeometryFactory(new PrecisionModel(), 4326);
+        return factory.CreateMultiPolygon(rectangles.Select(rectangle => factory.CreatePolygon(
+        [
+            new Coordinate(rectangle.MinLng, rectangle.MinLat), new Coordinate(rectangle.MaxLng, rectangle.MinLat),
+            new Coordinate(rectangle.MaxLng, rectangle.MaxLat), new Coordinate(rectangle.MinLng, rectangle.MaxLat),
+            new Coordinate(rectangle.MinLng, rectangle.MinLat),
+        ])).ToArray());
+    }
+
+    /// <summary>
     /// Hashes of the refresh tokens this fixture obtained for the SEEDED accounts, so teardown can
     /// delete exactly those rows (BE-REVIEW-02, N-5 / F-06).
     /// </summary>
@@ -76,6 +106,8 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
         {
             var mine = new AdministrativeUnit { Name = $"BE-12a home {Guid.NewGuid():N}"[..40] };
             var theirs = new AdministrativeUnit { Name = $"BE-12a foreign {Guid.NewGuid():N}"[..40] };
+            mine.Boundary = Rectangles(TestArea);
+            theirs.Boundary = Rectangles(TestArea);
             db.Set<AdministrativeUnit>().AddRange(mine, theirs);
             await db.SaveChangesAsync();
 
@@ -246,6 +278,32 @@ public sealed class AssetImportFixture : LuxMapTestHost, IAsyncLifetime
         client.DefaultRequestHeaders.Authorization = new("Bearer", tokens.AccessToken);
         return client;
     }
+
+    /// <summary>
+    /// A manager client whose signed token names exactly <paramref name="communes"/> — for a test that creates its own
+    /// commune and must write there without touching the shared account's assignments.
+    /// </summary>
+    public HttpClient ManagerClientFor(params string[] communes)
+    {
+        var manager = new AppUser
+        {
+            UserId = userId, Role = UserRole.Manager, Username = ManagerUsername, Email = $"{ManagerUsername}@luxmap.local",
+            FullName = "Manager token over test communes", PasswordAlgorithm = IdentitySeeder.PasswordAlgorithm,
+        };
+        var token = Services.GetRequiredService<Modules.Identity.Auth.AccessTokenIssuer>().Issue(manager, communes).Token;
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+        return client;
+    }
+
+    /// <summary>Gives a commune an outline directly; a test fixture writes as the system, not through the admin endpoint.</summary>
+    public Task SetBoundaryAsync(string communeId, MultiPolygon? boundary) => QueryAsync(async db =>
+    {
+        var unit = await db.Set<AdministrativeUnit>().SingleAsync(candidate => candidate.CommuneId == communeId);
+        unit.Boundary = boundary;
+        await db.SaveChangesAsync();
+        return 0;
+    });
 
     /// <summary>
     /// A manager whose SIGNED TOKEN still names both communes — what an account assigned to several communes

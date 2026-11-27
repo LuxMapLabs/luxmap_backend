@@ -47,6 +47,41 @@ public sealed class PoleRelocation(LuxMapDbContext dbContext, ICurrentActorAcces
         => !measured.Unchanged && measured.SegmentDistanceM is { } distance && distance > corridor.RouteCorridorM;
 
     /// <summary>
+    /// Refuses a move that leaves its commune's outline (COMMUNE-BOUNDARY-GUARD D-3/D-5). Call it AFTER <see cref="IsOffSegment"/> checked
+    /// clean: the survey corridor is the more specific complaint, so an off-road point gets the 409 it got before this rule existed.
+    /// </summary>
+    /// <remarks>
+    /// Takes the commune <c>FOR SHARE</c> only after the caller's own <c>work_order</c> / <c>pole</c> locks, in id order, so a
+    /// concurrent <c>PUT /admin/communes/{id}/boundary</c> either finishes before this read or waits for it — never rewrites the
+    /// outline between the check and the commit. A move that changes nothing is not checked (D-4). The caller owns the transaction.
+    /// </remarks>
+    /// <param name="field">Where the caller's request carries the position: <c>location</c>, or <c>pole_locations</c> for a verified order.</param>
+    public async Task RequireInsideBoundaryAsync(IReadOnlyCollection<Measured> measured, string field, CancellationToken ct)
+    {
+        var moves = measured.Where(move => !move.Unchanged).ToArray();
+        if (moves.Length == 0)
+        {
+            return;
+        }
+
+        var outlines = await CommuneBoundaryGuard.LockAndReadAsync(
+            dbContext, moves.Select(move => move.Pole.CommuneId), ct);
+
+        foreach (var move in moves)
+        {
+            if (!outlines.TryGetValue(move.Pole.CommuneId, out var outline))
+            {
+                throw new InvalidOperationException($"Pole {move.Pole.PoleId} names commune {move.Pole.CommuneId}, which does not exist.");
+            }
+            var verdict = CommuneBoundary.Verdict(outline.Boundary, move.Target);
+            if (verdict != BoundaryVerdict.Inside)
+            {
+                throw CommuneBoundaryGuard.Refused(outline, verdict, field);
+            }
+        }
+    }
+
+    /// <summary>
     /// Moves the pole and stages its one <c>pole / relocated</c> audit event (PL-4). The caller saves. <c>false</c> when the pole already
     /// stood there: nothing is stamped and nothing is audited.
     /// </summary>
