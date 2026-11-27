@@ -244,12 +244,16 @@ public sealed class AssetCrudService(
         var communeId = await CheckedCommuneAsync(request.CommuneId!, ct);
         await RejectDuplicateRefAsync<ElectricalCabinet>(communeId, request.ExternalRef, ct);
 
+        // COMMUNE-BOUNDARY-GUARD D-12: after every existing 400/409, before the write. A cabinet always has a point.
+        var geometry = Read<Point>(request.GeomWkt);
+        await RequireInsideBoundaryAsync(communeId, geometry, "geom_wkt", ct);
+
         var cabinet = new ElectricalCabinet
         {
             ExternalRef = request.ExternalRef,
             CabinetName = request.CabinetName!,
             CommuneId = communeId,
-            Geom = Read<Point>(request.GeomWkt),
+            Geom = geometry,
             DataSource = request.DataSource!.Value,
         };
 
@@ -266,9 +270,17 @@ public sealed class AssetCrudService(
 
         await RejectDuplicateRefAsync<ElectricalCabinet>(cabinet.CommuneId, request.ExternalRef, ct, cabinet.ExternalRef);
 
+        // D-4: this PUT always rewrites geom, so only a REAL move is checked; editing a cabinet that already sits outside
+        // the outline without moving it stays possible.
+        var geometry = Read<Point>(request.GeomWkt);
+        if (CommuneBoundary.Moved(cabinet.Geom, geometry))
+        {
+            await RequireInsideBoundaryAsync(cabinet.CommuneId, geometry, "geom_wkt", ct);
+        }
+
         cabinet.ExternalRef = request.ExternalRef;
         cabinet.CabinetName = request.CabinetName!;
-        cabinet.Geom = Read<Point>(request.GeomWkt);
+        cabinet.Geom = geometry;
         cabinet.DataSource = request.DataSource!.Value;
         Touch(cabinet);
 
@@ -359,6 +371,13 @@ public sealed class AssetCrudService(
         var feederSource = TopologyLink.ResolveOrThrow(
             null, null, request.FeederId, TopologyLink.Read(request.FeederSource, FeederSourceField), FeederSourceField, "feeder_id");
 
+        // Absent / null creates a pole with no position yet (D-1), which is allowed even where no outline exists.
+        var geometry = request.GeomWkt is null ? null : Read<Point>(request.GeomWkt);
+        if (geometry is not null)
+        {
+            await RequireInsideBoundaryAsync(communeId, geometry, "geom_wkt", ct);
+        }
+
         var pole = new Pole
         {
             ExternalRef = request.ExternalRef,
@@ -367,7 +386,7 @@ public sealed class AssetCrudService(
             FeederSource = feederSource,
             CommuneId = communeId,
             // Absent / null = a pole from the books with no position yet (POLE-GEOM-NULL); blank or malformed is still a 400.
-            Geom = request.GeomWkt is null ? null : Read<Point>(request.GeomWkt),
+            Geom = geometry,
             NearSensitivePoi = request.NearSensitivePoi,
             DataSource = request.DataSource!.Value,
             Note = PoleNoteInput.Normalize(request.Note),
@@ -629,11 +648,17 @@ public sealed class AssetCrudService(
             pole.FeederId, pole.FeederSource, request.FeederId,
             TopologyLink.Read(request.FeederSource, FeederSourceField), FeederSourceField, "feeder_id");
 
-        pole.ExternalRef = request.ExternalRef;
-        pole.SegmentId = segmentId;
-        TopologyLink.ApplyPoleFeeder(dbContext, pole, request.FeederId, feederSource);
         // GN-2: a pole that has a position keeps one — absent / null is a 400; a pole without one stays without unless a WKT arrives.
-        if (request.GeomWkt is not null) pole.Geom = Read<Point>(request.GeomWkt);
+        var geometry = request.GeomWkt is null ? null : Read<Point>(request.GeomWkt);
+        if (geometry is not null)
+        {
+            // D-4: a PUT that sends the stored position back is not a move, even when that pole already sits outside the
+            // outline (an old row, or the outline was drawn after it): checking it would block editing its note, lamps, circuit.
+            if (CommuneBoundary.Moved(pole.Geom, geometry))
+            {
+                await RequireInsideBoundaryAsync(pole.CommuneId, geometry, "geom_wkt", ct);
+            }
+        }
         else if (pole.Geom is not null)
         {
             throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
@@ -641,6 +666,11 @@ public sealed class AssetCrudService(
                 new Dictionary<string, object?> { ["field"] = "geom_wkt" });
         }
 
+        // Every check above could refuse: only now does the tracked pole change.
+        pole.ExternalRef = request.ExternalRef;
+        pole.SegmentId = segmentId;
+        TopologyLink.ApplyPoleFeeder(dbContext, pole, request.FeederId, feederSource);
+        if (geometry is not null) pole.Geom = geometry;
         pole.NearSensitivePoi = request.NearSensitivePoi;
         pole.DataSource = request.DataSource!.Value;
 
@@ -926,6 +956,10 @@ public sealed class AssetCrudService(
                 });
         }
 
+        // COMMUNE-BOUNDARY-GUARD D-3: the corridor is the more specific complaint, so it wins the 409 above; only a move
+        // that is still on the road can be refused for leaving the commune.
+        await relocation.RequireInsideBoundaryAsync([measured], "location", ct);
+
         var moved = relocation.Stage(measured, workOrderId: null) ? measured.MovedM : 0;
 
         await dbContext.SaveChangesAsync(ct);
@@ -936,6 +970,21 @@ public sealed class AssetCrudService(
     }
 
     private static bool Finite(double value, double limit) => double.IsFinite(value) && Math.Abs(value) <= limit;
+
+    /// <summary>The point must sit inside its own commune's outline (COMMUNE-BOUNDARY-GUARD D-1/D-2); a missing outline refuses.</summary>
+    private async Task RequireInsideBoundaryAsync(string communeId, Point point, string field, CancellationToken ct)
+    {
+        var outline = await CommuneBoundaryGuard.ReadAsync(dbContext, communeId, ct)
+            ?? throw new LuxMapException(ErrorCodes.ValidationFailed, HttpStatusCode.BadRequest,
+                "That commune does not exist.",
+                new Dictionary<string, object?> { ["commune_id"] = communeId });
+
+        var verdict = CommuneBoundary.Verdict(outline.Boundary, point);
+        if (verdict != BoundaryVerdict.Inside)
+        {
+            throw CommuneBoundaryGuard.Refused(outline, verdict, field);
+        }
+    }
 
     private void Touch(IUpdateStamped asset) => AssetStamp.Touch(dbContext, asset, actor);
 

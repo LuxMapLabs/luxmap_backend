@@ -10,6 +10,11 @@ The default, scripts/data/commune-boundaries.geojson, holds the two study commun
 COM-001 = Phường Long Phước (OSM relation 7342308), COM-002 = Phường Long Bình (OSM relation 7342307), downloaded from
 api.openstreetmap.org on 01/10/2026. Data © OpenStreetMap contributors, ODbL — credit the source wherever it is shown.
 
+It also holds COM-070 "Commune 01" as a MOCK rectangle (`properties.mock = true`) around the FO-26 test data. That is NOT a
+surveyed administrative boundary: it exists only so the seeded mock poles still accept a position after
+COMMUNE-BOUNDARY-GUARD made the outline a write rule. Do not present it as a real outline; a production environment has no
+COM-070 and the PUT for it simply answers 404.
+
 It goes through PUT /api/v1/admin/communes/{id}/boundary rather than SQL so the server's validation runs on every outline.
 The system admin signs in with LUXMAP_ADMIN_USERNAME (default `admin`) and LUXMAP_ADMIN_PASSWORD, read from the environment —
 never from a file in the repository.

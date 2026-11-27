@@ -46,8 +46,8 @@ d["info"]["description"] = (
     "CITIZEN-QR P2c (SELF-SIGNED — drift PC-1…PC-10): /citizen-reports — hàng chờ, ảnh, gợi ý AI; accept / merge / reject (Quản lý). "
     "BE-17 (SELF-SIGNED — drift BE-17 SC-1…SC-6): latest_run trên GET /sweeps/{id}, GET /sweeps/{id}/coverage; processing_status chốt 5 giá trị (O-4). "
     "COMMUNE-BBOX (SELF-SIGNED — drift CB-1…CB-6): /admin/communes — Quản trị tạo / sửa xã kèm khung bản đồ; GET /auth/me thêm communes[] và map_bounds. "
-    "COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Chỉ để vẽ — phân quyền vẫn theo commune_id. "
-    "POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit. "
+    "COMMUNE-BOUNDARY (SELF-SIGNED — drift CBD-1…CBD-6, COMMUNE-BOUNDARY-GUARD CBG-1…CBG-11): PUT /admin/communes/{id}/boundary đặt ranh giới xã; GET /map/communes trả ranh giới các xã trong phạm vi người gọi; has_boundary trên item xã. Từ COMMUNE-BOUNDARY-GUARD ranh giới là LUẬT GHI cho tài sản dạng điểm (pole, electrical_cabinet): ngoài ranh giới → 400 OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → 400 COMMUNE_BOUNDARY_MISSING; không lọc, không ẩn tài sản và không suy commune_id. "
+    "POLE-LOCATION (SELF-SIGNED — drift PL-1…PL-5, D-3 của COMMUNE-BOUNDARY-GUARD): PUT /assets/poles/{poleId}/location — Kỹ sư hiện trường / Quản lý dời cột trong hành lang khảo sát 25 m của tuyến, capability EditPoleLocation, có audit; ngoài hành lang → 409 POLE_OFF_SEGMENT trước, rồi mới kiểm ranh giới xã → 400. "
     "v1.15 (BE-35, SELF-SIGNED — drift SM-1…SM-8): GET /admin/system/status — job nền, xử lý sweep, đĩa, database, dung lượng theo bucket, capability MonitorSystem (chỉ Quản trị). "
     "v1.16 (BE-33, SELF-SIGNED — drift SET-1…SET-7): GET /admin/settings, PUT /admin/settings/{key} — ngưỡng dim và ngưỡng offline do Quản trị sửa, capability ManageSettings; luminance_history[].dim_threshold_ratio trên chi tiết cột. "
     "v1.17 (ASSET-COMMUNE-NAME, SELF-SIGNED — drift ACN-1): commune_name trên dòng kiểm kê cột / tuyến / mạch / tủ điện của /assets. "
@@ -58,8 +58,8 @@ d["info"]["description"] = (
     "v1.22 (ACCOUNT-ONE-COMMUNE — ACCT-1): mỗi tài khoản thường đúng một xã; admin không gán xã, claim [*]; giữ commune_ids dạng mảng. "
     "v1.24 (LUX-BASELINE, SELF-SIGNED — LUX-BASELINE-1…6): protocol tuỳ chọn trên số đo lux (đo đứng yên dưới đèn), evaluation do backend chấm khi Quản lý xác nhận ảnh cột, lux_classified_as/lux_baseline_ratio/lux_reason_codes trên PolePhotoItem, stationary_luminance_* ở chi tiết cột; lux vào ảnh đã quyết → 409. "
     "v1.23 (LUX-PHOTO, SELF-SIGNED — LUX-PHOTO-1…5): photo_id tuỳ chọn trên số đo lux (mỗi ảnh tối đa một số đo); lux_id/lux_value/lux_measured_at trên PolePhotoItem; lux từ điện thoại hoặc máy đo cầm tay, chỉ so cùng meter_model. "
-    "WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm "
-    "/work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không). "
+    "WO-POLE-GPS (SELF-SIGNED — drift PG-1…PG-13, D-3 của COMMUNE-BOUNDARY-GUARD): task_kind pole_gps_update (lệnh đơn lẻ) với segment_id + pole_ids; PDF đính kèm "
+    "/work-orders/{id}/attachments; complete nhận pole_locations, chỉ verify mới ghi vào pole.geom (tất cả hoặc không); verify kiểm hành lang trước (409 POLE_OFF_SEGMENT), ranh giới xã sau (400). "
     "Sinh bằng docs/openapi/tools/gen_consolidated_spec.py từ docs/openapi/luxmap-v1.json (spec xuất từ "
     f"code, {n_from_code} operation implemented) cộng các endpoint Contract chưa có code (x-luxmap-status = "
     "not_implemented). Quy ước: JSON snake_case, enum chuỗi thường, ISO 8601 UTC hậu tố Z, EPSG:4326, "
@@ -219,8 +219,8 @@ def opid(method, path):
 # Summaries for the implemented operations (from the controllers' XML docs / behaviour)
 SUMMARY = {
     ("get", "/api/v1/assets/export/workbook"): "Xuất mọi loại tài sản theo sheet Excel, ReadNetwork, tối đa 5000 mỗi loại; WKT, bộ đã tháo, Không xuất và thống kê nguồn (WB-19)",
-    ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|cabinets|feeders|poles|fixtures); 200 kèm kết quả theo dòng",
-    ("post", "/api/v1/assets/import/workbook"): "Nạp 5 sheet tài sản .xlsx, xã và data_source qua multipart, all-or-nothing (WB-12…WB-20); 200 kèm committed + lỗi theo sheet/dòng Excel",
+    ("post", "/api/v1/assets/import/{kind}"): "Nạp MỘT loại file kiểm kê (segments|cabinets|feeders|poles|fixtures); 200 kèm kết quả theo dòng. Từ COMMUNE-BOUNDARY-GUARD: dòng pole/electrical_cabinet ngoài ranh giới xã là lỗi dòng geom_wkt, xã chưa có ranh giới là lỗi dòng commune_id (reason trong message); các dòng hợp lệ khác vẫn vào",
+    ("post", "/api/v1/assets/import/workbook"): "Nạp 5 sheet tài sản .xlsx, xã và data_source qua multipart, all-or-nothing (WB-12…WB-20); 200 kèm committed + lỗi theo sheet/dòng Excel. Từ COMMUNE-BOUNDARY-GUARD: workbook dùng lại cùng planner nên dòng ngoài ranh giới / xã thiếu ranh giới là lỗi dòng như import một loại",
     ("get", "/api/v1/assets/segments"): "Danh sách tuyến — dòng kiểm kê đầy đủ (BE-12b, §5.3.1)",
     ("get", "/api/v1/assets/segments/{segmentId}"): "Một tuyến + geom_wkt + created_at; ngoài phạm vi xã → 404",
     ("post", "/api/v1/assets/segments"): "Tạo tuyến đường; 201 + Location, không body",
@@ -229,19 +229,19 @@ SUMMARY = {
     ("post", "/api/v1/assets/feeders"): "Tạo mạch điện; 201 + Location, không body",
     ("get", "/api/v1/assets/poles"): "Danh sách cột kiểm kê — có external_ref, data_source, feeder_id, active_fixture (§5.3.1); unassigned_segment=true chỉ lấy cột CHƯA TUYẾN, lọc trước tổng và phân trang [POLE-SEGMENT-NULL]",
     ("get", "/api/v1/assets/poles/{poleId}"): "Một cột + geom_wkt + segment_name + created_at; ngoài phạm vi xã → 404",
-    ("post", "/api/v1/assets/poles"): "Tạo cột; 201 + Location, không body. segment_id vắng hoặc null = cột chưa tuyến [POLE-SEGMENT-NULL]",
+    ("post", "/api/v1/assets/poles"): "Tạo cột; 201 + Location, không body. segment_id vắng hoặc null = cột chưa tuyến [POLE-SEGMENT-NULL]. Có geom_wkt thì điểm phải nằm trong ranh giới xã của cột (trên biên tính là trong), ngoài → 400 VALIDATION_FAILED details.reason=OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → COMMUNE_BOUNDARY_MISSING; cột geom_wkt null tạo được ở xã chưa có ranh giới [COMMUNE-BOUNDARY-GUARD D-1/D-2]",
     ("post", "/api/v1/assets/fixtures"): "Ghi một lần lắp bóng; commune_id chép từ cột",
     ("put", "/api/v1/assets/segments/{segmentId}"): "Thay thế TOÀN PHẦN một tuyến; commune_id không sửa được",
     ("delete", "/api/v1/assets/segments/{segmentId}"): "Xoá tuyến; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/feeders/{feederId}"): "Thay thế TOÀN PHẦN một mạch điện; commune_id không sửa được; cabinet_id VẮNG = GIỮ, null = tháo (CAB-6)",
     ("delete", "/api/v1/assets/feeders/{feederId}"): "Xoá mạch điện; còn cột đang đấu vào thì 409 ASSET_IN_USE",
-    ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột. Khoá segment_id BẮT BUỘC (thiếu = 400); null = tháo cột khỏi tuyến [POLE-SEGMENT-NULL]",
+    ("put", "/api/v1/assets/poles/{poleId}"): "Thay thế TOÀN PHẦN một cột; THIẾU feeder_id là XOÁ mạch của cột. Khoá segment_id BẮT BUỘC (thiếu = 400); null = tháo cột khỏi tuyến [POLE-SEGMENT-NULL]. Từ COMMUNE-BOUNDARY-GUARD chỉ kiểm ranh giới khi X hoặc Y thật sự đổi: gửi lại toạ độ cũ của cột đang lệch vẫn sửa được field khác; đổi tới điểm ngoài → 400 như POST",
     ("delete", "/api/v1/assets/poles/{poleId}"): "Xoá cột; khoá ngoại quyết định (409 ASSET_IN_USE)",
     ("put", "/api/v1/assets/poles/{poleId}/feeder"): "Gán hoặc xoá mạch điện của cột (feeder_id null = không mạch)",
     ("get", "/api/v1/sync/bundle"): "[BE-43] Gói offline đầy đủ cho các tuyến (segment_id lặp, ≤ 20; vắng = tuyến của phiếu mở của tôi): tuyến, cột (+note), sự cố mở, phiếu mở của tôi. Gói mặc định (vắng segment_id) còn kèm cột CHƯA TUYẾN (segment_id null) mà phiếu mở của tôi giữ sự cố, cùng sự cố và phiếu đó; segment_ids không bao giờ chứa null; gói nêu tuyến thì chỉ đúng các tuyến ấy [POLE-SEGMENT-NULL D-4]. Không có since",
-    ("post", "/api/v1/sync/push"): "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id",
+    ("post", "/api/v1/sync/push"): "[BE-43] Áp hàng chờ offline theo thứ tự: applied[] / conflicts[] (server thắng, kèm trạng thái hiện tại) / rejected[]; khử trùng lặp theo client_op_id. Từ COMMUNE-BOUNDARY-GUARD thao tác ghi vị trí cột ngoài ranh giới xã là 400 nên vào rejected[], không phải conflicts[] (D-4)",
     ("put", "/api/v1/assets/poles/{poleId}/note"): "[POLE-NOTE] Kỹ sư hiện trường / Quản lý ghi hoặc xoá ghi chú của cột (≤ 1000 ký tự; null hay rỗng = xoá)",
-    ("put", "/api/v1/assets/poles/{poleId}/location"): "[POLE-LOCATION] Kỹ sư hiện trường / Quản lý dời cột tới vị trí thật ({lat, lng}); quá 25 m khỏi tuyến của cột → 409 POLE_OFF_SEGMENT; mỗi lần dời ghi audit",
+    ("put", "/api/v1/assets/poles/{poleId}/location"): "[POLE-LOCATION] Kỹ sư hiện trường / Quản lý dời cột tới vị trí thật ({lat, lng}); quá 25 m khỏi tuyến của cột → 409 POLE_OFF_SEGMENT (kiểm trước); điểm còn trên tuyến nhưng ngoài ranh giới xã → 400 VALIDATION_FAILED như POST/PUT cột [COMMUNE-BOUNDARY-GUARD D-3]; mỗi lần dời ghi audit",
     ("get", "/api/v1/notifications"): "[BE-27] Thông báo của chính người gọi, mới nhất trước, kèm số chưa đọc (polling)",
     ("get", "/api/v1/notifications/unread-count"): "[BE-27] Số thông báo chưa đọc — gọi định kỳ 30–60 giây cho huy hiệu chuông",
     ("post", "/api/v1/notifications/{notificationId}/read"): "[BE-27] Đánh dấu một thông báo đã đọc (lặp lại không đổi gì; của người khác → 404)",
@@ -283,8 +283,8 @@ SUMMARY = {
     # CABINET — trụ / tủ điện tổng, drift CAB-1…CAB-8 + CAB-MN-1…CAB-MN-5 (SELF-SIGNED, nền tạm tới FW).
     ("get", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Danh sách trụ điện tổng — location, feeder_ids[], iot_node_ids[]; iot_node_id | null giữ tương thích (CAB-MN-2)",
     ("get", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Một trụ + geom_wkt + created_at; ngoài phạm vi xã → 404",
-    ("post", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body",
-    ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được",
+    ("post", "/api/v1/assets/cabinets"): "[TẠM — CABINET] Tạo trụ điện tổng; geom_wkt POINT bắt buộc; 201 + Location, không body. Điểm phải nằm trong ranh giới xã (trên biên tính là trong); ngoài → 400 OUTSIDE_COMMUNE_BOUNDARY, xã chưa có ranh giới → COMMUNE_BOUNDARY_MISSING [COMMUNE-BOUNDARY-GUARD D-1/D-2]",
+    ("put", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Thay thế TOÀN PHẦN một trụ; commune_id không sửa được. Từ COMMUNE-BOUNDARY-GUARD chỉ kiểm ranh giới khi X hoặc Y thật sự đổi; gửi lại toạ độ cũ vẫn sửa được field khác",
     ("delete", "/api/v1/assets/cabinets/{cabinetId}"): "[TẠM — CABINET] Xoá trụ; còn mạch hay thiết bị trỏ vào thì 409 ASSET_IN_USE",
     ("get", "/api/v1/map/cabinets/{cabinetId}/topology"): "[TẠM — TOPO-INFER] Sơ đồ nhánh của một trụ: FeatureCollection các cạnh LineString trụ → cột → cột theo thứ tự dọc đường; feeder_source hiện ở tooltip của cạnh (TI-7). Sơ đồ logic, không phải tuyến cáp; cột chưa tuyến → 409 POLE_SEGMENT_REQUIRED (operation=cabinet_topology, pole_ids tối đa 100, pole_count)",
     ("get", "/api/v1/map/communes"): "[TẠM — COMMUNE-BOUNDARY] Ranh giới các xã trong phạm vi người gọi: FeatureCollection MultiPolygon, properties {commune_id, name}; không bbox; xã chưa có ranh giới bị bỏ qua",
@@ -326,7 +326,7 @@ SUMMARY = {
     ("post", "/api/v1/admin/communes"): "[COMMUNE-BBOX] Quản trị tạo xã; bbox {min_lng, min_lat, max_lng, max_lat} tuỳ chọn",
     ("get", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Chi tiết một xã",
     ("put", "/api/v1/admin/communes/{id}"): "[COMMUNE-BBOX] Thay tên + khung bản đồ; cả hai khoá bắt buộc, bbox null = xoá khung",
-    ("put", "/api/v1/admin/communes/{id}/boundary"): "[TẠM — COMMUNE-BOUNDARY] Đặt ranh giới xã (GeoJSON Polygon | MultiPolygon, EPSG:4326); khoá bắt buộc, null = xoá. Chỉ để vẽ, không lọc tài sản",
+    ("put", "/api/v1/admin/communes/{id}/boundary"): "[TẠM — COMMUNE-BOUNDARY] Đặt ranh giới xã (GeoJSON Polygon | MultiPolygon, EPSG:4326); khoá bắt buộc, null = xoá. Từ COMMUNE-BOUNDARY-GUARD đây là ranh giới dùng để từ chối tài sản dạng điểm nằm ngoài (pole, electrical_cabinet) và là nơi DUY NHẤT nạp ranh giới; vẫn không lọc / không ẩn tài sản, không suy commune_id, không kiểm tuyến / feeder. Ghi ranh giới chờ import / dời cột đang kiểm (chúng giữ FOR SHARE trên hàng xã) nên không đổi hình giữa chừng",
     ("get", "/api/v1/admin/system/status"): "[BE-35] Quản trị: job nền, xử lý sweep, đĩa trống, database và dung lượng theo bucket",
     ("get", "/api/v1/admin/settings"): "[BE-33] Quản trị: cấu hình hệ thống — giá trị, mặc định, miền nhận",
     ("put", "/api/v1/admin/settings/{key}"): "[BE-33] Quản trị đổi một cấu hình; có hiệu lực ngay, lưu lịch sử kèm note",
@@ -366,7 +366,7 @@ for method, suffix, summary in [
     ("put", "/{id}/assignee", "Giao, giao lại hoặc gỡ người được giao"),
     ("post", "/{id}/start", "Người được giao bắt đầu việc"),
     ("post", "/{id}/complete", "Người được giao nộp báo cáo và kết quả kiểm tra; pole_gps_update: pole_locations (PG-10; accuracy_m tuỳ chọn, PG-14), chưa vào GIS"),
-    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12)"),
+    ("post", "/{id}/verify", "Quản lý nghiệm thu và giải phóng liên kết fault; survey: còn ảnh/clip chưa hủy, chưa quyết → 409 POLE_PHOTOS_UNDECIDED (details.photo_ids, SVP-1); pole_gps_update: ghi pole_locations vào pole.geom, tất cả hoặc không (PG-12); vị trí ngoài hành lang → 409 POLE_OFF_SEGMENT trước, ngoài ranh giới xã → 400 VALIDATION_FAILED [COMMUNE-BOUNDARY-GUARD D-3]"),
     ("post", "/{id}/return", "Quản lý trả việc để làm tiếp"),
     ("post", "/{id}/cancel", "Quản lý huỷ và giải phóng liên kết fault"),
     ("post", "/{id}/follow-up", "[FR-2, WSC] Quản lý tạo bước tiếp từ phiếu đã nghiệm thu, chung case_id: kiểm tra → sửa chữa mang sự cố fault_present; khảo sát → kiểm tra mang sự cố mở trên cột mà lần khảo sát đã duyệt thấy out/dim (xã neo)"),
@@ -704,7 +704,8 @@ verify = d["paths"]["/api/v1/work-orders/{id}/verify"]["post"]
 verify["responses"]["409"] = err(
     "INVALID_STATE_TRANSITION / CONCURRENT_MODIFICATION; survey: POLE_PHOTOS_UNDECIDED, "
     "details.photo_ids là mảng ID ảnh/clip chưa hủy và decision=null, theo captured_at, uploaded_at, length(photo_id), photo_id. "
-    "Không đổi allowed_actions; inspection/repair/pole_gps_update giữ nguyên (kể cả POLE_OFF_SEGMENT của PG-12)."
+    "Không đổi allowed_actions; inspection/repair giữ nguyên. pole_gps_update: POLE_OFF_SEGMENT của PG-12 vẫn kiểm TRƯỚC; "
+    "sau đó ranh giới xã là 400 VALIDATION_FAILED (COMMUNE-BOUNDARY-GUARD D-3)."
 )
 
 # ACCT-1: arrays remain on the wire; cardinality depends on the resulting role.

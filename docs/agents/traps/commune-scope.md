@@ -84,6 +84,15 @@ Mọi cột `commune_id` khác **bắt buộc** `HasCommuneReference()`. Chốt 
 
 Vì sao FK này không phải cầu toàn: `commune_id` mồ côi **không gây lỗi** — query filter nằm trong `WHERE` nên dòng đó vô hình với tất cả mọi người. Không exception, không log, dữ liệu biến mất.
 
+**1c. Ranh giới xã KHÔNG phải lớp thứ ba của phạm vi xã.**
+
+COMMUNE-BOUNDARY-GUARD (26/11/2026) kiểm toạ độ `pole` / `electrical_cabinet` có nằm trong ranh giới **của xã ghi trên tài sản**
+không (`CommuneBoundary.Verdict`). Đó là **kiểm dữ liệu trong service**, không phải `HasQueryFilter` và không phải
+`CommuneWriteGuard`: nó không đổi phạm vi đọc/ghi (vẫn claim `commune_ids` + cột `commune_id`), không ẩn tài sản cũ đang nằm ngoài,
+và **không suy `commune_id`**. Đừng nhét nó vào guard — guard chỉ thấy ChangeTracker, không tạo được lỗi theo dòng của import và
+không phân biệt được "toạ độ không đổi". 400 `VALIDATION_FAILED` + `details.reason` là hình dạng đúng, không phải 403
+`COMMUNE_FORBIDDEN`.
+
 **2. Tạo schema và quyền ghi là hai chuyện khác nhau.**
 
 `pole_current_status` do **BE-09 tạo bảng** (BE-14 chạy trước BE-15 và cần 4 trường đó), nhưng
