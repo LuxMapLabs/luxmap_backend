@@ -176,7 +176,7 @@ Fault cũ không bị xóa khi bỏ đếm bóng.
 
 ## 6. Cấu hình baseline bộ thử
 
-Manager trong phạm vi xã dùng request đầy đủ (đúng node/feeder của mình):
+Admin hệ thống dùng request đầy đủ (đúng node/feeder của mình):
 
 PUT https://luxmap.com.vn/api/v1/iot/nodes/NODE-004
 

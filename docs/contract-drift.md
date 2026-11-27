@@ -1,5 +1,9 @@
 # Chỗ lệch giữa code và Contract — log mới từ v1.4 (18/09/2026)
 
+## IOT-NODE-UPDATE — quyền sửa cấu hình node (27/11/2026)
+
+Theo yêu cầu người dùng ngày 27/11/2026, `PUT /api/v1/iot/nodes/{nodeId}` chuyển sang `cap:manage_settings`, chỉ dành cho `system_admin`. Manager gọi PUT nhận `403 ROLE_FORBIDDEN`. Node, feeder và server vẫn phải cùng xã, feeder vẫn phải khớp tủ của node nếu node đã được gắn. Quyết định API này là **SELF-SIGNED**, chờ maintainer review.
+
 ## D-R30 — đo lux lại gắn trên xe, lấy mẫu khi xe chạy (26/11/2026)
 
 | | |

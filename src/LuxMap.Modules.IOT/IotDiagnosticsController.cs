@@ -308,10 +308,11 @@ public sealed partial class IotDiagnosticsController(IotDiagnosticsService diagn
         [Range(0, 1000)] public double RadiusKm { get; init; }
     }
 
-    /// <summary>Manager cập nhật nguồn và xác nhận quyền MQTT của node trên server đã chọn.</summary>
+    /// <summary>Admin hệ thống cập nhật nguồn và xác nhận quyền MQTT của node trên server đã chọn.</summary>
     [HttpPut("nodes/{nodeId}")]
-    [Authorize(Policy = LuxMapPolicies.ManageAssets)]
+    [Authorize(Policy = LuxMapPolicies.ManageSettings)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status403Forbidden)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ApiErrorResponse>(StatusCodes.Status409Conflict)]

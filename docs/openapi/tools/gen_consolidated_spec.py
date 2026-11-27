@@ -483,7 +483,7 @@ SUMMARY.update({
     ("delete", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Thu hồi MQTT secret và ngắt gateway",
     ("post", "/api/v1/iot/servers/{serverId}/gateways/{gatewayId}/credential"): "Cấp MQTT key mới cho gateway",
     ("get", "/api/v1/iot/servers/{serverId}/gateways/routes"): "Liệt kê tuyến và trạng thái cấp secret trên bridge",
-    ("put", "/api/v1/iot/nodes/{nodeId}"): "Manager cập nhật nguồn đo và radius_km, kiểm phạm vi xã",
+    ("put", "/api/v1/iot/nodes/{nodeId}"): "Admin hệ thống cập nhật nguồn đo và radius_km, kiểm tra liên kết cùng xã",
     ("delete", "/api/v1/iot/nodes/{nodeId}/feeder"): "Gỡ node khỏi feeder, giữ node trong tủ và giữ lịch sử",
     ("delete", "/api/v1/iot/nodes/{nodeId}"): "Gỡ node IoT khỏi tủ và mạch điện, giữ lịch sử",
     ("post", "/api/v1/iot/servers"): "Admin đăng ký IoT server và vị trí, tự dùng Bridge cấu hình sẵn (không nhận base_url)",

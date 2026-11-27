@@ -229,7 +229,7 @@ Firmware espserver mới đã build; việc nạp thiết bị/deploy VPS thực
 
 POST /api/v1/iot/nodes (Admin) thêm tuyến MQTT theo server_id sau kiểm tra xã/tủ/feeder.
 Gửi lại POST cùng cấu hình trả 200 và cùng node_id, đồng thời khôi phục tuyến bị thiếu.
-PUT /api/v1/iot/nodes/{nodeId} (Manager cùng xã) với cấu hình hiện có cũng đồng bộ lại tuyến,
+PUT /api/v1/iot/nodes/{nodeId} (Admin hệ thống) với cấu hình hiện có cũng đồng bộ lại tuyến,
 không cần API gateway-migration. BE gửi lại danh sách node và đọc xác nhận Bridge trước khi trả thành công.
 Server phải có key; MQTT/Wi-Fi và LoRa còn phải hoạt động để nhận mẫu/ACK, không hứa online ngay khi lưu.
 

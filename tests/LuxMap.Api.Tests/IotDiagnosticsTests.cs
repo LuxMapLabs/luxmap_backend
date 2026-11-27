@@ -73,7 +73,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.True(storedNode.SupportsRemoteControl);
         Assert.Equal(cabinet, storedNode.CabinetId);
         Assert.Equal(0.1, storedNode.RadiusKm);
-        using var invalidNodeRadius = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{storedNode.NodeId}", new { server_id = server, feeder_id = feeder, device_id = "P001", nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500, radius_km = 1001.0 });
+        using var invalidNodeRadius = await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{storedNode.NodeId}", new { server_id = server, feeder_id = feeder, device_id = "P001", nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500, radius_km = 1001.0 });
         Assert.Equal(HttpStatusCode.BadRequest, invalidNodeRadius.StatusCode);
         using var repeat = await admin.PostAsJsonAsync(register, Payload(feeder, "P001"));
         Assert.Equal(HttpStatusCode.OK, repeat.StatusCode);
@@ -151,13 +151,13 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal(node, (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("node_id").GetString());
         Assert.Contains("identity-probe", bridge.Devices[first]);
         bridge.Devices[first].Clear();
-        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
         Assert.Contains("identity-probe", bridge.Devices[first]);
 
         // An established DB source may reconcile a leftover unregistered legacy MQTT owner.
         bridge.Devices[first].Clear();
         bridge.Devices["LEGACY-PROBE"] = ["identity-probe", "unrelated-device"];
-        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
         Assert.Contains("identity-probe", bridge.Devices[first]);
         Assert.Equal(new[] { "unrelated-device" }, bridge.Devices["LEGACY-PROBE"]);
         bridge.Devices[first].Clear();
@@ -169,7 +169,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         // The same operation must not steal an ACL from another registered server.
         bridge.Devices[first].Clear();
         bridge.Devices[second].Add("identity-probe");
-        using var conflict = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first));
+        using var conflict = await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first));
         Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
         Assert.Equal("IOT_REGISTRATION_CONFLICT", (await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("error").GetProperty("code").GetString());
         Assert.Contains("identity-probe", bridge.Devices[second]);
@@ -177,7 +177,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         bridge.Devices[second].Clear();
         bridge.Devices[first].Add("identity-probe");
         requestedRadius = 0.4;
-        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(first))).StatusCode);
         var radiusUpdated = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/nodes/{node}");
         Assert.Equal(0.4, radiusUpdated.GetProperty("radius_km").GetDouble());
         // Configuration remains readable while Bridge is unavailable, without exposing secrets/internal thresholds.
@@ -206,7 +206,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal(node, list.GetProperty("items")[0].GetProperty("node_id").GetString());
         var empty = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/iot/servers/{first}/nodes?page=2147483647&page_size=200");
         Assert.Empty(empty.GetProperty("items").EnumerateArray());
-        using var moved = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(second));
+        using var moved = await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(second));
         Assert.True(moved.StatusCode == HttpStatusCode.NoContent, await moved.Content.ReadAsStringAsync());
         Assert.Empty(bridge.Devices[first]);
         Assert.Contains("identity-probe", bridge.Devices[second]);
@@ -238,7 +238,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         Assert.Equal(0.4, unbound.GetProperty("radius_km").GetDouble());
         Assert.Contains("identity-probe", removedSource.Profile); // preserved for historical lookups
         options.Nodes.Remove(node!);
-        using var reattached = await manager.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(second));
+        using var reattached = await admin.PutAsJsonAsync($"/api/v1/iot/nodes/{node}", Payload(second));
         Assert.Equal(HttpStatusCode.NoContent, reattached.StatusCode);
         Assert.Contains("identity-probe", bridge.Devices[second]);
 
@@ -379,7 +379,10 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         };
 
         Assert.Equal(HttpStatusCode.Forbidden, (await manager.PostAsJsonAsync($"{root}/servers", server)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await admin.PutAsJsonAsync(nodePath, profile)).StatusCode);
+        using var deniedUpdate = await manager.PutAsJsonAsync(nodePath, profile);
+        Assert.Equal(HttpStatusCode.Forbidden, deniedUpdate.StatusCode);
+        var deniedBody = await deniedUpdate.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("ROLE_FORBIDDEN", deniedBody.GetProperty("error").GetProperty("code").GetString());
         foreach (var invalid in new[] { "", "bad/server", "iot server" })
         {
             Assert.Equal(HttpStatusCode.BadRequest,
@@ -396,8 +399,8 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         var stored = await fixture.QueryAsync(db => db.Set<IotServerRegistration>()
             .SingleAsync(row => row.ServerId == ignoredId));
         Assert.Equal(origin, stored.BaseUrl);
-        Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync(nodePath, profile)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync(nodePath,
+        Assert.Equal(HttpStatusCode.Forbidden, (await foreign.PutAsJsonAsync(nodePath, profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync(nodePath,
             new { profile.server_id, device_id = "unauthorized", profile.feeder_id,
                 profile.nominal_voltage, profile.nominal_current_ma, profile.nominal_power_mw })).StatusCode);
         var credentialPath = $"{root}/servers/{id}/credential";
@@ -427,8 +430,8 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             profile.server_id, profile.device_id, feeder_id = otherFeeder,
             profile.nominal_voltage, profile.nominal_current_ma, profile.nominal_power_mw,
         };
-        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync(nodePath, wrongFeeder)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync(nodePath, profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync(nodePath, wrongFeeder)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync(nodePath, profile)).StatusCode);
         var auditCount = await fixture.QueryAsync(db => db.Database.SqlQuery<int>(
             $"SELECT count(*)::integer AS \"Value\" FROM iot_registration_audit WHERE server_id = {id}").SingleAsync());
         Assert.Equal(2, auditCount);
@@ -460,16 +463,16 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         var hidden = await foreign.GetFromJsonAsync<JsonElement>($"{root}/servers");
         Assert.DoesNotContain(hidden.EnumerateArray(), item => item.GetProperty("server_id").GetString() == id);
 
-        Assert.Equal(HttpStatusCode.NotFound, (await foreign.PutAsJsonAsync(nodePath, profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await foreign.PutAsJsonAsync(nodePath, profile)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await foreign.DeleteAsync(nodePath)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PutAsJsonAsync(nodePath, wrongFeeder)).StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync(nodePath, profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await admin.PutAsJsonAsync(nodePath, wrongFeeder)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync(nodePath, profile)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync(nodePath)).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await manager.DeleteAsync(nodePath)).StatusCode);
         var detached = await manager.GetFromJsonAsync<JsonElement>($"/api/v1/assets/iot-nodes/{rig.Node}");
         Assert.Equal(JsonValueKind.Null, detached.GetProperty("cabinet_id").ValueKind);
         Assert.Empty(detached.GetProperty("relays").EnumerateArray());
-        Assert.Equal(HttpStatusCode.NoContent, (await manager.PutAsJsonAsync(nodePath, profile)).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PutAsJsonAsync(nodePath, profile)).StatusCode);
         var legacyDeviceId = "legacy-probe";
         var legacyProfile = JsonSerializer.Serialize(new { profile.server_id, device_id = legacyDeviceId, profile.feeder_id, pole_id = "legacy-pole", relay_no = 2, profile.nominal_voltage, profile.nominal_current_ma, profile.nominal_power_mw });
         await fixture.QueryAsync(db => db.Database.ExecuteSqlInterpolatedAsync(
@@ -528,7 +531,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
         var node = created.Headers.Location!.OriginalString.Split('/')[^1];
         var nodePath = $"/api/v1/iot/nodes/{node}";
 
-        using var source = await manager.PutAsJsonAsync(nodePath, new
+        using var source = await admin.PutAsJsonAsync(nodePath, new
         {
             server_id = server, device_id = "probe", feeder_id = feeder,
             nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
@@ -679,10 +682,10 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     public Task Feeder_diagnostics_uses_five_live_samples_for_current_and_voltage_without_lamp_counts()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, services) =>
+        return WithSharedCabinetAsync(async (client, rig, services, sourceAdmin) =>
         {
             var path = $"/api/v1/iot/feeders/{rig.Feeder}/diagnostics";
-            using var configured = await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", new {
+            using var configured = await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", new {
                 server_id = rig.Server, device_id = "probe", feeder_id = rig.Feeder,
                 nominal_voltage = 5, nominal_current_ma = 93.5546875, nominal_power_mw = 467.7734375,
             });
@@ -786,10 +789,10 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     public Task Sensor_health_uses_the_common_anomaly_shape_with_or_without_electrical_data()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             var nodePath = $"/api/v1/iot/nodes/{rig.First}";
-            using var source = await client.PutAsJsonAsync(nodePath, SourceBody(rig));
+            using var source = await sourceAdmin.PutAsJsonAsync(nodePath, SourceBody(rig));
             Assert.Equal(HttpStatusCode.NoContent, source.StatusCode);
             var diagnoses = $"{nodePath}/diagnostics";
             var now = DateTimeOffset.UtcNow;
@@ -877,18 +880,18 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     [InlineData(true)]
     [InlineData(false)]
     public Task A_source_and_a_relay_cannot_assign_different_nodes_to_the_same_feeder(bool relayFirst)
-        => WithSharedCabinetAsync(async (client, rig, _) =>
+        => WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             HttpResponseMessage rejected;
             if (relayFirst)
             {
                 Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
                     $"/api/v1/assets/iot-nodes/{rig.Second}/relays/1", new { feeder_id = rig.Feeder })).StatusCode);
-                rejected = await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig));
+                rejected = await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig));
             }
             else
             {
-                Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+                Assert.Equal(HttpStatusCode.NoContent, (await sourceAdmin.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
                 rejected = await client.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Second}/relays/1", new { feeder_id = rig.Feeder });
             }
@@ -897,11 +900,11 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
     [Fact]
     public Task Matching_sources_and_relays_keep_two_nodes_in_one_cabinet_independent()
-        => WithSharedCabinetAsync(async (client, rig, services) =>
+        => WithSharedCabinetAsync(async (client, rig, services, sourceAdmin) =>
         {
-            Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            Assert.Equal(HttpStatusCode.NoContent, (await sourceAdmin.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
-            Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            Assert.Equal(HttpStatusCode.NoContent, (await sourceAdmin.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, rig.OtherFeeder, "probe-2"))).StatusCode);
             foreach (var (node, feeder) in new[] { (rig.First, rig.Feeder), (rig.Second, rig.OtherFeeder) })
             {
@@ -925,7 +928,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             using var freedFeeder = await client.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Second}/relays/2",
                 new { feeder_id = rig.Feeder });
             Assert.Equal(HttpStatusCode.NoContent, freedFeeder.StatusCode);
-            using var claimed = await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, device: "probe-2"));
+            using var claimed = await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, device: "probe-2"));
             Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
             Assert.Equal(LuxMap.Modules.IOT.Lighting.LightingCommandStatus.Superseded,
                 await fixture.QueryAsync(db => db.Set<LuxMap.Modules.IOT.Lighting.LightingCommand>()
@@ -935,9 +938,9 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
     [Fact]
     public Task Configured_and_database_sources_for_one_feeder_return_a_clear_conflict_instead_of_500()
-        => WithSharedCabinetAsync(async (client, rig, services) =>
+        => WithSharedCabinetAsync(async (client, rig, services, sourceAdmin) =>
         {
-            Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            Assert.Equal(HttpStatusCode.NoContent, (await sourceAdmin.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             var feederPage = await FindFeederPageAsync(client, rig.Feeder);
             services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IotOptions>>().Value.Nodes[rig.Second] = new NodeProfile
@@ -964,9 +967,9 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
     [Fact]
     public Task An_existing_cross_channel_conflict_blocks_reads_commands_and_MQTT_delivery()
-        => WithSharedCabinetAsync(async (client, rig, services) =>
+        => WithSharedCabinetAsync(async (client, rig, services, sourceAdmin) =>
         {
-            Assert.Equal(HttpStatusCode.NoContent, (await client.PutAsJsonAsync(
+            Assert.Equal(HttpStatusCode.NoContent, (await sourceAdmin.PutAsJsonAsync(
                 $"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             var feederPage = await FindFeederPageAsync(client, rig.Feeder);
             // Simulate a conflicting mapping imported before the guard existed.
@@ -993,11 +996,11 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
     [Fact]
     public Task Concurrent_bridge_sources_cannot_take_the_same_feeder()
-        => WithSharedCabinetAsync(async (client, rig, _) =>
+        => WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             var responses = await Task.WhenAll(
-                client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig)),
-                client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, device: "probe-2")));
+                sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig)),
+                sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, device: "probe-2")));
             Assert.Single(responses, response => response.StatusCode == HttpStatusCode.NoContent);
             var rejected = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
             Assert.Equal("IOT_REGISTRATION_CONFLICT", (await rejected.Content.ReadFromJsonAsync<JsonElement>())
@@ -1006,13 +1009,13 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
 
     [Fact]
     public Task Concurrent_source_and_relay_writes_wait_for_the_feeder_and_leave_one_controller()
-        => WithSharedCabinetAsync(async (client, rig, services) =>
+        => WithSharedCabinetAsync(async (client, rig, services, sourceAdmin) =>
         {
             await using var scope = services.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<LuxMap.Persistence.LuxMapDbContext>();
             await using var transaction = await db.Database.BeginTransactionAsync();
             await db.Database.ExecuteSqlAsync($"SELECT 1 FROM feeder WHERE feeder_id = {rig.Feeder} FOR NO KEY UPDATE");
-            var source = client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig));
+            var source = sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig));
             var relay = client.PutAsJsonAsync($"/api/v1/assets/iot-nodes/{rig.Second}/relays/1", new { feeder_id = rig.Feeder });
             try
             {
@@ -1033,7 +1036,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     public Task Feeder_electrical_history_survives_detach_and_combines_replacement_nodes()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             var now = DateTimeOffset.UtcNow;
             var assigned = now.AddMinutes(-3);
@@ -1096,7 +1099,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
                 };
             };
 
-            using var attach = await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig));
+            using var attach = await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig));
             Assert.Equal(HttpStatusCode.NoContent, attach.StatusCode);
             using var detach = await client.DeleteAsync($"/api/v1/iot/nodes/{rig.First}");
             Assert.Equal(HttpStatusCode.NoContent, detach.StatusCode);
@@ -1113,7 +1116,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             Assert.Equal("offline", latest.GetProperty("status").GetString());
             Assert.Equal(4.07, latest.GetProperty("measurement").GetProperty("voltage").GetDouble());
 
-            using var replacement = await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, device: "probe-2"));
+            using var replacement = await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", SourceBody(rig, device: "probe-2"));
             Assert.Equal(HttpStatusCode.NoContent, replacement.StatusCode);
             await fixture.QueryAsync(db => db.Database.ExecuteSqlAsync($"""
                 UPDATE iot_registration_audit SET created_at = {replacementAt} WHERE node_id = {rig.Second}
@@ -1166,7 +1169,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     public Task Feeder_raw_history_merges_pages_from_multiple_bridges_without_averaging()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, services) =>
+        return WithSharedCabinetAsync(async (client, rig, services, sourceAdmin) =>
         {
             using var admin = await fixture.SeededClientAsync("admin", "SEED_ADMIN_PASSWORD");
             var alternate = "iot-" + Guid.NewGuid().ToString("N");
@@ -1185,11 +1188,11 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             try { Assert.Equal(HttpStatusCode.Created, (await client.SendAsync(register)).StatusCode); }
             finally { bridgeDefaults.BaseUrl = originalOrigin; }
             Assert.Equal(HttpStatusCode.NoContent,
-                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+                (await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             Assert.Equal(HttpStatusCode.NoContent,
                 (await client.DeleteAsync($"/api/v1/iot/nodes/{rig.First}")).StatusCode);
             Assert.Equal(HttpStatusCode.NoContent,
-                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", new
+                (await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.Second}", new
                 {
                     server_id = alternate, device_id = "probe", feeder_id = rig.Feeder,
                     nominal_voltage = 5, nominal_current_ma = 100, nominal_power_mw = 500,
@@ -1249,10 +1252,10 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     {
         var bridge = new ReportedPowerBridge();
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             Assert.Equal(HttpStatusCode.NoContent,
-                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+                (await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             var path = $"/api/v1/iot/nodes/{rig.First}/command";
             using var sent = await client.PostAsJsonAsync(path, new { mode = "MANUAL", command = "ON" });
             Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
@@ -1287,10 +1290,10 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     {
         var bridge = new ReportedPowerBridge();
         var time = new FakeTimeProvider(DateTimeOffset.UtcNow);
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             Assert.Equal(HttpStatusCode.NoContent,
-                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+                (await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             var now = time.GetUtcNow();
             var old = now.AddMinutes(-5);
             object Reading(DateTimeOffset received, DateTimeOffset measured) => new
@@ -1382,10 +1385,10 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     public Task Auto_types_round_trip_through_commands_and_history_and_reject_conflicting_inputs()
     {
         var bridge = new ReportedPowerBridge();
-        return WithSharedCabinetAsync(async (client, rig, _) =>
+        return WithSharedCabinetAsync(async (client, rig, _, sourceAdmin) =>
         {
             Assert.Equal(HttpStatusCode.NoContent,
-                (await client.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
+                (await sourceAdmin.PutAsJsonAsync($"/api/v1/iot/nodes/{rig.First}", SourceBody(rig))).StatusCode);
             var path = $"/api/v1/iot/nodes/{rig.First}/command";
             foreach (var type in new string?[] { "full_time", "scheduled", null })
             {
@@ -1477,7 +1480,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
     }
 
     private async Task WithSharedCabinetAsync(
-        Func<HttpClient, SharedCabinet, IServiceProvider, Task> check, ReportedPowerBridge? bridge = null, TimeProvider? clock = null)
+        Func<HttpClient, SharedCabinet, IServiceProvider, HttpClient, Task> check, ReportedPowerBridge? bridge = null, TimeProvider? clock = null)
     {
         var origin = "https://isolated-" + Guid.NewGuid().ToString("N") + ".example.test";
         using var factory = new LuxMapApiFactory();
@@ -1519,7 +1522,7 @@ public sealed partial class IotDiagnosticsTests(AssetImportFixture fixture)
             server_id = server, commune_id = fixture.CommuneId,
             location = new { lat = 13.5, lng = 109.5 },
         })).StatusCode);
-        await check(client, new(cabinet, feeder, other, pole, nodes[0], nodes[1], server), host.Services);
+        await check(client, new(cabinet, feeder, other, pole, nodes[0], nodes[1], server), host.Services, admin);
     }
 
     private sealed class ReportedPowerBridge : HttpMessageHandler
