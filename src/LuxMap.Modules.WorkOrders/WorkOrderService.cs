@@ -51,7 +51,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
 
     public async Task<PagedResult<WorkOrderItem>> List(WorkOrderStatus[]? statuses, TaskKind? kind,
         string? assigned, string? segment, string[]? communes, DateOnly? from, DateOnly? to,
-        PageRequest page, CancellationToken ct, string? caseId = null, CancellationRequestStatus? cancellation = null)
+        PageRequest page, CancellationToken ct, string? caseId = null, CancellationRequestStatus? cancellation = null,
+        WorkOrderSort? sort = null)
     {
         if (from > to) throw OptionalJson.Invalid("scheduled_from");
         var scope = CommuneFilter.Narrow(db.CurrentCommuneScope, communes);
@@ -70,8 +71,8 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
         if (from is not null) query = query.Where(x => x.ScheduledDate >= from);
         if (to is not null) query = query.Where(x => x.ScheduledDate <= to);
         var total = await query.CountAsync(ct);
-        var orders = await query.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.WorkOrderId.Length)
-            .ThenByDescending(x => x.WorkOrderId).Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
+        var orders = await WorkOrderSort.Apply(query, sort ?? WorkOrderSort.Default)
+            .Skip(page.Skip).Take(page.PageSize).ToListAsync(ct);
         return PagedResult<WorkOrderItem>.From(page, total, await ItemsAsync(db, orders, ct));
     }
 
@@ -91,6 +92,7 @@ public sealed class WorkOrderService(LuxMapDbContext db, ICurrentActorAccessor a
             WorkOrderId = wo.WorkOrderId, Title = wo.Title, CommuneId = wo.CommuneId, TaskKind = wo.TaskKind,
             SegmentId = wo.SegmentId, ClusterId = wo.ClusterId, WoStatus = wo.WoStatus, AssignedTo = wo.AssignedTo,
             CreatedAt = wo.CreatedAt, UpdatedAt = wo.UpdatedAt, DueDate = wo.DueDate, ScheduledDate = wo.ScheduledDate,
+            CompletedAt = wo.CompletedAt, ClosedAt = wo.ClosedAt,
             CancellationRequestStatus = wo.CancellationRequestStatus, CancellationRequestNote = wo.CancellationRequestNote,
             CancellationRequestedAt = wo.CancellationRequestedAt, CancellationRejectNote = wo.CancellationRejectNote,
             CancellationRejectedAt = wo.CancellationRejectedAt,

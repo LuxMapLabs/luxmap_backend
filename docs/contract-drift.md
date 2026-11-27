@@ -3216,3 +3216,20 @@ Dữ liệu rejected cũ không tự mở hàng loạt; script riêng chỉ xử
 cách xử lý trước khi quay lại.
 
 **Phải báo:** WP6 (PG-15, trường `accuracy_m` có thể bỏ trống), WP5 (PG-16, `accuracy_m` có thể `null`). Chưa báo.
+
+## WO-SORT — `completed_at` / `closed_at` trên danh sách phiếu + tham số `sort` (27/11/2026)
+
+| | |
+|---|---|
+| **Decision maker** | **Mỹ (Dylan), 27/11/2026** trong chat. Bối cảnh: màn "phiếu đã đóng" cần hiện và sắp theo lúc hoàn thành / đóng mà không gọi detail từng phiếu |
+| **Chạm API** | **Có**, dạng **thêm**: hai khoá mới trên item, một query tuỳ chọn. Vắng `sort` = thứ tự cũ; client cũ không đổi gì |
+| **Nền** | **SELF-SIGNED**, nền tạm tới FW kế tiếp. Im lặng 3 ngày làm việc = **ESCALATE**. Không migration |
+
+| Mã | Quyết định |
+|---|---|
+| WOS-1 | **`completed_at`, `closed_at`** (ISO UTC `Z`, nullable) thêm vào item của `GET /work-orders` — kéo theo phiếu trong `GET /work-orders/agenda` (cùng kiểu item). Detail đã có hai khoá này, giá trị không đổi. `completed_at` = lần `complete` gần nhất, `return` xoá lại `null`; `closed_at` = lúc `verify` / `cancel`. Phiếu huỷ trước khi làm có `closed_at` mà `completed_at = null` |
+| WOS-2 | **`GET /work-orders?sort=`** một khoá, tiền tố `-` = giảm dần: `created_at`, `updated_at`, `completed_at`, `closed_at`. Mặc định **`-created_at`** (đúng thứ tự trước đây). `completed_at` / `closed_at` `null` xếp **cuối** ở cả hai chiều. Hoà thì theo `created_at, length(work_order_id), work_order_id` **cùng chiều với khoá**. Khoá lạ, rỗng sau `-`, hay nhiều khoá → `400 VALIDATION_FAILED`. AND với mọi filter, giữ phân trang — ví dụ `?wo_status=verified,cancelled&sort=-closed_at` |
+
+**Rollback:** gỡ tham số và hai khoá — không dữ liệu nào phụ thuộc.
+
+**Phải báo:** WP5 / WP6 (hai khoá mới trên item, `sort`). Chưa báo.

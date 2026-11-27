@@ -1453,6 +1453,14 @@
     <table>
       <tr><th>Ngày</th><th>Task</th><th>File chính</th><th>Commit</th></tr>
       <tr>
+        <td>27/11/2026</td>
+        <td><code>WO-SORT</code> (drift WOS-1, WOS-2, SELF-SIGNED): item của <code>GET /work-orders</code> (và agenda) thêm <code>completed_at</code>,
+        <code>closed_at</code>; thêm <code>?sort=</code> (<code>created_at</code> / <code>updated_at</code> / <code>completed_at</code> / <code>closed_at</code>, <code>-</code> = giảm dần,
+        mặc định <code>-created_at</code> như cũ, <code>null</code> xếp cuối). Không migration. 1 test mới, phá thử null-cuối đỏ, spec v1.5 sinh lại. Chưa báo WP5 / WP6.</td>
+        <td><code>WorkOrderSort.cs</code>, <code>WorkOrderResponses.cs</code>, <code>WorkOrderService.cs</code>, <code>WorkOrdersController.cs</code>, <code>WorkOrderTests.cs</code>, drift, hai OpenAPI</td>
+        <td><code>feat(work-orders): list completed/closed times and sort by them</code></td>
+      </tr>
+      <tr>
         <td>26/11/2026</td>
         <td><code>COMMUNE-BOUNDARY-GUARD</code> Cột / tủ điện ngoài ranh giới xã (hoặc xã chưa có ranh giới) bị từ chối ở CRUD, import, dời cột, GPS verify, sync push.
         10 test mới, toàn bộ suite xanh, 2 phá thử đỏ đúng test, spec v1.5 sinh lại.</td>

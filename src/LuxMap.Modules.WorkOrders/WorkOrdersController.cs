@@ -43,12 +43,14 @@ public sealed class WorkOrdersController(WorkOrderService service, WorkOrderPole
         [FromQuery(Name = "scheduled_to")] DateOnly? to,
         [FromQuery(Name = "case_id")] string? caseId,
         [FromQuery(Name = "cancellation_request_status")] string? cancellation,
+        [FromQuery(Name = "sort")] string? sort,
         PageQuery page, CancellationToken ct)
         => service.List(statuses?.Split(',').Select(x => Wire<WorkOrderStatus>(x, "wo_status")).ToArray(),
             kind is null ? null : Wire<TaskKind>(kind, "task_kind"), assigned, segment, communes, from, to, page.ToPageRequest(), ct,
             string.IsNullOrWhiteSpace(caseId) ? null : caseId.Trim(),
             cancellation is null && !Request.Query.ContainsKey("cancellation_request_status") ? null : WireEnum.ParseCsv<CancellationRequestStatus>(cancellation, "cancellation_request_status") is [var value]
-                ? value : throw OptionalJson.Invalid("cancellation_request_status"));
+                ? value : throw OptionalJson.Invalid("cancellation_request_status"),
+            WorkOrderSort.Parse(sort));
 
     /// <summary>
     /// What one field engineer can work on tonight, grouped by road — nearest road first when <c>near=lat,lng</c> is

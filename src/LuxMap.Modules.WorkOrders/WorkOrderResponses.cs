@@ -33,6 +33,10 @@ public record WorkOrderItem
     public DateTime UpdatedAt { get; init; }
     public DateOnly? DueDate { get; init; }
     public DateOnly? ScheduledDate { get; init; }
+    /// <summary>The last <c>complete</c>; cleared again by <c>return</c>. NULL on an order that was never completed (drift WOS-1).</summary>
+    public DateTime? CompletedAt { get; init; }
+    /// <summary>When the order reached <c>verified</c> or <c>cancelled</c>.</summary>
+    public DateTime? ClosedAt { get; init; }
 }
 
 public sealed record WorkOrderDetail : WorkOrderItem
@@ -47,8 +51,6 @@ public sealed record WorkOrderDetail : WorkOrderItem
     public required string CreatedBy { get; init; }
     public DateTime? AssignedAt { get; init; }
     public DateTime? StartedAt { get; init; }
-    public DateTime? CompletedAt { get; init; }
-    public DateTime? ClosedAt { get; init; }
     public bool? AssigneeEligible { get; init; }
     public required string[] AllowedActions { get; init; }
     public required WorkOrderFaultDetail[] Faults { get; init; }
